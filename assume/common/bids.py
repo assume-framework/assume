@@ -1,7 +1,5 @@
 import logging
 from datetime import datetime, timedelta
-from itertools import groupby
-from operator import itemgetter
 from math import isclose, log10
 from typing import TypedDict
 

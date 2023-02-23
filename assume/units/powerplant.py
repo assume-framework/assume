@@ -1,8 +1,68 @@
 from common.utils import initializer
-from base_unit import BaseUnit, OperationalWindow
+from base_unit import BaseUnit
+from common.strategies import BaseStrategy
 
 
 class PowerPlant(BaseUnit):
+    """A class for a power plants.
+    
+    Attributes
+    ----------
+    id : str
+        The ID of the power plant.
+    technology : str
+        The technology of the power plant.
+    node : str
+        The node of the power plant.
+    max_power : float
+        The maximum power output of the power plant in MW.
+    min_power : float
+        The minimum power output of the power plant in MW.
+    efficiency : float
+        The efficiency of the power plant.
+    fuel_type : str
+        The fuel type of the power plant.
+    fuel_price : list
+        The fuel type specific fuel price in €/MWh.
+    co2_price : list
+        The co2 price in €/t.
+    emission_factor : float
+        The emission factor of the power plant.
+    ramp_up : float, optional
+        The ramp up rate of the power plant in MW/15 minutes.
+    ramp_down : float, optional
+        The ramp down rate of the power plant in MW/15 minutes.
+    fixed_cost : float, optional
+        The fixed cost of the power plant in €/MW.
+    hot_start_cost : float, optional
+        The hot start cost of the power plant in €/MW.
+    warm_start_cost : float, optional
+        The warm start cost of the power plant in €/MW.
+    cold_start_cost : float, optional
+        The cold start cost of the power plant in €/MW.
+    min_operating_time : float, optional
+        The minimum operating time of the power plant in hours.
+    min_down_time : float, optional
+        The minimum down time of the power plant in hours.
+    heat_extraction : bool, optional
+        If the power plant can extract heat.
+    max_heat_extraction : float, optional
+        The maximum heat extraction of the power plant in MW.
+    availability : dict, optional
+        The availability of the power plant in MW for each time step.
+    **kwargs
+        Additional keyword arguments.
+        
+    Methods
+    -------
+    reset()
+        Reset the power plant.
+    calculate_operational_window()
+        Calculate the operation window for the next time step.
+    calc_marginal_cost(power_output, partial_load_eff)
+        Calculate the marginal cost of the power plant.
+    """
+    
     @initializer
     def __init__(self,
                  id: str,
@@ -26,6 +86,8 @@ class PowerPlant(BaseUnit):
                  heat_extraction: bool = False,
                  max_heat_extraction: float = 0,
                  availability: dict = None,
+                 bidding_strategy: dict[str, BaseStrategy]= {},
+                 location: tuple(float, float)=None,
                  **kwargs):
                  
         super().__init__()
@@ -35,12 +97,17 @@ class PowerPlant(BaseUnit):
         self.min_operating_time = max(min_operating_time, 0)
         self.min_down_time = max(min_down_time, 0)
 
+        self.bidding_strategy = bidding_strategy
+        self.location = location
+
         self.hot_start_cost *= self.max_power
         self.warm_start_cost *= self.max_power
         self.cold_start_cost *= self.max_power
 
 
     def reset(self):
+        """Reset the unit to its initial state."""
+
         self.current_time_step = 0
         self.current_status = 1
         self.current_down_time = self.min_down_time
@@ -50,11 +117,16 @@ class PowerPlant(BaseUnit):
         self.pos_capacity_reserve = [0.]
         self.neg_capacity_reserve = [0.]
 
-        self.partial_load_eff = []
 
-
-    def calculate_operational_window(self) -> OperationalWindow:
-        """Calculate the operation window for the next time step."""
+    def calculate_operational_window(self) -> dict:
+        
+        """Calculate the operation window for the next time step.
+        
+        Returns
+        -------
+        operational_window : dict
+            Dictionary containing the operational window for the next time step.
+        """
         
         t = self.current_time_step
 
@@ -92,7 +164,22 @@ class PowerPlant(BaseUnit):
     
     def calc_marginal_cost(self,
                            power_output: float,
-                           partial_load_eff: bool = False):
+                           partial_load_eff: bool = False) -> float:
+        
+        """Calculate the marginal cost of the unit.
+
+        Parameters
+        ----------
+        power_output : float
+            Power output of the unit in MW.
+        partial_load_eff : bool, optional
+            If True, the partial load efficiency is considered. The default is False.
+
+        Returns
+        -------
+        marginal_cost : float
+            Marginal cost of the unit in €/MWh.
+        """
 
         t = self.current_time_step
 
@@ -138,6 +225,6 @@ class PowerPlant(BaseUnit):
 
         marginal_cost = fuel_price/efficiency \
             + co2_price * self.emission_factor/efficiency \
-                + self.variableCosts
+                + self.fixed_cost
 
         return marginal_cost 

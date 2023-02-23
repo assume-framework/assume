@@ -12,20 +12,28 @@ from common.bids import (
     OpeningMessage,
     ClearingMessage,
 )
+from units.base_unit import BaseUnit
+from units.powerplant import PowerPlant
 import logging
+
 
 logger = logging.getLogger(__name__)
 
 
 class UnitsOperatorRole(Role):
-    def __init__(self, available_markets: list[MarketConfig], bidding_strategies: dict[str, BaseStrategy]):
+    def __init__(self, id:int= None, name:str=None,  units: dict={} ):
         super().__init__()
-        self.available_markets = available_markets
+        self.id = id
+        self.name = name
+        self.available_markets: list[MarketConfig] = []
         self.registered_markets: dict[str, MarketConfig] = {}
         self.valid_orders = []
-        self.bidding_strategies = bidding_strategies
+        
+        self.build_units(units)
 
-
+    def set_markets(self, available_markets: list[MarketConfig]):
+        self.available_markets.extend(available_markets)
+        
     def setup(self):
         self.context.volume = self.volume
         self.context.price = self.price
@@ -36,7 +44,7 @@ class UnitsOperatorRole(Role):
         )
         self.context.subscribe_message(
             self,
-            self.handle_market_result,
+            self.handle_market_feedback,
             lambda content, meta: content.get("context") == "clearing",
         )
 
@@ -44,6 +52,9 @@ class UnitsOperatorRole(Role):
             if self.participate(market):
                 self.register_market(market)
                 self.registered_markets[market.name] = market
+
+    def add_unit():
+        pass
 
     def participate(self, market):
         # always participate at all markets
@@ -69,26 +80,32 @@ class UnitsOperatorRole(Role):
 
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
 
-    def handle_market_result(self, content: ClearingMessage, meta: dict[str, str]):
+    def send_dispatch_plan(self):
+        valid_orders = self.valid_orders
+        # todo group by unit_id
+        for unit in self.units:
+            unit.dispatch(valid_orders)
+    
+    def handle_market_feedback(self, content: ClearingMessage, meta: dict[str, str]):
         logger.debug(f"got market result: {content}")
         orderbook: Orderbook = content["orderbook"]
         for bid in orderbook:
             self.valid_orders.append(bid)
+        
+        self.send_dispatch_plan(sel)
 
     async def submit_bids(self, opening):
-
-        """"
+        """
             send the formulated order book to the market. OPtion for further
             portfolio processing
 
             Return:
-        """"
+        """
 
         products = opening["products"]
-        market = self.registered_markets[]
+        market = self.registered_markets[opening["market"]]
         logger.debug(f"setting bids for {market.name}")
-        used_strategy=self.bidding_strategies[opening["market"]
-        self.formulate_bid(market, products, strategy_to_use)
+        orderbook = self.formulate_bid(market, products)
         acl_metadata = {
             "performative": Performatives.inform,
             "sender_id": self.context.aid,
@@ -105,94 +122,75 @@ class UnitsOperatorRole(Role):
             acl_metadata=acl_metadata,
         )
 
-    async def formulate_bids(self, market: MarketConfig, products, bidding_strategy: BaseStrategy):
+    async def formulate_bids(self, market: MarketConfig, products):
 
-        """"
+        """
             Takes information from all units that the unit operator manages and
             formulates the bid to the market from that according to the bidding strategy.
 
             Return: OrderBook that is submitted as a bid to the market
-        """"
+        """
 
         orderbook: Orderbook = []
         for product in products:
-            for unit in units:
+            for unit in self.units:
                 order: Order = {}
                 order["start_time"] = product[0]
                 order["end_time"] = product[1]
                 order["agent_id"] = (self.context.addr, self.context.aid)
                 #get operational window for each unit
-                operational_window= PowerPlant.calculate_operational_window()
+                operational_window= unit.calculate_operational_window()
+                #get used bidding strategy for the unit
+                used_strategy = unit['bidding_strategy'] 
                 #take price from bidding strategy
-                order["volume"], order["price"] = bidding_strategy.calculate_bids(market, operational_window)
+                order["volume"], order["price"] = used_strategy.calculate_bids(market,  operational_window)
 
             orderbook.append(order)
 
 
         return orderbook
 
+    def build_units(self, unit_dict: dict):
+        """
+        Instantiates all units assigned to the units operator.
+        """
+        self.units = []
+        for id, unit_conf in unit_dict.items():
 
-
-
-
-class UnitsOperator():
-    def __init__(self, id:int= None, name:str=None,location:tuple(float, float)=None,  units:dict={} ):
-        self.id = id
-        self.name = name
-        self.location = location
-
-    def create_units():
-        pass
-
-
+            # unit_creater_dict={"solar": SolarPlant()}
+            
+            if unit_conf["type"] == "solar":
+                unit = SolarPlant()
+            elif unit_conf["type"] == "powerplant":
+                unit = PowerPlant(**unit_conf)
+            elif unit_conf["type"] == "storage":
+                unit = Storage(**unit_conf)
+            elif unit_conf["type"] == "wind":
+                unit = WindPowerPlant(**unit_conf)
+            else:
+                raise Exception("unknown unit type")
+            self.units[id] = unit
+        
     def get_world_data(self, input_data):
         self.temperature = input_data.temperature
         self.wind_speed = input_data.wind_speed
 
-    def location(self, coordinates = {x, y}, NUTS_0: str = None )
+    def location(self, coordinates: tuple(float, float)= (0,0), NUTS_0: str = None):
         self.x: int = 0
         self.y: int = 0
         NUTS_0: str = 0
 
     def get_temperature(self, location):
-        if type(location) == tuple():
+        if isinstance(location, tuple):
             # get lat lon table
             pass
         elif "NUTS" in location:
             # get nuts table
             pass
-    def get_market_feedback():
-        pass
-
-    def send_dispatch_plan():
-        pass
-
-    def __init__(self, unit: str = None, input_data = None):
-        super(x, self).__init__()
-        self.unit = unit
-        self.temperature = input_data.temperature
-        self.wind_speed = input_data.wind_speed
-
-    def location(self, coordinates = {x, y}, NUTS_0: str = None )
-        self.coordinates = (x=) : int = 0
-        self.y: int = 0
-        NUTS_0: str = 0
-
-    def get_temperature(self, cordinates):
-        if type(location) == tuple():
-            # get lat lon table
-            pass
-        elif "NUTS" in location:
-            # get nuts table
-            pass
-        self.x = (unit="")
-    def coordinates(self, x: int = None, y:int = None):
-        self.x = x
-        self.y = y
-
-    def nuts(self, NUTS: str = None):
-        self.NUTS = "DE"
+            
+    def reset(self):
     
-        elif "NUTS" in location:
-            # get nuts table
-            pass
+        """Reset the unit to its initial state."""
+
+
+        

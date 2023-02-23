@@ -2,20 +2,20 @@ import asyncio
 from datetime import datetime, timedelta
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
-from marketconfig import MarketConfig, MarketProduct
+from assume.common.marketconfig import MarketConfig, MarketProduct
 
-import numpy as np
 from tqdm import tqdm
 
 from mango import Role, RoleAgent, create_container
 from mango.messages.message import Performatives
 from mango.container.core import Container
 from mango.util.clock import ExternalClock
-from common.bids import (
+from assume.common.bids import (
     MarketRole,
     Orderbook
 )
-from markets.
+from assume.markets.base_market import MarketRole
+from assume.units.unitsoperator import UnitsOperatorRole
 
 import logging
 
@@ -124,18 +124,34 @@ async def main(start):
     
     weatherforecast = weatherforecast()
 
+
+ 
+    unit_dict= {
+            '1': {
+                'type': 'solar',
+                'location': (50,10),
+                'generation_power_mw': 40,
+            },
+            '2': {
+                'type': 'coal',
+                'location': (51,11),
+                'generation_power_mw': 1000,
+            },
+            '3': {
+                'type': 'wind',
+                'location': (52,12),
+                'generation_power_mw': 1200,
+            }
+        }
+
     for i in range(4):
         agent = RoleAgent(c)
-        agent.add_role(UnitsOperatorRole(marketdesign, price=0.05 * (i % 9), units = [Powerplant(1GW, location=(lat, lon)), Windturbine(100 MW, location=(lat, lon)), Solar(100MW)], 
-                                         forecast = weatherforecast]))
-
-
-
-        forecast.forecast(timedelta(days=1), self.location)
+        agent.add_role(UnitsOperatorRole(marketdesign, price=0.05 * (i % 9), units = unit_dict, forecast = weatherforecast))
+        #forecast.forecast(timedelta(days=1), self.location)
         
-    for i in range(4):
-        agent = RoleAgent(c)
-        agent.add_role(UnitsOperatorRole(marketdesign, price=5 * (i % 9), volume=-80))
+    #for i in range(4):
+    #    agent = RoleAgent(c)
+    #    agent.add_role(UnitsOperatorRole(marketdesign, price=5 * (i % 9), volume=-80))
 
     if isinstance(clock, ExternalClock):
         next_activity = clock.get_next_activity()
@@ -156,3 +172,21 @@ async def main(start):
 if __name__ == "__main__":
     logging.basicConfig(level="WARN")
     asyncio.run(main(datetime.now()))
+
+
+
+for time in steps():
+
+    for agent in agents:
+        agent.step()
+
+import SomeNewUnit
+from assume.units import powerplant
+
+operator=Operator()
+operator.add_unit(SomeNewUnit)
+operator.add_unit(SomeNewUnit)
+operator.add_unit(SomeNewUnit)
+operator.add_unit(SomeNewUnit)
+
+world.add_operator(operator)

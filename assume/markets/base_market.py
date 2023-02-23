@@ -1,4 +1,13 @@
+from mango import Role
 
+from common.marketconfig import MarketConfig, MarketOrderbook, Order, Orderbook, MarketProduct
+from common.bids import get_available_products, is_mod_close, round_digits
+from datetime import datetime
+from itertools import groupby
+from operator import itemgetter
+import logging
+
+logger = logging.getLogger(__name__)
 
 # add role per Market
 class MarketRole(Role):
@@ -99,7 +108,7 @@ class MarketRole(Role):
         agent = meta["sender_id"]
         agent_addr = meta["sender_addr"]
         # TODO allow accessing agents properties?
-        if self.marketconfig.eligable_obligations_lambda(agent):
+        if self.marketconfig.eligible_obligations_lambda(agent):
             self.registered_agents.append((agent_addr, agent))
 
     def handle_orderbook(self, content, meta):

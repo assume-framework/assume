@@ -22,9 +22,9 @@ class Order(TypedDict):
 Orderbook = list[Order]
 MarketOrderbook = dict[str, Orderbook]
 
-contracttype = Callable[[Agent, Agent], None]
-marketcontracttype = Callable[[Agent, Agent, ArrayLike], None]
-eligable_lambda = Callable[[Agent], bool]
+contract_type = Callable[[Agent, Agent], None]
+market_contract_type = Callable[[Agent, Agent, ArrayLike], None]
+eligible_lambda = Callable[[Agent], bool]
 
 # describes the configuration of an actual product traded at the market
 @dataclass
@@ -49,7 +49,7 @@ class MarketProduct:
     only_hours: tuple[
         int, int
     ] | None = None  # e.g. (8,20) - for peak trade, (20, 8) for off-peak, none for base
-    eligable_lambda_function: eligable_lambda | None = None
+    eligible_lambda_function: eligible_lambda | None = None
 
 
 market_mechanism = Callable[[Role, list[MarketProduct]], tuple[Orderbook, dict]]
@@ -78,7 +78,7 @@ class MarketConfig:
     amount_tick: float = 0.1  # steps in which the amount can be increased
     price_unit: str = "€"
     price_tick: float = 0.1  # steps in which the price can be increased
-    eligable_obligations_lambda: eligable_lambda = lambda x: True
+    eligible_obligations_lambda: eligible_lambda = lambda x: True
     # lambda: agent.payed_fee
     # obligation should be time-based
     # only allowed to bid regelenergie if regelleistung was accepted in the same hour for this agent by the market
@@ -204,7 +204,7 @@ def dynamic_end(current_time: datetime):
 
 
 # TODO: area specific dependencies
-# eligable_lambda for marketproducts (also see RAM)
+# eligible_lambda for marketproducts (also see RAM)
 # 60 minutes before for xbid
 # 30 minutes before in DE
 # 5 minutes before in same TSO area
@@ -223,7 +223,7 @@ epex_intraday_trading_config = MarketConfig(
         MarketProduct(rd(minutes=+30), dynamic_end, rd(minutes=30)),
         MarketProduct(rd(hours=+1), dynamic_end, rd(minutes=30)),
     ],
-    eligable_obligations_lambda=lambda agent, market: agent.aid in market.participants
+    eligible_obligations_lambda=lambda agent, market: agent.aid in market.participants
     and agent.payed > 10000,  # per year + 25k once
     market_mechanism="continuous_clearing",  # only one orderbook is retained per agent
     amount_unit="MWh",
@@ -280,7 +280,7 @@ eex_future_trading_config = MarketConfig(
     amount_tick=0.1,
     price_unit="€/MWh",  # cost is given in €/MWh - total product cost results in price*amount/(duration in hours)
     price_tick=0.01,
-    eligable_obligations_lambda=lambda agent, market: agent.aid in market.participants
+    eligible_obligations_lambda=lambda agent, market: agent.aid in market.participants
     and agent.payed > 22000,  # per year
     market_mechanism="pay_as_bid",
 )
@@ -358,11 +358,11 @@ p2p_trading_config = MarketConfig(
     minimum_bid=-9999,
 )
 
-# eligable_lambda is a lambda to check if an agent is eligable to receive a policy (must have solar...)
+# eligible_lambda is a lambda to check if an agent is eligible to receive a policy (must have solar...)
 # TODO define how contracts look like - maybe just a string?
 policy_trading_config = MarketConfig(
     today,
-    additional_fields=['sender_id', 'eligable_lambda', 'contract'], # agent_id, eligable_lambda, MarketContract/Contracttype
+    additional_fields=['sender_id', 'eligible_lambda', 'contract'], # agent_id, eligible_lambda, MarketContract/Contracttype
     market_products=[
         MarketProduct('monthly', 12),
         MarketProduct('quarter-yearly', 1),
@@ -383,7 +383,7 @@ policy_trading_config = MarketConfig(
 market_start = today - timedelta(days=7) + timedelta(hours=10)
 control_reserve_trading_config = MarketConfig(
     today,
-    additional_fields=['eligable_lambda'], # eligable_lambda
+    additional_fields=['eligible_lambda'], # eligible_lambda
     market_products=[
         MarketProduct(rd(hours=+4), 6*7, rd(days=+1)),
     ],
@@ -401,7 +401,7 @@ control_reserve_trading_config = MarketConfig(
 market_start = today - timedelta(days=2) + timedelta(hours=12)
 control_work_trading_config = MarketConfig(
     today,
-    additional_fields=['eligable_lambda'],
+    additional_fields=['eligible_lambda'],
     market_products=[
         MarketProduct('quarter-hourly', 96),
     ],
@@ -435,7 +435,7 @@ miso_day_ahead_config = MarketConfig(
     price_tick=0.01,
     maximum_bid=9999,
     minimum_bid=-9999,
-    eligable_lambda=lambda agent: agent.location
+    eligible_lambda=lambda agent: agent.location
 ) # pay-as-bid/merit-order
 
 # ISO gibt spezifisches Marktergebnis welches nicht teil des Angebots war
@@ -467,7 +467,7 @@ miso_real_time_config = MarketConfig(
     price_tick=0.01,
     maximum_bid=9999,
     minimum_bid=-9999,
-    eligable_lambda=lambda agent: agent.location in BW,
+    eligible_lambda=lambda agent: agent.location in BW,
     clearing = "twoside_clearing"
 ) # pay-as-bid/merit-order
 
