@@ -127,6 +127,8 @@ class MarketRole(Role):
                     order["price"], self.marketconfig.price_tick
                 ), "price_tick"
                 order["price"] = round_digits(order["price"], self.marketconfig.price_tick)
+                if not order.get("only_hours"):
+                    order["only_hours"] = None
 
                 assert order["price"] <= self.marketconfig.maximum_bid, "max_bid"
                 assert order["price"] >= self.marketconfig.minimum_bid, "min_bid"

@@ -74,7 +74,7 @@ class PowerPlant(BaseUnit):
                  min_power: float,
                  efficiency: float,
                  fuel_type: str,
-                 fuel_price: float,
+                 fuel_price: float, #should be list later
                  co2_price: float,
                  emission_factor: float,
                  ramp_up: float = -1,
@@ -174,7 +174,7 @@ class PowerPlant(BaseUnit):
                                             'marginal_cost': self.calc_marginal_cost(power_output=max_power,
                                                                                      partial_load_eff=True)}
                               }
-
+        
         return operational_window
 
     
@@ -196,7 +196,7 @@ class PowerPlant(BaseUnit):
         marginal_cost : float
             Marginal cost of the unit in €/MWh.
         """
-
+        
         t = self.current_time_step
 
         fuel_price = self.fuel_price[t]

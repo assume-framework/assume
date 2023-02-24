@@ -20,7 +20,6 @@ class NaiveStrategyNoMarkUp(BaseStrategy):
         price = round(operational_window['max_power']['marginal_cost'], 1)
         volume = round(operational_window['max_power']['power'], 1)
         
-
         return volume, price  
 
 

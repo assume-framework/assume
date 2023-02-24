@@ -142,6 +142,7 @@ class UnitsOperator(Role):
                     order: Order = {}
                     order["start_time"] = product[0]
                     order["end_time"] = product[1]
+                    order["only_hours"] = None
                     order["agent_id"] = (self.context.addr, self.context.aid)
                     #get operational window for each unit
                     operational_window= unit.calculate_operational_window()
