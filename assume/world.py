@@ -1,48 +1,134 @@
 # %%
 import asyncio
-import pandas as pd
-import numpy as np
 import logging
 from dateutil import rrule as rr
-from dateutil.relativedelta import relativedelta as rd
 from datetime import datetime, timedelta
-from mango import RoleAgent, create_container
+from mango import Role, RoleAgent, create_container
 from mango.util.clock import ExternalClock
 
 from assume.common.marketconfig import MarketConfig, MarketProduct
-from assume.units.unitsoperator import UnitsOperatorRole
+from assume.units import PowerPlant, Demand
+from assume.common import UnitsOperator
 from assume.markets.base_market import MarketRole
-
+from assume.common.orders import available_clearing_strategies
+from assume.strategies import NaiveStrategyNoMarkUp
 
 # %%
 class World():
     def __init__(self):
         self.clock = ExternalClock(0)
-        self.addr = ("127.0.0.1", 5555)  
+        self.addr = ("localhost", 9099)
 
+        self.market_operator_agents =  {}
         self.markets = {}
         self.unit_operators = {}
 
         self.logger = logging.getLogger(__name__)
 
+        self.unit_types = {'power_plant': PowerPlant, 'demand': Demand}
+        self.bidding_types = {'simple': NaiveStrategyNoMarkUp}
+        self.available_clearing_strategies = available_clearing_strategies
+
     async def setup(self):
         self.container = await create_container(addr=self.addr, clock=self.clock)
-        
-        for id, marketconfig in self.markets.items():
-            market_agent = RoleAgent(self.container, suggested_aid=id)
-            market_agent.add_role(MarketRole(marketconfig))
+        # agent is implicit added to self.container.agents
             
+    def add_unit_operator(self, id:str) -> None:
+        """
+        Create and add a new unit operator to the world.
+        
+        Params
+        ------
+        id: str
+            
+        
+        Returns
+        -------
+            None
 
-        for id, units in self.unit_operators.items():
-            agent = RoleAgent(self.container, suggested_aid=id)
-            agent.add_role(UnitsOperatorRole(available_markets=self.markets.values(), units=units))
-            # agent is implicit added to self.container.agents
+        """
+        uo = UnitsOperator(available_markets=self.markets.values())
+        # creating a new role agent and apply the role of a unitsoperator
+        unit_operator = RoleAgent(self.container, suggested_aid=f"{id}")
+        unit_operator.add_role(uo)
 
-    def add_unit_operator(self, id, units: dict):
-        self.unit_operators[id] = units
+        # add the current unitsoperator to the list of operators currently existing
+        self.unit_operators[id] = uo
 
-    def add_market(self, id, marketconfig: MarketConfig):
-        self.markets[id] = marketconfig
+    
+    def add_unit(
+            self, id:str, unit_type:str, params:dict, bidding_strategy:str=None
+        ) -> None:
+        """
+        Create a unit based on the provided unit type and maps it to the specified unit
+        operator.
+
+
+        Parameters
+        ----------
+        id : str
+            Unit id.
+        unit_type : str
+            Type of unit.
+        params : dict
+            Dict of parameters defining the unit.
+        bidding_strategy : str, optional
+            Bidding strategy of the created unit.
+        
+        Returns
+        -------
+            None
+        """
+        # extract unit operator id from unit parameters
+        operator_id = params['unit_operator']
+
+        # provided unit type does not exist yet
+        if unit_type not in self.unit_types.keys():
+            raise Exception(f"invalid unit type {unit_type}")
+        unit_class = self.unit_types[unit_type]
+
+        if bidding_strategy not in self.bidding_types.keys():
+            raise Exception(f"invalid bidding strategy {bidding_strategy}")
+        bidding_strategy = self.bidding_types[bidding_strategy]
+        
+        # create unit within the unit operator its associated with
+        self.unit_operators[operator_id].add_unit(id, unit_class, params, bidding_strategy)
+
+    def add_market(self, market_operator_id:int, marketconfig: MarketConfig):
+
+        """
+        including the markets in the market container
+        
+        Params
+        ------
+        id = int
+             ID of the operator
+        marketconfig = 
+             describes the configuration of a market
+        """
+        if isinstance(marketconfig.market_mechanism, str):
+            strategy = self.available_clearing_strategies.get(marketconfig.market_mechanism)
+            if not strategy:
+                raise Exception(f"invalid strategy {marketconfig.market_mechanism}")
+            marketconfig.market_mechanism = strategy
+        market_operator = self.market_operator_agents.get(market_operator_id)
+        if not market_operator:
+            raise Exception(f"no market operator {market_operator_id}")
+        market_operator.add_role(MarketRole(marketconfig))
+        market_operator.markets.append(marketconfig)
+
+    def add_market_operator(self, id):
+
+        """
+        creates the market operator/s
+        
+        Params
+        ------
+        id = int
+             market operator id is associated with the market its participating
+        """
+        self.market_operator_agents[id] = RoleAgent(self.container, suggested_aid=f"{id}")
+        self.market_operator_agents[id].markets = []
 
     async def step(self):
         next_activity = self.clock.get_next_activity()
@@ -62,12 +148,13 @@ class World():
 
         await self.container.shutdown()
 
-# %%
-if __name__ == "__main__":
+
+async def main():
     world = World()
+    await world.setup()
     our_marketconfig = MarketConfig(
         "simple_dayahead_auction",
-        market_products=[MarketProduct(rd(hours=+1), 1, rd(hours=1))],
+        market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
         opening_hours=rr.rrule(
             rr.HOURLY,
             dtstart=datetime(2005, 6, 1),
@@ -81,29 +168,50 @@ if __name__ == "__main__":
         price_unit="€/MW",
         market_mechanism="pay_as_clear",
     )
-    world.add_market('market', our_marketconfig)
+    world.add_market_operator(id="market")
+    world.add_market(market_operator_id="market",marketconfig=our_marketconfig)
 
-    unit_dict= {
-        '1': {
-            'type': 'solar',
-            'location': (50,10),
-            'generation_power_mw': 40,
-        },
-        '2': {
-            'type': 'coal',
-            'location': (51,11),
-            'generation_power_mw': 1000,
-        },
-        '3': {
-            'type': 'wind',
-            'location': (52,12),
-            'generation_power_mw': 1200,
-        }
-    }
+
+    def mein_market_clearing(market_agent: Role, market_products: list[MarketProduct]):
+        # TODO example
+        pass
     
-    world.add_unit_operator('agent1', unit_dict)
+    world.available_clearing_strategies['mein_market_clearing'] = mein_market_clearing
+    
+    # create unit operators
+    for operator_id in range(1,4):
+         world.add_unit_operator(id=f'operator_{operator_id}')
+    
+    supply_params={
+        "technology": 'coal',
+        "node": '',
+        "max_power": 500,
+        "min_power": 50,
+        "efficiency": 0.8,
+        "fuel_type": 'hard coal',
+        "fuel_price": [25],
+        "co2_price": [20],
+        "emission_factor": 0.82,
+        'unit_operator': 'operator_1'
+        }
+    world.add_unit(id='unit_01', unit_type='power_plant', params=supply_params, bidding_strategy='simple')
 
+    world.add_unit_operator(id=99)
+    demand_params = {
+        'price': 999,
+        'volume': -1000,
+        "technology": 'demand',
+        "node": '',
+        'unit_operator': 99,
+    }
+    world.add_unit(id=23, unit_type='demand', params=demand_params, bidding_strategy='simple')
+    print(world)
     start = datetime(2019, 1, 1).timestamp
     end = datetime(2019, 12, 31).timestamp
-    asyncio.run(world.run_simulation(start, end))
-    print(world)
+    await world.run_simulation(start, end)
+
+# %%
+if __name__ == "__main__":
+
+    asyncio.run(main())
+    

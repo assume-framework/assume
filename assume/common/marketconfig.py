@@ -7,16 +7,15 @@ from dataclasses import dataclass, field
 from typing import Callable, TypedDict
 from numpy.typing import ArrayLike
 
-logger = logging.getLogger(__name__)
-
-
 class Order(TypedDict):
     start_time: datetime | float
     end_time: datetime | float
-    volume: float
+    volume: float  # positive if generation
     price: float
     only_hours: tuple[int, int]
     agent_id: str
+
+logger = logging.getLogger(__name__)
 
 
 Orderbook = list[Order]
@@ -25,16 +24,6 @@ MarketOrderbook = dict[str, Orderbook]
 contract_type = Callable[[Agent, Agent], None]
 market_contract_type = Callable[[Agent, Agent, ArrayLike], None]
 eligible_lambda = Callable[[Agent], bool]
-
-# describes the configuration of an actual product traded at the market
-@dataclass
-class RealMarketProduct:
-    issued_time: datetime
-    delivery_start_time: datetime
-    delivery_end_time: datetime
-    price: float
-    volume: float
-
 
 # describes the configuration of a market product which is available at a market
 @dataclass

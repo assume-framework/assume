@@ -1,6 +1,5 @@
-from common.utils import initializer
-from base_unit import BaseUnit
-from common.strategies import BaseStrategy
+from .base_unit import BaseUnit
+from assume.strategies import BaseStrategy
 
 
 class PowerPlant(BaseUnit):
@@ -50,6 +49,10 @@ class PowerPlant(BaseUnit):
         The maximum heat extraction of the power plant in MW.
     availability : dict, optional
         The availability of the power plant in MW for each time step.
+    is_active: bool
+        Defines whether or not the unit bids itself or is portfolio optimized.
+    bidding_startegy: str
+        In case the unit is active it has to be defined which bidding strategy should be used
     **kwargs
         Additional keyword arguments.
         
@@ -63,7 +66,6 @@ class PowerPlant(BaseUnit):
         Calculate the marginal cost of the power plant.
     """
     
-    @initializer
     def __init__(self,
                  id: str,
                  technology: str,
@@ -86,24 +88,37 @@ class PowerPlant(BaseUnit):
                  heat_extraction: bool = False,
                  max_heat_extraction: float = 0,
                  availability: dict = None,
-                 bidding_strategy: dict[str, BaseStrategy]= {},
-                 location: tuple(float, float)=None,
+                 location: tuple[float, float]=None,
                  **kwargs):
                  
-        super().__init__()
+        super().__init__(id, technology, node)
+        
+        self.max_power = max_power
+        self.min_power = min_power
+        self.efficiency = efficiency
+        self.fuel_type = fuel_type
+        self.fuel_price = fuel_price
+        self.co2_price = co2_price
+        self.emission_factor = emission_factor
 
         self.ramp_up = ramp_up if ramp_up > 0 else max_power
         self.ramp_down = ramp_down if ramp_down > 0 else max_power
         self.min_operating_time = max(min_operating_time, 0)
         self.min_down_time = max(min_down_time, 0)
 
-        self.bidding_strategy = bidding_strategy
+        self.fixed_cost = fixed_cost
+        self.hot_start_cost = hot_start_cost*max_power
+        self.warm_start_cost = warm_start_cost*max_power
+        self.cold_start_cost = cold_start_cost*max_power
+
+        self.heat_extraction = heat_extraction
+        self.max_heat_extraction = max_heat_extraction
+
+        self.availability = availability
+
         self.location = location
 
-        self.hot_start_cost *= self.max_power
-        self.warm_start_cost *= self.max_power
-        self.cold_start_cost *= self.max_power
-
+        self.bidding_strategy = None
 
     def reset(self):
         """Reset the unit to its initial state."""

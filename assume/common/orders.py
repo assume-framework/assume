@@ -4,13 +4,13 @@ from math import isclose, log10
 from typing import TypedDict
 
 from dateutil import relativedelta, rrule
-from marketconfig import MarketConfig, MarketProduct, MarketOrderbook, Orderbook, Order
-
 from mango import Role
 
-from market_mechanisms import available_strategies
+from assume.common.marketconfig import MarketConfig, MarketProduct, MarketOrderbook, Orderbook, Order
+from assume.common.market_mechanisms import available_clearing_strategies
 
 logger = logging.getLogger(__name__)
+
 
 
 def is_mod_close(a, mod_b):

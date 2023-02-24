@@ -1,47 +1,48 @@
 import asyncio
-from datetime import datetime, timedelta
-from dateutil import rrule as rr
-from dateutil.relativedelta import relativedelta as rd
-from common.marketconfig import MarketConfig, MarketProduct
+from assume.common.marketconfig import MarketConfig
+from assume.units import BaseUnit
+from assume.strategies import BaseStrategy
 
-from mango import Role, create_container
+from mango import Role
 from mango.messages.message import Performatives
-from common.bids import (
+from assume.common.orders import (
     Order,
     Orderbook,
     OpeningMessage,
     ClearingMessage,
 )
-from units.base_unit import BaseUnit
-from units.powerplant import PowerPlant
 import logging
-
-
 logger = logging.getLogger(__name__)
 
 
-class UnitsOperatorRole(Role):
-    def __init__(self, id:int= None, name:str=None,  units: dict={} ):
+class UnitsOperator(Role):
+    def __init__(self,
+                 available_markets: list[MarketConfig],
+                 opt_portfolio: dict[bool, BaseStrategy]=None
+                 ):
         super().__init__()
-        self.id = id
-        self.name = name
-        self.available_markets: list[MarketConfig] = []
+        
+        self.available_markets = available_markets
         self.registered_markets: dict[str, MarketConfig] = {}
-        self.valid_orders = []
-        
-        self.build_units(units)
 
-    def set_markets(self, available_markets: list[MarketConfig]):
-        self.available_markets.extend(available_markets)
+        if opt_portfolio is None:
+            self.use_portfolio_opt = False
+            self.portfolio_strategy = None
+        else:
+            self.use_portfolio_opt = opt_portfolio[0]
+            self.portfolio_strategy = opt_portfolio[1]
         
+        self.valid_orders = []
+        self.units = {}
+                
     def setup(self):
-        self.context.volume = self.volume
-        self.context.price = self.price
+        self.id = self.context.aid
         self.context.subscribe_message(
             self,
             self.handle_opening,
             lambda content, meta: content.get("context") == "opening",
         )
+
         self.context.subscribe_message(
             self,
             self.handle_market_feedback,
@@ -53,12 +54,11 @@ class UnitsOperatorRole(Role):
                 self.register_market(market)
                 self.registered_markets[market.name] = market
 
-    def add_unit():
-        pass
-
+    
     def participate(self, market):
         # always participate at all markets
         return True
+
 
     def register_market(self, market):
         self.context.schedule_timestamp_task(
@@ -92,7 +92,7 @@ class UnitsOperatorRole(Role):
         for bid in orderbook:
             self.valid_orders.append(bid)
         
-        self.send_dispatch_plan(sel)
+        self.send_dispatch_plan()
 
     async def submit_bids(self, opening):
         """
@@ -123,6 +123,7 @@ class UnitsOperatorRole(Role):
         )
 
     async def formulate_bids(self, market: MarketConfig, products):
+        # sourcery skip: merge-dict-assign
 
         """
             Takes information from all units that the unit operator manages and
@@ -133,44 +134,38 @@ class UnitsOperatorRole(Role):
 
         orderbook: Orderbook = []
         for product in products:
-            for unit in self.units:
-                order: Order = {}
-                order["start_time"] = product[0]
-                order["end_time"] = product[1]
-                order["agent_id"] = (self.context.addr, self.context.aid)
-                #get operational window for each unit
-                operational_window= unit.calculate_operational_window()
-                #get used bidding strategy for the unit
-                used_strategy = unit['bidding_strategy'] 
-                #take price from bidding strategy
-                order["volume"], order["price"] = used_strategy.calculate_bids(market,  operational_window)
+            if self.use_portfolio_opt==False:
+                for unit in self.units:
+                    order: Order = {}
+                    order["start_time"] = product[0]
+                    order["end_time"] = product[1]
+                    order["agent_id"] = (self.context.addr, self.context.aid)
+                    #get operational window for each unit
+                    operational_window= unit.calculate_operational_window()
+                    #get used bidding strategy for the unit
+                    unit_strategy = unit['bidding_strategy'] 
+                    #take price from bidding strategy
+                    order["volume"], order["price"] = unit_strategy.calculate_bids(market,  operational_window)
 
-            orderbook.append(order)
+                    orderbook.append(order)
 
+            else:
+                raise NotImplementedError
 
         return orderbook
 
-    def build_units(self, unit_dict: dict):
+    def add_unit(self, id:str, unit_class: BaseUnit, unit_params: dict, bidding_strategy: BaseStrategy=None):
         """
-        Instantiates all units assigned to the units operator.
+        Create a unit.
         """
-        self.units = []
-        for id, unit_conf in unit_dict.items():
+        self.units[id] = unit_class(id, **unit_params)
+        self.units[id].bidding_strategy = bidding_strategy
 
-            # unit_creater_dict={"solar": SolarPlant()}
-            
-            if unit_conf["type"] == "solar":
-                unit = SolarPlant()
-            elif unit_conf["type"] == "powerplant":
-                unit = PowerPlant(**unit_conf)
-            elif unit_conf["type"] == "storage":
-                unit = Storage(**unit_conf)
-            elif unit_conf["type"] == "wind":
-                unit = WindPowerPlant(**unit_conf)
-            else:
-                raise Exception("unknown unit type")
-            self.units[id] = unit
-        
+        if bidding_strategy is None and self.use_portfolio_opt == False:
+            raise ValueError("No bidding strategy defined for unit while not using portfolio optimization.")
+
+    #Needed data in the future 
+    """""
     def get_world_data(self, input_data):
         self.temperature = input_data.temperature
         self.wind_speed = input_data.wind_speed
@@ -190,7 +185,6 @@ class UnitsOperatorRole(Role):
             
     def reset(self):
     
-        """Reset the unit to its initial state."""
+        #Reset the unit to its initial state.
 
-
-        
+    """

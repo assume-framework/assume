@@ -15,7 +15,7 @@ from assume.common.bids import (
     Orderbook
 )
 from assume.markets.base_market import MarketRole
-from assume.units.unitsoperator import UnitsOperatorRole
+from assume.unitsoperator import UnitsOperator
 
 import logging
 
@@ -151,7 +151,7 @@ async def main(start):
         
     #for i in range(4):
     #    agent = RoleAgent(c)
-    #    agent.add_role(UnitsOperatorRole(marketdesign, price=5 * (i % 9), volume=-80))
+    #    agent.add_role(UnitsOperator(marketdesign, price=5 * (i % 9), volume=-80))
 
     if isinstance(clock, ExternalClock):
         next_activity = clock.get_next_activity()
