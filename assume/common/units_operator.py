@@ -33,7 +33,7 @@ class UnitsOperator(Role):
             self.portfolio_strategy = opt_portfolio[1]
         
         self.valid_orders = []
-        self.units = {}
+        self.units : dict[str, BaseUnit] = {}
                 
     def setup(self):
         self.id = self.context.aid
@@ -73,18 +73,21 @@ class UnitsOperator(Role):
             ),
             1,  # register after time was updated for the first time
         )
+        logger.debug(f'tried to register at market {market.name}')
 
     def handle_opening(self, opening: OpeningMessage, meta: dict[str, str]):
         logger.debug(f'Received opening from: {opening["market"]} {opening["start"]}.')
         logger.debug(f'can bid until: {opening["stop"]}')
 
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
+        print(f'Operator {self.id} got a call')
 
     def send_dispatch_plan(self):
         valid_orders = self.valid_orders
         # todo group by unit_id
-        for unit in self.units:
-            unit.dispatch(valid_orders)
+        for unit_id, unit in self.units.items():
+            #unit.dispatch(valid_orders)
+            unit.current_time_step +=1
     
     def handle_market_feedback(self, content: ClearingMessage, meta: dict[str, str]):
         logger.debug(f"got market result: {content}")
@@ -105,7 +108,7 @@ class UnitsOperator(Role):
         products = opening["products"]
         market = self.registered_markets[opening["market"]]
         logger.debug(f"setting bids for {market.name}")
-        orderbook = self.formulate_bid(market, products)
+        orderbook = await self.formulate_bids(market, products)
         acl_metadata = {
             "performative": Performatives.inform,
             "sender_id": self.context.aid,
@@ -135,7 +138,7 @@ class UnitsOperator(Role):
         orderbook: Orderbook = []
         for product in products:
             if self.use_portfolio_opt==False:
-                for unit in self.units:
+                for unit_id, unit in self.units.items():
                     order: Order = {}
                     order["start_time"] = product[0]
                     order["end_time"] = product[1]
@@ -143,7 +146,7 @@ class UnitsOperator(Role):
                     #get operational window for each unit
                     operational_window= unit.calculate_operational_window()
                     #get used bidding strategy for the unit
-                    unit_strategy = unit['bidding_strategy'] 
+                    unit_strategy = unit.bidding_strategy
                     #take price from bidding strategy
                     order["volume"], order["price"] = unit_strategy.calculate_bids(market,  operational_window)
 
@@ -164,6 +167,7 @@ class UnitsOperator(Role):
         if bidding_strategy is None and self.use_portfolio_opt == False:
             raise ValueError("No bidding strategy defined for unit while not using portfolio optimization.")
 
+        self.units[id].reset()
     #Needed data in the future 
     """""
     def get_world_data(self, input_data):

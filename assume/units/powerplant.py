@@ -74,8 +74,8 @@ class PowerPlant(BaseUnit):
                  min_power: float,
                  efficiency: float,
                  fuel_type: str,
-                 fuel_price: list,
-                 co2_price: list,
+                 fuel_price: float,
+                 co2_price: float,
                  emission_factor: float,
                  ramp_up: float = -1,
                  ramp_down: float = -1,
@@ -97,8 +97,8 @@ class PowerPlant(BaseUnit):
         self.min_power = min_power
         self.efficiency = efficiency
         self.fuel_type = fuel_type
-        self.fuel_price = fuel_price
-        self.co2_price = co2_price
+        self.fuel_price = fuel_price*1000
+        self.co2_price = co2_price*1000
         self.emission_factor = emission_factor
 
         self.ramp_up = ramp_up if ramp_up > 0 else max_power
@@ -119,6 +119,7 @@ class PowerPlant(BaseUnit):
         self.location = location
 
         self.bidding_strategy = None
+        
 
     def reset(self):
         """Reset the unit to its initial state."""
@@ -149,13 +150,13 @@ class PowerPlant(BaseUnit):
 
         if self.availability is None:
             min_power = max(self.total_power_output[t-1] - self.ramp_down, 
-                            min_power)
+                            self.min_power)
             max_power = min(self.total_power_output[t-1] + self.ramp_up, 
-                            max_power)
+                            self.max_power)
         
-        elif self.availability[t] >= min_power:
+        elif self.availability[t] >= self.min_power:
             min_power = max(self.total_power_output[t-1] - self.ramp_down, 
-                            min_power)
+                            self.min_power)
             max_power = min(self.total_power_output[t-1] + self.ramp_up, 
                             self.availability[t])
        

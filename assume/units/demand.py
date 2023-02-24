@@ -36,6 +36,9 @@ class Demand(BaseUnit):
         self.bidding_strategy = bidding_strategy
         self.location = location
 
+    def reset(self):
+        self.current_time_step = 0
+
     def calculate_operational_window(self) -> dict:
         """Calculate the operation window for the next time step."""
 

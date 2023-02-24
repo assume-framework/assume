@@ -19,7 +19,7 @@ def cumsum(orderbook: Orderbook):
 
 
 def twoside_clearing(market_agent: Role, market_products: list[MarketProduct], **kwargs):
-    market_getter = itemgetter("start_time", "end_time", "only_hours")
+    market_getter = itemgetter("start_time", "end_time") #, "only_hours")
     accepted_orders = []
     rejected_orders = []
     price, demand = 0, 0

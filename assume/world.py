@@ -12,6 +12,11 @@ from assume.common import UnitsOperator
 from assume.markets.base_market import MarketRole
 from assume.common.orders import available_clearing_strategies
 from assume.strategies import NaiveStrategyNoMarkUp
+from assume.common.mango_serializer import mango_codec_factory
+
+logger = logging.getLogger(__name__)
+
+
 
 # %%
 class World():
@@ -30,7 +35,7 @@ class World():
 
     async def setup(self, start: float):
         self.clock = ExternalClock(start)
-        self.container = await create_container(addr=self.addr, clock=self.clock)
+        self.container = await create_container(addr=self.addr, clock=self.clock, codec=mango_codec_factory())
         # agent is implicit added to self.container.agents
             
     def add_unit_operator(self, id:str) -> None:
@@ -116,6 +121,7 @@ class World():
             raise Exception(f"no market operator {market_operator_id}")
         market_operator.add_role(MarketRole(marketconfig))
         market_operator.markets.append(marketconfig)
+        self.markets[f"{market_operator_id}_{marketconfig.name}"]=marketconfig
 
     def add_market_operator(self, id):
 
@@ -141,7 +147,7 @@ class World():
     async def run_simulation(self, stop: float):
         while self.clock.time < stop:
             await self.step()
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(1)
 
         await self.container.shutdown()
 
@@ -166,11 +172,13 @@ async def main():
         maximum_gradient=0.1,  # can only change 10% between hours - should be more generic
         amount_unit="MWh",
         amount_tick=0.1,
+        maximum_volume=1e9,
         price_unit="€/MW",
         market_mechanism="pay_as_clear",
     )
     world.add_market_operator(id="market")
     world.add_market(market_operator_id="market",marketconfig=our_marketconfig)
+    logger.info(f"marketconfig {our_marketconfig}")
 
 
     def mein_market_clearing(market_agent: Role, market_products: list[MarketProduct]):
@@ -190,8 +198,8 @@ async def main():
         "min_power": 50,
         "efficiency": 0.8,
         "fuel_type": 'hard coal',
-        "fuel_price": [25],
-        "co2_price": [20],
+        "fuel_price": 25,
+        "co2_price": 20,
         "emission_factor": 0.82,
         'unit_operator': 'operator_1'
         }
@@ -211,7 +219,7 @@ async def main():
 
 # %%
 if __name__ == "__main__":
-    logging.basicConfig(level='DEBUG')
+    logging.basicConfig(level='INFO')
 
     asyncio.run(main())
     

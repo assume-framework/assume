@@ -17,7 +17,7 @@ def is_mod_close(a, mod_b):
     """
     due to floating point, a mod b can be very close to 0 or very close to mod_b
     """
-    abs_tol = 1e-14
+    abs_tol = 1e-10
     # abs_tol needed for comparison near zero
     return isclose(a % mod_b, 0, abs_tol=abs_tol) or isclose(
         a % mod_b, mod_b, abs_tol=abs_tol
