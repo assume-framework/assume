@@ -16,7 +16,6 @@ from assume.strategies import NaiveStrategyNoMarkUp
 # %%
 class World():
     def __init__(self):
-        self.clock = ExternalClock(0)
         self.addr = ("localhost", 9099)
 
         self.market_operator_agents =  {}
@@ -29,7 +28,8 @@ class World():
         self.bidding_types = {'simple': NaiveStrategyNoMarkUp}
         self.available_clearing_strategies = available_clearing_strategies
 
-    async def setup(self):
+    async def setup(self, start: float):
+        self.clock = ExternalClock(start)
         self.container = await create_container(addr=self.addr, clock=self.clock)
         # agent is implicit added to self.container.agents
             
@@ -138,20 +138,21 @@ class World():
 
         self.clock.set_time(next_activity)
     
-    async def run_simulation(self, start: float, stop: float):
-        await self.setup()
-        self.clock.time = start
-
+    async def run_simulation(self, stop: float):
         while self.clock.time < stop:
             await self.step()
-            await asyncio.sleep(0.00001)
+            await asyncio.sleep(0.1)
 
         await self.container.shutdown()
 
 
 async def main():
     world = World()
-    await world.setup()
+    start = datetime(2019, 1, 1).timestamp()
+    end = datetime(2019, 1, 3).timestamp()
+    #end = datetime(2019, 12, 31).timestamp()
+
+    await world.setup(start)
     our_marketconfig = MarketConfig(
         "simple_dayahead_auction",
         market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
@@ -206,12 +207,11 @@ async def main():
     }
     world.add_unit(id=23, unit_type='demand', params=demand_params, bidding_strategy='simple')
     print(world)
-    start = datetime(2019, 1, 1).timestamp
-    end = datetime(2019, 12, 31).timestamp
-    await world.run_simulation(start, end)
+    await world.run_simulation(end)
 
 # %%
 if __name__ == "__main__":
+    logging.basicConfig(level='DEBUG')
 
     asyncio.run(main())
     
