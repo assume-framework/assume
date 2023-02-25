@@ -1,5 +1,6 @@
+from ..strategies import BaseStrategy
 from .base_unit import BaseUnit
-from assume.strategies import BaseStrategy
+
 
 class Demand(BaseUnit):
     """A demand unit.
@@ -24,7 +25,7 @@ class Demand(BaseUnit):
                  technology: str=None,
                  node: str=None,
                  price: float = 900,
-                 volume: int = 1000,
+                 volume: int = -1000,
                  location: tuple[float, float]=None,
                  bidding_strategy: dict[str, BaseStrategy]= {},
                  **kwargs

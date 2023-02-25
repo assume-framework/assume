@@ -1,17 +1,14 @@
 import asyncio
-from assume.common.marketconfig import MarketConfig
-from assume.units import BaseUnit
-from assume.strategies import BaseStrategy
+import logging
 
 from mango import Role
 from mango.messages.message import Performatives
-from assume.common.orders import (
-    Order,
-    Orderbook,
-    OpeningMessage,
-    ClearingMessage,
-)
-import logging
+
+from ..strategies import BaseStrategy
+from ..units import BaseUnit
+from .marketclasses import (ClearingMessage, MarketConfig, OpeningMessage,
+                            Order, Orderbook)
+
 logger = logging.getLogger(__name__)
 
 
@@ -76,11 +73,10 @@ class UnitsOperator(Role):
         logger.debug(f'tried to register at market {market.name}')
 
     def handle_opening(self, opening: OpeningMessage, meta: dict[str, str]):
-        logger.debug(f'Received opening from: {opening["market"]} {opening["start"]}.')
-        logger.debug(f'can bid until: {opening["stop"]}')
+        logger.debug(f'Operator {self.id} received opening from: {opening["market"]} {opening["start"]}.')
+        logger.debug(f'Operator {self.id} can bid until: {opening["stop"]}')
 
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
-        print(f'Operator {self.id} got a call')
 
     def send_dispatch_plan(self):
         valid_orders = self.valid_orders

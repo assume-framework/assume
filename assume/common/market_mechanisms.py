@@ -3,9 +3,9 @@ import logging
 from itertools import groupby
 from operator import itemgetter
 
-from .marketconfig import MarketConfig, MarketProduct, Orderbook, Order
-
 from mango import Role
+
+from .marketclasses import MarketConfig, MarketProduct, Order, Orderbook
 
 logger = logging.getLogger(__name__)
 
@@ -235,6 +235,7 @@ available_clearing_strategies = {
 
 if __name__ == '__main__':
     from datetime import datetime, timedelta
+
     from dateutil import rrule as rr
     from dateutil.relativedelta import relativedelta as rd
 

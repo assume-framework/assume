@@ -1,18 +1,20 @@
 # %%
 import asyncio
 import logging
-from dateutil import rrule as rr
 from datetime import datetime, timedelta
+
+from dateutil import rrule as rr
 from mango import Role, RoleAgent, create_container
 from mango.util.clock import ExternalClock
+from tqdm import tqdm
 
-from assume.common.marketconfig import MarketConfig, MarketProduct
-from assume.units import PowerPlant, Demand
-from assume.common import UnitsOperator
-from assume.markets.base_market import MarketRole
-from assume.common.orders import available_clearing_strategies
-from assume.strategies import NaiveStrategyNoMarkUp
-from assume.common.mango_serializer import mango_codec_factory
+from .common import UnitsOperator
+from .common.mango_serializer import mango_codec_factory
+from .common.market_mechanisms import available_clearing_strategies
+from .common.marketclasses import MarketConfig, MarketProduct
+from .markets.base_market import MarketRole
+from .strategies import NaiveStrategyNoMarkUp
+from .units import Demand, PowerPlant
 
 logger = logging.getLogger(__name__)
 
@@ -144,11 +146,17 @@ class World():
 
         self.clock.set_time(next_activity)
     
-    async def run_simulation(self, stop: float):
+    async def run_simulation(self, stop: float, sleep=1e-6):
+        prev = self.clock.time
+        pbar = tqdm(total=stop-prev)
         while self.clock.time < stop:
+            pbar.update(self.clock.time-prev)
+            pbar.set_description(f"{datetime.fromtimestamp(self.clock.time)}")
+            prev = self.clock.time
             await self.step()
-            await asyncio.sleep(1)
-
+            await asyncio.sleep(sleep)
+            
+        pbar.close()
         await self.container.shutdown()
 
 

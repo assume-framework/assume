@@ -1,5 +1,5 @@
+from ..strategies import BaseStrategy
 from .base_unit import BaseUnit
-from assume.strategies import BaseStrategy
 
 
 class PowerPlant(BaseUnit):

@@ -1,0 +1,61 @@
+[tool.poetry]
+name = "assume-mango"
+version = "0.0.1"
+description = "ASSUME - Agent based energy market modeling using mango agents"
+authors = ["ASSUME developers <nick.harder@inatech.uni-freiburg.de>"]
+license = "LICENSE"
+readme = "README.md"
+
+homepage = "https://github.com/INATECH-CIG/ASSUME"
+repository = "https://github.com/INATECH-CIG/ASSUME"
+
+keywords = ["agent based simulation", "energy market", "reinforcement learning", "market simulation", "simulation"]
+
+classifiers=[
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU Affero General Public License v3 (AGPLv3)",
+    "Operating System :: OS Independent",
+    "Framework :: asyncio",
+    "Framework :: mango-agents",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+packages = [
+    { include="assume", from="." },
+]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+paho-mqtt = "^1.5.1"
+mango-agents = {git = "https://gitlab.com/mango-agents/mango"}
+tqdm = "^4.64.1"
+python-dateutil = "^2.8.2"
+
+
+[tool.poetry.group.dev.dependencies]
+black = "^22.8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+
+[tool.pytest]
+testpaths = "tests"
+
+[tool.mypy]
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+# output
+show_error_context = true
+show_column_numbers = true
+show_error_codes = true
+pretty = true

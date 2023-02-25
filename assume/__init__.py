@@ -1,10 +1,8 @@
-from assume import world
+from importlib.metadata import version
 
-__version__ = "0.0.1"
+from .world import World
 
-__author__ = (
-    "ASSUME Developers: Nick Harder, Kim Miskiw, FLorian Mauer, Manish Khanra"
-)
-__copyright__ = (
-    "AGPL-3.0 License"
-)
+__version__ = version("assume-mango")
+
+__author__ = "ASSUME Developers: Nick Harder, Kim Miskiw, Florian Mauer, Manish Khanra"
+__copyright__ = "AGPL-3.0 License"

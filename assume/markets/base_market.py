@@ -1,10 +1,12 @@
-from mango import Role
-
-from assume.common.marketconfig import MarketConfig, MarketOrderbook, Order, Orderbook, MarketProduct
-from assume.common.orders import get_available_products, is_mod_close, round_digits
+import logging
 from datetime import datetime, timedelta
 from itertools import groupby
-import logging
+
+from mango import Role
+
+from ..common.marketclasses import (MarketConfig, MarketOrderbook,
+                                    MarketProduct, Order, Orderbook)
+from ..common.utils import get_available_products, is_mod_close, round_digits
 
 logger = logging.getLogger(__name__)
 
@@ -16,12 +18,6 @@ class MarketRole(Role):
 
     def __init__(self, marketconfig: MarketConfig):
         super().__init__()
-        if isinstance(marketconfig.market_mechanism, str):
-            strategy = available_strategies.get(marketconfig.market_mechanism)
-            if not strategy:
-                raise Exception(f"invalid strategy {marketconfig.market_mechanism}")
-            marketconfig.market_mechanism = strategy
-
         self.marketconfig: MarketConfig = marketconfig
         self.registered_agents: list[str] = []
         self.open_slots = []
