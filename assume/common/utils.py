@@ -57,7 +57,7 @@ def round_digits(n, tick_size):
     >>> round_digits(400.1, 20)
     400
     """
-    return round(n, 1-int(log10(tick_size)))
+    return round(n, 1 - int(log10(tick_size)))
 
 
 def get_available_products(market_products: list[MarketProduct], startdate: datetime):

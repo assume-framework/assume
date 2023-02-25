@@ -4,8 +4,13 @@ from itertools import groupby
 
 from mango import Role
 
-from ..common.marketclasses import (MarketConfig, MarketOrderbook,
-                                    MarketProduct, Order, Orderbook)
+from ..common.marketclasses import (
+    MarketConfig,
+    MarketOrderbook,
+    MarketProduct,
+    Order,
+    Orderbook,
+)
 from ..common.utils import get_available_products, is_mod_close, round_digits
 
 logger = logging.getLogger(__name__)
@@ -118,11 +123,15 @@ class MarketRole(Role):
                 assert is_mod_close(
                     order["volume"], self.marketconfig.amount_tick
                 ), "amount_tick"
-                order["volume"] = round_digits(order["volume"], self.marketconfig.amount_tick)
+                order["volume"] = round_digits(
+                    order["volume"], self.marketconfig.amount_tick
+                )
                 assert is_mod_close(
                     order["price"], self.marketconfig.price_tick
                 ), "price_tick"
-                order["price"] = round_digits(order["price"], self.marketconfig.price_tick)
+                order["price"] = round_digits(
+                    order["price"], self.marketconfig.price_tick
+                )
                 if not order.get("only_hours"):
                     order["only_hours"] = None
 

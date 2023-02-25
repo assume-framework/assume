@@ -1,4 +1,3 @@
-
 # relevant information
 # https://www.next-kraftwerke.de/wissen/spotmarkt-epex-spot
 # https://www.epexspot.com/sites/default/files/2023-01/22-10-25_TradingBrochure.pdf

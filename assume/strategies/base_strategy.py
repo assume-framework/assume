@@ -2,17 +2,18 @@ import warnings
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Generator, List, Optional, Union
 
-class BaseStrategy():
+
+class BaseStrategy:
     """A base class for a bidding strategy.
 
-        Attributes
-        ----------
+    Attributes
+    ----------
 
-        
-        Methods
-        -------
 
-        """
-    
+    Methods
+    -------
+
+    """
+
     def __init__(self):
         super().__init__()
