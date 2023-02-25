@@ -97,8 +97,8 @@ class PowerPlant(BaseUnit):
         self.min_power = min_power
         self.efficiency = efficiency
         self.fuel_type = fuel_type
-        self.fuel_price = fuel_price*1000
-        self.co2_price = co2_price*1000
+        self.fuel_price = fuel_price #*1000
+        self.co2_price = co2_price #*1000
         self.emission_factor = emission_factor
 
         self.ramp_up = ramp_up if ramp_up > 0 else max_power
@@ -199,8 +199,8 @@ class PowerPlant(BaseUnit):
         
         t = self.current_time_step
 
-        fuel_price = self.fuel_price[t]
-        co2_price = self.co2_price[t]
+        fuel_price = self.fuel_price #[t]
+        co2_price = self.co2_price #[t]
 
         # Partial load efficiency dependent marginal costs
         if not partial_load_eff:
