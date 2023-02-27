@@ -4,16 +4,11 @@ from itertools import groupby
 
 from mango import Role
 
-from ..common.marketclasses import (
-    MarketConfig,
-    MarketOrderbook,
-    MarketProduct,
-    Order,
-    Orderbook,
-)
+from ..common.marketclasses import MarketConfig, MarketProduct, Order, Orderbook
 from ..common.utils import get_available_products, is_mod_close, round_digits
 
 logger = logging.getLogger(__name__)
+
 
 # add role per Market
 class MarketRole(Role):
@@ -27,7 +22,6 @@ class MarketRole(Role):
         self.registered_agents: list[str] = []
         self.open_slots = []
         self.all_orders: list[Order] = []
-        self.order_book: MarketOrderbook = {}
         self.market_result: Orderbook = []
 
     def setup(self):
@@ -143,7 +137,6 @@ class MarketRole(Role):
                 for field in self.marketconfig.additional_fields:
                     assert order[field], f"missing field: {field}"
                 self.all_orders.append(order)
-            self.order_book[agent_id] = orderbook
         except Exception as e:
             logger.error(f"error handling message from {agent_id} - {e}")
             self.context.schedule_instant_acl_message(

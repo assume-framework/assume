@@ -1,4 +1,3 @@
-# %%
 import asyncio
 import logging
 from datetime import datetime, timedelta
@@ -15,11 +14,11 @@ from .common.marketclasses import MarketConfig, MarketProduct
 from .markets.base_market import MarketRole
 from .strategies import NaiveStrategyNoMarkUp
 from .units import Demand, PowerPlant
+from .common.exceptions import InvalidTypeException
 
 logger = logging.getLogger(__name__)
 
 
-# %%
 class World:
     def __init__(self):
         self.addr = ("localhost", 9099)
@@ -88,19 +87,21 @@ class World:
         """
         # extract unit operator id from unit parameters
         operator_id = params["unit_operator"]
+        unit_class = self.unit_types.get(unit_type)
+        if unit_class is None:
+            raise InvalidTypeException(
+                f"unit type {unit_type} not in {self.unit_types.keys()}"
+            )
 
-        # provided unit type does not exist yet
-        if unit_type not in self.unit_types.keys():
-            raise Exception(f"invalid unit type {unit_type}")
-        unit_class = self.unit_types[unit_type]
-
-        if bidding_strategy not in self.bidding_types.keys():
-            raise Exception(f"invalid bidding strategy {bidding_strategy}")
-        bidding_strategy = self.bidding_types[bidding_strategy]
+        bidding_strategy_func = self.bidding_types.get(bidding_strategy)
+        if bidding_strategy_func is None:
+            raise InvalidTypeException(
+                f"invalid bidding strategy {bidding_strategy} not in {self.bidding_types.keys()}"
+            )
 
         # create unit within the unit operator its associated with
         self.unit_operators[operator_id].add_unit(
-            id, unit_class, params, bidding_strategy
+            id, unit_class, params, bidding_strategy_func
         )
 
     def add_market(self, market_operator_id: int, marketconfig: MarketConfig):
@@ -116,15 +117,19 @@ class World:
              describes the configuration of a market
         """
         if isinstance(marketconfig.market_mechanism, str):
-            strategy = self.available_clearing_strategies.get(
+            clear_strategy = self.available_clearing_strategies.get(
                 marketconfig.market_mechanism
             )
-            if not strategy:
-                raise Exception(f"invalid strategy {marketconfig.market_mechanism}")
-            marketconfig.market_mechanism = strategy
+            if clear_strategy is None:
+                raise InvalidTypeException(
+                    f"strategy {marketconfig.market_mechanism} not in {self.available_clearing_strategies.keys()}"
+                )
+            marketconfig.market_mechanism = clear_strategy
         market_operator = self.market_operator_agents.get(market_operator_id)
-        if not market_operator:
-            raise Exception(f"no market operator {market_operator_id}")
+        if market_operator is None:
+            raise InvalidTypeException(
+                f"market operator {market_operator_id} not in {self.market_operator_agents.keys()}"
+            )
         market_operator.add_role(MarketRole(marketconfig))
         market_operator.markets.append(marketconfig)
         self.markets[f"{market_operator_id}_{marketconfig.name}"] = marketconfig
@@ -183,7 +188,6 @@ async def main():
             cache=True,
         ),
         opening_duration=timedelta(hours=1),
-        maximum_gradient=0.1,  # can only change 10% between hours - should be more generic
         amount_unit="MWh",
         amount_tick=0.1,
         maximum_volume=1e9,

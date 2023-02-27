@@ -5,8 +5,7 @@ from math import isclose, log10
 
 from dateutil import rrule
 
-from .market_mechanisms import available_clearing_strategies
-from .marketclasses import MarketOrderbook, MarketProduct, Orderbook
+from .marketclasses import MarketProduct
 
 
 def initializer(func):

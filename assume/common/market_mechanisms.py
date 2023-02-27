@@ -17,9 +17,7 @@ def cumsum(orderbook: Orderbook):
     return orderbook
 
 
-def twoside_clearing(
-    market_agent: Role, market_products: list[MarketProduct], **kwargs
-):
+def pay_as_clear(market_agent: Role, market_products: list[Order], **kwargs):
     market_getter = itemgetter("start_time", "end_time", "only_hours")
     accepted_orders = []
     rejected_orders = []
@@ -94,6 +92,7 @@ def pay_as_bid(market_agent: Role, market_products: list[MarketProduct]):
 
         # product_orders = list(product_orders)
         for volume, orders in groupby(product_orders, lambda x: abs(x["volume"])):
+            product_orders = list(product_orders)
             demand_orders = filter(lambda x: x["volume"] < 0, product_orders)
             supply_orders = filter(lambda x: x["volume"] > 0, product_orders)
             # volume 0 is ignored/invalid
@@ -106,7 +105,7 @@ def pay_as_bid(market_agent: Role, market_products: list[MarketProduct]):
                 demand_orders, key=lambda i: i["price"], reverse=True
             )
 
-            min_len = min(len(sorted_supply_orders, len(sorted_demand_orders)))
+            min_len = min(len(sorted_supply_orders), len(sorted_demand_orders))
             i = 0
             for i in range(min_len):
                 if sorted_supply_orders[i]["price"] <= sorted_demand_orders[i]["price"]:
@@ -123,13 +122,15 @@ def pay_as_bid(market_agent: Role, market_products: list[MarketProduct]):
             rejected_orders.extend(sorted_demand_orders[i:])
             rejected_orders.extend(sorted_supply_orders[i:])
 
-    price = sum(map(lambda order: order["price"], accepted_orders)) / len(
-        accepted_orders
-    )
-    volume = sum(map(lambda order: order["volume"], accepted_orders))
     # TODO price and volume is wrong if multiple products exist
-    if price == 0:
+    if len(accepted_orders) > 0:
+        price = sum(map(lambda order: order["price"], accepted_orders)) / len(
+            accepted_orders
+        )
+    else:
+
         price = market_agent.marketconfig.maximum_bid
+    volume = sum(map(lambda order: order["volume"], accepted_orders))
     meta = {"volume": volume, "price": price}
     market_agent.all_orders = rejected_orders
     # accepted orders can not be used in future
@@ -241,13 +242,11 @@ def pay_as_bid_partial(market_agent: Role, market_products: list[MarketProduct])
 # 5.
 
 available_clearing_strategies = {
-    "one_side_market": "TODO",
-    "two_side_market": twoside_clearing,
-    "pay_as_bid": pay_as_bid,  # TODO
-    "pay_as_clear": twoside_clearing,
+    "pay_as_bid": pay_as_bid,
+    "pay_as_bid_partial": pay_as_bid_partial,
+    "pay_as_clear": pay_as_clear,
     "nodal_market": "TODO",
 }
-
 
 if __name__ == "__main__":
     from datetime import datetime, timedelta
@@ -261,7 +260,6 @@ if __name__ == "__main__":
         opening_hours=rr.rrule(
             rr.HOURLY,
             dtstart=datetime(2005, 6, 1),
-            until=datetime(2030, 12, 31),
             cache=True,
         ),
         opening_duration=timedelta(hours=1),
@@ -270,3 +268,60 @@ if __name__ == "__main__":
         price_unit="€/MW",
         market_mechanism="pay_as_clear",
     )
+
+    from ..markets.base_market import MarketRole
+    from ..common.utils import get_available_products
+    mr = MarketRole(simple_dayahead_auction_config)
+    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
+    products = get_available_products(
+        simple_dayahead_auction_config.market_products, next_opening
+    )
+    assert len(products) == 1
+
+    print(products)
+    start = products[0][0]
+    end = products[0][1]
+    only_hours = products[0][2]
+
+    orderbook: Orderbook = [
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": 120,
+            "price": 120,
+            "agent_id": "gen1",
+            "only_hours": None,
+        },
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": 80,
+            "price": 58,
+            "agent_id": "gen1",
+            "only_hours": None,
+        },
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": 100,
+            "price": 53,
+            "agent_id": "gen1",
+            "only_hours": None,
+        },
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": -180,
+            "price": 70,
+            "agent_id": "dem1",
+            "only_hours": None,
+        },
+
+    ]
+    simple_dayahead_auction_config.market_mechanism = available_clearing_strategies[simple_dayahead_auction_config.market_mechanism]
+    mr.all_orders = orderbook
+    clearing_result, meta = simple_dayahead_auction_config.market_mechanism(mr, products)
+    import pandas as pd
+    print(pd.DataFrame.from_dict(mr.all_orders))
+    print(pd.DataFrame.from_dict(clearing_result))
+    print(meta)

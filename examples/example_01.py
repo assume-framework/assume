@@ -26,7 +26,6 @@ async def main():
             cache=True,
         ),
         opening_duration=timedelta(hours=1),
-        maximum_gradient=0.1,  # can only change 10% between hours - should be more generic
         amount_unit="MWh",
         amount_tick=0.1,
         maximum_volume=1e9,
@@ -60,13 +59,13 @@ async def main():
         bidding_strategy="simple",
     )
 
-    world.add_unit_operator(id=99)
+    world.add_unit_operator(id="demand1")
     demand_params = {
         "price": 999,
         "volume": -1000,
         "technology": "demand",
         "node": "",
-        "unit_operator": 99,
+        "unit_operator": "demand1",
     }
     world.add_unit(
         id=23, unit_type="demand", params=demand_params, bidding_strategy="simple"

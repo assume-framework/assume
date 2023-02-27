@@ -1,3 +1,10 @@
+from datetime import datetime, timedelta
+
+from dateutil import rrule as rr
+from dateutil.relativedelta import relativedelta as rd
+
+from assume.common.marketclasses import MarketConfig, MarketProduct
+
 # relevant information
 # https://www.next-kraftwerke.de/wissen/spotmarkt-epex-spot
 # https://www.epexspot.com/sites/default/files/2023-01/22-10-25_TradingBrochure.pdf
@@ -62,6 +69,7 @@ epex_intraday_auction_config = MarketConfig(
 # IDM only 5000€/a
 # 15m IDM auction 5000€/a
 # https://www.epexspot.com/en/downloads#rules-fees-processes
+
 
 # Trading should start at 15:00
 def dynamic_end(current_time: datetime):
@@ -155,10 +163,9 @@ eex_future_trading_config = MarketConfig(
     market_mechanism="pay_as_bid",
 )
 
+
 # AfterMarket:
 # https://www.epexspot.com/en/tradingproducts#after-market-trading
-NOW = datetime.now()
-
 # Trading end should be 12:30 day after delivery (D+1) - dynamic repetition makes it possible
 def dynamic_repetition(current_time):
     if current_time.hour < 13:
@@ -338,7 +345,7 @@ miso_real_time_config = MarketConfig(
     maximum_bid=9999,
     minimum_bid=-9999,
     eligible_lambda=lambda agent: agent.location in BW,
-    clearing = "twoside_clearing"
+    clearing = "pay_as_clear"
 ) # pay-as-bid/merit-order
 
 
@@ -359,10 +366,8 @@ result_bids = clearing(self, input_bids)
 
 # TODO: ISO NE, ERCOT, CAISO
 
-
 ## Agenten müssen ihren Verpflichtungen nachkommen
 ## TODO: geographische Voraussetzungen - wer darf was - Marktbeitrittsbedingungen
-
 
 # LMP Markt:
 # https://www.e-education.psu.edu/eme801/node/498
