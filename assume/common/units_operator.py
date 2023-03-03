@@ -1,27 +1,30 @@
 import asyncio
-from assume.common.marketconfig import MarketConfig
-from assume.units import BaseUnit
-from assume.strategies import BaseStrategy
+import logging
 
 from mango import Role
 from mango.messages.message import Performatives
-from assume.common.orders import (
+
+from ..strategies import BaseStrategy
+from ..units import BaseUnit
+from .marketclasses import (
+    ClearingMessage,
+    MarketConfig,
+    OpeningMessage,
     Order,
     Orderbook,
-    OpeningMessage,
-    ClearingMessage,
 )
-import logging
+
 logger = logging.getLogger(__name__)
 
 
 class UnitsOperator(Role):
-    def __init__(self,
-                 available_markets: list[MarketConfig],
-                 opt_portfolio: dict[bool, BaseStrategy]=None
-                 ):
+    def __init__(
+        self,
+        available_markets: list[MarketConfig],
+        opt_portfolio: dict[bool, BaseStrategy] = None,
+    ):
         super().__init__()
-        
+
         self.available_markets = available_markets
         self.registered_markets: dict[str, MarketConfig] = {}
 
@@ -31,10 +34,10 @@ class UnitsOperator(Role):
         else:
             self.use_portfolio_opt = opt_portfolio[0]
             self.portfolio_strategy = opt_portfolio[1]
-        
+
         self.valid_orders = []
-        self.units : dict[str, BaseUnit] = {}
-                
+        self.units: dict[str, BaseUnit] = {}
+
     def setup(self):
         self.id = self.context.aid
         self.context.subscribe_message(
@@ -54,11 +57,9 @@ class UnitsOperator(Role):
                 self.register_market(market)
                 self.registered_markets[market.name] = market
 
-    
     def participate(self, market):
         # always participate at all markets
         return True
-
 
     def register_market(self, market):
         self.context.schedule_timestamp_task(
@@ -73,36 +74,37 @@ class UnitsOperator(Role):
             ),
             1,  # register after time was updated for the first time
         )
-        logger.debug(f'tried to register at market {market.name}')
+        logger.debug(f"tried to register at market {market.name}")
 
     def handle_opening(self, opening: OpeningMessage, meta: dict[str, str]):
-        logger.debug(f'Received opening from: {opening["market"]} {opening["start"]}.')
-        logger.debug(f'can bid until: {opening["stop"]}')
+        logger.debug(
+            f'Operator {self.id} received opening from: {opening["market"]} {opening["start"]}.'
+        )
+        logger.debug(f'Operator {self.id} can bid until: {opening["stop"]}')
 
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
-        print(f'Operator {self.id} got a call')
 
     def send_dispatch_plan(self):
         valid_orders = self.valid_orders
         # todo group by unit_id
         for unit_id, unit in self.units.items():
-            #unit.dispatch(valid_orders)
-            unit.current_time_step +=1
-    
+            # unit.dispatch(valid_orders)
+            unit.current_time_step += 1
+
     def handle_market_feedback(self, content: ClearingMessage, meta: dict[str, str]):
         logger.debug(f"got market result: {content}")
         orderbook: Orderbook = content["orderbook"]
         for bid in orderbook:
             self.valid_orders.append(bid)
-        
+
         self.send_dispatch_plan()
 
     async def submit_bids(self, opening):
         """
-            send the formulated order book to the market. OPtion for further
-            portfolio processing
+        send the formulated order book to the market. OPtion for further
+        portfolio processing
 
-            Return:
+        Return:
         """
 
         products = opening["products"]
@@ -129,27 +131,29 @@ class UnitsOperator(Role):
         # sourcery skip: merge-dict-assign
 
         """
-            Takes information from all units that the unit operator manages and
-            formulates the bid to the market from that according to the bidding strategy.
+        Takes information from all units that the unit operator manages and
+        formulates the bid to the market from that according to the bidding strategy.
 
-            Return: OrderBook that is submitted as a bid to the market
+        Return: OrderBook that is submitted as a bid to the market
         """
 
         orderbook: Orderbook = []
         for product in products:
-            if self.use_portfolio_opt==False:
+            if self.use_portfolio_opt == False:
                 for unit_id, unit in self.units.items():
                     order: Order = {}
                     order["start_time"] = product[0]
                     order["end_time"] = product[1]
                     order["only_hours"] = None
                     order["agent_id"] = (self.context.addr, self.context.aid)
-                    #get operational window for each unit
-                    operational_window= unit.calculate_operational_window()
-                    #get used bidding strategy for the unit
+                    # get operational window for each unit
+                    operational_window = unit.calculate_operational_window()
+                    # get used bidding strategy for the unit
                     unit_strategy = unit.bidding_strategy
-                    #take price from bidding strategy
-                    order["volume"], order["price"] = unit_strategy.calculate_bids(market,  operational_window)
+                    # take price from bidding strategy
+                    order["volume"], order["price"] = unit_strategy.calculate_bids(
+                        market, operational_window
+                    )
 
                     orderbook.append(order)
 
@@ -158,7 +162,13 @@ class UnitsOperator(Role):
 
         return orderbook
 
-    def add_unit(self, id:str, unit_class: BaseUnit, unit_params: dict, bidding_strategy: BaseStrategy=None):
+    def add_unit(
+        self,
+        id: str,
+        unit_class: BaseUnit,
+        unit_params: dict,
+        bidding_strategy: BaseStrategy = None,
+    ):
         """
         Create a unit.
         """
@@ -166,10 +176,13 @@ class UnitsOperator(Role):
         self.units[id].bidding_strategy = bidding_strategy
 
         if bidding_strategy is None and self.use_portfolio_opt == False:
-            raise ValueError("No bidding strategy defined for unit while not using portfolio optimization.")
+            raise ValueError(
+                "No bidding strategy defined for unit while not using portfolio optimization."
+            )
 
         self.units[id].reset()
-    #Needed data in the future 
+
+    # Needed data in the future
     """""
     def get_world_data(self, input_data):
         self.temperature = input_data.temperature

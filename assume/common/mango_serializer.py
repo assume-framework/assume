@@ -1,4 +1,4 @@
-from mango.messages.codecs import JSON
+from mango.messages.codecs import JSON, GenericProtoMsg
 import pickle
 
 

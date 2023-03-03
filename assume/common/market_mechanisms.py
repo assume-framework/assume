@@ -1,11 +1,10 @@
-
 import logging
 from itertools import groupby
 from operator import itemgetter
 
-from .marketconfig import MarketConfig, MarketProduct, Orderbook, Order
-
 from mango import Role
+
+from .marketclasses import MarketConfig, MarketProduct, Order, Orderbook
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +17,7 @@ def cumsum(orderbook: Orderbook):
     return orderbook
 
 
-def twoside_clearing(market_agent: Role, market_products: list[MarketProduct], **kwargs):
+def pay_as_clear(market_agent: Role, market_products: list[Order], **kwargs):
     market_getter = itemgetter("start_time", "end_time", "only_hours")
     accepted_orders = []
     rejected_orders = []
@@ -37,7 +36,9 @@ def twoside_clearing(market_agent: Role, market_products: list[MarketProduct], *
         sorted_supply_orders = sorted(supply_orders, key=lambda i: i["price"])
 
         # demand
-        sorted_demand_orders = sorted(demand_orders, key=lambda i: i["price"], reverse=True)
+        sorted_demand_orders = sorted(
+            demand_orders, key=lambda i: i["price"], reverse=True
+        )
 
         sorted_supply_orders = cumsum(sorted_supply_orders)
         sorted_demand_orders = cumsum(sorted_demand_orders)
@@ -51,7 +52,10 @@ def twoside_clearing(market_agent: Role, market_products: list[MarketProduct], *
                 # gen = total_generation + sorted_supply_orders[j]['volume']
                 if sorted_supply_orders[j]["cumsum"] >= -demand:
                     assert price <= sorted_supply_orders[j]["price"], "wrong order"
-                    if sorted_supply_orders[j]["price"] < sorted_demand_orders[i]["price"]:
+                    if (
+                        sorted_supply_orders[j]["price"]
+                        < sorted_demand_orders[i]["price"]
+                    ):
                         # generation is cheaper than demand
                         price = sorted_supply_orders[j]["price"]
                         demand = total_vol
@@ -88,6 +92,7 @@ def pay_as_bid(market_agent: Role, market_products: list[MarketProduct]):
 
         # product_orders = list(product_orders)
         for volume, orders in groupby(product_orders, lambda x: abs(x["volume"])):
+            product_orders = list(product_orders)
             demand_orders = filter(lambda x: x["volume"] < 0, product_orders)
             supply_orders = filter(lambda x: x["volume"] > 0, product_orders)
             # volume 0 is ignored/invalid
@@ -96,15 +101,17 @@ def pay_as_bid(market_agent: Role, market_products: list[MarketProduct]):
             sorted_supply_orders = sorted(supply_orders, key=lambda i: i["price"])
 
             # demand
-            sorted_demand_orders = sorted(demand_orders, key=lambda i: i["price"], reverse=True)
+            sorted_demand_orders = sorted(
+                demand_orders, key=lambda i: i["price"], reverse=True
+            )
 
-            min_len = min(len(sorted_supply_orders, len(sorted_demand_orders)))
+            min_len = min(len(sorted_supply_orders), len(sorted_demand_orders))
             i = 0
             for i in range(min_len):
-                if sorted_supply_orders[i]['price'] <= sorted_demand_orders[i]['price']:
+                if sorted_supply_orders[i]["price"] <= sorted_demand_orders[i]["price"]:
                     # pay as bid - so the generator gets payed more than he needed to operate
-                    sorted_supply_orders[i]['price'] = sorted_demand_orders[i]['price']
-                    
+                    sorted_supply_orders[i]["price"] = sorted_demand_orders[i]["price"]
+
                 else:
                     # as we have sorted before, the other bids/supply_orders can't be matched either
                     # once we get here
@@ -115,16 +122,21 @@ def pay_as_bid(market_agent: Role, market_products: list[MarketProduct]):
             rejected_orders.extend(sorted_demand_orders[i:])
             rejected_orders.extend(sorted_supply_orders[i:])
 
-    price = sum(map(lambda order: order['price'], accepted_orders))/len(accepted_orders)
-    volume = sum(map(lambda order: order['volume'], accepted_orders))
     # TODO price and volume is wrong if multiple products exist
-    if price == 0:
+    if len(accepted_orders) > 0:
+        price = sum(map(lambda order: order["price"], accepted_orders)) / len(
+            accepted_orders
+        )
+    else:
+
         price = market_agent.marketconfig.maximum_bid
+    volume = sum(map(lambda order: order["volume"], accepted_orders))
     meta = {"volume": volume, "price": price}
     market_agent.all_orders = rejected_orders
     # accepted orders can not be used in future
 
     return accepted_orders, meta
+
 
 # with partial accepted bids
 def pay_as_bid_partial(market_agent: Role, market_products: list[MarketProduct]):
@@ -145,7 +157,9 @@ def pay_as_bid_partial(market_agent: Role, market_products: list[MarketProduct])
         # generation
         sorted_supply_orders = sorted(supply_orders, key=lambda i: i["price"])
         # demand
-        sorted_demand_orders = sorted(demand_orders, key=lambda i: i["price"], reverse=True)
+        sorted_demand_orders = sorted(
+            demand_orders, key=lambda i: i["price"], reverse=True
+        )
 
         dem_vol, gen_vol = 0, 0
         # the following algorithm is inspired by one bar for generation and one for demand
@@ -207,8 +221,10 @@ def pay_as_bid_partial(market_agent: Role, market_products: list[MarketProduct])
                 for supply_order in to_commit:
                     supply_order["price"] = demand_order["price"]
 
-    price = sum(map(lambda order: order['price'], accepted_orders))/len(accepted_orders)
-    volume = sum(map(lambda order: order['volume'], accepted_orders))
+    price = sum(map(lambda order: order["price"], accepted_orders)) / len(
+        accepted_orders
+    )
+    volume = sum(map(lambda order: order["volume"], accepted_orders))
     # TODO price and volume is wrong if multiple products exist
     if price == 0:
         price = market_agent.marketconfig.maximum_bid
@@ -218,6 +234,7 @@ def pay_as_bid_partial(market_agent: Role, market_products: list[MarketProduct])
 
     return accepted_orders, meta
 
+
 # 1. multi-stage market -> clears locally, rejected_bids are pushed up a layer
 # 2. nodal pricing -> centralized market which handles different node_ids different - can also be used for country coupling
 # 3. nodal limited market -> clear by node_id, select cheapest generation orders from surrounding area up to max_capacity, clear market
@@ -225,16 +242,15 @@ def pay_as_bid_partial(market_agent: Role, market_products: list[MarketProduct])
 # 5.
 
 available_clearing_strategies = {
-    "one_side_market": "TODO",
-    "two_side_market": twoside_clearing,
-    "pay_as_bid": pay_as_bid,  # TODO
-    "pay_as_clear": twoside_clearing,
+    "pay_as_bid": pay_as_bid,
+    "pay_as_bid_partial": pay_as_bid_partial,
+    "pay_as_clear": pay_as_clear,
     "nodal_market": "TODO",
 }
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     from datetime import datetime, timedelta
+
     from dateutil import rrule as rr
     from dateutil.relativedelta import relativedelta as rd
 
@@ -244,7 +260,6 @@ if __name__ == '__main__':
         opening_hours=rr.rrule(
             rr.HOURLY,
             dtstart=datetime(2005, 6, 1),
-            until=datetime(2030, 12, 31),
             cache=True,
         ),
         opening_duration=timedelta(hours=1),
@@ -253,3 +268,60 @@ if __name__ == '__main__':
         price_unit="€/MW",
         market_mechanism="pay_as_clear",
     )
+
+    from ..markets.base_market import MarketRole
+    from ..common.utils import get_available_products
+    mr = MarketRole(simple_dayahead_auction_config)
+    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
+    products = get_available_products(
+        simple_dayahead_auction_config.market_products, next_opening
+    )
+    assert len(products) == 1
+
+    print(products)
+    start = products[0][0]
+    end = products[0][1]
+    only_hours = products[0][2]
+
+    orderbook: Orderbook = [
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": 120,
+            "price": 120,
+            "agent_id": "gen1",
+            "only_hours": None,
+        },
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": 80,
+            "price": 58,
+            "agent_id": "gen1",
+            "only_hours": None,
+        },
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": 100,
+            "price": 53,
+            "agent_id": "gen1",
+            "only_hours": None,
+        },
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": -180,
+            "price": 70,
+            "agent_id": "dem1",
+            "only_hours": None,
+        },
+
+    ]
+    simple_dayahead_auction_config.market_mechanism = available_clearing_strategies[simple_dayahead_auction_config.market_mechanism]
+    mr.all_orders = orderbook
+    clearing_result, meta = simple_dayahead_auction_config.market_mechanism(mr, products)
+    import pandas as pd
+    print(pd.DataFrame.from_dict(mr.all_orders))
+    print(pd.DataFrame.from_dict(clearing_result))
+    print(meta)

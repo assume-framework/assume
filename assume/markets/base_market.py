@@ -1,12 +1,14 @@
-from mango import Role
-
-from assume.common.marketconfig import MarketConfig, MarketOrderbook, Order, Orderbook, MarketProduct
-from assume.common.orders import get_available_products, is_mod_close, round_digits
+import logging
 from datetime import datetime, timedelta
 from itertools import groupby
-import logging
+
+from mango import Role
+
+from ..common.marketclasses import MarketConfig, MarketProduct, Order, Orderbook
+from ..common.utils import get_available_products, is_mod_close, round_digits
 
 logger = logging.getLogger(__name__)
+
 
 # add role per Market
 class MarketRole(Role):
@@ -16,17 +18,10 @@ class MarketRole(Role):
 
     def __init__(self, marketconfig: MarketConfig):
         super().__init__()
-        if isinstance(marketconfig.market_mechanism, str):
-            strategy = available_strategies.get(marketconfig.market_mechanism)
-            if not strategy:
-                raise Exception(f"invalid strategy {marketconfig.market_mechanism}")
-            marketconfig.market_mechanism = strategy
-
         self.marketconfig: MarketConfig = marketconfig
         self.registered_agents: list[str] = []
         self.open_slots = []
         self.all_orders: list[Order] = []
-        self.order_book: MarketOrderbook = {}
         self.market_result: Orderbook = []
 
     def setup(self):
@@ -122,11 +117,15 @@ class MarketRole(Role):
                 assert is_mod_close(
                     order["volume"], self.marketconfig.amount_tick
                 ), "amount_tick"
-                order["volume"] = round_digits(order["volume"], self.marketconfig.amount_tick)
+                order["volume"] = round_digits(
+                    order["volume"], self.marketconfig.amount_tick
+                )
                 assert is_mod_close(
                     order["price"], self.marketconfig.price_tick
                 ), "price_tick"
-                order["price"] = round_digits(order["price"], self.marketconfig.price_tick)
+                order["price"] = round_digits(
+                    order["price"], self.marketconfig.price_tick
+                )
                 if not order.get("only_hours"):
                     order["only_hours"] = None
 
@@ -138,7 +137,6 @@ class MarketRole(Role):
                 for field in self.marketconfig.additional_fields:
                     assert order[field], f"missing field: {field}"
                 self.all_orders.append(order)
-            self.order_book[agent_id] = orderbook
         except Exception as e:
             logger.error(f"error handling message from {agent_id} - {e}")
             self.context.schedule_instant_acl_message(
