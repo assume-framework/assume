@@ -37,13 +37,6 @@ async def main():
     world.add_market(market_operator_id="market",marketconfig=our_marketconfig)
     logger.info(f"marketconfig {our_marketconfig}")
 
-
-    def mein_market_clearing(market_agent: Role, market_products: list[MarketProduct]):
-        # TODO example
-        pass
-    
-    world.available_clearing_strategies['mein_market_clearing'] = mein_market_clearing
-    
     # create unit operators
     for operator_id in range(1,4):
          world.add_unit_operator(id=f'operator_{operator_id}')
