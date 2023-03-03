@@ -1,4 +1,4 @@
-from assume import world
+from assume.world import World
 
 __version__ = "0.0.1"
 

@@ -1,2 +1,1 @@
-x= "Hello ASSUME"
-print(x)
+from .base_market import MarketRole

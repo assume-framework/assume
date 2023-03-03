@@ -199,8 +199,8 @@ class PowerPlant(BaseUnit):
         
         t = self.current_time_step
 
-        fuel_price = self.fuel_price[t]
-        co2_price = self.co2_price[t]
+        fuel_price = 10#self.fuel_price[t]
+        co2_price = 12#self.co2_price[t]
 
         # Partial load efficiency dependent marginal costs
         if not partial_load_eff:
