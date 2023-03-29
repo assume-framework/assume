@@ -4,22 +4,21 @@ import logging
 from mango import RoleAgent, create_container
 from mango.util.clock import ExternalClock
 
-from assume.common import MarketConfig
-from assume.units import PowerPlant, Demand
-from assume.common import UnitsOperator
-from assume.markets import MarketRole
-from assume.common import available_clearing_strategies
-from assume.strategies import NaiveStrategyNoMarkUp
-from assume.common import mango_codec_factory
+from .common import MarketConfig
+from .units import PowerPlant, Demand
+from .common import UnitsOperator
+from .markets import MarketRole
+from .common import available_clearing_strategies
+from .strategies import NaiveStrategyNoMarkUp
+from .common import mango_codec_factory
 
 logger = logging.getLogger(__name__)
 
 
-
 # %%
 class World():
-    def __init__(self):
-        self.addr = ("localhost", 9099)
+    def __init__(self, ifac_addr="0.0.0.0", port=9099):
+        self.addr = (ifac_addr, port)
 
         self.market_operator_agents =  {}
         self.markets = {}

@@ -5,8 +5,6 @@ from typing import Callable, TypedDict
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
 from mango import Agent, Role
-from numpy.typing import ArrayLike
-
 
 # describes an order which can be either generation (volume > 0) or demand (volume < 0)
 class Order(TypedDict):
@@ -92,7 +90,7 @@ class ClearingMessage(TypedDict):
 # - Power Purchase Agreements (PPA) -> A buys everything B generates for price x
 # - Swing Contract ->
 contract_type = Callable[[Agent, Agent], None]
-market_contract_type = Callable[[Agent, Agent, ArrayLike], None]
+market_contract_type = Callable[[Agent, Agent, list], None]
 
 
 def ppa(buyer: Agent, seller: Agent):

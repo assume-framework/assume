@@ -3,10 +3,10 @@ ASSUME Framework working directory
 
 ## Get started
 
-install the assume framework in editable/development mode:
+install the assume framework:
 
 ```
-pip install -e .
+poetry install
 ```
 
 run the example market simulation:

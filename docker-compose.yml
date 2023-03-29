@@ -1,0 +1,54 @@
+version: "3.9"
+services:
+  assume_db:
+    container_name: assume_db
+    image: timescale/timescaledb:latest-pg15
+    restart: always
+    environment:
+      - POSTGRES_USER=assume
+      - POSTGRES_PASSWORD=assume
+      - POSTGRES_DB=assume
+      - TS_TUNE_MAX_CONNS=500
+    ports:
+      - 5432:5432
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+
+  grafana:
+    image: grafana/grafana-oss
+    container_name: dmas-grafana
+    user: "104"
+    depends_on:
+      - assume_db
+    ports:
+      - 3001:3000
+    environment:
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_INSTALL_PLUGINS: volkovlabs-echarts-panel
+    volumes:
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/dashboard-definitions:/etc/grafana/provisioning/dashboard-definitions
+    restart: always
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+
+
+  simulation:
+    container_name: simulation
+    image: assume:latest
+    build: .
+    environment:
+      DB_URI: 'postgresql+psycopg2://assume:assume@assume_db/assume'
+    ports:
+      - 5000:5000
+      - 4000:4000
+    depends_on:
+      - assume_db

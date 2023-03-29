@@ -5,7 +5,6 @@ importlib-resources==5.12.0
 kiwisolver==1.4.4
 mango-agents @ git+https://gitlab.com/mango-agents/mango@development
 matplotlib==3.7.0
-numpy==1.24.2
 packaging==23.0
 paho-mqtt==1.5.1
 pandas==1.5.3
