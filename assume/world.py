@@ -151,6 +151,6 @@ class World:
     async def run_simulation(self, stop: float):
         while self.clock.time < stop:
             await self.step()
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.0001)
 
         await self.container.shutdown()
