@@ -52,7 +52,7 @@ class MarketConfig:
     # continuous markets are clearing just very fast and keep unmatched orders between clearings
     opening_hours: rr.rrule  # dtstart ist start/introduction of market
     opening_duration: timedelta
-    market_mechanism: market_mechanism  # market_mechanism determines wether old offers are deleted (continuous) or not (auction) after clearing
+    market_mechanism: market_mechanism | str  # market_mechanism determines wether old offers are deleted (continuous) or not (auction) after clearing
     # if continuous: one of [pay_as_bid, pay_as_ask] else: pay_as_clear
 
     maximum_bid: float = 9999

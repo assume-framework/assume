@@ -21,7 +21,7 @@ class UnitsOperator(Role):
     def __init__(
         self,
         available_markets: list[MarketConfig],
-        opt_portfolio: dict[bool, BaseStrategy] = None,
+        opt_portfolio: tuple[bool, BaseStrategy] = None,
     ):
         super().__init__()
 
@@ -78,7 +78,7 @@ class UnitsOperator(Role):
 
     def handle_opening(self, opening: OpeningMessage, meta: dict[str, str]):
         log.debug(
-            f'Operator {self.id} received opening from: {opening["market"]} {opening["start"]}.'
+            f'Operator {self.id} received opening from: {opening["market_id"]} {opening["start"]}.'
         )
         log.debug(f'Operator {self.id} can bid until: {opening["stop"]}')
 
@@ -165,9 +165,9 @@ class UnitsOperator(Role):
     def add_unit(
         self,
         id: str,
-        unit_class: BaseUnit,
+        unit_class: type[BaseUnit],
         unit_params: dict,
-        bidding_strategy: BaseStrategy = None,
+        bidding_strategy: type[BaseStrategy] = None,
     ):
         """
         Create a unit.

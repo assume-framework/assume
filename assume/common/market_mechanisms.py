@@ -1,6 +1,7 @@
 import logging
 from itertools import groupby
 from operator import itemgetter
+from typing import Callable
 
 from mango import Role
 
@@ -241,7 +242,7 @@ def pay_as_bid_partial(market_agent: Role, market_products: list[MarketProduct])
 # 4. one sided market? - fixed demand as special case of two sided market
 # 5.
 
-available_clearing_strategies = {
+available_clearing_strategies: dict[str, Callable] = {
     "pay_as_bid": pay_as_bid,
     "pay_as_bid_partial": pay_as_bid_partial,
     "pay_as_clear": pay_as_clear,

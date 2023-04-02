@@ -44,9 +44,9 @@ class World:
 
         self.export_csv = export_csv
 
-        self.market_operator_agents = {}
-        self.markets = {}
-        self.unit_operators = {}
+        self.market_operator_agents: dict[str, RoleAgent] = {}
+        self.markets: dict[str, MarketConfig] = {}
+        self.unit_operators: dict[str, UnitsOperator] = {}
 
         self.unit_types = {"power_plant": PowerPlant, "demand": Demand}
         self.bidding_types = {"simple": NaiveStrategyNoMarkUp}
@@ -72,7 +72,7 @@ class World:
             None
 
         """
-        uo = UnitsOperator(available_markets=self.markets.values())
+        uo = UnitsOperator(available_markets=list(self.markets.values()))
         # creating a new role agent and apply the role of a unitsoperator
         unit_operator = RoleAgent(self.container, suggested_aid=f"{id}")
         unit_operator.add_role(uo)
@@ -81,7 +81,7 @@ class World:
         self.unit_operators[id] = uo
 
     def add_unit(
-        self, id: str, unit_type: str, params: dict, bidding_strategy: str = None
+        self, id: str, unit_type: str, params: dict, bidding_strategy: str = ""
     ) -> None:
         """
         Create a unit based on the provided unit type and maps it to the specified unit
