@@ -1,5 +1,6 @@
-from mango.messages.codecs import JSON, GenericProtoMsg
 import pickle
+
+from mango.messages.codecs import JSON, GenericProtoMsg
 
 
 def generic_json_serializer():

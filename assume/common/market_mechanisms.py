@@ -6,7 +6,7 @@ from mango import Role
 
 from .marketclasses import MarketConfig, MarketProduct, Order, Orderbook
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
 def cumsum(orderbook: Orderbook):
@@ -25,7 +25,7 @@ def pay_as_clear(market_agent: Role, market_products: list[Order], **kwargs):
     for product, product_orders in groupby(market_agent.all_orders, market_getter):
         if product not in market_products:
             rejected_orders.extend(product_orders)
-            # logger.debug(f'found unwanted bids for {product} should be {market_products}')
+            # log.debug(f'found unwanted bids for {product} should be {market_products}')
             continue
         product_orders = list(product_orders)
         demand_orders = filter(lambda x: x["volume"] < 0, product_orders)
@@ -87,7 +87,7 @@ def pay_as_bid(market_agent: Role, market_products: list[MarketProduct]):
     for product, product_orders in groupby(market_agent.all_orders, market_getter):
         if product not in market_products:
             rejected_orders.extend(product_orders)
-            # logger.debug(f'found unwanted bids for {product} should be {market_products}')
+            # log.debug(f'found unwanted bids for {product} should be {market_products}')
             continue
 
         # product_orders = list(product_orders)
@@ -146,7 +146,7 @@ def pay_as_bid_partial(market_agent: Role, market_products: list[MarketProduct])
     for product, product_orders in groupby(market_agent.all_orders, market_getter):
         if product not in market_products:
             rejected_orders.extend(product_orders)
-            # logger.debug(f'found unwanted bids for {product} should be {market_products}')
+            # log.debug(f'found unwanted bids for {product} should be {market_products}')
             continue
 
         product_orders = list(product_orders)
@@ -269,8 +269,9 @@ if __name__ == "__main__":
         market_mechanism="pay_as_clear",
     )
 
-    from ..markets.base_market import MarketRole
     from ..common.utils import get_available_products
+    from ..markets.base_market import MarketRole
+
     mr = MarketRole(simple_dayahead_auction_config)
     next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
     products = get_available_products(
@@ -316,12 +317,16 @@ if __name__ == "__main__":
             "agent_id": "dem1",
             "only_hours": None,
         },
-
     ]
-    simple_dayahead_auction_config.market_mechanism = available_clearing_strategies[simple_dayahead_auction_config.market_mechanism]
+    simple_dayahead_auction_config.market_mechanism = available_clearing_strategies[
+        simple_dayahead_auction_config.market_mechanism
+    ]
     mr.all_orders = orderbook
-    clearing_result, meta = simple_dayahead_auction_config.market_mechanism(mr, products)
+    clearing_result, meta = simple_dayahead_auction_config.market_mechanism(
+        mr, products
+    )
     import pandas as pd
+
     print(pd.DataFrame.from_dict(mr.all_orders))
     print(pd.DataFrame.from_dict(clearing_result))
     print(meta)

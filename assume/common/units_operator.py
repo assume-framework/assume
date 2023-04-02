@@ -14,7 +14,7 @@ from .marketclasses import (
     Orderbook,
 )
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
 class UnitsOperator(Role):
@@ -74,13 +74,13 @@ class UnitsOperator(Role):
             ),
             1,  # register after time was updated for the first time
         )
-        logger.debug(f"tried to register at market {market.name}")
+        log.debug(f"tried to register at market {market.name}")
 
     def handle_opening(self, opening: OpeningMessage, meta: dict[str, str]):
-        logger.debug(
+        log.debug(
             f'Operator {self.id} received opening from: {opening["market"]} {opening["start"]}.'
         )
-        logger.debug(f'Operator {self.id} can bid until: {opening["stop"]}')
+        log.debug(f'Operator {self.id} can bid until: {opening["stop"]}')
 
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
 
@@ -92,7 +92,7 @@ class UnitsOperator(Role):
             unit.current_time_step += 1
 
     def handle_market_feedback(self, content: ClearingMessage, meta: dict[str, str]):
-        logger.debug(f"got market result: {content}")
+        log.debug(f"got market result: {content}")
         orderbook: Orderbook = content["orderbook"]
         for bid in orderbook:
             self.valid_orders.append(bid)
@@ -109,7 +109,7 @@ class UnitsOperator(Role):
 
         products = opening["products"]
         market = self.registered_markets[opening["market"]]
-        logger.debug(f"setting bids for {market.name}")
+        log.debug(f"setting bids for {market.name}")
         orderbook = await self.formulate_bids(market, products)
         acl_metadata = {
             "performative": Performatives.inform,
