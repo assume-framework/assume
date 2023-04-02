@@ -35,8 +35,8 @@
       },
       "description": "",
       "gridPos": {
-        "h": 8,
-        "w": 12,
+        "h": 5,
+        "w": 13,
         "x": 0,
         "y": 0
       },
@@ -107,15 +107,16 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "€/MW"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 16,
-        "w": 24,
+        "h": 14,
+        "w": 12,
         "x": 0,
-        "y": 8
+        "y": 5
       },
       "id": 2,
       "options": {
@@ -126,7 +127,7 @@
           "showLegend": true
         },
         "tooltip": {
-          "mode": "single",
+          "mode": "multi",
           "sort": "none"
         }
       },
@@ -140,7 +141,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": false,
-          "rawSql": "SELECT\n  \"time\" AS \"time\",\n  price,\n  volume\nFROM market_meta\nWHERE\n  $__unixEpochFilter(\"time\")\nORDER BY 1",
+          "rawSql": "SELECT\n  \"time\" AS \"time\",\n  price\nFROM market_meta\nWHERE\n  $__unixEpochFilter(\"time\")\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -150,7 +151,126 @@
                 ],
                 "type": "column"
               }
-            ],
+            ]
+          ],
+          "table": "market_meta",
+          "timeColumn": "\"time\"",
+          "timeColumnType": "float8",
+          "where": [
+            {
+              "name": "$__unixEpochFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Market Price",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "megwatt"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "price"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "€/MW"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 14,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": false,
+          "rawSql": "SELECT\n  \"time\" AS \"time\",\n  volume\nFROM market_meta\nWHERE\n  $__unixEpochFilter(\"time\")\nORDER BY 1",
+          "refId": "A",
+          "select": [
             [
               {
                 "params": [
@@ -172,7 +292,7 @@
           ]
         }
       ],
-      "title": "Market Result",
+      "title": "Market Volume",
       "type": "timeseries"
     }
   ],
@@ -191,6 +311,6 @@
   "timezone": "",
   "title": "ASSUME",
   "uid": "ap3RcmY4z",
-  "version": 1,
+  "version": 3,
   "weekStart": ""
 }
