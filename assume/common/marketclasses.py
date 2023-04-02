@@ -6,6 +6,7 @@ from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
 from mango import Agent, Role
 
+
 # describes an order which can be either generation (volume > 0) or demand (volume < 0)
 class Order(TypedDict):
     start_time: datetime | float

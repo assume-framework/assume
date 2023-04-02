@@ -18,7 +18,7 @@ services:
         constraints: [node.role == manager]
 
   grafana:
-    image: grafana/grafana-oss
+    image: grafana/grafana-oss:9.2.15
     container_name: dmas-grafana
     user: "104"
     depends_on:
@@ -29,6 +29,7 @@ services:
       GF_SECURITY_ALLOW_EMBEDDING: "true"
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_INSTALL_PLUGINS: volkovlabs-echarts-panel
+      GF_SECURITY_ADMIN_PASSWORD: "assume"
     volumes:
       - ./grafana/datasources:/etc/grafana/provisioning/datasources
       - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
@@ -46,7 +47,7 @@ services:
     image: assume:latest
     build: .
     environment:
-      DB_URI: 'postgresql+psycopg2://assume:assume@assume_db/assume'
+      DATABASE_URI: 'postgresql://assume:assume@assume_db/assume'
     ports:
       - 5000:5000
       - 4000:4000

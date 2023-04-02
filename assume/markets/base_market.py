@@ -1,13 +1,15 @@
 import logging
 from datetime import datetime, timedelta
 from itertools import groupby
+from pathlib import Path
 
+import pandas as pd
 from mango import Role
 
 from ..common.marketclasses import MarketConfig, MarketProduct, Order, Orderbook
 from ..common.utils import get_available_products, is_mod_close, round_digits
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
 # add role per Market
@@ -51,8 +53,10 @@ class MarketRole(Role):
             # TODO safer type check? dataclass?
         )
         current = datetime.fromtimestamp(self.context.current_timestamp)
-        next_opening = self.marketconfig.opening_hours.after(
-            current + timedelta(days=1)
+        next_opening = self.marketconfig.opening_hours.after(current)
+        market_closing = next_opening + self.marketconfig.opening_duration
+        log.info(
+            f"first market opening: {self.marketconfig.name} - {next_opening} - {market_closing}"
         )
         self.context.schedule_timestamp_task(
             self.next_opening(), next_opening.timestamp()
@@ -62,7 +66,7 @@ class MarketRole(Role):
         current = datetime.fromtimestamp(self.context.current_timestamp)
         next_opening = self.marketconfig.opening_hours.after(current)
         if not next_opening:
-            logger.info(f"market {self.marketconfig.name} - does not reopen")
+            log.info(f"market {self.marketconfig.name} - does not reopen")
             return
 
         market_closing = next_opening + self.marketconfig.opening_duration
@@ -82,8 +86,8 @@ class MarketRole(Role):
         self.context.schedule_timestamp_task(
             self.next_opening(), next_opening.timestamp()
         )
-        logger.info(
-            f"market {self.marketconfig.name} - {next_opening} - {market_closing}"
+        log.info(
+            f"next market opening: {self.marketconfig.name} - {next_opening} - {market_closing}"
         )
 
         for agent in self.registered_agents:
@@ -138,7 +142,7 @@ class MarketRole(Role):
                     assert order[field], f"missing field: {field}"
                 self.all_orders.append(order)
         except Exception as e:
-            logger.error(f"error handling message from {agent_id} - {e}")
+            log.error(f"error handling message from {agent_id} - {e}")
             self.context.schedule_instant_acl_message(
                 content={"context": "Rejected"},
                 receiver_addr=agent_addr,
@@ -171,9 +175,17 @@ class MarketRole(Role):
                 receiver_id=aid,
                 acl_metadata=meta,
             )
-
         # clear_price = sorted(self.market_result, lambda o: o['price'])[0]
-        logger.info(
+        log.info(
             f'clearing price for {self.marketconfig.name} is {market_meta["price"]}, volume: {market_meta["volume"]}'
         )
-        # TODO store metrics about latest clearing
+        market_meta["name"] = self.marketconfig.name
+        market_meta["time"] = self.context.current_timestamp
+        df = pd.DataFrame.from_dict([market_meta])
+        if self.context.data.export_csv:
+            p = Path(self.context.data.export_csv)
+            p.mkdir(parents=True, exist_ok=True)
+            market_data_path = p.joinpath("market_meta.csv")
+            df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
+        df.to_sql("market_meta", self.context.data.db.bind, if_exists="append")
+        return self.market_result

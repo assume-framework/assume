@@ -1,30 +1,52 @@
 # %%
 import asyncio
 import logging
+import time
+
 from mango import RoleAgent, create_container
 from mango.util.clock import ExternalClock
+from sqlalchemy import create_engine
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.orm import scoped_session, sessionmaker
 
-from .common import MarketConfig
-from .units import PowerPlant, Demand
-from .common import UnitsOperator
+from .common import (
+    MarketConfig,
+    UnitsOperator,
+    available_clearing_strategies,
+    mango_codec_factory,
+)
 from .markets import MarketRole
-from .common import available_clearing_strategies
 from .strategies import NaiveStrategyNoMarkUp
-from .common import mango_codec_factory
-
-logger = logging.getLogger(__name__)
+from .units import Demand, PowerPlant
 
 
 # %%
 class World:
-    def __init__(self, ifac_addr="0.0.0.0", port=9099):
+    def __init__(
+        self,
+        ifac_addr: str = "0.0.0.0",
+        port: int = 9099,
+        database_uri: str = "",
+        export_csv=False,
+    ):
+        self.log = logging.getLogger(__name__)
         self.addr = (ifac_addr, port)
+        self.db = scoped_session(sessionmaker(create_engine(database_uri)))
+        connected = False
+        while not connected:
+            try:
+                self.db.connection()
+                connected = True
+                self.log.info("connected to db")
+            except OperationalError:
+                self.log.error(f"could not connect to {database_uri}, trying again")
+            time.sleep(2)
+
+        self.export_csv = export_csv
 
         self.market_operator_agents = {}
         self.markets = {}
         self.unit_operators = {}
-
-        self.logger = logging.getLogger(__name__)
 
         self.unit_types = {"power_plant": PowerPlant, "demand": Demand}
         self.bidding_types = {"simple": NaiveStrategyNoMarkUp}
@@ -35,7 +57,6 @@ class World:
         self.container = await create_container(
             addr=self.addr, clock=self.clock, codec=mango_codec_factory()
         )
-        # agent is implicit added to self.container.agents
 
     def add_unit_operator(self, id: str) -> None:
         """
@@ -100,7 +121,6 @@ class World:
         )
 
     def add_market(self, market_operator_id: int, marketconfig: MarketConfig):
-
         """
         including the markets in the market container
 
@@ -126,7 +146,6 @@ class World:
         self.markets[f"{market_operator_id}_{marketconfig.name}"] = marketconfig
 
     def add_market_operator(self, id):
-
         """
         creates the market operator/s
 
@@ -143,14 +162,20 @@ class World:
     async def step(self):
         next_activity = self.clock.get_next_activity()
         if not next_activity:
-            self.logger.info("simulation finished - no schedules left")
+            self.log.info("simulation finished - no schedules left")
             return None
 
         self.clock.set_time(next_activity)
 
     async def run_simulation(self, stop: float):
+        # agent is implicit added to self.container._agents
+        for agent in self.container._agents.values():
+            # TODO add a Role which does exactly this
+            agent._role_context.data.db = self.db
+            agent._role_context.data.export_csv = self.export_csv
+
         while self.clock.time < stop:
-            await self.step()
             await asyncio.sleep(0.0001)
+            await self.step()
 
         await self.container.shutdown()

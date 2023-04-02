@@ -32,7 +32,9 @@ paho-mqtt = "^1.5.1"
 mango-agents = {git = "https://gitlab.com/mango-agents/mango"}
 tqdm = "^4.64.1"
 python-dateutil = "^2.8.2"
-
+sqlalchemy = "^2.0.8"
+pandas = {version = "^2.0.0rc1", allow-prereleases = true}
+psycopg2-binary = "^2.9.5"
 
 [tool.poetry.group.dev.dependencies]
 black = "^22.8.0"

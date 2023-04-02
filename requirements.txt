@@ -7,7 +7,6 @@ mango-agents @ git+https://gitlab.com/mango-agents/mango@development
 matplotlib==3.7.0
 packaging==23.0
 paho-mqtt==1.5.1
-pandas==1.5.3
 Pillow==9.4.0
 protobuf==3.13.0
 pyparsing==3.0.9
@@ -16,3 +15,5 @@ pytz==2022.7.1
 six==1.16.0
 tqdm==4.64.1
 zipp==3.14.0
+pandas==2.0.0rc1
+SQLAlchemy==2.0.8

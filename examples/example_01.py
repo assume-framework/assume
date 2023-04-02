@@ -1,17 +1,25 @@
 # %%
-import assume
 import asyncio
-from dateutil import rrule as rr
-from datetime import datetime, timedelta
 import logging
-from mango import Role
+from datetime import datetime, timedelta
+from os import getenv
 
-logger = logging.getLogger(__name__)
+from dateutil import rrule as rr
+
+import assume
+
+log = logging.getLogger(__name__)
+
+EXPORT_CSV_PATH = str(getenv("EXPORT_CSV_PATH", "./output"))
+DATABASE_URI = getenv("DATABASE_URI", "sqlite:///./output/test.db")
+# DATABASE_URI = getenv(
+#     "DATABASE_URI", "postgresql://assume:assume@localhost:5432/assume"
+# )
 
 
 # %%
 async def main():
-    world = assume.World()
+    world = assume.World(database_uri=DATABASE_URI, export_csv=EXPORT_CSV_PATH)
     start = datetime(2019, 1, 1).timestamp()
     end = datetime(2019, 1, 3).timestamp()
 
@@ -38,7 +46,7 @@ async def main():
     )
     world.add_market_operator(id="market")
     world.add_market(market_operator_id="market", marketconfig=our_marketconfig)
-    logger.info(f"marketconfig {our_marketconfig}")
+    log.info(f"marketconfig {our_marketconfig}")
 
     # create unit operators
     for operator_id in range(1, 4):
