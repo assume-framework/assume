@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Callable, TypedDict
+from typing import Callable, TypedDict, Union
 
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
@@ -9,8 +9,8 @@ from mango import Agent, Role
 
 # describes an order which can be either generation (volume > 0) or demand (volume < 0)
 class Order(TypedDict):
-    start_time: datetime | float
-    end_time: datetime | float
+    start_time: Union[datetime, float]
+    end_time: Union[datetime, float]
     volume: float  # positive if generation
     price: float
     only_hours: tuple[int, int]
@@ -33,10 +33,8 @@ class MarketProduct:
         rd()
     )  # when does the first delivery begin, in relation to market start
     # this should be a multiple of duration
-    only_hours: tuple[
-        int, int
-    ] | None = None  # e.g. (8,20) - for peak trade, (20, 8) for off-peak, none for base
-    eligible_lambda_function: eligible_lambda | None = None
+    only_hours: Union[tuple[int, int], None] = None  # e.g. (8,20) - for peak trade, (20, 8) for off-peak, none for base
+    eligible_lambda_function: Union[eligible_lambda, None] = None
 
 
 market_mechanism = Callable[[Role, list[MarketProduct]], tuple[Orderbook, dict]]
@@ -52,7 +50,7 @@ class MarketConfig:
     # continuous markets are clearing just very fast and keep unmatched orders between clearings
     opening_hours: rr.rrule  # dtstart ist start/introduction of market
     opening_duration: timedelta
-    market_mechanism: market_mechanism | str  # market_mechanism determines wether old offers are deleted (continuous) or not (auction) after clearing
+    market_mechanism: Union[market_mechanism, str]  # market_mechanism determines wether old offers are deleted (continuous) or not (auction) after clearing
     # if continuous: one of [pay_as_bid, pay_as_ask] else: pay_as_clear
 
     maximum_bid: float = 9999

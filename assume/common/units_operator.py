@@ -99,7 +99,7 @@ class UnitsOperator(Role):
 
         self.send_dispatch_plan()
 
-    async def submit_bids(self, opening):
+    async def submit_bids(self, opening: OpeningMessage):
         """
         send the formulated order book to the market. OPtion for further
         portfolio processing
@@ -108,7 +108,7 @@ class UnitsOperator(Role):
         """
 
         products = opening["products"]
-        market = self.registered_markets[opening["market"]]
+        market = self.registered_markets[opening["market_id"]]
         log.debug(f"setting bids for {market.name}")
         orderbook = await self.formulate_bids(market, products)
         acl_metadata = {

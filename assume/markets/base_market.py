@@ -75,7 +75,7 @@ class MarketRole(Role):
         )
         opening_message = {
             "context": "opening",
-            "market": self.marketconfig.name,
+            "market_id": self.marketconfig.name,
             "start": next_opening,
             "stop": market_closing,
             "products": products,
@@ -168,7 +168,7 @@ class MarketRole(Role):
             await self.context.send_acl_message(
                 {
                     "context": "clearing",
-                    "market": self.marketconfig.name,
+                    "market_id": self.marketconfig.name,
                     "orderbook": list(accepted_orderbook),
                 },
                 receiver_addr=addr,
