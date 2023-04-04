@@ -37,6 +37,7 @@ class Demand(BaseUnit):
         self.volume = volume
         self.bidding_strategy = bidding_strategy
         self.location = location
+        self.total_power_output = []
 
     def reset(self):
         self.current_time_step = 0

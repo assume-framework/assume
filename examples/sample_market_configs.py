@@ -29,6 +29,11 @@ epex_dayahead_auction_config = MarketConfig(
     price_unit="€/MW",
     market_mechanism="pay_as_clear",
 )
+
+
+# Bewertung überlegen wie ich
+# Paper-Title: Presentation of a flexible market abstraction model for agent-based simulations
+
 # uniform pricing/merit order
 
 # EPEX Intraday-Auction:

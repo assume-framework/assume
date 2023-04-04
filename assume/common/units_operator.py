@@ -85,11 +85,11 @@ class UnitsOperator(Role):
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
 
     def send_dispatch_plan(self):
-        valid_orders = self.valid_orders
         # todo group by unit_id
         for unit_id, unit in self.units.items():
             # unit.dispatch(valid_orders)
             unit.current_time_step += 1
+            unit.total_power_output.append(self.valid_orders[0]["volume"])
 
     def handle_market_feedback(self, content: ClearingMessage, meta: dict[str, str]):
         log.debug(f"got market result: {content}")

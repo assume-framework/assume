@@ -46,7 +46,7 @@ async def main():
     )
     world.add_market_operator(id="market")
     world.add_market(market_operator_id="market", marketconfig=our_marketconfig)
-    log.info(f"marketconfig {our_marketconfig}")
+    #log.info(f"marketconfig {our_marketconfig}")
 
     # create unit operators
     for operator_id in range(1, 4):
@@ -82,7 +82,6 @@ async def main():
     world.add_unit(
         id=23, unit_type="demand", params=demand_params, bidding_strategy="simple"
     )
-    print(world)
     await world.run_simulation(end)
 
 

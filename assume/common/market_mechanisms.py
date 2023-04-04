@@ -3,7 +3,7 @@ from itertools import groupby
 from operator import itemgetter
 from typing import Callable
 
-from mango import Role
+from ..markets.base_market import MarketRole
 
 from .marketclasses import MarketConfig, MarketProduct, Order, Orderbook
 
@@ -18,16 +18,81 @@ def cumsum(orderbook: Orderbook):
     return orderbook
 
 
-def pay_as_clear(market_agent: Role, market_products: list[Order], **kwargs):
+# does not allow to have partially accepted bids
+# all or nothing
+def pay_as_clear_aon(market_agent: MarketRole, market_products: list[MarketProduct]):
+    """
+    This implements pay-as-clear where each bids volume needs an exactly matching order with the same volume.
+    Partial clearing is not allowed here.
+    This has the side effect, that the cleared price can be much higher if bids with different volume are accepted
+    """
     market_getter = itemgetter("start_time", "end_time", "only_hours")
-    accepted_orders = []
-    rejected_orders = []
-    price, demand = 0, 0
+    accepted_orders: Orderbook = []
+    rejected_orders: Orderbook = []
+    clear_price = market_agent.marketconfig.minimum_bid
     for product, product_orders in groupby(market_agent.all_orders, market_getter):
         if product not in market_products:
             rejected_orders.extend(product_orders)
             # log.debug(f'found unwanted bids for {product} should be {market_products}')
             continue
+
+        # product_orders = list(product_orders)
+        for volume, orders in groupby(product_orders, lambda x: abs(x["volume"])):
+            product_orders = list(product_orders)
+            demand_orders = filter(lambda x: x["volume"] < 0, product_orders)
+            supply_orders = filter(lambda x: x["volume"] > 0, product_orders)
+            # volume 0 is ignored/invalid
+
+            # generation
+            sorted_supply_orders = sorted(supply_orders, key=lambda i: i["price"])
+
+            # demand
+            sorted_demand_orders = sorted(
+                demand_orders, key=lambda i: i["price"], reverse=True
+            )
+
+            min_len = min(len(sorted_supply_orders), len(sorted_demand_orders))
+            i = 0
+            for i in range(min_len):
+                if sorted_supply_orders[i]["price"] <= sorted_demand_orders[i]["price"]:
+                    # pay as clear - all accepted receive the highest needed/cleared price
+                    if clear_price < sorted_supply_orders[i]["price"]:
+                        clear_price = sorted_supply_orders[i]["price"]
+                else:
+                    # as we have sorted before, the other bids/supply_orders can't be matched either
+                    # once we get here
+                    break
+            # resulting i is the cut point
+            accepted_orders.extend(sorted_demand_orders[:i])
+            accepted_orders.extend(sorted_supply_orders[:i])
+            rejected_orders.extend(sorted_demand_orders[i:])
+            rejected_orders.extend(sorted_supply_orders[i:])
+
+    # TODO price is wrong if multiple products exist
+    for order in accepted_orders:
+        order["price"] = clear_price
+    volume = sum(map(lambda order: order["volume"], accepted_orders))
+    meta = {"volume": volume, "price": clear_price}
+
+    # remember unused orders - necessary if the same hour will be cleared again
+    market_agent.all_orders = rejected_orders
+    # accepted orders can not be used in future
+    return accepted_orders, meta
+
+
+# with partial accepted bids
+def pay_as_clear(market_agent: MarketRole, market_products: list[MarketProduct]):
+    market_getter = itemgetter("start_time", "end_time", "only_hours")
+    accepted_orders: Orderbook = []
+    rejected_orders: Orderbook = []
+    clear_price = 0
+    for product, product_orders in groupby(market_agent.all_orders, market_getter):
+        accepted_product_orders: Orderbook = []
+        if product not in market_products:
+            rejected_orders.extend(product_orders)
+            # log.debug(f'found unwanted bids for {product} should be {market_products}')
+            continue
+
         product_orders = list(product_orders)
         demand_orders = filter(lambda x: x["volume"] < 0, product_orders)
         supply_orders = filter(lambda x: x["volume"] > 0, product_orders)
@@ -35,45 +100,82 @@ def pay_as_clear(market_agent: Role, market_products: list[Order], **kwargs):
 
         # generation
         sorted_supply_orders = sorted(supply_orders, key=lambda i: i["price"])
-
         # demand
         sorted_demand_orders = sorted(
             demand_orders, key=lambda i: i["price"], reverse=True
         )
-
-        sorted_supply_orders = cumsum(sorted_supply_orders)
-        sorted_demand_orders = cumsum(sorted_demand_orders)
-
-        price, demand, i, j = 0, 0, 0, 0
-        intersection_found = False
+        dem_vol, gen_vol = 0, 0
+        # the following algorithm is inspired by one bar for generation and one for demand
+        # add generation for currents demand price, until it matches demand
+        # generation above it has to be sold for the lower price (or not at all)
         for i in range(len(sorted_demand_orders)):
-            total_vol = sorted_demand_orders[i]["cumsum"]
-            # get first price to match demand (vol)
-            for j in range(len(sorted_supply_orders)):
-                # gen = total_generation + sorted_supply_orders[j]['volume']
-                if sorted_supply_orders[j]["cumsum"] >= -demand:
-                    assert price <= sorted_supply_orders[j]["price"], "wrong order"
-                    if (
-                        sorted_supply_orders[j]["price"]
-                        < sorted_demand_orders[i]["price"]
-                    ):
-                        # generation is cheaper than demand
-                        price = sorted_supply_orders[j]["price"]
-                        demand = total_vol
-                    else:
-                        intersection_found = True
-                    break
-            if intersection_found:
-                break
+            demand_order: Order = sorted_demand_orders[i]
+            if not sorted_supply_orders:
+                # if no more generation - reject left over demand
+                rejected_orders.append(demand_order)
+                continue
 
-        accepted_orders.extend(sorted_demand_orders[:i])
-        accepted_orders.extend(sorted_supply_orders[:j])
-        rejected_orders.extend(sorted_demand_orders[i:])
-        rejected_orders.extend(sorted_supply_orders[j:])
+            dem_vol += -demand_order["volume"]
+            to_commit: Orderbook = []
 
-        if price == 0:
-            price = market_agent.marketconfig.maximum_bid
-    meta = {"volume": -demand, "price": price}
+            while sorted_supply_orders and gen_vol < dem_vol:
+                supply_order = sorted_supply_orders.pop(0)
+                if supply_order["price"] <= demand_order["price"]:
+                    to_commit.append(supply_order)
+                    gen_vol += supply_order["volume"]
+                else:
+                    rejected_orders.append(supply_order)
+            # now we know which orders we need
+            # we only need to see how to arrange it.
+
+            diff = gen_vol - dem_vol
+
+            if diff == 0:
+                # perfect match
+                accepted_product_orders.append(demand_order)
+                # pay as bid
+                for supply_order in to_commit:
+                    supply_order["price"] = demand_order["price"]
+                accepted_product_orders.extend(to_commit)
+            elif diff < 0:
+                # gen < dem
+                # generation is not enough
+                split_demand_order = demand_order.copy()
+                split_demand_order["volume"] = diff
+                demand_order["volume"] -= diff
+                accepted_product_orders.append(demand_order)
+                rejected_orders.append(split_demand_order)
+                accepted_product_orders.extend(to_commit)
+            else:  # diff > 0
+                # generation left over
+                accepted_product_orders.append(demand_order)
+                # split generation
+                supply_order = to_commit[-1]
+                split_supply_order = supply_order.copy()
+                split_supply_order["volume"] = diff
+                supply_order["volume"] -= diff
+                # only volume-diff can be sold for current price
+                # add left over to supply_orders again
+                sorted_supply_orders.insert(0, split_supply_order)
+
+        # set clearing price
+        accepted_supply_orders = list(
+            filter(lambda x: x["volume"] > 0, accepted_product_orders)
+        )
+        if len(accepted_supply_orders) > 0:
+            clear_price = max(map(lambda order: order["price"], accepted_supply_orders))
+        else:
+            clear_price = market_agent.marketconfig.maximum_bid
+        for order in accepted_product_orders:
+            order["price"] = clear_price
+        accepted_orders.extend(accepted_product_orders)
+
+    accepted_supply_orders = filter(lambda x: x["volume"] > 0, accepted_orders)
+    volume = sum(map(lambda order: order["volume"], accepted_supply_orders))
+    # TODO price and volume is wrong if multiple products exist
+    if clear_price == 0:
+        clear_price = market_agent.marketconfig.maximum_bid
+    meta = {"volume": volume, "price": clear_price}
     market_agent.all_orders = rejected_orders
     # accepted orders can not be used in future
 
@@ -81,7 +183,7 @@ def pay_as_clear(market_agent: Role, market_products: list[Order], **kwargs):
 
 
 # does not allow to have partial accepted bids
-def pay_as_bid(market_agent: Role, market_products: list[MarketProduct]):
+def pay_as_bid_aon(market_agent: MarketRole, market_products: list[MarketProduct]):
     market_getter = itemgetter("start_time", "end_time", "only_hours")
     accepted_orders: Orderbook = []
     rejected_orders: Orderbook = []
@@ -123,13 +225,12 @@ def pay_as_bid(market_agent: Role, market_products: list[MarketProduct]):
             rejected_orders.extend(sorted_demand_orders[i:])
             rejected_orders.extend(sorted_supply_orders[i:])
 
-    # TODO price and volume is wrong if multiple products exist
+    # TODO price is wrong if multiple products exist
     if len(accepted_orders) > 0:
         price = sum(map(lambda order: order["price"], accepted_orders)) / len(
             accepted_orders
         )
     else:
-
         price = market_agent.marketconfig.maximum_bid
     volume = sum(map(lambda order: order["volume"], accepted_orders))
     meta = {"volume": volume, "price": price}
@@ -140,7 +241,7 @@ def pay_as_bid(market_agent: Role, market_products: list[MarketProduct]):
 
 
 # with partial accepted bids
-def pay_as_bid_partial(market_agent: Role, market_products: list[MarketProduct]):
+def pay_as_bid(market_agent: MarketRole, market_products: list[MarketProduct]):
     market_getter = itemgetter("start_time", "end_time", "only_hours")
     accepted_orders: Orderbook = []
     rejected_orders: Orderbook = []
@@ -243,8 +344,9 @@ def pay_as_bid_partial(market_agent: Role, market_products: list[MarketProduct])
 # 5.
 
 available_clearing_strategies: dict[str, Callable] = {
+    "pay_as_bid_all_or_nothing": pay_as_bid_aon,
     "pay_as_bid": pay_as_bid,
-    "pay_as_bid_partial": pay_as_bid_partial,
+    "pay_as_clear_all_or_nothing": pay_as_clear_aon,
     "pay_as_clear": pay_as_clear,
     "nodal_market": "TODO",
 }
@@ -254,6 +356,7 @@ if __name__ == "__main__":
 
     from dateutil import rrule as rr
     from dateutil.relativedelta import relativedelta as rd
+    from ..common.utils import get_available_products
 
     simple_dayahead_auction_config = MarketConfig(
         "simple_dayahead_auction",
@@ -269,9 +372,6 @@ if __name__ == "__main__":
         price_unit="€/MW",
         market_mechanism="pay_as_clear",
     )
-
-    from ..common.utils import get_available_products
-    from ..markets.base_market import MarketRole
 
     mr = MarketRole(simple_dayahead_auction_config)
     next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())

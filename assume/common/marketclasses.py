@@ -33,7 +33,9 @@ class MarketProduct:
         rd()
     )  # when does the first delivery begin, in relation to market start
     # this should be a multiple of duration
-    only_hours: Union[tuple[int, int], None] = None  # e.g. (8,20) - for peak trade, (20, 8) for off-peak, none for base
+    only_hours: Union[
+        tuple[int, int], None
+    ] = None  # e.g. (8,20) - for peak trade, (20, 8) for off-peak, none for base
     eligible_lambda_function: Union[eligible_lambda, None] = None
 
 
@@ -50,7 +52,9 @@ class MarketConfig:
     # continuous markets are clearing just very fast and keep unmatched orders between clearings
     opening_hours: rr.rrule  # dtstart ist start/introduction of market
     opening_duration: timedelta
-    market_mechanism: Union[market_mechanism, str]  # market_mechanism determines wether old offers are deleted (continuous) or not (auction) after clearing
+    market_mechanism: Union[
+        market_mechanism, str
+    ]  # market_mechanism determines wether old offers are deleted (continuous) or not (auction) after clearing
     # if continuous: one of [pay_as_bid, pay_as_ask] else: pay_as_clear
 
     maximum_bid: float = 9999
