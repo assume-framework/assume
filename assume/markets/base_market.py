@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timedelta
 from itertools import groupby
+from operator import itemgetter
 from pathlib import Path
 
 import pandas as pd
@@ -21,14 +22,14 @@ class MarketRole(Role):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__()
         self.marketconfig: MarketConfig = marketconfig
-        self.registered_agents: list[str] = []
-        self.open_slots = []
-        self.all_orders: list[Order] = []
-        self.market_result: Orderbook = []
 
     def setup(self):
         self.marketconfig.addr = self.context.addr
         self.marketconfig.aid = self.context.aid
+        self.all_orders: list[Order] = []
+        self.market_result: Orderbook = []
+        self.registered_agents: list[str] = []
+        self.open_slots = []
 
         def accept_orderbook(content: dict, meta):
             if not isinstance(content, dict):
@@ -159,8 +160,9 @@ class MarketRole(Role):
             self, market_products
         )
 
+        self.market_result = sorted(self.market_result, itemgetter("agent_id"))
         for agent, accepted_orderbook in groupby(
-            self.market_result, lambda o: o["agent_id"]
+            self.market_result, itemgetter("agent_id")
         ):
             addr, aid = agent
             meta = {"sender_addr": self.context.addr, "sender_id": self.context.aid}
