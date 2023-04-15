@@ -542,7 +542,7 @@ def nodal_pricing_pypsa_unflexible_demand(
 
 
 def nodal_pricing_pypsa(market_agent: MarketRole, market_products: list[MarketProduct]):
-    pass
+    raise NotImplementedError()
 
 
 def nodal_pricing_pyomo(market_agent: MarketRole, market_products: list[MarketProduct]):

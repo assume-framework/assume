@@ -5,7 +5,7 @@ class NaiveStrategyNoMarkUp(BaseStrategy):
     def __init__(self):
         super().__init__()
 
-    def calculate_bids(self, operational_window):
+    def calculate_bids(self, market, operational_window):
 
         """
         Takes information from a unit that the unit operator manages and
@@ -24,7 +24,7 @@ class NaiveStrategyMarkUp(BaseStrategy):
     def __init__(self):
         super().__init__()
 
-    def calculate_bids(self, operational_window):
+    def calculate_bids(self, market, operational_window):
 
         """
         Takes information from a unit that the unit operator manages and

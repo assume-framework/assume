@@ -16,7 +16,7 @@ class Demand(BaseUnit):
 
     Methods
     -------
-    calculate_operational_window()
+    calculate_operational_window(product)
         Calculate the operation window for the next time step.
     """
 
@@ -28,21 +28,20 @@ class Demand(BaseUnit):
         price: float = 900,
         volume: int = -1000,
         location: tuple[float, float] = None,
-        bidding_strategy: dict[str, BaseStrategy] = {},
+        bidding_strategy: BaseStrategy = {},
         **kwargs
     ):
-        super().__init__(id, technology, node)
+        super().__init__(id, technology, node, bidding_strategy=bidding_strategy)
 
         self.price = price
         self.volume = volume
-        self.bidding_strategy = bidding_strategy
         self.location = location
         self.total_power_output = []
 
     def reset(self):
         self.current_time_step = 0
 
-    def calculate_operational_window(self) -> dict:
+    def calculate_operational_window(self, product) -> dict:
         """Calculate the operation window for the next time step."""
 
         return {"max_power": {"power": self.volume, "marginal_cost": self.price}}  # MW

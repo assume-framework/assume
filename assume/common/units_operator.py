@@ -101,8 +101,8 @@ class UnitsOperator(Role):
 
     async def submit_bids(self, opening: OpeningMessage):
         """
-        send the formulated order book to the market. OPtion for further
-        portfolio processing
+        formulates an orderbook and sends it to the market.
+        This will handle optional portfolio processing
 
         Return:
         """
@@ -127,7 +127,7 @@ class UnitsOperator(Role):
             acl_metadata=acl_metadata,
         )
 
-    async def formulate_bids(self, market: MarketConfig, products):
+    async def formulate_bids(self, market: MarketConfig, products: list[tuple]):
         # sourcery skip: merge-dict-assign
 
         """
@@ -138,28 +138,39 @@ class UnitsOperator(Role):
         """
 
         orderbook: Orderbook = []
-        for product in products:
-            if self.use_portfolio_opt == False:
+        # the given products just became available on our market
+        # and we need to provide bids
+        # [whole_next_hour, quarter1, quarter2, quarter3, quarter4]
+        # algorithm should buy as much baseload as possible, then add up with quarters
+        sorted_products = sorted(products, key=lambda p: (p[0] - p[1], p[0]))
+
+        for product in sorted_products:
+            order: Order = {}
+            order["start_time"] = product[0]
+            order["end_time"] = product[1]
+            order["only_hours"] = product[2]
+            order["agent_id"] = (self.context.addr, self.context.aid)
+
+            if self.use_portfolio_opt:
+                op_windows = []
                 for unit_id, unit in self.units.items():
-                    order: Order = {}
-                    order["start_time"] = product[0]
-                    order["end_time"] = product[1]
-                    order["only_hours"] = None
-                    order["agent_id"] = (self.context.addr, self.context.aid)
                     # get operational window for each unit
-                    operational_window = unit.calculate_operational_window()
-                    # get used bidding strategy for the unit
-                    unit_strategy = unit.bidding_strategy
+                    operational_window = unit.calculate_operational_window(product)
+                    op_windows.append(operational_window)
+                    # TODO calculate bids from sum of op_windows
+            else:
+                for unit_id, unit in self.units.items():
+                    order_c = order.copy()
+                    # get operational window for each unit
+                    operational_window = unit.calculate_operational_window(product)
                     # take price from bidding strategy
-                    order["volume"], order["price"] = unit_strategy.calculate_bids(
+                    volume, price = unit.bidding_strategy.calculate_bids(
                         market, operational_window
                     )
+                    order_c["volume"] = volume
+                    order_c["price"] = price
 
-                    orderbook.append(order)
-
-            else:
-                raise NotImplementedError
-
+                    orderbook.append(order_c)
         return orderbook
 
     def add_unit(
@@ -167,13 +178,14 @@ class UnitsOperator(Role):
         id: str,
         unit_class: type[BaseUnit],
         unit_params: dict,
-        bidding_strategy: type[BaseStrategy] = None,
+        bidding_strategy: BaseStrategy = None,
     ):
         """
         Create a unit.
         """
-        self.units[id] = unit_class(id, **unit_params)
-        self.units[id].bidding_strategy = bidding_strategy
+        self.units[id] = unit_class(
+            id, bidding_strategy=bidding_strategy, **unit_params
+        )
 
         if bidding_strategy is None and self.use_portfolio_opt == False:
             raise ValueError(
@@ -200,9 +212,9 @@ class UnitsOperator(Role):
         elif "NUTS" in location:
             # get nuts table
             pass
-            
+
     def reset(self):
-    
+
         #Reset the unit to its initial state.
 
     """

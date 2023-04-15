@@ -90,10 +90,11 @@ class PowerPlant(BaseUnit):
         max_heat_extraction: float = 0,
         availability: dict = None,
         location: tuple[float, float] = None,
+        bidding_strategy: BaseStrategy = None,
         **kwargs
     ):
 
-        super().__init__(id, technology, node)
+        super().__init__(id, technology, node, bidding_strategy)
 
         self.max_power = max_power
         self.min_power = min_power
@@ -120,8 +121,6 @@ class PowerPlant(BaseUnit):
 
         self.location = location
 
-        self.bidding_strategy = None
-
     def reset(self):
         """Reset the unit to its initial state."""
 
@@ -134,7 +133,7 @@ class PowerPlant(BaseUnit):
         self.pos_capacity_reserve = [0.0]
         self.neg_capacity_reserve = [0.0]
 
-    def calculate_operational_window(self) -> dict:
+    def calculate_operational_window(self, product) -> dict:
 
         """Calculate the operation window for the next time step.
 

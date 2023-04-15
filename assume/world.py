@@ -16,7 +16,7 @@ from .common import (
     mango_codec_factory,
 )
 from .markets import MarketRole
-from .strategies import NaiveStrategyNoMarkUp
+from .strategies import NaiveStrategyMarkUp, NaiveStrategyNoMarkUp
 from .units import Demand, PowerPlant
 
 
@@ -49,7 +49,10 @@ class World:
         self.unit_operators: dict[str, UnitsOperator] = {}
 
         self.unit_types = {"power_plant": PowerPlant, "demand": Demand}
-        self.bidding_types = {"simple": NaiveStrategyNoMarkUp}
+        self.bidding_types = {
+            "simple": NaiveStrategyNoMarkUp,
+            "markup": NaiveStrategyMarkUp,
+        }
         self.available_clearing_strategies = available_clearing_strategies
 
     async def setup(self, start: float):
@@ -113,7 +116,7 @@ class World:
 
         if bidding_strategy not in self.bidding_types.keys():
             raise Exception(f"invalid bidding strategy {bidding_strategy}")
-        bidding_strategy = self.bidding_types[bidding_strategy]
+        bidding_strategy = self.bidding_types[bidding_strategy]()
 
         # create unit within the unit operator its associated with
         self.unit_operators[operator_id].add_unit(

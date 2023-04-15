@@ -178,7 +178,7 @@ class MarketRole(Role):
                 acl_metadata=meta,
             )
         # clear_price = sorted(self.market_result, lambda o: o['price'])[0]
-        
+
         for meta in market_meta:
             log.info(
                 f'clearing price for {self.marketconfig.name} is {meta["price"]}, volume: {meta["demand_volume"]}'

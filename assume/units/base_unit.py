@@ -1,3 +1,6 @@
+from ..strategies import BaseStrategy
+
+
 class BaseUnit:
     """A base class for a unit.
 
@@ -12,17 +15,24 @@ class BaseUnit:
 
     Methods
     -------
-    calculate_operational_window()
+    calculate_operational_window(product)
         Calculate the operation window for the next time step.
     """
 
-    def __init__(self, id: str, technology: str, node: str):
+    def __init__(
+        self, id: str, technology: str, node: str, bidding_strategy: BaseStrategy
+    ):
 
         self.id = id
         self.technology = technology
         self.node = node
+        self.bidding_strategy = bidding_strategy
 
-    def calculate_operational_window(self) -> dict:
+    def calculate_operational_window(self, product) -> dict:
         """Calculate the operation window for the next time step."""
 
-        raise NotImplementedError
+        raise NotImplementedError()
+
+    def reset(self):
+        """Reset the unit to its initial state."""
+        raise NotImplementedError()

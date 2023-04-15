@@ -46,7 +46,7 @@ async def main():
     )
     world.add_market_operator(id="market")
     world.add_market(market_operator_id="market", marketconfig=our_marketconfig)
-    #log.info(f"marketconfig {our_marketconfig}")
+    # log.info(f"marketconfig {our_marketconfig}")
 
     # create unit operators
     for operator_id in range(1, 4):
