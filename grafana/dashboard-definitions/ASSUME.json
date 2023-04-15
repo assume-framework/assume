@@ -268,13 +268,21 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": false,
-          "rawSql": "SELECT\n  \"time\" AS \"time\",\n  volume\nFROM market_meta\nWHERE\n  $__unixEpochFilter(\"time\")\nORDER BY 1",
+          "rawSql": "SELECT\n  \"time\" AS \"time\",\n  demand_volume,\n  supply_volume\nFROM market_meta\nWHERE\n  $__unixEpochFilter(\"time\")\nORDER BY 1",
           "refId": "A",
           "select": [
             [
               {
                 "params": [
-                  "volume"
+                  "demand_volume"
+                ],
+                "type": "column"
+              }
+            ],
+            [
+              {
+                "params": [
+                  "supply_volume"
                 ],
                 "type": "column"
               }
@@ -311,6 +319,6 @@
   "timezone": "",
   "title": "ASSUME",
   "uid": "ap3RcmY4z",
-  "version": 3,
+  "version": 5,
   "weekStart": ""
 }

@@ -3,7 +3,7 @@ cycler==0.11.0
 fonttools==4.38.0
 importlib-resources==5.12.0
 kiwisolver==1.4.4
-mango-agents @ git+https://gitlab.com/mango-agents/mango@development
+mango-agents==1.0.0
 matplotlib==3.7.0
 packaging==23.0
 paho-mqtt==1.5.1
@@ -15,5 +15,5 @@ pytz==2022.7.1
 six==1.16.0
 tqdm==4.64.1
 zipp==3.14.0
-pandas==2.0.0rc1
+pandas==2.0.0
 SQLAlchemy==2.0.8

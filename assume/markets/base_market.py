@@ -160,7 +160,7 @@ class MarketRole(Role):
             self, market_products
         )
 
-        self.market_result = sorted(self.market_result, itemgetter("agent_id"))
+        self.market_result = sorted(self.market_result, key=itemgetter("agent_id"))
         for agent, accepted_orderbook in groupby(
             self.market_result, itemgetter("agent_id")
         ):
@@ -178,12 +178,14 @@ class MarketRole(Role):
                 acl_metadata=meta,
             )
         # clear_price = sorted(self.market_result, lambda o: o['price'])[0]
-        log.info(
-            f'clearing price for {self.marketconfig.name} is {market_meta["price"]}, volume: {market_meta["volume"]}'
-        )
-        market_meta["name"] = self.marketconfig.name
-        market_meta["time"] = self.context.current_timestamp
-        df = pd.DataFrame.from_dict([market_meta])
+        
+        for meta in market_meta:
+            log.info(
+                f'clearing price for {self.marketconfig.name} is {meta["price"]}, volume: {meta["demand_volume"]}'
+            )
+            meta["name"] = self.marketconfig.name
+            meta["time"] = self.context.current_timestamp
+        df = pd.DataFrame.from_dict(market_meta)
         if self.context.data.export_csv:
             p = Path(self.context.data.export_csv)
             p.mkdir(parents=True, exist_ok=True)
