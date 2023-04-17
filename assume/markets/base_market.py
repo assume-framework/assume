@@ -46,6 +46,14 @@ class MarketRole(Role):
                 and content.get("market") == self.marketconfig.name
             )
 
+        def accept_get_unmatched(content: dict, meta):
+            if not isinstance(content, dict):
+                return False
+            return (
+                content.get("context") == "get_unmatched"
+                and content.get("market") == self.marketconfig.name
+            )
+
         self.context.subscribe_message(self, self.handle_orderbook, accept_orderbook)
         self.context.subscribe_message(
             self,
@@ -53,6 +61,15 @@ class MarketRole(Role):
             accept_registration
             # TODO safer type check? dataclass?
         )
+
+        if self.marketconfig.supports_get_unmatched:
+            self.context.subscribe_message(
+                self,
+                self.handle_get_unmatched,
+                accept_get_unmatched
+                # TODO safer type check? dataclass?
+            )
+
         current = datetime.fromtimestamp(self.context.current_timestamp)
         next_opening = self.marketconfig.opening_hours.after(current)
         market_closing = next_opening + self.marketconfig.opening_duration
@@ -103,14 +120,14 @@ class MarketRole(Role):
                 },
             )
 
-    def handle_registration(self, content: str, meta):
+    def handle_registration(self, content: dict, meta: dict):
         agent = meta["sender_id"]
         agent_addr = meta["sender_addr"]
         # TODO allow accessing agents properties?
         if self.marketconfig.eligible_obligations_lambda(agent):
             self.registered_agents.append((agent_addr, agent))
 
-    def handle_orderbook(self, content, meta):
+    def handle_orderbook(self, content: dict, meta: dict):
         orderbook: Orderbook = content["orderbook"]
         # TODO check if agent is allowed to bid
         agent_addr = meta["sender_addr"]
@@ -145,7 +162,7 @@ class MarketRole(Role):
         except Exception as e:
             log.error(f"error handling message from {agent_id} - {e}")
             self.context.schedule_instant_acl_message(
-                content={"context": "Rejected"},
+                content={"context": "submit_bids", "message": "Rejected"},
                 receiver_addr=agent_addr,
                 receiver_id=agent_id,
                 acl_metadata={
@@ -154,6 +171,38 @@ class MarketRole(Role):
                     "reply_to": 1,
                 },
             )
+
+    def handle_get_unmatched(self, content: dict, meta: dict):
+        """
+        A handler which sends the orderbook with unmatched orders to an agent.
+        Allows to query a subset of the orderbook.
+        """
+        order = content.get("order")
+        agent_addr = meta["sender_addr"]
+        agent_id = meta["sender_id"]
+        if order:
+
+            def order_matches_req(o):
+                return (
+                    o["start_time"] == order["start_time"]
+                    and o["end_time"] == order["end_time"]
+                    and o["only_hours"] == order["only_hours"]
+                )
+
+            available_orders = filter(order_matches_req, self.all_orders)
+        else:
+            available_orders = self.all_orders
+
+        self.context.schedule_instant_acl_message(
+            content={"context": "get_unmatched", "available_orders": available_orders},
+            receiver_addr=agent_addr,
+            receiver_id=agent_id,
+            acl_metadata={
+                "sender_addr": self.context.addr,
+                "sender_id": self.context.aid,
+                "reply_to": 1,
+            },
+        )
 
     async def clear_market(self, market_products: list[MarketProduct]):
         self.market_result, market_meta = self.marketconfig.market_mechanism(
@@ -185,11 +234,19 @@ class MarketRole(Role):
             )
             meta["name"] = self.marketconfig.name
             meta["time"] = self.context.current_timestamp
+        self.write_results(self.market_result, market_meta)
+
+        return self.market_result, market_meta
+
+    def write_results(self, market_result, market_meta):
         df = pd.DataFrame.from_dict(market_meta)
-        if self.context.data.export_csv:
-            p = Path(self.context.data.export_csv)
+        export_csv_path = self.context.data_dict.get("export_csv")
+        if export_csv_path:
+            p = Path(export_csv_path)
             p.mkdir(parents=True, exist_ok=True)
             market_data_path = p.joinpath("market_meta.csv")
             df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
-        df.to_sql("market_meta", self.context.data.db.bind, if_exists="append")
-        return self.market_result
+
+        df.to_sql("market_meta", self.context.data_dict["db"].bind, if_exists="append")
+
+        # TODO write market_result or other metrics

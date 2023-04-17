@@ -174,8 +174,9 @@ class World:
         # agent is implicit added to self.container._agents
         for agent in self.container._agents.values():
             # TODO add a Role which does exactly this
-            agent._role_context.data.db = self.db
-            agent._role_context.data.export_csv = self.export_csv
+            agent._role_context.data_dict = {}
+            agent._role_context.data_dict["db"] = self.db
+            agent._role_context.data_dict["export_csv"] = self.export_csv
 
         while self.clock.time < stop:
             await asyncio.sleep(0.0001)
