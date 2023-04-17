@@ -11,10 +11,10 @@ import assume
 log = logging.getLogger(__name__)
 
 EXPORT_CSV_PATH = str(getenv("EXPORT_CSV_PATH", "./output"))
-DATABASE_URI = getenv("DATABASE_URI", "sqlite:///./output/test.db")
-# DATABASE_URI = getenv(
-#     "DATABASE_URI", "postgresql://assume:assume@localhost:5432/assume"
-# )
+#DATABASE_URI = getenv("DATABASE_URI", "sqlite:///./output/test.db")
+DATABASE_URI = getenv(
+     "DATABASE_URI", "postgresql://assume:assume@localhost:5432/assume"
+ )
 
 
 # %%
