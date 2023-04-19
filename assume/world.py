@@ -9,6 +9,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
 
+from pathlib import Path
+
+import pandas as pd
+
 from .common import (
     MarketConfig,
     UnitsOperator,
@@ -19,6 +23,7 @@ from .markets import MarketRole
 from .strategies import NaiveStrategyMarkUp, NaiveStrategyNoMarkUp
 from .units import Demand, PowerPlant
 
+log = logging.getLogger(__name__)
 
 # %%
 class World:
@@ -121,7 +126,38 @@ class World:
         # create unit within the unit operator its associated with
         self.unit_operators[operator_id].add_unit(
             id, unit_class, params, bidding_strategy
+
+        
         )
+
+        # write unit into db
+        log.info(
+            f'added unit {unit_type}, fuel: {params["technology"]}'
+        )
+        
+        df = pd.DataFrame([params])
+        df['type']= unit_type
+        
+
+        if unit_type != 'demand':
+        
+            if self.export_csv:
+                p = Path(self.export_csv)
+                p.mkdir(parents=True, exist_ok=True)
+                market_data_path = p.joinpath("unit_meta.csv")
+                df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
+            df.to_sql("unit_meta", self.db.bind, if_exists="append")
+
+        else:
+            if self.export_csv:
+                p = Path(self.export_csv)
+                p.mkdir(parents=True, exist_ok=True)
+                market_data_path = p.joinpath("demand_meta.csv")
+                df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
+            df.to_sql("demand_meta", self.db.bind, if_exists="append")
+        
+
+       
 
     def add_market(self, market_operator_id: int, marketconfig: MarketConfig):
         """

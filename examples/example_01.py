@@ -11,11 +11,10 @@ import assume
 log = logging.getLogger(__name__)
 
 EXPORT_CSV_PATH = str(getenv("EXPORT_CSV_PATH", "./output"))
-#DATABASE_URI = getenv("DATABASE_URI", "sqlite:///./output/test.db")
-DATABASE_URI = getenv(
-     "DATABASE_URI", "postgresql://assume:assume@localhost:5432/assume"
- )
-
+DATABASE_URI = getenv("DATABASE_URI", "sqlite:///./output/test.db")
+#DATABASE_URI = getenv(
+#     "DATABASE_URI", "postgresql://assume:assume@localhost:5432/assume"
+#)
 
 # %%
 async def main():
@@ -68,6 +67,44 @@ async def main():
         id="unit_01",
         unit_type="power_plant",
         params=supply_params,
+        bidding_strategy="simple",
+    )
+
+    supply_params2 = {
+        "technology": "gas",
+        "node": "",
+        "max_power": 200,
+        "min_power": 20,
+        "efficiency": 0.8,
+        "fuel_type": "natrual gas",
+        "fuel_price": 35,
+        "co2_price": 20,
+        "emission_factor": 0.82,
+        "unit_operator": "operator_1",
+    }
+    world.add_unit(
+        id="unit_02",
+        unit_type="power_plant",
+        params=supply_params2,
+        bidding_strategy="simple",
+    )
+
+    supply_params3 = {
+        "technology": "wind",
+        "node": "",
+        "max_power": 400,
+        "min_power": 0,
+        "efficiency": 1,
+        "fuel_type": "wind",
+        "fuel_price": 0,
+        "co2_price": 0,
+        "emission_factor": 0,
+        "unit_operator": "operator_1",
+    }
+    world.add_unit(
+        id="unit_03",
+        unit_type="power_plant",
+        params=supply_params3,
         bidding_strategy="simple",
     )
 
