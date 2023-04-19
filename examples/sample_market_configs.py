@@ -25,7 +25,7 @@ epex_dayahead_auction_config = MarketConfig(
     opening_duration=timedelta(days=1),
     maximum_gradient=0.1,  # can only change 10% between hours - should be more generic
     amount_unit="MWh",
-    amount_tick=0.1,
+    volume_tick=0.1,
     price_unit="€/MW",
     market_mechanism="pay_as_clear",
 )
@@ -57,7 +57,7 @@ epex_intraday_auction_config = MarketConfig(
     ),
     opening_duration=timedelta(days=1),
     amount_unit="MWh",
-    amount_tick=0.1,
+    volume_tick=0.1,
     price_unit="€/MWh",
     price_tick=0.01,
     maximum_bid=4000,
@@ -110,7 +110,7 @@ epex_intraday_trading_config = MarketConfig(
     and agent.payed > 10000,  # per year + 25k once
     market_mechanism="pay_as_bid",  # TODO remove orders from same agent when setting for same product
     amount_unit="MWh",
-    amount_tick=0.1,
+    volume_tick=0.1,
     price_unit="€/MWh",
     price_tick=0.01,
     maximum_bid=9999,
@@ -160,7 +160,7 @@ eex_future_trading_config = MarketConfig(
     maximum_bid=9999,
     minimum_bid=-9999,
     amount_unit="MW",  # offer volume is in MW for whole product duration
-    amount_tick=0.1,
+    volume_tick=0.1,
     price_unit="€/MWh",  # cost is given in €/MWh - total product cost results in price*amount/(duration in hours)
     price_tick=0.01,
     eligible_obligations_lambda=lambda agent, market: agent.aid in market.participants
@@ -196,7 +196,7 @@ epex_aftermarket_trading_config = MarketConfig(
     ),
     opening_duration=timedelta(minutes=CLEARING_FREQ_MINUTES),
     amount_unit="MWh",
-    amount_tick=0.1,
+    volume_tick=0.1,
     price_unit="€/MWh",
     price_tick=0.01,
     supports_get_unmatched=True,
@@ -254,7 +254,7 @@ epex_emission_trading_config = MarketConfig(
     ],
     supports_get_unmatched=True,
     amount_unit='t CO2',
-    amount_tick=1,
+    volume_tick=1,
     price_unit='€/t',
     price_tick=5,
 )
@@ -289,7 +289,7 @@ control_reserve_trading_config = MarketConfig(
     opening_hours=rr.rrule(rr.DAILY, market_start),
     opening_duration=timedelta(days=7),
     amount_unit='MW',
-    amount_tick=0.1,
+    volume_tick=0.1,
     price_unit='€/MW',
     price_tick=0.01,
     maximum_bid=9999,
@@ -307,7 +307,7 @@ control_work_trading_config = MarketConfig(
     opening_hours=rr.rrule(rr.DAILY, market_start),
     opening_duration=timedelta(days=1),
     amount_unit='MW',
-    amount_tick=0.1,
+    volume_tick=0.1,
     price_unit='€/MW',
     price_tick=0.01,
     maximum_bid=9999,

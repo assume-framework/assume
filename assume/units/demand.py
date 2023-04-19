@@ -25,7 +25,7 @@ class Demand(BaseUnit):
         id: str,
         technology: str = None,
         node: str = None,
-        price: float = 900,
+        price: int = 900,
         volume: int = -1000,
         location: tuple[float, float] = None,
         bidding_strategy: BaseStrategy = {},

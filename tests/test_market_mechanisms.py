@@ -19,7 +19,7 @@ simple_dayahead_auction_config = MarketConfig(
     ),
     opening_duration=timedelta(hours=1),
     amount_unit="MW",
-    amount_tick=0.1,
+    volume_tick=0.1,
     price_unit="€/MW",
     market_mechanism="pay_as_clear",
 )

@@ -8,6 +8,7 @@ from mango.util.clock import ExternalClock
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
+from datetime import datetime
 
 from pathlib import Path
 
@@ -60,8 +61,8 @@ class World:
         }
         self.available_clearing_strategies = available_clearing_strategies
 
-    async def setup(self, start: float):
-        self.clock = ExternalClock(start)
+    async def setup(self, start: datetime):
+        self.clock = ExternalClock(start.timestamp())
         self.container = await create_container(
             addr=self.addr, clock=self.clock, codec=mango_codec_factory()
         )
@@ -206,7 +207,7 @@ class World:
 
         self.clock.set_time(next_activity)
 
-    async def run_simulation(self, stop: float):
+    async def run_simulation(self, stop: datetime):
         # agent is implicit added to self.container._agents
         for agent in self.container._agents.values():
             # TODO add a Role which does exactly this
@@ -214,8 +215,7 @@ class World:
             agent._role_context.data_dict["db"] = self.db
             agent._role_context.data_dict["export_csv"] = self.export_csv
 
-        while self.clock.time < stop:
-            await asyncio.sleep(0.0001)
+        while self.clock.time < stop.timestamp():
+            await asyncio.sleep(0)
             await self.step()
-
         await self.container.shutdown()

@@ -39,29 +39,6 @@ def initializer(func):
     return wrapper
 
 
-def is_mod_close(a, mod_b):
-    """
-    due to floating point, a mod b can be very close to 0 or very close to mod_b
-    """
-    abs_tol = 1e-10
-    # abs_tol needed for comparison near zero
-    return isclose(a % mod_b, 0, abs_tol=abs_tol) or isclose(
-        a % mod_b, mod_b, abs_tol=abs_tol
-    )
-
-
-def round_digits(n, tick_size):
-    """
-    rounds n to the power of 10 of the needed tick_size
-    Example_
-    >>> round_digits(1.100001, 0.1)
-    1.1
-    >>> round_digits(400.1, 20)
-    400
-    """
-    return round(n, 1 - int(log10(tick_size)))
-
-
 def get_available_products(market_products: list[MarketProduct], startdate: datetime):
     options = []
     for product in market_products:

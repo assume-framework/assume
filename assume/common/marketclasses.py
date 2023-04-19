@@ -11,8 +11,8 @@ from mango import Agent, Role
 class Order(TypedDict):
     start_time: Union[datetime, float]
     end_time: Union[datetime, float]
-    volume: float  # positive if generation
-    price: float
+    volume: int  # positive if generation
+    price: int
     only_hours: tuple[int, int]
     agent_id: str
 
@@ -56,15 +56,15 @@ class MarketConfig:
         market_mechanism, str
     ]  # market_mechanism determines wether old offers are deleted (auction) or not (continuous) after clearing
 
-    maximum_bid: float = 9999
-    minimum_bid: float = -500
+    maximum_bid: int = 9999
+    minimum_bid: int = -500
     maximum_gradient: float = None  # very specific - should be in market clearing
     maximum_volume: int = 500
     additional_fields: list[str] = field(default_factory=list)
     market_products: list[MarketProduct] = field(default_factory=list)
     amount_unit: str = "MW"
-    amount_tick: float = 0.1  # steps in which the amount can be increased
-    price_unit: str = "€"
+    volume_tick: float = 0.1  # steps in which the amount can be increased
+    price_unit: str = "€/MWh"
     price_tick: float = 0.1  # steps in which the price can be increased
     supports_get_unmatched: bool = False
     eligible_obligations_lambda: eligible_lambda = lambda x: True

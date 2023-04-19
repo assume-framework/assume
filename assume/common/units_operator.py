@@ -167,9 +167,9 @@ class UnitsOperator(Role):
                     volume, price = unit.bidding_strategy.calculate_bids(
                         market, operational_window
                     )
-                    order_c["volume"] = volume
-                    order_c["price"] = price
-
+                    order_c["volume"] = round(volume/market.volume_tick)
+                    order_c["price"] = round(price/market.price_tick)
+    
                     orderbook.append(order_c)
         return orderbook
 
