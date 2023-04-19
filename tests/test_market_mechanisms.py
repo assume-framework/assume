@@ -11,6 +11,7 @@ from assume.markets.base_market import MarketRole
 simple_dayahead_auction_config = MarketConfig(
     "simple_dayahead_auction",
     market_products=[MarketProduct(rd(hours=+1), 1, rd(hours=1))],
+    additional_fields=["node_id"],
     opening_hours=rr.rrule(
         rr.HOURLY,
         dtstart=datetime(2005, 6, 1),

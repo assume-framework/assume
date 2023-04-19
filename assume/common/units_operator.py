@@ -81,7 +81,6 @@ class UnitsOperator(Role):
             f'Operator {self.id} received opening from: {opening["market_id"]} {opening["start"]}.'
         )
         log.debug(f'Operator {self.id} can bid until: {opening["stop"]}')
-
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
 
     def send_dispatch_plan(self):
@@ -119,6 +118,7 @@ class UnitsOperator(Role):
         }
         await self.context.send_acl_message(
             content={
+                "context": "submit_bids",
                 "market": market.name,
                 "orderbook": orderbook,
             },

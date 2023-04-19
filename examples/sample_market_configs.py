@@ -18,7 +18,7 @@ epex_dayahead_auction_config = MarketConfig(
     "epex_dayahead_auction",
     additional_fields=["link", "offer_id"],
     market_products=[MarketProduct(rd(hours=+1), 24 * 45, rd(days=2, hour=0))],
-    # continuous=False, # orders persist between clearings - shorter intervals
+    supports_get_unmatched=False,  # orders persist between clearings - shorter intervals
     opening_hours=rr.rrule(
         rr.DAILY, byhour=12, dtstart=datetime(2005, 6, 1), until=datetime(2030, 12, 31)
     ),
@@ -48,7 +48,7 @@ epex_intraday_auction_config = MarketConfig(
             first_delivery_after_start=rd(days=2, hour=0),
         )
     ],
-    # continuous=False,
+    supports_get_unmatched=False,
     opening_hours=rr.rrule(
         rr.DAILY,
         byhour=15,
@@ -108,7 +108,7 @@ epex_intraday_trading_config = MarketConfig(
     ],
     eligible_obligations_lambda=lambda agent, market: agent.aid in market.participants
     and agent.payed > 10000,  # per year + 25k once
-    market_mechanism="continuous_clearing",  # only one orderbook is retained per agent
+    market_mechanism="pay_as_bid",  # TODO remove orders from same agent when setting for same product
     amount_unit="MWh",
     amount_tick=0.1,
     price_unit="€/MWh",
@@ -133,7 +133,7 @@ workdays = (rr.MO, rr.TU, rr.WE, rr.TH, rr.FR)
 # trading structure:
 # https://www.eex.com/en/markets/trading-ressources/rules-and-regulations
 CLEARING_FREQ_MINUTES = 5
-first_after_start = rd(days=2, hour=0)
+two_days_after_start = rd(days=2, hour=0)
 eex_future_trading_config = MarketConfig(
     name="eex_future_trading",
     additional_fields=["link", "offer_id"],
@@ -147,15 +147,15 @@ eex_future_trading_config = MarketConfig(
     ),
     opening_duration=timedelta(minutes=CLEARING_FREQ_MINUTES),
     market_products=[
-        MarketProduct(rd(days=+1, hour=0), 7, first_after_start),
-        MarketProduct(rd(weeks=+1, weekday=0, hour=0), 4, first_after_start),
-        MarketProduct(rd(months=+1, day=1, hour=0), 9, first_after_start),
+        MarketProduct(rd(days=+1, hour=0), 7, two_days_after_start),
+        MarketProduct(rd(weeks=+1, weekday=0, hour=0), 4, two_days_after_start),
+        MarketProduct(rd(months=+1, day=1, hour=0), 9, two_days_after_start),
         MarketProduct(
             rr.rrule(rr.MONTHLY, bymonth=(1, 4, 7, 10), bymonthday=1, byhour=0),
             11,
-            first_after_start,
+            two_days_after_start,
         ),
-        MarketProduct(rd(years=+1, yearday=1, hour=0), 10, first_after_start),
+        MarketProduct(rd(years=+1, yearday=1, hour=0), 10, two_days_after_start),
     ],
     maximum_bid=9999,
     minimum_bid=-9999,
@@ -199,11 +199,46 @@ epex_aftermarket_trading_config = MarketConfig(
     amount_tick=0.1,
     price_unit="€/MWh",
     price_tick=0.01,
-    # continuous=True,
+    supports_get_unmatched=True,
     maximum_bid=9999,
     minimum_bid=-9999,
     market_mechanism="pay_as_bid",
 )
+
+policy_trading_config = MarketConfig(
+    "contract_trading",
+    additional_fields=[
+        "sender_id",
+        "eligible_lambda",
+        "contract",
+        "evaluation_frequency",
+    ],
+    market_products=[
+        MarketProduct(rd(months=+1, day=1, hour=0), 12, two_days_after_start),
+        MarketProduct(
+            rr.rrule(rr.MONTHLY, bymonth=(1, 4, 7, 10), bymonthday=1, byhour=0),
+            11,
+            two_days_after_start,
+        ),
+        MarketProduct(rd(years=+1, yearday=1, hour=0), 10, two_days_after_start),
+    ],
+    opening_hours=rr.rrule(
+        rr.MINUTELY,
+        interval=CLEARING_FREQ_MINUTES,
+        dtstart=datetime(2023, 1, 1),
+        until=datetime(2023, 12, 31),
+    ),
+    opening_duration=timedelta(minutes=CLEARING_FREQ_MINUTES),
+    supports_get_unmatched=True,
+    amount_unit="MW",
+    price_unit="€/MWh",
+    price_tick=0.01,
+    maximum_bid=9999,
+    minimum_bid=-9999,
+    market_mechanism="pay_as_bid_contract",
+    # laufzeit vs abrechnungszeitraum
+)
+
 
 # EPEX Emissionsmarkt Spot:
 # EU Allowance (EUA)
@@ -217,7 +252,7 @@ epex_emission_trading_config = MarketConfig(
     market_products=[
         MarketProduct('yearly', 10),
     ],
-    #continuous=True,
+    supports_get_unmatched=True,
     amount_unit='t CO2',
     amount_tick=1,
     price_unit='€/t',
@@ -232,7 +267,7 @@ p2p_trading_config = MarketConfig(
         MarketProduct('half-hourly', 48),
         MarketProduct('hourly', 24),
     ],
-    #continuous=True,
+    supports_get_unmatched=True,
     amount_unit='kWh',
     price_unit='€/kWh',
     price_tick=0.01,
@@ -241,24 +276,6 @@ p2p_trading_config = MarketConfig(
 )
 
 # eligible_lambda is a lambda to check if an agent is eligible to receive a policy (must have solar...)
-# TODO define how contracts look like - maybe just a string?
-policy_trading_config = MarketConfig(
-    today,
-    additional_fields=['sender_id', 'eligible_lambda', 'contract'], # agent_id, eligible_lambda, MarketContract/Contracttype
-    market_products=[
-        MarketProduct('monthly', 12),
-        MarketProduct('quarter-yearly', 1),
-        MarketProduct('yearly', 1),
-    ],
-    #continuous=True,
-    amount_unit='MW',
-    price_unit='€/MWh',
-    price_tick=0.01,
-    maximum_bid=9999,
-    minimum_bid=-9999,
-    # laufzeit vs abrechnungszeitraum
-)
-
 # Control Reserve market
 # regelleistung kann 7 Tage lang geboten werden (überschneidende Gebots-Zeiträume)?
 # FCR
@@ -287,7 +304,6 @@ control_work_trading_config = MarketConfig(
     market_products=[
         MarketProduct('quarter-hourly', 96),
     ],
-    #continuous=False,
     opening_hours=rr.rrule(rr.DAILY, market_start),
     opening_duration=timedelta(days=1),
     amount_unit='MW',
@@ -309,7 +325,6 @@ miso_day_ahead_config = MarketConfig(
     market_products=[
         MarketProduct('hourly', 24),
     ],
-    #continuous=False,
     opening_hours=rr.rrule(rr.DAILY, market_start),
     opening_duration=timedelta(days=1),
     amount_unit='MW',
@@ -341,7 +356,6 @@ miso_real_time_config = MarketConfig(
         # unclear how many slots can be traded?
         # at least the current hour
     ],
-    #continuous=False,
     opening_hours=rr.rrule(rr.MINUTELY, interval=5, dtstart=today-timedelta(hours=1)),
     opening_duration=timedelta(hours=1),
     amount_unit='MW',

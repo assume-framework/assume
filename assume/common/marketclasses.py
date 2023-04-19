@@ -54,8 +54,7 @@ class MarketConfig:
     opening_duration: timedelta
     market_mechanism: Union[
         market_mechanism, str
-    ]  # market_mechanism determines wether old offers are deleted (continuous) or not (auction) after clearing
-    # if continuous: one of [pay_as_bid, pay_as_ask] else: pay_as_clear
+    ]  # market_mechanism determines wether old offers are deleted (auction) or not (continuous) after clearing
 
     maximum_bid: float = 9999
     minimum_bid: float = -500
@@ -67,6 +66,7 @@ class MarketConfig:
     amount_tick: float = 0.1  # steps in which the amount can be increased
     price_unit: str = "€"
     price_tick: float = 0.1  # steps in which the price can be increased
+    supports_get_unmatched: bool = False
     eligible_obligations_lambda: eligible_lambda = lambda x: True
     # lambda: agent.payed_fee
     # obligation should be time-based
@@ -94,39 +94,3 @@ class ClearingMessage(TypedDict):
 # - Swing Contract ->
 contract_type = Callable[[Agent, Agent], None]
 market_contract_type = Callable[[Agent, Agent, list], None]
-
-
-def ppa(buyer: Agent, seller: Agent):
-    set_price = 26  # ct/kWh
-    buyer.generation += seller.generation
-    seller.revenue += seller.generation * set_price
-    buyer.revenue -= seller.generation * set_price
-    seller.generation = 0
-
-
-def swingcontract(buyer: Agent, seller: Agent):
-    maxDCQ = 100
-    minDCQ = 80
-    set_price = 26  # ct/kWh
-    outer_price = 45  # ct/kwh
-    if minDCQ < buyer.demand and buyer.demand < maxDCQ:
-        cost = buyer.demand * set_price
-    else:
-        cost = outer_price
-    buyer.revenue -= buyer.demand * cost
-    seller.revenue += buyer.demand * cost
-
-
-def cfd(buyer: Agent, seller: Agent, market_index):
-    set_price = 26  # ct/kWh
-    cost = set_price - market_index
-    seller.revenue += cost
-    buyer.revenue -= cost
-
-
-def eeg(buyer: Agent, seller: Agent, market_index):
-    set_price = 26  # ct/kWh
-    cost = set_price - market_index
-    if cost > 0:
-        seller.revenue += cost
-        buyer.revenue -= cost

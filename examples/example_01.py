@@ -3,18 +3,20 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 from os import getenv
-
+import os
 from dateutil import rrule as rr
 
 import assume
 
 log = logging.getLogger(__name__)
 
+os.makedirs('./output', exist_ok=True)
 EXPORT_CSV_PATH = str(getenv("EXPORT_CSV_PATH", "./output"))
-DATABASE_URI = getenv("DATABASE_URI", "sqlite:///./output/test.db")
-#DATABASE_URI = getenv(
-#     "DATABASE_URI", "postgresql://assume:assume@localhost:5432/assume"
-#)
+#DATABASE_URI = getenv("DATABASE_URI", "sqlite:///./output/test.db")
+DATABASE_URI = getenv(
+     "DATABASE_URI", "postgresql://assume:assume@localhost:5432/assume"
+ )
+
 
 # %%
 async def main():
