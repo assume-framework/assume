@@ -62,7 +62,7 @@ class MarketConfig:
     maximum_volume: int = 500
     additional_fields: list[str] = field(default_factory=list)
     market_products: list[MarketProduct] = field(default_factory=list)
-    amount_unit: str = "MW"
+    volume_unit: str = "MW"
     volume_tick: float = 0.1  # steps in which the amount can be increased
     price_unit: str = "€/MWh"
     price_tick: float = 0.1  # steps in which the price can be increased

@@ -36,7 +36,7 @@ async def main():
         ),
         opening_duration=timedelta(hours=1),
         maximum_gradient=0.1,  # can only change 10% between hours - should be more generic
-        amount_unit="MWh",
+        volume_unit="MWh",
         volume_tick=0.1,
         maximum_volume=1e9,
         price_tick=0.01,

@@ -20,8 +20,8 @@ DATABASE_URI = getenv(
 # %%
 async def main():
     world = assume.World(database_uri=DATABASE_URI, export_csv=EXPORT_CSV_PATH)
-    start = datetime(2019, 1, 1).timestamp()
-    end = datetime(2019, 1, 3).timestamp()
+    start = datetime(2019, 1, 1)
+    end = datetime(2019, 1, 3)
 
     await world.setup(start)
     our_marketconfig = assume.MarketConfig(
@@ -37,8 +37,8 @@ async def main():
         ),
         opening_duration=timedelta(hours=1),
         maximum_gradient=0.1,  # can only change 10% between hours - should be more generic
-        amount_unit="MWh",
-        amount_tick=0.1,
+        volume_unit="MWh",
+        volume_tick=0.1,
         maximum_volume=1e9,
         price_tick=0.001,
         price_unit="€/MW",
