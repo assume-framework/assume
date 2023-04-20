@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "assumepy"
+name = "assume_framework"
 version = "0.0.1"
 description = "ASSUME - Agent based energy market modeling using mango agents"
 authors = ["ASSUME developers <nick.harder@inatech.uni-freiburg.de>"]

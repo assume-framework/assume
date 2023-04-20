@@ -1,0 +1,20 @@
+name: assume-doc
+channels:
+- conda-forge
+dependencies:
+- python>=3.9
+- pip
+- python
+- ipykernel
+- pandas
+- numpy
+- tqdm
+- SQLAlchemy
+
+- pip:
+  - .
+  - mango-agents==1.0.0
+  - sphinx<6
+  - sphinx-book-theme
+  - nbsphinx
+  - nbsphinx_link

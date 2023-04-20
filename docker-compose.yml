@@ -19,7 +19,7 @@ services:
 
   grafana:
     image: grafana/grafana-oss:9.2.15
-    container_name: assume-grafana
+    container_name: assume_grafana
     user: "104"
     depends_on:
       - assume_db
@@ -32,9 +32,9 @@ services:
       GF_SECURITY_ADMIN_USER: assume
       GF_SECURITY_ADMIN_PASSWORD: "assume"
     volumes:
-      - ./grafana/datasources:/etc/grafana/provisioning/datasources
-      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
-      - ./grafana/dashboard-definitions:/etc/grafana/provisioning/dashboard-definitions
+      - ./docker_configs/datasources:/etc/grafana/provisioning/datasources
+      - ./docker_configs/dashboards:/etc/grafana/provisioning/dashboards
+      - ./docker_configs/dashboard-definitions:/etc/grafana/provisioning/dashboard-definitions
     restart: always
     deploy:
       mode: replicated
@@ -46,6 +46,7 @@ services:
   simulation:
     container_name: simulation
     image: assume:latest
+    profiles: ["cli-only"]
     build: .
     environment:
       DATABASE_URI: 'postgresql://assume:assume@assume_db/assume'
