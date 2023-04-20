@@ -13,7 +13,7 @@ dependencies:
 
 - pip:
   - .
-  - mango-agents==1.0.0
+  - mango-agents==1.0.1
   - sphinx<6
   - sphinx-book-theme
   - nbsphinx
