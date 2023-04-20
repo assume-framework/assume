@@ -128,4 +128,10 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-output
+.DS_Store
+*.orig
+
+examples/outputs
+examples/local_db/
+examples/inputs/
+

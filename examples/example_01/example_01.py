@@ -10,13 +10,11 @@ import assume
 
 log = logging.getLogger(__name__)
 
-os.makedirs('./output', exist_ok=True)
-EXPORT_CSV_PATH = str(getenv("EXPORT_CSV_PATH", "./output"))
-#DATABASE_URI = getenv("DATABASE_URI", "sqlite:///./output/test.db")
-DATABASE_URI = getenv(
-     "DATABASE_URI", "postgresql://assume:assume@localhost:5432/assume"
- )
+os.makedirs("./examples/outputs", exist_ok=True)
+EXPORT_CSV_PATH = str(getenv("EXPORT_CSV_PATH", "./examples/outputs"))
 
+os.makedirs("./examples/local_db", exist_ok=True)
+DATABASE_URI = getenv("DATABASE_URI", "sqlite:///./examples/local_db/assume_db.db")
 
 # %%
 async def main():

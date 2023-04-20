@@ -137,9 +137,10 @@ class MarketRole(Role):
                 order["agent_id"] = (agent_addr, agent_id)
                 if not order.get("only_hours"):
                     order["only_hours"] = None
-
-                assert order["price"] <= self.marketconfig.maximum_bid, "max_bid"
-                assert order["price"] >= self.marketconfig.minimum_bid, "min_bid"
+                max_price_int = round(self.marketconfig.maximum_bid/self.marketconfig.price_tick)
+                min_price_int = round(self.marketconfig.minimum_bid/self.marketconfig.price_tick)
+                assert order["price"] <= max_price_int, "max_bid"
+                assert order["price"] >= min_price_int, "min_bid"
                 assert (
                     abs(order["volume"]) <= self.marketconfig.maximum_volume
                 ), "max_volume"
