@@ -13,4 +13,4 @@ dependencies:
 
 - pip:
   - .
-  - mango-agents==1.0.0
+  - mango-agents==1.0.1
