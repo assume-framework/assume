@@ -23,4 +23,4 @@ RUN pip install -e .
 
 COPY examples /src/examples
 
-CMD ["python", "-u" ,"./examples/example_02/example_02.py"]
+CMD ["python", "-u" ,"./examples/example_01/example_01.py"]

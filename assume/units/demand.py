@@ -28,6 +28,7 @@ class Demand(BaseUnit):
         price: int = 900,
         volume: int = -1000,
         location: tuple[float, float] = None,
+        unit_operator_id: str = None,
         bidding_strategy: BaseStrategy = {},
         **kwargs
     ):
@@ -37,6 +38,7 @@ class Demand(BaseUnit):
         self.volume = volume
         self.location = location
         self.total_power_output = []
+        self.unit_operator = unit_operator_id
 
     def reset(self):
         self.current_time_step = 0

@@ -1,0 +1,4 @@
+,technology,node,max_power,min_power,efficiency,fuel_type,fuel_price,co2_price,emission_factor,unit_operator,type
+0,coal,,500,50,0.8,hard coal,25,20,0.82,operator_1,power_plant
+0,gas,,200,20,0.8,natrual gas,35,20,0.82,operator_1,power_plant
+0,wind,,400,0,1,wind,0,0,0,operator_1,power_plant
