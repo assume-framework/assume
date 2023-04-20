@@ -37,6 +37,7 @@ html_theme_options = {
     "repository_url": "https://github.com/assume-framework/assume.git",
     "use_repository_button": True,
     "show_navbar_depth": 2,
+    'logo_only': True,
 }
 
 # The name for this set of Sphinx documents.  If None, it defaults to
@@ -48,7 +49,7 @@ html_short_title = "ASSUME"
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-html_logo = "_static/assume-logo.png"
+html_logo = "img/assume-logo.png"
 
 # These folders are copied to the documentation's HTML output
 html_static_path = ["_static"]
