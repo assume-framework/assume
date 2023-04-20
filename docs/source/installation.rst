@@ -44,10 +44,10 @@ After these steps you can also run the example simulation::
     python examples/example_01.py
 
 Access to database and dashboards
---------------------------------
+---------------------------------
 To save the simulation results to a database and be able to analyze them using Grafan dashboards, 
 install the docker container::
 
-    docker compose up --build
+    docker compose up
 
 This will start a container for timescaledb and grafana with preconfigured grafana dashboard.

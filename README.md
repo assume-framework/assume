@@ -78,10 +78,13 @@ To run an exemplar simulation without database and grafana, run the following co
     python examples/example_01/example_01.py
 ```
 
-If you have also built the docker container, run the following command:
+If you have docker installed, you can run the following two commands:
 ```
+    docker compose up -d
     python examples/example_02/example_02.py
 ```
+
+Afterwards you can access the Dashboard on `http://localhost:3000`
 
 Licence
 =======

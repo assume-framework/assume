@@ -48,7 +48,7 @@ html_short_title = "ASSUME"
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-html_logo = "_static/assume-logo.png"
+html_logo = "_static/assume_logo.png"
 
 # These folders are copied to the documentation's HTML output
 html_static_path = ["_static"]

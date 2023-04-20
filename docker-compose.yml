@@ -24,7 +24,7 @@ services:
     depends_on:
       - assume_db
     ports:
-      - 3001:3000
+      - 3000:3000
     environment:
       GF_SECURITY_ALLOW_EMBEDDING: "true"
       GF_AUTH_ANONYMOUS_ENABLED: "true"
