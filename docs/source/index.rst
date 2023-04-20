@@ -18,8 +18,8 @@ The project is developed by `developers <https://assume.readthedocs.io/en/latest
 The project ASSUME is funded by the Federal Ministry for Economic
 Affairs and Energy (BMWK).
 
-Check out the :doc:`usage` section for further information, including
-how to :ref:`installation` the project.
+Check out the :doc:`quick_start` section for further information, including
+how to :doc:`installation` the project.
 
 .. note::
 

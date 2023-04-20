@@ -6,8 +6,8 @@ authors = ["ASSUME developers <nick.harder@inatech.uni-freiburg.de>"]
 license = "LICENSE"
 readme = "README.md"
 
-homepage = "https://github.com/INATECH-CIG/ASSUME"
-repository = "https://github.com/INATECH-CIG/ASSUME"
+homepage = "https://assume.readthedocs.io"
+repository = "https://github.com/assume-framework/assume"
 
 keywords = ["agent based simulation", "energy market", "reinforcement learning", "market simulation", "simulation"]
 
