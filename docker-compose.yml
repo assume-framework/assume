@@ -41,17 +41,3 @@ services:
       replicas: 1
       placement:
         constraints: [node.role == manager]
-
-
-  simulation:
-    container_name: simulation
-    image: assume:latest
-    profiles: ["cli-only"]
-    build: .
-    environment:
-      DATABASE_URI: 'postgresql://assume:assume@assume_db/assume'
-    ports:
-      - 5000:5000
-      - 4000:4000
-    depends_on:
-      - assume_db
