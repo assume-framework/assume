@@ -29,6 +29,7 @@ class Demand(BaseUnit):
         volume: int = -1000,
         location: tuple[float, float] = None,
         unit_operator_id: str = None,
+
         bidding_strategy: BaseStrategy = {},
         **kwargs
     ):
