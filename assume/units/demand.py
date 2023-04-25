@@ -1,7 +1,8 @@
+import pandas as pd
+
 from assume.strategies import BaseStrategy
 from assume.units.base_unit import BaseUnit
 
-import pandas as pd
 
 class Demand(BaseUnit):
     """A demand unit.

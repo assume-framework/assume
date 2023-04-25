@@ -926,8 +926,8 @@ def swingcontract(
     # TODO does not work with multiple markets with differing time scales..
     # this only works for whole trading hours (as x MW*1h == x MWh)
     demand = -demand_series[seller][start:end]
-    normal = demand[minDCQ < demand and demand < maxDCQ ] * set_price
-    expensive = ~demand[minDCQ < demand and demand < maxDCQ ] * outer_price
+    normal = demand[minDCQ < demand and demand < maxDCQ] * set_price
+    expensive = ~demand[minDCQ < demand and demand < maxDCQ] * outer_price
     price = sum(normal) + sum(expensive)
     # volume is hard to calculate with differing units?
     # unit conversion is quite hard regarding the different intervals
@@ -960,7 +960,9 @@ def cfd(
 
     # TODO does not work with multiple markets with differing time scales..
     # this only works for whole trading hours (as x MW*1h == x MWh)
-    price_series = (contract["price"] - market_index[start:end]) * gen_series[seller][start:end]
+    price_series = (contract["price"] - market_index[start:end]) * gen_series[seller][
+        start:end
+    ]
     price = sum(price_series)
     # volume is hard to calculate with differing units?
     # unit conversion is quite hard regarding the different intervals
@@ -992,9 +994,11 @@ def market_premium(
     buyer, seller = contract["buyer_id"], contract["seller_id"]
     # TODO does not work with multiple markets with differing time scales..
     # this only works for whole trading hours (as x MW*1h == x MWh)
-    price_series = (contract["price"] - market_index[start:end]) * gen_series[seller][start:end]
+    price_series = (contract["price"] - market_index[start:end]) * gen_series[seller][
+        start:end
+    ]
     # sum only where market price is below set_
-    price = sum(price_series[price_series < 0 ])
+    price = sum(price_series[price_series < 0])
     # volume is hard to calculate with differing units?
     # unit conversion is quite hard regarding the different intervals
     return {

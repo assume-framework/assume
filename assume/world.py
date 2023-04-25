@@ -1,19 +1,14 @@
 import asyncio
+import logging
 import time
 
+import pandas as pd
+import yaml
 from mango import RoleAgent, create_container
 from mango.util.clock import ExternalClock
-
-import yaml
-import pandas as pd
-
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
-
-from assume.markets import MarketRole
-from assume.strategies import NaiveStrategyMarkUp, NaiveStrategyNoMarkUp
-from assume.units import Demand, PowerPlant
 
 from assume.common import (
     MarketConfig,
@@ -21,16 +16,14 @@ from assume.common import (
     available_clearing_strategies,
     mango_codec_factory,
 )
-
-from assume.common.misc import (
-    load_file,
-    make_market_config,
-)
-
-import logging
+from assume.common.misc import load_file, make_market_config
+from assume.markets import MarketRole
+from assume.strategies import NaiveStrategyMarkUp, NaiveStrategyNoMarkUp
+from assume.units import Demand, PowerPlant
 
 logging.basicConfig(level=logging.INFO)
-logging.getLogger('mango').setLevel(logging.WARNING)
+logging.getLogger("mango").setLevel(logging.WARNING)
+logging.getLogger("assume").setLevel(logging.WARNING)
 
 
 class World:

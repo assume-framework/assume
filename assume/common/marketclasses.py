@@ -29,7 +29,9 @@ class MarketProduct:
     duration: rd  # quarter-hourly, half-hourly, hourly, 4hourly, daily, weekly, monthly, quarter-yearly, yearly
     count: int  # how many future durations can be traded, must be >= 1
     # count can also be given as a rrule with until
-    first_delivery: rd = (rd())  # when does the first delivery begin, in relation to market start
+    first_delivery: rd = (
+        rd()
+    )  # when does the first delivery begin, in relation to market start
     # this should be a multiple of duration
     only_hours: Union[
         tuple[int, int], None
@@ -54,10 +56,10 @@ class MarketConfig:
         market_mechanism, str
     ]  # market_mechanism determines wether old offers are deleted (auction) or not (continuous) after clearing
 
-    maximum_bid: float = 3000.
-    minimum_bid: float = -500.
+    maximum_bid: float = 3000.0
+    minimum_bid: float = -500.0
     maximum_gradient: float = None  # very specific - should be in market clearing
-    maximum_volume: float = 500.
+    maximum_volume: float = 500.0
     additional_fields: list[str] = field(default_factory=list)
     market_products: list[MarketProduct] = field(default_factory=list)
     volume_unit: str = "MW"
