@@ -2,7 +2,7 @@ name: assume-framework
 channels:
 - conda-forge
 dependencies:
-- python>=3.9
+- python>=3.10
 - pip
 - python
 - ipykernel
@@ -13,4 +13,3 @@ dependencies:
 
 - pip:
   - .
-  - mango-agents==1.0.1
