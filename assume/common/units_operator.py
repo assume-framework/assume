@@ -1,11 +1,11 @@
-import asyncio
 import logging
+import pandas as pd
 
 from mango import Role
 from mango.messages.message import Performatives
 
-from ..strategies import BaseStrategy
-from ..units import BaseUnit
+from assume.strategies import BaseStrategy
+from assume.units import BaseUnit
 from .marketclasses import (
     ClearingMessage,
     MarketConfig,
@@ -57,6 +57,28 @@ class UnitsOperator(Role):
                 self.register_market(market)
                 self.registered_markets[market.name] = market
 
+    def add_unit(
+        self,
+        id: str,
+        unit_class: type[BaseUnit],
+        unit_params: dict,
+    ):
+        """
+        Create a unit.
+        """
+        self.units[id] = unit_class(
+            id, 
+            **unit_params
+        )
+
+        if unit_params["bidding_strategy"] is None and self.use_portfolio_opt == False:
+            raise ValueError(
+                "No bidding strategy defined for unit while not using portfolio optimization."
+            )
+
+        self.units[id].reset()
+
+    
     def participate(self, market):
         # always participate at all markets
         return True
@@ -128,8 +150,6 @@ class UnitsOperator(Role):
         )
 
     async def formulate_bids(self, market: MarketConfig, products: list[tuple]):
-        # sourcery skip: merge-dict-assign
-
         """
         Takes information from all units that the unit operator manages and
         formulates the bid to the market from that according to the bidding strategy.
@@ -138,6 +158,7 @@ class UnitsOperator(Role):
         """
 
         orderbook: Orderbook = []
+        current_time = pd.to_datetime(self.context.current_timestamp, unit='s')
         # the given products just became available on our market
         # and we need to provide bids
         # [whole_next_hour, quarter1, quarter2, quarter3, quarter4]
@@ -155,44 +176,27 @@ class UnitsOperator(Role):
                 op_windows = []
                 for unit_id, unit in self.units.items():
                     # get operational window for each unit
-                    operational_window = unit.calculate_operational_window(product)
+                    operational_window = unit.calculate_operational_window(product, current_time)
                     op_windows.append(operational_window)
                     # TODO calculate bids from sum of op_windows
             else:
                 for unit_id, unit in self.units.items():
                     order_c = order.copy()
                     # get operational window for each unit
-                    operational_window = unit.calculate_operational_window(product)
+                    operational_window = unit.calculate_operational_window(product, current_time)
                     # take price from bidding strategy
                     volume, price = unit.bidding_strategy.calculate_bids(
                         market, operational_window
                     )
-                    order_c["volume"] = round(volume/market.volume_tick)
-                    order_c["price"] = round(price/market.price_tick)
-    
+                    if market.volume_tick:
+                        volume = round(volume/market.volume_tick)
+                    if market.price_tick:
+                        price = round(price/market.price_tick)
+
+                    order_c["volume"] = volume
+                    order_c["price"] = price
                     orderbook.append(order_c)
         return orderbook
-
-    def add_unit(
-        self,
-        id: str,
-        unit_class: type[BaseUnit],
-        unit_params: dict,
-        bidding_strategy: BaseStrategy = None,
-    ):
-        """
-        Create a unit.
-        """
-        self.units[id] = unit_class(
-            id, bidding_strategy=bidding_strategy, **unit_params
-        )
-
-        if bidding_strategy is None and self.use_portfolio_opt == False:
-            raise ValueError(
-                "No bidding strategy defined for unit while not using portfolio optimization."
-            )
-
-        self.units[id].reset()
 
     # Needed data in the future
     """""

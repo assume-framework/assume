@@ -14,8 +14,8 @@ class NaiveStrategyNoMarkUp(BaseStrategy):
         Return: volume, price
         """
 
-        price = round(operational_window["max_power"]["marginal_cost"], 1)
-        volume = round(operational_window["max_power"]["power"], 1)
+        price = operational_window["max_power"]["marginal_cost"]
+        volume = operational_window["max_power"]["power"]
 
         return volume, price
 
@@ -33,7 +33,7 @@ class NaiveStrategyMarkUp(BaseStrategy):
 
         Return: volume, price
         """
-        price = round(operational_window["max_power"]["marginal_cost"] * 1.2, 1)
-        volume = round(operational_window["max_power"]["power"], 1)
+        price = operational_window["max_power"]["marginal_cost"] * 1.2
+        volume = operational_window["max_power"]["power"]
 
         return volume, price

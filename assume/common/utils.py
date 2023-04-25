@@ -42,7 +42,7 @@ def initializer(func):
 def get_available_products(market_products: list[MarketProduct], startdate: datetime):
     options = []
     for product in market_products:
-        start = startdate + product.first_delivery_after_start
+        start = startdate + product.first_delivery
         if isinstance(product.duration, rrule.rrule):
             starts = list(product.duration.xafter(start, product.count + 1))
             for i in range(product.count):
