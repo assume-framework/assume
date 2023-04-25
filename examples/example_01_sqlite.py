@@ -21,7 +21,6 @@ async def main():
     )
     await world.run_simulation()
 
-
 if __name__ == "__main__":
     result = asyncio.run(main())
 

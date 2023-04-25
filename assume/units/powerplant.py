@@ -72,7 +72,7 @@ class PowerPlant(BaseUnit):
         self,
         id: str,
         technology: str,
-        bidding_strategy: BaseStrategy,
+        bidding_strategies: dict,
         max_power: float or pd.Series,
         min_power: float or pd.Series = 0.0,
         efficiency: float = 1,
@@ -94,7 +94,12 @@ class PowerPlant(BaseUnit):
         location: tuple[float, float] = None,
         **kwargs
     ):
-        super().__init__(id, technology, node, bidding_strategy)
+        super().__init__(
+            id=id,
+            technology=technology,
+            node=node,
+            bidding_strategies=bidding_strategies,
+        )
 
         self.max_power = max_power
         self.min_power = min_power
@@ -131,7 +136,9 @@ class PowerPlant(BaseUnit):
         self.pos_capacity_reserve = [0.0]
         self.neg_capacity_reserve = [0.0]
 
-    def calculate_operational_window(self, product, current_time) -> dict:
+    def calculate_operational_window(
+        self, product_type: str, current_time: pd.Timestamp
+    ) -> dict:
         """Calculate the operation window for the next time step.
 
         Returns
@@ -174,6 +181,9 @@ class PowerPlant(BaseUnit):
         }
 
         return operational_window
+
+    def calculate_bids(self, product_type, current_time, operational_window):
+        return super().calculate_bids(product_type, current_time, operational_window)
 
     def calc_marginal_cost(
         self, power_output: float, partial_load_eff: bool = False

@@ -11,6 +11,7 @@ base_case:
   markets_config:
     EOM:
       operator: EOM_operator
+      product_type: energy
       duration: 1h
       count: 1
       first_delivery: 1h
