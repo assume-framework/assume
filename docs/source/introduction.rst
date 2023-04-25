@@ -152,9 +152,9 @@ Communication layer
 Throughout the model, a variety of data exchanges need to take place. This exchange can have several forms. It 
 can be between the agents and the markets for order submission and market feedback. Moreover, it has to take 
 place between the global environment and the agents for the weather and scenario data. To handle that in a 
-standardized way, we facilitate the mango framework (`mango – Modular Python Agent Framework <https://gitlab.com/mango-selm>`_) 
-which is an open-source solution by University Oldenburg. `mango <https://gitlab.com/mango-selm/mango>`_ is 
-a Python framework for the development of multi-agent systems. It provides a basic framework for building a 
+standardized way, we facilitate the mango framework (`mango – Modular Python Agent Framework <https://gitlab.com/mango-agents/mango>`_) 
+which is an open-source agent-based simulation framework by University Oldenburg. 
+It is a Python framework for the development of multi-agent systems which can be used to build a 
 single intelligent software agent, provides simple interfaces for communication between agents, and enables 
 modularization of complex agents. A container mechanism is used to accelerate message exchange for agents 
 that reside within a dedicated process. Please note that the whole simulation is timed by the clock function 
