@@ -1,11 +1,12 @@
 import logging
-import pandas as pd
 
+import pandas as pd
 from mango import Role
 from mango.messages.message import Performatives
 
 from assume.strategies import BaseStrategy
 from assume.units import BaseUnit
+
 from .marketclasses import (
     ClearingMessage,
     MarketConfig,

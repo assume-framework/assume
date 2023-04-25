@@ -1,7 +1,8 @@
-import pandas as pd
 import logging
-import dateutil.rrule as rr
 import os
+
+import dateutil.rrule as rr
+import pandas as pd
 
 from assume.common import MarketConfig, MarketProduct
 

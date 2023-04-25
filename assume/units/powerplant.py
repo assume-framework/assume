@@ -1,7 +1,8 @@
+import pandas as pd
+
 from assume.strategies import BaseStrategy
 from assume.units.base_unit import BaseUnit
 
-import pandas as pd
 
 class PowerPlant(BaseUnit):
     """A class for a power plants.
@@ -73,12 +74,12 @@ class PowerPlant(BaseUnit):
         technology: str,
         bidding_strategy: BaseStrategy,
         max_power: float or pd.Series,
-        min_power: float or pd.Series = 0.,
+        min_power: float or pd.Series = 0.0,
         efficiency: float = 1,
         fuel_type: str = None,
-        fuel_price: float or pd.Series = 0.,
-        co2_price: float or pd.Series = 0.,
-        emission_factor: float = 0.,
+        fuel_price: float or pd.Series = 0.0,
+        co2_price: float or pd.Series = 0.0,
+        emission_factor: float = 0.0,
         node: str = None,
         ramp_up: float = -1,
         ramp_down: float = -1,
@@ -139,8 +140,16 @@ class PowerPlant(BaseUnit):
             Dictionary containing the operational window for the next time step.
         """
 
-        min_power = self.min_power if type(self.min_power) is float else self.min_power[current_time]
-        max_power = self.max_power if type(self.max_power) is float else self.max_power[current_time]
+        min_power = (
+            self.min_power
+            if type(self.min_power) is float
+            else self.min_power[current_time]
+        )
+        max_power = (
+            self.max_power
+            if type(self.max_power) is float
+            else self.max_power[current_time]
+        )
         current_power = self.total_power_output[0]
 
         operational_window = {

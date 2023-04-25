@@ -17,10 +17,13 @@ DATABASE_URI = getenv(
 # %%
 async def main():
     world = World(database_uri=DATABASE_URI, export_csv=EXPORT_CSV_PATH)
-    await world.load_scenario(inputs_path="examples/inputs", scenario="example_01", study_case="base_case")
+    await world.load_scenario(
+        inputs_path="examples/inputs", scenario="example_01", study_case="base_case"
+    )
     await world.run_simulation()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     result = asyncio.run(main())
 
 # %%

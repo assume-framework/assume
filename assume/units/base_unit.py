@@ -1,5 +1,6 @@
 from assume.strategies import BaseStrategy
 
+
 class BaseUnit:
     """A base class for a unit.
 
