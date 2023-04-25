@@ -19,13 +19,7 @@ base_case:
       first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
-      max_gradient: 0.1
       volume_unit: MWh
-      volume_tick: 0.1
       maximum_volume: 1000000
-      price_tick: 0.01
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
-
-
-    

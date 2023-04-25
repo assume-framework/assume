@@ -30,6 +30,7 @@ from assume.common.misc import (
 import logging
 
 logging.basicConfig(level=logging.INFO)
+logging.getLogger('mango').setLevel(logging.WARNING)
 
 
 class World:
@@ -165,7 +166,7 @@ class World:
                 unit_params["fuel_price"] = fuel_prices_df[unit_params["fuel_type"]]
                 unit_params["co2_price"] = fuel_prices_df["co2"]
 
-            if pp_name in vre_df.columns:
+            if vre_df and pp_name in vre_df.columns:
                 unit_params["max_power"] = vre_df[pp_name]
 
             self.add_unit(

@@ -66,10 +66,7 @@ class UnitsOperator(Role):
         """
         Create a unit.
         """
-        self.units[id] = unit_class(
-            id, 
-            **unit_params
-        )
+        self.units[id] = unit_class(id, **unit_params)
 
         if unit_params["bidding_strategy"] is None and self.use_portfolio_opt == False:
             raise ValueError(
@@ -78,7 +75,6 @@ class UnitsOperator(Role):
 
         self.units[id].reset()
 
-    
     def participate(self, market):
         # always participate at all markets
         return True
@@ -158,7 +154,7 @@ class UnitsOperator(Role):
         """
 
         orderbook: Orderbook = []
-        current_time = pd.to_datetime(self.context.current_timestamp, unit='s')
+        current_time = pd.to_datetime(self.context.current_timestamp, unit="s")
         # the given products just became available on our market
         # and we need to provide bids
         # [whole_next_hour, quarter1, quarter2, quarter3, quarter4]
@@ -176,22 +172,26 @@ class UnitsOperator(Role):
                 op_windows = []
                 for unit_id, unit in self.units.items():
                     # get operational window for each unit
-                    operational_window = unit.calculate_operational_window(product, current_time)
+                    operational_window = unit.calculate_operational_window(
+                        product, current_time
+                    )
                     op_windows.append(operational_window)
                     # TODO calculate bids from sum of op_windows
             else:
                 for unit_id, unit in self.units.items():
                     order_c = order.copy()
                     # get operational window for each unit
-                    operational_window = unit.calculate_operational_window(product, current_time)
+                    operational_window = unit.calculate_operational_window(
+                        product, current_time
+                    )
                     # take price from bidding strategy
                     volume, price = unit.bidding_strategy.calculate_bids(
                         market, operational_window
                     )
                     if market.volume_tick:
-                        volume = round(volume/market.volume_tick)
+                        volume = round(volume / market.volume_tick)
                     if market.price_tick:
-                        price = round(price/market.price_tick)
+                        price = round(price / market.price_tick)
 
                     order_c["volume"] = volume
                     order_c["price"] = price
