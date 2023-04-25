@@ -7,7 +7,6 @@ import os
 from assume import World
 
 log = logging.getLogger(__name__)
-logging.getLogger('mango').setLevel(logging.WARNING)
 
 os.makedirs("./examples/outputs", exist_ok=True)
 EXPORT_CSV_PATH = str(getenv("EXPORT_CSV_PATH", "./examples/outputs"))
