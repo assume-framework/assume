@@ -25,18 +25,19 @@ class Demand(BaseUnit):
     def __init__(
         self,
         id: str,
-        technology: str = "inflexible_demand",
+        technology: str,
+        bidding_strategies: dict,
         node: str = None,
         price: float or pd.Series = 3000.0,
         volume: float or pd.Series = 1000,
         location: tuple[float, float] = None,
-        bidding_strategy: BaseStrategy = None,
         **kwargs
     ):
-        if bidding_strategy is None:
-            bidding_strategy = {}
         super().__init__(
-            id=id, technology=technology, node=node, bidding_strategy=bidding_strategy
+            id=id,
+            technology=technology,
+            node=node,
+            bidding_strategies=bidding_strategies,
         )
 
         self.price = price
@@ -47,7 +48,9 @@ class Demand(BaseUnit):
     def reset(self):
         self.current_time_step = 0
 
-    def calculate_operational_window(self, product, current_time) -> dict:
+    def calculate_operational_window(
+        self, product_type: str, current_time: pd.Timestamp
+    ) -> dict:
         """Calculate the operation window for the next time step."""
         if type(self.volume) == pd.Series:
             bid_volume = self.volume.loc[current_time]
@@ -59,4 +62,7 @@ class Demand(BaseUnit):
         else:
             bid_price = self.price
 
-        return {"max_power": {"power": -bid_volume, "marginal_cost": bid_price}}  # MW
+        return {"max_power": {"power": -bid_volume, "marginal_cost": bid_price}}
+
+    def calculate_bids(self, product_type, current_time, operational_window):
+        return super().calculate_bids(product_type, current_time, operational_window)

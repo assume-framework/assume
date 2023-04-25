@@ -1,7 +1,7 @@
 base_case:
   id: case_2019
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-31 23:00
+  end_date: 2019-01-10 23:00
   time_step: 1h
   powerplants: powerplants.csv
   powerplants_strategy: simple
@@ -14,6 +14,7 @@ base_case:
   markets_config:
     EOM:
       operator: EOM_operator
+      product_type: energy
       duration: 1h
       count: 1
       first_delivery: 1h

@@ -1,5 +1,7 @@
 from assume.strategies import BaseStrategy
 
+import pandas as pd
+
 
 class BaseUnit:
     """A base class for a unit.
@@ -24,14 +26,14 @@ class BaseUnit:
         id: str,
         technology: str,
         node: str,
-        bidding_strategy: BaseStrategy,
+        bidding_strategies: dict,
     ):
         self.id = id
         self.technology = technology
         self.node = node
-        self.bidding_strategy = bidding_strategy
+        self.bidding_strategies = bidding_strategies
 
-    def calculate_operational_window(self, product) -> dict:
+    def calculate_operational_window(self, current_time) -> dict:
         """Calculate the operation window for the next time step."""
 
         raise NotImplementedError()
@@ -39,3 +41,16 @@ class BaseUnit:
     def reset(self):
         """Reset the unit to its initial state."""
         raise NotImplementedError()
+
+    def calculate_bids(
+        self,
+        product_type: str,
+        current_time: pd.Timestamp,
+        operational_window: dict,
+    ):
+        """Calculate the bids for the next time step."""
+
+        return self.bidding_strategies[product_type].calculate_bids(
+            current_time=current_time,
+            operational_window=operational_window,
+        )

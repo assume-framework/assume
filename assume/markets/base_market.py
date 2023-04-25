@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
 from pathlib import Path
@@ -7,13 +7,11 @@ from pathlib import Path
 import pandas as pd
 from mango import Role
 
-from ..common.marketclasses import MarketConfig, MarketProduct, Order, Orderbook
-from ..common.utils import get_available_products
+from assume.common.market_objects import MarketConfig, MarketProduct, Order, Orderbook
+from assume.common.utils import get_available_products
 
 logger = logging.getLogger(__name__)
 
-
-# add role per Market
 class MarketRole(Role):
     longitude: float
     latitude: float

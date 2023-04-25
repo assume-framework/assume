@@ -1,3 +1,3 @@
-from .base_unit import BaseUnit
-from .demand import Demand
-from .powerplant import PowerPlant
+from assume.units.base_unit import BaseUnit
+from assume.units.demand import Demand
+from assume.units.powerplant import PowerPlant

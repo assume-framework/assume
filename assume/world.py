@@ -4,8 +4,10 @@ import time
 
 import pandas as pd
 import yaml
+
 from mango import RoleAgent, create_container
 from mango.util.clock import ExternalClock
+
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -13,17 +15,25 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from assume.common import (
     MarketConfig,
     UnitsOperator,
-    available_clearing_strategies,
     mango_codec_factory,
+    load_file,
+    make_market_config,
 )
-from assume.common.misc import load_file, make_market_config
-from assume.markets import MarketRole
-from assume.strategies import NaiveStrategyMarkUp, NaiveStrategyNoMarkUp
-from assume.units import Demand, PowerPlant
+
+from assume.markets import (
+    MarketRole,
+    pay_as_bid,
+    pay_as_clear,
+)
+from assume.strategies import NaiveStrategy
+from assume.units import (
+    Demand,
+    PowerPlant,
+)
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("mango").setLevel(logging.WARNING)
-logging.getLogger("assume").setLevel(logging.WARNING)
+logging.getLogger("assume").setLevel(logging.INFO)
 
 
 class World:
@@ -53,12 +63,17 @@ class World:
         self.markets: dict[str, MarketConfig] = {}
         self.unit_operators: dict[str, UnitsOperator] = {}
 
-        self.unit_types = {"power_plant": PowerPlant, "demand": Demand}
-        self.bidding_types = {
-            "simple": NaiveStrategyNoMarkUp,
-            "markup": NaiveStrategyMarkUp,
+        self.unit_types = {
+            "power_plant": PowerPlant,
+            "demand": Demand,
         }
-        self.available_clearing_strategies = available_clearing_strategies
+        self.bidding_types = {
+            "simple": NaiveStrategy,
+        }
+        self.clearing_mechanisms = {
+            "pay_as_clear": pay_as_clear,
+            "pay_as_bid": pay_as_bid,
+        }
 
     async def setup(
         self,
@@ -124,6 +139,10 @@ class World:
             path=path, config=config, file_name="renewable_generation", index=self.index
         )
 
+        bidding_strategies_df = load_file(
+            path=path, config=config, file_name="bidding_strategies"
+        )
+
         # cross_border_flows_df = load_file(
         #     path=path, config=config, file_name="cross_border_flows", index=self.index
         # )
@@ -153,13 +172,26 @@ class World:
         self.logger.info("Adding power plant units")
         for pp_name, unit_params in powerplants_df.iterrows():
             if (
+                bidding_strategies_df is not None
+                and pp_name in bidding_strategies_df.index
+            ):
+                unit_params["bidding_strategies"] = bidding_strategies_df.loc[
+                    pp_name
+                ].to_dict()
+            else:
+                self.logger.warning(
+                    f"No bidding strategies specified for {pp_name}. Using default strategies."
+                )
+                unit_params["bidding_strategies"] = {"energy": "simple"}
+
+            if (
                 fuel_prices_df is not None
                 and unit_params["fuel_type"] in fuel_prices_df.columns
             ):
                 unit_params["fuel_price"] = fuel_prices_df[unit_params["fuel_type"]]
                 unit_params["co2_price"] = fuel_prices_df["co2"]
 
-            if vre_df and pp_name in vre_df.columns:
+            if vre_df is not None and pp_name in vre_df.columns:
                 unit_params["max_power"] = vre_df[pp_name]
 
             self.add_unit(
@@ -173,13 +205,24 @@ class World:
         self.logger.info("Adding demand")
         for demand_name, demand in demand_df.items():
             self.add_unit_operator(id=demand_name)
-
             unit_params = {
                 "technology": "inflex_demand",
                 "volume": demand,
                 "price": 3000.0,
-                "bidding_strategy": "simple",
             }
+
+            if (
+                bidding_strategies_df is not None
+                and demand_name in bidding_strategies_df.index
+            ):
+                unit_params["bidding_strategies"] = bidding_strategies_df.loc[
+                    demand_name
+                ].to_dict()
+            else:
+                self.logger.warning(
+                    f"No bidding strategies specified for {demand_name}. Using default strategies."
+                )
+                unit_params["bidding_strategies"] = {"energy": "simple"}
 
             self.add_unit(
                 id=demand_name,
@@ -234,12 +277,14 @@ class World:
             self.logger.error(f"invalid unit type {unit_type}")
             raise e
 
-        try:
-            bidding_strategy = unit_params["bidding_strategy"]
-            unit_params["bidding_strategy"] = self.bidding_types[bidding_strategy]()
-        except KeyError as e:
-            self.logger.error(f"invalid bidding strategy {bidding_strategy}")
-            raise e
+        for product_type, strategy in unit_params["bidding_strategies"].items():
+            try:
+                unit_params["bidding_strategies"][product_type] = self.bidding_types[
+                    strategy
+                ]()
+            except KeyError as e:
+                self.logger.error(f"Invalid bidding strategy {strategy}")
+                raise e
 
         # create unit within the unit operator its associated with
         self.unit_operators[unit_operator_id].add_unit(
@@ -247,29 +292,6 @@ class World:
             unit_class,
             unit_params,
         )
-
-        # df = pd.DataFrame([unit_params])
-        # df["type"] = unit_type
-
-        # if unit_type != "demand":
-        #     if self.export_csv:
-        #         p = Path(self.export_csv)
-        #         p.mkdir(parents=True, exist_ok=True)
-        #         market_data_path = p.joinpath("unit_meta.csv")
-        #         df.to_csv(
-        #             market_data_path, mode="a", header=not market_data_path.exists()
-        #         )
-        #     df.to_sql("unit_meta", self.db.bind, if_exists="append")
-
-        # else:
-        #     if self.export_csv:
-        #         p = Path(self.export_csv)
-        #         p.mkdir(parents=True, exist_ok=True)
-        #         market_data_path = p.joinpath("demand_meta.csv")
-        #         df.to_csv(
-        #             market_data_path, mode="a", header=not market_data_path.exists()
-        #         )
-        #     df.to_sql("demand_meta", self.db.bind, if_exists="append")
 
     def add_market_operator(
         self,
@@ -304,9 +326,7 @@ class World:
              describes the configuration of a market
         """
         if isinstance(market_config.market_mechanism, str):
-            if strategy := self.available_clearing_strategies.get(
-                market_config.market_mechanism
-            ):
+            if strategy := self.clearing_mechanisms.get(market_config.market_mechanism):
                 market_config.market_mechanism = strategy
 
             else:

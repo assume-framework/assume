@@ -1,13 +1,10 @@
-import logging
-
 import pandas as pd
 from mango import Role
 from mango.messages.message import Performatives
 
 from assume.strategies import BaseStrategy
 from assume.units import BaseUnit
-
-from .marketclasses import (
+from assume.common.market_objects import (
     ClearingMessage,
     MarketConfig,
     OpeningMessage,
@@ -15,7 +12,9 @@ from .marketclasses import (
     Orderbook,
 )
 
-log = logging.getLogger(__name__)
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class UnitsOperator(Role):
@@ -68,12 +67,6 @@ class UnitsOperator(Role):
         Create a unit.
         """
         self.units[id] = unit_class(id, **unit_params)
-
-        if unit_params["bidding_strategy"] is None and self.use_portfolio_opt == False:
-            raise ValueError(
-                "No bidding strategy defined for unit while not using portfolio optimization."
-            )
-
         self.units[id].reset()
 
     def participate(self, market):
@@ -93,13 +86,13 @@ class UnitsOperator(Role):
             ),
             1,  # register after time was updated for the first time
         )
-        log.debug(f"tried to register at market {market.name}")
+        logger.debug(f"tried to register at market {market.name}")
 
     def handle_opening(self, opening: OpeningMessage, meta: dict[str, str]):
-        log.debug(
+        logger.debug(
             f'Operator {self.id} received opening from: {opening["market_id"]} {opening["start"]}.'
         )
-        log.debug(f'Operator {self.id} can bid until: {opening["stop"]}')
+        logger.debug(f'Operator {self.id} can bid until: {opening["stop"]}')
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
 
     def send_dispatch_plan(self):
@@ -110,7 +103,7 @@ class UnitsOperator(Role):
             unit.total_power_output.append(self.valid_orders[0]["volume"])
 
     def handle_market_feedback(self, content: ClearingMessage, meta: dict[str, str]):
-        log.debug(f"got market result: {content}")
+        logger.debug(f"got market result: {content}")
         orderbook: Orderbook = content["orderbook"]
         for bid in orderbook:
             self.valid_orders.append(bid)
@@ -127,7 +120,7 @@ class UnitsOperator(Role):
 
         products = opening["products"]
         market = self.registered_markets[opening["market_id"]]
-        log.debug(f"setting bids for {market.name}")
+        logger.debug(f"setting bids for {market.name}")
         orderbook = await self.formulate_bids(market, products)
         acl_metadata = {
             "performative": Performatives.inform,
@@ -155,7 +148,9 @@ class UnitsOperator(Role):
         """
 
         orderbook: Orderbook = []
+        product_type = market.product_type
         current_time = pd.to_datetime(self.context.current_timestamp, unit="s")
+        
         # the given products just became available on our market
         # and we need to provide bids
         # [whole_next_hour, quarter1, quarter2, quarter3, quarter4]
@@ -163,12 +158,6 @@ class UnitsOperator(Role):
         sorted_products = sorted(products, key=lambda p: (p[0] - p[1], p[0]))
 
         for product in sorted_products:
-            order: Order = {}
-            order["start_time"] = product[0]
-            order["end_time"] = product[1]
-            order["only_hours"] = product[2]
-            order["agent_id"] = (self.context.addr, self.context.aid)
-
             if self.use_portfolio_opt:
                 op_windows = []
                 for unit_id, unit in self.units.items():
@@ -179,15 +168,24 @@ class UnitsOperator(Role):
                     op_windows.append(operational_window)
                     # TODO calculate bids from sum of op_windows
             else:
+                order: Order = {
+                    "start_time": product[0],
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "agent_id": (self.context.addr, self.context.aid),
+                }
                 for unit_id, unit in self.units.items():
                     order_c = order.copy()
                     # get operational window for each unit
                     operational_window = unit.calculate_operational_window(
-                        product, current_time
+                        product_type=product_type,
+                        current_time=current_time,
                     )
                     # take price from bidding strategy
-                    volume, price = unit.bidding_strategy.calculate_bids(
-                        market, operational_window
+                    volume, price = unit.calculate_bids(
+                        product_type=product_type,
+                        operational_window=operational_window,
+                        current_time=current_time,
                     )
                     if market.volume_tick:
                         volume = round(volume / market.volume_tick)
@@ -198,28 +196,3 @@ class UnitsOperator(Role):
                     order_c["price"] = price
                     orderbook.append(order_c)
         return orderbook
-
-    # Needed data in the future
-    """""
-    def get_world_data(self, input_data):
-        self.temperature = input_data.temperature
-        self.wind_speed = input_data.wind_speed
-
-    def location(self, coordinates: tuple(float, float)= (0,0), NUTS_0: str = None):
-        self.x: int = 0
-        self.y: int = 0
-        NUTS_0: str = 0
-
-    def get_temperature(self, location):
-        if isinstance(location, tuple):
-            # get lat lon table
-            pass
-        elif "NUTS" in location:
-            # get nuts table
-            pass
-
-    def reset(self):
-
-        #Reset the unit to its initial state.
-
-    """

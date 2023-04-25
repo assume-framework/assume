@@ -19,7 +19,6 @@ class Order(TypedDict):
 
 Orderbook = list[Order]
 MarketOrderbook = dict[str, Orderbook]
-
 eligible_lambda = Callable[[Agent], bool]
 
 
@@ -38,9 +37,7 @@ class MarketProduct:
     ] = None  # e.g. (8,20) - for peak trade, (20, 8) for off-peak, none for base
     eligible_lambda_function: Union[eligible_lambda, None] = None
 
-
 market_mechanism = Callable[[Role, list[MarketProduct]], tuple[Orderbook, dict]]
-
 
 @dataclass
 class MarketConfig:
@@ -61,6 +58,7 @@ class MarketConfig:
     maximum_gradient: float = None  # very specific - should be in market clearing
     maximum_volume: float = 500.0
     additional_fields: list[str] = field(default_factory=list)
+    product_type: str = "energy"
     market_products: list[MarketProduct] = field(default_factory=list)
     volume_unit: str = "MW"
     volume_tick: float or None = None  # steps in which the amount can be increased
