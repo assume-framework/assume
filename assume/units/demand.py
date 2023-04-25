@@ -1,6 +1,7 @@
-from ..strategies import BaseStrategy
-from .base_unit import BaseUnit
+from assume.strategies import BaseStrategy
+from assume.units.base_unit import BaseUnit
 
+import pandas as pd
 
 class Demand(BaseUnit):
     """A demand unit.
@@ -23,15 +24,19 @@ class Demand(BaseUnit):
     def __init__(
         self,
         id: str,
-        technology: str = None,
+        technology: str = "inflexible_demand",
         node: str = None,
-        price: int = 900,
-        volume: int = -1000,
+        price: float or pd.Series = 3000.0,
+        volume: float or pd.Series = 1000,
         location: tuple[float, float] = None,
-        bidding_strategy: BaseStrategy = {},
+        bidding_strategy: BaseStrategy = None,
         **kwargs
     ):
-        super().__init__(id, technology, node, bidding_strategy=bidding_strategy)
+        if bidding_strategy is None:
+            bidding_strategy = {}
+        super().__init__(
+            id=id, technology=technology, node=node, bidding_strategy=bidding_strategy
+        )
 
         self.price = price
         self.volume = volume
@@ -41,7 +46,16 @@ class Demand(BaseUnit):
     def reset(self):
         self.current_time_step = 0
 
-    def calculate_operational_window(self, product) -> dict:
+    def calculate_operational_window(self, product, current_time) -> dict:
         """Calculate the operation window for the next time step."""
+        if type(self.volume) == pd.Series:
+            bid_volume = self.volume.loc[current_time]
+        else:
+            bid_volume = self.volume
 
-        return {"max_power": {"power": self.volume, "marginal_cost": self.price}}  # MW
+        if type(self.price) == pd.Series:
+            bid_price = self.price.loc[current_time]
+        else:
+            bid_price = self.price
+
+        return {"max_power": {"power": -bid_volume, "marginal_cost": bid_price}}  # MW

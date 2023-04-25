@@ -133,5 +133,4 @@ dmypy.json
 
 examples/outputs
 examples/local_db/
-examples/inputs/
 

@@ -1,5 +1,4 @@
-from ..strategies import BaseStrategy
-
+from assume.strategies import BaseStrategy
 
 class BaseUnit:
     """A base class for a unit.
@@ -20,9 +19,12 @@ class BaseUnit:
     """
 
     def __init__(
-        self, id: str, technology: str, node: str, bidding_strategy: BaseStrategy
+        self,
+        id: str,
+        technology: str,
+        node: str,
+        bidding_strategy: BaseStrategy,
     ):
-
         self.id = id
         self.technology = technology
         self.node = node
