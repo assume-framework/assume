@@ -13,6 +13,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
 from tqdm import tqdm
 from datetime import datetime
+import nest_asyncio
 
 from assume.common import (
     MarketConfig,
@@ -57,7 +58,7 @@ class World:
                 self.logger.info("connected to db")
             except OperationalError:
                 self.logger.error(f"could not connect to {database_uri}, trying again")
-            time.sleep(2)
+                time.sleep(2)
 
         self.export_csv = export_csv
 
@@ -76,6 +77,9 @@ class World:
             "pay_as_clear": pay_as_clear,
             "pay_as_bid": pay_as_bid,
         }
+        nest_asyncio.apply()
+        self.loop = asyncio.get_event_loop()
+        asyncio.set_event_loop(self.loop)
 
     async def setup(
         self,
@@ -86,7 +90,7 @@ class World:
             addr=self.addr, clock=self.clock, codec=mango_codec_factory()
         )
 
-    async def load_scenario(
+    async def async_load_scenario(
         self,
         inputs_path: str,
         scenario: str,
@@ -370,3 +374,20 @@ class World:
                 pbar.set_description(f"{datetime.fromtimestamp(self.clock.time)}", refresh=False)
         pbar.close()
         await self.container.shutdown()
+
+    def load_scenario(
+        self,
+        inputs_path: str,
+        scenario: str,
+        study_case: str,
+        ):
+        return self.loop.run_until_complete(self.async_load_scenario(
+            inputs_path,
+            scenario,
+            study_case,
+        ))
+
+    def run(self):
+        return self.loop.run_until_complete(
+            self.run_simulation()
+        )

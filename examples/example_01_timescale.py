@@ -1,5 +1,4 @@
 # %%
-import asyncio
 import logging
 from os import getenv
 import os
@@ -15,15 +14,9 @@ DATABASE_URI = getenv(
     "DATABASE_URI", "postgresql://assume:assume@localhost:5432/assume"
 )
 # %%
-async def main():
+if __name__ == "__main__":
     world = World(database_uri=DATABASE_URI, export_csv=EXPORT_CSV_PATH)
-    await world.load_scenario(
+    world.load_scenario(
         inputs_path="examples/inputs", scenario="example_01", study_case="base_case"
     )
-    await world.run_simulation()
-
-
-if __name__ == "__main__":
-    result = asyncio.run(main())
-
-# %%
+    world.run()
