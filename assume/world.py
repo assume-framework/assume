@@ -9,6 +9,8 @@ from mango.util.clock import ExternalClock
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
+from tqdm import tqdm
+from datetime import datetime
 
 from assume.common import (
     MarketConfig,
@@ -159,7 +161,7 @@ class World:
                 unit_params["fuel_price"] = fuel_prices_df[unit_params["fuel_type"]]
                 unit_params["co2_price"] = fuel_prices_df["co2"]
 
-            if vre_df and pp_name in vre_df.columns:
+            if vre_df is not None and pp_name in vre_df.columns:
                 unit_params["max_power"] = vre_df[pp_name]
 
             self.add_unit(
@@ -326,8 +328,9 @@ class World:
         if not next_activity:
             self.logger.info("simulation finished - no schedules left")
             return None
-
+        delta = next_activity - self.clock.time
         self.clock.set_time(next_activity)
+        return delta
 
     async def run_simulation(self):
         # agent is implicit added to self.container._agents
@@ -337,7 +340,13 @@ class World:
                 "db": self.db,
                 "export_csv": self.export_csv,
             }
+        total = self.end.timestamp()-self.start.timestamp()
+        pbar = tqdm(total=total)
         while self.clock.time < self.end.timestamp():
             await asyncio.sleep(0)
-            await self.step()
+            delta = await self.step()
+            if delta:
+                pbar.update(delta)
+                pbar.set_description(f"{datetime.fromtimestamp(self.clock.time)}", refresh=False)
+        pbar.close()
         await self.container.shutdown()
