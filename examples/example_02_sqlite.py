@@ -21,7 +21,7 @@ DATABASE_URI = getenv("DATABASE_URI", "sqlite:///./examples/local_db/assume_db.d
 
 async def main():
     world = World(database_uri=DATABASE_URI, export_csv=EXPORT_CSV_PATH)
-    await world.load_scenario(inputs_path="examples/inputs", scenario="example_03", study_case="base_case")
+    await world.load_scenario(inputs_path="examples/inputs", scenario="example_02", study_case="base_case")
     await world.run_simulation()
 
 if __name__ == '__main__':
