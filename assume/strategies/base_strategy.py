@@ -13,5 +13,5 @@ class BaseStrategy:
     def __init__(self):
         super().__init__()
 
-    def calculate_bids(self, product, operational_window):
+    def calculate_bids(self):
         raise NotImplementedError()

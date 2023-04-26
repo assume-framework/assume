@@ -294,9 +294,10 @@ class World:
 
         # create unit within the unit operator its associated with
         self.unit_operators[unit_operator_id].add_unit(
-            id,
-            unit_class,
-            unit_params,
+            id=id,
+            unit_class=unit_class,
+            unit_params=unit_params,
+            index=self.index,
         )
 
     def add_market_operator(

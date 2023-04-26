@@ -24,14 +24,16 @@ class BaseUnit:
     def __init__(
         self,
         id: str,
-        technology: str,
-        node: str,
-        bidding_strategies: dict,
+        technology: str = None,
+        node: str = None,
+        bidding_strategies: dict = None,
+        index: pd.DatetimeIndex = None,
     ):
         self.id = id
         self.technology = technology
         self.node = node
         self.bidding_strategies = bidding_strategies
+        self.index = index
 
     def calculate_operational_window(self, current_time) -> dict:
         """Calculate the operation window for the next time step."""
@@ -44,13 +46,15 @@ class BaseUnit:
 
     def calculate_bids(
         self,
-        product_type: str,
-        current_time: pd.Timestamp,
-        operational_window: dict,
+        unit,
+        product_type,
+        operational_window,
     ):
         """Calculate the bids for the next time step."""
 
-        return self.bidding_strategies[product_type].calculate_bids(
-            current_time=current_time,
-            operational_window=operational_window,
-        )
+        return self.bidding_strategies[product_type].calculate_bids(unit=unit, operational_window=operational_window)
+
+    def get_dispatch_plan(self, dispatch_plan: dict, current_time: pd.Timestamp):
+        """Get the dispatch plan for the next time step."""
+
+        pass
