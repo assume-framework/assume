@@ -11,7 +11,6 @@ class NaiveStrategy(BaseStrategy):
         unit: BaseUnit = None,
         operational_window: dict = None,
     ):
-
         """
         Takes information from a unit that the unit operator manages and
         defines how it is dispatched to the market

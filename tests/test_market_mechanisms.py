@@ -3,10 +3,13 @@ from datetime import datetime, timedelta
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
 
+from assume import World
 from assume.common.market_objects import MarketConfig, MarketProduct, Order, Orderbook
 from assume.common.utils import get_available_products
 from assume.markets.base_market import MarketRole
-from assume.markets.clearing_algorithms import available_clearing_strategies
+
+w = World()
+available_clearing_strategies = w.clearing_mechanisms
 
 simple_dayahead_auction_config = MarketConfig(
     "simple_dayahead_auction",
@@ -79,8 +82,8 @@ def test_market():
     clearing_result, meta = simple_dayahead_auction_config.market_mechanism(
         mr, products
     )
-    assert meta["volume"] > 0
-    assert meta["price"] > 0
+    assert meta[0]["demand_volume"] > 0
+    assert meta[0]["price"] > 0
     import pandas as pd
 
     print(pd.DataFrame.from_dict(mr.all_orders))

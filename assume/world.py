@@ -39,16 +39,20 @@ class World:
     ):
         self.logger = logging.getLogger(__name__)
         self.addr = (ifac_addr, port)
-        self.db = scoped_session(sessionmaker(create_engine(database_uri)))
-        connected = False
-        while not connected:
-            try:
-                self.db.connection()
-                connected = True
-                self.logger.info("connected to db")
-            except OperationalError:
-                self.logger.error(f"could not connect to {database_uri}, trying again")
-                time.sleep(2)
+        self.db = None
+        if database_uri:
+            self.db = scoped_session(sessionmaker(create_engine(database_uri)))
+            connected = False
+            while not connected:
+                try:
+                    self.db.connection()
+                    connected = True
+                    self.logger.info("connected to db")
+                except OperationalError:
+                    self.logger.error(
+                        f"could not connect to {database_uri}, trying again"
+                    )
+                    time.sleep(2)
 
         self.export_csv = export_csv
 
