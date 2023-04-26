@@ -35,7 +35,7 @@ class UnitsOperator(Role):
             self.use_portfolio_opt = opt_portfolio[0]
             self.portfolio_strategy = opt_portfolio[1]
 
-        self.valid_orders = []
+        self.valid_orders = {}
         self.units: dict[str, BaseUnit] = {}
 
     def setup(self):
@@ -62,11 +62,13 @@ class UnitsOperator(Role):
         id: str,
         unit_class: type[BaseUnit],
         unit_params: dict,
+        index: pd.DatetimeIndex,
     ):
         """
         Create a unit.
         """
-        self.units[id] = unit_class(id, **unit_params)
+
+        self.units[id] = unit_class(id=id, index=index, **unit_params)
         self.units[id].reset()
 
     def participate(self, market):
@@ -94,21 +96,26 @@ class UnitsOperator(Role):
         )
         logger.debug(f'Operator {self.id} can bid until: {opening["stop"]}')
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
-
-    def send_dispatch_plan(self):
-        # todo group by unit_id
-        for unit_id, unit in self.units.items():
-            # unit.dispatch(valid_orders)
-            unit.current_time_step += 1
-            unit.total_power_output.append(self.valid_orders[0]["volume"])
+        self.current_time = pd.to_datetime(self.context.current_timestamp, unit="s")
 
     def handle_market_feedback(self, content: ClearingMessage, meta: dict[str, str]):
         logger.debug(f"got market result: {content}")
         orderbook: Orderbook = content["orderbook"]
+        self.valid_orders = {unit_id: [] for unit_id in self.units.keys()}
         for bid in orderbook:
-            self.valid_orders.append(bid)
+            self.valid_orders[self.bids_map[bid['bid_id']]].append(bid)
 
         self.send_dispatch_plan()
+
+    def send_dispatch_plan(self):
+        # todo group by unit_id
+        for unit_id in self.units.keys():
+            total_capacity = 0.0
+            for bid in self.valid_orders[unit_id]:
+                total_capacity += bid['volume']
+
+            dispatch_plan = {'total_capacity': total_capacity}
+            self.units[unit_id].get_dispatch_plan(dispatch_plan, self.current_time)
 
     async def submit_bids(self, opening: OpeningMessage):
         """
@@ -149,8 +156,7 @@ class UnitsOperator(Role):
 
         orderbook: Orderbook = []
         product_type = market.product_type
-        current_time = pd.to_datetime(self.context.current_timestamp, unit="s")
-        
+
         # the given products just became available on our market
         # and we need to provide bids
         # [whole_next_hour, quarter1, quarter2, quarter3, quarter4]
@@ -163,7 +169,8 @@ class UnitsOperator(Role):
                 for unit_id, unit in self.units.items():
                     # get operational window for each unit
                     operational_window = unit.calculate_operational_window(
-                        product, current_time
+                        product_type=product,
+                        current_time=self.current_time,
                     )
                     op_windows.append(operational_window)
                     # TODO calculate bids from sum of op_windows
@@ -174,25 +181,32 @@ class UnitsOperator(Role):
                     "only_hours": product[2],
                     "agent_id": (self.context.addr, self.context.aid),
                 }
+                self.bids_map = {}
                 for unit_id, unit in self.units.items():
                     order_c = order.copy()
                     # get operational window for each unit
                     operational_window = unit.calculate_operational_window(
                         product_type=product_type,
-                        current_time=current_time,
+                        current_time=self.current_time,
                     )
                     # take price from bidding strategy
-                    volume, price = unit.calculate_bids(
+                    bids = unit.calculate_bids(
                         product_type=product_type,
                         operational_window=operational_window,
-                        current_time=current_time,
                     )
-                    if market.volume_tick:
-                        volume = round(volume / market.volume_tick)
-                    if market.price_tick:
-                        price = round(price / market.price_tick)
+                    for i, bid in enumerate(bids):
+                        price = bid["price"]
+                        volume = bid["volume"]
+                        if market.volume_tick:
+                            volume = round(volume / market.volume_tick)
+                        if market.price_tick:
+                            price = round(price / market.price_tick)
 
-                    order_c["volume"] = volume
-                    order_c["price"] = price
-                    orderbook.append(order_c)
+                        order_c["volume"] = volume
+                        order_c["price"] = price
+                        order_c['bid_id'] = f'{unit_id}_{i+1}'
+                        orderbook.append(order_c)
+
+                        self.bids_map[order_c['bid_id']] = unit_id
+
         return orderbook

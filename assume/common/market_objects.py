@@ -9,6 +9,7 @@ from mango import Agent, Role
 
 # describes an order which can be either generation (volume > 0) or demand (volume < 0)
 class Order(TypedDict):
+    bid_id: str
     start_time: Union[datetime, float]
     end_time: Union[datetime, float]
     volume: int  # positive if generation
