@@ -1,7 +1,7 @@
+import pandas as pd
+
 from assume.strategies.base_strategy import BaseStrategy
 from assume.units.base_unit import BaseUnit
-
-import pandas as pd
 
 
 class flexableEOM(BaseStrategy):
