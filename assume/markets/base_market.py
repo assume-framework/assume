@@ -12,6 +12,7 @@ from assume.common.utils import get_available_products
 
 logger = logging.getLogger(__name__)
 
+
 class MarketRole(Role):
     longitude: float
     latitude: float

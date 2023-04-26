@@ -1,18 +1,20 @@
 import inspect
+import logging
 from collections import defaultdict
 from datetime import datetime
 from functools import wraps
 from itertools import groupby
 from operator import itemgetter
+
 import dateutil.rrule as rr
 import pandas as pd
 
 from assume.common import MarketConfig, MarketProduct
 
-import logging
 logger = logging.getLogger(__name__)
 
 freq_map = {"h": rr.HOURLY, "m": rr.MINUTELY}
+
 
 def load_file(
     path: str,
@@ -106,6 +108,7 @@ def make_market_config(
     )
 
     return market_config
+
 
 def initializer(func):
     """

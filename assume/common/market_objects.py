@@ -9,6 +9,7 @@ from mango import Agent, Role
 
 # describes an order which can be either generation (volume > 0) or demand (volume < 0)
 class Order(TypedDict):
+    bid_id: str
     start_time: Union[datetime, float]
     end_time: Union[datetime, float]
     volume: int  # positive if generation
@@ -37,7 +38,9 @@ class MarketProduct:
     ] = None  # e.g. (8,20) - for peak trade, (20, 8) for off-peak, none for base
     eligible_lambda_function: Union[eligible_lambda, None] = None
 
+
 market_mechanism = Callable[[Role, list[MarketProduct]], tuple[Orderbook, dict]]
+
 
 @dataclass
 class MarketConfig:

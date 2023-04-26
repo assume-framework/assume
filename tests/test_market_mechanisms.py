@@ -3,10 +3,10 @@ from datetime import datetime, timedelta
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
 
-from assume.markets.clearing_algorithms import available_clearing_strategies
 from assume.common.market_objects import MarketConfig, MarketProduct, Order, Orderbook
 from assume.common.utils import get_available_products
 from assume.markets.base_market import MarketRole
+from assume.markets.clearing_algorithms import available_clearing_strategies
 
 simple_dayahead_auction_config = MarketConfig(
     "simple_dayahead_auction",

@@ -30,6 +30,7 @@ class Demand(BaseUnit):
         node: str = None,
         price: float or pd.Series = 3000.0,
         volume: float or pd.Series = 1000,
+        index: pd.DatetimeIndex = None,
         location: tuple[float, float] = None,
         **kwargs
     ):
@@ -38,6 +39,7 @@ class Demand(BaseUnit):
             technology=technology,
             node=node,
             bidding_strategies=bidding_strategies,
+            index=index,
         )
 
         self.price = price
@@ -46,7 +48,7 @@ class Demand(BaseUnit):
         self.total_power_output = []
 
     def reset(self):
-        self.current_time_step = 0
+        self.total_capacity = pd.Series(0.0, index=self.index)
 
     def calculate_operational_window(
         self, product_type: str, current_time: pd.Timestamp
@@ -64,5 +66,16 @@ class Demand(BaseUnit):
 
         return {"max_power": {"power": -bid_volume, "marginal_cost": bid_price}}
 
-    def calculate_bids(self, product_type, current_time, operational_window):
-        return super().calculate_bids(product_type, current_time, operational_window)
+    def calculate_bids(
+        self,
+        product_type,
+        operational_window,
+    ):
+        return super().calculate_bids(
+            unit=self,
+            product_type=product_type,
+            operational_window=operational_window,
+        )
+
+    def get_dispatch_plan(self, dispatch_plan, current_time):
+        self.total_capacity.at[current_time] = dispatch_plan["total_capacity"]

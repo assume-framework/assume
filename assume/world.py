@@ -1,38 +1,28 @@
 import asyncio
 import logging
 import time
+from datetime import datetime
 
+import nest_asyncio
 import pandas as pd
 import yaml
-
 from mango import RoleAgent, create_container
 from mango.util.clock import ExternalClock
-
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
 from tqdm import tqdm
-from datetime import datetime
-import nest_asyncio
 
 from assume.common import (
     MarketConfig,
     UnitsOperator,
-    mango_codec_factory,
     load_file,
     make_market_config,
+    mango_codec_factory,
 )
-
-from assume.markets import (
-    MarketRole,
-    pay_as_bid,
-    pay_as_clear,
-)
+from assume.markets import MarketRole, pay_as_bid, pay_as_clear
 from assume.strategies import NaiveStrategy
-from assume.units import (
-    Demand,
-    PowerPlant,
-)
+from assume.units import Demand, PowerPlant
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("mango").setLevel(logging.WARNING)
@@ -294,9 +284,10 @@ class World:
 
         # create unit within the unit operator its associated with
         self.unit_operators[unit_operator_id].add_unit(
-            id,
-            unit_class,
-            unit_params,
+            id=id,
+            unit_class=unit_class,
+            unit_params=unit_params,
+            index=self.index,
         )
 
     def add_market_operator(
@@ -364,14 +355,16 @@ class World:
                 "db": self.db,
                 "export_csv": self.export_csv,
             }
-        total = self.end.timestamp()-self.start.timestamp()
+        total = self.end.timestamp() - self.start.timestamp()
         pbar = tqdm(total=total)
         while self.clock.time < self.end.timestamp():
             await asyncio.sleep(0)
             delta = await self.step()
             if delta:
                 pbar.update(delta)
-                pbar.set_description(f"{datetime.fromtimestamp(self.clock.time)}", refresh=False)
+                pbar.set_description(
+                    f"{datetime.fromtimestamp(self.clock.time)}", refresh=False
+                )
         pbar.close()
         await self.container.shutdown()
 
@@ -380,14 +373,14 @@ class World:
         inputs_path: str,
         scenario: str,
         study_case: str,
-        ):
-        return self.loop.run_until_complete(self.async_load_scenario(
-            inputs_path,
-            scenario,
-            study_case,
-        ))
+    ):
+        return self.loop.run_until_complete(
+            self.async_load_scenario(
+                inputs_path,
+                scenario,
+                study_case,
+            )
+        )
 
     def run(self):
-        return self.loop.run_until_complete(
-            self.run_simulation()
-        )
+        return self.loop.run_until_complete(self.run_simulation())
