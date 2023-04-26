@@ -240,12 +240,13 @@ class MarketRole(Role):
     def write_results(self, market_result, market_meta):
         df = pd.DataFrame.from_dict(market_meta)
         export_csv_path = self.context.data_dict.get("export_csv")
+        db = self.context.data_dict.get("db")
         if export_csv_path:
             p = Path(export_csv_path)
             p.mkdir(parents=True, exist_ok=True)
             market_data_path = p.joinpath("market_meta.csv")
             df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
-
-        df.to_sql("market_meta", self.context.data_dict["db"].bind, if_exists="append")
+        if db:
+            df.to_sql("market_meta", db.bind, if_exists="append")
 
         # TODO write market_result or other metrics
