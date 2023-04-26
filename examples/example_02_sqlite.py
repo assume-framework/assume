@@ -1,7 +1,7 @@
 # %%
 import logging
-from os import getenv
 import os
+from os import getenv
 
 from assume import World
 

@@ -38,7 +38,9 @@ class MarketProduct:
     ] = None  # e.g. (8,20) - for peak trade, (20, 8) for off-peak, none for base
     eligible_lambda_function: Union[eligible_lambda, None] = None
 
+
 market_mechanism = Callable[[Role, list[MarketProduct]], tuple[Orderbook, dict]]
+
 
 @dataclass
 class MarketConfig:

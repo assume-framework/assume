@@ -1,6 +1,7 @@
 from assume.strategies.base_strategy import BaseStrategy
 from assume.units.base_unit import BaseUnit
 
+
 class NaiveStrategy(BaseStrategy):
     def __init__(self):
         super().__init__()

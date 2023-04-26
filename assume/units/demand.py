@@ -76,8 +76,6 @@ class Demand(BaseUnit):
             product_type=product_type,
             operational_window=operational_window,
         )
-    
+
     def get_dispatch_plan(self, dispatch_plan, current_time):
         self.total_capacity.at[current_time] = dispatch_plan["total_capacity"]
-
-    

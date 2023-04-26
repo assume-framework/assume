@@ -1,9 +1,9 @@
+import logging
+
 import pandas as pd
 from mango import Role
 from mango.messages.message import Performatives
 
-from assume.strategies import BaseStrategy
-from assume.units import BaseUnit
 from assume.common.market_objects import (
     ClearingMessage,
     MarketConfig,
@@ -11,8 +11,8 @@ from assume.common.market_objects import (
     Order,
     Orderbook,
 )
-
-import logging
+from assume.strategies import BaseStrategy
+from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ class UnitsOperator(Role):
         orderbook: Orderbook = content["orderbook"]
         self.valid_orders = {unit_id: [] for unit_id in self.units.keys()}
         for bid in orderbook:
-            self.valid_orders[self.bids_map[bid['bid_id']]].append(bid)
+            self.valid_orders[self.bids_map[bid["bid_id"]]].append(bid)
 
         self.send_dispatch_plan()
 
@@ -112,9 +112,9 @@ class UnitsOperator(Role):
         for unit_id in self.units.keys():
             total_capacity = 0.0
             for bid in self.valid_orders[unit_id]:
-                total_capacity += bid['volume']
+                total_capacity += bid["volume"]
 
-            dispatch_plan = {'total_capacity': total_capacity}
+            dispatch_plan = {"total_capacity": total_capacity}
             self.units[unit_id].get_dispatch_plan(dispatch_plan, self.current_time)
 
     async def submit_bids(self, opening: OpeningMessage):
@@ -204,9 +204,9 @@ class UnitsOperator(Role):
 
                         order_c["volume"] = volume
                         order_c["price"] = price
-                        order_c['bid_id'] = f'{unit_id}_{i+1}'
+                        order_c["bid_id"] = f"{unit_id}_{i+1}"
                         orderbook.append(order_c)
 
-                        self.bids_map[order_c['bid_id']] = unit_id
+                        self.bids_map[order_c["bid_id"]] = unit_id
 
         return orderbook

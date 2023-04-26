@@ -1,6 +1,6 @@
-from assume.strategies import BaseStrategy
-
 import pandas as pd
+
+from assume.strategies import BaseStrategy
 
 
 class BaseUnit:
@@ -52,7 +52,9 @@ class BaseUnit:
     ):
         """Calculate the bids for the next time step."""
 
-        return self.bidding_strategies[product_type].calculate_bids(unit=unit, operational_window=operational_window)
+        return self.bidding_strategies[product_type].calculate_bids(
+            unit=unit, operational_window=operational_window
+        )
 
     def get_dispatch_plan(self, dispatch_plan: dict, current_time: pd.Timestamp):
         """Get the dispatch plan for the next time step."""
