@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
 from pathlib import Path
@@ -7,13 +7,11 @@ from pathlib import Path
 import pandas as pd
 from mango import Role
 
-from ..common.marketclasses import MarketConfig, MarketProduct, Order, Orderbook
-from ..common.utils import get_available_products
+from assume.common.market_objects import MarketConfig, MarketProduct, Order, Orderbook
+from assume.common.utils import get_available_products
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
-
-# add role per Market
 class MarketRole(Role):
     longitude: float
     latitude: float
@@ -73,7 +71,7 @@ class MarketRole(Role):
         current = datetime.fromtimestamp(self.context.current_timestamp)
         next_opening = self.marketconfig.opening_hours.after(current)
         market_closing = next_opening + self.marketconfig.opening_duration
-        log.info(
+        logger.info(
             f"first market opening: {self.marketconfig.name} - {next_opening} - {market_closing}"
         )
         self.context.schedule_timestamp_task(
@@ -84,13 +82,14 @@ class MarketRole(Role):
         current = datetime.fromtimestamp(self.context.current_timestamp)
         next_opening = self.marketconfig.opening_hours.after(current)
         if not next_opening:
-            log.info(f"market {self.marketconfig.name} - does not reopen")
+            logger.info(f"market {self.marketconfig.name} - does not reopen")
             return
 
         market_closing = next_opening + self.marketconfig.opening_duration
         products = get_available_products(
             self.marketconfig.market_products, next_opening
         )
+
         opening_message = {
             "context": "opening",
             "market_id": self.marketconfig.name,
@@ -104,7 +103,7 @@ class MarketRole(Role):
         self.context.schedule_timestamp_task(
             self.next_opening(), next_opening.timestamp()
         )
-        log.info(
+        logger.info(
             f"next market opening: {self.marketconfig.name} - {next_opening} - {market_closing}"
         )
 
@@ -133,22 +132,33 @@ class MarketRole(Role):
         agent_addr = meta["sender_addr"]
         agent_id = meta["sender_id"]
         try:
+            max_price = self.marketconfig.maximum_bid
+            min_price = self.marketconfig.minimum_bid
+            max_volume = self.marketconfig.maximum_volume
+
+            if self.marketconfig.price_tick:
+                # max and min should be in units
+                max_price = round(min_price / self.marketconfig.price_tick)
+                min_price = round(min_price / self.marketconfig.price_tick)
+            if self.marketconfig.volume_tick:
+                max_volume = round(max_volume / self.marketconfig.maximum_volume)
+
             for order in orderbook:
                 order["agent_id"] = (agent_addr, agent_id)
                 if not order.get("only_hours"):
                     order["only_hours"] = None
-                max_price_int = round(self.marketconfig.maximum_bid/self.marketconfig.price_tick)
-                min_price_int = round(self.marketconfig.minimum_bid/self.marketconfig.price_tick)
-                assert order["price"] <= max_price_int, "max_bid"
-                assert order["price"] >= min_price_int, "min_bid"
-                assert (
-                    abs(order["volume"]) <= self.marketconfig.maximum_volume
-                ), "max_volume"
+                assert order["price"] <= max_price, "max_bid"
+                assert order["price"] >= min_price, "min_bid"
+                assert abs(order["volume"]) <= max_volume, "max_volume"
+                if self.marketconfig.price_tick:
+                    assert isinstance(order["price"], int)
+                if self.marketconfig.volume_tick:
+                    assert isinstance(order["volume"], int)
                 for field in self.marketconfig.additional_fields:
                     assert order[field], f"missing field: {field}"
                 self.all_orders.append(order)
         except Exception as e:
-            log.error(f"error handling message from {agent_id} - {e}")
+            logger.error(f"error handling message from {agent_id} - {e}")
             self.context.schedule_instant_acl_message(
                 content={"context": "submit_bids", "message": "Rejected"},
                 receiver_addr=agent_addr,
@@ -217,8 +227,8 @@ class MarketRole(Role):
         # clear_price = sorted(self.market_result, lambda o: o['price'])[0]
 
         for meta in market_meta:
-            log.info(
-                f'clearing price for {self.marketconfig.name} is {meta["price"]}, volume: {meta["demand_volume"]}'
+            logger.info(
+                f'clearing price for {self.marketconfig.name} is {round(meta["price"],2)}, volume: {meta["demand_volume"]}'
             )
             meta["name"] = self.marketconfig.name
             meta["time"] = self.context.current_timestamp

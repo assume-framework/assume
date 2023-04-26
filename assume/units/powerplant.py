@@ -1,5 +1,7 @@
-from ..strategies import BaseStrategy
-from .base_unit import BaseUnit
+import pandas as pd
+
+from assume.strategies import BaseStrategy
+from assume.units.base_unit import BaseUnit
 
 
 class PowerPlant(BaseUnit):
@@ -70,14 +72,15 @@ class PowerPlant(BaseUnit):
         self,
         id: str,
         technology: str,
-        node: str,
-        max_power: float,
-        min_power: float,
-        efficiency: float,
-        fuel_type: str,
-        fuel_price: float,  # should be list later
-        co2_price: float,
-        emission_factor: float,
+        bidding_strategies: dict,
+        max_power: float or pd.Series,
+        min_power: float or pd.Series = 0.0,
+        efficiency: float = 1,
+        fuel_type: str = None,
+        fuel_price: float or pd.Series = 0.0,
+        co2_price: float or pd.Series = 0.0,
+        emission_factor: float = 0.0,
+        node: str = None,
         ramp_up: float = -1,
         ramp_down: float = -1,
         fixed_cost: float = 0,
@@ -88,20 +91,22 @@ class PowerPlant(BaseUnit):
         min_down_time: float = -1,
         heat_extraction: bool = False,
         max_heat_extraction: float = 0,
-        availability: dict = None,
         location: tuple[float, float] = None,
-        bidding_strategy: BaseStrategy = None,
         **kwargs
     ):
-
-        super().__init__(id, technology, node, bidding_strategy)
+        super().__init__(
+            id=id,
+            technology=technology,
+            node=node,
+            bidding_strategies=bidding_strategies,
+        )
 
         self.max_power = max_power
         self.min_power = min_power
         self.efficiency = efficiency
         self.fuel_type = fuel_type
-        self.fuel_price = fuel_price * 1000
-        self.co2_price = co2_price * 1000
+        self.fuel_price = fuel_price
+        self.co2_price = co2_price
         self.emission_factor = emission_factor
 
         self.ramp_up = ramp_up if ramp_up > 0 else max_power
@@ -117,8 +122,6 @@ class PowerPlant(BaseUnit):
         self.heat_extraction = heat_extraction
         self.max_heat_extraction = max_heat_extraction
 
-        self.availability = availability
-
         self.location = location
 
     def reset(self):
@@ -133,8 +136,9 @@ class PowerPlant(BaseUnit):
         self.pos_capacity_reserve = [0.0]
         self.neg_capacity_reserve = [0.0]
 
-    def calculate_operational_window(self, product) -> dict:
-
+    def calculate_operational_window(
+        self, product_type: str, current_time: pd.Timestamp
+    ) -> dict:
         """Calculate the operation window for the next time step.
 
         Returns
@@ -143,29 +147,17 @@ class PowerPlant(BaseUnit):
             Dictionary containing the operational window for the next time step.
         """
 
-        t = self.current_time_step
-
-        current_power = self.total_power_output[t - 1]
-
-        if self.availability is None:
-            min_power = max(
-                self.total_power_output[t - 1] - self.ramp_down, self.min_power
-            )
-            max_power = min(
-                self.total_power_output[t - 1] + self.ramp_up, self.max_power
-            )
-
-        elif self.availability[t] >= self.min_power:
-            min_power = max(
-                self.total_power_output[t - 1] - self.ramp_down, self.min_power
-            )
-            max_power = min(
-                self.total_power_output[t - 1] + self.ramp_up, self.availability[t]
-            )
-
-        else:
-            min_power = 0.0
-            max_power = 0.0
+        min_power = (
+            self.min_power
+            if type(self.min_power) is float
+            else self.min_power[current_time]
+        )
+        max_power = (
+            self.max_power
+            if type(self.max_power) is float
+            else self.max_power[current_time]
+        )
+        current_power = self.total_power_output[0]
 
         operational_window = {
             "current_power": {
@@ -190,10 +182,12 @@ class PowerPlant(BaseUnit):
 
         return operational_window
 
+    def calculate_bids(self, product_type, current_time, operational_window):
+        return super().calculate_bids(product_type, current_time, operational_window)
+
     def calc_marginal_cost(
         self, power_output: float, partial_load_eff: bool = False
     ) -> float:
-
         """Calculate the marginal cost of the unit.
 
         Parameters

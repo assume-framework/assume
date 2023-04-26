@@ -1,4 +1,4 @@
-from .base_strategy import BaseStrategy
+from assume.strategies.base_strategy import BaseStrategy
 
 
 class RLStrategy(BaseStrategy):

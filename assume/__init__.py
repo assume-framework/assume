@@ -1,5 +1,5 @@
-from .common import MarketConfig, MarketProduct
-from .world import World
+from assume.common import MarketConfig, MarketProduct
+from assume.world import World
 
 __version__ = "0.0.1"
 

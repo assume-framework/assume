@@ -1,11 +1,11 @@
-from .base_strategy import BaseStrategy
+from assume.strategies.base_strategy import BaseStrategy
 
 
-class NaiveStrategyNoMarkUp(BaseStrategy):
+class NaiveStrategy(BaseStrategy):
     def __init__(self):
         super().__init__()
 
-    def calculate_bids(self, market, operational_window):
+    def calculate_bids(self, operational_window, current_time):
 
         """
         Takes information from a unit that the unit operator manages and
@@ -14,26 +14,7 @@ class NaiveStrategyNoMarkUp(BaseStrategy):
         Return: volume, price
         """
 
-        price = round(operational_window["max_power"]["marginal_cost"], 1)
-        volume = round(operational_window["max_power"]["power"], 1)
-
-        return volume, price
-
-
-class NaiveStrategyMarkUp(BaseStrategy):
-    def __init__(self):
-        super().__init__()
-
-    def calculate_bids(self, market, operational_window):
-
-        """
-        Takes information from a unit that the unit operator manages and
-        defines how it is dispatched to the market, here a little mark up on the marginal
-        costs is used as well
-
-        Return: volume, price
-        """
-        price = round(operational_window["max_power"]["marginal_cost"] * 1.2, 1)
-        volume = round(operational_window["max_power"]["power"], 1)
+        price = operational_window["max_power"]["marginal_cost"]
+        volume = operational_window["max_power"]["power"]
 
         return volume, price

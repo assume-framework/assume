@@ -1,0 +1,263 @@
+name,energy,capacity
+wind_onshore_DE,simple,simple
+wind_offshore_DE,simple,simple
+solar_DE,simple,simple
+water_DE,simple,simple
+biomass_DE,simple,simple
+KKW ISAR 2,simple,simple
+KKW BROKDORF,simple,simple
+KKW PHILIPPSBURG 2,simple,simple
+KKW GROHNDE,simple,simple
+KKW EMSLAND,simple,simple
+KKW NECKARWESTHEIM,simple,simple
+KKW GUNDREMMINGEN C,simple,simple
+NEURATH F,simple,simple
+NEURATH G,simple,simple
+NIEDERAUSSEM K,simple,simple
+LIPPENDORF R,simple,simple
+LIPPENDORF S,simple,simple
+BOXBERG Q,simple,simple
+SCHWARZE PUMPE A,simple,simple
+SCHWARZE PUMPE B,simple,simple
+BOXBERG R,simple,simple
+NIEDERAUSSEM G,simple,simple
+NIEDERAUSSEM H,simple,simple
+NEURATH D,simple,simple
+WEISWEILER H,simple,simple
+NEURATH E,simple,simple
+WEISWEILER G,simple,simple
+JAENSCHWALDE D,simple,simple
+JAENSCHWALDE E,simple,simple
+JAENSCHWALDE F,simple,simple
+JAENSCHWALDE B,simple,simple
+JAENSCHWALDE C,simple,simple
+BOXBERG P,simple,simple
+JAENSCHWALDE A,simple,simple
+BOXBERG N,simple,simple
+SCHKOPAU II A,simple,simple
+SCHKOPAU II B,simple,simple
+NIEDERAUSSEM C,simple,simple
+NIEDERAUSSEM F,simple,simple
+NIEDERAUSSEM E,simple,simple
+NEURATH A,simple,simple
+NEURATH B,simple,simple
+NEURATH C,simple,simple
+FRIMMERSDORF Q,simple,simple
+WEISWEILER E,simple,simple
+FRIMMERSDORF P,simple,simple
+NIEDERAUSSEM D,simple,simple
+WEISWEILER F,simple,simple
+FRECHEN WACHTBERG,simple,simple
+MERKENICH BLOCK 6,simple,simple
+CHEMNITZ NORD II BLOCK C,simple,simple
+CHEMNITZ NORD II BLOCK B,simple,simple
+KLINGENBERG 5,simple,simple
+KLINGENBERG 6,simple,simple
+KLINGENBERG 4,simple,simple
+RDK (KARLSRUHE) 8,simple,simple
+GKM 9,simple,simple
+HEYDEN 4,simple,simple
+MOORBURG A,simple,simple
+MOORBURG B,simple,simple
+WESTFALEN E,simple,simple
+IBBENBUEREN B NO 1,simple,simple
+WILHELMSHAVEN C,simple,simple
+WALSUM 10,simple,simple
+BERGKAMEN A,simple,simple
+BEXBACH C 1,simple,simple
+WILHELMSHAVEN A,simple,simple
+HEILBRONN 7,simple,simple
+MEHRUM,simple,simple
+LUENEN 2 STUMMHAFEN,simple,simple
+WEIHER 3,simple,simple
+GERSTEINWERK BLOCK K,simple,simple
+ROSTOCK 1,simple,simple
+RDK (KARLSRUHE) 7,simple,simple
+STAUDINGER 5,simple,simple
+HERNE BLOCK 4,simple,simple
+GKM 8,simple,simple
+GKM 7,simple,simple
+ZOLLING LEININGER 5,simple,simple
+ALTBACH DEIZISAU HKW I,simple,simple
+WALSUM BLOCK 9,simple,simple
+SCHOLVEN C,simple,simple
+SCHOLVEN B,simple,simple
+HKW MUENCHEN NORD 2,simple,simple
+KIEL A,simple,simple
+BREMEN FARGE,simple,simple
+ALTBACH DEIZISAU HKW II,simple,simple
+BREMEN HAFEN 6,simple,simple
+WERDOHL ELVERLINGSEN E4,simple,simple
+GKH HANNOVER,simple,simple
+HKW BERLIN REUTER WEST E,simple,simple
+HKW BERLIN REUTER WEST D,simple,simple
+GKM 6,simple,simple
+HKW FENNE C,simple,simple
+MKW FENNE B,simple,simple
+HAMBURG TIEFSTACK,simple,simple
+WALHEIM 2,simple,simple
+WEDEL 1,simple,simple
+WEDEL 2,simple,simple
+KW BERLIN REUTER BlOCK C,simple,simple
+BREMEN HASTEDT 15,simple,simple
+HEILBRONN 6,simple,simple
+HEILBRONN 5,simple,simple
+WALHEIM 1,simple,simple
+WUPPERTAL ELBERFELD 2,simple,simple
+BERLIN MOABIT A,simple,simple
+FERNWAERMEKRAFTWERK BUER,simple,simple
+STUTTGART MUENSTER K25,simple,simple
+HKW FRANKFURT WEST 2,simple,simple
+HKW FRANKFURT WEST 3,simple,simple
+HKW OFFENBACH 1,simple,simple
+HOECHST 3,simple,simple
+ROEMERBRUCKE 2,simple,simple
+KARLSRUHE WEST 3,simple,simple
+FLENSBURG 11,simple,simple
+FLENSBURG 09,simple,simple
+FLENSBURG 10,simple,simple
+KASSEL SWEW 1,simple,simple
+ROMERBRUCKE 3,simple,simple
+KARLSRUHE WEST 1,simple,simple
+KARLSRUHE WEST 2,simple,simple
+PFORZHEIM III NO 1,simple,simple
+IRSCHING 5,simple,simple
+EMSLAND LINGEN D,simple,simple
+GUD HUERTH KNAPSACK 1,simple,simple
+KW LAUSWARD BLOCK FORTUNA GUD,simple,simple
+DORMAGEN RWE,simple,simple
+IRSCHING 4,simple,simple
+KW BASF LUDWIGSHAFEN MITTE,simple,simple
+EMSLAND LINGEN B,simple,simple
+EMSLAND LINGEN C,simple,simple
+KW BREMEN MITTELSBUEREN BLOCK 5 GUD,simple,simple
+BERLIN MITTE HKW,simple,simple
+GUD HUERTH KNAPSACK 2,simple,simple
+HKW MUENCHEN SUED GUD,simple,simple
+KW LAUSWARD BLOCK EMIL GUD,simple,simple
+KW HERDECKE CUNO MARK E,simple,simple
+GERSTEINWERK BLOCK F,simple,simple
+GERSTEINWERK BLOCK G,simple,simple
+KOELN NIEHL 2,simple,simple
+HAMM UENTROP BLOCK 10,simple,simple
+HAMM UENTROP BLOCK 20,simple,simple
+MAINZ III,simple,simple
+KW BASF LUDWIGSHAFEN SUED,simple,simple
+RDK (KARLSRUHE) 4RP,simple,simple
+HKW DRESDEN NOSSENER BRUECKE,simple,simple
+HKW HANNOVER LINDEN,simple,simple
+HKW DUISBURG WANHEIM IIIB,simple,simple
+HKW HAGEN KABEL,simple,simple
+HKW HOECHST BUSINESS PARK,simple,simple
+HKW JENA SUED,simple,simple
+HKW LEIPZIG NORD GUD,simple,simple
+KIRCHMOESER,simple,simple
+KW KIRCHLENGERN,simple,simple
+HKW MUENCHEN FREIMANN GUD,simple,simple
+HAMBURG TIEFSTACK GUD,simple,simple
+HKW SAARBRUECKEN ROEMERBRUECKE GUD,simple,simple
+GUD LEUNA,simple,simple
+HKW ERFURT OST,simple,simple
+GUD BITTERFELD ENVIA,simple,simple
+GUD ANLAGE RÜSSELSHEIM OPEL,simple,simple
+GUD ROSTOCK MARIENEHE,simple,simple
+HKW KOELN MERKENICH GUD,simple,simple
+GUD MUENSTER HAFEN,simple,simple
+KW LAUSWARD BLOCK ANTON GUD,simple,simple
+KW PLATTLING DAIMLER AG,simple,simple
+HALLE TROTHA,simple,simple
+HKW BARMEN I WUPPERTAL,simple,simple
+HKW POTSDAM SUED,simple,simple
+HKW FRANKFURT ODER AM HOHEN FELD,simple,simple
+HKW SANDREUTH 1 NUERNBERG,simple,simple
+HKW SANDREUTH 2 NUERNBERG,simple,simple
+HKW GUD NEUBRANDENBURG,simple,simple
+GUD GERA NORD,simple,simple
+HKW FLENSBURG 12,simple,simple
+SCHWERIN SUD,simple,simple
+FREIBURG WVK,simple,simple
+PKV KRAFTWERK VAREL,simple,simple
+KW BASF LUDWIGSHAFEN NORD,simple,simple
+HKW ELTMANN,simple,simple
+HKW KASSEL KOMBI,simple,simple
+KW HALLE DIESELSTRASSE BLOCK 1,simple,simple
+KW HALLE DIESELSTRASSE BLOCK 2,simple,simple
+HKW FRIEDENSBRUECKE BLOCK IV,simple,simple
+HKW HILTROP BOCHUM,simple,simple
+HKW PFORZHEIM,simple,simple
+KW GRENZACH WYHLEN 1,simple,simple
+HKW SUD SAARBRUECKEN,simple,simple
+GUD BIELEFELD HILLEGOSSEN,simple,simple
+HKW UNTERBREIZBACH,simple,simple
+HKW ERLANGEN,simple,simple
+HKW FRIEDENSBRUECKE BLOCK II,simple,simple
+KWK ANLAGE KREFELD,simple,simple
+KWK ANLAGE NEUSTADT,simple,simple
+HKW SCHWERIN LANKOW,simple,simple
+KWK ANLAGE MOHN MEDIA GÜTERSLOH,simple,simple
+HKW HBB RAUBLING,simple,simple
+KW STAUDINGER 4,simple,simple
+NUERNBERG FRANKEN 1,simple,simple
+IRSCHING 3,simple,simple
+KW HUNTORF CAES GT,simple,simple
+KW DUISBURG HUCKINGEN BLOCK A,simple,simple
+KW DUISBURG HUCKINGEN BLOCK B,simple,simple
+KW WEISWEILER VGT BLOCK G,simple,simple
+KW WEISWEILER VGT BLOCK H,simple,simple
+DKW BGH O1 BURGHAUSEN WACKER CHEMIE,simple,simple
+KW MITTELSBUEREN BLOCK 4,simple,simple
+KW BREMEN HASTEDT 14,simple,simple
+LICHTERFELDE 2,simple,simple
+KW HANNOVER HERRENHAUSEN B,simple,simple
+HKW FRANKFURT WEST GT,simple,simple
+KW MAINZ II GT,simple,simple
+KW MARL BLOCK 312 EVONIK,simple,simple
+CHARLOTTENBURG GT 1,simple,simple
+CHARLOTTENBURG GT 2,simple,simple
+HKW CHEMNITZ NORD II BLOCK A,simple,simple
+INDUSTRIEKRAFTWERK BERNBURG (IKB),simple,simple
+ALTBACH II GT E,simple,simple
+KW OBERNBURG GT1,simple,simple
+GTKW BIELEFELD UMMELN,simple,simple
+CHARLOTTENBURG GT 3,simple,simple
+KW LANDESBERGEN GT,simple,simple
+GERSTEINWERK BLOCK I GT,simple,simple
+KW ZIELITZ,simple,simple
+KW EMDEN BLOCK 4 GT,simple,simple
+IKW GENDORF INFRASERV,simple,simple
+GTKW DARMSTADT GT 1,simple,simple
+GTKW DARMSTADT GT 2,simple,simple
+UPM SCHONGAU,simple,simple
+WOLFEN ENVIA,simple,simple
+HKW DUISBURG WANHEIM IIIA,simple,simple
+KW LEUNA GT 3,simple,simple
+AHRENSFELDE GT D,simple,simple
+AHRENSFELDE GT A,simple,simple
+AHRENSFELDE GT B,simple,simple
+THYROW GT E,simple,simple
+AHRENSFELDE GT C,simple,simple
+INGOLSTADT 3,simple,simple
+INGOLSTADT 4,simple,simple
+MARBACH 3,simple,simple
+LICHTERFELDE 1,simple,simple
+WALHEIM GT 1,simple,simple
+BARMEN II,simple,simple
+WILMERSDORF GT 2,simple,simple
+WILMERSDORF GT 3,simple,simple
+WERDOHL ELVERLINGSEN 2,simple,simple
+WERDOHL ELVERLINGSEN 1,simple,simple
+ALTBACH I GT 3,simple,simple
+MITTELSBUEREN GT 3,simple,simple
+FLINGERN GT 1,simple,simple
+ALTBACH I GT 2,simple,simple
+MARBACH 3 GT 1,simple,simple
+MARIENEHE 1,simple,simple
+WILHELMSHAVEN GT 1,simple,simple
+NUERNBERG FRANKEN I GT 1,simple,simple
+WEDEL GT 1,simple,simple
+WEDEL GT 2,simple,simple
+ALTBACH I NO 5 GT 1,simple,simple
+PEISSENBERG 1,simple,simple
+GROSSKAYNA GT 1,simple,simple
+GROSSKAYNA GT 2,simple,simple
+GROSSKAYNA GT 3,simple,simple

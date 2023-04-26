@@ -19,7 +19,6 @@ class Order(TypedDict):
 
 Orderbook = list[Order]
 MarketOrderbook = dict[str, Orderbook]
-
 eligible_lambda = Callable[[Agent], bool]
 
 
@@ -29,7 +28,7 @@ class MarketProduct:
     duration: rd  # quarter-hourly, half-hourly, hourly, 4hourly, daily, weekly, monthly, quarter-yearly, yearly
     count: int  # how many future durations can be traded, must be >= 1
     # count can also be given as a rrule with until
-    first_delivery_after_start: rd = (
+    first_delivery: rd = (
         rd()
     )  # when does the first delivery begin, in relation to market start
     # this should be a multiple of duration
@@ -38,9 +37,7 @@ class MarketProduct:
     ] = None  # e.g. (8,20) - for peak trade, (20, 8) for off-peak, none for base
     eligible_lambda_function: Union[eligible_lambda, None] = None
 
-
 market_mechanism = Callable[[Role, list[MarketProduct]], tuple[Orderbook, dict]]
-
 
 @dataclass
 class MarketConfig:
@@ -50,22 +47,23 @@ class MarketConfig:
     # filled by market agent
 
     # continuous markets are clearing just very fast and keep unmatched orders between clearings
-    opening_hours: rr.rrule  # dtstart ist start/introduction of market
+    opening_hours: rr.rrule  # dtstart is start/introduction of market
     opening_duration: timedelta
     market_mechanism: Union[
         market_mechanism, str
     ]  # market_mechanism determines wether old offers are deleted (auction) or not (continuous) after clearing
 
-    maximum_bid: int = 9999
-    minimum_bid: int = -500
+    maximum_bid: float = 3000.0
+    minimum_bid: float = -500.0
     maximum_gradient: float = None  # very specific - should be in market clearing
-    maximum_volume: int = 500
+    maximum_volume: float = 500.0
     additional_fields: list[str] = field(default_factory=list)
+    product_type: str = "energy"
     market_products: list[MarketProduct] = field(default_factory=list)
     volume_unit: str = "MW"
-    volume_tick: float = 0.1  # steps in which the amount can be increased
+    volume_tick: float or None = None  # steps in which the amount can be increased
     price_unit: str = "€/MWh"
-    price_tick: float = 0.1  # steps in which the price can be increased
+    price_tick: float or None = None  # steps in which the price can be increased
     supports_get_unmatched: bool = False
     eligible_obligations_lambda: eligible_lambda = lambda x: True
     # lambda: agent.payed_fee
