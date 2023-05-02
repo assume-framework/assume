@@ -57,7 +57,7 @@ conda activate assume-framework
 After these steps you can also run the example simulation:
 
 ```
-python examples/example_01_sqlite.py
+python examples/example_01a_sqlite.py
 ```
 
 Access to database and dashboards
@@ -75,13 +75,13 @@ Quick Start
 
 To run an exemplar simulation without database and grafana, run the following command:
 ```
-    python examples/example_01_sqlite.py
+    python examples/example_01a_sqlite.py
 ```
 
 If you have docker installed, you can run the following two commands:
 ```
     docker compose up -d
-    python examples/example_01_timescale.py
+    python examples/example_01a_timescale.py
 ```
 
 Afterwards you can access the Dashboard on `http://localhost:3000`
