@@ -21,7 +21,7 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.markets import MarketRole, pay_as_bid, pay_as_clear
-from assume.strategies import NaiveStrategy
+from assume.strategies import NaiveStrategy, flexableEOM
 from assume.units import Demand, PowerPlant
 
 logging.basicConfig(level=logging.INFO)
@@ -66,6 +66,7 @@ class World:
         }
         self.bidding_types = {
             "simple": NaiveStrategy,
+            "flexable_eom": flexableEOM,
         }
         self.clearing_mechanisms = {
             "pay_as_clear": pay_as_clear,

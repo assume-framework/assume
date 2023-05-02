@@ -90,7 +90,7 @@ class PowerPlant(BaseUnit):
         min_operating_time: float = 0,
         min_down_time: float = 0,
         downtime_hot_start: int = 8,  # hours
-        downtime_warm_tart: int = 48,  # hours
+        downtime_warm_start: int = 48,  # hours
         heat_extraction: bool = False,
         max_heat_extraction: float = 0,
         index: pd.DatetimeIndex = None,
@@ -119,10 +119,10 @@ class PowerPlant(BaseUnit):
 
         self.ramp_up = ramp_up
         self.ramp_down = ramp_down
-        self.min_operating_time = min_operating_time
-        self.min_down_time = min_down_time
+        self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
+        self.min_down_time = min_down_time if min_down_time > 0 else 1
         self.downtime_hot_start = downtime_hot_start
-        self.warm_start_cost = downtime_warm_tart
+        self.downtime_warm_start = downtime_warm_start
 
         self.fixed_cost = fixed_cost
         self.hot_start_cost = hot_start_cost * max_power
@@ -141,7 +141,7 @@ class PowerPlant(BaseUnit):
         self.current_down_time = self.min_down_time
 
         self.total_power_output = pd.Series(0.0, index=self.index)
-        self.total_power_output.iat[0] = self.min_power
+        self.total_power_output.iloc[:2] = self.min_power
 
         self.total_heat_output = pd.Series(0.0, index=self.index)
         self.power_loss_chp = pd.Series(0.0, index=self.index)
@@ -164,6 +164,8 @@ class PowerPlant(BaseUnit):
         operational_window : dict
             Dictionary containing the operational window for the next time step.
         """
+
+        self.current_time = current_time
 
         if self.current_status == 0 and self.current_down_time < self.min_down_time:
             return None
