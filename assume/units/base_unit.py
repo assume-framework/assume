@@ -48,9 +48,15 @@ class BaseUnit:
         self,
         unit,
         product_type,
-        operational_window,
+        current_time,
     ):
         """Calculate the bids for the next time step."""
+
+        # get operational window for each unit
+        operational_window = self.calculate_operational_window(
+            product_type=product_type,
+            current_time=current_time,
+        )
 
         return self.bidding_strategies[product_type].calculate_bids(
             unit=unit, operational_window=operational_window

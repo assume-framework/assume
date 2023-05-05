@@ -224,12 +224,12 @@ class PowerPlant(BaseUnit):
     def calculate_bids(
         self,
         product_type,
-        operational_window,
+        current_time,
     ):
         return super().calculate_bids(
             unit=self,
             product_type=product_type,
-            operational_window=operational_window,
+            current_time=current_time,
         )
 
     def get_dispatch_plan(self, dispatch_plan, current_time):

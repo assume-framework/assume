@@ -154,7 +154,7 @@ class World:
         self.logger.info("Adding markets")
         for id, market_params in config["markets_config"].items():
             market_config = make_market_config(
-                id=id, market_params=market_params, start=self.start, end=self.end
+                id=id, market_params=market_params, world_start=self.start, world_end=self.end
             )
             self.add_market_operator(id=market_params["operator"])
             self.add_market(
@@ -183,7 +183,9 @@ class World:
                 self.logger.warning(
                     f"No bidding strategies specified for {pp_name}. Using default strategies."
                 )
-                unit_params["bidding_strategies"] = {"energy": "simple"}
+                unit_params["bidding_strategies"] = {
+                    market.product_type: "simple" for market in self.markets.values()
+                }
 
             if (
                 fuel_prices_df is not None

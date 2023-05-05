@@ -95,8 +95,8 @@ class UnitsOperator(Role):
             f'Operator {self.id} received opening from: {opening["market_id"]} {opening["start"]}.'
         )
         logger.debug(f'Operator {self.id} can bid until: {opening["stop"]}')
-        self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
         self.current_time = pd.to_datetime(self.context.current_timestamp, unit="s")
+        self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
 
     def handle_market_feedback(self, content: ClearingMessage, meta: dict[str, str]):
         logger.debug(f"got market result: {content}")
@@ -105,6 +105,7 @@ class UnitsOperator(Role):
         for bid in orderbook:
             self.valid_orders[self.bids_map[bid["bid_id"]]].append(bid)
 
+        self.current_time = pd.to_datetime(self.context.current_timestamp, unit="s")
         self.send_dispatch_plan()
 
     def send_dispatch_plan(self):
@@ -169,7 +170,7 @@ class UnitsOperator(Role):
                 for unit_id, unit in self.units.items():
                     # get operational window for each unit
                     operational_window = unit.calculate_operational_window(
-                        product_type=product,
+                        product_type=product_type,
                         current_time=self.current_time,
                     )
                     op_windows.append(operational_window)
@@ -184,15 +185,10 @@ class UnitsOperator(Role):
                 self.bids_map = {}
                 for unit_id, unit in self.units.items():
                     order_c = order.copy()
-                    # get operational window for each unit
-                    operational_window = unit.calculate_operational_window(
-                        product_type=product_type,
-                        current_time=self.current_time,
-                    )
                     # take price from bidding strategy
                     bids = unit.calculate_bids(
                         product_type=product_type,
-                        operational_window=operational_window,
+                        current_time=self.current_time,
                     )
                     for i, bid in enumerate(bids):
                         price = bid["price"]

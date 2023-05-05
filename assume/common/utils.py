@@ -76,10 +76,18 @@ def convert_to_rrule_freq(string):
 def make_market_config(
     id,
     market_params,
-    start,
-    end,
+    world_start,
+    world_end,
 ):
     freq, interval = convert_to_rrule_freq(market_params["opening_frequency"])
+    start = market_params.get("start_date")
+    end = market_params.get("end_date")
+    if start:
+        start = pd.Timestamp(start)
+    if end:
+        end = pd.Timestamp(end)
+    start = start or world_start
+    end = end or world_end
 
     market_config = MarketConfig(
         name=id,
