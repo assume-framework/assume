@@ -155,7 +155,7 @@ class PowerPlant(BaseUnit):
     def calculate_operational_window(
         self,
         product_type: str,
-        current_time: pd.Timestamp,
+        product_tuple: tuple,
     ) -> dict:
         """Calculate the operation window for the next time step.
 
@@ -164,16 +164,20 @@ class PowerPlant(BaseUnit):
         operational_window : dict
             Dictionary containing the operational window for the next time step.
         """
+        start, end, only_hours = product_tuple
+        start = pd.Timestamp(start)
+        end = pd.Timestamp(end)
 
-        self.current_time = current_time
+        # TODO remove current_time from flexable_strategy, so that the product config is always used
+        self.current_time = start
 
         if self.current_status == 0 and self.current_down_time < self.min_down_time:
             return None
 
-        current_power = self.total_power_output.at[current_time]
+        current_power = self.total_power_output.at[start]
 
         min_power = (
-            self.min_power[current_time]
+            self.min_power[start]
             if type(self.min_power) is pd.Series
             else self.min_power
         )
@@ -183,7 +187,7 @@ class PowerPlant(BaseUnit):
             min_power = min_power
 
         max_power = (
-            self.max_power[current_time]
+            self.max_power[start]
             if type(self.max_power) is pd.Series
             else self.max_power
         )
@@ -197,7 +201,7 @@ class PowerPlant(BaseUnit):
                 "power": current_power,
                 "marginal_cost": self.calc_marginal_cost(
                     power_output=current_power,
-                    current_time=current_time,
+                    current_time=start,
                     partial_load_eff=True,
                 ),
             },
@@ -205,7 +209,7 @@ class PowerPlant(BaseUnit):
                 "power": min_power,
                 "marginal_cost": self.calc_marginal_cost(
                     power_output=min_power,
-                    current_time=current_time,
+                    current_time=start,
                     partial_load_eff=True,
                 ),
             },
@@ -213,7 +217,7 @@ class PowerPlant(BaseUnit):
                 "power": max_power,
                 "marginal_cost": self.calc_marginal_cost(
                     power_output=max_power,
-                    current_time=current_time,
+                    current_time=start,
                     partial_load_eff=True,
                 ),
             },
@@ -224,12 +228,11 @@ class PowerPlant(BaseUnit):
     def calculate_bids(
         self,
         product_type,
-        current_time,
+        product_tuple,
     ):
         return super().calculate_bids(
-            unit=self,
             product_type=product_type,
-            current_time=current_time,
+            product_tuple=product_tuple,
         )
 
     def get_dispatch_plan(self, dispatch_plan, current_time):

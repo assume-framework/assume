@@ -15,7 +15,7 @@ class BaseStrategy:
 
     def calculate_bids(
         self,
-        unit=None,
-        operational_window: dict = None,
+        operational_window: dict,
+        product_tuple: tuple,
     ):
         raise NotImplementedError()
