@@ -11,7 +11,7 @@ os.makedirs("./examples/outputs", exist_ok=True)
 EXPORT_CSV_PATH = str(getenv("EXPORT_CSV_PATH", "./examples/outputs"))
 
 os.makedirs("./examples/local_db", exist_ok=True)
-DATABASE_URI = getenv("DATABASE_URI", "sqlite:///./examples/local_db/assume_db.db")
+DATABASE_URI = getenv("DATABASE_URI", "sqlite:///./examples/local_db/assume_db_01b.db")
 # %%
 if __name__ == "__main__":
     scenario = "example_01b"
