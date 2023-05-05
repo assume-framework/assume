@@ -114,7 +114,7 @@ class World:
 
         self.index = pd.date_range(
             start=self.start,
-            end=self.end,
+            end=self.end + pd.Timedelta(hours=4),
             freq=config["time_step"],
         )
 
