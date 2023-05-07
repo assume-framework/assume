@@ -13,6 +13,8 @@ from assume.common.market_objects import (
 )
 from assume.strategies import BaseStrategy
 from assume.units import BaseUnit
+import pandas as pd
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +118,12 @@ class UnitsOperator(Role):
 
             dispatch_plan = {"total_capacity": total_capacity}
             self.units[unit_id].get_dispatch_plan(dispatch_plan, self.current_time)
+
+            #self.write_dispatch_plan(unit.total_power_output, unit, unit_id)
+
+
+
+
 
     async def submit_bids(self, opening: OpeningMessage):
         """

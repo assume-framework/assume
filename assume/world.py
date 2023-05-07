@@ -1,21 +1,25 @@
 import asyncio
 import logging
-import time
+
 from datetime import datetime
 
 import nest_asyncio
 import pandas as pd
+from pathlib import Path
 import yaml
 from mango import RoleAgent, create_container
 from mango.util.clock import ExternalClock
+from tqdm import tqdm
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
 from tqdm import tqdm
+import time
 
 from assume.common import (
     MarketConfig,
     UnitsOperator,
+    WriteOutput, #TODO intialisieren
     load_file,
     make_market_config,
     mango_codec_factory,
@@ -35,10 +39,9 @@ class World:
         ifac_addr: str = "0.0.0.0",
         port: int = 9099,
         database_uri: str = "",
-        export_csv=False,
     ):
-        self.logger = logging.getLogger(__name__)
-        self.addr = (ifac_addr, port)
+        
+        #intialize db connection at beginning of simulation
         self.db = scoped_session(sessionmaker(create_engine(database_uri)))
         connected = False
         while not connected:
@@ -49,8 +52,10 @@ class World:
             except OperationalError:
                 self.logger.error(f"could not connect to {database_uri}, trying again")
                 time.sleep(2)
+        
+        self.logger = logging.getLogger(__name__)
+        self.addr = (ifac_addr, port)
 
-        self.export_csv = export_csv
 
         self.market_operator_agents: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}
@@ -244,6 +249,9 @@ class World:
         unit_operator_role = RoleAgent(self.container, suggested_aid=f"{id}")
         unit_operator_role.add_role(units_operator)
 
+        #write_output = WriteOutput()
+        unit_operator_role.add_role(units_operator)
+
         # add the current unitsoperator to the list of operators currently existing
         self.unit_operators[id] = units_operator
 
@@ -290,6 +298,9 @@ class World:
             index=self.index,
         )
 
+        
+
+
     def add_market_operator(
         self,
         id: str or int,
@@ -335,6 +346,8 @@ class World:
             raise Exception(f"no market operator {market_operator_id}")
 
         market_operator.add_role(MarketRole(market_config))
+        #TODO
+        #market_operator.add_role(WriteOutput(market_config))
         market_operator.markets.append(market_config)
         self.markets[f"{market_config.name}"] = market_config
 
@@ -353,7 +366,6 @@ class World:
             # TODO add a Role which does exactly this
             agent._role_context.data_dict = {
                 "db": self.db,
-                "export_csv": self.export_csv,
             }
         total = self.end.timestamp() - self.start.timestamp()
         pbar = tqdm(total=total)
