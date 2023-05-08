@@ -39,8 +39,12 @@ class World:
         ifac_addr: str = "0.0.0.0",
         port: int = 9099,
         database_uri: str = "",
+        export_csv_path: str = "",
     ):
-        
+        self.logger = logging.getLogger(__name__)
+        self.addr = (ifac_addr, port)
+
+        self.export_csv_path=export_csv_path
         #intialize db connection at beginning of simulation
         self.db = scoped_session(sessionmaker(create_engine(database_uri)))
         connected = False
@@ -53,10 +57,8 @@ class World:
                 self.logger.error(f"could not connect to {database_uri}, trying again")
                 time.sleep(2)
         
-        self.logger = logging.getLogger(__name__)
-        self.addr = (ifac_addr, port)
 
-
+        
         self.market_operator_agents: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}
         self.unit_operators: dict[str, UnitsOperator] = {}
@@ -102,6 +104,7 @@ class World:
             ValueError: If the scenario or study case is not found.
 
         """
+
 
         # load the config file
         path = f"{inputs_path}/{scenario}"
@@ -249,13 +252,11 @@ class World:
         unit_operator_role = RoleAgent(self.container, suggested_aid=f"{id}")
         unit_operator_role.add_role(units_operator)
 
-        #write_output = WriteOutput()
-        unit_operator_role.add_role(units_operator)
 
         # add the current unitsoperator to the list of operators currently existing
         self.unit_operators[id] = units_operator
 
-    def add_unit(
+    async def add_unit(
         self,
         id: str,
         unit_type: str,
@@ -298,7 +299,13 @@ class World:
             index=self.index,
         )
 
-        
+        #send unit data to db agent to store it
+        await self.send_units_defintion(unit_type, unit_params)
+
+    async def send_units_defintion(self, unit_type, unit_params):
+        # Send a message to the DBRole to update data in the database
+        message = {'type': 'store_units', 'unit_type': unit_type, 'data': unit_params}
+        await self.send_message_to_role('WriteOutput', message)        
 
 
     def add_market_operator(
@@ -346,8 +353,6 @@ class World:
             raise Exception(f"no market operator {market_operator_id}")
 
         market_operator.add_role(MarketRole(market_config))
-        #TODO
-        #market_operator.add_role(WriteOutput(market_config))
         market_operator.markets.append(market_config)
         self.markets[f"{market_config.name}"] = market_config
 
@@ -365,7 +370,7 @@ class World:
         for agent in self.container._agents.values():
             # TODO add a Role which does exactly this
             agent._role_context.data_dict = {
-                "db": self.db,
+                "db_agent_id": self.db_agent_id,
             }
         total = self.end.timestamp() - self.start.timestamp()
         pbar = tqdm(total=total)
@@ -386,6 +391,13 @@ class World:
         scenario: str,
         study_case: str,
     ):
+        
+        #Add output agent to world
+        export_agent = WriteOutput( inputs_path, scenario, study_case, self.db, self.export_csv_path)
+        export_agent_role = RoleAgent(self.container, suggested_aid=f"{id}")
+        export_agent_role.add_role(export_agent)
+        self.db_agent_id = export_agent_role.aid
+
         return self.loop.run_until_complete(
             self.async_load_scenario(
                 inputs_path,

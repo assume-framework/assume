@@ -73,6 +73,8 @@ class UnitsOperator(Role):
         self.units[id] = unit_class(id=id, index=index, **unit_params)
         self.units[id].reset()
 
+        
+
     def participate(self, market):
         # always participate at all markets
         return True
@@ -120,8 +122,6 @@ class UnitsOperator(Role):
             self.units[unit_id].get_dispatch_plan(dispatch_plan, self.current_time)
 
             #self.write_dispatch_plan(unit.total_power_output, unit, unit_id)
-
-
 
 
 

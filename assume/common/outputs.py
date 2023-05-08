@@ -33,6 +33,8 @@ class WriteOutput(Role):
         inputs_path: str,
         scenario: str,
         study_case: str,
+        database_uri: str = "",
+        export_csv_path: str = ""
         ):
 
         super().__init__()
@@ -43,25 +45,39 @@ class WriteOutput(Role):
             config = yaml.safe_load(f)
             config = config[study_case]
             self.simulation_id = config['id']
+           
+            self.export_csv = config['export_config']['export_csv']
 
-        self.export_csv = config.export_config.export_csv
-
-        self.export_csv_path = self.context.data_dict.get("export_csv")
+            self.write_orders_frequency = config['export_config']['write_orders_frequency']
+        
+        self.export_csv_path = export_csv_path
         self.p = Path(self.export_csv_path)
         self.p.mkdir(parents=True, exist_ok=True)
         print('test, we triggered the right event? yes')
+        self.db = database_uri
+
+    async def handle_message(self, message):
+        if message.get('type') == 'store_order_book':
+            self.write_market_orders( message.get('data'), self.write_orders_frequency)
+
+        elif message.get('type') == 'store_market_results':
+            self.write_market_results(self, message.get('data'))
+
+        elif message.get('type') == 'store_units':
+            self.write_units_defintion(self, message.get('unit_type'), message.get('data'))
+
 
 
     def write_market_results(self, market_meta):
         df = pd.DataFrame.from_dict(market_meta)
         df['simulation']=self.simulation_id
         
-        if self.export_csv_path:
+        if self.export_csv:
             
             market_data_path = self.p.joinpath("market_meta.csv")
             df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
 
-        df.to_sql("market_meta", self.context.data_dict["db"].bind, if_exists="append")
+        df.to_sql("market_meta", self.db.bind, if_exists="append")
 
 
 
@@ -77,11 +93,11 @@ class WriteOutput(Role):
             df["agent_id"]=df["agent_id"].astype(str)
             df['simulation']=self.simulation_id
 
-            if self.export_csv_path:
+            if self.export_csv:
                 market_data_path = self.p.joinpath("market_orders.csv")
                 df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
 
-            df.to_sql("market_orders_all", self.context.data_dict["db"].bind, if_exists="append")
+            df.to_sql("market_orders_all", self.db.bind, if_exists="append")
 
 
 
@@ -94,11 +110,13 @@ class WriteOutput(Role):
             df=df[['technology','fuel_type','emission_factor','max_power','min_power','efficiency','unit_operator']]
         
             if self.export_csv:
-                p = Path(self.export_csv)
+                p = Path(self.export_csv_path)
                 p.mkdir(parents=True, exist_ok=True)
                 market_data_path = p.joinpath("unit_meta.csv")
                 df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
             df.to_sql("unit_meta", self.db.bind, if_exists="append")
+
+            print('I should have written demand')
 
         else:
             df = pd.DataFrame()    
@@ -108,7 +126,7 @@ class WriteOutput(Role):
             #df['volume']=df["volume"].max()
             
             if self.export_csv:
-                p = Path(self.export_csv)
+                p = Path(self.export_csv_path)
                 p.mkdir(parents=True, exist_ok=True)
                 market_data_path = p.joinpath("demand_meta.csv")
                 df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
@@ -128,44 +146,14 @@ class WriteOutput(Role):
         df['unit_id']=unit_id
         df['simulation']=self.simulation_id
 
-        export_csv_path = self.context.data_dict.get("export_csv")
-        if export_csv_path:
-            p = Path(export_csv_path)
+        
+        if self.export_csv:
+            p = Path(self.export_csv_path)
             p.mkdir(parents=True, exist_ok=True)
             data_path = p.joinpath("power_plant_dispatch.csv")
             df.to_csv(data_path, mode="a", header=not data_path.exists())
         
-        df.to_sql("power_plant_dispatch", self.context.data_dict["db"].bind, if_exists="append")
+        df.to_sql("power_plant_dispatch", self.db.bind, if_exists="append")
 
 
 
-@dataclass
-class ExportConfig:
-    name: str
-    addr = None
-    aid = None
-    # filled by market agent
-
-    # continuous markets are clearing just very fast and keep unmatched orders between clearings
-    opening_hours: rr.rrule  # dtstart is start/introduction of market
-    opening_duration: timedelta
-    market_mechanism: Union[
-        market_mechanism, str
-    ]  # market_mechanism determines wether old offers are deleted (auction) or not (continuous) after clearing
-
-    maximum_bid: float = 3000.0
-    minimum_bid: float = -500.0
-    maximum_gradient: float = None  # very specific - should be in market clearing
-    maximum_volume: float = 500.0
-    additional_fields: list[str] = field(default_factory=list)
-    product_type: str = "energy"
-    market_products: list[MarketProduct] = field(default_factory=list)
-    volume_unit: str = "MW"
-    volume_tick: float or None = None  # steps in which the amount can be increased
-    price_unit: str = "€/MWh"
-    price_tick: float or None = None  # steps in which the price can be increased
-    supports_get_unmatched: bool = False
-    eligible_obligations_lambda: eligible_lambda = lambda x: True
-    # lambda: agent.payed_fee
-    # obligation should be time-based
-    # only allowed to bid regelenergie if regelleistung was accepted in the same hour for this agent by the market
