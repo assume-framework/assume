@@ -246,7 +246,7 @@ class MarketRole(Role):
             p.mkdir(parents=True, exist_ok=True)
             market_data_path = p.joinpath("market_meta.csv")
             df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
-        if db:
+        if db and not df.empty:
             df.to_sql("market_meta", db.bind, if_exists="append")
 
         # TODO write market_result or other metrics
