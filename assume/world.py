@@ -106,6 +106,7 @@ class World:
         """
 
 
+
         # load the config file
         path = f"{inputs_path}/{scenario}"
         with open(f"{path}/config.yml", "r") as f:
@@ -153,6 +154,31 @@ class World:
 
         await self.setup(self.start)
 
+        #read writing properties form config
+        simulation_id = config['id']           
+        export_csv = config['export_config']['export_csv']
+        write_orders_frequency = config['export_config']['write_orders_frequency']
+        
+        #Add output agent to world
+        export_agent = WriteOutput(simulation_id, 
+                                   export_csv, 
+                                   write_orders_frequency, 
+                                   config['start_date'], 
+                                   config['end_date'], 
+                                   self.db, 
+                                   self.export_csv_path)
+        export_agent_role = RoleAgent(self.container, suggested_aid="export_agent_1")
+        export_agent_role.add_role(export_agent)
+        self.db_agent_id = export_agent_role.aid
+        self.db_agent_addr = export_agent_role.addr
+
+        for agent in self.container._agents.values():
+            print(self.db_agent_id, self.db_agent_addr)
+            agent._role_context.data_dict = {
+                "db_agent_id": self.db_agent_id,
+                "db_agent_addr": self.db_agent_addr,
+            }
+
         # get the market configt from the config file and add the markets
         self.logger.info("Adding markets")
         for id, market_params in config["markets_config"].items():
@@ -198,7 +224,7 @@ class World:
             if vre_df is not None and pp_name in vre_df.columns:
                 unit_params["max_power"] = vre_df[pp_name]
 
-            self.add_unit(
+            await self.add_unit(
                 id=pp_name,
                 unit_type="power_plant",
                 unit_operator_id=unit_params["unit_operator"],
@@ -228,7 +254,7 @@ class World:
                 )
                 unit_params["bidding_strategies"] = {"energy": "simple"}
 
-            self.add_unit(
+            await self.add_unit(
                 id=demand_name,
                 unit_type="demand",
                 unit_operator_id=demand_name,
@@ -292,21 +318,14 @@ class World:
                 raise e
 
         # create unit within the unit operator its associated with
-        self.unit_operators[unit_operator_id].add_unit(
+        await self.unit_operators[unit_operator_id].add_unit(
             id=id,
             unit_class=unit_class,
             unit_params=unit_params,
             index=self.index,
         )
 
-        #send unit data to db agent to store it
-        await self.send_units_defintion(unit_type, unit_params)
-
-    async def send_units_defintion(self, unit_type, unit_params):
-        # Send a message to the DBRole to update data in the database
-        message = {'type': 'store_units', 'unit_type': unit_type, 'data': unit_params}
-        await self.send_message_to_role('WriteOutput', message)        
-
+        
 
     def add_market_operator(
         self,
@@ -367,11 +386,7 @@ class World:
 
     async def run_simulation(self):
         # agent is implicit added to self.container._agents
-        for agent in self.container._agents.values():
-            # TODO add a Role which does exactly this
-            agent._role_context.data_dict = {
-                "db_agent_id": self.db_agent_id,
-            }
+
         total = self.end.timestamp() - self.start.timestamp()
         pbar = tqdm(total=total)
         while self.clock.time < self.end.timestamp():
@@ -392,11 +407,7 @@ class World:
         study_case: str,
     ):
         
-        #Add output agent to world
-        export_agent = WriteOutput( inputs_path, scenario, study_case, self.db, self.export_csv_path)
-        export_agent_role = RoleAgent(self.container, suggested_aid=f"{id}")
-        export_agent_role.add_role(export_agent)
-        self.db_agent_id = export_agent_role.aid
+
 
         return self.loop.run_until_complete(
             self.async_load_scenario(

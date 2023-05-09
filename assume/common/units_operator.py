@@ -59,7 +59,7 @@ class UnitsOperator(Role):
                 self.register_market(market)
                 self.registered_markets[market.name] = market
 
-    def add_unit(
+    async def add_unit(
         self,
         id: str,
         unit_class: type[BaseUnit],
@@ -72,6 +72,14 @@ class UnitsOperator(Role):
 
         self.units[id] = unit_class(id=id, index=index, **unit_params)
         self.units[id].reset()
+
+        #send unit data to db agent to store it
+        message = {'type': 'store_units', 'unit_type': unit_class, 'data': unit_params}
+        await self.context.send_acl_message(receiver_id='export_agent_1', 
+                                    receiver_addr=('0.0.0.0', 9099), 
+                                    content=message
+                                    )
+        
 
         
 

@@ -9,8 +9,8 @@ base_case:
   fuel_prices: fuel_prices.csv
   export_config:
     export_csv: True
-    write_orders: False
-    write_orders_frequency: 24h
+    write_orders: True
+    write_orders_frequency: 24
     write_capacities: True
   markets_config:
     EOM:

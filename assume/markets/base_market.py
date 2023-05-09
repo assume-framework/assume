@@ -230,7 +230,7 @@ class MarketRole(Role):
                 acl_metadata=meta,
             )
             #store order book in db agent
-        #await self.store_order_book(self.market_result)
+        await self.store_order_book(self.market_result)
         # clear_price = sorted(self.market_result, lambda o: o['price'])[0]
 
         for meta in market_meta:
@@ -240,19 +240,28 @@ class MarketRole(Role):
             meta["name"] = self.marketconfig.name
             meta["time"] = self.context.current_timestamp
         
-        #await self.store_market_results(market_meta)
+        await self.store_market_results(market_meta)
 
         return self.market_result, market_meta
     
     async def store_order_book(self, orderbook):
         # Send a message to the DBRole to update data in the database
         message = {'type': 'store_order_book', 'sender': self.marketconfig.name, 'data': orderbook}
-        await self.send_message(agent_id=self._role_context.data_dict.db_agent_id, message=message)
+        await self.context.send_acl_message(receiver_id='export_agent_1', 
+                                    receiver_addr=('0.0.0.0', 9099),
+            #receiver_id=self.context.data_dict.get("db_agent_id"), 
+            #receiver_addr=self.context.data_dict.get("db_agent_addr"), 
+                                    content=message
+                                    )
+        print('We attempt sending the order book')
 
     async def store_market_results(self, market_meta):
         # Send a message to the DBRole to update data in the database
-        message = {'type': 'store_market_results', 'sender': self.marketconfig.name, 'data': market_meta}
-        await self.send_message(agent_id=self._role_context.data_dict.db_agent_id, message=message)
-
+        message = {'context':'write_results','type': 'store_market_results', 'sender': self.marketconfig.name, 'data': market_meta}
+        await self.context.send_acl_message(receiver_id='export_agent_1', 
+                                            receiver_addr=('0.0.0.0', 9099), 
+                                            content=message
+                                            )
+        
 
 
