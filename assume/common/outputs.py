@@ -2,12 +2,14 @@ import logging
 from datetime import datetime, timedelta
 import os
 import pandas as pd
+import assume
 from mango import Role
 from pathlib import Path
 import pandas as pd
 from pathlib import Path
 import yaml
 from sqlalchemy import create_engine, inspect
+from assume.units import BaseUnit
 
 
 logger = logging.getLogger(__name__)
@@ -74,7 +76,6 @@ class WriteOutput(Role):
             
             # Read table into Pandas DataFrame
             df = pd.read_sql_table(table_name, self.db.bind)
-            print(df)
             
             # Apply filter to delete rows where a column meets a certain condition
             df = df[df['simulation'] != self.simulation_id]
@@ -144,15 +145,12 @@ class WriteOutput(Role):
 
 
 
-
-
     def write_units_defintion(self, unit_type, unit_params):
-
-        if unit_type != 'demand':
-
+        if isinstance(unit_type, assume.units.powerplant.PowerPlant):
+            
             df = pd.DataFrame([unit_params])
             df['simulation']=self.simulation_id
-            df=df[['simulatio','technology','fuel_type','emission_factor','max_power','min_power','efficiency','unit_operator']]
+            df=df[['simulation','technology','fuel_type','emission_factor','max_power','min_power','efficiency','unit_operator']]
         
             if self.export_csv:
                 p = Path(self.export_csv_path)
@@ -162,7 +160,7 @@ class WriteOutput(Role):
             df.to_sql("unit_meta", self.db.bind, if_exists="append")
 
             
-        else:
+        elif isinstance(unit_type, assume.units.demand.Demand):
             df = pd.DataFrame()    
             df['type']= unit_type
             df['volume']= unit_params['volume'].max()

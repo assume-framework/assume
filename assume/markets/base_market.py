@@ -253,8 +253,7 @@ class MarketRole(Role):
             #receiver_addr=self.context.data_dict.get("db_agent_addr"), 
                                     content=message
                                     )
-        print('We attempt sending the order book')
-
+        
     async def store_market_results(self, market_meta):
         # Send a message to the DBRole to update data in the database
         message = {'context':'write_results','type': 'store_market_results', 'sender': self.marketconfig.name, 'data': market_meta}
