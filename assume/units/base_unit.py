@@ -24,10 +24,10 @@ class BaseUnit:
     def __init__(
         self,
         id: str,
-        technology: str = None,
-        node: str = None,
-        bidding_strategies: dict = None,
-        index: pd.DatetimeIndex = None,
+        technology: str,
+        bidding_strategies: dict,
+        index: pd.DatetimeIndex,
+        node: str,
     ):
         self.id = id
         self.technology = technology

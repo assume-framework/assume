@@ -56,7 +56,7 @@ class World:
 
         self.export_csv = export_csv
 
-        self.market_operator_agents: dict[str, RoleAgent] = {}
+        self.market_operators: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}
         self.unit_operators: dict[str, UnitsOperator] = {}
 
@@ -159,16 +159,20 @@ class World:
                 world_start=self.start,
                 world_end=self.end,
             )
-            self.add_market_operator(id=market_params["operator"])
+            
+            operator_id = str(market_params["operator"])
+            if operator_id not in self.market_operators:
+                self.add_market_operator(id=operator_id)
+
             self.add_market(
-                market_operator_id=market_params["operator"],
+                market_operator_id=operator_id,
                 market_config=market_config,
             )
 
         # add the unit operators using unique unit operator names in the powerplants csv
         self.logger.info("Adding unit operators")
         for company_name in powerplants_df.unit_operator.unique():
-            self.add_unit_operator(id=company_name)
+            self.add_unit_operator(id=str(company_name))
 
         # add the units to corresponsing unit operators
         # if fuel prices are provided, add them to the unit params
@@ -210,6 +214,7 @@ class World:
         # add the demand unit operators and units
         self.logger.info("Adding demand")
         for demand_name, demand in demand_df.items():
+            demand_name = str(demand_name)
             self.add_unit_operator(id=demand_name)
             unit_params = {
                 "technology": "inflex_demand",
@@ -239,7 +244,7 @@ class World:
 
     def add_unit_operator(
         self,
-        id: str or int,
+        id: str,
     ) -> None:
         """
         Create and add a new unit operator to the world.
@@ -300,7 +305,7 @@ class World:
 
     def add_market_operator(
         self,
-        id: str or int,
+        id: str,
     ):
         """
         creates the market operator/s
@@ -310,14 +315,14 @@ class World:
         id = int
              market operator id is associated with the market its participating
         """
-        self.market_operator_agents[id] = RoleAgent(
-            self.container, suggested_aid=f"{id}"
+        self.market_operators[id] = RoleAgent(
+            self.container, suggested_aid=id,
         )
-        self.market_operator_agents[id].markets = []
+        self.market_operators[id].markets = []
 
     def add_market(
         self,
-        market_operator_id: str or int,
+        market_operator_id: str,
         market_config: MarketConfig,
     ):
         """
@@ -337,7 +342,7 @@ class World:
             else:
                 raise Exception(f"invalid strategy {market_config.market_mechanism}")
 
-        market_operator = self.market_operator_agents.get(market_operator_id)
+        market_operator = self.market_operators.get(market_operator_id)
 
         if not market_operator:
             raise Exception(f"no market operator {market_operator_id}")
