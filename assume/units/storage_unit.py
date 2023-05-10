@@ -15,9 +15,9 @@ class StorageUnit(BaseUnit):
     node : str
         The node of the storage unit.
     max_power_charge : float
-        The maximum power input of the storage unit in MW.
+        The maximum power input of the storage unit in MW (negative value).
     min_power_charge : float
-        The minimum power input of the storage unit in MW.
+        The minimum power input of the storage unit in MW (negative value).
     max_power_discharge : float
         The maximum power output of the storage unit in MW.
     min_power_discharge : float
@@ -36,13 +36,13 @@ class StorageUnit(BaseUnit):
         Variable costs to discharge the storage unit in €/MW.
     emission_factor : float
         The emission factor of the storage unit.
-    ramp_up_charging : float, optional
-        The ramp up rate of carging the storage unit in MW/15 minutes.
-    ramp_down_charging : float, optional
-        The ramp down rate of charging the storage unit in MW/15 minutes.
-    ramp_up_discharging : float, optional
+    ramp_up_charge : float, optional
+        The ramp up rate of charging the storage unit in MW/15 minutes (negative value).
+    ramp_down_charge : float, optional
+        The ramp down rate of charging the storage unit in MW/15 minutes (negative value).
+    ramp_up_discharge : float, optional
         The ramp up rate of discharging the storage unit in MW/15 minutes.
-    ramp_down_discharging : float, optional
+    ramp_down_discharge : float, optional
         The ramp down rate of discharging the storage unit in MW/15 minutes.
     fixed_cost : float, optional
         The fixed cost of the storage unit in €/MW. (related to capacity?)
@@ -98,8 +98,8 @@ class StorageUnit(BaseUnit):
         variable_costs_discharge: float or pd.Series = 0.0,
         price_forecast: pd.Series = None,
         emission_factor: float = 0.0,
-        ramp_up_charge: float = -1,
-        ramp_down_charge: float = -1,
+        ramp_up_charge: float = 0.0,
+        ramp_down_charge: float = 0.0,
         ramp_up_discharge: float = -1,
         ramp_down_discharge: float = -1,
         fixed_cost: float = 0,
@@ -160,17 +160,15 @@ class StorageUnit(BaseUnit):
         """Reset the unit to its initial state."""
 
         #current_status = 0 means the unit is not dispatched
-        #current_status = 1 means unit is discharging, energy provider
-        #current_status = -1 means unit is charging, energy consumer
         self.current_status = 1
         self.current_down_time = self.min_down_time
         
 
-        #total_power_exchange always >= 0 (charging/discharging depends on status)
-        self.total_power_exchange = pd.Series(0.0, index=self.index)
+        #total_power > 0 discharging, total_power < 0 charging
+        self.total_power = pd.Series(0.0, index=self.index)
 
-        #alwasys starting with discharging?
-        self.total_power_exchange.iat[0] = self.min_power_discharge
+        #always starting with discharging?
+        self.total_power.iat[0] = self.min_power_discharge
 
         #starting half way charged
         self.current_SOC = (self.min_SOC + self.max_SOC)/2
@@ -201,13 +199,13 @@ class StorageUnit(BaseUnit):
         #current_power = self.total_power_exchange.at[current_time]
 
         current_power_discharge = (
-            self.total_power_exchange.at[current_time]
-            if self.current_status == 1
+            self.total_power.at[current_time]
+            if self.total_power > 0
             else 0)
         
         current_power_charge = (
-            self.total_power_charge.at[current_time]
-            if self.current_status == -1
+            self.total_power.at[current_time]
+            if self.total_power < 0
             else 0)
 
         min_power_discharge = (
@@ -232,7 +230,7 @@ class StorageUnit(BaseUnit):
             else self.max_power_charge
         )
 
-        if self.min_down_time > 0 and self.current_status == -1:
+        if self.min_down_time > 0 and self.total_power < 0:
             min_power_discharge = 0
             max_power_discharge = 0
         else:
@@ -244,24 +242,23 @@ class StorageUnit(BaseUnit):
                 max_power_discharge = min(self.ramp_up_discharge + current_power_discharge, 
                                         max_power_discharge)
 
-        if self.min_down_time > 0 and self.current_status == 1:
+        if self.min_down_time > 0 and self.total_power > 0:
             min_power_charge = 0
             max_power_charge = 0
         else:
-            if self.ramp_down_charge != -1:
-                min_power_charge = max(current_power_charge - self.ramp_down_charge, 
+            if self.ramp_down_charge < 0:
+                min_power_charge = min(current_power_charge - self.ramp_down_charge, 
                                     min_power_charge)
-            else:
-                min_power_charge = min_power_charge
-            if self.ramp_up_charge != -1:
-                max_power_charge = min(current_power_charge + self.ramp_up_charge, 
+                
+            if self.ramp_up_charge < 0:
+                max_power_charge = max(current_power_charge + self.ramp_up_charge, 
                                     max_power_charge)
         
         #restrict according to min_SOC
-        max_power_discharge = min(max_power_discharge, max(0,self.current_SOC - self.min_SOC))
+        max_power_discharge = min(max_power_discharge, max(0,self.current_SOC - self.min_SOC - self.pos_capacity_reserve))
         
         #restrict charging according to max_SOC
-        max_power_charge = min(max_power_charge, max(0, self.max_SOC - self.current_SOC))
+        max_power_charge = max(max_power_charge, min(0, self.current_SOC - self.max_SOC - self.neg_capacity_reserve))
         
         #what form does the operational window have?
         operational_window = {
