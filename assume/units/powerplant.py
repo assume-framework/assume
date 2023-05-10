@@ -90,7 +90,7 @@ class PowerPlant(BaseUnit):
         min_operating_time: float = 0,
         min_down_time: float = 0,
         downtime_hot_start: int = 8,  # hours
-        downtime_warm_tart: int = 48,  # hours
+        downtime_warm_start: int = 48,  # hours
         heat_extraction: bool = False,
         max_heat_extraction: float = 0,
         index: pd.DatetimeIndex = None,
@@ -119,10 +119,10 @@ class PowerPlant(BaseUnit):
 
         self.ramp_up = ramp_up
         self.ramp_down = ramp_down
-        self.min_operating_time = min_operating_time
-        self.min_down_time = min_down_time
+        self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
+        self.min_down_time = min_down_time if min_down_time > 0 else 1
         self.downtime_hot_start = downtime_hot_start
-        self.warm_start_cost = downtime_warm_tart
+        self.downtime_warm_start = downtime_warm_start
 
         self.fixed_cost = fixed_cost
         self.hot_start_cost = hot_start_cost * max_power
@@ -141,7 +141,7 @@ class PowerPlant(BaseUnit):
         self.current_down_time = self.min_down_time
 
         self.total_power_output = pd.Series(0.0, index=self.index)
-        self.total_power_output.iat[0] = self.min_power
+        self.total_power_output.iloc[:2] = self.min_power
 
         self.total_heat_output = pd.Series(0.0, index=self.index)
         self.power_loss_chp = pd.Series(0.0, index=self.index)
@@ -155,7 +155,7 @@ class PowerPlant(BaseUnit):
     def calculate_operational_window(
         self,
         product_type: str,
-        current_time: pd.Timestamp,
+        product_tuple: tuple,
     ) -> dict:
         """Calculate the operation window for the next time step.
 
@@ -164,14 +164,20 @@ class PowerPlant(BaseUnit):
         operational_window : dict
             Dictionary containing the operational window for the next time step.
         """
+        start, end, only_hours = product_tuple
+        start = pd.Timestamp(start)
+        end = pd.Timestamp(end)
+
+        # TODO remove current_time from flexable_strategy, so that the product config is always used
+        self.current_time = start
 
         if self.current_status == 0 and self.current_down_time < self.min_down_time:
             return None
 
-        current_power = self.total_power_output.at[current_time]
+        current_power = self.total_power_output.at[start]
 
         min_power = (
-            self.min_power[current_time]
+            self.min_power[start]
             if type(self.min_power) is pd.Series
             else self.min_power
         )
@@ -181,7 +187,7 @@ class PowerPlant(BaseUnit):
             min_power = min_power
 
         max_power = (
-            self.max_power[current_time]
+            self.max_power[start]
             if type(self.max_power) is pd.Series
             else self.max_power
         )
@@ -195,7 +201,7 @@ class PowerPlant(BaseUnit):
                 "power": current_power,
                 "marginal_cost": self.calc_marginal_cost(
                     power_output=current_power,
-                    current_time=current_time,
+                    current_time=start,
                     partial_load_eff=True,
                 ),
             },
@@ -203,7 +209,7 @@ class PowerPlant(BaseUnit):
                 "power": min_power,
                 "marginal_cost": self.calc_marginal_cost(
                     power_output=min_power,
-                    current_time=current_time,
+                    current_time=start,
                     partial_load_eff=True,
                 ),
             },
@@ -211,7 +217,7 @@ class PowerPlant(BaseUnit):
                 "power": max_power,
                 "marginal_cost": self.calc_marginal_cost(
                     power_output=max_power,
-                    current_time=current_time,
+                    current_time=start,
                     partial_load_eff=True,
                 ),
             },
@@ -222,12 +228,11 @@ class PowerPlant(BaseUnit):
     def calculate_bids(
         self,
         product_type,
-        operational_window,
+        product_tuple,
     ):
         return super().calculate_bids(
-            unit=self,
             product_type=product_type,
-            operational_window=operational_window,
+            product_tuple=product_tuple,
         )
 
     def get_dispatch_plan(self, dispatch_plan, current_time):

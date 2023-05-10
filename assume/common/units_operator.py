@@ -96,7 +96,6 @@ class UnitsOperator(Role):
         )
         logger.debug(f'Operator {self.id} can bid until: {opening["stop"]}')
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
-        self.current_time = pd.to_datetime(self.context.current_timestamp, unit="s")
 
     def handle_market_feedback(self, content: ClearingMessage, meta: dict[str, str]):
         logger.debug(f"got market result: {content}")
@@ -109,13 +108,14 @@ class UnitsOperator(Role):
 
     def send_dispatch_plan(self):
         # todo group by unit_id
+        current_time = pd.to_datetime(self.context.current_timestamp, unit="s")
         for unit_id in self.units.keys():
             total_capacity = 0.0
             for bid in self.valid_orders[unit_id]:
                 total_capacity += bid["volume"]
 
             dispatch_plan = {"total_capacity": total_capacity}
-            self.units[unit_id].get_dispatch_plan(dispatch_plan, self.current_time)
+            self.units[unit_id].get_dispatch_plan(dispatch_plan, current_time)
 
     async def submit_bids(self, opening: OpeningMessage):
         """
@@ -169,8 +169,8 @@ class UnitsOperator(Role):
                 for unit_id, unit in self.units.items():
                     # get operational window for each unit
                     operational_window = unit.calculate_operational_window(
-                        product_type=product,
-                        current_time=self.current_time,
+                        product_type=product_type,
+                        product_tuple=product,
                     )
                     op_windows.append(operational_window)
                     # TODO calculate bids from sum of op_windows
@@ -184,15 +184,10 @@ class UnitsOperator(Role):
                 self.bids_map = {}
                 for unit_id, unit in self.units.items():
                     order_c = order.copy()
-                    # get operational window for each unit
-                    operational_window = unit.calculate_operational_window(
-                        product_type=product_type,
-                        current_time=self.current_time,
-                    )
                     # take price from bidding strategy
                     bids = unit.calculate_bids(
                         product_type=product_type,
-                        operational_window=operational_window,
+                        product_tuple=product,
                     )
                     for i, bid in enumerate(bids):
                         price = bid["price"]

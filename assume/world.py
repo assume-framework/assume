@@ -21,7 +21,7 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.markets import MarketRole, pay_as_bid, pay_as_clear
-from assume.strategies import NaiveStrategy
+from assume.strategies import NaiveStrategy, flexableEOM
 from assume.units import Demand, PowerPlant
 
 logging.basicConfig(level=logging.INFO)
@@ -66,6 +66,7 @@ class World:
         }
         self.bidding_types = {
             "simple": NaiveStrategy,
+            "flexable_eom": flexableEOM,
         }
         self.clearing_mechanisms = {
             "pay_as_clear": pay_as_clear,
@@ -113,7 +114,7 @@ class World:
 
         self.index = pd.date_range(
             start=self.start,
-            end=self.end,
+            end=self.end + pd.Timedelta(hours=4),
             freq=config["time_step"],
         )
 
@@ -153,7 +154,10 @@ class World:
         self.logger.info("Adding markets")
         for id, market_params in config["markets_config"].items():
             market_config = make_market_config(
-                id=id, market_params=market_params, start=self.start, end=self.end
+                id=id,
+                market_params=market_params,
+                world_start=self.start,
+                world_end=self.end,
             )
             self.add_market_operator(id=market_params["operator"])
             self.add_market(
@@ -182,7 +186,9 @@ class World:
                 self.logger.warning(
                     f"No bidding strategies specified for {pp_name}. Using default strategies."
                 )
-                unit_params["bidding_strategies"] = {"energy": "simple"}
+                unit_params["bidding_strategies"] = {
+                    market.product_type: "simple" for market in self.markets.values()
+                }
 
             if (
                 fuel_prices_df is not None
@@ -271,11 +277,9 @@ class World:
         """
 
         # provided unit type does not exist yet
-        try:
-            unit_class = self.unit_types[unit_type]
-        except KeyError as e:
-            self.logger.error(f"invalid unit type {unit_type}")
-            raise e
+        unit_class = self.unit_types.get(unit_type)
+        if unit_class is None:
+            raise ValueError(f"invalid unit type {unit_type}")
 
         for product_type, strategy in unit_params["bidding_strategies"].items():
             try:
@@ -346,6 +350,7 @@ class World:
         next_activity = self.clock.get_next_activity()
         if not next_activity:
             self.logger.info("simulation finished - no schedules left")
+            self.clock.set_time(self.end.timestamp())
             return None
         delta = next_activity - self.clock.time
         self.clock.set_time(next_activity)
