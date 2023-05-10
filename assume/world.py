@@ -159,7 +159,7 @@ class World:
                 world_start=self.start,
                 world_end=self.end,
             )
-            
+
             operator_id = str(market_params["operator"])
             if operator_id not in self.market_operators:
                 self.add_market_operator(id=operator_id)
@@ -316,7 +316,8 @@ class World:
              market operator id is associated with the market its participating
         """
         self.market_operators[id] = RoleAgent(
-            self.container, suggested_aid=id,
+            self.container,
+            suggested_aid=id,
         )
         self.market_operators[id].markets = []
 

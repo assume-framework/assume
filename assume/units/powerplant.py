@@ -1,5 +1,5 @@
 import pandas as pd
-import numpy as np
+
 from assume.units.base_unit import BaseUnit
 
 
@@ -51,9 +51,7 @@ class PowerPlant(BaseUnit):
         self.fuel_price = fuel_price
         self.co2_price = co2_price
         self.price_forecast = (
-            pd.Series(0.0, index=self.index)
-            if price_forecast.empty
-            else price_forecast
+            pd.Series(0.0, index=self.index) if price_forecast.empty else price_forecast
         )
         self.emission_factor = emission_factor
 
@@ -136,7 +134,7 @@ class PowerPlant(BaseUnit):
             else self.max_power
         )
 
-        #adjust for ramp up speed
+        # adjust for ramp up speed
         if self.ramp_up != -1:
             max_power = min(current_power + self.ramp_up, max_power)
         else:
@@ -205,7 +203,6 @@ class PowerPlant(BaseUnit):
         power_output: float,
         timestep: pd.Timestamp,
     ) -> float or pd.Series:
-        
         fuel_price = (
             self.fuel_price.at[timestep]
             if type(self.fuel_price) is pd.Series

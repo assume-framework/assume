@@ -20,7 +20,7 @@ class flexableEOM(BaseStrategy):
         bid_quantity_flex, bid_price_flex = 0, 0
 
         if operational_window is not None:
-            self.current_time = operational_window['window']['start']
+            self.current_time = operational_window["window"]["start"]
             # =============================================================================
             # Powerplant is either on, or is able to turn on
             # Calculating possible bid amount
