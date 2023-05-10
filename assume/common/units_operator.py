@@ -76,6 +76,7 @@ class UnitsOperator(Role):
 
         #send unit data to db agent to store it
         message = {'context':'write_results','type': 'store_units', 'unit_type': unit_type, 'data': unit_params}
+        print(message)
         await self.context.send_acl_message(receiver_id='export_agent_1', 
                                     receiver_addr=('0.0.0.0', 9099), 
                                     content=message
@@ -117,8 +118,8 @@ class UnitsOperator(Role):
         self.valid_orders = {unit_id: [] for unit_id in self.units.keys()}
         for bid in orderbook:
             self.valid_orders[self.bids_map[bid["bid_id"]]].append(bid)
-
-        self.send_dispatch_plan()
+        #TODO fix send dispatch, as currently not awaited
+        #await self.send_dispatch_plan()
 
     def send_dispatch_plan(self):
         # todo group by unit_id

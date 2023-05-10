@@ -173,7 +173,6 @@ class World:
         self.db_agent_addr = export_agent_role.addr
 
         for agent in self.container._agents.values():
-            print(self.db_agent_id, self.db_agent_addr)
             agent._role_context.data_dict = {
                 "db_agent_id": self.db_agent_id,
                 "db_agent_addr": self.db_agent_addr,

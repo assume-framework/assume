@@ -123,6 +123,7 @@ class WriteOutput(Role):
 
         if content.get('type') == 'store_order_book':
             self.write_market_orders(content.get('data'))
+            self.store_market_orders()
 
         elif content.get('type') == 'store_market_results':
             self.write_market_results(content.get('data'))
@@ -132,6 +133,8 @@ class WriteOutput(Role):
 
         elif content.get('type') == 'store_dispatch':
             self.write_dispatch_plan(content.get('unit'), content.get('unit_id'), content.get('capacity'), content.get('timestamp'))
+            #TODO make this with timstamp sheduled task instead of every time
+            self.store_dispatch_plan()
 
 
 
@@ -148,7 +151,7 @@ class WriteOutput(Role):
 
 
     def store_market_orders(self):
-        print('we should store orders now)')
+        
         if self.export_csv:
             market_data_path = self.p.joinpath("market_orders.csv")
             self.df_orders.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
@@ -185,14 +188,15 @@ class WriteOutput(Role):
 
             
         elif unit_type=='demand':
+            del unit_params['bidding_strategies']
             
             df = pd.DataFrame.from_dict(unit_params)    
             df['type']= unit_type
             df.reset_index(inplace=True)
             df=df.rename(columns={'level_0':'', 'index':'Timestamp'})
             #sql does not like Timestamp or other types of values
-            df=df.astype(str)
-            df['volume']= unit_params['volume'].max()
+            #df=df.astype(str)
+            #df['Timestamp']=df['Timestamp'].astype(float)
             df['simulation']=self.simulation_id
             #df['volume']=df["volume"].max()
             
@@ -210,7 +214,7 @@ class WriteOutput(Role):
         
 
     def store_dispatch_plan(self):
-        print('we should store dispatch now)')
+        
         if self.export_csv:
             p = Path(self.export_csv_path)
             p.mkdir(parents=True, exist_ok=True)
