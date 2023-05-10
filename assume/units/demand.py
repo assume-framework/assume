@@ -27,19 +27,19 @@ class Demand(BaseUnit):
         id: str,
         technology: str,
         bidding_strategies: dict,
-        node: str = None,
+        index: pd.DatetimeIndex,
+        node: str = "bus0",
         price: float or pd.Series = 3000.0,
         volume: float or pd.Series = 1000,
-        index: pd.DatetimeIndex = None,
-        location: tuple[float, float] = None,
+        location: tuple[float, float] = (0.0, 0.0),
         **kwargs
     ):
         super().__init__(
             id=id,
             technology=technology,
-            node=node,
             bidding_strategies=bidding_strategies,
             index=index,
+            node=node,
         )
 
         self.price = price

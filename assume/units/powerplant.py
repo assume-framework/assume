@@ -1,85 +1,23 @@
 import pandas as pd
 
-from assume.strategies import BaseStrategy
 from assume.units.base_unit import BaseUnit
 
 
 class PowerPlant(BaseUnit):
-    """A class for a power plants.
-
-    Attributes
-    ----------
-    id : str
-        The ID of the power plant.
-    technology : str
-        The technology of the power plant.
-    node : str
-        The node of the power plant.
-    max_power : float
-        The maximum power output of the power plant in MW.
-    min_power : float
-        The minimum power output of the power plant in MW.
-    efficiency : float
-        The efficiency of the power plant.
-    fuel_type : str
-        The fuel type of the power plant.
-    fuel_price : list
-        The fuel type specific fuel price in €/MWh.
-    co2_price : list
-        The co2 price in €/t.
-    emission_factor : float
-        The emission factor of the power plant.
-    ramp_up : float, optional
-        The ramp up rate of the power plant in MW/15 minutes.
-    ramp_down : float, optional
-        The ramp down rate of the power plant in MW/15 minutes.
-    fixed_cost : float, optional
-        The fixed cost of the power plant in €/MW.
-    hot_start_cost : float, optional
-        The hot start cost of the power plant in €/MW.
-    warm_start_cost : float, optional
-        The warm start cost of the power plant in €/MW.
-    cold_start_cost : float, optional
-        The cold start cost of the power plant in €/MW.
-    min_operating_time : float, optional
-        The minimum operating time of the power plant in hours.
-    min_down_time : float, optional
-        The minimum down time of the power plant in hours.
-    heat_extraction : bool, optional
-        If the power plant can extract heat.
-    max_heat_extraction : float, optional
-        The maximum heat extraction of the power plant in MW.
-    availability : dict, optional
-        The availability of the power plant in MW for each time step.
-    is_active: bool
-        Defines whether or not the unit bids itself or is portfolio optimized.
-    bidding_startegy: str
-        In case the unit is active it has to be defined which bidding strategy should be used
-    **kwargs
-        Additional keyword arguments.
-
-    Methods
-    -------
-    reset()
-        Reset the power plant.
-    calculate_operational_window()
-        Calculate the operation window for the next time step.
-    calc_marginal_cost(power_output, partial_load_eff)
-        Calculate the marginal cost of the power plant.
-    """
-
     def __init__(
         self,
         id: str,
         technology: str,
         bidding_strategies: dict,
+        index: pd.DatetimeIndex,
         max_power: float or pd.Series,
         min_power: float or pd.Series = 0.0,
         efficiency: float = 1,
-        fuel_type: str = None,
+        partial_load_eff: bool = False,
+        fuel_type: str = "others",
         fuel_price: float or pd.Series = 0.0,
         co2_price: float or pd.Series = 0.0,
-        price_forecast: pd.Series = None,
+        price_forecast: pd.Series = pd.Series(),
         emission_factor: float = 0.0,
         ramp_up: float = -1,
         ramp_down: float = -1,
@@ -93,27 +31,27 @@ class PowerPlant(BaseUnit):
         downtime_warm_start: int = 48,  # hours
         heat_extraction: bool = False,
         max_heat_extraction: float = 0,
-        index: pd.DatetimeIndex = None,
-        location: tuple[float, float] = None,
-        node: str = None,
+        location: tuple[float, float] = (0.0, 0.0),
+        node: str = "bus0",
         **kwargs
     ):
         super().__init__(
             id=id,
             technology=technology,
-            node=node,
             bidding_strategies=bidding_strategies,
             index=index,
+            node=node,
         )
 
         self.max_power = max_power
         self.min_power = min_power
         self.efficiency = efficiency
+        self.partial_load_eff = partial_load_eff
         self.fuel_type = fuel_type
         self.fuel_price = fuel_price
         self.co2_price = co2_price
         self.price_forecast = (
-            price_forecast if price_forecast is not None else pd.Series(0, index=index)
+            pd.Series(0.0, index=self.index) if price_forecast.empty else price_forecast
         )
         self.emission_factor = emission_factor
 
@@ -141,7 +79,7 @@ class PowerPlant(BaseUnit):
         self.current_down_time = self.min_down_time
 
         self.total_power_output = pd.Series(0.0, index=self.index)
-        self.total_power_output.iloc[:2] = self.min_power
+        self.total_power_output.iat[0] = self.min_power
 
         self.total_heat_output = pd.Series(0.0, index=self.index)
         self.power_loss_chp = pd.Series(0.0, index=self.index)
@@ -168,57 +106,64 @@ class PowerPlant(BaseUnit):
         start = pd.Timestamp(start)
         end = pd.Timestamp(end)
 
-        # TODO remove current_time from flexable_strategy, so that the product config is always used
-        self.current_time = start
-
         if self.current_status == 0 and self.current_down_time < self.min_down_time:
             return None
 
-        current_power = self.total_power_output.at[start]
+        current_power = self.total_power_output.loc[start]
 
+        # check if min_power is a series or a float
         min_power = (
-            self.min_power[start]
+            self.min_power.at[start]
             if type(self.min_power) is pd.Series
             else self.min_power
         )
+
+        # adjust for ramp down speed
         if self.ramp_down != -1:
             min_power = max(current_power - self.ramp_down, min_power)
         else:
             min_power = min_power
 
+        # adjust min_power if sold negative reserve capacity on control reserve market
+        min_power = min_power + self.neg_capacity_reserve.at[start]
+
+        # check if max_power is a series or a float
         max_power = (
-            self.max_power[start]
+            self.max_power.at[start]
             if type(self.max_power) is pd.Series
             else self.max_power
         )
+
+        # adjust for ramp up speed
         if self.ramp_up != -1:
             max_power = min(current_power + self.ramp_up, max_power)
         else:
             max_power = max_power
 
+        # adjust max_power if sold positive reserve capacity on control reserve market
+        max_power = max_power - self.pos_capacity_reserve.at[start]
+
         operational_window = {
+            "window": {"start": start, "end": end},
             "current_power": {
                 "power": current_power,
                 "marginal_cost": self.calc_marginal_cost(
                     power_output=current_power,
-                    current_time=start,
-                    partial_load_eff=True,
+                    timestep=start,
                 ),
             },
             "min_power": {
                 "power": min_power,
                 "marginal_cost": self.calc_marginal_cost(
                     power_output=min_power,
-                    current_time=start,
-                    partial_load_eff=True,
+                    timestep=start,
                 ),
             },
             "max_power": {
                 "power": max_power,
                 "marginal_cost": self.calc_marginal_cost(
                     power_output=max_power,
-                    current_time=start,
-                    partial_load_eff=True,
+                    timestep=start,
                 ),
             },
         }
@@ -256,22 +201,21 @@ class PowerPlant(BaseUnit):
     def calc_marginal_cost(
         self,
         power_output: float,
-        current_time: pd.Timestamp,
-        partial_load_eff: bool = False,
-    ) -> float:
+        timestep: pd.Timestamp,
+    ) -> float or pd.Series:
         fuel_price = (
-            self.fuel_price.at[current_time]
+            self.fuel_price.at[timestep]
             if type(self.fuel_price) is pd.Series
             else self.fuel_price
         )
         co2_price = (
-            self.co2_price.at[current_time]
+            self.co2_price.at[timestep]
             if type(self.co2_price) is pd.Series
             else self.co2_price
         )
 
         # Partial load efficiency dependent marginal costs
-        if not partial_load_eff:
+        if not self.partial_load_eff:
             marginal_cost = (
                 fuel_price / self.efficiency
                 + co2_price * self.emission_factor / self.efficiency
