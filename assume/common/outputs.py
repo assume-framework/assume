@@ -122,7 +122,7 @@ class WriteOutput(Role):
     def handle_message(self, content, meta):
 
         if content.get('type') == 'store_order_book':
-            self.write_market_orders(content.get('data'))
+            self.write_market_orders(content.get('data'), content.get('sender'))
             self.store_market_orders()
 
         elif content.get('type') == 'store_market_results':
@@ -161,10 +161,11 @@ class WriteOutput(Role):
         self.df_orders = pd.DataFrame()
 
 
-    def write_market_orders(self, market_result):
+    def write_market_orders(self, market_result, market_name):
        
         df = pd.DataFrame.from_dict(market_result)
         df['simulation']=self.simulation_id
+        df['market_name']=market_name
         df=df.astype(str)
 
         self.df_orders=self.df_orders._append(df)

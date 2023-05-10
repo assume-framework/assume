@@ -76,7 +76,6 @@ class UnitsOperator(Role):
 
         #send unit data to db agent to store it
         message = {'context':'write_results','type': 'store_units', 'unit_type': unit_type, 'data': unit_params}
-        print(message)
         await self.context.send_acl_message(receiver_id='export_agent_1', 
                                     receiver_addr=('0.0.0.0', 9099), 
                                     content=message
