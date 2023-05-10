@@ -62,6 +62,7 @@ class UnitsOperator(Role):
     async def add_unit(
         self,
         id: str,
+        unit_type: str, 
         unit_class: type[BaseUnit],
         unit_params: dict,
         index: pd.DatetimeIndex,
@@ -74,7 +75,7 @@ class UnitsOperator(Role):
         self.units[id].reset()
 
         #send unit data to db agent to store it
-        message = {'context':'write_results','type': 'store_units', 'unit_type': unit_class, 'data': unit_params}
+        message = {'context':'write_results','type': 'store_units', 'unit_type': unit_type, 'data': unit_params}
         await self.context.send_acl_message(receiver_id='export_agent_1', 
                                     receiver_addr=('0.0.0.0', 9099), 
                                     content=message
@@ -129,8 +130,12 @@ class UnitsOperator(Role):
             dispatch_plan = {"total_capacity": total_capacity}
             self.units[unit_id].get_dispatch_plan(dispatch_plan, self.current_time)
 
-            #self.write_dispatch_plan(unit.total_power_output, unit, unit_id)
-
+            #send unit data to db agent to store it
+            message = {'context':'write_results','type': 'store_dispatch','unit':self.units[unit_id], 'unit_id': unit_id, 'capacity': total_capacity, 'timestamp':self.current_time}
+            self.context.send_acl_message(receiver_id='export_agent_1', 
+                                        receiver_addr=('0.0.0.0', 9099), 
+                                        content=message
+                                        )
 
 
     async def submit_bids(self, opening: OpeningMessage):

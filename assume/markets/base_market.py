@@ -229,7 +229,7 @@ class MarketRole(Role):
                 receiver_id=aid,
                 acl_metadata=meta,
             )
-            #store order book in db agent
+        #store order book in db agent
         await self.store_order_book(self.market_result)
         # clear_price = sorted(self.market_result, lambda o: o['price'])[0]
 
@@ -246,7 +246,7 @@ class MarketRole(Role):
     
     async def store_order_book(self, orderbook):
         # Send a message to the DBRole to update data in the database
-        message = {'type': 'store_order_book', 'sender': self.marketconfig.name, 'data': orderbook}
+        message = {'context':'write_results','type': 'store_order_book', 'sender': self.marketconfig.name, 'data': orderbook}
         await self.context.send_acl_message(receiver_id='export_agent_1', 
                                     receiver_addr=('0.0.0.0', 9099),
             #receiver_id=self.context.data_dict.get("db_agent_id"), 

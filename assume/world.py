@@ -320,6 +320,7 @@ class World:
         # create unit within the unit operator its associated with
         await self.unit_operators[unit_operator_id].add_unit(
             id=id,
+            unit_type=unit_type,
             unit_class=unit_class,
             unit_params=unit_params,
             index=self.index,
