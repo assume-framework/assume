@@ -14,10 +14,10 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
 from tqdm import tqdm
 
-from assume.common import WriteOutput  # TODO intialisieren
 from assume.common import (
     MarketConfig,
     UnitsOperator,
+    WriteOutput,
     load_file,
     make_market_config,
     mango_codec_factory,
@@ -155,18 +155,17 @@ class World:
         # read writing properties form config
         simulation_id = config["id"]
         export_conf = config.get("export_config", {})
-        export_csv = export_conf.get("export_csv", False)
-        write_orders_frequency = export_conf.get("write_orders_frequency", None)
+        export_csv = export_conf.get("export_csv", "")
+        save_frequency_hours = export_conf.get("save_frequency_hours", None)
 
         # Add output agent to world
         export_agent = WriteOutput(
             simulation_id,
-            export_csv,
-            write_orders_frequency,
-            config["start_date"],
-            config["end_date"],
+            self.start,
+            self.end,
             self.db,
             self.export_csv_path,
+            save_frequency_hours,
         )
         export_agent_role = RoleAgent(self.container, suggested_aid="export_agent_1")
         export_agent_role.add_role(export_agent)
@@ -414,7 +413,6 @@ class World:
         scenario: str,
         study_case: str,
     ):
-
         return self.loop.run_until_complete(
             self.async_load_scenario(
                 inputs_path,
