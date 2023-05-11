@@ -154,7 +154,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "megwatt"
         },
         "overrides": []
       },
@@ -195,7 +196,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT \n  NOW() as time_sec,\n  MAX(volume),\n  type,\n  simulation\nFROM demand_meta\nWHERE \"simulation\" LIKE '$simulation'\nGROUP BY type, simulation;\n",
+          "rawSql": "SELECT \n  NOW() as time_sec,\n  MAX(volume) as \"Demand Volume\",\n  type,\n  simulation\nFROM demand_meta\nWHERE \"simulation\" LIKE '$simulation'\nGROUP BY type, simulation;\n",
           "refId": "A",
           "select": [
             [
@@ -234,65 +235,46 @@
             "mode": "palette-classic"
           },
           "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
               "viz": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
             }
           },
           "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
+          "unit": "megwatt"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 11,
         "w": 12,
         "x": 12,
         "y": 7
       },
       "id": 7,
       "options": {
-        "barRadius": 0,
-        "barWidth": 0.97,
-        "groupWidth": 0.7,
+        "displayLabels": [
+          "value",
+          "name"
+        ],
         "legend": {
-          "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": false
         },
-        "orientation": "auto",
-        "showValue": "auto",
-        "stacking": "none",
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^sum$/",
+          "values": true
+        },
         "tooltip": {
           "mode": "single",
           "sort": "none"
-        },
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
+        }
       },
       "targets": [
         {
@@ -348,8 +330,8 @@
           ]
         }
       ],
-      "title": "Installed Capacities",
-      "type": "barchart"
+      "title": "Installed Generation Capacities",
+      "type": "piechart"
     },
     {
       "datasource": {
@@ -358,7 +340,7 @@
       },
       "gridPos": {
         "h": 3,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 15
       },
@@ -462,7 +444,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "megwatt"
         },
         "overrides": []
       },
@@ -495,7 +478,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  demand_volume,\n  name\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"name\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY name, simulation, product_start, demand_volume\nORDER BY 1;",
+          "rawSql": "SELECT\n  product_start AS \"time\",\n  demand_volume AS \"Demand Volume\",\n  name\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"name\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY name, simulation, product_start, demand_volume\nORDER BY 1;",
           "refId": "A",
           "select": [
             [
@@ -622,7 +605,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  supply_volume,\n  name\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"name\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY name, simulation, product_start, supply_volume\nORDER BY 1;",
+          "rawSql": "SELECT\n  product_start AS \"time\",\n  supply_volume AS \"Supply Volume\",\n  name\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"name\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY name, simulation, product_start, supply_volume\nORDER BY 1;",
           "refId": "A",
           "select": [
             [
@@ -781,8 +764,8 @@
       {
         "current": {
           "selected": true,
-          "text": "example_01",
-          "value": "example_01"
+          "text": "case_2019",
+          "value": "case_2019"
         },
         "datasource": {
           "type": "postgres",
@@ -808,6 +791,10 @@
           "text": "EOM",
           "value": "EOM"
         },
+        "datasource": {
+          "type": "postgres",
+          "uid": "P7B13B9DF907EC40C"
+        },
         "definition": "SELECT \n  name\nFROM market_meta\ngroup by name;",
         "description": "Choose for which market the data is displayed",
         "hide": 0,
@@ -826,12 +813,12 @@
   },
   "time": {
     "from": "2018-12-31T23:00:00.000Z",
-    "to": "2019-01-10T22:59:59.000Z"
+    "to": "2019-01-11T23:00:00.000Z"
   },
   "timepicker": {},
   "timezone": "",
   "title": "ASSUME",
   "uid": "ap3RcmY4z",
-  "version": 10,
+  "version": 4,
   "weekStart": ""
 }

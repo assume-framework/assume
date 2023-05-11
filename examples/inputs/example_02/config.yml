@@ -15,7 +15,7 @@ base_case:
       operator: EOM_operator
       product_type: energy
       start_date: 2018-12-31 23:00
-      duration: 59T
+      duration: 1h
       count: 1
       first_delivery: 1h
       opening_frequency: 1h

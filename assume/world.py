@@ -394,11 +394,11 @@ class World:
 
     async def run_simulation(self):
         # agent is implicit added to self.container._agents
-
         total = self.end.timestamp() - self.start.timestamp()
         pbar = tqdm(total=total)
+        self.clock.set_time(self.start.timestamp())
         while self.clock.time < self.end.timestamp():
-            await asyncio.sleep(0)
+            await asyncio.sleep(0.00001)
             delta = await self.step()
             if delta:
                 pbar.update(delta)
