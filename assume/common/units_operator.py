@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 import pandas as pd
 from mango import Role
@@ -57,9 +58,10 @@ class UnitsOperator(Role):
                 self.register_market(market)
                 self.registered_markets[market.name] = market
 
-    def add_unit(
+    async def add_unit(
         self,
         id: str,
+        unit_type: str,
         unit_class: type[BaseUnit],
         unit_params: dict,
         index: pd.DatetimeIndex,
@@ -70,6 +72,19 @@ class UnitsOperator(Role):
 
         self.units[id] = unit_class(id=id, index=index, **unit_params)
         self.units[id].reset()
+
+        # send unit data to db agent to store it
+        message = {
+            "context": "write_results",
+            "type": "store_units",
+            "unit_type": unit_type,
+            "data": unit_params,
+        }
+        await self.context.send_acl_message(
+            receiver_id="export_agent_1",
+            receiver_addr=("0.0.0.0", 9099),
+            content=message,
+        )
 
     def participate(self, market):
         # always participate at all markets
@@ -103,8 +118,8 @@ class UnitsOperator(Role):
         self.valid_orders = {unit_id: [] for unit_id in self.units.keys()}
         for bid in orderbook:
             self.valid_orders[self.bids_map[bid["bid_id"]]].append(bid)
-
-        self.send_dispatch_plan()
+        # TODO fix send dispatch, as currently not awaited
+        # await self.send_dispatch_plan()
 
     def send_dispatch_plan(self):
         # todo group by unit_id
@@ -116,6 +131,21 @@ class UnitsOperator(Role):
 
             dispatch_plan = {"total_capacity": total_capacity}
             self.units[unit_id].get_dispatch_plan(dispatch_plan, current_time)
+
+            # send unit data to db agent to store it
+            message = {
+                "context": "write_results",
+                "type": "store_dispatch",
+                "unit": self.units[unit_id],
+                "unit_id": unit_id,
+                "capacity": total_capacity,
+                "timestamp": self.current_time,
+            }
+            self.context.send_acl_message(
+                receiver_id="export_agent_1",
+                receiver_addr=("0.0.0.0", 9099),
+                content=message,
+            )
 
     async def submit_bids(self, opening: OpeningMessage):
         """

@@ -1,12 +1,17 @@
 base_case:
   id: example_01
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-10 23:00
+  end_date: 2019-01-11 00:00
   time_step: 1h
   powerplants: powerplants.csv
   demand: inflex_demand.csv
   renewable_generation: renewable_generation.csv
   fuel_prices: fuel_prices.csv
+  export_config:
+    export_csv: True
+    write_orders: True
+    write_orders_frequency: 24
+    write_capacities: True
   markets_config:
     EOM:
       operator: EOM_operator

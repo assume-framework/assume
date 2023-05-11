@@ -225,6 +225,8 @@ class MarketRole(Role):
                 receiver_id=aid,
                 acl_metadata=meta,
             )
+        # store order book in db agent
+        await self.store_order_book(self.market_result)
         # clear_price = sorted(self.market_result, lambda o: o['price'])[0]
 
         for meta in market_meta:
@@ -233,20 +235,37 @@ class MarketRole(Role):
             )
             meta["name"] = self.marketconfig.name
             meta["time"] = self.context.current_timestamp
-        self.write_results(self.market_result, market_meta)
+
+        await self.store_market_results(market_meta)
 
         return self.market_result, market_meta
 
-    def write_results(self, market_result, market_meta):
-        df = pd.DataFrame.from_dict(market_meta)
-        export_csv_path = self.context.data_dict.get("export_csv")
-        db = self.context.data_dict.get("db")
-        if export_csv_path:
-            p = Path(export_csv_path)
-            p.mkdir(parents=True, exist_ok=True)
-            market_data_path = p.joinpath("market_meta.csv")
-            df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
-        if db and not df.empty:
-            df.to_sql("market_meta", db.bind, if_exists="append")
+    async def store_order_book(self, orderbook):
+        # Send a message to the DBRole to update data in the database
+        message = {
+            "context": "write_results",
+            "type": "store_order_book",
+            "sender": self.marketconfig.name,
+            "data": orderbook,
+        }
+        await self.context.send_acl_message(
+            receiver_id="export_agent_1",
+            receiver_addr=("0.0.0.0", 9099),
+            # receiver_id=self.context.data_dict.get("db_agent_id"),
+            # receiver_addr=self.context.data_dict.get("db_agent_addr"),
+            content=message,
+        )
 
-        # TODO write market_result or other metrics
+    async def store_market_results(self, market_meta):
+        # Send a message to the DBRole to update data in the database
+        message = {
+            "context": "write_results",
+            "type": "store_market_results",
+            "sender": self.marketconfig.name,
+            "data": market_meta,
+        }
+        await self.context.send_acl_message(
+            receiver_id="export_agent_1",
+            receiver_addr=("0.0.0.0", 9099),
+            content=message,
+        )

@@ -2,6 +2,7 @@ import asyncio
 import logging
 import time
 from datetime import datetime
+from pathlib import Path
 
 import nest_asyncio
 import pandas as pd
@@ -13,6 +14,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
 from tqdm import tqdm
 
+from assume.common import WriteOutput  # TODO intialisieren
 from assume.common import (
     MarketConfig,
     UnitsOperator,
@@ -35,11 +37,13 @@ class World:
         ifac_addr: str = "0.0.0.0",
         port: int = 9099,
         database_uri: str = "",
-        export_csv=False,
+        export_csv_path: str = "",
     ):
         self.logger = logging.getLogger(__name__)
         self.addr = (ifac_addr, port)
-        self.db = None
+
+        self.export_csv_path = export_csv_path
+        # intialize db connection at beginning of simulation
         if database_uri:
             self.db = scoped_session(sessionmaker(create_engine(database_uri)))
             connected = False
@@ -53,8 +57,6 @@ class World:
                         f"could not connect to {database_uri}, trying again"
                     )
                     time.sleep(2)
-
-        self.export_csv = export_csv
 
         self.market_operators: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}
@@ -150,6 +152,33 @@ class World:
 
         await self.setup(self.start)
 
+        # read writing properties form config
+        simulation_id = config["id"]
+        export_conf = config.get("export_config", {})
+        export_csv = export_conf.get("export_csv", False)
+        write_orders_frequency = export_conf.get("write_orders_frequency", None)
+
+        # Add output agent to world
+        export_agent = WriteOutput(
+            simulation_id,
+            export_csv,
+            write_orders_frequency,
+            config["start_date"],
+            config["end_date"],
+            self.db,
+            self.export_csv_path,
+        )
+        export_agent_role = RoleAgent(self.container, suggested_aid="export_agent_1")
+        export_agent_role.add_role(export_agent)
+        self.db_agent_id = export_agent_role.aid
+        self.db_agent_addr = export_agent_role.addr
+
+        for agent in self.container._agents.values():
+            agent._role_context.data_dict = {
+                "db_agent_id": self.db_agent_id,
+                "db_agent_addr": self.db_agent_addr,
+            }
+
         # get the market configt from the config file and add the markets
         self.logger.info("Adding markets")
         for id, market_params in config["markets_config"].items():
@@ -204,7 +233,7 @@ class World:
             if vre_df is not None and pp_name in vre_df.columns:
                 unit_params["max_power"] = vre_df[pp_name]
 
-            self.add_unit(
+            await self.add_unit(
                 id=pp_name,
                 unit_type="power_plant",
                 unit_operator_id=unit_params["unit_operator"],
@@ -235,7 +264,7 @@ class World:
                 )
                 unit_params["bidding_strategies"] = {"energy": "simple"}
 
-            self.add_unit(
+            await self.add_unit(
                 id=demand_name,
                 unit_type="demand",
                 unit_operator_id=demand_name,
@@ -262,7 +291,7 @@ class World:
         # add the current unitsoperator to the list of operators currently existing
         self.unit_operators[id] = units_operator
 
-    def add_unit(
+    async def add_unit(
         self,
         id: str,
         unit_type: str,
@@ -296,8 +325,9 @@ class World:
                 raise e
 
         # create unit within the unit operator its associated with
-        self.unit_operators[unit_operator_id].add_unit(
+        await self.unit_operators[unit_operator_id].add_unit(
             id=id,
+            unit_type=unit_type,
             unit_class=unit_class,
             unit_params=unit_params,
             index=self.index,
@@ -364,16 +394,11 @@ class World:
 
     async def run_simulation(self):
         # agent is implicit added to self.container._agents
-        for agent in self.container._agents.values():
-            # TODO add a Role which does exactly this
-            agent._role_context.data_dict = {
-                "db": self.db,
-                "export_csv": self.export_csv,
-            }
         total = self.end.timestamp() - self.start.timestamp()
         pbar = tqdm(total=total)
+        self.clock.set_time(self.start.timestamp())
         while self.clock.time < self.end.timestamp():
-            await asyncio.sleep(0)
+            await asyncio.sleep(0.00001)
             delta = await self.step()
             if delta:
                 pbar.update(delta)
@@ -389,6 +414,7 @@ class World:
         scenario: str,
         study_case: str,
     ):
+
         return self.loop.run_until_complete(
             self.async_load_scenario(
                 inputs_path,
