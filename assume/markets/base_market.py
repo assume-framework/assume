@@ -72,7 +72,7 @@ class MarketRole(Role):
         current = datetime.fromtimestamp(self.context.current_timestamp)
         next_opening = self.marketconfig.opening_hours.after(current)
         market_closing = next_opening + self.marketconfig.opening_duration
-        logger.info(
+        logger.debug(
             f"first market opening: {self.marketconfig.name} - {next_opening} - {market_closing}"
         )
         self.context.schedule_timestamp_task(
@@ -83,7 +83,7 @@ class MarketRole(Role):
         current = datetime.fromtimestamp(self.context.current_timestamp)
         next_opening = self.marketconfig.opening_hours.after(current)
         if not next_opening:
-            logger.info(f"market {self.marketconfig.name} - does not reopen")
+            logger.debug(f"market {self.marketconfig.name} - does not reopen")
             return
 
         market_closing = next_opening + self.marketconfig.opening_duration
@@ -104,7 +104,7 @@ class MarketRole(Role):
         self.context.schedule_timestamp_task(
             self.next_opening(), next_opening.timestamp()
         )
-        logger.info(
+        logger.debug(
             f"next market opening: {self.marketconfig.name} - {next_opening} - {market_closing}"
         )
 
@@ -234,7 +234,7 @@ class MarketRole(Role):
         # clear_price = sorted(self.market_result, lambda o: o['price'])[0]
 
         for meta in market_meta:
-            logger.info(
+            logger.debug(
                 f'clearing price for {self.marketconfig.name} is {round(meta["price"],2)}, volume: {meta["demand_volume"]}'
             )
             meta["name"] = self.marketconfig.name

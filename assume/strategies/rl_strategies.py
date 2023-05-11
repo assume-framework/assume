@@ -16,7 +16,6 @@ class RLStrategy(BaseStrategy):
         raise NotImplementedError()
 
     def calculate_bids(self, market, operational_window):
-
         """
         load current RL model to map state to action
 

@@ -25,7 +25,7 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.markets import MarketRole, pay_as_bid, pay_as_clear
-from assume.strategies import NaiveStrategy
+from assume.strategies import NaiveStrategy, flexableEOM
 from assume.units import Demand, PowerPlant
 
 logging.basicConfig(level=logging.INFO)
@@ -46,20 +46,19 @@ class World:
 
         self.export_csv_path=export_csv_path
         #intialize db connection at beginning of simulation
-        self.db = scoped_session(sessionmaker(create_engine(database_uri)))
-        connected = False
-        while not connected:
-            try:
-                self.db.connection()
-                connected = True
-                self.logger.info("connected to db")
-            except OperationalError:
-                self.logger.error(f"could not connect to {database_uri}, trying again")
-                time.sleep(2)
-        
+        if database_uri:
+            self.db = scoped_session(sessionmaker(create_engine(database_uri)))
+            connected = False
+            while not connected:
+                try:
+                    self.db.connection()
+                    connected = True
+                    self.logger.info("connected to db")
+                except OperationalError:
+                    self.logger.error(f"could not connect to {database_uri}, trying again")
+                    time.sleep(2)
 
-        
-        self.market_operator_agents: dict[str, RoleAgent] = {}
+        self.market_operators: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}
         self.unit_operators: dict[str, UnitsOperator] = {}
 
@@ -69,6 +68,7 @@ class World:
         }
         self.bidding_types = {
             "simple": NaiveStrategy,
+            "flexable_eom": flexableEOM,
         }
         self.clearing_mechanisms = {
             "pay_as_clear": pay_as_clear,
@@ -118,7 +118,7 @@ class World:
 
         self.index = pd.date_range(
             start=self.start,
-            end=self.end,
+            end=self.end + pd.Timedelta(hours=4),
             freq=config["time_step"],
         )
 
@@ -155,17 +155,17 @@ class World:
         await self.setup(self.start)
 
         #read writing properties form config
-        simulation_id = config['id']           
+        simulation_id = config['id']
         export_csv = config['export_config']['export_csv']
         write_orders_frequency = config['export_config']['write_orders_frequency']
-        
+
         #Add output agent to world
-        export_agent = WriteOutput(simulation_id, 
-                                   export_csv, 
-                                   write_orders_frequency, 
-                                   config['start_date'], 
-                                   config['end_date'], 
-                                   self.db, 
+        export_agent = WriteOutput(simulation_id,
+                                   export_csv,
+                                   write_orders_frequency,
+                                   config['start_date'],
+                                   config['end_date'],
+                                   self.db,
                                    self.export_csv_path)
         export_agent_role = RoleAgent(self.container, suggested_aid="export_agent_1")
         export_agent_role.add_role(export_agent)
@@ -182,18 +182,25 @@ class World:
         self.logger.info("Adding markets")
         for id, market_params in config["markets_config"].items():
             market_config = make_market_config(
-                id=id, market_params=market_params, start=self.start, end=self.end
+                id=id,
+                market_params=market_params,
+                world_start=self.start,
+                world_end=self.end,
             )
-            self.add_market_operator(id=market_params["operator"])
+
+            operator_id = str(market_params["operator"])
+            if operator_id not in self.market_operators:
+                self.add_market_operator(id=operator_id)
+
             self.add_market(
-                market_operator_id=market_params["operator"],
+                market_operator_id=operator_id,
                 market_config=market_config,
             )
 
         # add the unit operators using unique unit operator names in the powerplants csv
         self.logger.info("Adding unit operators")
         for company_name in powerplants_df.unit_operator.unique():
-            self.add_unit_operator(id=company_name)
+            self.add_unit_operator(id=str(company_name))
 
         # add the units to corresponsing unit operators
         # if fuel prices are provided, add them to the unit params
@@ -211,7 +218,9 @@ class World:
                 self.logger.warning(
                     f"No bidding strategies specified for {pp_name}. Using default strategies."
                 )
-                unit_params["bidding_strategies"] = {"energy": "simple"}
+                unit_params["bidding_strategies"] = {
+                    market.product_type: "simple" for market in self.markets.values()
+                }
 
             if (
                 fuel_prices_df is not None
@@ -233,6 +242,7 @@ class World:
         # add the demand unit operators and units
         self.logger.info("Adding demand")
         for demand_name, demand in demand_df.items():
+            demand_name = str(demand_name)
             self.add_unit_operator(id=demand_name)
             unit_params = {
                 "technology": "inflex_demand",
@@ -262,7 +272,7 @@ class World:
 
     def add_unit_operator(
         self,
-        id: str or int,
+        id: str,
     ) -> None:
         """
         Create and add a new unit operator to the world.
@@ -301,11 +311,9 @@ class World:
         """
 
         # provided unit type does not exist yet
-        try:
-            unit_class = self.unit_types[unit_type]
-        except KeyError as e:
-            self.logger.error(f"invalid unit type {unit_type}")
-            raise e
+        unit_class = self.unit_types.get(unit_type)
+        if unit_class is None:
+            raise ValueError(f"invalid unit type {unit_type}")
 
         for product_type, strategy in unit_params["bidding_strategies"].items():
             try:
@@ -325,11 +333,11 @@ class World:
             index=self.index,
         )
 
-        
+
 
     def add_market_operator(
         self,
-        id: str or int,
+        id: str,
     ):
         """
         creates the market operator/s
@@ -339,14 +347,15 @@ class World:
         id = int
              market operator id is associated with the market its participating
         """
-        self.market_operator_agents[id] = RoleAgent(
-            self.container, suggested_aid=f"{id}"
+        self.market_operators[id] = RoleAgent(
+            self.container,
+            suggested_aid=id,
         )
-        self.market_operator_agents[id].markets = []
+        self.market_operators[id].markets = []
 
     def add_market(
         self,
-        market_operator_id: str or int,
+        market_operator_id: str,
         market_config: MarketConfig,
     ):
         """
@@ -366,7 +375,7 @@ class World:
             else:
                 raise Exception(f"invalid strategy {market_config.market_mechanism}")
 
-        market_operator = self.market_operator_agents.get(market_operator_id)
+        market_operator = self.market_operators.get(market_operator_id)
 
         if not market_operator:
             raise Exception(f"no market operator {market_operator_id}")
@@ -379,6 +388,7 @@ class World:
         next_activity = self.clock.get_next_activity()
         if not next_activity:
             self.logger.info("simulation finished - no schedules left")
+            self.clock.set_time(self.end.timestamp())
             return None
         delta = next_activity - self.clock.time
         self.clock.set_time(next_activity)
@@ -406,7 +416,7 @@ class World:
         scenario: str,
         study_case: str,
     ):
-        
+
 
 
         return self.loop.run_until_complete(

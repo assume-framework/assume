@@ -116,6 +116,8 @@ def pay_as_clear(
                 "demand_volume": demand_volume,
                 "uniform_price": clear_price,
                 "price": clear_price,
+                "max_price": clear_price,
+                "min_price": clear_price,
                 "node_id": None,
                 "product_start": product[0],
                 "product_end": product[1],

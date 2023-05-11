@@ -27,19 +27,19 @@ class Demand(BaseUnit):
         id: str,
         technology: str,
         bidding_strategies: dict,
-        node: str = None,
+        index: pd.DatetimeIndex,
+        node: str = "bus0",
         price: float or pd.Series = 3000.0,
         volume: float or pd.Series = 1000,
-        index: pd.DatetimeIndex = None,
-        location: tuple[float, float] = None,
+        location: tuple[float, float] = (0.0, 0.0),
         **kwargs
     ):
         super().__init__(
             id=id,
             technology=technology,
-            node=node,
             bidding_strategies=bidding_strategies,
             index=index,
+            node=node,
         )
 
         self.price = price
@@ -51,31 +51,25 @@ class Demand(BaseUnit):
         self.total_capacity = pd.Series(0.0, index=self.index)
 
     def calculate_operational_window(
-        self, product_type: str, current_time: pd.Timestamp
+        self,
+        product_type: str,
+        product_tuple: tuple,
     ) -> dict:
+        start, end, only_hours = product_tuple
+        start = pd.Timestamp(start)
+        end = pd.Timestamp(end)
         """Calculate the operation window for the next time step."""
         if type(self.volume) == pd.Series:
-            bid_volume = self.volume.loc[current_time]
+            bid_volume = self.volume.loc[start]
         else:
             bid_volume = self.volume
 
         if type(self.price) == pd.Series:
-            bid_price = self.price.loc[current_time]
+            bid_price = self.price.loc[start]
         else:
             bid_price = self.price
 
         return {"max_power": {"power": -bid_volume, "marginal_cost": bid_price}}
-
-    def calculate_bids(
-        self,
-        product_type,
-        operational_window,
-    ):
-        return super().calculate_bids(
-            unit=self,
-            product_type=product_type,
-            operational_window=operational_window,
-        )
 
     def get_dispatch_plan(self, dispatch_plan, current_time):
         self.total_capacity.at[current_time] = dispatch_plan["total_capacity"]
