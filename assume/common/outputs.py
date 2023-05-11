@@ -83,7 +83,8 @@ class WriteOutput(Role):
             df = df[df["simulation"] != self.simulation_id]
 
             # Save filtered DataFrame back to table
-            df.to_sql(table_name, self.db.bind, if_exists="replace", index=False)
+            if not df.empty:
+                df.to_sql(table_name, self.db.bind, if_exists="replace", index=False)
 
     def setup(self):
         self.context.subscribe_message(
@@ -93,13 +94,13 @@ class WriteOutput(Role):
         )
         """
         h=self.write_orders_frequency*3600
-        
+
 
         while h < self.delay:
 
             self.context.schedule_timestamp_task(coroutine=self.store_market_orders(),
                                      timestamp=(self.start_time_dt + timedelta(seconds=h)).timestamp())
-            
+
             self.context.schedule_timestamp_task(coroutine=self.store_dispatch_plan(),
                             timestamp=(self.start_time_dt + timedelta(seconds=h)).timestamp())
             h = h + self.write_orders_frequency*3600
@@ -111,6 +112,8 @@ class WriteOutput(Role):
         """
 
     def handle_message(self, content, meta):
+        if not isinstance(content, dict):
+            return False
 
         if content.get("type") == "store_order_book":
             self.write_market_orders(content.get("data"), content.get("sender"))
@@ -140,8 +143,8 @@ class WriteOutput(Role):
 
             market_data_path = self.p.joinpath("market_meta.csv")
             df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
-
-        df.to_sql("market_meta", self.db.bind, if_exists="append")
+        if not df.empty:
+            df.to_sql("market_meta", self.db.bind, if_exists="append")
 
     def store_market_orders(self):
 
@@ -151,7 +154,8 @@ class WriteOutput(Role):
                 market_data_path, mode="a", header=not market_data_path.exists()
             )
 
-        self.df_orders.to_sql("market_orders_all", self.db.bind, if_exists="append")
+        if not self.df_orders.empty:
+            self.df_orders.to_sql("market_orders_all", self.db.bind, if_exists="append")
 
         self.df_orders = pd.DataFrame()
 
@@ -161,8 +165,7 @@ class WriteOutput(Role):
         df["simulation"] = self.simulation_id
         df["market_name"] = market_name
         df = df.astype(str)
-
-        self.df_orders = self.df_orders._append(df)
+        self.df_orders = pd.concat([self.df_orders, df], axis=1)
 
     def write_units_defintion(self, unit_type, unit_params):
 
@@ -182,6 +185,8 @@ class WriteOutput(Role):
                     "unit_operator",
                 ]
             ]
+            df["max_power"] = max(df["max_power"])
+            df["min_power"] = max(df["min_power"])
 
             if self.export_csv:
                 p = Path(self.export_csv_path)
@@ -190,7 +195,8 @@ class WriteOutput(Role):
                 df.to_csv(
                     market_data_path, mode="a", header=not market_data_path.exists()
                 )
-            df.to_sql("unit_meta", self.db.bind, if_exists="append")
+            if not df.empty:
+                df.to_sql("unit_meta", self.db.bind, if_exists="append")
 
         elif unit_type == "demand":
             del unit_params["bidding_strategies"]
@@ -212,7 +218,8 @@ class WriteOutput(Role):
                 df.to_csv(
                     market_data_path, mode="a", header=not market_data_path.exists()
                 )
-            df.to_sql("demand_meta", self.db.bind, if_exists="append")
+            if not df.empty:
+                df.to_sql("demand_meta", self.db.bind, if_exists="append")
 
         else:
             logger.info(
