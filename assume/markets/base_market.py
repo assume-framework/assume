@@ -127,8 +127,6 @@ class MarketRole(Role):
         if self.marketconfig.eligible_obligations_lambda(agent):
             self.registered_agents.append((agent_addr, agent))
 
-
-
     def handle_orderbook(self, content: dict, meta: dict):
         orderbook: Orderbook = content["orderbook"]
         # TODO check if agent is allowed to bid
@@ -172,9 +170,7 @@ class MarketRole(Role):
                     "reply_to": 1,
                 },
             )
-        
 
-    
     def handle_get_unmatched(self, content: dict, meta: dict):
         """
         A handler which sends the orderbook with unmatched orders to an agent.
@@ -229,7 +225,7 @@ class MarketRole(Role):
                 receiver_id=aid,
                 acl_metadata=meta,
             )
-        #store order book in db agent
+        # store order book in db agent
         await self.store_order_book(self.market_result)
         # clear_price = sorted(self.market_result, lambda o: o['price'])[0]
 
@@ -239,28 +235,37 @@ class MarketRole(Role):
             )
             meta["name"] = self.marketconfig.name
             meta["time"] = self.context.current_timestamp
-        
+
         await self.store_market_results(market_meta)
 
         return self.market_result, market_meta
-    
+
     async def store_order_book(self, orderbook):
         # Send a message to the DBRole to update data in the database
-        message = {'context':'write_results','type': 'store_order_book', 'sender': self.marketconfig.name, 'data': orderbook}
-        await self.context.send_acl_message(receiver_id='export_agent_1', 
-                                    receiver_addr=('0.0.0.0', 9099),
-            #receiver_id=self.context.data_dict.get("db_agent_id"), 
-            #receiver_addr=self.context.data_dict.get("db_agent_addr"), 
-                                    content=message
-                                    )
-        
+        message = {
+            "context": "write_results",
+            "type": "store_order_book",
+            "sender": self.marketconfig.name,
+            "data": orderbook,
+        }
+        await self.context.send_acl_message(
+            receiver_id="export_agent_1",
+            receiver_addr=("0.0.0.0", 9099),
+            # receiver_id=self.context.data_dict.get("db_agent_id"),
+            # receiver_addr=self.context.data_dict.get("db_agent_addr"),
+            content=message,
+        )
+
     async def store_market_results(self, market_meta):
         # Send a message to the DBRole to update data in the database
-        message = {'context':'write_results','type': 'store_market_results', 'sender': self.marketconfig.name, 'data': market_meta}
-        await self.context.send_acl_message(receiver_id='export_agent_1', 
-                                            receiver_addr=('0.0.0.0', 9099), 
-                                            content=message
-                                            )
-        
-
-
+        message = {
+            "context": "write_results",
+            "type": "store_market_results",
+            "sender": self.marketconfig.name,
+            "data": market_meta,
+        }
+        await self.context.send_acl_message(
+            receiver_id="export_agent_1",
+            receiver_addr=("0.0.0.0", 9099),
+            content=message,
+        )

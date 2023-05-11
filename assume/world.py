@@ -1,25 +1,23 @@
 import asyncio
 import logging
-
+import time
 from datetime import datetime
+from pathlib import Path
 
 import nest_asyncio
 import pandas as pd
-from pathlib import Path
 import yaml
 from mango import RoleAgent, create_container
 from mango.util.clock import ExternalClock
-from tqdm import tqdm
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
 from tqdm import tqdm
-import time
 
+from assume.common import WriteOutput  # TODO intialisieren
 from assume.common import (
     MarketConfig,
     UnitsOperator,
-    WriteOutput, #TODO intialisieren
     load_file,
     make_market_config,
     mango_codec_factory,
@@ -44,8 +42,8 @@ class World:
         self.logger = logging.getLogger(__name__)
         self.addr = (ifac_addr, port)
 
-        self.export_csv_path=export_csv_path
-        #intialize db connection at beginning of simulation
+        self.export_csv_path = export_csv_path
+        # intialize db connection at beginning of simulation
         if database_uri:
             self.db = scoped_session(sessionmaker(create_engine(database_uri)))
             connected = False
@@ -55,7 +53,9 @@ class World:
                     connected = True
                     self.logger.info("connected to db")
                 except OperationalError:
-                    self.logger.error(f"could not connect to {database_uri}, trying again")
+                    self.logger.error(
+                        f"could not connect to {database_uri}, trying again"
+                    )
                     time.sleep(2)
 
         self.market_operators: dict[str, RoleAgent] = {}
@@ -105,8 +105,6 @@ class World:
 
         """
 
-
-
         # load the config file
         path = f"{inputs_path}/{scenario}"
         with open(f"{path}/config.yml", "r") as f:
@@ -154,19 +152,22 @@ class World:
 
         await self.setup(self.start)
 
-        #read writing properties form config
-        simulation_id = config['id']
-        export_csv = config['export_config']['export_csv']
-        write_orders_frequency = config['export_config']['write_orders_frequency']
+        # read writing properties form config
+        simulation_id = config["id"]
+        export_conf = config.get("export_config", {})
+        export_csv = export_conf.get("export_csv", False)
+        write_orders_frequency = export_conf.get("write_orders_frequency", None)
 
-        #Add output agent to world
-        export_agent = WriteOutput(simulation_id,
-                                   export_csv,
-                                   write_orders_frequency,
-                                   config['start_date'],
-                                   config['end_date'],
-                                   self.db,
-                                   self.export_csv_path)
+        # Add output agent to world
+        export_agent = WriteOutput(
+            simulation_id,
+            export_csv,
+            write_orders_frequency,
+            config["start_date"],
+            config["end_date"],
+            self.db,
+            self.export_csv_path,
+        )
         export_agent_role = RoleAgent(self.container, suggested_aid="export_agent_1")
         export_agent_role.add_role(export_agent)
         self.db_agent_id = export_agent_role.aid
@@ -287,7 +288,6 @@ class World:
         unit_operator_role = RoleAgent(self.container, suggested_aid=f"{id}")
         unit_operator_role.add_role(units_operator)
 
-
         # add the current unitsoperator to the list of operators currently existing
         self.unit_operators[id] = units_operator
 
@@ -332,8 +332,6 @@ class World:
             unit_params=unit_params,
             index=self.index,
         )
-
-
 
     def add_market_operator(
         self,
@@ -416,8 +414,6 @@ class World:
         scenario: str,
         study_case: str,
     ):
-
-
 
         return self.loop.run_until_complete(
             self.async_load_scenario(
