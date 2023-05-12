@@ -1,19 +1,12 @@
-import asyncio
 import logging
 import os
-
-# from mango.agent import Agent, scheduler
-import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
-import yaml
 from dateutil import rrule as rr
 from mango import Role
-from sqlalchemy import inspect
-
-import assume
+from sqlalchemy import inspect, text
 
 logger = logging.getLogger(__name__)
 
@@ -76,14 +69,8 @@ class WriteOutput(Role):
             # Iterate through each table
             for table_name in table_names:
                 # Read table into Pandas DataFrame
-                df = pd.read_sql_table(table_name, self.db.bind)
-                if not df.empty:
-                    # Apply filter to delete rows where a column meets a certain condition
-                    df = df[df["simulation"] != self.simulation_id]
-                    # Save filtered DataFrame back to table
-                    df.to_sql(
-                        table_name, self.db.bind, if_exists="replace", index=False
-                    )
+                query = text(f"delete from {table_name} where simulation = '{self.simulation_id}'")
+                self.db.execute(query)
 
     def setup(self):
         self.context.subscribe_message(
@@ -229,4 +216,4 @@ class WriteOutput(Role):
         df["timestamp"] = current_time
         df["simulation"] = self.simulation_id
 
-        self.df_dispatch = self.df_dispatch._append(df)
+        self.df_dispatch = pd.concat([self.df_dispatch, df], axis=0)
