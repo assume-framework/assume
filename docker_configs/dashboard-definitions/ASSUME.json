@@ -118,6 +118,356 @@
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
+      "description": "Bid prices of accepted bids",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "€/MW"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 7
+      },
+      "id": 19,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
+          "group": [
+            {
+              "params": [
+                "$__interval",
+                "none"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "bid_id"
+              ],
+              "type": "column"
+            }
+          ],
+          "metricColumn": "none",
+          "rawQuery": false,
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(price) AS \"price\",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_name = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "price"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "avg"
+                ],
+                "type": "aggregate"
+              },
+              {
+                "params": [
+                  "price"
+                ],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": [
+                  "bid_id"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "bid_id"
+                ],
+                "type": "alias"
+              }
+            ]
+          ],
+          "table": "market_orders",
+          "timeColumn": "start_time",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            },
+            {
+              "datatype": "text",
+              "name": "",
+              "params": [
+                "market_name",
+                "=",
+                "'$market'"
+              ],
+              "type": "expression"
+            },
+            {
+              "datatype": "text",
+              "name": "",
+              "params": [
+                "simulation",
+                "=",
+                "'$simulation'"
+              ],
+              "type": "expression"
+            }
+          ]
+        }
+      ],
+      "title": "Accepted Bid Prices",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "Accepted Volume per agent",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "megwatt"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 7
+      },
+      "id": 20,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
+          "group": [
+            {
+              "params": [
+                "$__interval",
+                "none"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "bid_id"
+              ],
+              "type": "column"
+            }
+          ],
+          "metricColumn": "none",
+          "rawQuery": false,
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(volume) AS \"volume\",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_name = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "volume"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "avg"
+                ],
+                "type": "aggregate"
+              },
+              {
+                "params": [
+                  "volume"
+                ],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": [
+                  "bid_id"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "bid_id"
+                ],
+                "type": "alias"
+              }
+            ]
+          ],
+          "table": "market_orders",
+          "timeColumn": "start_time",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            },
+            {
+              "datatype": "text",
+              "name": "",
+              "params": [
+                "market_name",
+                "=",
+                "'$market'"
+              ],
+              "type": "expression"
+            },
+            {
+              "datatype": "text",
+              "name": "",
+              "params": [
+                "simulation",
+                "=",
+                "'$simulation'"
+              ],
+              "type": "expression"
+            }
+          ]
+        }
+      ],
+      "title": "Accepted Volume",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
       "description": "TODO change to higehst demand (capacity) over all timesteps",
       "fieldConfig": {
         "defaults": {
@@ -163,7 +513,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 7
+        "y": 15
       },
       "id": 9,
       "options": {
@@ -250,7 +600,7 @@
         "h": 11,
         "w": 12,
         "x": 12,
-        "y": 7
+        "y": 15
       },
       "id": 7,
       "options": {
@@ -342,7 +692,7 @@
         "h": 3,
         "w": 12,
         "x": 0,
-        "y": 15
+        "y": 23
       },
       "id": 17,
       "options": {
@@ -453,7 +803,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 18
+        "y": 26
       },
       "id": 11,
       "options": {
@@ -580,7 +930,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 18
+        "y": 26
       },
       "id": 5,
       "options": {
@@ -702,7 +1052,7 @@
         "h": 14,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 36
       },
       "id": 2,
       "options": {
@@ -764,8 +1114,8 @@
       {
         "current": {
           "selected": true,
-          "text": "case_2019",
-          "value": "case_2019"
+          "text": "example_01",
+          "value": "example_01"
         },
         "datasource": {
           "type": "postgres",
@@ -787,7 +1137,7 @@
       },
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": "EOM",
           "value": "EOM"
         },
@@ -819,6 +1169,6 @@
   "timezone": "",
   "title": "ASSUME",
   "uid": "ap3RcmY4z",
-  "version": 4,
+  "version": 2,
   "weekStart": ""
 }
