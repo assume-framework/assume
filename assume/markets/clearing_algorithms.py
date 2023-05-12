@@ -211,7 +211,7 @@ def pay_as_bid(
             for supply_order in to_commit:
                 supply_order["original_price"] = supply_order["price"]
                 demand_order["original_price"] = demand_order["price"]
-                supply_order["price"] = demand_order["price"]
+                demand_order["price"] = supply_order["price"]
             accepted_product_orders.extend(to_commit)
 
         accepted_supply_orders = list(

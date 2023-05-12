@@ -1,5 +1,6 @@
 import logging
 import os
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -30,8 +31,10 @@ class WriteOutput(Role):
         # make directory if not already present
         self.export_csv_path = export_csv_path
         if self.export_csv_path:
-            self.p = Path(self.export_csv_path)
-            self.p.mkdir(parents=True, exist_ok=True)
+            self.p = Path(self.export_csv_path, simulation_id)
+            if self.p.exists():
+                shutil.rmtree(self.p)
+            self.p.mkdir(parents=True)
         self.db = db_engine
 
         # contruct all timeframe under which hourly values are written to excel and db
@@ -45,24 +48,6 @@ class WriteOutput(Role):
             "market_meta": pd.DataFrame(),
             "market_orders": pd.DataFrame(),
         }
-
-        if self.export_csv_path:
-            # Check id data for this simulation id is already present and delete it if so
-            logger.info(
-                f"deleting all data with the id {self.simulation_id} if this simulation was previously run"
-            )
-
-            # Loop through all Excel files in the directory
-            for file_name in os.listdir(self.export_csv_path):
-                # Load the Excel file into a pandas dataframe
-                file_path = os.path.join(self.export_csv_path, file_name)
-                df = pd.read_csv(file_path)
-                if not df.empty:
-                    # Filter the dataframe based on the specified column and condition
-                    df = df[df["simulation"] != self.simulation_id]
-
-                    # Save the updated dataframe back to the original Excel file
-                    df.to_csv(file_path, index=False)
 
         # Loop throuph all database tabels
         # Get list of table names in database
@@ -122,7 +107,8 @@ class WriteOutput(Role):
         )
 
     async def store_dfs(self):
-        for table, df in self.write_dfs.items():
+        for table in self.write_dfs.keys():
+            df = self.write_dfs[table]
             if df.empty:
                 continue
             df.reset_index()
@@ -132,6 +118,7 @@ class WriteOutput(Role):
 
             if self.db is not None:
                 df.to_sql(table, self.db.bind, if_exists="append")
+            self.write_dfs[table] = pd.DataFrame()
 
     def write_market_orders(self, market_result, market_name):
         df = pd.DataFrame.from_dict(market_result)
