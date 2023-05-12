@@ -69,8 +69,16 @@ class WriteOutput(Role):
             # Iterate through each table
             for table_name in table_names:
                 # Read table into Pandas DataFrame
-                query = text(f"delete from {table_name} where simulation = '{self.simulation_id}'")
-                self.db.execute(query)
+                df = pd.read_sql_table(table_name, self.db.bind)
+                if not df.empty:
+                    # Apply filter to delete rows where a column meets a certain condition
+                    df = df[df["simulation"] != self.simulation_id]
+                    # Save filtered DataFrame back to table
+                    df.to_sql(
+                        table_name, self.db.bind, if_exists="replace", index=False
+                    )
+
+            
 
     def setup(self):
         self.context.subscribe_message(
