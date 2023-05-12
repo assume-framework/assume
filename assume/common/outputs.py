@@ -1,12 +1,19 @@
+import asyncio
 import logging
 import os
-from datetime import datetime
+
+# from mango.agent import Agent, scheduler
+import time
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
+import yaml
 from dateutil import rrule as rr
 from mango import Role
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect
+
+import assume
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +22,8 @@ class WriteOutput(Role):
     def __init__(
         self,
         simulation_id: str,
-        start: datetime,
-        end: datetime,
+        start_date: str,
+        end_date: str,
         db_engine=None,
         export_csv_path: str = "",
         save_frequency_hours: int | None = None,
@@ -35,9 +42,7 @@ class WriteOutput(Role):
         self.db = db_engine
 
         # contruct all timeframe under which hourly values are written to excel and db
-        self.delay = (end - start).total_seconds()
-        self.start = start
-        self.end = end
+        self.delay = (end_date - start_date).total_seconds()
 
         # initalizes dfs for storing and writing asynchron
         self.df_orders = pd.DataFrame()
@@ -69,8 +74,14 @@ class WriteOutput(Role):
             # Iterate through each table
             for table_name in table_names:
                 # Read table into Pandas DataFrame
-                query = text(f"delete from {table_name} where simulation = '{self.simulation_id}'")
-                self.db.execute(query)
+                df = pd.read_sql_table(table_name, self.db.bind)
+                if not df.empty:
+                    # Apply filter to delete rows where a column meets a certain condition
+                    df = df[df["simulation"] != self.simulation_id]
+                    # Save filtered DataFrame back to table
+                    df.to_sql(
+                        table_name, self.db.bind, if_exists="replace", index=False
+                    )
 
     def setup(self):
         self.context.subscribe_message(
@@ -79,12 +90,7 @@ class WriteOutput(Role):
             lambda content, meta: content.get("context") == "write_results",
         )
 
-        recurrency_task = rr.rrule(
-            rr.HOURLY,
-            interval=self.save_frequency_hours,
-            dtstart=self.start,
-            until=self.end,
-        )
+        recurrency_task = rr.rrule(rr.HOURLY, interval=self.save_frequency_hours)
         self.context.schedule_recurrent_task(self.store_dispatch_plan, recurrency_task)
         self.context.schedule_recurrent_task(self.store_market_orders, recurrency_task)
 
@@ -120,26 +126,23 @@ class WriteOutput(Role):
             df.to_sql("market_meta", self.db.bind, if_exists="append")
 
     async def store_market_orders(self):
-        if not self.df_orders.empty:
-            if self.export_csv_path:
-                market_data_path = self.p.joinpath("market_orders.csv")
-                self.df_orders.to_csv(
-                    market_data_path, mode="a", header=not market_data_path.exists()
-                )
+        if self.export_csv_path:
+            market_data_path = self.p.joinpath("market_orders.csv")
+            self.df_orders.to_csv(
+                market_data_path, mode="a", header=not market_data_path.exists()
+            )
 
-            if self.db is not None:
-                self.df_orders.to_sql(
-                    "market_orders_all", self.db.bind, if_exists="append"
-                )
+        if self.db is not None and not self.df_orders.empty:
+            self.df_orders.to_sql("market_orders_all", self.db.bind, if_exists="append")
 
-            self.df_orders = pd.DataFrame()
+        self.df_orders = pd.DataFrame()
 
     def write_market_orders(self, market_result, market_name):
         df = pd.DataFrame.from_dict(market_result)
         df["simulation"] = self.simulation_id
         df["market_name"] = market_name
         df = df.astype(str)
-        self.df_orders = pd.concat([self.df_orders, df], axis=0)
+        self.df_orders = pd.concat([self.df_orders, df], axis=1)
 
     def write_units_defintion(self, unit_type, unit_params):
         if unit_type == "power_plant":
@@ -160,7 +163,15 @@ class WriteOutput(Role):
             df["max_power"] = max(df["max_power"])
             df["min_power"] = max(df["min_power"])
 
-            table_name = "unit_meta"
+            if self.export_csv_path:
+                p = Path(self.export_csv_path)
+                p.mkdir(parents=True, exist_ok=True)
+                market_data_path = p.joinpath("unit_meta.csv")
+                df.to_csv(
+                    market_data_path, mode="a", header=not market_data_path.exists()
+                )
+            if not df.empty:
+                df.to_sql("unit_meta", self.db.bind, if_exists="append")
 
         elif unit_type == "demand":
             del unit_params["bidding_strategies"]
@@ -175,32 +186,31 @@ class WriteOutput(Role):
             df["simulation"] = self.simulation_id
             # df['volume']=df["volume"].max()
 
-            table_name = "demand_meta"
-        else:
-            logger.info(f"unknown {unit_type} is not exported")
-            return False
-
-        if self.export_csv_path:
-            p = Path(self.export_csv_path)
-            p.mkdir(parents=True, exist_ok=True)
-            market_data_path = p.joinpath(f"{table_name}.csv")
-            df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
-        if self.db is not None and not df.empty:
-            df.to_sql(table_name, self.db.bind, if_exists="append")
-
-    async def store_dispatch_plan(self):
-        if not self.df_dispatch.empty:
             if self.export_csv_path:
                 p = Path(self.export_csv_path)
                 p.mkdir(parents=True, exist_ok=True)
-                data_path = p.joinpath("power_plant_dispatch.csv")
-                self.df_dispatch.to_csv(
-                    data_path, mode="a", header=not data_path.exists()
+                market_data_path = p.joinpath("demand_meta.csv")
+                df.to_csv(
+                    market_data_path, mode="a", header=not market_data_path.exists()
                 )
+            if not df.empty:
+                df.to_sql("demand_meta", self.db.bind, if_exists="append")
 
-            self.df_dispatch.to_sql(
-                "power_plant_dispatch", self.db.bind, if_exists="append"
+        else:
+            logger.info(
+                f"added unit not stored in db, since type {unit_type} is not yet written in outputs.py"
             )
+
+    async def store_dispatch_plan(self):
+        if self.export_csv_path:
+            p = Path(self.export_csv_path)
+            p.mkdir(parents=True, exist_ok=True)
+            data_path = p.joinpath("power_plant_dispatch.csv")
+            self.df_dispatch.to_csv(data_path, mode="a", header=not data_path.exists())
+
+        self.df_dispatch.to_sql(
+            "power_plant_dispatch", self.db.bind, if_exists="append"
+        )
 
     def write_dispatch_plan(self, unit, unit_id, total_power_output, current_time):
         """
@@ -216,4 +226,4 @@ class WriteOutput(Role):
         df["timestamp"] = current_time
         df["simulation"] = self.simulation_id
 
-        self.df_dispatch = pd.concat([self.df_dispatch, df], axis=0)
+        self.df_dispatch = self.df_dispatch._append(df)

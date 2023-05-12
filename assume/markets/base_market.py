@@ -248,14 +248,13 @@ class MarketRole(Role):
             "sender": self.marketconfig.name,
             "data": orderbook,
         }
-        db_aid = self.context.data_dict.get("output_agent_id")
-        db_addr = self.context.data_dict.get("output_agent_addr")
-        if db_aid and db_addr:
-            await self.context.send_acl_message(
-                receiver_id=db_aid,
-                receiver_addr=db_addr,
-                content=message,
-            )
+        await self.context.send_acl_message(
+            receiver_id="export_agent_1",
+            receiver_addr=("0.0.0.0", 9099),
+            # receiver_id=self.context.data_dict.get("db_agent_id"),
+            # receiver_addr=self.context.data_dict.get("db_agent_addr"),
+            content=message,
+        )
 
     async def store_market_results(self, market_meta):
         # Send a message to the DBRole to update data in the database
@@ -265,11 +264,8 @@ class MarketRole(Role):
             "sender": self.marketconfig.name,
             "data": market_meta,
         }
-        db_aid = self.context.data_dict.get("output_agent_id")
-        db_addr = self.context.data_dict.get("output_agent_addr")
-        if db_aid and db_addr:
-            await self.context.send_acl_message(
-                receiver_id=db_aid,
-                receiver_addr=db_addr,
-                content=message,
-            )
+        await self.context.send_acl_message(
+            receiver_id="export_agent_1",
+            receiver_addr=("0.0.0.0", 9099),
+            content=message,
+        )

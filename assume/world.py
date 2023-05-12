@@ -34,7 +34,7 @@ logging.getLogger("assume").setLevel(logging.INFO)
 class World:
     def __init__(
         self,
-        ifac_addr: str = "localhost",
+        ifac_addr: str = "0.0.0.0",
         port: int = 9099,
         database_uri: str = "",
         export_csv_path: str = "",
@@ -154,10 +154,12 @@ class World:
 
         # read writing properties form config
         simulation_id = config["id"]
-        save_frequency_hours = config.get("save_frequency_hours", None)
+        export_conf = config.get("export_config", {})
+        export_csv = export_conf.get("export_csv", "")
+        save_frequency_hours = export_conf.get("save_frequency_hours", None)
 
         # Add output agent to world
-        output_role = WriteOutput(
+        export_agent = WriteOutput(
             simulation_id,
             self.start,
             self.end,
@@ -165,10 +167,18 @@ class World:
             self.export_csv_path,
             save_frequency_hours,
         )
-        self.output_agent = RoleAgent(self.container, suggested_aid="export_agent_1")
-        self.output_agent.add_role(output_role)
+        export_agent_role = RoleAgent(self.container, suggested_aid="export_agent_1")
+        export_agent_role.add_role(export_agent)
+        self.db_agent_id = export_agent_role.aid
+        self.db_agent_addr = export_agent_role.addr
 
-        # get the market config from the config file and add the markets
+        for agent in self.container._agents.values():
+            agent._role_context.data_dict = {
+                "db_agent_id": self.db_agent_id,
+                "db_agent_addr": self.db_agent_addr,
+            }
+
+        # get the market configt from the config file and add the markets
         self.logger.info("Adding markets")
         for id, market_params in config["markets_config"].items():
             market_config = make_market_config(
@@ -274,17 +284,11 @@ class World:
         """
         units_operator = UnitsOperator(available_markets=list(self.markets.values()))
         # creating a new role agent and apply the role of a unitsoperator
-        unit_operator_agent = RoleAgent(self.container, suggested_aid=f"{id}")
-        unit_operator_agent.add_role(units_operator)
+        unit_operator_role = RoleAgent(self.container, suggested_aid=f"{id}")
+        unit_operator_role.add_role(units_operator)
 
         # add the current unitsoperator to the list of operators currently existing
         self.unit_operators[id] = units_operator
-
-        # after creation of an agent - we set additional context params
-        unit_operator_agent._role_context.data_dict = {
-            "output_agent_id": self.output_agent.aid,
-            "output_agent_addr": self.output_agent.addr,
-        }
 
     async def add_unit(
         self,
@@ -333,25 +337,18 @@ class World:
         id: str,
     ):
         """
-        creates the market operator
+        creates the market operator/s
 
         Params
         ------
         id = int
              market operator id is associated with the market its participating
         """
-        market_operator_agent = RoleAgent(
+        self.market_operators[id] = RoleAgent(
             self.container,
             suggested_aid=id,
         )
-        market_operator_agent.markets = []
-
-        # after creation of an agent - we set additional context params
-        market_operator_agent._role_context.data_dict = {
-            "output_agent_id": self.output_agent.aid,
-            "output_agent_addr": self.output_agent.addr,
-        }
-        self.market_operators[id] = market_operator_agent
+        self.market_operators[id].markets = []
 
     def add_market(
         self,
