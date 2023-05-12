@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pandas as pd
 import yaml
+from dateutil import rrule as rr
 from mango import Role
 from sqlalchemy import inspect
 
@@ -21,70 +22,66 @@ class WriteOutput(Role):
     def __init__(
         self,
         simulation_id: str,
-        export_csv: bool,
-        write_orders_frequency: int,
         start_date: str,
         end_date: str,
-        database_uri: str = "",
+        db_engine=None,
         export_csv_path: str = "",
+        save_frequency_hours: int | None = None,
     ):
-
         super().__init__()
 
         # store needed date
         self.simulation_id = simulation_id
-        self.export_csv = export_csv
-        self.write_orders_frequency = write_orders_frequency
+        self.save_frequency_hours: int = save_frequency_hours or 1
 
         # make directory if not already present
         self.export_csv_path = export_csv_path
-        self.p = Path(self.export_csv_path)
-        self.p.mkdir(parents=True, exist_ok=True)
-        self.db = database_uri
+        if self.export_csv_path:
+            self.p = Path(self.export_csv_path)
+            self.p.mkdir(parents=True, exist_ok=True)
+        self.db = db_engine
 
         # contruct all timeframe under which hourly values are written to excel and db
-        self.start_time_dt = datetime.strptime(start_date, "%Y-%m-%d %H:%M")
-        self.end_time_dt = datetime.strptime(end_date, "%Y-%m-%d %H:%M")
-        self.delay = (self.end_time_dt - self.start_time_dt).total_seconds()
+        self.delay = (end_date - start_date).total_seconds()
 
         # initalizes dfs for storing and writing asynchron
         self.df_orders = pd.DataFrame()
         self.df_dispatch = pd.DataFrame()
 
-        # Check id data for this simulation id is already present and delete it if so
-        logger.info(
-            f"deleting all data with the id {self.simulation_id} if this simulation was previously run"
-        )
+        if self.export_csv_path:
+            # Check id data for this simulation id is already present and delete it if so
+            logger.info(
+                f"deleting all data with the id {self.simulation_id} if this simulation was previously run"
+            )
 
-        # Loop through all Excel files in the directory
-        for file_name in os.listdir(self.export_csv_path):
+            # Loop through all Excel files in the directory
+            for file_name in os.listdir(self.export_csv_path):
+                # Load the Excel file into a pandas dataframe
+                file_path = os.path.join(self.export_csv_path, file_name)
+                df = pd.read_csv(file_path)
+                if not df.empty:
+                    # Filter the dataframe based on the specified column and condition
+                    df = df[df["simulation"] != self.simulation_id]
 
-            # Load the Excel file into a pandas dataframe
-            file_path = os.path.join(self.export_csv_path, file_name)
-            df = pd.read_csv(file_path)
-
-            # Filter the dataframe based on the specified column and condition
-            df = df[df["simulation"] != self.simulation_id]
-
-            # Save the updated dataframe back to the original Excel file
-            df.to_csv(file_path, index=False)
+                    # Save the updated dataframe back to the original Excel file
+                    df.to_csv(file_path, index=False)
 
         # Loop throuph all database tabels
         # Get list of table names in database
-        table_names = inspect(self.db.bind).get_table_names()
+        if self.db is not None:
+            table_names = inspect(self.db.bind).get_table_names()
 
-        # Iterate through each table
-        for table_name in table_names:
-
-            # Read table into Pandas DataFrame
-            df = pd.read_sql_table(table_name, self.db.bind)
-
-            # Apply filter to delete rows where a column meets a certain condition
-            df = df[df["simulation"] != self.simulation_id]
-
-            # Save filtered DataFrame back to table
-            if not df.empty:
-                df.to_sql(table_name, self.db.bind, if_exists="replace", index=False)
+            # Iterate through each table
+            for table_name in table_names:
+                # Read table into Pandas DataFrame
+                df = pd.read_sql_table(table_name, self.db.bind)
+                if not df.empty:
+                    # Apply filter to delete rows where a column meets a certain condition
+                    df = df[df["simulation"] != self.simulation_id]
+                    # Save filtered DataFrame back to table
+                    df.to_sql(
+                        table_name, self.db.bind, if_exists="replace", index=False
+                    )
 
     def setup(self):
         self.context.subscribe_message(
@@ -92,24 +89,10 @@ class WriteOutput(Role):
             self.handle_message,
             lambda content, meta: content.get("context") == "write_results",
         )
-        """
-        h=self.write_orders_frequency*3600
 
-
-        while h < self.delay:
-
-            self.context.schedule_timestamp_task(coroutine=self.store_market_orders(),
-                                     timestamp=(self.start_time_dt + timedelta(seconds=h)).timestamp())
-
-            self.context.schedule_timestamp_task(coroutine=self.store_dispatch_plan(),
-                            timestamp=(self.start_time_dt + timedelta(seconds=h)).timestamp())
-            h = h + self.write_orders_frequency*3600
-
-        self.context.schedule_timestamp_task(coroutine=self.store_market_orders(),
-                            timestamp=self.end_time_dt.timestamp())
-        self.context.schedule_timestamp_task(coroutine=self.store_dispatch_plan(),
-                            timestamp=self.end_time_dt.timestamp())
-        """
+        recurrency_task = rr.rrule(rr.HOURLY, interval=self.save_frequency_hours)
+        self.context.schedule_recurrent_task(self.store_dispatch_plan, recurrency_task)
+        self.context.schedule_recurrent_task(self.store_market_orders, recurrency_task)
 
     def handle_message(self, content, meta):
         if not isinstance(content, dict):
@@ -117,7 +100,6 @@ class WriteOutput(Role):
 
         if content.get("type") == "store_order_book":
             self.write_market_orders(content.get("data"), content.get("sender"))
-            self.store_market_orders()
 
         elif content.get("type") == "store_market_results":
             self.write_market_results(content.get("data"))
@@ -132,35 +114,30 @@ class WriteOutput(Role):
                 content.get("capacity"),
                 content.get("timestamp"),
             )
-            # TODO make this with timstamp sheduled task instead of every time
-            self.store_dispatch_plan()
 
     def write_market_results(self, market_meta):
         df = pd.DataFrame.from_dict(market_meta)
         df["simulation"] = self.simulation_id
 
-        if self.export_csv:
-
+        if self.export_csv_path:
             market_data_path = self.p.joinpath("market_meta.csv")
             df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
-        if not df.empty:
+        if self.db is not None and not df.empty:
             df.to_sql("market_meta", self.db.bind, if_exists="append")
 
-    def store_market_orders(self):
-
-        if self.export_csv:
+    async def store_market_orders(self):
+        if self.export_csv_path:
             market_data_path = self.p.joinpath("market_orders.csv")
             self.df_orders.to_csv(
                 market_data_path, mode="a", header=not market_data_path.exists()
             )
 
-        if not self.df_orders.empty:
+        if self.db is not None and not self.df_orders.empty:
             self.df_orders.to_sql("market_orders_all", self.db.bind, if_exists="append")
 
         self.df_orders = pd.DataFrame()
 
     def write_market_orders(self, market_result, market_name):
-
         df = pd.DataFrame.from_dict(market_result)
         df["simulation"] = self.simulation_id
         df["market_name"] = market_name
@@ -168,9 +145,7 @@ class WriteOutput(Role):
         self.df_orders = pd.concat([self.df_orders, df], axis=1)
 
     def write_units_defintion(self, unit_type, unit_params):
-
         if unit_type == "power_plant":
-
             df = pd.DataFrame([unit_params])
             df["simulation"] = self.simulation_id
             df = df[
@@ -188,7 +163,7 @@ class WriteOutput(Role):
             df["max_power"] = max(df["max_power"])
             df["min_power"] = max(df["min_power"])
 
-            if self.export_csv:
+            if self.export_csv_path:
                 p = Path(self.export_csv_path)
                 p.mkdir(parents=True, exist_ok=True)
                 market_data_path = p.joinpath("unit_meta.csv")
@@ -211,7 +186,7 @@ class WriteOutput(Role):
             df["simulation"] = self.simulation_id
             # df['volume']=df["volume"].max()
 
-            if self.export_csv:
+            if self.export_csv_path:
                 p = Path(self.export_csv_path)
                 p.mkdir(parents=True, exist_ok=True)
                 market_data_path = p.joinpath("demand_meta.csv")
@@ -226,9 +201,8 @@ class WriteOutput(Role):
                 f"added unit not stored in db, since type {unit_type} is not yet written in outputs.py"
             )
 
-    def store_dispatch_plan(self):
-
-        if self.export_csv:
+    async def store_dispatch_plan(self):
+        if self.export_csv_path:
             p = Path(self.export_csv_path)
             p.mkdir(parents=True, exist_ok=True)
             data_path = p.joinpath("power_plant_dispatch.csv")
