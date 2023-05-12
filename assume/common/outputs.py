@@ -42,6 +42,7 @@ class WriteOutput(Role):
         # initalizes dfs for storing and writing asynchron
         self.df_orders = pd.DataFrame()
         self.df_dispatch = pd.DataFrame()
+        self.market_results_df = pd.DataFrame()
 
         if self.export_csv_path:
             # Check id data for this simulation id is already present and delete it if so
@@ -69,8 +70,11 @@ class WriteOutput(Role):
             # Iterate through each table
             for table_name in table_names:
                 # Read table into Pandas DataFrame
-                query = text(f"delete from {table_name} where simulation = '{self.simulation_id}'")
-                self.db.execute(query)
+                query = text(
+                    f"delete from {table_name} where simulation = '{self.simulation_id}'"
+                )
+                with self.db() as db:
+                    db.execute(query)
 
     def setup(self):
         self.context.subscribe_message(
@@ -99,7 +103,7 @@ class WriteOutput(Role):
             self.write_market_results(content.get("data"))
 
         elif content.get("type") == "store_units":
-            self.write_units_defintion(content.get("unit_type"), content.get("data"))
+            self.write_units_definition(content.get("unit_type"), content.get("data"))
 
         elif content.get("type") == "store_dispatch":
             self.write_dispatch_plan(
@@ -113,11 +117,19 @@ class WriteOutput(Role):
         df = pd.DataFrame.from_dict(market_meta)
         df["simulation"] = self.simulation_id
 
-        if self.export_csv_path:
-            market_data_path = self.p.joinpath("market_meta.csv")
-            df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
-        if self.db is not None and not df.empty:
-            df.to_sql("market_meta", self.db.bind, if_exists="append")
+        self.market_results_df = pd.concat([self.market_results_df, df], axis=0)
+
+    def store_market_results(self, market_meta):
+        if not self.market_results_df.empty:
+            if self.export_csv_path:
+                market_data_path = self.p.joinpath("market_meta.csv")
+                self.market_results_df.to_csv(
+                    market_data_path, mode="a", header=not market_data_path.exists()
+                )
+            if self.db is not None:
+                self.market_results_df.to_sql(
+                    "market_meta", self.db.bind, if_exists="append"
+                )
 
     async def store_market_orders(self):
         if not self.df_orders.empty:
@@ -141,7 +153,7 @@ class WriteOutput(Role):
         df = df.astype(str)
         self.df_orders = pd.concat([self.df_orders, df], axis=0)
 
-    def write_units_defintion(self, unit_type, unit_params):
+    def write_units_definition(self, unit_type, unit_params):
         if unit_type == "power_plant":
             df = pd.DataFrame([unit_params])
             df["simulation"] = self.simulation_id
@@ -198,9 +210,10 @@ class WriteOutput(Role):
                     data_path, mode="a", header=not data_path.exists()
                 )
 
-            self.df_dispatch.to_sql(
-                "power_plant_dispatch", self.db.bind, if_exists="append"
-            )
+            if self.db is not None:
+                self.df_dispatch.to_sql(
+                    "power_plant_dispatch", self.db.bind, if_exists="append"
+                )
 
     def write_dispatch_plan(self, unit, unit_id, total_power_output, current_time):
         """
