@@ -7,10 +7,7 @@ base_case:
   demand: inflex_demand.csv
   renewable_generation: renewable_generation.csv
   fuel_prices: fuel_prices.csv
-  export_config:
-    write_orders: True
-    save_frequency_hours: 24
-    write_capacities: True
+  save_frequency_hours: 24
   markets_config:
     EOM:
       operator: EOM_operator
