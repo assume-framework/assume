@@ -215,13 +215,13 @@
           ],
           "metricColumn": "none",
           "rawQuery": false,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(price) AS \"price\",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_name = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(original_price) AS \"price\",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_name = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1",
           "refId": "A",
           "select": [
             [
               {
                 "params": [
-                  "price"
+                  "original_price"
                 ],
                 "type": "column"
               },
