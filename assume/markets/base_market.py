@@ -72,7 +72,7 @@ class MarketRole(Role):
         current = datetime.fromtimestamp(self.context.current_timestamp)
         next_opening = self.marketconfig.opening_hours.after(current)
         market_closing = next_opening + self.marketconfig.opening_duration
-        logger.info(
+        logger.debug(
             f"first market opening: {self.marketconfig.name} - {next_opening} - {market_closing}"
         )
         self.context.schedule_timestamp_task(
@@ -83,7 +83,7 @@ class MarketRole(Role):
         current = datetime.fromtimestamp(self.context.current_timestamp)
         next_opening = self.marketconfig.opening_hours.after(current)
         if not next_opening:
-            logger.info(f"market {self.marketconfig.name} - does not reopen")
+            logger.debug(f"market {self.marketconfig.name} - does not reopen")
             return
 
         market_closing = next_opening + self.marketconfig.opening_duration
@@ -104,7 +104,7 @@ class MarketRole(Role):
         self.context.schedule_timestamp_task(
             self.next_opening(), next_opening.timestamp()
         )
-        logger.info(
+        logger.debug(
             f"next market opening: {self.marketconfig.name} - {next_opening} - {market_closing}"
         )
 
@@ -225,27 +225,51 @@ class MarketRole(Role):
                 receiver_id=aid,
                 acl_metadata=meta,
             )
+        # store order book in db agent
+        await self.store_order_book(self.market_result)
         # clear_price = sorted(self.market_result, lambda o: o['price'])[0]
 
         for meta in market_meta:
-            logger.info(
+            logger.debug(
                 f'clearing price for {self.marketconfig.name} is {round(meta["price"],2)}, volume: {meta["demand_volume"]}'
             )
             meta["name"] = self.marketconfig.name
             meta["time"] = self.context.current_timestamp
-        self.write_results(self.market_result, market_meta)
+
+        await self.store_market_results(market_meta)
 
         return self.market_result, market_meta
 
-    def write_results(self, market_result, market_meta):
-        df = pd.DataFrame.from_dict(market_meta)
-        export_csv_path = self.context.data_dict.get("export_csv")
-        if export_csv_path:
-            p = Path(export_csv_path)
-            p.mkdir(parents=True, exist_ok=True)
-            market_data_path = p.joinpath("market_meta.csv")
-            df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
+    async def store_order_book(self, orderbook):
+        # Send a message to the DBRole to update data in the database
+        message = {
+            "context": "write_results",
+            "type": "store_order_book",
+            "sender": self.marketconfig.name,
+            "data": orderbook,
+        }
+        db_aid = self.context.data_dict.get("output_agent_id")
+        db_addr = self.context.data_dict.get("output_agent_addr")
+        if db_aid and db_addr:
+            await self.context.send_acl_message(
+                receiver_id=db_aid,
+                receiver_addr=db_addr,
+                content=message,
+            )
 
-        df.to_sql("market_meta", self.context.data_dict["db"].bind, if_exists="append")
-
-        # TODO write market_result or other metrics
+    async def store_market_results(self, market_meta):
+        # Send a message to the DBRole to update data in the database
+        message = {
+            "context": "write_results",
+            "type": "store_market_results",
+            "sender": self.marketconfig.name,
+            "data": market_meta,
+        }
+        db_aid = self.context.data_dict.get("output_agent_id")
+        db_addr = self.context.data_dict.get("output_agent_addr")
+        if db_aid and db_addr:
+            await self.context.send_acl_message(
+                receiver_id=db_aid,
+                receiver_addr=db_addr,
+                content=message,
+            )

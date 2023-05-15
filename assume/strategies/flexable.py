@@ -9,6 +9,7 @@ class flexableEOM(BaseStrategy):
         super().__init__()
 
         self.foresight = pd.Timedelta("12h")
+        self.current_time = None
 
     def calculate_bids(
         self,
@@ -19,6 +20,7 @@ class flexableEOM(BaseStrategy):
         bid_quantity_flex, bid_price_flex = 0, 0
 
         if operational_window is not None:
+            self.current_time = operational_window["window"]["start"]
             # =============================================================================
             # Powerplant is either on, or is able to turn on
             # Calculating possible bid amount
@@ -35,17 +37,17 @@ class flexableEOM(BaseStrategy):
             # =============================================================================
             if unit.current_status:
                 bid_price_mr = self.calculate_EOM_price_if_on(
-                    self, unit, marginal_cost_mr, bid_quantity_mr
+                    unit, marginal_cost_mr, bid_quantity_mr
                 )
             else:
                 bid_price_mr = self.calculate_EOM_price_if_off(
-                    self, unit, marginal_cost_flex, bid_quantity_mr
+                    unit, marginal_cost_flex, bid_quantity_mr
                 )
 
-            if unit.total_heat_output[unit.current_time] > 0:
+            if unit.total_heat_output[self.current_time] > 0:
                 power_loss_ratio = (
-                    unit.power_loss_chp[unit.current_time]
-                    / unit.total_heat_output[unit.current_time]
+                    unit.power_loss_chp[self.current_time]
+                    / unit.total_heat_output[self.current_time]
                 )
             else:
                 power_loss_ratio = 0.0
@@ -79,48 +81,50 @@ class flexableEOM(BaseStrategy):
         """
         Check the description provided by Thomas in last version, the average downtime is not available
         """
-        t = unit.current_time
+        if bid_quantity_mr == 0:
+            return 0
+
+        t = self.current_time
 
         starting_cost = self.get_starting_costs(time=unit.min_down_time, unit=unit)
-        priceReduction_restart = starting_cost / unit.min_down_time / bid_quantity_mr
+        price_reduction_restart = starting_cost / unit.min_down_time / bid_quantity_mr
 
-        if unit.total_heat_output[unit.current_time] > 0:
+        if unit.total_heat_output[t] > 0:
             heat_gen_cost = (
-                unit.total_heat_output[unit.current_time]
-                * (unit.fuel_price["natural gas"][unit.current_time] / 0.9)
+                unit.total_heat_output[t] * (unit.fuel_price["natural gas"][t] / 0.9)
             ) / bid_quantity_mr
         else:
             heat_gen_cost = 0.0
 
-        possible_revenue = self.get_possible_revenues(marginal_cost_flex)
-        if (
-            possible_revenue >= 0
-            and unit.price_forecast[unit.current_time] < marginal_cost_flex
-        ):
+        possible_revenue = self.get_possible_revenues(
+            marginal_cost=marginal_cost_flex,
+            unit=unit,
+        )
+        if possible_revenue >= 0 and unit.price_forecast[t] < marginal_cost_flex:
             marginal_cost_flex = 0
 
         bid_price_mr = max(
-            -priceReduction_restart - heat_gen_cost + marginal_cost_flex,
+            -price_reduction_restart - heat_gen_cost + marginal_cost_flex,
             -2999.00,
         )
 
         return bid_price_mr
 
     def get_starting_costs(self, time, unit):
-        if time < self.downtime_hot_start:
+        if time < unit.downtime_hot_start:
             return unit.hot_start_cost
 
-        elif time < self.downtime_warm_tart:
+        elif time < unit.downtime_warm_start:
             return unit.warm_start_cost
 
         else:
             return unit.cold_start_cost
 
     def get_possible_revenues(self, marginal_cost, unit):
-        t = unit.current_time
+        t = self.current_time
         price_forecast = []
 
-        if t + self.foresight > len(unit.price_forecast):
+        if t + self.foresight > unit.price_forecast.index[-1]:
             price_forecast = unit.price_forecast.loc[t:]
         else:
             price_forecast = unit.price_forecast.loc[t : t + self.foresight]
