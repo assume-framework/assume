@@ -21,8 +21,8 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.markets import MarketRole, pay_as_bid, pay_as_clear
-from assume.strategies import NaiveStrategy, flexableEOM
-from assume.units import Demand, PowerPlant
+from assume.strategies import NaiveStrategy, flexableEOM, flexableEOMStorage
+from assume.units import Demand, PowerPlant, StorageUnit
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("mango").setLevel(logging.WARNING)
@@ -63,10 +63,12 @@ class World:
         self.unit_types = {
             "power_plant": PowerPlant,
             "demand": Demand,
+            "storage_unit": StorageUnit,
         }
         self.bidding_types = {
             "simple": NaiveStrategy,
             "flexable_eom": flexableEOM,
+            "flexable_eom_storage": flexableEOMStorage,
         }
         self.clearing_mechanisms = {
             "pay_as_clear": pay_as_clear,
@@ -123,10 +125,11 @@ class World:
         # also attempts to resample the inputs if their resolution is higher than user specified time step
         self.logger.info("Loading input data")
         powerplants_df = load_file(path=path, config=config, file_name="powerplants")
-
-        # storage_units_df = load_file(
-        #     path=path, config=config, file_name="storage_units"
-        # )
+        
+        self.logger.info("Loading storage unit data")
+        storage_units_df = load_file(
+             path=path, config=config, file_name="storage_units"
+        )
 
         fuel_prices_df = load_file(
             path=path, config=config, file_name="fuel_prices", index=self.index
@@ -203,6 +206,33 @@ class World:
             self.add_unit(
                 id=pp_name,
                 unit_type="power_plant",
+                unit_operator_id=unit_params["unit_operator"],
+                unit_params=unit_params,
+            )
+
+        self.logger.info("Adding storage units")
+        for storage_name, unit_params in storage_units_df.iterrows():
+            if (
+                bidding_strategies_df is not None
+                and storage_name in bidding_strategies_df.index
+            ):
+                unit_params["bidding_strategies"] = bidding_strategies_df.loc[
+                    storage_name
+                ].to_dict()
+            else:
+                self.logger.warning(
+                    f"No bidding strategies specified for {storage_name}. Using default strategies."
+                )
+                unit_params["bidding_strategies"] = {
+                    market.product_type: "simple" for market in self.markets.values()
+                }
+
+            if vre_df is not None and storage_name in vre_df.columns:
+                unit_params["max_power"] = vre_df[storage_name]
+
+            self.add_unit(
+                id=storage_name,
+                unit_type="storage_unit",
                 unit_operator_id=unit_params["unit_operator"],
                 unit_params=unit_params,
             )
