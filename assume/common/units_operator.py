@@ -26,6 +26,7 @@ class UnitsOperator(Role):
     ):
         super().__init__()
 
+        self.bids_map = {}
         self.available_markets = available_markets
         self.registered_markets: dict[str, MarketConfig] = {}
 
