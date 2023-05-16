@@ -125,7 +125,7 @@ class UnitsOperator(Role):
         # await self.send_dispatch_plan()
 
     def send_dispatch_plan(self):
-        # todo group by unit_id
+        #TODO group by unit_id
         current_time = pd.to_datetime(self.context.current_timestamp, unit="s")
         for unit_id in self.units.keys():
             total_capacity = 0.0
@@ -134,6 +134,8 @@ class UnitsOperator(Role):
 
             dispatch_plan = {"total_capacity": total_capacity}
             self.units[unit_id].get_dispatch_plan(dispatch_plan, current_time)
+
+            print(dispatch_plan)
 
             db_aid = self.context.data_dict.get("output_agent_id")
             db_addr = self.context.data_dict.get("output_agent_addr")
