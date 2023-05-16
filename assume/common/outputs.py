@@ -22,7 +22,6 @@ class WriteOutput(Role):
         export_csv_path: str = "",
         save_frequency_hours: int | None = None,
     ):
-        
         """
         Initializes an instance of the WriteOutput class.
 
@@ -34,9 +33,7 @@ class WriteOutput(Role):
             export_csv_path (str, optional): The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
             save_frequency_hours (int | None, optional): The frequency in hours for storeing data in the db and/or csv files. Defaults to None.
         """
-        
-        
-        
+
         super().__init__()
 
         # store needed date
@@ -105,7 +102,7 @@ class WriteOutput(Role):
             content (dict): The content of the message.
             meta: The metadata associated with the message. (not needed yet)
         """
-        
+
         if not isinstance(content, dict):
             return False
 
@@ -127,14 +124,13 @@ class WriteOutput(Role):
             )
 
     def write_market_results(self, market_meta):
-        
         """
         Writes market results to the corresponding data frame.
 
         Args:
             market_meta: The market metadata, which includes the clearing price and volume.
         """
-        
+
         df = pd.DataFrame.from_dict(market_meta)
         df["simulation"] = self.simulation_id
         self.write_dfs["market_meta"] = pd.concat(
@@ -143,7 +139,7 @@ class WriteOutput(Role):
 
     async def store_dfs(self):
         """
-        Stores the data frames to CSV files and the database. 
+        Stores the data frames to CSV files and the database.
         Is scheduled as a recurrent task based on the frequency.
         """
 
@@ -169,7 +165,7 @@ class WriteOutput(Role):
             market_result: The market result including all orders.
             market_name: The name of the market.
         """
-        
+
         df = pd.DataFrame.from_dict(market_result)
         del df["only_hours"]
         del df["agent_id"]
@@ -188,7 +184,7 @@ class WriteOutput(Role):
             unit_type (str): The type of the unit.
             unit_params: The parameters of the unit.
         """
-                
+
         if unit_type == "power_plant":
             df = pd.DataFrame([unit_params])
             df["simulation"] = self.simulation_id
@@ -227,9 +223,7 @@ class WriteOutput(Role):
             logger.info(f"unknown {unit_type} is not exported")
             return False
 
-
         if self.export_csv_path:
-
             market_data_path = self.p.joinpath(f"{table_name}.csv")
             df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
         if self.db is not None and not df.empty:
