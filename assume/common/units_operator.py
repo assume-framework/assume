@@ -135,8 +135,7 @@ class UnitsOperator(Role):
             dispatch_plan = {"total_capacity": total_capacity}
             self.units[unit_id].get_dispatch_plan(dispatch_plan, current_time)
 
-            print(dispatch_plan)
-
+            logger.debug("Got Dispatch Plan: %s", dispatch_plan)
             db_aid = self.context.data_dict.get("output_agent_id")
             db_addr = self.context.data_dict.get("output_agent_addr")
             if db_aid and db_addr:
