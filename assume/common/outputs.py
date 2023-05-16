@@ -227,9 +227,10 @@ class WriteOutput(Role):
             logger.info(f"unknown {unit_type} is not exported")
             return False
 
+
         if self.export_csv_path:
-            p = Path(self.export_csv_path)
-            market_data_path = p.joinpath(f"{table_name}.csv")
+
+            market_data_path = self.p.joinpath(f"{table_name}.csv")
             df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
         if self.db is not None and not df.empty:
             df.to_sql(table_name, self.db.bind, if_exists="append")
