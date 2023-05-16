@@ -4,7 +4,7 @@ import numpy as np
 from assume.strategies.base_strategy import BaseStrategy
 from assume.units.storage_unit import StorageUnit
 
-class NaiveStorageStrategy(BaseStrategy):
+class flexableEOMStorage(BaseStrategy):
     def __init__(self):
         super().__init__()
 
