@@ -1,0 +1,289 @@
+name,energy,capacity
+demand_DE,simple,simple
+wind_onshore_DE,simple,simple
+wind_offshore_DE,simple,simple
+solar_DE,simple,simple
+water_DE,simple,simple
+biomass_DE,simple,simple
+KKW ISAR 2,flexable_eom,simple
+KKW BROKDORF,flexable_eom,simple
+KKW PHILIPPSBURG 2,flexable_eom,simple
+KKW GROHNDE,flexable_eom,simple
+KKW EMSLAND,flexable_eom,simple
+KKW NECKARWESTHEIM,flexable_eom,simple
+KKW GUNDREMMINGEN C,flexable_eom,simple
+NEURATH F,flexable_eom,simple
+NEURATH G,flexable_eom,simple
+NIEDERAUSSEM K,flexable_eom,simple
+LIPPENDORF R,flexable_eom,simple
+LIPPENDORF S,flexable_eom,simple
+BOXBERG Q,flexable_eom,simple
+SCHWARZE PUMPE A,flexable_eom,simple
+SCHWARZE PUMPE B,flexable_eom,simple
+BOXBERG R,flexable_eom,simple
+NIEDERAUSSEM G,flexable_eom,simple
+NIEDERAUSSEM H,flexable_eom,simple
+NEURATH D,flexable_eom,simple
+WEISWEILER H,flexable_eom,simple
+NEURATH E,flexable_eom,simple
+WEISWEILER G,flexable_eom,simple
+JAENSCHWALDE D,flexable_eom,simple
+JAENSCHWALDE E,flexable_eom,simple
+JAENSCHWALDE F,flexable_eom,simple
+JAENSCHWALDE B,flexable_eom,simple
+JAENSCHWALDE C,flexable_eom,simple
+BOXBERG P,flexable_eom,simple
+JAENSCHWALDE A,flexable_eom,simple
+BOXBERG N,flexable_eom,simple
+SCHKOPAU II A,flexable_eom,simple
+SCHKOPAU II B,flexable_eom,simple
+NIEDERAUSSEM C,flexable_eom,simple
+NIEDERAUSSEM F,flexable_eom,simple
+NIEDERAUSSEM E,flexable_eom,simple
+NEURATH A,flexable_eom,simple
+NEURATH B,flexable_eom,simple
+NEURATH C,flexable_eom,simple
+FRIMMERSDORF Q,flexable_eom,simple
+WEISWEILER E,flexable_eom,simple
+FRIMMERSDORF P,flexable_eom,simple
+NIEDERAUSSEM D,flexable_eom,simple
+WEISWEILER F,flexable_eom,simple
+FRECHEN WACHTBERG,flexable_eom,simple
+MERKENICH BLOCK 6,flexable_eom,simple
+CHEMNITZ NORD II BLOCK C,flexable_eom,simple
+CHEMNITZ NORD II BLOCK B,flexable_eom,simple
+KLINGENBERG 5,flexable_eom,simple
+KLINGENBERG 6,flexable_eom,simple
+KLINGENBERG 4,flexable_eom,simple
+RDK (KARLSRUHE) 8,flexable_eom,simple
+GKM 9,flexable_eom,simple
+HEYDEN 4,flexable_eom,simple
+MOORBURG A,flexable_eom,simple
+MOORBURG B,flexable_eom,simple
+WESTFALEN E,flexable_eom,simple
+IBBENBUEREN B NO 1,flexable_eom,simple
+WILHELMSHAVEN C,flexable_eom,simple
+WALSUM 10,flexable_eom,simple
+BERGKAMEN A,flexable_eom,simple
+BEXBACH C 1,flexable_eom,simple
+WILHELMSHAVEN A,flexable_eom,simple
+HEILBRONN 7,flexable_eom,simple
+MEHRUM,flexable_eom,simple
+LUENEN 2 STUMMHAFEN,flexable_eom,simple
+WEIHER 3,flexable_eom,simple
+GERSTEINWERK BLOCK K,flexable_eom,simple
+ROSTOCK 1,flexable_eom,simple
+RDK (KARLSRUHE) 7,flexable_eom,simple
+STAUDINGER 5,flexable_eom,simple
+HERNE BLOCK 4,flexable_eom,simple
+GKM 8,flexable_eom,simple
+GKM 7,flexable_eom,simple
+ZOLLING LEININGER 5,flexable_eom,simple
+ALTBACH DEIZISAU HKW I,flexable_eom,simple
+WALSUM BLOCK 9,flexable_eom,simple
+SCHOLVEN C,flexable_eom,simple
+SCHOLVEN B,flexable_eom,simple
+HKW MUENCHEN NORD 2,flexable_eom,simple
+KIEL A,flexable_eom,simple
+BREMEN FARGE,flexable_eom,simple
+ALTBACH DEIZISAU HKW II,flexable_eom,simple
+BREMEN HAFEN 6,flexable_eom,simple
+WERDOHL ELVERLINGSEN E4,flexable_eom,simple
+GKH HANNOVER,flexable_eom,simple
+HKW BERLIN REUTER WEST E,flexable_eom,simple
+HKW BERLIN REUTER WEST D,flexable_eom,simple
+GKM 6,flexable_eom,simple
+HKW FENNE C,flexable_eom,simple
+MKW FENNE B,flexable_eom,simple
+HAMBURG TIEFSTACK,flexable_eom,simple
+WALHEIM 2,flexable_eom,simple
+WEDEL 1,flexable_eom,simple
+WEDEL 2,flexable_eom,simple
+KW BERLIN REUTER BlOCK C,flexable_eom,simple
+BREMEN HASTEDT 15,flexable_eom,simple
+HEILBRONN 6,flexable_eom,simple
+HEILBRONN 5,flexable_eom,simple
+WALHEIM 1,flexable_eom,simple
+WUPPERTAL ELBERFELD 2,flexable_eom,simple
+BERLIN MOABIT A,flexable_eom,simple
+FERNWAERMEKRAFTWERK BUER,flexable_eom,simple
+STUTTGART MUENSTER K25,flexable_eom,simple
+HKW FRANKFURT WEST 2,flexable_eom,simple
+HKW FRANKFURT WEST 3,flexable_eom,simple
+HKW OFFENBACH 1,flexable_eom,simple
+HOECHST 3,flexable_eom,simple
+ROEMERBRUCKE 2,flexable_eom,simple
+KARLSRUHE WEST 3,flexable_eom,simple
+FLENSBURG 11,flexable_eom,simple
+FLENSBURG 09,flexable_eom,simple
+FLENSBURG 10,flexable_eom,simple
+KASSEL SWEW 1,flexable_eom,simple
+ROMERBRUCKE 3,flexable_eom,simple
+KARLSRUHE WEST 1,flexable_eom,simple
+KARLSRUHE WEST 2,flexable_eom,simple
+PFORZHEIM III NO 1,flexable_eom,simple
+IRSCHING 5,flexable_eom,simple
+EMSLAND LINGEN D,flexable_eom,simple
+GUD HUERTH KNAPSACK 1,flexable_eom,simple
+KW LAUSWARD BLOCK FORTUNA GUD,flexable_eom,simple
+DORMAGEN RWE,flexable_eom,simple
+IRSCHING 4,flexable_eom,simple
+KW BASF LUDWIGSHAFEN MITTE,flexable_eom,simple
+EMSLAND LINGEN B,flexable_eom,simple
+EMSLAND LINGEN C,flexable_eom,simple
+KW BREMEN MITTELSBUEREN BLOCK 5 GUD,flexable_eom,simple
+BERLIN MITTE HKW,flexable_eom,simple
+GUD HUERTH KNAPSACK 2,flexable_eom,simple
+HKW MUENCHEN SUED GUD,flexable_eom,simple
+KW LAUSWARD BLOCK EMIL GUD,flexable_eom,simple
+KW HERDECKE CUNO MARK E,flexable_eom,simple
+GERSTEINWERK BLOCK F,flexable_eom,simple
+GERSTEINWERK BLOCK G,flexable_eom,simple
+KOELN NIEHL 2,flexable_eom,simple
+HAMM UENTROP BLOCK 10,flexable_eom,simple
+HAMM UENTROP BLOCK 20,flexable_eom,simple
+MAINZ III,flexable_eom,simple
+KW BASF LUDWIGSHAFEN SUED,flexable_eom,simple
+RDK (KARLSRUHE) 4RP,flexable_eom,simple
+HKW DRESDEN NOSSENER BRUECKE,flexable_eom,simple
+HKW HANNOVER LINDEN,flexable_eom,simple
+HKW DUISBURG WANHEIM IIIB,flexable_eom,simple
+HKW HAGEN KABEL,flexable_eom,simple
+HKW HOECHST BUSINESS PARK,flexable_eom,simple
+HKW JENA SUED,flexable_eom,simple
+HKW LEIPZIG NORD GUD,flexable_eom,simple
+KIRCHMOESER,flexable_eom,simple
+KW KIRCHLENGERN,flexable_eom,simple
+HKW MUENCHEN FREIMANN GUD,flexable_eom,simple
+HAMBURG TIEFSTACK GUD,flexable_eom,simple
+HKW SAARBRUECKEN ROEMERBRUECKE GUD,flexable_eom,simple
+GUD LEUNA,flexable_eom,simple
+HKW ERFURT OST,flexable_eom,simple
+GUD BITTERFELD ENVIA,flexable_eom,simple
+GUD ANLAGE RÜSSELSHEIM OPEL,flexable_eom,simple
+GUD ROSTOCK MARIENEHE,flexable_eom,simple
+HKW KOELN MERKENICH GUD,flexable_eom,simple
+GUD MUENSTER HAFEN,flexable_eom,simple
+KW LAUSWARD BLOCK ANTON GUD,flexable_eom,simple
+KW PLATTLING DAIMLER AG,flexable_eom,simple
+HALLE TROTHA,flexable_eom,simple
+HKW BARMEN I WUPPERTAL,flexable_eom,simple
+HKW POTSDAM SUED,flexable_eom,simple
+HKW FRANKFURT ODER AM HOHEN FELD,flexable_eom,simple
+HKW SANDREUTH 1 NUERNBERG,flexable_eom,simple
+HKW SANDREUTH 2 NUERNBERG,flexable_eom,simple
+HKW GUD NEUBRANDENBURG,flexable_eom,simple
+GUD GERA NORD,flexable_eom,simple
+HKW FLENSBURG 12,flexable_eom,simple
+SCHWERIN SUD,flexable_eom,simple
+FREIBURG WVK,flexable_eom,simple
+PKV KRAFTWERK VAREL,flexable_eom,simple
+KW BASF LUDWIGSHAFEN NORD,flexable_eom,simple
+HKW ELTMANN,flexable_eom,simple
+HKW KASSEL KOMBI,flexable_eom,simple
+KW HALLE DIESELSTRASSE BLOCK 1,flexable_eom,simple
+KW HALLE DIESELSTRASSE BLOCK 2,flexable_eom,simple
+HKW FRIEDENSBRUECKE BLOCK IV,flexable_eom,simple
+HKW HILTROP BOCHUM,flexable_eom,simple
+HKW PFORZHEIM,flexable_eom,simple
+KW GRENZACH WYHLEN 1,flexable_eom,simple
+HKW SUD SAARBRUECKEN,flexable_eom,simple
+GUD BIELEFELD HILLEGOSSEN,flexable_eom,simple
+HKW UNTERBREIZBACH,flexable_eom,simple
+HKW ERLANGEN,flexable_eom,simple
+HKW FRIEDENSBRUECKE BLOCK II,flexable_eom,simple
+KWK ANLAGE KREFELD,flexable_eom,simple
+KWK ANLAGE NEUSTADT,flexable_eom,simple
+HKW SCHWERIN LANKOW,flexable_eom,simple
+KWK ANLAGE MOHN MEDIA GÜTERSLOH,flexable_eom,simple
+HKW HBB RAUBLING,flexable_eom,simple
+KW STAUDINGER 4,flexable_eom,simple
+NUERNBERG FRANKEN 1,flexable_eom,simple
+IRSCHING 3,flexable_eom,simple
+KW HUNTORF CAES GT,flexable_eom,simple
+KW DUISBURG HUCKINGEN BLOCK A,flexable_eom,simple
+KW DUISBURG HUCKINGEN BLOCK B,flexable_eom,simple
+KW WEISWEILER VGT BLOCK G,flexable_eom,simple
+KW WEISWEILER VGT BLOCK H,flexable_eom,simple
+DKW BGH O1 BURGHAUSEN WACKER CHEMIE,flexable_eom,simple
+KW MITTELSBUEREN BLOCK 4,flexable_eom,simple
+KW BREMEN HASTEDT 14,flexable_eom,simple
+LICHTERFELDE 2,flexable_eom,simple
+KW HANNOVER HERRENHAUSEN B,flexable_eom,simple
+HKW FRANKFURT WEST GT,flexable_eom,simple
+KW MAINZ II GT,flexable_eom,simple
+KW MARL BLOCK 312 EVONIK,flexable_eom,simple
+CHARLOTTENBURG GT 1,flexable_eom,simple
+CHARLOTTENBURG GT 2,flexable_eom,simple
+HKW CHEMNITZ NORD II BLOCK A,flexable_eom,simple
+INDUSTRIEKRAFTWERK BERNBURG (IKB),flexable_eom,simple
+ALTBACH II GT E,flexable_eom,simple
+KW OBERNBURG GT1,flexable_eom,simple
+GTKW BIELEFELD UMMELN,flexable_eom,simple
+CHARLOTTENBURG GT 3,flexable_eom,simple
+KW LANDESBERGEN GT,flexable_eom,simple
+GERSTEINWERK BLOCK I GT,flexable_eom,simple
+KW ZIELITZ,flexable_eom,simple
+KW EMDEN BLOCK 4 GT,flexable_eom,simple
+IKW GENDORF INFRASERV,flexable_eom,simple
+GTKW DARMSTADT GT 1,flexable_eom,simple
+GTKW DARMSTADT GT 2,flexable_eom,simple
+UPM SCHONGAU,flexable_eom,simple
+WOLFEN ENVIA,flexable_eom,simple
+HKW DUISBURG WANHEIM IIIA,flexable_eom,simple
+KW LEUNA GT 3,flexable_eom,simple
+AHRENSFELDE GT D,flexable_eom,simple
+AHRENSFELDE GT A,flexable_eom,simple
+AHRENSFELDE GT B,flexable_eom,simple
+THYROW GT E,flexable_eom,simple
+AHRENSFELDE GT C,flexable_eom,simple
+INGOLSTADT 3,flexable_eom,simple
+INGOLSTADT 4,flexable_eom,simple
+MARBACH 3,flexable_eom,simple
+LICHTERFELDE 1,flexable_eom,simple
+WALHEIM GT 1,flexable_eom,simple
+BARMEN II,flexable_eom,simple
+WILMERSDORF GT 2,flexable_eom,simple
+WILMERSDORF GT 3,flexable_eom,simple
+WERDOHL ELVERLINGSEN 2,flexable_eom,simple
+WERDOHL ELVERLINGSEN 1,flexable_eom,simple
+ALTBACH I GT 3,flexable_eom,simple
+MITTELSBUEREN GT 3,flexable_eom,simple
+FLINGERN GT 1,flexable_eom,simple
+ALTBACH I GT 2,flexable_eom,simple
+MARBACH 3 GT 1,flexable_eom,simple
+MARIENEHE 1,flexable_eom,simple
+WILHELMSHAVEN GT 1,flexable_eom,simple
+NUERNBERG FRANKEN I GT 1,flexable_eom,simple
+WEDEL GT 1,flexable_eom,simple
+WEDEL GT 2,flexable_eom,simple
+ALTBACH I NO 5 GT 1,flexable_eom,simple
+PEISSENBERG 1,flexable_eom,simple
+GROSSKAYNA GT 1,flexable_eom,simple
+GROSSKAYNA GT 2,flexable_eom,simple
+GROSSKAYNA GT 3,flexable_eom,simple
+Tanzmühle - Rabenleite,flexable_eom_storage, simple
+Schwarzenbachwerk,flexable_eom_storage
+Leitzach II,flexable_eom_storage
+Leitzach I,flexable_eom_storage
+Hohenwarte I,flexable_eom_storage
+Bleiloch,flexable_eom_storage
+Wendefurth,flexable_eom_storage
+Glems,flexable_eom_storage
+Reisach - Rabenleite,flexable_eom_storage
+Geesthacht,flexable_eom_storage
+Rönkhausen,flexable_eom_storage
+Waldeck I,flexable_eom_storage
+Häusern,flexable_eom_storage
+Koepchenwerk Herdecke II,flexable_eom_storage
+Happurg,flexable_eom_storage
+Langenprozelten,flexable_eom_storage
+Waldshut,flexable_eom_storage
+Erzhausen,flexable_eom_storage
+Witznau,flexable_eom_storage
+Hohenwarte II,flexable_eom_storage
+Säckingen,flexable_eom_storage
+Waldeck II,flexable_eom_storage
+Wehr,flexable_eom_storage
+Markersbach,flexable_eom_storage
+Goldisthal,flexable_eom_storage
