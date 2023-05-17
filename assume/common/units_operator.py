@@ -122,34 +122,37 @@ class UnitsOperator(Role):
         self.valid_orders = {unit_id: [] for unit_id in self.units.keys()}
         for bid in orderbook:
             self.valid_orders[self.bids_map[bid["bid_id"]]].append(bid)
-        # TODO fix send dispatch, as currently not awaited
-        # await self.send_dispatch_plan()
+        self.send_dispatch_plan(orderbook)
 
-    def send_dispatch_plan(self):
-        # TODO group by unit_id
+    def send_dispatch_plan(self, orderbook):
         current_time = pd.to_datetime(self.context.current_timestamp, unit="s")
         for unit_id in self.units.keys():
-            total_capacity = 0.0
+            total_power = 0.0
             for bid in self.valid_orders[unit_id]:
-                total_capacity += bid["volume"]
+                total_power += bid["volume"]
 
-            dispatch_plan = {"total_capacity": total_capacity}
+            dispatch_plan = {"total_power": total_power}
             self.units[unit_id].get_dispatch_plan(dispatch_plan, current_time)
 
             logger.debug("Got Dispatch Plan: %s", dispatch_plan)
             db_aid = self.context.data_dict.get("output_agent_id")
             db_addr = self.context.data_dict.get("output_agent_addr")
-            if db_aid and db_addr:
+            if db_aid and db_addr and total_power != 0.0:
+                start = bid["start_time"]
+                end = bid["end_time"]
                 # send unit data to db agent to store it
                 message = {
                     "context": "write_results",
                     "type": "store_dispatch",
-                    "unit": self.units[unit_id],
-                    "unit_id": unit_id,
-                    "capacity": total_capacity,
-                    "timestamp": self.current_time,
+                    "data": {
+                        "technology": self.units[unit_id].technology,
+                        "unit_id": unit_id,
+                        "power": total_power,
+                        "start_time": start,
+                        "end_time": end,
+                    },
                 }
-                self.context.send_acl_message(
+                self.context.schedule_instant_acl_message(
                     receiver_id=db_aid,
                     receiver_addr=db_addr,
                     content=message,
