@@ -56,7 +56,7 @@ class WriteOutput(Role):
 
         # initalizes dfs for storing and writing asynchron
         self.write_dfs: dict[str, pd.DataFrame] = {
-            "power_plant_dispatch": pd.DataFrame(),
+            "unit_dispatch": pd.DataFrame(),
             "market_meta": pd.DataFrame(),
             "market_orders": pd.DataFrame(),
         }
@@ -116,12 +116,7 @@ class WriteOutput(Role):
             self.write_units_definition(content.get("unit_type"), content.get("data"))
 
         elif content.get("type") == "store_dispatch":
-            self.write_dispatch_plan(
-                content.get("unit"),
-                content.get("unit_id"),
-                content.get("capacity"),
-                content.get("timestamp"),
-            )
+            self.write_dispatch_plan(content.get("data"))
 
     def write_market_results(self, market_meta):
         """
@@ -229,7 +224,7 @@ class WriteOutput(Role):
         if self.db is not None and not df.empty:
             df.to_sql(table_name, self.db.bind, if_exists="append")
 
-    def write_dispatch_plan(self, unit, unit_id, total_power_output, current_time):
+    def write_dispatch_plan(self, data):
         """
         Writes the planned dispatch of the units after the market clearing to a csv and db
         In the case that we have no portfolio optimisation this equals the bids.
@@ -241,13 +236,34 @@ class WriteOutput(Role):
             current_time: The current time.
         """
 
-        df = pd.DataFrame.from_dict(total_power_output)
-        df.rename(columns={df.columns[0]: "power"}, inplace=True)
-        df["unit"] = unit
-        # sql does not liek tuples, so conversion necessary
-        df["unit_id"] = unit_id
-        df["timestamp"] = current_time
+        df = pd.DataFrame.from_dict([data])
         df["simulation"] = self.simulation_id
-        self.write_dfs["power_plant_dispatch"] = pd.concat(
-            [self.write_dfs["power_plant_dispatch"], df], axis=0
+        self.write_dfs["unit_dispatch"] = pd.concat(
+            [self.write_dfs["unit_dispatch"], df], axis=0
         )
+
+    async def on_stop(self):
+        """
+        This function makes it possible to calculate Key Performance Indicators
+        """
+
+        # insert left records into db
+        await self.store_dfs()
+        queries = {
+            "avg_price_mw": f"select name, avg(price) as avg_price from market_meta where simulation = '{self.simulation_id}' group by name",
+            "total_cost": f"select name, sum(price*demand_volume) as total_cost from market_meta where simulation = '{self.simulation_id}' group by name",
+            "total_volume": f"select name, sum(demand_volume) as total_volume from market_meta where simulation = '{self.simulation_id}' group by name",
+            "capacity_factor": f"select unit_id as name, avg(power/max_power) as capacity_factor from unit_dispatch ud join unit_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by name",
+        }
+        dfs = []
+        for value, query in queries.items():
+            df = pd.read_sql(query, self.db.bind)
+            dfs.append(df.melt(id_vars=["name"]))
+        df = pd.concat(dfs)
+        df.reset_index()
+        df["simulation"] = self.simulation_id
+        if self.export_csv_path:
+            kpi_data_path = self.p.joinpath("kpis.csv")
+            df.to_csv(kpi_data_path, mode="a", header=not kpi_data_path.exists())
+        if self.db is not None and not df.empty:
+            df.to_sql("kpis", self.db.bind, if_exists="replace")
