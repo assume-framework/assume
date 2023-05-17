@@ -176,7 +176,7 @@ class World:
         # add the unit operators using unique unit operator names in the storage units csv
         for company_name in storage_units_df.unit_operator.unique():
             self.add_unit_operator(id=company_name)
-            
+
         # add the units to corresponsing unit operators
         # if fuel prices are provided, add them to the unit params
         # if vre generation is provided, add them to the vre units
@@ -309,6 +309,10 @@ class World:
         unit_params: dict
 
         """
+
+        #check if unit operator exists
+        if unit_operator_id not in self.unit_operators:
+            raise ValueError(f"invalid unit operator {unit_operator_id}")
 
         # provided unit type does not exist yet
         unit_class = self.unit_types.get(unit_type)
