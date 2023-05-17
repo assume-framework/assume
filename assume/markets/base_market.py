@@ -139,18 +139,20 @@ class MarketRole(Role):
 
             if self.marketconfig.price_tick:
                 # max and min should be in units
-                max_price = round(min_price / self.marketconfig.price_tick)
+                max_price = round(max_price / self.marketconfig.price_tick)
                 min_price = round(min_price / self.marketconfig.price_tick)
             if self.marketconfig.volume_tick:
-                max_volume = round(max_volume / self.marketconfig.maximum_volume)
+                max_volume = round(max_volume / self.marketconfig.volume_tick)
 
             for order in orderbook:
                 order["agent_id"] = (agent_addr, agent_id)
                 if not order.get("only_hours"):
                     order["only_hours"] = None
-                assert order["price"] <= max_price, "max_bid"
-                assert order["price"] >= min_price, "min_bid"
-                assert abs(order["volume"]) <= max_volume, "max_volume"
+                assert order["price"] <= max_price, f"max_bid {order['price']}"
+                assert order["price"] >= min_price, f"min_bid {order['price']}"
+                assert (
+                    abs(order["volume"]) <= max_volume
+                ), f"max_volume {order['volume']}"
                 if self.marketconfig.price_tick:
                     assert isinstance(order["price"], int)
                 if self.marketconfig.volume_tick:
