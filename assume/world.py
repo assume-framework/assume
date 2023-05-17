@@ -173,6 +173,10 @@ class World:
         for company_name in powerplants_df.unit_operator.unique():
             self.add_unit_operator(id=company_name)
 
+        # add the unit operators using unique unit operator names in the storage units csv
+        for company_name in storage_units_df.unit_operator.unique():
+            self.add_unit_operator(id=company_name)
+            
         # add the units to corresponsing unit operators
         # if fuel prices are provided, add them to the unit params
         # if vre generation is provided, add them to the vre units

@@ -23,37 +23,10 @@ if __name__ == "__main__":
     world = World(database_uri=DATABASE_URI, export_csv=EXPORT_CSV_PATH)
     #%%
     world.load_scenario(
-        inputs_path="inputs",
+        inputs_path="examples/inputs",
         scenario=scenario,
         study_case=study_case,
     )
     #%%
-    world.run()
-
-# %% test
-import yaml
-
-from assume.common import (
-    MarketConfig,
-    UnitsOperator,
-    load_file,
-    make_market_config,
-    mango_codec_factory,
-)
-
-inputs_path="inputs"
-scenario = "example_02b"
-
-path = f"{inputs_path}/{scenario}"
-with open(f"{path}/config.yml", "r") as f:
-    config = yaml.safe_load(f)
-    config = config[study_case]
-
-
-storage_units_df = load_file(
-             path=path, config=config, file_name="storage_units"
-        )
-# %%
-for storage_name, unit_params in storage_units_df.iterrows():
-    print(storage_name)
+    #world.run()
 # %%
