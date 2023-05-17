@@ -14,7 +14,6 @@ class flexableEOMStorage(BaseStrategy):
         self,
         unit: StorageUnit = None,
         operational_window: dict = None,
-        current_time: pd.Timestamp = None
     ):
         """
         Takes information from a unit that the unit operator manages and
@@ -47,9 +46,9 @@ class flexableEOMStorage(BaseStrategy):
             marginal_cost_mr_charge = operational_window["min_power_charge"]["marginal_cost"]
             marginal_cost_flex_charge = operational_window["max_power_charge"]["marginal_cost"]
 
-            average_price = self.calculate_price_average(unit, t=current_time)
+            average_price = self.calculate_price_average(unit)
 
-            if unit.price_forecast[current_time] >= average_price/unit.efficiency_discharge:
+            if unit.price_forecast[unit.current_time] >= average_price/unit.efficiency_discharge:
             #place bid to discharge
 
                 if operational_window["current_power_discharge"]["power_discharge"] > 0:
@@ -74,9 +73,14 @@ class flexableEOMStorage(BaseStrategy):
                         bid_quantity_mr = bid_quantity_mr_discharge
                         bid_price_flex = marginal_cost_flex_discharge
                         bid_quantity_flex = bid_quantity_flex_discharge
+                else:
+                    bid_price_mr = 0
+                    bid_quantity_mr = 0
+                    bid_price_flex = 0
+                    bid_quantity_flex = 0
                 
                 
-            elif unit.price_forecast[current_time] < average_price * unit.efficiency_charge: 
+            elif unit.price_forecast[unit.current_time] <= average_price * unit.efficiency_charge: 
             #place bid to charge
                 if operational_window["current_power_discharge"]["power_discharge"] > 0:
                 #was discharging before
@@ -97,6 +101,17 @@ class flexableEOMStorage(BaseStrategy):
                     bid_quantity_mr = marginal_cost_mr_charge
                     bid_price_flex = marginal_cost_flex_charge
                     bid_quantity_flex = bid_quantity_flex_charge
+                else:
+                    bid_price_mr = 0
+                    bid_quantity_mr = 0
+                    bid_price_flex = 0
+                    bid_quantity_flex = 0
+
+            else:
+                bid_price_mr = 0
+                bid_quantity_mr = 0
+                bid_price_flex = 0
+                bid_quantity_flex = 0
                 
             bids = [
             {"price": bid_price_mr, "volume": bid_quantity_mr},
@@ -105,13 +120,13 @@ class flexableEOMStorage(BaseStrategy):
         
         return bids
     
-    def calculate_price_agerage(self, unit):
+    def calculate_price_average(self, unit):
         t = unit.current_time
-        if t - self.foresight < 0:
+        """if t - self.foresight < pd.Timedelta("0h"):
             average_price = np.mean(unit.price_forecast[t-self.foresight:] 
                                     + unit.price_forecast[:t+self.foresight])
-        else:
-            average_price = np.mean(unit.price_forecast[t-self.foresight:t+self.foresight])
+        else:"""
+        average_price = np.mean(unit.price_forecast[t-self.foresight:t+self.foresight])
         
         return average_price
 

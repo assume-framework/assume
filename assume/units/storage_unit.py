@@ -183,7 +183,7 @@ class StorageUnit(BaseUnit):
     def calculate_operational_window(
         self,
         product_type: str,
-        current_time: pd.Timestamp,
+        product_tuple: tuple,
     ) -> dict:
         """Calculate the operation window for the next time step.
 
@@ -192,40 +192,46 @@ class StorageUnit(BaseUnit):
         operational_window : dict
             Dictionary containing the operational window for the next time step.
         """
+        start, end, only_hours = product_tuple
+        start = pd.Timestamp(start)
+        end = pd.Timestamp(end)
+
+        # TODO remove current_time from flexable_strategy, so that the product config is always used
+        self.current_time = start
 
         if self.current_status == 0 and self.current_down_time < self.min_down_time:
             return None
 
-        #current_power = self.total_power_exchange.at[current_time]
+        #current_power = self.total_power_exchange.at[self.current_time]
 
         current_power_discharge = (
-            self.total_power.at[current_time]
-            if self.total_power > 0
+            self.total_power.at[self.current_time]
+            if self.total_power.at[self.current_time] > 0
             else 0)
         
         current_power_charge = (
-            self.total_power.at[current_time]
-            if self.total_power < 0
+            self.total_power.at[self.current_time]
+            if self.total_power.at[self.current_time] < 0
             else 0)
 
         min_power_discharge = (
-            self.min_power_discharge[current_time]
+            self.min_power_discharge[self.current_time]
             if type(self.min_power_discharge) is pd.Series
             else self.min_power_discharge
         )
         min_power_charge = (
-            self.min_power_charge[current_time]
+            self.min_power_charge[self.current_time]
             if type(self.min_power_charge) is pd.Series
             else self.min_power_charge
         )
 
         max_power_discharge = (
-            self.max_power_discharge[current_time]
+            self.max_power_discharge[self.current_time]
             if type(self.max_power_discharge) is pd.Series
             else self.max_power_discharge
         )
         max_power_charge = (
-            self.max_power_charge[current_time]
+            self.max_power_charge[self.current_time]
             if type(self.max_power_charge) is pd.Series
             else self.max_power_charge
         )
@@ -254,53 +260,64 @@ class StorageUnit(BaseUnit):
                 max_power_charge = max(current_power_charge + self.ramp_up_charge, 
                                     max_power_charge)
         
+        
+        current_SOC = (self.current_SOC[self.current_time] 
+                    if type(self.current_SOC) is pd.Series
+                    else self.current_SOC)
+        min_SOC = (self.min_SOC[self.current_time]
+                   if type(self.min_SOC) is pd.Series
+                   else self.min_SOC)
+        max_SOC = (self.max_SOC[self.current_time]
+                   if type(self.max_SOC) is pd.Series
+                   else self.max_SOC)    
+        
         #restrict according to min_SOC
-        max_power_discharge = min(max_power_discharge, max(0,self.current_SOC - self.min_SOC - self.pos_capacity_reserve))
+        max_power_discharge = min(max_power_discharge, max(0,current_SOC - min_SOC - self.pos_capacity_reserve[self.current_time]))
         
         #restrict charging according to max_SOC
-        max_power_charge = max(max_power_charge, min(0, self.current_SOC - self.max_SOC - self.neg_capacity_reserve))
+        max_power_charge = max(max_power_charge, min(0, current_SOC - max_SOC - self.neg_capacity_reserve[self.current_time]))
         
         #what form does the operational window have?
         operational_window = {
             "current_power_discharge": {
                 "power_discharge": current_power_discharge,
                 "marginal_cost": self.calc_marginal_cost(
-                    current_time=current_time,
+                    current_time=self.current_time,
                     discharge=True,
                 ),
             },
             "current_power_charge": {
                 "power_charge": current_power_charge,
                 "marginal_cost": self.calc_marginal_cost(
-                    current_time=current_time,
+                    current_time=self.current_time,
                     discharge=False,
                 ),
             },
             "min_power_discharge": {
                 "power_discharge": min_power_discharge,
                 "marginal_cost": self.calc_marginal_cost(
-                    current_time=current_time,
+                    current_time=self.current_time,
                     discharge=True,
                 ),
             },
             "max_power_discharge": {
                 "power_discharge": max_power_discharge,
                 "marginal_cost": self.calc_marginal_cost(
-                    current_time=current_time,
+                    current_time=self.current_time,
                     discharge=True,
                 ),
             },
             "min_power_charge": {
                 "power_charge": min_power_charge,
                 "marginal_cost": self.calc_marginal_cost(
-                    current_time=current_time,
+                    current_time=self.current_time,
                     discharge=False,
                 )
             },
             "max_power_charge": {
                 "power_charge": max_power_charge,
                 "marginal_cost": self.calc_marginal_cost(
-                    current_time=current_time,
+                    current_time=self.current_time,
                     discharge=False,
                 )
             },
@@ -311,12 +328,11 @@ class StorageUnit(BaseUnit):
     def calculate_bids(
         self,
         product_type,
-        operational_window,
+        product_tuple,
     ):
         return super().calculate_bids(
-            unit=self,
             product_type=product_type,
-            operational_window=operational_window,
+            product_tuple=product_tuple,
         )
     
     def get_dispatch_plan(self, dispatch_plan, current_time):

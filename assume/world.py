@@ -126,7 +126,6 @@ class World:
         self.logger.info("Loading input data")
         powerplants_df = load_file(path=path, config=config, file_name="powerplants")
         
-        self.logger.info("Loading storage unit data")
         storage_units_df = load_file(
              path=path, config=config, file_name="storage_units"
         )

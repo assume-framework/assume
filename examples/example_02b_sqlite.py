@@ -28,5 +28,5 @@ if __name__ == "__main__":
         study_case=study_case,
     )
     #%%
-    #world.run()
+    world.run()
 # %%
