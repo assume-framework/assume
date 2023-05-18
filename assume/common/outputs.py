@@ -253,7 +253,7 @@ class WriteOutput(Role):
             "avg_price_mw": f"select name, avg(price) as avg_price from market_meta where simulation = '{self.simulation_id}' group by name",
             "total_cost": f"select name, sum(price*demand_volume) as total_cost from market_meta where simulation = '{self.simulation_id}' group by name",
             "total_volume": f"select name, sum(demand_volume) as total_volume from market_meta where simulation = '{self.simulation_id}' group by name",
-            "capacity_factor": f"select unit_id as name, avg(power/max_power) as capacity_factor from unit_dispatch ud join unit_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by name",
+            # "capacity_factor": f"select unit_id as name, avg(power/max_power) as capacity_factor from unit_dispatch ud join unit_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by name",
         }
         dfs = []
         for value, query in queries.items():

@@ -29,6 +29,19 @@
   "liveNow": false,
   "panels": [
     {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 28,
+      "panels": [],
+      "title": "Overview",
+      "type": "row"
+    },
+    {
       "datasource": {
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
@@ -38,7 +51,7 @@
         "h": 4,
         "w": 24,
         "x": 0,
-        "y": 0
+        "y": 1
       },
       "id": 4,
       "options": {
@@ -64,7 +77,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 4
+        "y": 5
       },
       "id": 15,
       "options": {
@@ -163,7 +176,7 @@
         "h": 11,
         "w": 6,
         "x": 0,
-        "y": 7
+        "y": 8
       },
       "id": 9,
       "options": {
@@ -250,7 +263,7 @@
         "h": 11,
         "w": 12,
         "x": 6,
-        "y": 7
+        "y": 8
       },
       "id": 7,
       "options": {
@@ -334,15 +347,28 @@
       "type": "piechart"
     },
     {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 19
+      },
+      "id": 30,
+      "panels": [],
+      "title": "Market Data",
+      "type": "row"
+    },
+    {
       "datasource": {
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
       "gridPos": {
-        "h": 3,
-        "w": 24,
+        "h": 6,
+        "w": 19,
         "x": 0,
-        "y": 18
+        "y": 20
       },
       "id": 17,
       "options": {
@@ -396,6 +422,70 @@
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
+      "description": "",
+      "gridPos": {
+        "h": 6,
+        "w": 5,
+        "x": 19,
+        "y": 20
+      },
+      "id": 34,
+      "options": {
+        "content": "### {{kpi}}  {{value}}",
+        "defaultContent": "The query didn't return any results.",
+        "editor": {
+          "format": "auto",
+          "height": 200,
+          "language": "markdown"
+        },
+        "editors": [],
+        "everyRow": true,
+        "helpers": "",
+        "styles": ""
+      },
+      "pluginVersion": "9.2.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "table",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  variable as kpi, round(CAST(value AS numeric), 2) as value\nFROM kpis\nwhere simulation = '$simulation' and name = '$market'\nORDER BY 1",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "volume"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "kpis",
+          "timeColumn": "index",
+          "timeColumnType": "int8",
+          "where": [
+            {
+              "name": "$__unixEpochFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Market KPIs for $market",
+      "type": "marcusolsson-dynamictext-panel"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
       "description": "Overview of market results for the chossen market",
       "fieldConfig": {
         "defaults": {
@@ -440,8 +530,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -481,7 +570,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 21
+        "y": 26
       },
       "id": 11,
       "maxPerRow": 4,
@@ -496,7 +585,7 @@
           ""
         ],
         "tooltip": {
-          "mode": "single",
+          "mode": "multi",
           "sort": "none"
         }
       },
@@ -536,7 +625,7 @@
           ]
         }
       ],
-      "title": "Market Summary",
+      "title": "Market Summary $market",
       "type": "timeseries"
     },
     {
@@ -601,7 +690,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 33
+        "y": 74
       },
       "id": 19,
       "options": {
@@ -775,7 +864,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 33
+        "y": 74
       },
       "id": 20,
       "options": {
@@ -886,6 +975,255 @@
       ],
       "title": "Accepted Volume",
       "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 82
+      },
+      "id": 32,
+      "panels": [],
+      "repeat": "unit_id",
+      "repeatDirection": "h",
+      "title": "Unit Data $unit_id",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 83
+      },
+      "id": 22,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# Unit Specific Data\n\nFor the chosen market and the chosen unit here the dispatch is displayed.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "9.2.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": false,
+          "rawSql": "SELECT\n  \"Timestamp\" AS \"time\",\n  volume\nFROM demand_meta\nWHERE\n  $__timeFilter(\"Timestamp\")\nORDER BY 1",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "volume"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "demand_meta",
+          "timeColumn": "\"Timestamp\"",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "megwatt"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 18,
+        "x": 0,
+        "y": 86
+      },
+      "id": 24,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  power AS \"power\",\n  unit_id\nFROM unit_dispatch\nWHERE\n  $__timeFilter(start_time) AND\n  simulation = '$simulation' AND\n  unit_id = $unit_id\nGROUP BY 1, unit_id, power\nORDER BY 1",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "volume"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "demand_meta",
+          "timeColumn": "\"Timestamp\"",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Unitwise Dispatch",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 6,
+        "x": 18,
+        "y": 86
+      },
+      "id": 26,
+      "options": {
+        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\nFuel: {{fuel_type}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
+        "defaultContent": "The query didn't return any results.",
+        "editor": {
+          "format": "auto",
+          "height": 200,
+          "language": "markdown"
+        },
+        "editors": [],
+        "everyRow": true,
+        "helpers": "",
+        "styles": ""
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "table",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM unit_meta\nWHERE index in ($unit_id) and simulation = '$simulation'\nlimit 1\n",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "volume"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "demand_meta",
+          "timeColumn": "\"Timestamp\"",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Chosen Unit Specifications",
+      "type": "marcusolsson-dynamictext-panel"
     }
   ],
   "refresh": false,
@@ -915,7 +1253,7 @@
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
-        "sort": 0,
+        "sort": 1,
         "type": "query"
       },
       {
@@ -928,18 +1266,47 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT \n  name\nFROM market_meta\ngroup by name;",
+        "definition": "SELECT \n  name\nFROM market_meta\nwhere simulation='$simulation'\ngroup by name ;",
         "description": "Choose for which market the data is displayed",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "market",
         "options": [],
-        "query": "SELECT \n  name\nFROM market_meta\ngroup by name;",
+        "query": "SELECT \n  name\nFROM market_meta\nwhere simulation='$simulation'\ngroup by name ;",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
-        "sort": 0,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "NEURATH F"
+          ],
+          "value": [
+            "NEURATH F"
+          ]
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "P7B13B9DF907EC40C"
+        },
+        "definition": "SELECT \n  unit_id\nFROM unit_dispatch\nwhere simulation = '$simulation' group by unit_id;",
+        "description": "Can choose which unit we want to display ",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
+        "multi": true,
+        "name": "unit_id",
+        "options": [],
+        "query": "SELECT \n  unit_id\nFROM unit_dispatch\nwhere simulation = '$simulation' group by unit_id;",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
         "type": "query"
       }
     ]
@@ -952,6 +1319,6 @@
   "timezone": "",
   "title": "ASSUME",
   "uid": "ap3RcmY4z",
-  "version": 2,
+  "version": 11,
   "weekStart": ""
 }
