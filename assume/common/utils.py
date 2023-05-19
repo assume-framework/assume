@@ -277,3 +277,67 @@ def plot_orderbook(orderbook: Orderbook, results):
     plt.subplots_adjust(wspace=0.3)
 
     return fig, ax
+
+
+def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=[]):
+    """
+    step function with bought volume
+    allows setting timeframe through begin and end
+    and group by columns in groupby.
+    This allows to have separate time series per market and bid_id/unit_id.
+    The orderbook must contain all relevant orders.
+    E.g. to calculate the current volume from 01.06 to 02.06, a yearly base
+    order from 01.01-31.12 must also be given, to be considered.
+
+    If called without groupby, this returns the aggregated orderbook timeseries
+    """
+    deltas = []
+
+    # first we are creating a list of tuples with the following form:
+    # start, delta_volume, bid_id, market_id
+    for bid in orderbook:
+        add = ()
+        for field in groupby:
+            add += (bid[field],)
+        if bid["only_hours"] is None:
+            deltas.append((bid["start_time"], bid["volume"]) + add)
+            deltas.append((bid["end_time"], -bid["volume"]) + add)
+        else:
+            # only_hours allows to have peak or off-peak bids
+            start_hour, end_hour = bid["only_hours"]
+            duration_hours = end_hour - start_hour
+            if duration_hours <= 0:
+                duration_hours += 24
+
+            starts = rr.rrule(
+                rr.DAILY,
+                dtstart=bid["start_time"],
+                byhour=start_hour,
+                until=bid["end_time"],
+            )
+            for date in starts:
+                deltas.append((date, bid["volume"]) + add)
+                deltas.append(
+                    (date + timedelta(hours=duration_hours), -bid["volume"]) + add
+                )
+
+    aggregation = []
+    # current_power is separated by group
+    current_power = defaultdict(lambda: 0)
+    for d_tuple in sorted(deltas, key=lambda i: i[0]):
+        time, delta, *groupdata = d_tuple
+        groupdata = "_".join(groupdata)
+        current_power[groupdata] += delta
+        # we don't know what the power will be at "end" yet
+        # as a new order with this start point might be added
+        # afterwards - so the end is excluded here
+        # this also makes sure that each timestamp is only written
+        # once when iterativley calling this function
+        if (not begin or time >= begin) and (not end or time < end):
+            if len(aggregation) > 0 and aggregation[-1][0] == time:
+                aggregation[-1][1] = current_power[groupdata]
+            else:
+                d_list = list(d_tuple)
+                d_list[1] = current_power[groupdata]
+                aggregation.append(d_list)
+    return aggregation

@@ -86,8 +86,8 @@ def test_market():
     assert meta[0]["price"] > 0
     import pandas as pd
 
-    print(pd.DataFrame.from_dict(mr.all_orders))
-    print(pd.DataFrame.from_dict(clearing_result))
+    print(pd.DataFrame(mr.all_orders))
+    print(pd.DataFrame(clearing_result))
     print(meta)
 
 
@@ -150,8 +150,8 @@ def test_market_mechanism():
         assert meta[0]["supply_volume"] > 0
         assert meta[0]["price"] > 0
         # import pandas as pd
-        # print(pd.DataFrame.from_dict(mr.all_orders))
-        # print(pd.DataFrame.from_dict(clearing_result))
+        # print(pd.DataFrame(mr.all_orders))
+        # print(pd.DataFrame(clearing_result))
         print(meta)
 
     return mr.all_orders, meta
