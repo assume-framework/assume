@@ -1,5 +1,30 @@
 base_case:
-  id: case_2019
+  start_date: 2018-12-31 20:00
+  end_date: 2019-01-11 00:00
+  time_step: 1h
+  powerplants: powerplants.csv
+  powerplants_strategy: simple
+  storage_units: storage_units.csv
+  demand: inflex_demand.csv
+  demand_strategy: simple
+  renewable_generation: renewable_generation.csv
+  fuel_prices: fuel_prices.csv
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2018-12-31 23:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_volume: 1000000
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+crm_case:
   start_date: 2018-12-31 20:00
   end_date: 2019-01-11 00:00
   time_step: 1h
@@ -40,7 +65,6 @@ base_case:
       price_unit: EUR/MW
       market_mechanism: pay_as_bid
 policy_case:
-  id: policy_case
   start_date: 2018-12-31 20:00
   end_date: 2019-01-11 00:00
   time_step: 1h
