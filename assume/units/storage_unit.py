@@ -171,7 +171,7 @@ class StorageUnit(BaseUnit):
         self.total_power.iat[0] = self.min_power_discharge
 
         #starting half way charged
-        self.current_SOC = (self.min_SOC + self.max_SOC)/2
+        self.current_SOC = self.max_SOC + 0.5
 
         self.pos_capacity_reserve = pd.Series(0.0, index=self.index)
         self.neg_capacity_reserve = pd.Series(0.0, index=self.index)
@@ -272,7 +272,10 @@ class StorageUnit(BaseUnit):
                    else self.max_SOC)    
         
         #restrict according to min_SOC
-        max_power_discharge = min(max_power_discharge, max(0,current_SOC - min_SOC - self.pos_capacity_reserve[self.current_time]))
+        max_power_discharge = min(max_power_discharge, 
+                                  max(0,(current_SOC - min_SOC 
+                                         - self.pos_capacity_reserve[self.current_time])
+                                         *self.efficiency_discharge))
         
         #restrict charging according to max_SOC
         max_power_charge = max(max_power_charge, min(0, current_SOC - max_SOC - self.neg_capacity_reserve[self.current_time]))
@@ -340,12 +343,12 @@ class StorageUnit(BaseUnit):
             self.market_success_list[-1] += 1
             self.current_status = 1 #discharging
             self.current_down_time = 0
-            self.total_power_exchange.at[current_time] = dispatch_plan["total_capacity"]
+            self.total_power.at[current_time] = dispatch_plan["total_capacity"]
 
         elif dispatch_plan["total_capacity"] < self.min_power_discharge:
             self.current_status = 0
             self.current_down_time += 1
-            self.total_power_exchange.at[current_time] = 0
+            self.total_power.at[current_time] = 0
 
             if self.market_success_list[-1] != 0:
                 self.mean_market_success = sum(self.market_success_list) / len(

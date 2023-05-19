@@ -4,7 +4,7 @@ import numpy as np
 from assume.strategies.base_strategy import BaseStrategy
 from assume.units.storage_unit import StorageUnit
 
-class flexableEOMStorage(BaseStrategy):
+class complexEOMStorage(BaseStrategy):
     def __init__(self):
         super().__init__()
 
@@ -54,7 +54,7 @@ class flexableEOMStorage(BaseStrategy):
                 if operational_window["current_power_discharge"]["power_discharge"] > 0:
                 #was discharging before
                     bid_price_mr = self.calculate_EOM_price_continue_discharging(
-                        unit, marginal_cost_flex_discharge, bid_quantity_mr_discharge
+                        unit, marginal_cost_mr_discharge, bid_quantity_mr_discharge
                     )
                     bid_quantity_mr = bid_quantity_mr_discharge
                     bid_price_flex = marginal_cost_flex_discharge
