@@ -1,7 +1,7 @@
 import inspect
 import logging
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 from itertools import groupby
 from operator import itemgetter
@@ -9,7 +9,7 @@ from operator import itemgetter
 import dateutil.rrule as rr
 import pandas as pd
 
-from assume.common import MarketConfig, MarketProduct
+from assume.common import MarketConfig, MarketProduct, Orderbook
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ def load_file(
 
         return df
 
-    except FileNotFoundError as e:
+    except FileNotFoundError:
         logger.warning(f"File {file_name} not found. Returning None")
 
 
@@ -89,15 +89,19 @@ def make_market_config(
     start = start or world_start
     end = end or world_end
 
+    market_products = []
+    for product in market_params["products"]:
+        market_products.append(
+            MarketProduct(
+                duration=pd.Timedelta(product["duration"]),
+                count=product["count"],
+                first_delivery=pd.Timedelta(product["first_delivery"]),
+            )
+        )
+
     market_config = MarketConfig(
         name=id,
-        market_products=[
-            MarketProduct(
-                duration=pd.Timedelta(market_params["duration"]),
-                count=market_params["count"],
-                first_delivery=pd.Timedelta(market_params["first_delivery"]),
-            )
-        ],
+        market_products=market_products,
         opening_hours=rr.rrule(
             freq=freq,
             interval=interval,
@@ -105,6 +109,8 @@ def make_market_config(
             until=end,
             cache=True,
         ),
+        additional_fields=market_params.get("additional_fields", []),
+        product_type=market_params.get("product_type", "energy"),
         opening_duration=pd.Timedelta(market_params["opening_duration"]),
         maximum_gradient=market_params.get("max_gradient"),
         volume_unit=market_params.get("volume_unit"),
@@ -113,6 +119,7 @@ def make_market_config(
         price_tick=market_params.get("price_tick"),
         price_unit=market_params["price_unit"],
         market_mechanism=market_params["market_mechanism"],
+        supports_get_unmatched=market_params.get("supports_get_unmatched", False),
     )
 
     return market_config
@@ -163,7 +170,7 @@ def get_available_products(market_products: list[MarketProduct], startdate: date
     return options
 
 
-def plot_orderbook(orderbook, results):
+def plot_orderbook(orderbook: Orderbook, results):
     """
     Plot the merit order of bids for each node in a separate subplot
     """
