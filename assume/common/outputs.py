@@ -22,6 +22,18 @@ class WriteOutput(Role):
         export_csv_path: str = "",
         save_frequency_hours: int | None = None,
     ):
+        """
+        Initializes an instance of the WriteOutput class.
+
+        Args:
+            simulation_id (str): The ID of the simulation as a unique calssifier.
+            start (datetime): The start datetime of the simulation run.
+            end (datetime): The end datetime of the simulation run.
+            db_engine (optional): The database engine. Defaults to None.
+            export_csv_path (str, optional): The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
+            save_frequency_hours (int | None, optional): The frequency in hours for storeing data in the db and/or csv files. Defaults to None.
+        """
+
         super().__init__()
 
         # store needed date
@@ -44,7 +56,7 @@ class WriteOutput(Role):
 
         # initalizes dfs for storing and writing asynchron
         self.write_dfs: dict[str, pd.DataFrame] = {
-            "power_plant_dispatch": pd.DataFrame(),
+            "unit_dispatch": pd.DataFrame(),
             "market_meta": pd.DataFrame(),
             "market_orders": pd.DataFrame(),
         }
@@ -64,6 +76,10 @@ class WriteOutput(Role):
                     db.execute(query)
 
     def setup(self):
+        """
+        Sets up the WriteOutput instance by subscribing to messages and scheduling recurrent tasks of storing the data.
+        """
+
         self.context.subscribe_message(
             self,
             self.handle_message,
@@ -79,6 +95,14 @@ class WriteOutput(Role):
         self.context.schedule_recurrent_task(self.store_dfs, recurrency_task)
 
     def handle_message(self, content, meta):
+        """
+        Handles the incoming messages and performs corresponding actions.
+
+        Args:
+            content (dict): The content of the message.
+            meta: The metadata associated with the message. (not needed yet)
+        """
+
         if not isinstance(content, dict):
             return False
 
@@ -92,14 +116,16 @@ class WriteOutput(Role):
             self.write_units_definition(content.get("unit_type"), content.get("data"))
 
         elif content.get("type") == "store_dispatch":
-            self.write_dispatch_plan(
-                content.get("unit"),
-                content.get("unit_id"),
-                content.get("capacity"),
-                content.get("timestamp"),
-            )
+            self.write_dispatch_plan(content.get("data"))
 
     def write_market_results(self, market_meta):
+        """
+        Writes market results to the corresponding data frame.
+
+        Args:
+            market_meta: The market metadata, which includes the clearing price and volume.
+        """
+
         df = pd.DataFrame.from_dict(market_meta)
         df["simulation"] = self.simulation_id
         self.write_dfs["market_meta"] = pd.concat(
@@ -107,6 +133,11 @@ class WriteOutput(Role):
         )
 
     async def store_dfs(self):
+        """
+        Stores the data frames to CSV files and the database.
+        Is scheduled as a recurrent task based on the frequency.
+        """
+
         for table in self.write_dfs.keys():
             df = self.write_dfs[table]
             if df.empty:
@@ -121,6 +152,15 @@ class WriteOutput(Role):
             self.write_dfs[table] = pd.DataFrame()
 
     def write_market_orders(self, market_result, market_name):
+        """
+        Writes market orders to the corresponding data frame.
+        Append new data until it is wirtten to db and csv with store_df function.
+
+        Args:
+            market_result: The market result including all orders.
+            market_name: The name of the market.
+        """
+
         df = pd.DataFrame.from_dict(market_result)
         del df["only_hours"]
         del df["agent_id"]
@@ -131,6 +171,15 @@ class WriteOutput(Role):
         )
 
     def write_units_definition(self, unit_type, unit_params):
+        """
+        Writes unit definitions to the corresponding data frame and directly store it in db and csv.
+        Since that is only done once, no need for recurrent sheduling arises.
+
+        Args:
+            unit_type (str): The type of the unit.
+            unit_params: The parameters of the unit.
+        """
+
         if unit_type == "power_plant":
             df = pd.DataFrame([unit_params])
             df["simulation"] = self.simulation_id
@@ -170,25 +219,51 @@ class WriteOutput(Role):
             return False
 
         if self.export_csv_path:
-            p = Path(self.export_csv_path)
-            market_data_path = p.joinpath(f"{table_name}.csv")
+            market_data_path = self.p.joinpath(f"{table_name}.csv")
             df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
         if self.db is not None and not df.empty:
             df.to_sql(table_name, self.db.bind, if_exists="append")
 
-    def write_dispatch_plan(self, unit, unit_id, total_power_output, current_time):
+    def write_dispatch_plan(self, data):
         """
         Writes the planned dispatch of the units after the market clearing to a csv and db
         In the case that we have no portfolio optimisation this equals the bids.
+
+        Args:
+            unit: The unit.
+            unit_id: The ID of the unit.
+            total_power_output: The total power output.
+            current_time: The current time.
         """
 
-        df = pd.DataFrame.from_dict(total_power_output)
-        df.rename(columns={df.columns[0]: "power"}, inplace=True)
-        df["unit"] = unit
-        # sql does not liek tuples, so conversion necessary
-        df["unit_id"] = unit_id
-        df["timestamp"] = current_time
+        df = pd.DataFrame.from_dict([data])
         df["simulation"] = self.simulation_id
-        self.write_dfs["power_plant_dispatch"] = pd.concat(
-            [self.write_dfs["power_plant_dispatch"], df], axis=0
+        self.write_dfs["unit_dispatch"] = pd.concat(
+            [self.write_dfs["unit_dispatch"], df], axis=0
         )
+
+    async def on_stop(self):
+        """
+        This function makes it possible to calculate Key Performance Indicators
+        """
+
+        # insert left records into db
+        await self.store_dfs()
+        queries = {
+            "avg_price_mw": f"select name, avg(price) as avg_price from market_meta where simulation = '{self.simulation_id}' group by name",
+            "total_cost": f"select name, sum(price*demand_volume) as total_cost from market_meta where simulation = '{self.simulation_id}' group by name",
+            "total_volume": f"select name, sum(demand_volume) as total_volume from market_meta where simulation = '{self.simulation_id}' group by name",
+            # "capacity_factor": f"select unit_id as name, avg(power/max_power) as capacity_factor from unit_dispatch ud join unit_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by name",
+        }
+        dfs = []
+        for value, query in queries.items():
+            df = pd.read_sql(query, self.db.bind)
+            dfs.append(df.melt(id_vars=["name"]))
+        df = pd.concat(dfs)
+        df.reset_index()
+        df["simulation"] = self.simulation_id
+        if self.export_csv_path:
+            kpi_data_path = self.p.joinpath("kpis.csv")
+            df.to_csv(kpi_data_path, mode="a", header=not kpi_data_path.exists())
+        if self.db is not None and not df.empty:
+            df.to_sql("kpis", self.db.bind, if_exists="replace")

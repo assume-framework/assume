@@ -181,13 +181,13 @@ class PowerPlant(BaseUnit):
         )
 
     def get_dispatch_plan(self, dispatch_plan, current_time):
-        if dispatch_plan["total_capacity"] > self.min_power:
+        if dispatch_plan["total_power"] > self.min_power:
             self.market_success_list[-1] += 1
             self.current_status = 1
             self.current_down_time = 0
-            self.total_power_output.at[current_time] = dispatch_plan["total_capacity"]
+            self.total_power_output.at[current_time] = dispatch_plan["total_power"]
 
-        elif dispatch_plan["total_capacity"] < self.min_power:
+        elif dispatch_plan["total_power"] < self.min_power:
             self.current_status = 0
             self.current_down_time += 1
             self.total_power_output.at[current_time] = 0

@@ -28,10 +28,11 @@ services:
     environment:
       GF_SECURITY_ALLOW_EMBEDDING: "true"
       GF_AUTH_ANONYMOUS_ENABLED: "true"
-      GF_INSTALL_PLUGINS: volkovlabs-echarts-panel
+      GF_INSTALL_PLUGINS: "marcusolsson-dynamictext-panel"
       GF_SECURITY_ADMIN_USER: assume
       GF_SECURITY_ADMIN_PASSWORD: "assume"
     volumes:
+      - ./docker_configs/grafana.ini:/etc/grafana/grafana.ini
       - ./docker_configs/datasources:/etc/grafana/provisioning/datasources
       - ./docker_configs/dashboards:/etc/grafana/provisioning/dashboards
       - ./docker_configs/dashboard-definitions:/etc/grafana/provisioning/dashboard-definitions
