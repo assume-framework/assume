@@ -71,5 +71,5 @@ class Demand(BaseUnit):
 
         return {"max_power": {"power": -bid_volume, "marginal_cost": bid_price}}
 
-    def get_dispatch_plan(self, dispatch_plan, current_time):
-        self.total_capacity.at[current_time] = dispatch_plan["total_power"]
+    def get_dispatch_plan(self, dispatch_plan, time_period):
+        self.total_capacity.loc[time_period] = dispatch_plan["total_power"]
