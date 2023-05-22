@@ -55,7 +55,7 @@ class flexableEOM(BaseStrategy):
                     operational_window["max_power"]["power"] - bid_quantity_inflex
                 )
                 bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
-        
+
         bids = [
             {"price": bid_price_inflex, "volume": bid_quantity_inflex},
             {"price": bid_price_flex, "volume": bid_quantity_flex},
@@ -88,7 +88,9 @@ class flexableEOM(BaseStrategy):
         t = self.current_time
 
         starting_cost = self.get_starting_costs(time=unit.min_down_time, unit=unit)
-        price_reduction_restart = starting_cost / unit.min_down_time / bid_quantity_inflex
+        price_reduction_restart = (
+            starting_cost / unit.min_down_time / bid_quantity_inflex
+        )
 
         if unit.total_heat_output[t] > 0:
             heat_gen_cost = (

@@ -239,7 +239,7 @@ class UnitsOperator(Role):
                             volume = round(volume / market.volume_tick)
                         if market.price_tick:
                             price = round(price / market.price_tick)
-                            
+
                         order_c = order.copy()
                         order_c["volume"] = volume
                         order_c["price"] = price
