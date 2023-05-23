@@ -530,7 +530,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -674,7 +675,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -690,7 +692,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 74
+        "y": 38
       },
       "id": 19,
       "options": {
@@ -722,13 +724,13 @@
             },
             {
               "params": [
-                "bid_id"
+                "unit_id"
               ],
               "type": "column"
             }
           ],
           "metricColumn": "none",
-          "rawQuery": false,
+          "rawQuery": true,
           "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(original_price) AS \"price\",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_name = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1",
           "refId": "A",
           "select": [
@@ -755,13 +757,13 @@
             [
               {
                 "params": [
-                  "bid_id"
+                  "unit_id"
                 ],
                 "type": "column"
               },
               {
                 "params": [
-                  "bid_id"
+                  "unit_id"
                 ],
                 "type": "alias"
               }
@@ -848,7 +850,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -864,7 +867,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 74
+        "y": 38
       },
       "id": 20,
       "options": {
@@ -896,13 +899,13 @@
             },
             {
               "params": [
-                "bid_id"
+                "unit_id"
               ],
               "type": "column"
             }
           ],
           "metricColumn": "none",
-          "rawQuery": false,
+          "rawQuery": true,
           "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(volume) AS \"volume\",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_name = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1",
           "refId": "A",
           "select": [
@@ -929,13 +932,13 @@
             [
               {
                 "params": [
-                  "bid_id"
+                  "unit_id"
                 ],
                 "type": "column"
               },
               {
                 "params": [
-                  "bid_id"
+                  "unit_id"
                 ],
                 "type": "alias"
               }
@@ -982,7 +985,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 82
+        "y": 46
       },
       "id": 32,
       "panels": [],
@@ -1001,7 +1004,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 83
+        "y": 47
       },
       "id": 22,
       "options": {
@@ -1095,7 +1098,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1111,7 +1115,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 86
+        "y": 50
       },
       "id": 24,
       "options": {
@@ -1136,7 +1140,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"power\",\n  bid_id\nFROM unit_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  bid_id = $unit_id\nGROUP BY 1, bid_id, power\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"power\",\n  unit_id\nFROM unit_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id = $unit_id\nGROUP BY 1, unit_id, power\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -1172,7 +1176,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 86
+        "y": 50
       },
       "id": 26,
       "options": {
@@ -1235,8 +1239,8 @@
       {
         "current": {
           "selected": false,
-          "text": "example_01",
-          "value": "example_01"
+          "text": "example_01a",
+          "value": "example_01a"
         },
         "datasource": {
           "type": "postgres",
@@ -1294,7 +1298,7 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT \n  distinct bid_id\nFROM unit_dispatch\nwhere simulation = '$simulation' group by bid_id;",
+        "definition": "SELECT \n  distinct unit_id\nFROM unit_dispatch\nwhere simulation = '$simulation' group by unit_id;",
         "description": "Can choose which units we want to display ",
         "hide": 0,
         "includeAll": false,
@@ -1302,7 +1306,7 @@
         "multi": true,
         "name": "unit_id",
         "options": [],
-        "query": "SELECT \n  distinct bid_id\nFROM unit_dispatch\nwhere simulation = '$simulation' group by bid_id;",
+        "query": "SELECT \n  distinct unit_id\nFROM unit_dispatch\nwhere simulation = '$simulation' group by unit_id;",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
