@@ -26,6 +26,7 @@ class UnitsOperator(Role):
     ):
         super().__init__()
 
+        self.bids_map = {}
         self.available_markets = available_markets
         self.registered_markets: dict[str, MarketConfig] = {}
 
@@ -121,33 +122,40 @@ class UnitsOperator(Role):
         self.valid_orders = {unit_id: [] for unit_id in self.units.keys()}
         for bid in orderbook:
             self.valid_orders[self.bids_map[bid["bid_id"]]].append(bid)
-        # TODO fix send dispatch, as currently not awaited
-        # await self.send_dispatch_plan()
+        self.send_dispatch_plan(orderbook)
 
-    def send_dispatch_plan(self):
-        # todo group by unit_id
-        current_time = pd.to_datetime(self.context.current_timestamp, unit="s")
+    def send_dispatch_plan(self, orderbook):
+        time_period = [orderbook[0]["start_time"], orderbook[0]["end_time"]]
         for unit_id in self.units.keys():
-            total_capacity = 0.0
+            total_power = 0.0
             for bid in self.valid_orders[unit_id]:
-                total_capacity += bid["volume"]
+                total_power += bid["volume"]
 
-            dispatch_plan = {"total_capacity": total_capacity}
-            self.units[unit_id].get_dispatch_plan(dispatch_plan, current_time)
+            dispatch_plan = {"total_power": total_power}
+            self.units[unit_id].get_dispatch_plan(
+                dispatch_plan=dispatch_plan,
+                time_period=time_period,
+            )
 
+            logger.debug("Got Dispatch Plan: %s", dispatch_plan)
             db_aid = self.context.data_dict.get("output_agent_id")
             db_addr = self.context.data_dict.get("output_agent_addr")
-            if db_aid and db_addr:
+            if db_aid and db_addr and total_power != 0.0:
+                start = bid["start_time"]
+                end = bid["end_time"]
                 # send unit data to db agent to store it
                 message = {
                     "context": "write_results",
                     "type": "store_dispatch",
-                    "unit": self.units[unit_id],
-                    "unit_id": unit_id,
-                    "capacity": total_capacity,
-                    "timestamp": self.current_time,
+                    "data": {
+                        "technology": self.units[unit_id].technology,
+                        "unit_id": unit_id,
+                        "power": total_power,
+                        "start_time": start,
+                        "end_time": end,
+                    },
                 }
-                self.context.send_acl_message(
+                self.context.schedule_instant_acl_message(
                     receiver_id=db_aid,
                     receiver_addr=db_addr,
                     content=message,
@@ -219,7 +227,6 @@ class UnitsOperator(Role):
                 }
                 self.bids_map = {}
                 for unit_id, unit in self.units.items():
-                    order_c = order.copy()
                     # take price from bidding strategy
                     bids = unit.calculate_bids(
                         product_type=product_type,
@@ -233,6 +240,7 @@ class UnitsOperator(Role):
                         if market.price_tick:
                             price = round(price / market.price_tick)
 
+                        order_c = order.copy()
                         order_c["volume"] = volume
                         order_c["price"] = price
                         order_c["bid_id"] = f"{unit_id}_{i+1}"
