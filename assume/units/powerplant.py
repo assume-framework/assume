@@ -78,8 +78,10 @@ class PowerPlant(BaseUnit):
         self.current_status = 1
         self.current_down_time = self.min_down_time
 
-        self.total_power_output = pd.Series(0.0, index=self.index)
-        self.total_power_output.iat[0] = self.min_power
+        self.total_power_output = pd.Series(0, index=self.index)
+        self.total_power_output.loc[
+            self.index[0] : self.index[0] + pd.Timedelta("24h")
+        ] = self.min_power
 
         self.total_heat_output = pd.Series(0.0, index=self.index)
         self.power_loss_chp = pd.Series(0.0, index=self.index)
@@ -180,17 +182,17 @@ class PowerPlant(BaseUnit):
             product_tuple=product_tuple,
         )
 
-    def get_dispatch_plan(self, dispatch_plan, current_time):
+    def get_dispatch_plan(self, dispatch_plan, time_period):
         if dispatch_plan["total_power"] > self.min_power:
             self.market_success_list[-1] += 1
             self.current_status = 1
             self.current_down_time = 0
-            self.total_power_output.at[current_time] = dispatch_plan["total_power"]
+            self.total_power_output.loc[time_period] = dispatch_plan["total_power"]
 
         elif dispatch_plan["total_power"] < self.min_power:
             self.current_status = 0
             self.current_down_time += 1
-            self.total_power_output.at[current_time] = 0
+            self.total_power_output.loc[time_period] = 0
 
             if self.market_success_list[-1] != 0:
                 self.mean_market_success = sum(self.market_success_list) / len(

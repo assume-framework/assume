@@ -12,9 +12,10 @@ base_case:
     EOM:
       operator: EOM_operator
       product_type: energy
-      duration: 1h
-      count: 1
-      first_delivery: 1h
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh

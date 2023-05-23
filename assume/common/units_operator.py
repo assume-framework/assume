@@ -125,14 +125,17 @@ class UnitsOperator(Role):
         self.send_dispatch_plan(orderbook)
 
     def send_dispatch_plan(self, orderbook):
-        current_time = pd.to_datetime(self.context.current_timestamp, unit="s")
+        time_period = [orderbook[0]["start_time"], orderbook[0]["end_time"]]
         for unit_id in self.units.keys():
             total_power = 0.0
             for bid in self.valid_orders[unit_id]:
                 total_power += bid["volume"]
 
             dispatch_plan = {"total_power": total_power}
-            self.units[unit_id].get_dispatch_plan(dispatch_plan, current_time)
+            self.units[unit_id].get_dispatch_plan(
+                dispatch_plan=dispatch_plan,
+                time_period=time_period,
+            )
 
             logger.debug("Got Dispatch Plan: %s", dispatch_plan)
             db_aid = self.context.data_dict.get("output_agent_id")
@@ -224,7 +227,6 @@ class UnitsOperator(Role):
                 }
                 self.bids_map = {}
                 for unit_id, unit in self.units.items():
-                    order_c = order.copy()
                     # take price from bidding strategy
                     bids = unit.calculate_bids(
                         product_type=product_type,
@@ -238,6 +240,7 @@ class UnitsOperator(Role):
                         if market.price_tick:
                             price = round(price / market.price_tick)
 
+                        order_c = order.copy()
                         order_c["volume"] = volume
                         order_c["price"] = price
                         order_c["bid_id"] = f"{unit_id}_{i+1}"
