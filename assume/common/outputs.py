@@ -65,15 +65,17 @@ class WriteOutput(Role):
         # Get list of table names in database
         if self.db is not None:
             table_names = inspect(self.db.bind).get_table_names()
-
             # Iterate through each table
             for table_name in table_names:
-                # Read table into Pandas DataFrame
-                query = text(
-                    f"delete from {table_name} where simulation = '{self.simulation_id}'"
-                )
                 with self.db() as db:
-                    db.execute(query)
+                    # Read table into Pandas DataFrame
+                    query = text(
+                        f"delete from {table_name} where simulation = '{self.simulation_id}'"
+                    )
+                    rowcount = db.execute(query).rowcount
+                    # has to be done manually with raw queries
+                    db.commit()
+                    logger.debug("deleted %s rows from %s", rowcount, table_name)
 
     def setup(self):
         """
@@ -103,9 +105,6 @@ class WriteOutput(Role):
             meta: The metadata associated with the message. (not needed yet)
         """
 
-        if not isinstance(content, dict):
-            return False
-
         if content.get("type") == "store_order_book":
             self.write_market_orders(content.get("data"), content.get("sender"))
 
@@ -126,7 +125,7 @@ class WriteOutput(Role):
             market_meta: The market metadata, which includes the clearing price and volume.
         """
 
-        df = pd.DataFrame.from_dict(market_meta)
+        df = pd.DataFrame(market_meta)
         df["simulation"] = self.simulation_id
         self.write_dfs["market_meta"] = pd.concat(
             [self.write_dfs["market_meta"], df], axis=0
@@ -161,7 +160,7 @@ class WriteOutput(Role):
             market_name: The name of the market.
         """
 
-        df = pd.DataFrame.from_dict(market_result)
+        df = pd.DataFrame.from_records(market_result, index="start_time")
         del df["only_hours"]
         del df["agent_id"]
         df["simulation"] = self.simulation_id
@@ -203,7 +202,7 @@ class WriteOutput(Role):
         elif unit_type == "demand":
             del unit_params["bidding_strategies"]
 
-            df = pd.DataFrame.from_dict(unit_params)
+            df = pd.DataFrame(unit_params)
             df["type"] = unit_type
             df.reset_index(inplace=True)
             df = df.rename(columns={"level_0": "", "index": "Timestamp"})
@@ -230,13 +229,10 @@ class WriteOutput(Role):
         In the case that we have no portfolio optimisation this equals the bids.
 
         Args:
-            unit: The unit.
-            unit_id: The ID of the unit.
-            total_power_output: The total power output.
-            current_time: The current time.
+            data: The records to be put into the table.
+            Formatted like, "datetime, power, market_id, bid_id"
         """
-
-        df = pd.DataFrame.from_dict([data])
+        df = pd.DataFrame(data, columns=["datetime", "power", "market_id", "bid_id"])
         df["simulation"] = self.simulation_id
         self.write_dfs["unit_dispatch"] = pd.concat(
             [self.write_dfs["unit_dispatch"], df], axis=0
@@ -253,7 +249,7 @@ class WriteOutput(Role):
             "avg_price_mw": f"select name, avg(price) as avg_price from market_meta where simulation = '{self.simulation_id}' group by name",
             "total_cost": f"select name, sum(price*demand_volume) as total_cost from market_meta where simulation = '{self.simulation_id}' group by name",
             "total_volume": f"select name, sum(demand_volume) as total_volume from market_meta where simulation = '{self.simulation_id}' group by name",
-            "capacity_factor": f"select unit_id as name, avg(power/max_power) as capacity_factor from unit_dispatch ud join unit_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by name",
+            "capacity_factor": f"select bid_id as name, market_id, avg(power/max_power) as capacity_factor from unit_dispatch ud join unit_meta um on ud.bid_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by name, market_id",
         }
         dfs = []
         for value, query in queries.items():
@@ -266,4 +262,4 @@ class WriteOutput(Role):
             kpi_data_path = self.p.joinpath("kpis.csv")
             df.to_csv(kpi_data_path, mode="a", header=not kpi_data_path.exists())
         if self.db is not None and not df.empty:
-            df.to_sql("kpis", self.db.bind, if_exists="replace")
+            df.to_sql("kpis", self.db.bind, if_exists="append")

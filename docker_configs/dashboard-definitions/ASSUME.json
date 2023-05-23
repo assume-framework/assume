@@ -1136,7 +1136,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  power AS \"power\",\n  unit_id\nFROM unit_dispatch\nWHERE\n  $__timeFilter(start_time) AND\n  simulation = '$simulation' AND\n  unit_id = $unit_id\nGROUP BY 1, unit_id, power\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"power\",\n  bid_id\nFROM unit_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  bid_id = $unit_id\nGROUP BY 1, bid_id, power\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -1294,15 +1294,15 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT \n  unit_id\nFROM unit_dispatch\nwhere simulation = '$simulation' group by unit_id;",
-        "description": "Can choose which unit we want to display ",
+        "definition": "SELECT \n  distinct bid_id\nFROM unit_dispatch\nwhere simulation = '$simulation' group by bid_id;",
+        "description": "Can choose which units we want to display ",
         "hide": 0,
         "includeAll": false,
         "label": "",
         "multi": true,
         "name": "unit_id",
         "options": [],
-        "query": "SELECT \n  unit_id\nFROM unit_dispatch\nwhere simulation = '$simulation' group by unit_id;",
+        "query": "SELECT \n  distinct bid_id\nFROM unit_dispatch\nwhere simulation = '$simulation' group by bid_id;",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
