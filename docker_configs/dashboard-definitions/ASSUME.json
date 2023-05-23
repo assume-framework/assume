@@ -722,14 +722,14 @@
             },
             {
               "params": [
-                "bid_id"
+                "unit_id"
               ],
               "type": "column"
             }
           ],
           "metricColumn": "none",
           "rawQuery": false,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(original_price) AS \"price\",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_name = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(original_price) AS \"price\",\n  unit_id AS \"unit_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_name = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -755,13 +755,13 @@
             [
               {
                 "params": [
-                  "bid_id"
+                  "unit_id"
                 ],
                 "type": "column"
               },
               {
                 "params": [
-                  "bid_id"
+                  "unit_id"
                 ],
                 "type": "alias"
               }
@@ -896,14 +896,14 @@
             },
             {
               "params": [
-                "bid_id"
+                "unit_id"
               ],
               "type": "column"
             }
           ],
           "metricColumn": "none",
           "rawQuery": false,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(volume) AS \"volume\",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_name = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(volume) AS \"volume\",\n  unit_id AS \"unit_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_name = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -929,13 +929,13 @@
             [
               {
                 "params": [
-                  "bid_id"
+                  "unit_id"
                 ],
                 "type": "column"
               },
               {
                 "params": [
-                  "bid_id"
+                  "unit_id"
                 ],
                 "type": "alias"
               }
@@ -1136,7 +1136,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"power\",\n  bid_id\nFROM unit_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  bid_id = $unit_id\nGROUP BY 1, bid_id, power\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"power\",\n  unit_id\nFROM unit_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id = $unit_id\nGROUP BY 1, unit_id, power\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -1294,7 +1294,7 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT \n  distinct bid_id\nFROM unit_dispatch\nwhere simulation = '$simulation' group by bid_id;",
+        "definition": "SELECT \n  distinct unit_id\nFROM unit_dispatch\nwhere simulation = '$simulation' group by unit_id;",
         "description": "Can choose which units we want to display ",
         "hide": 0,
         "includeAll": false,
@@ -1302,7 +1302,7 @@
         "multi": true,
         "name": "unit_id",
         "options": [],
-        "query": "SELECT \n  distinct bid_id\nFROM unit_dispatch\nwhere simulation = '$simulation' group by bid_id;",
+        "query": "SELECT \n  distinct unit_id\nFROM unit_dispatch\nwhere simulation = '$simulation' group by unit_id;",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,

@@ -230,9 +230,9 @@ class WriteOutput(Role):
 
         Args:
             data: The records to be put into the table.
-            Formatted like, "datetime, power, market_id, bid_id"
+            Formatted like, "datetime, power, market_id, unit_id"
         """
-        df = pd.DataFrame(data, columns=["datetime", "power", "market_id", "bid_id"])
+        df = pd.DataFrame(data, columns=["datetime", "power", "market_id", "unit_id"])
         df["simulation"] = self.simulation_id
         self.write_dfs["unit_dispatch"] = pd.concat(
             [self.write_dfs["unit_dispatch"], df], axis=0
@@ -249,7 +249,7 @@ class WriteOutput(Role):
             "avg_price_mw": f"select name, avg(price) as avg_price from market_meta where simulation = '{self.simulation_id}' group by name",
             "total_cost": f"select name, sum(price*demand_volume) as total_cost from market_meta where simulation = '{self.simulation_id}' group by name",
             "total_volume": f"select name, sum(demand_volume) as total_volume from market_meta where simulation = '{self.simulation_id}' group by name",
-            "capacity_factor": f"select bid_id as name, market_id, avg(power/max_power) as capacity_factor from unit_dispatch ud join unit_meta um on ud.bid_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by name, market_id",
+            "capacity_factor": f"select unit_id as name, market_id, avg(power/max_power) as capacity_factor from unit_dispatch ud join unit_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by name, market_id",
         }
         dfs = []
         for value, query in queries.items():

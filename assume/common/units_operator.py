@@ -1,5 +1,7 @@
 import logging
 from datetime import datetime
+from itertools import groupby
+from operator import itemgetter
 from pathlib import Path
 
 import pandas as pd
@@ -124,6 +126,8 @@ class UnitsOperator(Role):
         orderbook: Orderbook = content["orderbook"]
         for order in orderbook:
             order["market_id"] = content["market_id"]
+            # map bid id to unit id
+            order["unit_id"] = self.bids_map[order["bid_id"]]
         self.valid_orders.extend(orderbook)
         self.write_actual_dispatch()
         self.send_unit_dispatch(orderbook)
@@ -136,14 +140,8 @@ class UnitsOperator(Role):
         """
         time_period = [orderbook[0]["start_time"], orderbook[0]["end_time"]]
 
-        unit_orders = {unit_id: [] for unit_id in self.units.keys()}
-        for bid in orderbook:
-            unit_orders[self.bids_map[bid["bid_id"]]].append(bid)
-        for unit_id in self.units.keys():
-            total_power = 0.0
-            for bid in unit_orders[unit_id]:
-                total_power += bid["volume"]
-
+        for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
+            total_power = sum(map(itemgetter("volume"), orders))
             dispatch_plan = {"total_power": total_power}
             self.units[unit_id].get_dispatch_plan(
                 dispatch_plan=dispatch_plan,
@@ -162,7 +160,7 @@ class UnitsOperator(Role):
         start = datetime.fromtimestamp(last)
 
         actual_dispatch = aggregate_step_amount(
-            self.valid_orders, start, now, groupby=["market_id", "bid_id"]
+            self.valid_orders, start, now, groupby=["market_id", "unit_id"]
         )
 
         db_aid = self.context.data_dict.get("output_agent_id")
