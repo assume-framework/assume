@@ -13,9 +13,10 @@ class HeatPump(BaseUnit):
         max_thermal_output: float or pd.Series,
         min_thermal_output: float or pd.Series,
         cop_curve: dict,
-        electricity_price: float,
-        ramp_up: float,
-        ramp_down: float,
+        volume: float or pd.Series = 1000,
+        electricity_price: float or pd.Series = 3000,
+        ramp_up: float = -1,
+        ramp_down: float = 1,
         fixed_cost: float = 0,
         min_operating_time: float = 0,
         min_down_time: float = 0,
@@ -30,7 +31,7 @@ class HeatPump(BaseUnit):
         **kwargs,
     ):
         super().__init__(
-            id, 
+            id=id,
             technology=technology, 
             node=node,
             bidding_strategies=bidding_strategies,
@@ -40,7 +41,10 @@ class HeatPump(BaseUnit):
         self.source_temp = source_temp
         self.sink_temp = sink_temp
         self.cop_curve = cop_curve
+        self.max_thermal_output = min_thermal_output
+        self.min_thermal_output = min_thermal_output
 
+        self.volume = volume
         self.electricity_price =(
             electricity_price if electricity_price is not None else pd.Series(0, index=index)
         )
@@ -63,15 +67,14 @@ class HeatPump(BaseUnit):
         self.current_down_time = self.min_down_time
 
         self.total_thermal_output = pd.Series(0.0, index=self.index)
-        self.total_thermal_output.iat[0] = self.min_power
+        self.total_thermal_output.loc[
+            self.index[0] : self.index[0] + pd.Timedelta("24h")
+        ] = self.min_thermal_output
 
         self.pos_capacity_reserve = pd.Series(0.0, index=self.index)
         self.neg_capacity_reserve = pd.Series(0.0, index=self.index)
 
-        self.mean_market_success = 0
-        self.market_success_list = [0]
-
-    def calculate_delta_t(source_temp, sink_temp):
+    def calculate_delta_t(self, source_temp, sink_temp):
         """
         Calculates the temperature difference between the source and sink temperatures for a heat pump.
         
@@ -85,7 +88,7 @@ class HeatPump(BaseUnit):
         delta_t = sink_temp - source_temp
         return delta_t
     
-    def calculate_cop(delta_t, source="air"):
+    def calculate_cop(self, delta_t, source="air"):
         """
         Calculates the COP of a heat pump given the temperature difference between the source and sink temperatures.
         
@@ -111,8 +114,6 @@ class HeatPump(BaseUnit):
         source: str,
         product_type: str,
         product_tuple: tuple,
-        current_time: pd.Timestamp, 
-        demand_response_signal=None
     ) -> dict:
         """Calculate the operation window for the next time step.
 
@@ -124,20 +125,22 @@ class HeatPump(BaseUnit):
         start, end, only_hours = product_tuple
         start = pd.Timestamp(start)
         end = pd.Timestamp(end)
-
+        timestep: pd.Timestamp
         cop = self.calculate_cop(source)
-
-        # Calculate the maximum and minimum heat that can be produced during the time window
-        #max_heat = min(self.max_heat, self.calculate_cop(source=source) * self.max_power)
-        #min_heat = min(self.min_heat, self.calculate_cop(source=source) * self.min_power)
         
         if self.current_status == 0 and self.current_down_time < self.min_down_time:
             return None
         
         # Calculate the maximum and minimum heat that can be produced during the time window
-        max_power = self.max_thermal_output.loc[current_time]/ cop.loc[current_time]
-        min_power = self.min_thermal_output.loc[current_time]/ cop.loc[current_time]
-        current_power_input = self.total_thermal_output.loc[current_time]/ cop.loc[current_time]
+        max_power = self.max_thermal_output.at[timestep] / cop.at[timestep]
+
+        min_power = self.min_thermal_output.at[timestep] / cop.at[timestep]
+        if type(self.min_thermal_output) == pd.Series:
+            bid_volume = min_power[start]
+        else:
+            bid_volume = self.volume
+
+        current_power_input = self.total_thermal_output.at[timestep] / cop.at[timestep]
 
         # check if min_power is a series or a float
         min_thermal_output = (
@@ -174,34 +177,28 @@ class HeatPump(BaseUnit):
         operational_window = {
             "window": {"start": start, "end": end},
             "current_power": {
-                "power": current_power_input,
+                "power": -current_power_input,
                 "marginal_cost": self.calc_marginal_cost(
-                    source,
+                    source=source,
                     timestep=start,
                 ),
             },
             "min_power": {
-                "power": min_power,
+                "power": -min_power,
                 "marginal_cost": self.calc_marginal_cost(
-                    source,
+                    source=source,
                     timestep=start,
                 ),
             },
             "max_power": {
-                "power": max_power,
+                "power": -max_power,
                 "marginal_cost": self.calc_marginal_cost(
-                    source,
+                    source=source,
                     timestep=start,
                 ),
             },
         }
-        
-        if demand_response_signal is not None:
-            # If demand response signal is high, reduce heat output by the specified factor
-            if demand_response_signal > 0:
-                operational_window["current_heat_output"]["heat"] *= 1 - self.dr_factor
-                operational_window["min_heat_output"]["heat"] *= 1 - self.dr_factor
-                operational_window["max_heat_output"]["heat"] *= 1 - self.dr_factor
+
         return operational_window
     
     def calculate_bids(
@@ -216,7 +213,6 @@ class HeatPump(BaseUnit):
     
     def get_dispatch_plan(self, dispatch_plan, current_time):
         if dispatch_plan["total_capacity"] > self.min_power:
-            self.market_success_list[-1] += 1
             self.current_status = 1
             self.current_down_time = 0
             self.total_thermal_output.at[current_time] = dispatch_plan["total_capacity"]
@@ -225,14 +221,12 @@ class HeatPump(BaseUnit):
             self.current_status = 0
             self.current_down_time += 1
             self.total_thermal_output.at[current_time] = 0
-
-            if self.market_success_list[-1] != 0:
-                self.mean_market_success = sum(self.market_success_list) / len(
-                    self.market_success_list
-                )
-                self.market_success_list.append(0)
     
-    def calc_marginal_cost(self, current_time: pd.Timestamp, source) -> float:
+    def calc_marginal_cost(
+            self,
+            timestep: pd.Timestamp,
+            source: str
+    ) -> float or pd.Series:
         """
         Calculate the marginal cost for the heat pump at the given time step.
 
@@ -243,12 +237,15 @@ class HeatPump(BaseUnit):
 
         Returns
         -------
-        marginal_cost : float
-            The calculated marginal cost.
+        bid_price : float
+            The calculated bid_price.
         """
-        electricity_price = self.electricity_price.loc[current_time]
         cop = self.calculate_cop(source)
-        cop_t = self.cop.loc[current_time]
-        marginal_cost = electricity_price / cop_t
+        cop_t = cop.loc[timestep]
 
-        return marginal_cost
+        if type(self.electricity_price) == pd.Series:
+            bid_price = self.electricity_price.at[timestep] / cop_t
+        else:
+            bid_price = self.electricity_price / cop_t
+
+        return bid_price
