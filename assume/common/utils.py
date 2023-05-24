@@ -349,5 +349,5 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=No
                 d_list = list(d_tuple)
                 d_list[1] = current_power[groupdata]
                 aggregation.append(d_list)
-    
+
     return aggregation
