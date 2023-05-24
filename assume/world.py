@@ -177,7 +177,7 @@ class World:
         await self.setup(self.start)
 
         # read writing properties form config
-        simulation_id = config["id"]
+        simulation_id = study_case
         save_frequency_hours = config.get("save_frequency_hours", None)
 
         # Add output agent to world

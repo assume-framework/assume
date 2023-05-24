@@ -25,3 +25,12 @@ if __name__ == "__main__":
         study_case=study_case,
     )
     world.run()
+
+    study_case = "crm_case"
+    world = World(database_uri=DATABASE_URI, export_csv_path=EXPORT_CSV_PATH)
+    world.load_scenario(
+        inputs_path="examples/inputs",
+        scenario=scenario,
+        study_case=study_case,
+    )
+    world.run()

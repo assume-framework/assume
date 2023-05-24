@@ -1,5 +1,4 @@
-base_case:
-  id: example_01a
+example_01a:
   start_date: 2019-01-01 00:00
   end_date: 2019-01-11 00:00
   time_step: 1h
