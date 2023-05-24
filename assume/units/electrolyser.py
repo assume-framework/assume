@@ -41,7 +41,9 @@ class Electrolyser(BaseUnit):
         self.efficiency = efficiency
         self.volume = volume
         self.electricity_price = (
-            electricity_price if electricity_price is not None else pd.Series(0, index=index)
+            electricity_price
+            if electricity_price is not None
+            else pd.Series(0, index=index)
         )
         self.fixed_cost = fixed_cost
         self.ramp_up = ramp_up
@@ -131,7 +133,9 @@ class Electrolyser(BaseUnit):
         if dispatch_plan["total_capacity"] > self.min_power:
             self.current_status = 1
             self.current_down_time = 0
-            self.total_hydrogen_output.at[current_time] = dispatch_plan["total_capacity"]
+            self.total_hydrogen_output.at[current_time] = dispatch_plan[
+                "total_capacity"
+            ]
 
         elif dispatch_plan["total_capacity"] < self.min_power:
             self.current_status = 0

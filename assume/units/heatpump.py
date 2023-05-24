@@ -27,16 +27,16 @@ class HeatPump(BaseUnit):
         index: pd.DatetimeIndex = None,
         location: tuple[float, float] = None,
         node: str = None,
-        dr_factor= None,
+        dr_factor=None,
         **kwargs,
     ):
         super().__init__(
             id=id,
-            technology=technology, 
+            technology=technology,
             node=node,
             bidding_strategies=bidding_strategies,
             index=index,
-            )
+        )
 
         self.source_temp = source_temp
         self.sink_temp = sink_temp
@@ -45,8 +45,10 @@ class HeatPump(BaseUnit):
         self.min_thermal_output = min_thermal_output
 
         self.volume = volume
-        self.electricity_price =(
-            electricity_price if electricity_price is not None else pd.Series(0, index=index)
+        self.electricity_price = (
+            electricity_price
+            if electricity_price is not None
+            else pd.Series(0, index=index)
         )
         self.fixed_cost = fixed_cost
 
@@ -74,39 +76,39 @@ class HeatPump(BaseUnit):
         self.pos_capacity_reserve = pd.Series(0.0, index=self.index)
         self.neg_capacity_reserve = pd.Series(0.0, index=self.index)
 
-    def calculate_delta_t(self, source_temp, sink_temp):
+    def calculate_delta_t(self, source_temp, sink_temp, timestep: pd.Timestamp):
         """
         Calculates the temperature difference between the source and sink temperatures for a heat pump.
-        
+
         Parameters:
         source_temperature (float): the current temperature of the heat source, in degrees Celsius
         sink_temperature (float): the current temperature of the heat sink, in degrees Celsius
-        
+
         Returns:
         float: the temperature difference between the source and sink temperatures, in degrees Celsius
         """
-        delta_t = sink_temp - source_temp
+        delta_t = sink_temp.at[timestep] - source_temp.at[timestep]
         return delta_t
-    
+
     def calculate_cop(self, delta_t, source="air"):
         """
         Calculates the COP of a heat pump given the temperature difference between the source and sink temperatures.
-        
+
         Parameters:
         delta_t (float): temperature difference between the source and sink temperatures, in degrees Celsius
         heat_pump_type (str): type of heat pump, either 'ASHP' for air-sourced heat pumps or 'GSHP' for ground-sourced heat pumps
-        
+
         Returns:
         float: the calculated COP
         """
-        
-        if source =="air":
-            cop = 6.81 + 0.121 * delta_t + 0.000630 * delta_t ** 2
-        elif source == 'soil':
-            cop = 8.77 + 0.150 * delta_t + 0.000734 * delta_t ** 2
+
+        if source == "air":
+            cop = 6.81 + 0.121 * delta_t + 0.000630 * delta_t**2
+        elif source == "soil":
+            cop = 8.77 + 0.150 * delta_t + 0.000734 * delta_t**2
         else:
             raise ValueError("Invalid heat pump type. Must be either 'ASHP' or 'GSHP'")
-            
+
         return cop
 
     def calculate_operational_window(
@@ -127,10 +129,10 @@ class HeatPump(BaseUnit):
         end = pd.Timestamp(end)
         timestep: pd.Timestamp
         cop = self.calculate_cop(source)
-        
+
         if self.current_status == 0 and self.current_down_time < self.min_down_time:
             return None
-        
+
         # Calculate the maximum and minimum heat that can be produced during the time window
         max_power = self.max_thermal_output.at[timestep] / cop.at[timestep]
 
@@ -200,7 +202,7 @@ class HeatPump(BaseUnit):
         }
 
         return operational_window
-    
+
     def calculate_bids(
         self,
         product_type,
@@ -210,7 +212,7 @@ class HeatPump(BaseUnit):
             product_type=product_type,
             product_tuple=product_tuple,
         )
-    
+
     def get_dispatch_plan(self, dispatch_plan, current_time):
         if dispatch_plan["total_capacity"] > self.min_power:
             self.current_status = 1
@@ -221,11 +223,9 @@ class HeatPump(BaseUnit):
             self.current_status = 0
             self.current_down_time += 1
             self.total_thermal_output.at[current_time] = 0
-    
+
     def calc_marginal_cost(
-            self,
-            timestep: pd.Timestamp,
-            source: str
+        self, timestep: pd.Timestamp, source: str
     ) -> float or pd.Series:
         """
         Calculate the marginal cost for the heat pump at the given time step.
