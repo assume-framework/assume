@@ -24,4 +24,4 @@ if __name__ == "__main__":
         scenario=scenario,
         study_case=study_case,
     )
-    world.run()
+    # world.run()

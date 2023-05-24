@@ -1,0 +1,6 @@
+name,type,max_volume,min_volume,unit_operator
+demand_DE,energy,1000000,1000000,eom_de
+pos_capacity_DE,capacity,1000000,1000000,crm_de
+neg_capacity_DE,capacity,1000000,1000000,crm_de
+pos_reserve_energy_DE,energy,1000000,1000000,crm_de
+neg_reserve_energy_DE,energy,1000000,1000000,crm_de

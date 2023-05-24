@@ -25,9 +25,9 @@ class Demand(BaseUnit):
     def __init__(
         self,
         id: str,
-        technology: str,
         bidding_strategies: dict,
         index: pd.DatetimeIndex,
+        technology: str = "inflex_demand",
         node: str = "bus0",
         price: float or pd.Series = 3000.0,
         volume: float or pd.Series = 1000,
