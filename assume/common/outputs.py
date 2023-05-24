@@ -184,13 +184,10 @@ class WriteOutput(Role):
             unit_info = {
                 unit.id: {
                     "simulation": self.simulation_id,
+                    "unit_type": unit_type,
                     "technology": unit.technology,
-                    "max_power": unit.max_power
-                    if type(unit.max_power) == float
-                    else "variable",
-                    "min_power": unit.min_power
-                    if type(unit.min_power) == float
-                    else "variable",
+                    "max_power": unit.max_power,
+                    "min_power": unit.min_power,
                     "emission_factor": unit.emission_factor,
                     "efficiency": unit.efficiency,
                     "unit_operator": unit.unit_operator,
@@ -205,13 +202,10 @@ class WriteOutput(Role):
             unit_info = {
                 unit.id: {
                     "simulation": self.simulation_id,
+                    "unit_type": unit_type,
                     "technology": unit.technology,
-                    "max_power": unit.max_power
-                    if type(unit.max_power) == float
-                    else "variable",
-                    "min_power": unit.min_power
-                    if type(unit.min_power) == float
-                    else "variable",
+                    "max_power": unit.max_power,
+                    "min_power": unit.min_power,
                     "unit_operator": unit.unit_operator,
                 }
             }

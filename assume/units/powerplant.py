@@ -13,6 +13,7 @@ class PowerPlant(BaseUnit):
         index: pd.DatetimeIndex,
         max_power: float or pd.Series,
         min_power: float or pd.Series = 0.0,
+        capacity_factor: float or pd.Series = 1.0,
         efficiency: float = 1,
         partial_load_eff: bool = False,
         fuel_type: str = "others",
@@ -47,6 +48,7 @@ class PowerPlant(BaseUnit):
 
         self.max_power = max_power
         self.min_power = min_power
+        self.capacity_factor = capacity_factor
         self.efficiency = efficiency
         self.partial_load_eff = partial_load_eff
         self.fuel_type = fuel_type
@@ -80,7 +82,7 @@ class PowerPlant(BaseUnit):
         self.current_status = 1
         self.current_down_time = self.min_down_time
 
-        self.total_power_output = pd.Series(0, index=self.index)
+        self.total_power_output = pd.Series(0.0, index=self.index)
         self.total_power_output.loc[
             self.index[0] : self.index[0] + pd.Timedelta("24h")
         ] = self.min_power
@@ -133,9 +135,9 @@ class PowerPlant(BaseUnit):
 
         # check if max_power is a series or a float
         max_power = (
-            self.max_power.at[start]
-            if type(self.max_power) is pd.Series
-            else self.max_power
+            self.capacity_factor.at[start] * self.max_power
+            if type(self.capacity_factor) is pd.Series
+            else self.capacity_factor * self.max_power
         )
 
         # adjust for ramp up speed

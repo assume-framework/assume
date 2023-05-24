@@ -156,10 +156,10 @@ class World:
             index=self.index,
         )
 
-        vre_df = load_file(
+        vre_cf_df = load_file(
             path=path,
             config=config,
-            file_name="renewable_generation",
+            file_name="vre_cf_df",
             index=self.index,
         )
 
@@ -255,8 +255,8 @@ class World:
                 unit_params["fuel_price"] = fuel_prices_df[unit_params["fuel_type"]]
                 unit_params["co2_price"] = fuel_prices_df["co2"]
 
-            if vre_df is not None and unit_name in vre_df.columns:
-                unit_params["max_power"] = vre_df[unit_name]
+            if vre_cf_df is not None and unit_name in vre_cf_df.columns:
+                unit_params["capacity_factor"] = vre_cf_df[unit_name]
 
             await self.add_unit(
                 id=unit_name,
@@ -284,7 +284,7 @@ class World:
                 }
 
             if demand_df is not None and unit_name in demand_df.columns:
-                unit_params["max_power"] = demand_df[unit_name]
+                unit_params["volume"] = demand_df[unit_name]
 
             await self.add_unit(
                 id=unit_name,

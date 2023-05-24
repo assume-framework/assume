@@ -31,6 +31,7 @@ class Demand(BaseUnit):
         index: pd.DatetimeIndex,
         max_power: float or pd.Series,
         min_power: float or pd.Series,
+        volume: float or pd.Series,
         node: str = "bus0",
         price: float or pd.Series = 3000.0,
         location: tuple[float, float] = (0.0, 0.0),
@@ -47,6 +48,7 @@ class Demand(BaseUnit):
 
         self.max_power = max_power
         self.min_power = min_power
+        self.volume = volume
         self.price = price
         self.location = location
         self.total_power_output = []
@@ -63,10 +65,10 @@ class Demand(BaseUnit):
         start = pd.Timestamp(start)
         end = pd.Timestamp(end)
         """Calculate the operation window for the next time step."""
-        if type(self.max_power) == pd.Series:
-            bid_volume = self.max_power.loc[start]
+        if type(self.volume) == pd.Series:
+            bid_volume = self.volume.loc[start]
         else:
-            bid_volume = self.max_power
+            bid_volume = self.volume
 
         if type(self.price) == pd.Series:
             bid_price = self.price.loc[start]
