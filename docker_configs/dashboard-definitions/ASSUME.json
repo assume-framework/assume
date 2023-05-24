@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": 2,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -74,8 +74,8 @@
       },
       "description": "",
       "gridPos": {
-        "h": 3,
-        "w": 24,
+        "h": 11,
+        "w": 11,
         "x": 0,
         "y": 5
       },
@@ -131,116 +131,6 @@
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
-      "description": "TODO change to higehst demand (capacity) over all timesteps",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "megwatt"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 11,
-        "w": 6,
-        "x": 0,
-        "y": 8
-      },
-      "id": 9,
-      "options": {
-        "barRadius": 0,
-        "barWidth": 0.97,
-        "groupWidth": 0.7,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "orientation": "auto",
-        "showValue": "auto",
-        "stacking": "none",
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        },
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "format": "table",
-          "group": [],
-          "metricColumn": "none",
-          "rawQuery": true,
-          "rawSql": "SELECT \n  NOW() as time_sec,\n  MAX(volume) as \"Demand Volume\",\n  type,\n  simulation\nFROM demand_meta\nWHERE \"simulation\" LIKE '$simulation'\nGROUP BY type, simulation;\n",
-          "refId": "A",
-          "select": [
-            [
-              {
-                "params": [
-                  "volume"
-                ],
-                "type": "column"
-              }
-            ]
-          ],
-          "table": "demand_meta",
-          "timeColumn": "index",
-          "timeColumnType": "int8",
-          "where": [
-            {
-              "name": "$__unixEpochFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        }
-      ],
-      "title": "System Demand",
-      "type": "barchart"
-    },
-    {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
-      },
       "description": "Shows installed capacities in the simulation based on the fuel type",
       "fieldConfig": {
         "defaults": {
@@ -262,8 +152,8 @@
       "gridPos": {
         "h": 11,
         "w": 12,
-        "x": 6,
-        "y": 8
+        "x": 11,
+        "y": 5
       },
       "id": 7,
       "options": {
@@ -307,7 +197,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT \n  NOW() as time_sec,\n  SUM(max_power),\n  fuel_type\nFROM unit_meta\nWHERE \"simulation\" LIKE '$simulation'\nGROUP BY fuel_type, simulation;\n\n\n",
+          "rawSql": "SELECT \n  NOW() as time_sec,\n  SUM(max_power),\n  technology\nFROM unit_meta\nWHERE \"simulation\" LIKE '$simulation'\nGROUP BY technology, simulation;\n\n\n",
           "refId": "Generation",
           "select": [
             [
@@ -352,7 +242,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 16
       },
       "id": 30,
       "panels": [],
@@ -368,7 +258,7 @@
         "h": 6,
         "w": 19,
         "x": 0,
-        "y": 20
+        "y": 17
       },
       "id": 17,
       "options": {
@@ -427,7 +317,7 @@
         "h": 6,
         "w": 5,
         "x": 19,
-        "y": 20
+        "y": 17
       },
       "id": 34,
       "options": {
@@ -571,7 +461,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 26
+        "y": 23
       },
       "id": 11,
       "maxPerRow": 4,
@@ -692,7 +582,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 38
+        "y": 35
       },
       "id": 19,
       "options": {
@@ -867,7 +757,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 38
+        "y": 35
       },
       "id": 20,
       "options": {
@@ -985,13 +875,13 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 46
+        "y": 43
       },
-      "id": 32,
+      "id": 41,
       "panels": [],
-      "repeat": "unit_id",
+      "repeat": "Gen_Units",
       "repeatDirection": "h",
-      "title": "Unit Data $unit_id",
+      "title": "Generation units $Gen_Units",
       "type": "row"
     },
     {
@@ -1004,7 +894,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 47
+        "y": 44
       },
       "id": 22,
       "options": {
@@ -1115,7 +1005,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 50
+        "y": 47
       },
       "id": 24,
       "options": {
@@ -1140,7 +1030,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"power\",\n  unit_id\nFROM unit_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id = $unit_id\nGROUP BY 1, unit_id, power\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"power\",\n  unit_id\nFROM unit_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id = $Gen_Units\nGROUP BY 1, unit_id, power\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -1176,11 +1066,11 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 50
+        "y": 47
       },
       "id": 26,
       "options": {
-        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\nFuel: {{fuel_type}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
+        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
         "defaultContent": "The query didn't return any results.",
         "editor": {
           "format": "auto",
@@ -1202,7 +1092,257 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT * FROM unit_meta\nWHERE index in ($unit_id) and simulation = '$simulation'\nlimit 1\n",
+          "rawSql": "SELECT * FROM unit_meta\nWHERE index in ($Gen_Units) and simulation = '$simulation'\nlimit 1\n",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "volume"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "demand_meta",
+          "timeColumn": "\"Timestamp\"",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Chosen Unit Specifications",
+      "type": "marcusolsson-dynamictext-panel"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 69
+      },
+      "id": 39,
+      "panels": [],
+      "repeat": "Demand_Units",
+      "repeatDirection": "h",
+      "title": "Demand units data $Demand_Units",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 70
+      },
+      "id": 35,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# Unit Specific Data\n\nFor the chosen market and the chosen unit here the dispatch is displayed.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "9.2.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": false,
+          "rawSql": "SELECT\n  \"Timestamp\" AS \"time\",\n  volume\nFROM demand_meta\nWHERE\n  $__timeFilter(\"Timestamp\")\nORDER BY 1",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "volume"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "demand_meta",
+          "timeColumn": "\"Timestamp\"",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "megwatt"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 18,
+        "x": 0,
+        "y": 73
+      },
+      "id": 36,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"power\",\n  unit_id\nFROM unit_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id = $Demand_Units\nGROUP BY 1, unit_id, power\nORDER BY 1",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "volume"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "demand_meta",
+          "timeColumn": "\"Timestamp\"",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Unitwise Dispatch",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 6,
+        "x": 18,
+        "y": 73
+      },
+      "id": 37,
+      "options": {
+        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
+        "defaultContent": "The query didn't return any results.",
+        "editor": {
+          "format": "auto",
+          "height": 200,
+          "language": "markdown"
+        },
+        "editors": [],
+        "everyRow": true,
+        "helpers": "",
+        "styles": ""
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "table",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT * FROM demand_meta\nWHERE index in ($Demand_Units) and simulation = '$simulation'\nlimit 1\n",
           "refId": "A",
           "select": [
             [
@@ -1278,7 +1418,7 @@
         "name": "market",
         "options": [],
         "query": "SELECT \n  name\nFROM market_meta\nwhere simulation='$simulation'\ngroup by name ;",
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
@@ -1288,9 +1428,11 @@
         "current": {
           "selected": true,
           "text": [
+            "KKW ISAR 2",
             "NEURATH F"
           ],
           "value": [
+            "KKW ISAR 2",
             "NEURATH F"
           ]
         },
@@ -1298,16 +1440,41 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT \n  distinct unit_id\nFROM unit_dispatch\nwhere simulation = '$simulation' group by unit_id;",
+        "definition": "SELECT index\nFROM unit_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which units we want to display ",
         "hide": 0,
         "includeAll": false,
         "label": "",
         "multi": true,
-        "name": "unit_id",
+        "name": "Gen_Units",
         "options": [],
-        "query": "SELECT \n  distinct unit_id\nFROM unit_dispatch\nwhere simulation = '$simulation' group by unit_id;",
-        "refresh": 1,
+        "query": "SELECT index\nFROM unit_meta\nwhere simulation = '$simulation';",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "demand_DE",
+          "value": "demand_DE"
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "P7B13B9DF907EC40C"
+        },
+        "definition": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
+        "description": "Can choose which units we want to display ",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
+        "multi": true,
+        "name": "Demand_Units",
+        "options": [],
+        "query": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
@@ -1322,7 +1489,7 @@
   "timepicker": {},
   "timezone": "",
   "title": "ASSUME",
-  "uid": "ap3RcmY4z",
-  "version": 11,
+  "uid": "-CM4svQ4z",
+  "version": 4,
   "weekStart": ""
 }

@@ -2,9 +2,9 @@ import asyncio
 import logging
 import time
 from datetime import datetime
-from pathlib import Path
 
 import nest_asyncio
+import numpy as np
 import pandas as pd
 import yaml
 from mango import RoleAgent, create_container
@@ -67,7 +67,7 @@ class World:
             "demand": Demand,
         }
         self.bidding_types = {
-            "simple": NaiveStrategy,
+            "naive": NaiveStrategy,
             "flexable_eom": flexableEOM,
         }
         self.clearing_mechanisms = {
@@ -124,22 +124,43 @@ class World:
         # tries to load all files, returns a warning if file does not exist
         # also attempts to resample the inputs if their resolution is higher than user specified time step
         self.logger.info("Loading input data")
-        powerplants_df = load_file(path=path, config=config, file_name="powerplants")
+        powerplant_units = load_file(
+            path=path,
+            config=config,
+            file_name="powerplant_units",
+        )
 
-        # storage_units_df = load_file(
-        #     path=path, config=config, file_name="storage_units"
-        # )
+        storage_units = load_file(
+            path=path,
+            config=config,
+            file_name="storage_units",
+        )
+
+        demand_units = load_file(
+            path=path,
+            config=config,
+            file_name="demand_units",
+        )
 
         fuel_prices_df = load_file(
-            path=path, config=config, file_name="fuel_prices", index=self.index
+            path=path,
+            config=config,
+            file_name="fuel_prices",
+            index=self.index,
         )
 
         demand_df = load_file(
-            path=path, config=config, file_name="demand", index=self.index
+            path=path,
+            config=config,
+            file_name="demand_df",
+            index=self.index,
         )
 
-        vre_df = load_file(
-            path=path, config=config, file_name="renewable_generation", index=self.index
+        vre_cf_df = load_file(
+            path=path,
+            config=config,
+            file_name="vre_cf_df",
+            index=self.index,
         )
 
         bidding_strategies_df = load_file(
@@ -147,8 +168,11 @@ class World:
         )
 
         # cross_border_flows_df = load_file(
-        #     path=path, config=config, file_name="cross_border_flows", index=self.index
+        #     path=path, config=config, file_name="cross_border_flows", index=self.index,
         # )
+
+        if powerplant_units is None or demand_units is None:
+            raise ValueError("No power plant and demand units were provided!")
 
         await self.setup(self.start)
 
@@ -189,27 +213,39 @@ class World:
 
         # add the unit operators using unique unit operator names in the powerplants csv
         self.logger.info("Adding unit operators")
-        for company_name in powerplants_df.unit_operator.unique():
+        all_operators = np.concatenate(
+            [
+                powerplant_units.unit_operator.unique(),
+                demand_units.unit_operator.unique(),
+            ]
+        )
+
+        if storage_units is not None:
+            all_operators = np.concatenate(
+                [all_operators, storage_units.unit_operator.unique()]
+            )
+
+        for company_name in all_operators:
             self.add_unit_operator(id=str(company_name))
 
         # add the units to corresponsing unit operators
         # if fuel prices are provided, add them to the unit params
         # if vre generation is provided, add them to the vre units
         self.logger.info("Adding power plant units")
-        for pp_name, unit_params in powerplants_df.iterrows():
+        for unit_name, unit_params in powerplant_units.iterrows():
             if (
                 bidding_strategies_df is not None
-                and pp_name in bidding_strategies_df.index
+                and unit_name in bidding_strategies_df.index
             ):
                 unit_params["bidding_strategies"] = bidding_strategies_df.loc[
-                    pp_name
+                    unit_name
                 ].to_dict()
             else:
                 self.logger.warning(
-                    f"No bidding strategies specified for {pp_name}. Using default strategies."
+                    f"No bidding strategies specified for {unit_name}. Using default strategies."
                 )
                 unit_params["bidding_strategies"] = {
-                    market.product_type: "simple" for market in self.markets.values()
+                    market.product_type: "naive" for market in self.markets.values()
                 }
 
             if (
@@ -219,11 +255,11 @@ class World:
                 unit_params["fuel_price"] = fuel_prices_df[unit_params["fuel_type"]]
                 unit_params["co2_price"] = fuel_prices_df["co2"]
 
-            if vre_df is not None and pp_name in vre_df.columns:
-                unit_params["max_power"] = vre_df[pp_name]
+            if vre_cf_df is not None and unit_name in vre_cf_df.columns:
+                unit_params["capacity_factor"] = vre_cf_df[unit_name]
 
             await self.add_unit(
-                id=pp_name,
+                id=unit_name,
                 unit_type="power_plant",
                 unit_operator_id=unit_params["unit_operator"],
                 unit_params=unit_params,
@@ -231,32 +267,29 @@ class World:
 
         # add the demand unit operators and units
         self.logger.info("Adding demand")
-        for demand_name, demand in demand_df.items():
-            demand_name = str(demand_name)
-            self.add_unit_operator(id=demand_name)
-            unit_params = {
-                "technology": "inflex_demand",
-                "volume": demand,
-                "price": 3000.0,
-            }
-
+        for unit_name, unit_params in demand_units.iterrows():
             if (
                 bidding_strategies_df is not None
-                and demand_name in bidding_strategies_df.index
+                and unit_name in bidding_strategies_df.index
             ):
                 unit_params["bidding_strategies"] = bidding_strategies_df.loc[
-                    demand_name
+                    unit_name
                 ].to_dict()
             else:
                 self.logger.warning(
-                    f"No bidding strategies specified for {demand_name}. Using default strategies."
+                    f"No bidding strategies specified for {unit_name}. Using default strategies."
                 )
-                unit_params["bidding_strategies"] = {"energy": "simple"}
+                unit_params["bidding_strategies"] = {
+                    market.product_type: "naive" for market in self.markets.values()
+                }
+
+            if demand_df is not None and unit_name in demand_df.columns:
+                unit_params["volume"] = demand_df[unit_name]
 
             await self.add_unit(
-                id=demand_name,
+                id=unit_name,
                 unit_type="demand",
-                unit_operator_id=demand_name,
+                unit_operator_id=unit_params["unit_operator"],
                 unit_params=unit_params,
             )
 

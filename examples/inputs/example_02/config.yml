@@ -1,14 +1,7 @@
-base_case:
+base_case_2019:
   start_date: 2018-12-31 20:00
   end_date: 2019-01-11 00:00
   time_step: 1h
-  powerplants: powerplants.csv
-  powerplants_strategy: simple
-  storage_units: storage_units.csv
-  demand: inflex_demand.csv
-  demand_strategy: simple
-  renewable_generation: renewable_generation.csv
-  fuel_prices: fuel_prices.csv
   markets_config:
     EOM:
       operator: EOM_operator
@@ -28,13 +21,6 @@ crm_case:
   start_date: 2018-12-31 20:00
   end_date: 2019-01-11 00:00
   time_step: 1h
-  powerplants: powerplants.csv
-  powerplants_strategy: simple
-  storage_units: storage_units.csv
-  demand: inflex_demand.csv
-  demand_strategy: simple
-  renewable_generation: renewable_generation.csv
-  fuel_prices: fuel_prices.csv
   markets_config:
     EOM:
       operator: EOM_operator
@@ -68,13 +54,6 @@ policy_case:
   start_date: 2018-12-31 20:00
   end_date: 2019-01-11 00:00
   time_step: 1h
-  powerplants: powerplants.csv
-  powerplants_strategy: simple
-  storage_units: storage_units.csv
-  demand: inflex_demand.csv
-  demand_strategy: simple
-  renewable_generation: renewable_generation.csv
-  fuel_prices: fuel_prices.csv
   markets_config:
     EOM:
       operator: EOM_operator

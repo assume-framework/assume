@@ -25,30 +25,36 @@ class Demand(BaseUnit):
     def __init__(
         self,
         id: str,
+        unit_operator: str,
         technology: str,
         bidding_strategies: dict,
         index: pd.DatetimeIndex,
+        max_power: float or pd.Series,
+        min_power: float or pd.Series,
+        volume: float or pd.Series,
         node: str = "bus0",
         price: float or pd.Series = 3000.0,
-        volume: float or pd.Series = 1000,
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs
     ):
         super().__init__(
             id=id,
+            unit_operator=unit_operator,
             technology=technology,
             bidding_strategies=bidding_strategies,
             index=index,
             node=node,
         )
 
-        self.price = price
+        self.max_power = max_power
+        self.min_power = min_power
         self.volume = volume
+        self.price = price
         self.location = location
         self.total_power_output = []
 
     def reset(self):
-        self.total_capacity = pd.Series(0.0, index=self.index)
+        self.total_power_output = pd.Series(0, index=self.index)
 
     def calculate_operational_window(
         self,
@@ -72,4 +78,4 @@ class Demand(BaseUnit):
         return {"max_power": {"power": -bid_volume, "marginal_cost": bid_price}}
 
     def get_dispatch_plan(self, dispatch_plan, time_period):
-        self.total_capacity.loc[time_period] = dispatch_plan["total_power"]
+        self.total_power_output.loc[time_period] = dispatch_plan["total_power"]
