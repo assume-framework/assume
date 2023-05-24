@@ -82,7 +82,7 @@ class UnitsOperator(Role):
                 "context": "write_results",
                 "type": "store_units",
                 "unit_type": unit_type,
-                "data": unit_params,
+                "data": self.units[id],
             }
             await self.context.send_acl_message(
                 receiver_id=db_aid,
@@ -150,7 +150,7 @@ class UnitsOperator(Role):
                     "data": {
                         "technology": self.units[unit_id].technology,
                         "unit_id": unit_id,
-                        "power": total_power,
+                        "power": self.units[unit_id].total_power_output.at[start],
                         "start_time": start,
                         "end_time": end,
                     },

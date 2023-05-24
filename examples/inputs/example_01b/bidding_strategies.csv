@@ -1,6 +1,6 @@
-name,energy,capacity
-KKW ISAR 2,flexable_eom,simple
-NEURATH F,flexable_eom,simple
-GKM 9,flexable_eom,simple
-IRSCHING 5,flexable_eom,simple
-demand_DE,simple,simple
+name,energy
+KKW ISAR 2,flexable_eom
+NEURATH F,flexable_eom
+GKM 9,flexable_eom
+IRSCHING 5,flexable_eom
+demand_DE,naive

@@ -171,6 +171,9 @@ class World:
         #     path=path, config=config, file_name="cross_border_flows", index=self.index,
         # )
 
+        if powerplant_units is None or demand_units is None:
+            raise ValueError("No power plant and demand units were provided!")
+
         await self.setup(self.start)
 
         # read writing properties form config
@@ -214,9 +217,13 @@ class World:
             [
                 powerplant_units.unit_operator.unique(),
                 demand_units.unit_operator.unique(),
-                storage_units.unit_operator.unique(),
             ]
         )
+
+        if storage_units is not None:
+            all_operators = np.concatenate(
+                [all_operators, storage_units.unit_operator.unique()]
+            )
 
         for company_name in all_operators:
             self.add_unit_operator(id=str(company_name))

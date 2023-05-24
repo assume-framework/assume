@@ -170,7 +170,7 @@ class WriteOutput(Role):
             [self.write_dfs["market_orders"], df], axis=0
         )
 
-    def write_units_definition(self, unit_type, unit_params):
+    def write_units_definition(self, unit_type, unit):
         """
         Writes unit definitions to the corresponding data frame and directly store it in db and csv.
         Since that is only done once, no need for recurrent sheduling arises.
@@ -181,37 +181,42 @@ class WriteOutput(Role):
         """
 
         if unit_type == "power_plant":
-            df = pd.DataFrame([unit_params])
-            df["simulation"] = self.simulation_id
-            df = df[
-                [
-                    "simulation",
-                    "technology",
-                    "fuel_type",
-                    "emission_factor",
-                    "max_power",
-                    "min_power",
-                    "efficiency",
-                    "unit_operator",
-                ]
-            ]
-            df["max_power"] = max(df["max_power"])
-            df["min_power"] = min(df["min_power"])
+            unit_info = {
+                unit.id: {
+                    "simulation": self.simulation_id,
+                    "technology": unit.technology,
+                    "max_power": unit.max_power
+                    if type(unit.max_power) == float
+                    else "variable",
+                    "min_power": unit.min_power
+                    if type(unit.min_power) == float
+                    else "variable",
+                    "emission_factor": unit.emission_factor,
+                    "efficiency": unit.efficiency,
+                    "unit_operator": unit.unit_operator,
+                }
+            }
+
+            df = pd.DataFrame(unit_info).T
 
             table_name = "unit_meta"
 
         elif unit_type == "demand":
-            del unit_params["bidding_strategies"]
+            unit_info = {
+                unit.id: {
+                    "simulation": self.simulation_id,
+                    "technology": unit.technology,
+                    "max_power": unit.max_power
+                    if type(unit.max_power) == float
+                    else "variable",
+                    "min_power": unit.min_power
+                    if type(unit.min_power) == float
+                    else "variable",
+                    "unit_operator": unit.unit_operator,
+                }
+            }
 
-            df = pd.DataFrame.from_dict(unit_params)
-            df["type"] = unit_type
-            df.reset_index(inplace=True)
-            df = df.rename(columns={"level_0": "", "index": "Timestamp"})
-            # sql does not like Timestamp or other types of values
-            # df=df.astype(str)
-            # df['Timestamp']=df['Timestamp'].astype(float)
-            df["simulation"] = self.simulation_id
-            # df['volume']=df["volume"].max()
+            df = pd.DataFrame(unit_info).T
 
             table_name = "demand_meta"
         else:

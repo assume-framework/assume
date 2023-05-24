@@ -7,6 +7,7 @@ class PowerPlant(BaseUnit):
     def __init__(
         self,
         id: str,
+        unit_operator: str,
         technology: str,
         bidding_strategies: dict,
         index: pd.DatetimeIndex,
@@ -37,6 +38,7 @@ class PowerPlant(BaseUnit):
     ):
         super().__init__(
             id=id,
+            unit_operator=unit_operator,
             technology=technology,
             bidding_strategies=bidding_strategies,
             index=index,
