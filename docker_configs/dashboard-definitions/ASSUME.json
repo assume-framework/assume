@@ -582,7 +582,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 38
+        "y": 35
       },
       "id": 19,
       "options": {
@@ -757,7 +757,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 38
+        "y": 35
       },
       "id": 20,
       "options": {
@@ -875,7 +875,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 46
+        "y": 43
       },
       "id": 41,
       "panels": [],
@@ -894,7 +894,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 47
+        "y": 44
       },
       "id": 22,
       "options": {
@@ -1005,7 +1005,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 50
+        "y": 47
       },
       "id": 24,
       "options": {
@@ -1030,7 +1030,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"power\",\n  unit_id\nFROM unit_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id = $unit_id\nGROUP BY 1, unit_id, power\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"power\",\n  unit_id\nFROM unit_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id = $Gen_Units\nGROUP BY 1, unit_id, power\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -1066,7 +1066,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 50
+        "y": 47
       },
       "id": 26,
       "options": {
@@ -1125,7 +1125,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 56
+        "y": 69
       },
       "id": 39,
       "panels": [],
@@ -1144,7 +1144,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 57
+        "y": 70
       },
       "id": 35,
       "options": {
@@ -1255,7 +1255,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 60
+        "y": 73
       },
       "id": 36,
       "options": {
@@ -1280,7 +1280,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  power AS \"power\",\n  unit_id\nFROM unit_dispatch\nWHERE\n  $__timeFilter(start_time) AND\n  simulation = '$simulation' AND\n  unit_id = $Demand_Units\nGROUP BY 1, unit_id, power\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"power\",\n  unit_id\nFROM unit_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id = $Demand_Units\nGROUP BY 1, unit_id, power\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -1316,7 +1316,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 60
+        "y": 73
       },
       "id": 37,
       "options": {
@@ -1428,17 +1428,19 @@
         "current": {
           "selected": true,
           "text": [
-            "KKW ISAR 2"
+            "KKW ISAR 2",
+            "NEURATH F"
           ],
           "value": [
-            "KKW ISAR 2"
+            "KKW ISAR 2",
+            "NEURATH F"
           ]
         },
         "datasource": {
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT \n  distinct unit_id\nFROM unit_dispatch\nwhere simulation = '$simulation' group by unit_id;",
+        "definition": "SELECT index\nFROM unit_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which units we want to display ",
         "hide": 0,
         "includeAll": false,
@@ -1446,8 +1448,33 @@
         "multi": true,
         "name": "Gen_Units",
         "options": [],
-        "query": "SELECT \n  distinct unit_id\nFROM unit_dispatch\nwhere simulation = '$simulation' group by unit_id;",
-        "refresh": 1,
+        "query": "SELECT index\nFROM unit_meta\nwhere simulation = '$simulation';",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "demand_DE",
+          "value": "demand_DE"
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "P7B13B9DF907EC40C"
+        },
+        "definition": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
+        "description": "Can choose which units we want to display ",
+        "hide": 0,
+        "includeAll": false,
+        "label": "",
+        "multi": true,
+        "name": "Demand_Units",
+        "options": [],
+        "query": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
@@ -1461,8 +1488,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "ASSUME",
-  "uid": "Cc8AavQ4z",
-  "version": 8,
+  "title": "ASSUME Copy",
+  "uid": "-CM4svQ4z",
+  "version": 4,
   "weekStart": ""
 }

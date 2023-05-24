@@ -1,4 +1,4 @@
-example_1b:
+example_01b:
   start_date: 2019-01-01 00:00
   end_date: 2019-01-11 00:00
   time_step: 1h

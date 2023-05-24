@@ -209,15 +209,7 @@ class WriteOutput(Role):
                 }
             }
 
-            df = pd.DataFrame(unit_params)
-            df["type"] = unit_type
-            df.reset_index(inplace=True)
-            df = df.rename(columns={"level_0": "", "index": "Timestamp"})
-            # sql does not like Timestamp or other types of values
-            # df=df.astype(str)
-            # df['Timestamp']=df['Timestamp'].astype(float)
-            df["simulation"] = self.simulation_id
-            # df['volume']=df["volume"].max()
+            df = pd.DataFrame(unit_info).T
 
             table_name = "demand_meta"
         else:
@@ -259,7 +251,7 @@ class WriteOutput(Role):
             "capacity_factor": f"select unit_id as name, market_id, avg(power/max_power) as capacity_factor from unit_dispatch ud join unit_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by name, market_id",
         }
         dfs = []
-        for value, query in queries.items():
+        for query in queries.values():
             df = pd.read_sql(query, self.db.bind)
             dfs.append(df.melt(id_vars=["name"]))
         df = pd.concat(dfs)
