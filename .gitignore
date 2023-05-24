@@ -130,6 +130,7 @@ dmypy.json
 
 .DS_Store
 *.orig
+.idea
 .vscode
 examples/outputs
 examples/local_db/

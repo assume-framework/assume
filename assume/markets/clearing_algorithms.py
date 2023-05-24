@@ -98,6 +98,7 @@ def pay_as_clear(
         else:
             clear_price = market_agent.marketconfig.maximum_bid
         for order in accepted_product_orders:
+            order["original_price"] = order["price"]
             order["price"] = clear_price
         accepted_orders.extend(accepted_product_orders)
 
@@ -208,7 +209,9 @@ def pay_as_bid(
             accepted_orders.append(demand_order)
             # pay as bid
             for supply_order in to_commit:
-                supply_order["price"] = demand_order["price"]
+                supply_order["original_price"] = supply_order["price"]
+                demand_order["original_price"] = demand_order["price"]
+                demand_order["price"] = supply_order["price"]
             accepted_product_orders.extend(to_commit)
 
         accepted_supply_orders = list(

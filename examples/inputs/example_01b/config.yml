@@ -1,5 +1,4 @@
-base_case:
-  id: example_01a
+example_1b:
   start_date: 2019-01-01 00:00
   end_date: 2019-01-10 23:00
   time_step: 1h
@@ -11,9 +10,10 @@ base_case:
     EOM:
       operator: EOM_operator
       product_type: energy
-      duration: 1h
-      count: 1
-      first_delivery: 1h
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh

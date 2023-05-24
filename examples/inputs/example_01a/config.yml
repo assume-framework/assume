@@ -1,19 +1,20 @@
-base_case:
-  id: example_01
+example_01a:
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-10 23:00
+  end_date: 2019-01-11 00:00
   time_step: 1h
   powerplants: powerplants.csv
   demand: inflex_demand.csv
   renewable_generation: renewable_generation.csv
   fuel_prices: fuel_prices.csv
+  save_frequency_hours: 24
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
-      duration: 1h
-      count: 1
-      first_delivery: 1h
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh

@@ -2,6 +2,7 @@ import asyncio
 import logging
 import time
 from datetime import datetime
+from pathlib import Path
 
 import nest_asyncio
 import pandas as pd
@@ -16,6 +17,7 @@ from tqdm import tqdm
 from assume.common import (
     MarketConfig,
     UnitsOperator,
+    WriteOutput,
     load_file,
     make_market_config,
     mango_codec_factory,
@@ -32,14 +34,16 @@ logging.getLogger("assume").setLevel(logging.INFO)
 class World:
     def __init__(
         self,
-        ifac_addr: str = "0.0.0.0",
+        ifac_addr: str = "localhost",
         port: int = 9099,
         database_uri: str = "",
-        export_csv=False,
+        export_csv_path: str = "",
     ):
         self.logger = logging.getLogger(__name__)
         self.addr = (ifac_addr, port)
-        self.db = None
+
+        self.export_csv_path = export_csv_path
+        # intialize db connection at beginning of simulation
         if database_uri:
             self.db = scoped_session(sessionmaker(create_engine(database_uri)))
             connected = False
@@ -54,9 +58,7 @@ class World:
                     )
                     time.sleep(2)
 
-        self.export_csv = export_csv
-
-        self.market_operator_agents: dict[str, RoleAgent] = {}
+        self.market_operators: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}
         self.unit_operators: dict[str, UnitsOperator] = {}
 
@@ -152,7 +154,23 @@ class World:
 
         await self.setup(self.start)
 
-        # get the market configt from the config file and add the markets
+        # read writing properties form config
+        simulation_id = study_case
+        save_frequency_hours = config.get("save_frequency_hours", None)
+
+        # Add output agent to world
+        output_role = WriteOutput(
+            simulation_id,
+            self.start,
+            self.end,
+            self.db,
+            self.export_csv_path,
+            save_frequency_hours,
+        )
+        self.output_agent = RoleAgent(self.container, suggested_aid="export_agent_1")
+        self.output_agent.add_role(output_role)
+
+        # get the market config from the config file and add the markets
         self.logger.info("Adding markets")
         for id, market_params in config["markets_config"].items():
             market_config = make_market_config(
@@ -161,16 +179,20 @@ class World:
                 world_start=self.start,
                 world_end=self.end,
             )
-            self.add_market_operator(id=market_params["operator"])
+
+            operator_id = str(market_params["operator"])
+            if operator_id not in self.market_operators:
+                self.add_market_operator(id=operator_id)
+
             self.add_market(
-                market_operator_id=market_params["operator"],
+                market_operator_id=operator_id,
                 market_config=market_config,
             )
 
         # add the unit operators using unique unit operator names in the powerplants csv
         self.logger.info("Adding unit operators")
         for company_name in powerplants_df.unit_operator.unique():
-            self.add_unit_operator(id=company_name)
+            self.add_unit_operator(id=str(company_name))
 
         # add the unit operators using unique unit operator names in the storage units csv
         for company_name in storage_units_df.unit_operator.unique():
@@ -206,7 +228,7 @@ class World:
             if vre_df is not None and pp_name in vre_df.columns:
                 unit_params["max_power"] = vre_df[pp_name]
 
-            self.add_unit(
+            await self.add_unit(
                 id=pp_name,
                 unit_type="power_plant",
                 unit_operator_id=unit_params["unit_operator"],
@@ -243,6 +265,7 @@ class World:
         # add the demand unit operators and units
         self.logger.info("Adding demand")
         for demand_name, demand in demand_df.items():
+            demand_name = str(demand_name)
             self.add_unit_operator(id=demand_name)
             unit_params = {
                 "technology": "inflex_demand",
@@ -263,7 +286,7 @@ class World:
                 )
                 unit_params["bidding_strategies"] = {"energy": "simple"}
 
-            self.add_unit(
+            await self.add_unit(
                 id=demand_name,
                 unit_type="demand",
                 unit_operator_id=demand_name,
@@ -272,7 +295,7 @@ class World:
 
     def add_unit_operator(
         self,
-        id: str or int,
+        id: str,
     ) -> None:
         """
         Create and add a new unit operator to the world.
@@ -284,13 +307,19 @@ class World:
         """
         units_operator = UnitsOperator(available_markets=list(self.markets.values()))
         # creating a new role agent and apply the role of a unitsoperator
-        unit_operator_role = RoleAgent(self.container, suggested_aid=f"{id}")
-        unit_operator_role.add_role(units_operator)
+        unit_operator_agent = RoleAgent(self.container, suggested_aid=f"{id}")
+        unit_operator_agent.add_role(units_operator)
 
         # add the current unitsoperator to the list of operators currently existing
         self.unit_operators[id] = units_operator
 
-    def add_unit(
+        # after creation of an agent - we set additional context params
+        unit_operator_agent._role_context.data_dict = {
+            "output_agent_id": self.output_agent.aid,
+            "output_agent_addr": self.output_agent.addr,
+        }
+
+    async def add_unit(
         self,
         id: str,
         unit_type: str,
@@ -328,8 +357,9 @@ class World:
                 raise e
 
         # create unit within the unit operator its associated with
-        self.unit_operators[unit_operator_id].add_unit(
+        await self.unit_operators[unit_operator_id].add_unit(
             id=id,
+            unit_type=unit_type,
             unit_class=unit_class,
             unit_params=unit_params,
             index=self.index,
@@ -337,24 +367,32 @@ class World:
 
     def add_market_operator(
         self,
-        id: str or int,
+        id: str,
     ):
         """
-        creates the market operator/s
+        creates the market operator
 
         Params
         ------
         id = int
              market operator id is associated with the market its participating
         """
-        self.market_operator_agents[id] = RoleAgent(
-            self.container, suggested_aid=f"{id}"
+        market_operator_agent = RoleAgent(
+            self.container,
+            suggested_aid=id,
         )
-        self.market_operator_agents[id].markets = []
+        market_operator_agent.markets = []
+
+        # after creation of an agent - we set additional context params
+        market_operator_agent._role_context.data_dict = {
+            "output_agent_id": self.output_agent.aid,
+            "output_agent_addr": self.output_agent.addr,
+        }
+        self.market_operators[id] = market_operator_agent
 
     def add_market(
         self,
-        market_operator_id: str or int,
+        market_operator_id: str,
         market_config: MarketConfig,
     ):
         """
@@ -374,7 +412,7 @@ class World:
             else:
                 raise Exception(f"invalid strategy {market_config.market_mechanism}")
 
-        market_operator = self.market_operator_agents.get(market_operator_id)
+        market_operator = self.market_operators.get(market_operator_id)
 
         if not market_operator:
             raise Exception(f"no market operator {market_operator_id}")
@@ -395,16 +433,11 @@ class World:
 
     async def run_simulation(self):
         # agent is implicit added to self.container._agents
-        for agent in self.container._agents.values():
-            # TODO add a Role which does exactly this
-            agent._role_context.data_dict = {
-                "db": self.db,
-                "export_csv": self.export_csv,
-            }
         total = self.end.timestamp() - self.start.timestamp()
         pbar = tqdm(total=total)
+        self.clock.set_time(self.start.timestamp())
         while self.clock.time < self.end.timestamp():
-            await asyncio.sleep(0)
+            await asyncio.sleep(0.00001)
             delta = await self.step()
             if delta:
                 pbar.update(delta)

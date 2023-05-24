@@ -1,4 +1,8 @@
 import logging
+from datetime import datetime
+from itertools import groupby
+from operator import itemgetter
+from pathlib import Path
 
 import pandas as pd
 from mango import Role
@@ -11,6 +15,7 @@ from assume.common.market_objects import (
     Order,
     Orderbook,
 )
+from assume.common.utils import aggregate_step_amount
 from assume.strategies import BaseStrategy
 from assume.units import BaseUnit
 
@@ -25,8 +30,10 @@ class UnitsOperator(Role):
     ):
         super().__init__()
 
+        self.bids_map = {}
         self.available_markets = available_markets
         self.registered_markets: dict[str, MarketConfig] = {}
+        self.last_sent_dispatch = 0
 
         if opt_portfolio is None:
             self.use_portfolio_opt = False
@@ -35,7 +42,7 @@ class UnitsOperator(Role):
             self.use_portfolio_opt = opt_portfolio[0]
             self.portfolio_strategy = opt_portfolio[1]
 
-        self.valid_orders = {}
+        self.valid_orders = []
         self.units: dict[str, BaseUnit] = {}
 
     def setup(self):
@@ -57,9 +64,10 @@ class UnitsOperator(Role):
                 self.register_market(market)
                 self.registered_markets[market.name] = market
 
-    def add_unit(
+    async def add_unit(
         self,
         id: str,
+        unit_type: str,
         unit_class: type[BaseUnit],
         unit_params: dict,
         index: pd.DatetimeIndex,
@@ -70,6 +78,22 @@ class UnitsOperator(Role):
 
         self.units[id] = unit_class(id=id, index=index, **unit_params)
         self.units[id].reset()
+
+        db_aid = self.context.data_dict.get("output_agent_id")
+        db_addr = self.context.data_dict.get("output_agent_addr")
+        if db_aid and db_addr:
+            # send unit data to db agent to store it
+            message = {
+                "context": "write_results",
+                "type": "store_units",
+                "unit_type": unit_type,
+                "data": unit_params,
+            }
+            await self.context.send_acl_message(
+                receiver_id=db_aid,
+                receiver_addr=db_addr,
+                content=message,
+            )
 
     def participate(self, market):
         # always participate at all markets
@@ -100,22 +124,61 @@ class UnitsOperator(Role):
     def handle_market_feedback(self, content: ClearingMessage, meta: dict[str, str]):
         logger.debug(f"got market result: {content}")
         orderbook: Orderbook = content["orderbook"]
-        self.valid_orders = {unit_id: [] for unit_id in self.units.keys()}
-        for bid in orderbook:
-            self.valid_orders[self.bids_map[bid["bid_id"]]].append(bid)
+        for order in orderbook:
+            order["market_id"] = content["market_id"]
+            # map bid id to unit id
+            order["unit_id"] = self.bids_map[order["bid_id"]]
+        self.valid_orders.extend(orderbook)
+        self.write_actual_dispatch()
+        self.send_unit_dispatch(orderbook)
 
-        self.send_dispatch_plan()
+    def send_unit_dispatch(self, orderbook):
+        """
+        feeds the current market result back to the units
+        this does not respect bids from multiple markets
+        for the same time period
+        """
+        time_period = [orderbook[0]["start_time"], orderbook[0]["end_time"]]
 
-    def send_dispatch_plan(self):
-        # todo group by unit_id
-        current_time = pd.to_datetime(self.context.current_timestamp, unit="s")
-        for unit_id in self.units.keys():
-            total_capacity = 0.0
-            for bid in self.valid_orders[unit_id]:
-                total_capacity += bid["volume"]
+        for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
+            total_power = sum(map(itemgetter("volume"), orders))
+            dispatch_plan = {"total_power": total_power}
+            self.units[unit_id].get_dispatch_plan(
+                dispatch_plan=dispatch_plan,
+                time_period=time_period,
+            )
 
-            dispatch_plan = {"total_capacity": total_capacity}
-            self.units[unit_id].get_dispatch_plan(dispatch_plan, current_time)
+    def write_actual_dispatch(self):
+        """
+        sends the actual aggregated dispatch curve
+        works across multiple markets
+        sends dispatch at or after it actually happens
+        """
+        last = self.last_sent_dispatch
+        self.last_sent_dispatch = self.context.current_timestamp
+        now = datetime.fromtimestamp(self.context.current_timestamp)
+        start = datetime.fromtimestamp(last)
+
+        actual_dispatch = aggregate_step_amount(
+            self.valid_orders, start, now, groupby=["market_id", "unit_id"]
+        )
+
+        db_aid = self.context.data_dict.get("output_agent_id")
+        db_addr = self.context.data_dict.get("output_agent_addr")
+        if db_aid and db_addr:
+            self.context.schedule_instant_acl_message(
+                receiver_id=db_aid,
+                receiver_addr=db_addr,
+                content={
+                    "context": "write_results",
+                    "type": "store_dispatch",
+                    "data": actual_dispatch,
+                },
+            )
+
+        self.valid_orders = list(
+            filter(lambda x: x["end_time"] >= now, self.valid_orders)
+        )
 
     async def submit_bids(self, opening: OpeningMessage):
         """
@@ -183,7 +246,6 @@ class UnitsOperator(Role):
                 }
                 self.bids_map = {}
                 for unit_id, unit in self.units.items():
-                    order_c = order.copy()
                     # take price from bidding strategy
                     bids = unit.calculate_bids(
                         product_type=product_type,
@@ -197,6 +259,7 @@ class UnitsOperator(Role):
                         if market.price_tick:
                             price = round(price / market.price_tick)
 
+                        order_c = order.copy()
                         order_c["volume"] = volume
                         order_c["price"] = price
                         order_c["bid_id"] = f"{unit_id}_{i+1}"

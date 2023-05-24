@@ -139,18 +139,20 @@ class MarketRole(Role):
 
             if self.marketconfig.price_tick:
                 # max and min should be in units
-                max_price = round(min_price / self.marketconfig.price_tick)
+                max_price = round(max_price / self.marketconfig.price_tick)
                 min_price = round(min_price / self.marketconfig.price_tick)
             if self.marketconfig.volume_tick:
-                max_volume = round(max_volume / self.marketconfig.maximum_volume)
+                max_volume = round(max_volume / self.marketconfig.volume_tick)
 
             for order in orderbook:
                 order["agent_id"] = (agent_addr, agent_id)
                 if not order.get("only_hours"):
                     order["only_hours"] = None
-                assert order["price"] <= max_price, "max_bid"
-                assert order["price"] >= min_price, "min_bid"
-                assert abs(order["volume"]) <= max_volume, "max_volume"
+                assert order["price"] <= max_price, f"max_bid {order['price']}"
+                assert order["price"] >= min_price, f"min_bid {order['price']}"
+                assert (
+                    abs(order["volume"]) <= max_volume
+                ), f"max_volume {order['volume']}"
                 if self.marketconfig.price_tick:
                     assert isinstance(order["price"], int)
                 if self.marketconfig.volume_tick:
@@ -225,6 +227,8 @@ class MarketRole(Role):
                 receiver_id=aid,
                 acl_metadata=meta,
             )
+        # store order book in db agent
+        await self.store_order_book(self.market_result)
         # clear_price = sorted(self.market_result, lambda o: o['price'])[0]
 
         for meta in market_meta:
@@ -233,20 +237,41 @@ class MarketRole(Role):
             )
             meta["name"] = self.marketconfig.name
             meta["time"] = self.context.current_timestamp
-        self.write_results(self.market_result, market_meta)
+
+        await self.store_market_results(market_meta)
 
         return self.market_result, market_meta
 
-    def write_results(self, market_result, market_meta):
-        df = pd.DataFrame.from_dict(market_meta)
-        export_csv_path = self.context.data_dict.get("export_csv")
-        db = self.context.data_dict.get("db")
-        if export_csv_path:
-            p = Path(export_csv_path)
-            p.mkdir(parents=True, exist_ok=True)
-            market_data_path = p.joinpath("market_meta.csv")
-            df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
-        if db and not df.empty:
-            df.to_sql("market_meta", db.bind, if_exists="append")
+    async def store_order_book(self, orderbook):
+        # Send a message to the DBRole to update data in the database
+        message = {
+            "context": "write_results",
+            "type": "store_order_book",
+            "sender": self.marketconfig.name,
+            "data": orderbook,
+        }
+        db_aid = self.context.data_dict.get("output_agent_id")
+        db_addr = self.context.data_dict.get("output_agent_addr")
+        if db_aid and db_addr:
+            await self.context.send_acl_message(
+                receiver_id=db_aid,
+                receiver_addr=db_addr,
+                content=message,
+            )
 
-        # TODO write market_result or other metrics
+    async def store_market_results(self, market_meta):
+        # Send a message to the DBRole to update data in the database
+        message = {
+            "context": "write_results",
+            "type": "store_market_results",
+            "sender": self.marketconfig.name,
+            "data": market_meta,
+        }
+        db_aid = self.context.data_dict.get("output_agent_id")
+        db_addr = self.context.data_dict.get("output_agent_addr")
+        if db_aid and db_addr:
+            await self.context.send_acl_message(
+                receiver_id=db_aid,
+                receiver_addr=db_addr,
+                content=message,
+            )
