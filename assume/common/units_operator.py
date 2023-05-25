@@ -244,13 +244,17 @@ class UnitsOperator(Role):
                     "only_hours": product[2],
                     "agent_id": (self.context.addr, self.context.aid),
                 }
-                self.bids_map = {}
+
                 for unit_id, unit in self.units.items():
                     # take price from bidding strategy
                     bids = unit.calculate_bids(
                         product_type=product_type,
                         product_tuple=product,
                     )
+
+                    if bids is None:
+                        continue
+
                     for i, bid in enumerate(bids):
                         price = bid["price"]
                         volume = bid["volume"]

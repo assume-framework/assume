@@ -1,7 +1,7 @@
 name,energy,capacity
-demand_DE,naive,naive
-pos_capacity_DE,naive,naive
-neg_capacity_DE,naive,naive
+demand_DE,naive,
+pos_capacity_DE,,naive
+neg_capacity_DE,None,naive
 wind_onshore_DE,naive,naive
 wind_offshore_DE,naive,naive
 solar_DE,naive,naive
