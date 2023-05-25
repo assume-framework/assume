@@ -112,17 +112,20 @@ class PowerPlant(BaseUnit):
         start = pd.Timestamp(start)
         end = pd.Timestamp(end)
 
+        if product_type == "energy":
+            return self.calculate_energy_operational_window(start, end)
+        elif product_type in {"capacity_pos", "capacity_neg"}:
+            return self.calculate_reserve_operational_window(start, end)
+
+    def calculate_energy_operational_window(
+        self, start: pd.Timestamp, end: pd.Timestamp
+    ) -> dict:
         if self.current_status == 0 and self.current_down_time < self.min_down_time:
             return None
 
         current_power = self.total_power_output.loc[start]
 
-        # check if min_power is a series or a float
-        min_power = (
-            self.min_power.at[start]
-            if type(self.min_power) is pd.Series
-            else self.min_power
-        )
+        min_power, max_power = self.calculate_min_max_power(timestep=start)
 
         # adjust for ramp down speed
         if self.ramp_down != -1:
@@ -130,21 +133,14 @@ class PowerPlant(BaseUnit):
         else:
             min_power = min_power
 
-        # adjust min_power if sold negative reserve capacity on control reserve market
-        min_power = min_power + self.neg_capacity_reserve.at[start]
-
-        # check if max_power is a series or a float
-        max_power = (
-            self.capacity_factor.at[start] * self.max_power
-            if type(self.capacity_factor) is pd.Series
-            else self.capacity_factor * self.max_power
-        )
-
         # adjust for ramp up speed
         if self.ramp_up != -1:
             max_power = min(current_power + self.ramp_up, max_power)
         else:
             max_power = max_power
+
+        # adjust min_power if sold negative reserve capacity on control reserve market
+        min_power = min_power + self.neg_capacity_reserve.at[start]
 
         # adjust max_power if sold positive reserve capacity on control reserve market
         max_power = max_power - self.pos_capacity_reserve.at[start]
@@ -171,6 +167,36 @@ class PowerPlant(BaseUnit):
                     power_output=max_power,
                     timestep=start,
                 ),
+            },
+        }
+
+        return operational_window
+
+    def calculate_reserve_operational_window(
+        self, start: pd.Timestamp, end: pd.Timestamp
+    ):
+        if self.current_status == 0 and self.current_down_time < self.min_down_time:
+            return None
+
+        current_power = self.total_power_output.loc[start]
+
+        min_power, max_power = self.calculate_min_max_power(timestep=start)
+
+        # should be adjusted to account for ramping speeds
+        # and differences between resolutions
+        ramp_up = self.ramp_up
+        ramp_down = self.ramp_down
+
+        available_pos_reserve = min(max_power - current_power, ramp_up)
+        available_neg_reserve = min(current_power - min_power, ramp_down)
+
+        operational_window = {
+            "window": {"start": start, "end": end},
+            "pos_reserve": {
+                "capacity": available_pos_reserve,
+            },
+            "neg_reserve": {
+                "capacity": available_neg_reserve,
             },
         }
 
@@ -271,3 +297,20 @@ class PowerPlant(BaseUnit):
         )
 
         return marginal_cost
+
+    def calculate_min_max_power(self, timestep: pd.Timestamp):
+        # check if min_power is a series or a float
+        min_power = (
+            self.min_power.at[timestep]
+            if type(self.min_power) is pd.Series
+            else self.min_power
+        )
+
+        # check if max_power is a series or a float
+        max_power = (
+            self.capacity_factor.at[timestep] * self.max_power
+            if type(self.capacity_factor) is pd.Series
+            else self.capacity_factor * self.max_power
+        )
+
+        return min_power, max_power
