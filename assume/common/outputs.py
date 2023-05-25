@@ -153,12 +153,16 @@ class WriteOutput(Role):
     def write_market_orders(self, market_result, market_name):
         """
         Writes market orders to the corresponding data frame.
-        Append new data until it is wirtten to db and csv with store_df function.
+        Append new data until it is written to db and csv with store_df function.
 
         Args:
             market_result: The market result including all orders.
             market_name: The name of the market.
         """
+        # check if market results list is empty and skip the funktion and raise a warning
+        if not market_result:
+            logger.warning(f"Market result for market {market_name} are empty!!!")
+            return None
 
         df = pd.DataFrame.from_records(market_result, index="start_time")
         del df["only_hours"]

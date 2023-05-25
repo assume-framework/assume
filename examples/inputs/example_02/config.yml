@@ -17,7 +17,8 @@ base_case_2019:
       maximum_volume: 1000000
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
-crm_case:
+
+crm_case_2019:
   start_date: 2018-12-31 20:00
   end_date: 2019-01-11 00:00
   time_step: 1h
@@ -50,6 +51,7 @@ crm_case:
       maximum_volume: 1000000
       price_unit: EUR/MW
       market_mechanism: pay_as_bid
+      
 policy_case:
   start_date: 2018-12-31 20:00
   end_date: 2019-01-11 00:00

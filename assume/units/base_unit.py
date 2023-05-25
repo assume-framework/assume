@@ -57,6 +57,9 @@ class BaseUnit:
     ):
         """Calculate the bids for the next time step."""
 
+        if product_type not in self.bidding_strategies:
+            return None
+
         # get operational window for each unit
         operational_window = self.calculate_operational_window(
             product_type=product_type,

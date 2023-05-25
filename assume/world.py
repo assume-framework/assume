@@ -167,6 +167,8 @@ class World:
             path=path, config=config, file_name="bidding_strategies"
         )
 
+        bidding_strategies_df = bidding_strategies_df.fillna(0)
+
         # cross_border_flows_df = load_file(
         #     path=path, config=config, file_name="cross_border_flows", index=self.index,
         # )
@@ -277,7 +279,7 @@ class World:
                 ].to_dict()
             else:
                 self.logger.warning(
-                    f"No bidding strategies specified for {unit_name}. Using default strategies."
+                    f"No bidding strategies specified for {unit_name}. Using default strategies for all markets."
                 )
                 unit_params["bidding_strategies"] = {
                     market.product_type: "naive" for market in self.markets.values()
@@ -343,14 +345,18 @@ class World:
         if unit_class is None:
             raise ValueError(f"invalid unit type {unit_type}")
 
+        bidding_strategies = {}
         for product_type, strategy in unit_params["bidding_strategies"].items():
+            if not strategy:
+                continue
+
             try:
-                unit_params["bidding_strategies"][product_type] = self.bidding_types[
-                    strategy
-                ]()
+                bidding_strategies[product_type] = self.bidding_types[strategy]()
             except KeyError as e:
                 self.logger.error(f"Invalid bidding strategy {strategy}")
                 raise e
+
+        unit_params["bidding_strategies"] = bidding_strategies
 
         # create unit within the unit operator its associated with
         await self.unit_operators[unit_operator_id].add_unit(
