@@ -195,8 +195,9 @@ class World:
             self.add_unit_operator(id=str(company_name))
 
         # add the unit operators using unique unit operator names in the storage units csv
-        for company_name in storage_units_df.unit_operator.unique():
-            self.add_unit_operator(id=company_name)
+        if storage_units_df is not None:
+            for company_name in storage_units_df.unit_operator.unique():
+                self.add_unit_operator(id=str(company_name))
 
         # add the units to corresponsing unit operators
         # if fuel prices are provided, add them to the unit params
@@ -236,31 +237,32 @@ class World:
             )
 
         self.logger.info("Adding storage units")
-        for storage_name, unit_params in storage_units_df.iterrows():
-            if (
-                bidding_strategies_df is not None
-                and storage_name in bidding_strategies_df.index
-            ):
-                unit_params["bidding_strategies"] = bidding_strategies_df.loc[
-                    storage_name
-                ].to_dict()
-            else:
-                self.logger.warning(
-                    f"No bidding strategies specified for {storage_name}. Using default strategies."
+        if storage_units_df is not None:
+            for storage_name, unit_params in storage_units_df.iterrows():
+                if (
+                    bidding_strategies_df is not None
+                    and storage_name in bidding_strategies_df.index
+                ):
+                    unit_params["bidding_strategies"] = bidding_strategies_df.loc[
+                        storage_name
+                    ].to_dict()
+                else:
+                    self.logger.warning(
+                        f"No bidding strategies specified for {storage_name}. Using default strategies."
+                    )
+                    unit_params["bidding_strategies"] = {
+                        market.product_type: "simple" for market in self.markets.values()
+                    }
+
+                if vre_df is not None and storage_name in vre_df.columns:
+                    unit_params["max_power"] = vre_df[storage_name]
+
+                await self.add_unit(
+                    id=storage_name,
+                    unit_type="storage_unit",
+                    unit_operator_id=unit_params["unit_operator"],
+                    unit_params=unit_params,
                 )
-                unit_params["bidding_strategies"] = {
-                    market.product_type: "simple" for market in self.markets.values()
-                }
-
-            if vre_df is not None and storage_name in vre_df.columns:
-                unit_params["max_power"] = vre_df[storage_name]
-
-            self.add_unit(
-                id=storage_name,
-                unit_type="storage_unit",
-                unit_operator_id=unit_params["unit_operator"],
-                unit_params=unit_params,
-            )
 
         # add the demand unit operators and units
         self.logger.info("Adding demand")

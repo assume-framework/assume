@@ -282,6 +282,7 @@ class StorageUnit(BaseUnit):
         
         #what form does the operational window have?
         operational_window = {
+            "window": {"start": start, "end": end},
             "current_power_discharge": {
                 "power_discharge": current_power_discharge,
                 "marginal_cost": self.calc_marginal_cost(
@@ -338,23 +339,30 @@ class StorageUnit(BaseUnit):
             product_tuple=product_tuple,
         )
     
-    def get_dispatch_plan(self, dispatch_plan, current_time):
-        if dispatch_plan["total_capacity"] > self.min_power_discharge:
+    def get_dispatch_plan(self, dispatch_plan, time_period):
+        if (dispatch_plan["total_power"] > self.min_power_discharge):
             self.market_success_list[-1] += 1
             self.current_status = 1 #discharging
             self.current_down_time = 0
-            self.total_power.at[current_time] = dispatch_plan["total_capacity"]
+            self.total_power.loc[time_period] = dispatch_plan["total_power"]
 
-        elif dispatch_plan["total_capacity"] < self.min_power_discharge:
+        elif dispatch_plan["total_power"] < -self.min_power_charge:
+            self.market_success_list[-1] += 1
+            self.current_status = 1 #charging
+            self.current_down_time = 0
+            self.total_power.loc[time_period] = dispatch_plan["total_power"]
+
+        elif dispatch_plan["total_power"] < self.min_power_discharge:
             self.current_status = 0
             self.current_down_time += 1
-            self.total_power.at[current_time] = 0
+            self.total_power.loc[time_period] = 0
 
             if self.market_success_list[-1] != 0:
                 self.mean_market_success = sum(self.market_success_list) / len(
                     self.market_success_list
                 )
                 self.market_success_list.append(0)
+        
     
     def calc_marginal_cost(
         self,

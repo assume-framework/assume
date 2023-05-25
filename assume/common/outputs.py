@@ -199,6 +199,32 @@ class WriteOutput(Role):
 
             table_name = "unit_meta"
 
+        elif unit_type == "storage_unit":
+            df = pd.DataFrame([unit_params])
+            df["simulation"] = self.simulation_id
+            df = df[
+                [
+                    "simulation",
+                    "technology",
+                    #"fuel_type",
+                    #"emission_factor",
+                    "max_power_charge",
+                    "max_power_discharge",
+                    #"min_power_charge",
+                    #"min_power_discharge",
+                    "efficiency_charge",
+                    "efficiency_discharge",
+                    "unit_operator",
+                ]
+            ]  
+            df["max_power_charge"] = max(df["max_power_charge"])
+            df["max_power_discharge"] = max(df["max_power_discharge"]) 
+            #df["min_power_charge"] = max(df["min_power_charge"]) 
+           #df["min_power_discharge"] = max(df["min_power_discharge"])
+
+            table_name = "storage_meta"
+            #demand and generation??
+
         elif unit_type == "demand":
             del unit_params["bidding_strategies"]
 
