@@ -169,7 +169,7 @@ class WriteOutput(Role):
             [self.write_dfs["market_orders"], df], axis=0
         )
 
-    def write_units_definition(self, unit_type, unit_params):
+    def write_units_definition(self, unit_type, unit):
         """
         Writes unit definitions to the corresponding data frame and directly store it in db and csv.
         Since that is only done once, no need for recurrent sheduling arises.
@@ -180,63 +180,55 @@ class WriteOutput(Role):
         """
 
         if unit_type == "power_plant":
-            df = pd.DataFrame([unit_params])
-            df["simulation"] = self.simulation_id
-            df = df[
-                [
-                    "simulation",
-                    "technology",
-                    "fuel_type",
-                    "emission_factor",
-                    "max_power",
-                    "min_power",
-                    "efficiency",
-                    "unit_operator",
-                ]
-            ]
-            df["max_power"] = max(df["max_power"])
-            df["min_power"] = min(df["min_power"])
+            unit_info = {
+                unit.id: {
+                    "simulation": self.simulation_id,
+                    "unit_type": unit_type,
+                    "technology": unit.technology,
+                    "max_power": unit.max_power,
+                    "min_power": unit.min_power,
+                    "emission_factor": unit.emission_factor,
+                    "efficiency": unit.efficiency,
+                    "unit_operator": unit.unit_operator,
+                }
+            }
+
+            df = pd.DataFrame(unit_info).T
 
             table_name = "unit_meta"
 
         elif unit_type == "storage_unit":
-            df = pd.DataFrame([unit_params])
-            df["simulation"] = self.simulation_id
-            df = df[
-                [
-                    "simulation",
-                    "technology",
-                    #"fuel_type",
-                    #"emission_factor",
-                    "max_power_charge",
-                    "max_power_discharge",
-                    #"min_power_charge",
-                    #"min_power_discharge",
-                    "efficiency_charge",
-                    "efficiency_discharge",
-                    "unit_operator",
-                ]
-            ]  
-            df["max_power_charge"] = max(df["max_power_charge"])
-            df["max_power_discharge"] = max(df["max_power_discharge"]) 
-            #df["min_power_charge"] = max(df["min_power_charge"]) 
-           #df["min_power_discharge"] = max(df["min_power_discharge"])
+            unit_info = {
+                unit.id: {
+                    "simulation": self.simulation_id,
+                    "unit_type": unit_type,
+                    "technology": unit.technology,
+                    "max_power_charge": unit.max_power_charge,
+                    "max_power_discharge": unit.max_power_discharge,
+                    "min_power_charge": unit.min_power_charge,
+                    "min_power_discharge": unit.min_power_discharge,
+                    "efficiency_charge": unit.efficiency_discharge,
+                    "unit_operator": unit.unit_operator,
+                }
+            }
+            
+            df = pd.DataFrame(unit_info).T
 
             table_name = "storage_meta"
-            #demand and generation??
 
         elif unit_type == "demand":
-            del unit_params["bidding_strategies"]
+            unit_info = {
+                unit.id: {
+                    "simulation": self.simulation_id,
+                    "unit_type": unit_type,
+                    "technology": unit.technology,
+                    "max_power": unit.max_power,
+                    "min_power": unit.min_power,
+                    "unit_operator": unit.unit_operator,
+                }
+            }
 
-            df = pd.DataFrame(unit_params)
-            df["type"] = unit_type
-            df.reset_index(inplace=True)
-            df = df.rename(columns={"level_0": "", "index": "Timestamp"})
-            # sql does not like Timestamp or other types of values
-            # df=df.astype(str)
-            # df['Timestamp']=df['Timestamp'].astype(float)
-            df["simulation"] = self.simulation_id
-            # df['volume']=df["volume"].max()
+            df = pd.DataFrame(unit_info).T
 
             table_name = "demand_meta"
         else:
@@ -278,7 +270,7 @@ class WriteOutput(Role):
             "capacity_factor": f"select unit_id as name, market_id, avg(power/max_power) as capacity_factor from unit_dispatch ud join unit_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by name, market_id",
         }
         dfs = []
-        for value, query in queries.items():
+        for query in queries.values():
             df = pd.read_sql(query, self.db.bind)
             dfs.append(df.melt(id_vars=["name"]))
         df = pd.concat(dfs)

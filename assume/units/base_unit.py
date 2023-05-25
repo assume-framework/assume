@@ -24,12 +24,14 @@ class BaseUnit:
     def __init__(
         self,
         id: str,
+        unit_operator: str,
         technology: str,
         bidding_strategies: dict,
         index: pd.DatetimeIndex,
         node: str,
     ):
         self.id = id
+        self.unit_operator = unit_operator
         self.technology = technology
         self.node = node
         self.bidding_strategies: dict[str, BaseStrategy] = bidding_strategies

@@ -89,16 +89,14 @@ def make_market_config(
     start = start or world_start
     end = end or world_end
 
-    market_products = []
-    for product in market_params["products"]:
-        market_products.append(
-            MarketProduct(
-                duration=pd.Timedelta(product["duration"]),
-                count=product["count"],
-                first_delivery=pd.Timedelta(product["first_delivery"]),
-            )
+    market_products = [
+        MarketProduct(
+            duration=pd.Timedelta(product["duration"]),
+            count=product["count"],
+            first_delivery=pd.Timedelta(product["first_delivery"]),
         )
-
+        for product in market_params["products"]
+    ]
     market_config = MarketConfig(
         name=id,
         market_products=market_products,
@@ -158,10 +156,10 @@ def get_available_products(market_products: list[MarketProduct], startdate: date
         start = startdate + product.first_delivery
         if isinstance(product.duration, rr.rrule):
             starts = list(product.duration.xafter(start, product.count + 1))
-            for i in range(product.count):
-                period_start = starts[i]
-                period_end = starts[i + 1]
-                options.append((period_start, period_end, product.only_hours))
+            options.extend(
+                (starts[i], starts[i + 1], product.only_hours)
+                for i in range(product.count)
+            )
         else:
             for i in range(product.count):
                 period_start = start + product.duration * i
@@ -279,7 +277,7 @@ def plot_orderbook(orderbook: Orderbook, results):
     return fig, ax
 
 
-def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=[]):
+def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=None):
     """
     step function with bought volume
     allows setting timeframe through begin and end
@@ -291,6 +289,8 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=[]
 
     If called without groupby, this returns the aggregated orderbook timeseries
     """
+    if groupby is None:
+        groupby = []
     deltas = []
 
     # first we are creating a list of tuples with the following form:
@@ -300,8 +300,12 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=[]
         for field in groupby:
             add += (bid[field],)
         if bid["only_hours"] is None:
-            deltas.append((bid["start_time"], bid["volume"]) + add)
-            deltas.append((bid["end_time"], -bid["volume"]) + add)
+            deltas.extend(
+                (
+                    (bid["start_time"], bid["volume"]) + add,
+                    (bid["end_time"], -bid["volume"]) + add,
+                )
+            )
         else:
             # only_hours allows to have peak or off-peak bids
             start_hour, end_hour = bid["only_hours"]
@@ -316,11 +320,16 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=[]
                 until=bid["end_time"],
             )
             for date in starts:
-                deltas.append((date, bid["volume"]) + add)
-                deltas.append(
-                    (date + timedelta(hours=duration_hours), -bid["volume"]) + add
+                deltas.extend(
+                    (
+                        (date, bid["volume"]) + add,
+                        (
+                            date + timedelta(hours=duration_hours),
+                            -bid["volume"],
+                        )
+                        + add,
+                    )
                 )
-
     aggregation = []
     # current_power is separated by group
     current_power = defaultdict(lambda: 0)
@@ -334,10 +343,11 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=[]
         # this also makes sure that each timestamp is only written
         # once when iterativley calling this function
         if (not begin or time >= begin) and (not end or time < end):
-            if len(aggregation) > 0 and aggregation[-1][0] == time:
+            if aggregation and aggregation[-1][0] == time:
                 aggregation[-1][1] = current_power[groupdata]
             else:
                 d_list = list(d_tuple)
                 d_list[1] = current_power[groupdata]
                 aggregation.append(d_list)
+
     return aggregation

@@ -84,6 +84,7 @@ class StorageUnit(BaseUnit):
     def __init__(
         self,
         id: str,
+        unit_operator: str,
         technology: str,
         bidding_strategies: dict,
         max_power_charge: float or pd.Series,
@@ -121,6 +122,7 @@ class StorageUnit(BaseUnit):
             node=node,
             bidding_strategies=bidding_strategies,
             index=index,
+            unit_operator=unit_operator,
         )
 
         self.max_power_charge = max_power_charge

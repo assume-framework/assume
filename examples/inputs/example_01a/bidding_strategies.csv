@@ -1,6 +1,6 @@
-name,energy,capacity
-KKW ISAR 2,simple,simple
-NEURATH F,simple,simple
-GKM 9,simple,simple
-IRSCHING 5,simple,simple
-demand_DE,simple,simple
+name,energy
+KKW ISAR 2,naive
+NEURATH F,naive
+GKM 9,naive
+IRSCHING 5,naive
+demand_DE,naive

@@ -1,9 +1,9 @@
 name,technology,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,fixed_cost,hot_start_cost,warm_start_cost,cold_start_cost,min_operating_time,minDowntime,heat_extraction,max_heat_extraction,unit_operator
-wind_onshore_DE,wind_onshore,renewable,0,1000,0,1,-1,-1,0,0,0,0,0,0,0,0,renewables_operator
-wind_offshore_DE,wind_offshore,renewable,0,1000,0,1,-1,-1,0,0,0,0,0,0,0,0,renewables_operator
-solar_DE,solar,renewable,0,1000,0,1,-1,-1,0,0,0,0,0,0,0,0,renewables_operator
-water_DE,hydro,renewable,0,1000,0,1,-1,-1,0,0,0,0,0,0,0,0,renewables_operator
-biomass_DE,biomass,renewable,0,1000,0,1,-1,-1,0,0,0,0,0,0,0,0,renewables_operator
+wind_onshore_DE,wind_onshore,renewable,0,53190,0,1,-1,-1,0,0,0,0,0,0,0,0,renewables_operator
+wind_offshore_DE,wind_offshore,renewable,0,7560,0,1,-1,-1,0,0,0,0,0,0,0,0,renewables_operator
+solar_DE,solar,renewable,0,48860,0,1,-1,-1,0,0,0,0,0,0,0,0,renewables_operator
+water_DE,hydro,renewable,0,4940,0,1,-1,-1,0,0,0,0,0,0,0,0,renewables_operator
+biomass_DE,biomass,renewable,0,8340,0,1,-1,-1,0,0,0,0,0,0,0,0,renewables_operator
 KKW ISAR 2,nuclear,uranium,0,1485,590,0.33,890,890,10.3,140,140,140,72,10,no,0,UNIPER
 KKW BROKDORF,nuclear,uranium,0,1480,590,0.33,890,890,10.3,140,140,140,72,10,no,0,UNIPER
 KKW PHILIPPSBURG 2,nuclear,uranium,0,1468,590,0.33,880,880,10.3,140,140,140,72,10,no,0,ENBW ENERGIE BADEN-WURTTEMBERG

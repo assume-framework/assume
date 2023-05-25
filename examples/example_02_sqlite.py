@@ -13,10 +13,6 @@ EXPORT_CSV_PATH = str(getenv("EXPORT_CSV_PATH", "./examples/outputs"))
 os.makedirs("./examples/local_db", exist_ok=True)
 DATABASE_URI = getenv("DATABASE_URI", "sqlite:///./examples/local_db/assume_db_02.db")
 
-# DATABASE_URI = getenv(
-#     "DATABASE_URI", "postgresql://assume:assume@localhost:5432/assume"
-# )
-
 if __name__ == "__main__":
     scenario = "example_02"
     study_case = "base_case"

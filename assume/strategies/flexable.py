@@ -137,3 +137,18 @@ class flexableEOM(BaseStrategy):
         )
 
         return possible_revenue
+
+
+class flexableCRM(BaseStrategy):
+    def __init__(self):
+        super().__init__()
+
+        self.foresight = pd.Timedelta("12h")
+        self.current_time = None
+
+    def calculate_bids(
+        self,
+        unit: BaseUnit = None,
+        operational_window: dict = None,
+    ):
+        pass
