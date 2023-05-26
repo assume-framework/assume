@@ -61,6 +61,11 @@ class PowerPlant(BaseUnit):
 
         self.ramp_up = ramp_up
         self.ramp_down = ramp_down
+        # check ramping enabled
+        if self.ramp_down == -1:
+            self.ramp_down = max_power
+        if self.ramp_up == -1:
+            self.ramp_up = max_power
         self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
         self.min_down_time = min_down_time if min_down_time > 0 else 1
         self.downtime_hot_start = downtime_hot_start
@@ -83,9 +88,11 @@ class PowerPlant(BaseUnit):
         self.current_down_time = self.min_down_time
 
         self.total_power_output = pd.Series(0.0, index=self.index)
-        self.total_power_output.loc[
-            self.index[0] : self.index[0] + pd.Timedelta("24h")
-        ] = self.min_power
+        # workaround if market schedules do not match
+        # for example neg_reserve is required but market did not bid yet
+        self.total_power_output.loc[:] = self.min_power + 0.5 * (
+            self.max_power - self.min_power
+        )
 
         self.total_heat_output = pd.Series(0.0, index=self.index)
         self.power_loss_chp = pd.Series(0.0, index=self.index)
@@ -108,6 +115,10 @@ class PowerPlant(BaseUnit):
         operational_window : dict
             Dictionary containing the operational window for the next time step.
         """
+
+        if self.current_status == 0 and self.current_down_time < self.min_down_time:
+            return None
+
         start, end, only_hours = product_tuple
         start = pd.Timestamp(start)
         end = pd.Timestamp(end)
@@ -120,24 +131,14 @@ class PowerPlant(BaseUnit):
     def calculate_energy_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
-        if self.current_status == 0 and self.current_down_time < self.min_down_time:
-            return None
-
-        current_power = self.total_power_output.loc[start]
+        current_power = self.total_power_output.at[start - self.index.freq]
 
         min_power, max_power = self.calculate_min_max_power(timestep=start)
 
         # adjust for ramp down speed
-        if self.ramp_down != -1:
-            min_power = max(current_power - self.ramp_down, min_power)
-        else:
-            min_power = min_power
-
+        min_power = max(current_power - self.ramp_down, min_power)
         # adjust for ramp up speed
-        if self.ramp_up != -1:
-            max_power = min(current_power + self.ramp_up, max_power)
-        else:
-            max_power = max_power
+        max_power = min(current_power + self.ramp_up, max_power)
 
         # adjust min_power if sold negative reserve capacity on control reserve market
         min_power = min_power + self.neg_capacity_reserve.at[start]
@@ -174,21 +175,20 @@ class PowerPlant(BaseUnit):
 
     def calculate_reserve_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
-    ):
-        if self.current_status == 0 and self.current_down_time < self.min_down_time:
-            return None
-
-        current_power = self.total_power_output.loc[start]
+    ) -> dict:
+        current_power = self.total_power_output.at[start - self.index.freq]
 
         min_power, max_power = self.calculate_min_max_power(timestep=start)
 
         # should be adjusted to account for ramping speeds
-        # and differences between resolutions
-        ramp_up = self.ramp_up
-        ramp_down = self.ramp_down
+        # and differences between resolutions of energy and reserve markets
+        if self.ramp_up != -1:
+            available_pos_reserve = min(max_power - current_power, self.ramp_up)
+        else:
+            available_pos_reserve = max_power - current_power
 
-        available_pos_reserve = min(max_power - current_power, ramp_up)
-        available_neg_reserve = min(current_power - min_power, ramp_down)
+        available_pos_reserve = min(max_power - current_power, self.ramp_up)
+        available_neg_reserve = max(0, min(current_power - min_power, self.ramp_down))
 
         operational_window = {
             "window": {"start": start, "end": end},
@@ -199,6 +199,9 @@ class PowerPlant(BaseUnit):
                 "capacity": available_neg_reserve,
             },
         }
+
+        if available_neg_reserve < 0:
+            print("available_neg_reserve < 0")
 
         return operational_window
 
@@ -213,13 +216,12 @@ class PowerPlant(BaseUnit):
         )
 
     def get_dispatch_plan(self, dispatch_plan, time_period):
-        if dispatch_plan["total_power"] > self.min_power:
+        if dispatch_plan["total_power"] >= self.min_power:
             self.market_success_list[-1] += 1
             self.current_status = 1
             self.current_down_time = 0
             self.total_power_output.loc[time_period] = dispatch_plan["total_power"]
-
-        elif dispatch_plan["total_power"] < self.min_power:
+        else:
             self.current_status = 0
             self.current_down_time += 1
             self.total_power_output.loc[time_period] = 0

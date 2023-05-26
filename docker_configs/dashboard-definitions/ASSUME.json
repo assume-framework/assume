@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2,
+  "id": 1,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -576,13 +576,39 @@
           },
           "unit": "€/MW"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "price NEURATH F_1",
+                  "price KKW ISAR 2_1"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 35
+        "y": 59
       },
       "id": 19,
       "options": {
@@ -757,7 +783,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 35
+        "y": 59
       },
       "id": 20,
       "options": {
@@ -875,12 +901,10 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 43
+        "y": 67
       },
       "id": 41,
       "panels": [],
-      "repeat": "Gen_Units",
-      "repeatDirection": "h",
       "title": "Generation units $Gen_Units",
       "type": "row"
     },
@@ -894,7 +918,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 44
+        "y": 68
       },
       "id": 22,
       "options": {
@@ -1005,7 +1029,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 47
+        "y": 71
       },
       "id": 24,
       "options": {
@@ -1028,10 +1052,44 @@
           },
           "format": "time_series",
           "group": [],
+          "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"power\",\n  unit_id\nFROM unit_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id = $Gen_Units\nGROUP BY 1, unit_id, power\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"market_result\",\n  unit_id \nFROM market_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id in ($Gen_Units)\nGROUP BY 1, unit_id, power\nORDER BY 1",
           "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "volume"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "demand_meta",
+          "timeColumn": "\"Timestamp\"",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
+          "group": [],
+          "hide": false,
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  $__timeGroupAlias(index,$__interval),\n  power AS \"dispatch\",\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(index) AND\n  simulation = '$simulation' AND\n  unit in ($Gen_Units)\nGROUP BY 1, unit, power\nORDER BY 1",
+          "refId": "B",
           "select": [
             [
               {
@@ -1066,7 +1124,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 47
+        "y": 71
       },
       "id": 26,
       "options": {
@@ -1125,12 +1183,10 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 69
+        "y": 80
       },
       "id": 39,
       "panels": [],
-      "repeat": "Demand_Units",
-      "repeatDirection": "h",
       "title": "Demand units data $Demand_Units",
       "type": "row"
     },
@@ -1144,7 +1200,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 70
+        "y": 81
       },
       "id": 35,
       "options": {
@@ -1255,7 +1311,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 73
+        "y": 84
       },
       "id": 36,
       "options": {
@@ -1280,7 +1336,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"power\",\n  unit_id\nFROM unit_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id = $Demand_Units\nGROUP BY 1, unit_id, power\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"power\",\n  unit_id\nFROM market_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id in ($Demand_Units)\nGROUP BY 1, unit_id, power\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -1316,7 +1372,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 73
+        "y": 84
       },
       "id": 37,
       "options": {
@@ -1378,9 +1434,9 @@
     "list": [
       {
         "current": {
-          "selected": false,
-          "text": "example_01a",
-          "value": "example_01a"
+          "selected": true,
+          "text": "example_01_crm",
+          "value": "example_01_crm"
         },
         "datasource": {
           "type": "postgres",
@@ -1457,9 +1513,13 @@
       },
       {
         "current": {
-          "selected": false,
-          "text": "demand_DE",
-          "value": "demand_DE"
+          "selected": true,
+          "text": [
+            "demand_DE"
+          ],
+          "value": [
+            "demand_DE"
+          ]
         },
         "datasource": {
           "type": "postgres",

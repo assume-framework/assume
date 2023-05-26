@@ -23,7 +23,12 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.markets import MarketRole, pay_as_bid, pay_as_clear
-from assume.strategies import NaiveStrategy, flexableEOM
+from assume.strategies import (
+    NaiveNegReserveStrategy,
+    NaivePosReserveStrategy,
+    NaiveStrategy,
+    flexableEOM,
+)
 from assume.units import Demand, PowerPlant
 
 logging.basicConfig(level=logging.INFO)
@@ -69,6 +74,8 @@ class World:
         self.bidding_types = {
             "naive": NaiveStrategy,
             "flexable_eom": flexableEOM,
+            "naive_neg_reserve": NaiveNegReserveStrategy,
+            "naive_pos_reserve": NaivePosReserveStrategy,
         }
         self.clearing_mechanisms = {
             "pay_as_clear": pay_as_clear,
@@ -82,7 +89,7 @@ class World:
         self,
         start: pd.Timestamp,
     ):
-        self.clock = ExternalClock(start.timestamp())
+        self.clock = ExternalClock(0)
         self.container = await create_container(
             addr=self.addr, clock=self.clock, codec=mango_codec_factory()
         )
@@ -427,7 +434,6 @@ class World:
         next_activity = self.clock.get_next_activity()
         if not next_activity:
             self.logger.info("simulation finished - no schedules left")
-            self.clock.set_time(self.end.timestamp())
             return None
         delta = next_activity - self.clock.time
         self.clock.set_time(next_activity)
@@ -435,18 +441,28 @@ class World:
 
     async def run_simulation(self):
         # agent is implicit added to self.container._agents
-        total = self.end.timestamp() - self.start.timestamp()
-        pbar = tqdm(total=total)
-        self.clock.set_time(self.start.timestamp())
-        while self.clock.time < self.end.timestamp():
-            await asyncio.sleep(0.00001)
+        import calendar
+
+        start_ts = calendar.timegm(self.start.utctimetuple())
+        end_ts = calendar.timegm(self.end.utctimetuple())
+        pbar = tqdm(total=end_ts - start_ts)
+
+        # allow registration before first opening
+        self.clock.set_time(start_ts - 1)
+        await asyncio.sleep(0.00001)
+        while self.clock.time < end_ts:
+            await asyncio.sleep(0.001)
             delta = await self.step()
             if delta:
                 pbar.update(delta)
                 pbar.set_description(
-                    f"{datetime.fromtimestamp(self.clock.time)}", refresh=False
+                    f"{datetime.utcfromtimestamp(self.clock.time)}", refresh=False
                 )
+            else:
+                self.clock.set_time(end_ts)
         pbar.close()
+        # for agent in self.container._agents.values():
+        #    await agent.inbox.join()
         await self.container.shutdown()
 
     def load_scenario(

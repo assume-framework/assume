@@ -108,7 +108,7 @@ class flexableEOM(BaseStrategy):
 
         bid_price_inflex = max(
             -price_reduction_restart - heat_gen_cost + marginal_cost_flex,
-            -2999.00,
+            -499.00,
         )
 
         return bid_price_inflex
