@@ -66,6 +66,10 @@ class BaseUnit:
             product_tuple=product_tuple,
         )
 
+        # check if operational window is valid
+        if operational_window is None:
+            return None
+
         return self.bidding_strategies[product_type].calculate_bids(
             unit=self,
             operational_window=operational_window,
