@@ -69,8 +69,8 @@ class MarketRole(Role):
                 # TODO safer type check? dataclass?
             )
 
-        current = datetime.fromtimestamp(self.context.current_timestamp)
-        next_opening = self.marketconfig.opening_hours.after(current)
+        current = datetime.utcfromtimestamp(self.context.current_timestamp)
+        next_opening = self.marketconfig.opening_hours.after(current, inc=True)
         market_closing = next_opening + self.marketconfig.opening_duration
         logger.debug(
             f"first market opening: {self.marketconfig.name} - {next_opening} - {market_closing}"
@@ -80,7 +80,7 @@ class MarketRole(Role):
         )
 
     async def next_opening(self):
-        current = datetime.fromtimestamp(self.context.current_timestamp)
+        current = datetime.utcfromtimestamp(self.context.current_timestamp)
         next_opening = self.marketconfig.opening_hours.after(current)
         if not next_opening:
             logger.debug(f"market {self.marketconfig.name} - does not reopen")

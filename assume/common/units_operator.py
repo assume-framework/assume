@@ -139,9 +139,10 @@ class UnitsOperator(Role):
         for the same time period
         """
         time_period = [orderbook[0]["start_time"], orderbook[0]["end_time"]]
-
+        orderbook = list(sorted(orderbook, key=itemgetter("unit_id")))
         for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
-            total_power = sum(map(itemgetter("volume"), orders))
+            orders_l = list(orders)
+            total_power = sum(map(itemgetter("volume"), orders_l))
             dispatch_plan = {"total_power": total_power}
             self.units[unit_id].get_dispatch_plan(
                 dispatch_plan=dispatch_plan,
@@ -156,12 +157,18 @@ class UnitsOperator(Role):
         """
         last = self.last_sent_dispatch
         self.last_sent_dispatch = self.context.current_timestamp
-        now = datetime.fromtimestamp(self.context.current_timestamp)
-        start = datetime.fromtimestamp(last)
+        now = datetime.utcfromtimestamp(self.context.current_timestamp)
+        start = datetime.utcfromtimestamp(last)
 
-        actual_dispatch = aggregate_step_amount(
+        market_dispatch = aggregate_step_amount(
             self.valid_orders, start, now, groupby=["market_id", "unit_id"]
         )
+        unit_dispatch_dfs = []
+        for unit_id, unit in self.units.items():
+            data = pd.DataFrame(unit.total_power_output.loc[start:now], columns=["power"])
+            data["unit"] = unit_id
+            unit_dispatch_dfs.append(data)
+        unit_dispatch = pd.concat(unit_dispatch_dfs)
 
         db_aid = self.context.data_dict.get("output_agent_id")
         db_addr = self.context.data_dict.get("output_agent_addr")
@@ -171,10 +178,20 @@ class UnitsOperator(Role):
                 receiver_addr=db_addr,
                 content={
                     "context": "write_results",
-                    "type": "store_dispatch",
-                    "data": actual_dispatch,
+                    "type": "market_dispatch",
+                    "data": market_dispatch,
                 },
             )
+            if not unit_dispatch.empty:
+                self.context.schedule_instant_acl_message(
+                    receiver_id=db_aid,
+                    receiver_addr=db_addr,
+                    content={
+                        "context": "write_results",
+                        "type": "unit_dispatch",
+                        "data": unit_dispatch,
+                    },
+                )
 
         self.valid_orders = list(
             filter(lambda x: x["end_time"] >= now, self.valid_orders)
