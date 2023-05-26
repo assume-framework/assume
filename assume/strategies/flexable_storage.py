@@ -34,17 +34,17 @@ class flexableEOMStorage(BaseStrategy):
 
             if unit.price_forecast[self.current_time] >= average_price/unit.efficiency_discharge:
             #place bid to discharge
-                bid_quantity = min(((unit.current_SOC - unit.min_SOC)
+                bid_quantity = min(max(((unit.current_SOC - unit.min_SOC)
                                     -unit.pos_capacity_reserve[self.current_time])
-                                   *unit.efficiency_discharge, unit.max_power_discharge)
+                                   *unit.efficiency_discharge,0), unit.max_power_discharge)
                 
                 bids = [{"price": average_price, "volume": bid_quantity}]
 
             elif unit.price_forecast[self.current_time] <= average_price*unit.efficiency_charge:
             #place bid todscharge
-                bid_quantity = min(((unit.max_SOC-unit.current_SOC)
+                bid_quantity = min(max(((unit.max_SOC-unit.current_SOC)
                                     -unit.neg_capacity_reserve[self.current_time])
-                                   /unit.efficiency_charge, unit.max_power_charge)
+                                   /unit.efficiency_charge,0), unit.max_power_charge)
 
                 bids = [{"price": average_price, "volume": -bid_quantity}]
                 

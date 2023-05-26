@@ -30,7 +30,7 @@ class StorageUnit(BaseUnit):
         The efficiency of the storage unit while charging.
     efficiency_discharge : float
         The efficiency of the storage unit while discharging.
-    variable_costs_charge : float
+    variable_cost_charge : float
         Variable costs to charge the storage unit in €/MW.
     variable_costs_discharge : float
         Variable costs to discharge the storage unit in €/MW.
@@ -89,14 +89,14 @@ class StorageUnit(BaseUnit):
         bidding_strategies: dict,
         max_power_charge: float or pd.Series,
         max_power_discharge: float or pd.Series,
-        max_SOC: float or pd.Series,
+        max_SOC: float,
         min_power_charge: float or pd.Series = 0.0,  
         min_power_discharge: float or pd.Series = 0.0,
-        min_SOC: float or pd.Series = 0.0,
+        min_SOC: float  = 0.0,
         efficiency_charge: float = 1,
         efficiency_discharge: float = 1,
-        variable_costs_charge: float or pd.Series = 0.0,
-        variable_costs_discharge: float or pd.Series = 0.0,
+        variable_cost_charge: float or pd.Series = 0.0,
+        variable_cost_discharge: float or pd.Series = 0.0,
         price_forecast: pd.Series = None,
         emission_factor: float = 0.0,
         ramp_up_charge: float = 0.0,
@@ -131,10 +131,10 @@ class StorageUnit(BaseUnit):
         self.min_power_discharge = min_power_discharge
         self.min_SOC = min_SOC
         self.max_SOC = max_SOC
-        self.efficiency_charge = efficiency_charge
-        self.efficiency_discharge = efficiency_discharge
-        self.variable_costs_charge = variable_costs_charge
-        self.variable_costs_discharge = variable_costs_discharge
+        self.efficiency_charge = efficiency_charge if efficiency_charge > 0 else 1
+        self.efficiency_discharge = efficiency_discharge if efficiency_discharge > 0 else 1
+        self.variable_cost_charge = variable_cost_charge
+        self.variable_cost_discharge = variable_cost_discharge
         self.price_forecast = (
             price_forecast if price_forecast is not None else pd.Series(0, index=index)
         )
@@ -173,7 +173,7 @@ class StorageUnit(BaseUnit):
         self.total_power.iat[0] = self.min_power_discharge
 
         #starting half way charged
-        self.current_SOC = self.max_SOC + 0.5
+        self.current_SOC = self.max_SOC * 0.5
 
         self.pos_capacity_reserve = pd.Series(0.0, index=self.index)
         self.neg_capacity_reserve = pd.Series(0.0, index=self.index)
@@ -238,6 +238,7 @@ class StorageUnit(BaseUnit):
             else self.max_power_charge
         )
 
+        #was charging before
         if self.min_down_time > 0 and self.total_power < 0:
             min_power_discharge = 0
             max_power_discharge = 0
@@ -250,6 +251,7 @@ class StorageUnit(BaseUnit):
                 max_power_discharge = min(self.ramp_up_discharge + current_power_discharge, 
                                         max_power_discharge)
 
+        #was discharging before
         if self.min_down_time > 0 and self.total_power > 0:
             min_power_charge = 0
             max_power_charge = 0
@@ -263,9 +265,6 @@ class StorageUnit(BaseUnit):
                                     max_power_charge)
         
         
-        current_SOC = (self.current_SOC[self.current_time] 
-                    if type(self.current_SOC) is pd.Series
-                    else self.current_SOC)
         min_SOC = (self.min_SOC[self.current_time]
                    if type(self.min_SOC) is pd.Series
                    else self.min_SOC)
@@ -275,12 +274,12 @@ class StorageUnit(BaseUnit):
         
         #restrict according to min_SOC
         max_power_discharge = min(max_power_discharge, 
-                                  max(0,(current_SOC - min_SOC 
+                                  max(0,(self.current_SOC - min_SOC 
                                          - self.pos_capacity_reserve[self.current_time])
                                          *self.efficiency_discharge))
         
         #restrict charging according to max_SOC
-        max_power_charge = max(max_power_charge, min(0, current_SOC - max_SOC - self.neg_capacity_reserve[self.current_time]))
+        max_power_charge = max(max_power_charge, min(0, self.current_SOC - max_SOC - self.neg_capacity_reserve[self.current_time]))
         
         #what form does the operational window have?
         operational_window = {
@@ -347,12 +346,14 @@ class StorageUnit(BaseUnit):
             self.current_status = 1 #discharging
             self.current_down_time = 0
             self.total_power.loc[time_period] = dispatch_plan["total_power"]
+            self.current_SOC = self.current_SOC - dispatch_plan["total_power"]
 
         elif dispatch_plan["total_power"] < -self.min_power_charge:
             self.market_success_list[-1] += 1
             self.current_status = 1 #charging
             self.current_down_time = 0
             self.total_power.loc[time_period] = dispatch_plan["total_power"]
+            self.current_SOC = self.current_SOC - dispatch_plan["total_power"]
 
         elif dispatch_plan["total_power"] < self.min_power_discharge:
             self.current_status = 0
@@ -372,23 +373,23 @@ class StorageUnit(BaseUnit):
         discharge: bool = True,
     ) -> float:
         if discharge == True:
-            variable_costs = (
-                self.variable_costs_discharge.at[current_time]
-                if type(self.variable_costs_discharge) is pd.Series
-                else self.variable_costs_discharge
+            variable_cost = (
+                self.variable_cost_discharge.at[current_time]
+                if type(self.variable_cost_discharge) is pd.Series
+                else self.variable_cost_discharge
             )
             efficiency = self.efficiency_discharge
     
         else:
-            variable_costs = (
-                self.variable_costs_charge.at[current_time]
-                if type(self.variable_costs_charge) is pd.Series
-                else self.variable_costs_charge
+            variable_cost = (
+                self.variable_cost_charge.at[current_time]
+                if type(self.variable_cost_charge) is pd.Series
+                else self.variable_cost_charge
             )
             efficiency = self.efficiency_charge
 
         marginal_cost = (
-            variable_costs / efficiency
+            variable_cost / efficiency
             + self.fixed_cost
         )
 
