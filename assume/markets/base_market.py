@@ -80,7 +80,7 @@ class MarketRole(Role):
         )
 
     async def next_opening(self):
-        current = datetime.utcfromtimestamp(self.context.current_timestamp)
+        current = datetime.fromtimestamp(self.context.current_timestamp)
         next_opening = self.marketconfig.opening_hours.after(current)
         if not next_opening:
             logger.debug(f"market {self.marketconfig.name} - does not reopen")
