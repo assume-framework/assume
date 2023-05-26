@@ -83,9 +83,7 @@ class PowerPlant(BaseUnit):
         self.current_down_time = self.min_down_time
 
         self.total_power_output = pd.Series(0.0, index=self.index)
-        self.total_power_output.loc[
-            self.index[0] : self.index[0] + pd.Timedelta("24h")
-        ] = self.min_power + 0.5*(self.max_power - self.min_power)
+        self.total_power_output.loc[:] = self.min_power + 0.5*(self.max_power - self.min_power)
 
         self.total_heat_output = pd.Series(0.0, index=self.index)
         self.power_loss_chp = pd.Series(0.0, index=self.index)
