@@ -140,7 +140,7 @@ class WriteOutput(Role):
         """
 
         for table in self.write_dfs.keys():
-            if len(self.write_dfs[table]) ==0:
+            if len(self.write_dfs[table]) == 0:
                 continue
             df = pd.concat(self.write_dfs[table], axis=0)
             df.reset_index()
@@ -162,9 +162,6 @@ class WriteOutput(Role):
             market_name: The name of the market.
         """
         # check if market results list is empty and skip the funktion and raise a warning
-        if not market_result:
-            logger.warning(f"Market result for market {market_name} are empty!!!")
-            return None
 
         df = pd.DataFrame.from_records(market_result, index="start_time")
         del df["only_hours"]

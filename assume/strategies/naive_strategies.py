@@ -42,7 +42,7 @@ class NaivePosReserveStrategy(BaseStrategy):
         volume = operational_window["pos_reserve"]["capacity"]
         bids = [{"price": price, "volume": volume}]
         return bids
-    
+
 
 class NaiveNegReserveStrategy(BaseStrategy):
     def __init__(self):

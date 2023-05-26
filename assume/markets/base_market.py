@@ -1,8 +1,8 @@
+import calendar
 import logging
 from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
-from pathlib import Path
 
 import pandas as pd
 from mango import Role
@@ -75,12 +75,11 @@ class MarketRole(Role):
         logger.debug(
             f"first market opening: {self.marketconfig.name} - {next_opening} - {market_closing}"
         )
-        self.context.schedule_timestamp_task(
-            self.next_opening(), next_opening.timestamp()
-        )
+        opening_ts = calendar.timegm(next_opening.utctimetuple())
+        self.context.schedule_timestamp_task(self.next_opening(), opening_ts)
 
     async def next_opening(self):
-        current = datetime.fromtimestamp(self.context.current_timestamp)
+        current = datetime.utcfromtimestamp(self.context.current_timestamp)
         next_opening = self.marketconfig.opening_hours.after(current)
         if not next_opening:
             logger.debug(f"market {self.marketconfig.name} - does not reopen")
@@ -98,12 +97,10 @@ class MarketRole(Role):
             "stop": market_closing,
             "products": products,
         }
-        self.context.schedule_timestamp_task(
-            self.clear_market(products), market_closing.timestamp()
-        )
-        self.context.schedule_timestamp_task(
-            self.next_opening(), next_opening.timestamp()
-        )
+        opening_ts = calendar.timegm(next_opening.utctimetuple())
+        closing_ts = calendar.timegm(market_closing.utctimetuple())
+        self.context.schedule_timestamp_task(self.clear_market(products), closing_ts)
+        self.context.schedule_timestamp_task(self.next_opening(), opening_ts)
         logger.debug(
             f"next market opening: {self.marketconfig.name} - {next_opening} - {market_closing}"
         )
@@ -206,6 +203,7 @@ class MarketRole(Role):
         )
 
     async def clear_market(self, market_products: list[MarketProduct]):
+        # print("clear market", len(self.all_orders))
         self.market_result, market_meta = self.marketconfig.market_mechanism(
             self, market_products
         )
@@ -228,6 +226,10 @@ class MarketRole(Role):
                 acl_metadata=meta,
             )
         # store order book in db agent
+        if not self.market_result:
+            logger.warning(
+                f"{self.context.current_timestamp} Market result {market_products} for market {self.marketconfig.name} are empty!"
+            )
         await self.store_order_book(self.market_result)
         # clear_price = sorted(self.market_result, lambda o: o['price'])[0]
 

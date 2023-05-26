@@ -165,7 +165,9 @@ class UnitsOperator(Role):
         )
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
-            data = pd.DataFrame(unit.total_power_output.loc[start:now], columns=["power"])
+            data = pd.DataFrame(
+                unit.total_power_output.loc[start:now], columns=["power"]
+            )
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
         unit_dispatch = pd.concat(unit_dispatch_dfs)

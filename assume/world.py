@@ -24,9 +24,9 @@ from assume.common import (
 )
 from assume.markets import MarketRole, pay_as_bid, pay_as_clear
 from assume.strategies import (
-    NaiveStrategy,
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
+    NaiveStrategy,
     flexableEOM,
 )
 from assume.units import Demand, PowerPlant
@@ -89,7 +89,7 @@ class World:
         self,
         start: pd.Timestamp,
     ):
-        self.clock = ExternalClock(start.timestamp())
+        self.clock = ExternalClock(0)
         self.container = await create_container(
             addr=self.addr, clock=self.clock, codec=mango_codec_factory()
         )
@@ -434,7 +434,6 @@ class World:
         next_activity = self.clock.get_next_activity()
         if not next_activity:
             self.logger.info("simulation finished - no schedules left")
-            self.clock.set_time(self.end.timestamp())
             return None
         delta = next_activity - self.clock.time
         self.clock.set_time(next_activity)
@@ -442,17 +441,25 @@ class World:
 
     async def run_simulation(self):
         # agent is implicit added to self.container._agents
-        total = self.end.timestamp() - self.start.timestamp()
-        pbar = tqdm(total=total)
-        self.clock.set_time(self.start.timestamp())
-        while self.clock.time < self.end.timestamp():
+        import calendar
+
+        start_ts = calendar.timegm(self.start.utctimetuple())
+        end_ts = calendar.timegm(self.end.utctimetuple())
+        pbar = tqdm(total=end_ts - start_ts)
+
+        # allow registration before first opening
+        self.clock.set_time(start_ts - 1)
+        await asyncio.sleep(0.00001)
+        while self.clock.time < end_ts:
             await asyncio.sleep(0.00001)
             delta = await self.step()
             if delta:
                 pbar.update(delta)
                 pbar.set_description(
-                    f"{datetime.fromtimestamp(self.clock.time)}", refresh=False
+                    f"{datetime.utcfromtimestamp(self.clock.time)}", refresh=False
                 )
+            else:
+                self.clock.set_time(end_ts)
         pbar.close()
         await self.container.shutdown()
 
