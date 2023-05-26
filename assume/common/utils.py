@@ -160,7 +160,7 @@ def get_available_products(market_products: list[MarketProduct], startdate: date
     for product in market_products:
         start = startdate + product.first_delivery
         if isinstance(product.duration, rr.rrule):
-            starts = list(product.duration.xafter(start, product.count + 1))
+            starts = list(product.duration.xafter(start, product.count + 1), inc=True)
             options.extend(
                 (starts[i], starts[i + 1], product.only_hours)
                 for i in range(product.count)

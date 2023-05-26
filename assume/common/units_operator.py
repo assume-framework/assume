@@ -184,7 +184,8 @@ class UnitsOperator(Role):
                     "data": market_dispatch,
                 },
             )
-            if not unit_dispatch.empty:
+            if unit_dispatch_dfs:
+                unit_dispatch = pd.concat(unit_dispatch_dfs)
                 self.context.schedule_instant_acl_message(
                     receiver_id=db_aid,
                     receiver_addr=db_addr,

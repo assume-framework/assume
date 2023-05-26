@@ -76,34 +76,23 @@ class MarketRole(Role):
             f"first market opening: {self.marketconfig.name} - {next_opening} - {market_closing}"
         )
         opening_ts = calendar.timegm(next_opening.utctimetuple())
-        self.context.schedule_timestamp_task(self.next_opening(), opening_ts)
+        self.context.schedule_timestamp_task(self.opening(), opening_ts)
 
-    async def next_opening(self):
-        current = datetime.utcfromtimestamp(self.context.current_timestamp)
-        next_opening = self.marketconfig.opening_hours.after(current)
-        if not next_opening:
-            logger.debug(f"market {self.marketconfig.name} - does not reopen")
-            return
-
-        market_closing = next_opening + self.marketconfig.opening_duration
+    async def opening(self):
+        # scheduled to be opened now
+        market_open = datetime.utcfromtimestamp(self.context.current_timestamp)
+        market_closing = market_open + self.marketconfig.opening_duration
         products = get_available_products(
-            self.marketconfig.market_products, next_opening
+            self.marketconfig.market_products, market_open
         )
 
         opening_message = {
             "context": "opening",
             "market_id": self.marketconfig.name,
-            "start": next_opening,
+            "start": market_open,
             "stop": market_closing,
             "products": products,
         }
-        opening_ts = calendar.timegm(next_opening.utctimetuple())
-        closing_ts = calendar.timegm(market_closing.utctimetuple())
-        self.context.schedule_timestamp_task(self.clear_market(products), closing_ts)
-        self.context.schedule_timestamp_task(self.next_opening(), opening_ts)
-        logger.debug(
-            f"next market opening: {self.marketconfig.name} - {next_opening} - {market_closing}"
-        )
 
         for agent in self.registered_agents:
             agent_addr, agent_id = agent
@@ -115,6 +104,20 @@ class MarketRole(Role):
                     "sender_addr": self.context.addr,
                     "sender_id": self.context.aid,
                 },
+            )
+
+        # schedule closing this market
+        closing_ts = calendar.timegm(market_closing.utctimetuple())
+        self.context.schedule_timestamp_task(self.clear_market(products), closing_ts)
+
+        # schedule the next opening too
+        next_opening = self.marketconfig.opening_hours.after(market_open)
+        if next_opening:
+            next_opening_ts = calendar.timegm(next_opening.utctimetuple())
+            logger.debug(f"market {self.marketconfig.name} - does not reopen")
+            self.context.schedule_timestamp_task(self.opening(), next_opening_ts)
+            logger.debug(
+                f"next market opening: {self.marketconfig.name} - {next_opening} - {market_closing}"
             )
 
     def handle_registration(self, content: dict, meta: dict):

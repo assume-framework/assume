@@ -451,7 +451,7 @@ class World:
         self.clock.set_time(start_ts - 1)
         await asyncio.sleep(0.00001)
         while self.clock.time < end_ts:
-            await asyncio.sleep(0.00001)
+            await asyncio.sleep(0.001)
             delta = await self.step()
             if delta:
                 pbar.update(delta)
@@ -461,6 +461,8 @@ class World:
             else:
                 self.clock.set_time(end_ts)
         pbar.close()
+        # for agent in self.container._agents.values():
+        #    await agent.inbox.join()
         await self.container.shutdown()
 
     def load_scenario(

@@ -162,7 +162,8 @@ class WriteOutput(Role):
             market_name: The name of the market.
         """
         # check if market results list is empty and skip the funktion and raise a warning
-
+        if not market_result:
+            return
         df = pd.DataFrame.from_records(market_result, index="start_time")
         del df["only_hours"]
         del df["agent_id"]
