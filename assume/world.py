@@ -1,4 +1,5 @@
 import asyncio
+import calendar
 import logging
 import time
 from datetime import datetime
@@ -9,6 +10,7 @@ import pandas as pd
 import yaml
 from mango import RoleAgent, create_container
 from mango.util.clock import ExternalClock
+from mango.util.termination_detection import tasks_complete_or_sleeping
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -189,6 +191,7 @@ class World:
         simulation_id = study_case
         save_frequency_hours = config.get("save_frequency_hours", None)
 
+        self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to world
         output_role = WriteOutput(
             simulation_id,
@@ -198,8 +201,21 @@ class World:
             self.export_csv_path,
             save_frequency_hours,
         )
-        self.output_agent = RoleAgent(self.container, suggested_aid="export_agent_1")
-        self.output_agent.add_role(output_role)
+        same_process = False
+        if same_process:
+            self.output_agent = RoleAgent(
+                self.container, suggested_aid=self.output_agent_addr[1]
+            )
+            self.output_agent.add_role(output_role)
+        else:
+            # this does not set the clock in output_agent correctly yet
+            # see https://gitlab.com/mango-agents/mango/-/issues/59
+            # but still improves performance
+            def creator(container):
+                agent = RoleAgent(container, suggested_aid=self.output_agent_addr[1])
+                agent.add_role(output_role)
+
+            await self.container.as_agent_process(agent_creator=creator)
 
         # get the market config from the config file and add the markets
         self.logger.info("Adding markets")
@@ -324,8 +340,8 @@ class World:
 
         # after creation of an agent - we set additional context params
         unit_operator_agent._role_context.data_dict = {
-            "output_agent_id": self.output_agent.aid,
-            "output_agent_addr": self.output_agent.addr,
+            "output_agent_addr": self.output_agent_addr[0],
+            "output_agent_id": self.output_agent_addr[1],
         }
 
     async def add_unit(
@@ -394,8 +410,8 @@ class World:
 
         # after creation of an agent - we set additional context params
         market_operator_agent._role_context.data_dict = {
-            "output_agent_id": self.output_agent.aid,
-            "output_agent_addr": self.output_agent.addr,
+            "output_agent_addr": self.output_agent_addr[0],
+            "output_agent_id": self.output_agent_addr[1],
         }
         self.market_operators[id] = market_operator_agent
 
@@ -441,7 +457,6 @@ class World:
 
     async def run_simulation(self):
         # agent is implicit added to self.container._agents
-        import calendar
 
         start_ts = calendar.timegm(self.start.utctimetuple())
         end_ts = calendar.timegm(self.end.utctimetuple())
@@ -449,9 +464,8 @@ class World:
 
         # allow registration before first opening
         self.clock.set_time(start_ts - 1)
-        await asyncio.sleep(0.00001)
         while self.clock.time < end_ts:
-            await asyncio.sleep(0.001)
+            await asyncio.sleep(0)
             delta = await self.step()
             if delta:
                 pbar.update(delta)
@@ -460,9 +474,9 @@ class World:
                 )
             else:
                 self.clock.set_time(end_ts)
+
+            await tasks_complete_or_sleeping(self.container)
         pbar.close()
-        # for agent in self.container._agents.values():
-        #    await agent.inbox.join()
         await self.container.shutdown()
 
     def load_scenario(

@@ -50,7 +50,6 @@ class WriteOutput(Role):
         self.db = db_engine
 
         # contruct all timeframe under which hourly values are written to excel and db
-        self.delay = (end - start).total_seconds()
         self.start = start
         self.end = end
 
@@ -90,10 +89,11 @@ class WriteOutput(Role):
         )
 
         recurrency_task = rr.rrule(
-            rr.HOURLY,
+            freq=rr.HOURLY,
             interval=self.save_frequency_hours,
             dtstart=self.start,
             until=self.end,
+            cache=True,
         )
         self.context.schedule_recurrent_task(self.store_dfs, recurrency_task)
 
