@@ -240,7 +240,7 @@ class MarketRole(Role):
             logger.debug(
                 f'clearing price for {self.marketconfig.name} is {round(meta["price"],2)}, volume: {meta["demand_volume"]}'
             )
-            meta["name"] = self.marketconfig.name
+            meta["market_id"] = self.marketconfig.name
             meta["time"] = self.context.current_timestamp
 
         await self.store_market_results(market_meta)

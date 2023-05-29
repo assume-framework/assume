@@ -90,9 +90,10 @@ class PowerPlant(BaseUnit):
         self.total_power_output = pd.Series(0.0, index=self.index)
         # workaround if market schedules do not match
         # for example neg_reserve is required but market did not bid yet
-        self.total_power_output.loc[:] = self.min_power + 0.5 * (
-            self.max_power - self.min_power
-        )
+        # it does set a usage in times where no power is used by the market
+        # self.total_power_output.loc[:] = self.min_power + 0.5 * (
+        #    self.max_power - self.min_power
+        # )
 
         self.total_heat_output = pd.Series(0.0, index=self.index)
         self.power_loss_chp = pd.Series(0.0, index=self.index)
