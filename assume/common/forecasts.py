@@ -46,9 +46,13 @@ class ForecastProvider(Role):
         get information about market aprticipants to make accurate price forecast
         """
 
-        return NotImplementedError
+        raise NotImplementedError(
+            "Functionality of using the different markets and specified registration for the price forecast is not implemented yet"
+        )
 
-    def calculate_marginal_price(self, demand, registered_power_plants):
+    def calculate_marginal_price(
+        self, market, demand, renewable_capacity_factors, registered_power_plants
+    ):
         """
         Function that calculates the merit order price, which is given as a price forecast to the Rl agents
         Here for the entire time horizon at once
@@ -56,29 +60,60 @@ class ForecastProvider(Role):
         TODO consider storages?
         """
 
+        # initialize price forecast
+        price_forecast = pd.DataFrame(
+            index=renewable_capacity_factors.index, columns="Price_forecast"
+        ).fillna(0)
+
         self.demand = list(demand.values)
 
         contractedSupply = 0
 
-        # calculate simplified marginal costs for each power plant
-        registered_power_plants["marginal_costs"] = (
-            self.fuel_prices / registered_power_plants["efficiency"]
-            + self.co2_price
-            * registered_power_plants["emission_factor"]
-            / registered_power_plants["efficiency"]
-            + registered_power_plants["fixed_cost"]
-        )
+        if market == "EOM":
+            # calculate simplified marginal costs for each power plant
+            registered_power_plants["marginal_costs"] = (
+                self.fuel_prices / registered_power_plants["efficiency"]
+                + self.co2_price
+                * registered_power_plants["emission_factor"]
+                / registered_power_plants["efficiency"]
+                + registered_power_plants["fixed_cost"]
+            )
 
-        registered_power_plants.sort_values(
-            "marginal_costs", ascending=True, axi=0, inplace=True
-        )
+            registered_power_plants.sort_values(
+                "marginal_costs", ascending=True, axi=0, inplace=True
+            )
 
-        for pp in powerplants:
-            contractedSupply += pp.maxPower
-            mcp = pp.marginal_cost[t]
-            if contractedSupply >= res_load:
-                break
+            # calculate infeed of renewables and residual demand
+            # check if max_power is a series or a float
+
+            i = 0
+
+            for t in renewable_capacity_factors.index:
+                for pp in registered_power_plants:
+                    if pp.unit_name in renewable_capacity_factors.columns:
+                        capacity_factor = renewable_capacity_factors[pp.unit_name]
+
+                        max_power = capacity_factor.at[t] * pp.max_power
+
+                    else:
+                        max_power = pp.maxPower
+
+                    contractedSupply += max_power
+                    mcp = pp.marginal_cost[t]
+
+                    if contractedSupply >= demand[i]:
+                        break
+
+                    else:
+                        mcp = 3000
+
+                i += 1
+
+                price_forecast.at[t, "Price_forecast"] = mcp
+
         else:
-            mcp = 100
+            raise NotImplementedError(
+                "For this market the price forecast is not implemented yet"
+            )
 
-        return mcp
+        return price_forecast
