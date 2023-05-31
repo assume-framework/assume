@@ -138,7 +138,6 @@ class UnitsOperator(Role):
         this does not respect bids from multiple markets
         for the same time period
         """
-        time_period = [orderbook[0]["start_time"], orderbook[0]["end_time"]]
         orderbook = list(sorted(orderbook, key=itemgetter("unit_id")))
         for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
             orders_l = list(orders)
@@ -146,7 +145,8 @@ class UnitsOperator(Role):
             dispatch_plan = {"total_power": total_power}
             self.units[unit_id].get_dispatch_plan(
                 dispatch_plan=dispatch_plan,
-                time_period=time_period,
+                start=orderbook[0]["start_time"],
+                end=orderbook[0]["end_time"],
             )
 
     def write_actual_dispatch(self):

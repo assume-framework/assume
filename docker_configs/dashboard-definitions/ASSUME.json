@@ -396,7 +396,7 @@
               "tooltip": false,
               "viz": false
             },
-            "lineInterpolation": "smooth",
+            "lineInterpolation": "stepAfter",
             "lineStyle": {
               "fill": "solid"
             },
@@ -452,6 +452,22 @@
               {
                 "id": "unit",
                 "value": "€/MWh"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "price .*"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "€/MWh"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "auto"
               }
             ]
           }
@@ -966,13 +982,16 @@
               "viz": false
             },
             "lineInterpolation": "smooth",
+            "lineStyle": {
+              "fill": "solid"
+            },
             "lineWidth": 2,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
             },
             "showPoints": "auto",
-            "spanNulls": false,
+            "spanNulls": true,
             "stacking": {
               "group": "A",
               "mode": "none"
@@ -1441,9 +1460,9 @@
     "list": [
       {
         "current": {
-          "selected": true,
-          "text": "example_01_crm",
-          "value": "example_01_crm"
+          "selected": false,
+          "text": "policy_case_01",
+          "value": "policy_case_01"
         },
         "datasource": {
           "type": "postgres",
@@ -1466,8 +1485,8 @@
       {
         "current": {
           "selected": false,
-          "text": "EOM",
-          "value": "EOM"
+          "text": "LTM",
+          "value": "LTM"
         },
         "datasource": {
           "type": "postgres",
@@ -1489,12 +1508,14 @@
       },
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": [
+            "GKM 9",
             "KKW ISAR 2",
             "NEURATH F"
           ],
           "value": [
+            "GKM 9",
             "KKW ISAR 2",
             "NEURATH F"
           ]
@@ -1520,7 +1541,7 @@
       },
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": [
             "demand_DE"
           ],

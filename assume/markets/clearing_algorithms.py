@@ -115,7 +115,6 @@ def pay_as_clear(
             {
                 "supply_volume": supply_volume,
                 "demand_volume": demand_volume,
-                "uniform_price": clear_price,
                 "price": clear_price,
                 "max_price": clear_price,
                 "min_price": clear_price,

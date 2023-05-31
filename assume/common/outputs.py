@@ -130,6 +130,8 @@ class WriteOutput(Role):
         """
 
         df = pd.DataFrame(market_meta)
+        if df.empty:
+            return
         df["simulation"] = self.simulation_id
         self.write_dfs["market_meta"].append(df)
 
