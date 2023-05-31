@@ -603,7 +603,7 @@ class World:
                     i += 1
 
                 price_forecast.at[t, "mcp"] = mcp
-                print(price_forecast)
+
         else:
             raise NotImplementedError(
                 "For this market the price forecast is not implemented yet"
