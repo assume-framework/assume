@@ -1,4 +1,5 @@
 from assume.strategies.base_strategy import BaseStrategy
+from assume.units.base_unit import BaseUnit
 
 
 class RLStrategy(BaseStrategy):
@@ -15,14 +16,18 @@ class RLStrategy(BaseStrategy):
 
         raise NotImplementedError()
 
-    def calculate_bids(self, market, operational_window):
+    def calculate_bids(
+        self,
+        unit: BaseUnit = None,
+        operational_window: dict = None,
+    ):
         """
-        load current RL model to map state to action
+        Takes information from a unit that the unit operator manages and
+        defines how it is dispatched to the market
 
         Return: volume, price
         """
-
-        # load model for market
-        # sample action based on state
-
-        raise NotImplementedError()
+        price = operational_window["max_power"]["marginal_cost"]
+        volume = operational_window["max_power"]["power"]
+        bids = [{"price": price, "volume": volume}]
+        return bids

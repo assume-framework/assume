@@ -18,6 +18,7 @@ from assume.common import (
     MarketConfig,
     UnitsOperator,
     WriteOutput,
+    ForecastProvider,
     load_file,
     make_market_config,
     mango_codec_factory,
@@ -220,6 +221,28 @@ class World:
                 market_config=market_config,
             )
 
+        # add making price forecast
+        # forecast_role = ForecastProvider(
+        #    config["markets_config"].items(),
+        #    fuel_prices_df,
+        #    fuel_prices_df["co2"],
+        #    vre_cf_df,
+        #    powerplant_units,
+        #    demand_df,
+        # )
+        # forecast_agent = RoleAgent(self.container, suggested_aid="forecast_agent_1")
+        # forecast_agent.add_role(forecast_role)
+
+        # write forecast
+        self.price_forecast = self.calculate_price_forecast(
+            "EOM",
+            demand_df,
+            vre_cf_df,
+            powerplant_units,
+            fuel_prices_df,
+            fuel_prices_df["co2"],
+        )
+
         # add the unit operators using unique unit operator names in the powerplants csv
         self.logger.info("Adding unit operators")
         all_operators = np.concatenate(
@@ -240,6 +263,7 @@ class World:
         # add the units to corresponsing unit operators
         # if fuel prices are provided, add them to the unit params
         # if vre generation is provided, add them to the vre units
+        # if we have RL strategy, add price forecast to unit_params
         self.logger.info("Adding power plant units")
         for unit_name, unit_params in powerplant_units.iterrows():
             if (
@@ -249,6 +273,12 @@ class World:
                 unit_params["bidding_strategies"] = bidding_strategies_df.loc[
                     unit_name
                 ].to_dict()
+
+                # check if we have RL bidding strategy
+                if bidding_strategies_df.loc[unit_name].to_dict() == "RLStrategy":
+                    unit_params["price_forecast"] = self.price_forecast
+                    print(unit_params)
+
             else:
                 self.logger.warning(
                     f"No bidding strategies specified for {unit_name}. Using default strategies."
@@ -481,3 +511,104 @@ class World:
 
     def run(self):
         return self.loop.run_until_complete(self.run_simulation())
+
+    # calculate price forecast
+    def calculate_price_forecast(
+        self,
+        market,
+        demand,
+        renewable_capacity_factors,
+        registered_power_plants,
+        fuel_prices,
+        co2_prices,
+    ):
+        """
+        Function that calculates the merit order price, which is given as a price forecast to the Rl agents
+        Here for the entire time horizon at once
+        TODO make price forecasts for all markets, not just specified for the DAM like here
+        TODO consider storages?
+        """
+
+        # initialize price forecast
+        price_forecast = pd.DataFrame(
+            index=renewable_capacity_factors.index, columns=["mcp"]
+        )
+
+        self.demand = list(demand.values)
+
+        # intialize potential orders
+        potential_orders = pd.DataFrame(columns=["mcp", "max_power"])
+
+        if market == "EOM":
+            # calculate infeed of renewables and residual demand
+            # check if max_power is a series or a float
+            self.logger.info("Preparing market forecasts")
+
+            for t in renewable_capacity_factors.index:
+                i = 0
+                # intialize potential orders
+                potential_orders = pd.DataFrame(columns=["mcp", "max_power"])
+
+                for unit_name, unit_params in registered_power_plants.iterrows():
+                    # pp = pp[1]
+                    if unit_name in renewable_capacity_factors.columns:
+                        # adds availabel renewables to merrit order
+                        capacity_factor = renewable_capacity_factors[unit_name]
+
+                        max_power = capacity_factor.at[t] * unit_params["max_power"]
+                        mcp = 0
+
+                        # potential_orders.loc[i] = (mcp, max_power)
+                        potential_orders.loc[i] = {"mcp": mcp, "max_power": max_power}
+                        # potential_orders = potential_orders.append(
+                        #    {"mcp": mcp, "max_power": max_power}, ignore_index=True
+                        # )
+
+                    else:
+                        max_power = unit_params.max_power
+
+                        # calculate simplified marginal costs for each power plant
+                        mcp = (
+                            fuel_prices[unit_params.fuel_type].at[t]
+                            / unit_params["efficiency"]
+                            + co2_prices.at[t]
+                            * unit_params["emission_factor"]
+                            / unit_params["efficiency"]
+                            + unit_params["fixed_cost"]
+                        )
+
+                        potential_orders.loc[i] = {"mcp": mcp, "max_power": max_power}
+
+                    # Sort the DataFrame by the "mcp" column
+                    potential_orders = potential_orders.sort_values("mcp")
+
+                    # Cumulate the "max_power" column
+                    potential_orders["cumulative_max_power"] = potential_orders[
+                        "max_power"
+                    ].cumsum()
+
+                    # Find the row where "cumulative_max_power" exceeds a demand value
+
+                    filtered_potential_orders = potential_orders[
+                        potential_orders["cumulative_max_power"]
+                        > demand.at[t, "demand_DE"]
+                    ]
+                    if not filtered_potential_orders.empty:
+                        mcp = filtered_potential_orders.iloc[0]["mcp"]
+
+                    else:
+                        # demand cannot be supplied by power plant fleet
+                        mcp = 3000
+
+                    i += 1
+
+                price_forecast.at[t, "mcp"] = mcp
+                print(price_forecast)
+        else:
+            raise NotImplementedError(
+                "For this market the price forecast is not implemented yet"
+            )
+
+        self.logger.info("Finished market forecasts")
+
+        return price_forecast

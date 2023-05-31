@@ -62,8 +62,11 @@ class ForecastProvider(Role):
 
         # initialize price forecast
         price_forecast = pd.DataFrame(
-            index=renewable_capacity_factors.index, columns="Price_forecast"
+            index=renewable_capacity_factors.index,
+            columns=renewable_capacity_factors["wind_onshore_DE"],
         ).fillna(0)
+
+        print(price_forecast)
 
         self.demand = list(demand.values)
 
