@@ -13,6 +13,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
 from tqdm import tqdm
+import os
 
 from assume.common import (
     MarketConfig,
@@ -29,6 +30,7 @@ from assume.strategies import (
     NaivePosReserveStrategy,
     NaiveStrategy,
     flexableEOM,
+    RLStrategy,
 )
 from assume.units import Demand, PowerPlant
 
@@ -77,6 +79,7 @@ class World:
             "flexable_eom": flexableEOM,
             "naive_neg_reserve": NaiveNegReserveStrategy,
             "naive_pos_reserve": NaivePosReserveStrategy,
+            "rl_strategy": RLStrategy,
         }
         self.clearing_mechanisms = {
             "pay_as_clear": pay_as_clear,
@@ -537,17 +540,34 @@ class World:
         self.demand = list(demand.values)
 
         # intialize potential orders
-        potential_orders = pd.DataFrame(columns=["mcp", "max_power"])
+        forecasted_orders = pd.DataFrame(columns=["mcp", "max_power"])
 
         if market == "EOM":
+            forecast_file = "price_forecast_EOM.csv"
+
+            # Check if the forecast file already exists
+            if os.path.isfile(forecast_file):
+                # Ask user if inputs have changed
+                user_response = input(
+                    "Did you change the input since the last price forecast calculation? (y/n): "
+                )
+
+                # Check user response
+                if user_response.lower() == "n":
+                    # If inputs haven't changed, load the forecast from the CSV file and exit
+                    price_forecast = pd.read_csv(forecast_file, index_col="Timestamp")
+                    self.logger.info("Price forecast loaded from the existing file.")
+
+                    return price_forecast
+
             # calculate infeed of renewables and residual demand
             # check if max_power is a series or a float
             self.logger.info("Preparing market forecasts")
 
             for t in renewable_capacity_factors.index:
                 i = 0
-                # intialize potential orders
-                potential_orders = pd.DataFrame(columns=["mcp", "max_power"])
+                # reset potential orders
+                forecasted_orders = forecasted_orders.iloc[0:0]
 
                 for unit_name, unit_params in registered_power_plants.iterrows():
                     # pp = pp[1]
@@ -558,11 +578,7 @@ class World:
                         max_power = capacity_factor.at[t] * unit_params["max_power"]
                         mcp = 0
 
-                        # potential_orders.loc[i] = (mcp, max_power)
-                        potential_orders.loc[i] = {"mcp": mcp, "max_power": max_power}
-                        # potential_orders = potential_orders.append(
-                        #    {"mcp": mcp, "max_power": max_power}, ignore_index=True
-                        # )
+                        forecasted_orders.loc[i] = {"mcp": mcp, "max_power": max_power}
 
                     else:
                         max_power = unit_params.max_power
@@ -577,30 +593,28 @@ class World:
                             + unit_params["fixed_cost"]
                         )
 
-                        potential_orders.loc[i] = {"mcp": mcp, "max_power": max_power}
+                        forecasted_orders.loc[i] = {"mcp": mcp, "max_power": max_power}
+                        i += 1
 
-                    # Sort the DataFrame by the "mcp" column
-                    potential_orders = potential_orders.sort_values("mcp")
+                # Sort the DataFrame by the "mcp" column
+                forecasted_orders = forecasted_orders.sort_values("mcp")
 
-                    # Cumulate the "max_power" column
-                    potential_orders["cumulative_max_power"] = potential_orders[
-                        "max_power"
-                    ].cumsum()
+                # Cumulate the "max_power" column
+                forecasted_orders["cumulative_max_power"] = forecasted_orders[
+                    "max_power"
+                ].cumsum()
 
-                    # Find the row where "cumulative_max_power" exceeds a demand value
+                # Find the row where "cumulative_max_power" exceeds a demand value
+                filtered_forecasted_orders = forecasted_orders[
+                    forecasted_orders["cumulative_max_power"]
+                    > demand.at[t, "demand_DE"]
+                ]
+                if not filtered_forecasted_orders.empty:
+                    mcp = filtered_forecasted_orders.iloc[0]["mcp"]
 
-                    filtered_potential_orders = potential_orders[
-                        potential_orders["cumulative_max_power"]
-                        > demand.at[t, "demand_DE"]
-                    ]
-                    if not filtered_potential_orders.empty:
-                        mcp = filtered_potential_orders.iloc[0]["mcp"]
-
-                    else:
-                        # demand cannot be supplied by power plant fleet
-                        mcp = 3000
-
-                    i += 1
+                else:
+                    # demand cannot be supplied by power plant fleet
+                    mcp = 3000
 
                 price_forecast.at[t, "mcp"] = mcp
 
@@ -610,5 +624,6 @@ class World:
             )
 
         self.logger.info("Finished market forecasts")
+        price_forecast.to_csv(forecast_file, index_label="Timestamp")
 
         return price_forecast
