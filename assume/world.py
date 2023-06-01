@@ -239,6 +239,7 @@ class World:
         # write forecast
         self.price_forecast = self.calculate_price_forecast(
             "EOM",
+            path,
             demand_df,
             vre_cf_df,
             powerplant_units,
@@ -519,6 +520,7 @@ class World:
     def calculate_price_forecast(
         self,
         market,
+        path,
         demand,
         renewable_capacity_factors,
         registered_power_plants,
@@ -538,13 +540,12 @@ class World:
         )
 
         self.demand = list(demand.values)
+        forecast_file = path + "/price_forecast_EOM.csv"
 
         # intialize potential orders
         forecasted_orders = pd.DataFrame(columns=["mcp", "max_power"])
 
         if market == "EOM":
-            forecast_file = "price_forecast_EOM.csv"
-
             # Check if the forecast file already exists
             if os.path.isfile(forecast_file):
                 # Ask user if inputs have changed
