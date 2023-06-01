@@ -60,6 +60,8 @@ After these steps you can also run the example simulation:
 python examples/example_01a_sqlite.py
 ```
 
+Please note that if you have python running on windows that you need to alter the same_process binary in world to True (to be changed). 
+
 Access to database and dashboards
 ---------------------------------
 To save the simulation results to a database and be able to analyze them using Grafan dashboards, install the docker container:

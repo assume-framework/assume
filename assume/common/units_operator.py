@@ -156,7 +156,11 @@ class UnitsOperator(Role):
         sends dispatch at or after it actually happens
         """
         last = self.last_sent_dispatch
+        if self.context.current_timestamp == last:
+            # stop if we exported at this time already
+            return
         self.last_sent_dispatch = self.context.current_timestamp
+
         now = datetime.utcfromtimestamp(self.context.current_timestamp)
         start = datetime.utcfromtimestamp(last)
 

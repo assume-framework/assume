@@ -492,7 +492,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  demand_volume AS \"Demand Volume\",\n  supply_volume AS \"Supply Volume\",\n  price,\n  name\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"name\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY name, simulation, product_start, demand_volume, supply_volume, price\nORDER BY 1;\n",
+          "rawSql": "SELECT\n  product_start AS \"time\",\n  demand_volume AS \"Demand Volume\",\n  supply_volume AS \"Supply Volume\",\n  price,\n  market_id\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, demand_volume, supply_volume, price\nORDER BY 1;\n",
           "refId": "A",
           "select": [
             [
@@ -576,39 +576,13 @@
           },
           "unit": "€/MW"
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "price NEURATH F_1",
-                  "price KKW ISAR 2_1"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 59
+        "y": 35
       },
       "id": 19,
       "options": {
@@ -647,7 +621,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(original_price) AS \"price\",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_name = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(original_price) AS \"price\",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -698,7 +672,7 @@
               "datatype": "text",
               "name": "",
               "params": [
-                "market_name",
+                "market_id",
                 "=",
                 "'$market'"
               ],
@@ -783,7 +757,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 59
+        "y": 35
       },
       "id": 20,
       "options": {
@@ -822,7 +796,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(volume) AS \"volume\",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_name = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(volume) AS \"volume\",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -873,7 +847,7 @@
               "datatype": "text",
               "name": "",
               "params": [
-                "market_name",
+                "market_id",
                 "=",
                 "'$market'"
               ],
@@ -901,7 +875,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 67
+        "y": 43
       },
       "id": 41,
       "panels": [],
@@ -918,7 +892,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 68
+        "y": 44
       },
       "id": 22,
       "options": {
@@ -1029,7 +1003,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 71
+        "y": 47
       },
       "id": 24,
       "options": {
@@ -1055,7 +1029,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"market_result\",\n  unit_id \nFROM market_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id in ($Gen_Units)\nGROUP BY 1, unit_id, power\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"market_dispatch\",\n  unit_id,\n  market_id\nFROM market_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id in ($Gen_Units)\nGROUP BY 1, unit_id, power, market_id\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -1124,7 +1098,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 71
+        "y": 47
       },
       "id": 26,
       "options": {
@@ -1183,7 +1157,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 80
+        "y": 56
       },
       "id": 39,
       "panels": [],
@@ -1200,7 +1174,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 81
+        "y": 57
       },
       "id": 35,
       "options": {
@@ -1311,7 +1285,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 84
+        "y": 60
       },
       "id": 36,
       "options": {
@@ -1336,7 +1310,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"power\",\n  unit_id\nFROM market_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id in ($Demand_Units)\nGROUP BY 1, unit_id, power\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"power\",\n  unit_id,\n  market_id\nFROM market_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id in ($Demand_Units)\nGROUP BY 1, unit_id, power, market_id\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -1350,6 +1324,39 @@
           ],
           "table": "demand_meta",
           "timeColumn": "\"Timestamp\"",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
+          "group": [],
+          "hide": false,
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  $__timeGroupAlias(index,$__interval),\n  power AS \"dispatch\",\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(index) AND\n  simulation = '$simulation' AND\n  unit in ($Demand_Units)\nGROUP BY 1, unit, power\nORDER BY 1",
+          "refId": "B",
+          "select": [
+            [
+              {
+                "params": [
+                  "power"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "market_dispatch",
+          "timeColumn": "datetime",
           "timeColumnType": "timestamp",
           "where": [
             {
@@ -1372,7 +1379,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 84
+        "y": 60
       },
       "id": 37,
       "options": {
@@ -1466,14 +1473,14 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT \n  name\nFROM market_meta\nwhere simulation='$simulation'\ngroup by name ;",
+        "definition": "SELECT \n  market_id\nFROM market_meta\nwhere simulation='$simulation'\ngroup by market_id ;",
         "description": "Choose for which market the data is displayed",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "market",
         "options": [],
-        "query": "SELECT \n  name\nFROM market_meta\nwhere simulation='$simulation'\ngroup by name ;",
+        "query": "SELECT \n  market_id\nFROM market_meta\nwhere simulation='$simulation'\ngroup by market_id ;",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
