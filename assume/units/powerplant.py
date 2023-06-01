@@ -187,10 +187,7 @@ class PowerPlant(BaseUnit):
 
         # should be adjusted to account for ramping speeds
         # and differences between resolutions of energy and reserve markets
-        if self.ramp_up != -1:
-            available_pos_reserve = min(max_power - current_power, self.ramp_up)
-        else:
-            available_pos_reserve = max_power - current_power
+        available_pos_reserve = min(max_power - current_power, self.ramp_up)
 
         available_pos_reserve = min(max_power - current_power, self.ramp_up)
         available_neg_reserve = max(0, min(current_power - min_power, self.ramp_down))
@@ -206,7 +203,7 @@ class PowerPlant(BaseUnit):
         }
 
         if available_neg_reserve < 0:
-            print("available_neg_reserve < 0")
+            logger.error("available_neg_reserve < 0")
 
         return operational_window
 
@@ -221,7 +218,11 @@ class PowerPlant(BaseUnit):
         )
 
     def get_dispatch_plan(
-        self, dispatch_plan: dict, start: pd.Timestamp, end: pd.Timestamp
+        self,
+        dispatch_plan: dict,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+        product_type: str,
     ):
         end_excl = end - self.index.freq
         self.total_power_output.loc[start:end_excl] += dispatch_plan["total_power"]

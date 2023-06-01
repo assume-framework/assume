@@ -76,7 +76,11 @@ class BaseUnit:
         )
 
     def get_dispatch_plan(
-        self, dispatch_plan: dict, start: pd.Timestamp, end: pd.Timestamp
+        self,
+        dispatch_plan: dict,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+        product_type: str,
     ):
         """set the dispatch plan for the given interval
         This checks if the market feedback is feasible for the given unit.
