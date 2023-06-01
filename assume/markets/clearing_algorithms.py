@@ -96,7 +96,7 @@ def pay_as_clear(
         if accepted_supply_orders:
             clear_price = max(map(itemgetter("price"), accepted_supply_orders))
         else:
-            clear_price = market_agent.marketconfig.maximum_bid
+            clear_price = 0
         for order in accepted_product_orders:
             order["original_price"] = order["price"]
             order["price"] = clear_price
@@ -224,7 +224,7 @@ def pay_as_bid(
         accepted_orders.extend(accepted_product_orders)
         prices = list(map(itemgetter("price"), accepted_supply_orders))
         if not prices:
-            prices = [market_agent.marketconfig.maximum_bid]
+            prices = [0]
 
         meta.append(
             {

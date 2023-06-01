@@ -224,7 +224,6 @@ class PowerPlant(BaseUnit):
         self, dispatch_plan: dict, start: pd.Timestamp, end: pd.Timestamp
     ):
         end_excl = end - self.index.freq
-        # TODO check if resulting power is < max_power
         self.total_power_output.loc[start:end_excl] += dispatch_plan["total_power"]
 
         if self.total_power_output[start:end_excl].min() < self.min_power:
@@ -241,9 +240,10 @@ class PowerPlant(BaseUnit):
             self.current_status = 1
             self.current_down_time = 0
 
-        if self.total_power_output[start:end_excl].max() > self.max_power:
-            max_pow = self.total_power_output[start:end_excl].max()
-            logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")
+        # TODO check if resulting power is < max_power
+        # if self.total_power_output[start:end_excl].max() > self.max_power:
+        #     max_pow = self.total_power_output[start:end_excl].max()
+        #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")
 
     def calc_marginal_cost(
         self,

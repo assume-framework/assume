@@ -169,8 +169,9 @@ class UnitsOperator(Role):
         )
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
+            end_excl = now - unit.index.freq
             data = pd.DataFrame(
-                unit.total_power_output.loc[start:now], columns=["power"]
+                unit.total_power_output.loc[start:end_excl], columns=["power"]
             )
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
