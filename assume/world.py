@@ -201,7 +201,7 @@ class World:
             self.export_csv_path,
             save_frequency_hours,
         )
-        same_process = False
+        same_process = True
         if same_process:
             self.output_agent = RoleAgent(
                 self.container, suggested_aid=self.output_agent_addr[1]

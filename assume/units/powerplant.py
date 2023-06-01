@@ -1,6 +1,10 @@
+import logging
+
 import pandas as pd
 
 from assume.units.base_unit import BaseUnit
+
+logger = logging.getLogger(__name__)
 
 
 class PowerPlant(BaseUnit):
@@ -35,7 +39,7 @@ class PowerPlant(BaseUnit):
         max_heat_extraction: float = 0,
         location: tuple[float, float] = (0.0, 0.0),
         node: str = "bus0",
-        **kwargs
+        **kwargs,
     ):
         super().__init__(
             id=id,
@@ -134,7 +138,7 @@ class PowerPlant(BaseUnit):
     ) -> dict:
         current_power = self.total_power_output.at[start - self.index.freq]
 
-        min_power, max_power = self.calculate_min_max_power(timestep=start)
+        min_power, max_power = self.calculate_min_max_power(start, end)
 
         # adjust for ramp down speed
         min_power = max(current_power - self.ramp_down, min_power)
@@ -179,14 +183,11 @@ class PowerPlant(BaseUnit):
     ) -> dict:
         current_power = self.total_power_output.at[start - self.index.freq]
 
-        min_power, max_power = self.calculate_min_max_power(timestep=start)
+        min_power, max_power = self.calculate_min_max_power(start, end)
 
         # should be adjusted to account for ramping speeds
         # and differences between resolutions of energy and reserve markets
-        if self.ramp_up != -1:
-            available_pos_reserve = min(max_power - current_power, self.ramp_up)
-        else:
-            available_pos_reserve = max_power - current_power
+        available_pos_reserve = min(max_power - current_power, self.ramp_up)
 
         available_pos_reserve = min(max_power - current_power, self.ramp_up)
         available_neg_reserve = max(0, min(current_power - min_power, self.ramp_down))
@@ -202,7 +203,7 @@ class PowerPlant(BaseUnit):
         }
 
         if available_neg_reserve < 0:
-            print("available_neg_reserve < 0")
+            logger.error("available_neg_reserve < 0")
 
         return operational_window
 
@@ -216,22 +217,34 @@ class PowerPlant(BaseUnit):
             product_tuple=product_tuple,
         )
 
-    def get_dispatch_plan(self, dispatch_plan, time_period):
-        if dispatch_plan["total_power"] >= self.min_power:
-            self.market_success_list[-1] += 1
-            self.current_status = 1
-            self.current_down_time = 0
-            self.total_power_output.loc[time_period] = dispatch_plan["total_power"]
-        else:
+    def get_dispatch_plan(
+        self,
+        dispatch_plan: dict,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+        product_type: str,
+    ):
+        end_excl = end - self.index.freq
+        self.total_power_output.loc[start:end_excl] += dispatch_plan["total_power"]
+
+        if self.total_power_output[start:end_excl].min() < self.min_power:
+            self.total_power_output.loc[start:end_excl] = 0
             self.current_status = 0
             self.current_down_time += 1
-            self.total_power_output.loc[time_period] = 0
-
             if self.market_success_list[-1] != 0:
                 self.mean_market_success = sum(self.market_success_list) / len(
                     self.market_success_list
                 )
                 self.market_success_list.append(0)
+        else:
+            self.market_success_list[-1] += 1
+            self.current_status = 1
+            self.current_down_time = 0
+
+        # TODO check if resulting power is < max_power
+        # if self.total_power_output[start:end_excl].max() > self.max_power:
+        #     max_pow = self.total_power_output[start:end_excl].max()
+        #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")
 
     def calc_marginal_cost(
         self,
@@ -301,19 +314,22 @@ class PowerPlant(BaseUnit):
 
         return marginal_cost
 
-    def calculate_min_max_power(self, timestep: pd.Timestamp):
+    def calculate_min_max_power(self, start: pd.Timestamp, end: pd.Timestamp):
+        base_load = self.total_power_output[start:end].min()
         # check if min_power is a series or a float
         min_power = (
-            self.min_power.at[timestep]
+            self.min_power.at[start]
             if type(self.min_power) is pd.Series
             else self.min_power
         )
+        min_power = max(min_power - base_load, 0)
 
         # check if max_power is a series or a float
         max_power = (
-            self.capacity_factor.at[timestep] * self.max_power
+            self.capacity_factor.at[start] * self.max_power
             if type(self.capacity_factor) is pd.Series
             else self.capacity_factor * self.max_power
         )
+        max_power = max(max_power - base_load, 0)
 
         return min_power, max_power
