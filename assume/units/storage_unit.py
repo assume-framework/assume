@@ -125,8 +125,8 @@ class StorageUnit(BaseUnit):
             unit_operator=unit_operator,
         )
 
-        self.max_power_charge = max_power_charge
-        self.min_power_charge = min_power_charge
+        self.max_power_charge = max_power_charge if max_power_charge <= 0 else -max_power_charge
+        self.min_power_charge = min_power_charge if min_power_charge <= 0 else -min_power_charge
         self.max_power_discharge = max_power_discharge
         self.min_power_discharge = min_power_discharge
         self.min_SOC = min_SOC
@@ -140,8 +140,8 @@ class StorageUnit(BaseUnit):
         )
         self.emission_factor = emission_factor
 
-        self.ramp_up_charge = ramp_up_charge
-        self.ramp_down_charge = ramp_down_charge
+        self.ramp_up_charge = ramp_up_charge if ramp_up_charge <= 0 else -ramp_up_charge
+        self.ramp_down_charge = ramp_down_charge if ramp_down_charge <= 0 else -ramp_up_charge
         self.ramp_up_discharge = ramp_up_discharge
         self.ramp_down_discharge = ramp_down_discharge
         self.min_operating_time = min_operating_time
@@ -207,13 +207,13 @@ class StorageUnit(BaseUnit):
         #current_power = self.total_power_exchange.at[self.current_time]
 
         current_power_discharge = (
-            self.total_power.at[self.current_time]
-            if self.total_power.at[self.current_time] > 0
+            self.total_power.at[self.current_time-pd.Timedelta(hours = 1)]
+            if self.total_power.at[self.current_time-pd.Timedelta(hours = 1)] > 0
             else 0)
         
         current_power_charge = (
-            self.total_power.at[self.current_time]
-            if self.total_power.at[self.current_time] < 0
+            self.total_power.at[self.current_time-pd.Timedelta(hours = 1)]
+            if self.total_power.at[self.current_time-pd.Timedelta(hours = 1)] < 0
             else 0)
 
         min_power_discharge = (
@@ -257,7 +257,7 @@ class StorageUnit(BaseUnit):
             max_power_charge = 0
         else:
             if self.ramp_down_charge < 0:
-                min_power_charge = min(current_power_charge - self.ramp_down_charge, 
+                min_power_charge = max(current_power_charge - self.ramp_down_charge, 
                                     min_power_charge)
                 
             if self.ramp_up_charge < 0:
@@ -279,7 +279,8 @@ class StorageUnit(BaseUnit):
                                          *self.efficiency_discharge))
         
         #restrict charging according to max_SOC
-        max_power_charge = max(max_power_charge, min(0, self.current_SOC - max_SOC - self.neg_capacity_reserve[self.current_time]))
+        max_power_charge = max(max_power_charge, min(0, (self.current_SOC - max_SOC 
+                                                         - self.neg_capacity_reserve[self.current_time])/self.efficiency_charge))
         
         #what form does the operational window have?
         operational_window = {
@@ -346,14 +347,15 @@ class StorageUnit(BaseUnit):
             self.current_status = 1 #discharging
             self.current_down_time = 0
             self.total_power.loc[time_period] = dispatch_plan["total_power"]
-            self.current_SOC = self.current_SOC - dispatch_plan["total_power"]
+            self.current_SOC = self.current_SOC - dispatch_plan["total_power"]/self.efficiency_discharge
+           
 
         elif dispatch_plan["total_power"] < -self.min_power_charge:
             self.market_success_list[-1] += 1
             self.current_status = 1 #charging
             self.current_down_time = 0
             self.total_power.loc[time_period] = dispatch_plan["total_power"]
-            self.current_SOC = self.current_SOC - dispatch_plan["total_power"]
+            self.current_SOC = self.current_SOC - dispatch_plan["total_power"]*self.efficiency_charge
 
         elif dispatch_plan["total_power"] < self.min_power_discharge:
             self.current_status = 0
