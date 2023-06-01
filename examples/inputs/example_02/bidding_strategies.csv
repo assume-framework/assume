@@ -10,7 +10,7 @@ biomass_DE,naive,-,-
 KKW ISAR 2,flexable_eom,naive_pos_reserve,naive_neg_reserve
 KKW BROKDORF,flexable_eom,naive_pos_reserve,naive_neg_reserve
 KKW PHILIPPSBURG 2,flexable_eom,naive_pos_reserve,naive_neg_reserve
-KKW GROHNDE,flexable_eom,naive_pos_reserve,naive_neg_reserve
+KKW GROHNDE,rl_strategy,naive_pos_reserve,naive_neg_reserve
 KKW EMSLAND,flexable_eom,naive_pos_reserve,naive_neg_reserve
 KKW NECKARWESTHEIM,flexable_eom,naive_pos_reserve,naive_neg_reserve
 KKW GUNDREMMINGEN C,flexable_eom,naive_pos_reserve,naive_neg_reserve

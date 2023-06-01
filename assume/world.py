@@ -205,7 +205,7 @@ class World:
             self.export_csv_path,
             save_frequency_hours,
         )
-        same_process = False
+        same_process = True
         if same_process:
             self.output_agent = RoleAgent(
                 self.container, suggested_aid=self.output_agent_addr[1]
@@ -295,9 +295,11 @@ class World:
                 ].to_dict()
 
                 # check if we have RL bidding strategy
-                if bidding_strategies_df.loc[unit_name].to_dict() == "RLStrategy":
-                    unit_params["price_forecast"] = self.price_forecast
-                    print(unit_params)
+                if unit_params["bidding_strategies"]["energy"] == "rl_strategy":
+                    unit_params["price_forecast"] = self.price_forecast["mcp"]
+                    unit_params["res_demand_forecast"] = self.price_forecast[
+                        "residual_demand"
+                    ]
 
             else:
                 self.logger.warning(
@@ -550,7 +552,7 @@ class World:
 
         # initialize price forecast
         price_forecast = pd.DataFrame(
-            index=renewable_capacity_factors.index, columns=["mcp"]
+            index=renewable_capacity_factors.index, columns=["mcp", "residual_demand"]
         )
 
         self.demand = list(demand.values)
@@ -581,6 +583,7 @@ class World:
 
             for t in renewable_capacity_factors.index:
                 i = 0
+                res_demand = demand.at[t, "demand_DE"]
                 # reset potential orders
                 forecasted_orders = forecasted_orders.iloc[0:0]
 
@@ -593,7 +596,7 @@ class World:
                         max_power = capacity_factor.at[t] * unit_params["max_power"]
                         mcp = 0
 
-                        forecasted_orders.loc[i] = {"mcp": mcp, "max_power": max_power}
+                        res_demand = res_demand - max_power
 
                     else:
                         max_power = unit_params.max_power
@@ -621,8 +624,7 @@ class World:
 
                 # Find the row where "cumulative_max_power" exceeds a demand value
                 filtered_forecasted_orders = forecasted_orders[
-                    forecasted_orders["cumulative_max_power"]
-                    > demand.at[t, "demand_DE"]
+                    forecasted_orders["cumulative_max_power"] > res_demand
                 ]
                 if not filtered_forecasted_orders.empty:
                     mcp = filtered_forecasted_orders.iloc[0]["mcp"]
@@ -632,6 +634,7 @@ class World:
                     mcp = 3000
 
                 price_forecast.at[t, "mcp"] = mcp
+                price_forecast.at[t, "residual_demand"] = res_demand
 
         else:
             raise NotImplementedError(

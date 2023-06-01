@@ -20,6 +20,7 @@ class PowerPlant(BaseUnit):
         fuel_price: float or pd.Series = 0.0,
         co2_price: float or pd.Series = 0.0,
         price_forecast: pd.Series = pd.Series(),
+        res_demand_forecast: pd.Series = pd.Series(),
         emission_factor: float = 0.0,
         ramp_up: float = -1,
         ramp_down: float = -1,
@@ -56,6 +57,11 @@ class PowerPlant(BaseUnit):
         self.co2_price = co2_price
         self.price_forecast = (
             pd.Series(0.0, index=self.index) if price_forecast.empty else price_forecast
+        )
+        self.res_demand_forecast = (
+            pd.Series(0.0, index=self.index)
+            if res_demand_forecast.empty
+            else res_demand_forecast
         )
         self.emission_factor = emission_factor
 
