@@ -118,7 +118,12 @@ class World:
         path = f"{inputs_path}/{scenario}"
         with open(f"{path}/config.yml", "r") as f:
             config = yaml.safe_load(f)
+            if not study_case:
+                study_case = list(config.keys())[0]
             config = config[study_case]
+        self.logger.info(
+            f"Starting Scenario {scenario}/{study_case} from {inputs_path}"
+        )
 
         self.start = pd.Timestamp(config["start_date"])
         self.end = pd.Timestamp(config["end_date"])
