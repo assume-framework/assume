@@ -57,18 +57,34 @@ class BaseUnit:
     ):
         """Calculate the bids for the next time step."""
 
+        if product_type not in self.bidding_strategies:
+            return None
+
         # get operational window for each unit
         operational_window = self.calculate_operational_window(
             product_type=product_type,
             product_tuple=product_tuple,
         )
 
+        # check if operational window is valid
+        if operational_window is None:
+            return None
+
         return self.bidding_strategies[product_type].calculate_bids(
             unit=self,
             operational_window=operational_window,
         )
 
-    def get_dispatch_plan(self, dispatch_plan: dict, current_time: pd.Timestamp):
-        """Get the dispatch plan for the next time step."""
-
+    def get_dispatch_plan(
+        self,
+        dispatch_plan: dict,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+        product_type: str,
+    ):
+        """set the dispatch plan for the given interval
+        This checks if the market feedback is feasible for the given unit.
+        And sets the closest dispatch if not.
+        The end date is exclusive.
+        """
         pass

@@ -30,7 +30,12 @@ def load_file(
         file_path = f"{path}/{file_name}.csv"
 
     try:
-        df = pd.read_csv(file_path, index_col=0, encoding="Latin-1")
+        df = pd.read_csv(
+            file_path,
+            index_col=0,
+            encoding="Latin-1",
+            na_values=["n.a.", "None", "-", "none", "nan"],
+        )
         if index is not None:
             if len(df.index) != len(index):
                 logger.warning(
@@ -155,11 +160,11 @@ def get_available_products(market_products: list[MarketProduct], startdate: date
     for product in market_products:
         start = startdate + product.first_delivery
         if isinstance(product.duration, rr.rrule):
-            starts = list(product.duration.xafter(start, product.count + 1))
-            options.extend(
-                (starts[i], starts[i + 1], product.only_hours)
-                for i in range(product.count)
-            )
+            starts = list(product.duration.xafter(start, product.count + 1), inc=True)
+            for i in range(product.count):
+                period_start = starts[i]
+                period_end = starts[i + 1]
+                options.append((period_start, period_end, product.only_hours))
         else:
             for i in range(product.count):
                 period_start = start + product.duration * i
@@ -300,12 +305,8 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=No
         for field in groupby:
             add += (bid[field],)
         if bid["only_hours"] is None:
-            deltas.extend(
-                (
-                    (bid["start_time"], bid["volume"]) + add,
-                    (bid["end_time"], -bid["volume"]) + add,
-                )
-            )
+            deltas.append((bid["start_time"], bid["volume"]) + add)
+            deltas.append((bid["end_time"], -bid["volume"]) + add)
         else:
             # only_hours allows to have peak or off-peak bids
             start_hour, end_hour = bid["only_hours"]
@@ -320,34 +321,28 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=No
                 until=bid["end_time"],
             )
             for date in starts:
-                deltas.extend(
-                    (
-                        (date, bid["volume"]) + add,
-                        (
-                            date + timedelta(hours=duration_hours),
-                            -bid["volume"],
-                        )
-                        + add,
-                    )
-                )
-    aggregation = []
+                start = date
+                end = date + timedelta(hours=duration_hours)
+                deltas.append((start, bid["volume"]) + add)
+                deltas.append((end, -bid["volume"]) + add)
+    aggregation = defaultdict(lambda: [])
     # current_power is separated by group
     current_power = defaultdict(lambda: 0)
     for d_tuple in sorted(deltas, key=lambda i: i[0]):
         time, delta, *groupdata = d_tuple
-        groupdata = "_".join(groupdata)
-        current_power[groupdata] += delta
+        groupdata_str = "_".join(groupdata)
+        current_power[groupdata_str] += delta
         # we don't know what the power will be at "end" yet
         # as a new order with this start point might be added
         # afterwards - so the end is excluded here
         # this also makes sure that each timestamp is only written
         # once when iterativley calling this function
         if (not begin or time >= begin) and (not end or time < end):
-            if aggregation and aggregation[-1][0] == time:
-                aggregation[-1][1] = current_power[groupdata]
+            if aggregation[groupdata_str] and aggregation[groupdata_str][-1][0] == time:
+                aggregation[groupdata_str][-1][1] = current_power[groupdata_str]
             else:
                 d_list = list(d_tuple)
-                d_list[1] = current_power[groupdata]
-                aggregation.append(d_list)
+                d_list[1] = current_power[groupdata_str]
+                aggregation[groupdata_str].append(d_list)
 
-    return aggregation
+    return [j for sub in list(aggregation.values()) for j in sub]

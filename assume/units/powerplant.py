@@ -1,6 +1,10 @@
+import logging
+
 import pandas as pd
 
 from assume.units.base_unit import BaseUnit
+
+logger = logging.getLogger(__name__)
 
 
 class PowerPlant(BaseUnit):
@@ -35,7 +39,7 @@ class PowerPlant(BaseUnit):
         max_heat_extraction: float = 0,
         location: tuple[float, float] = (0.0, 0.0),
         node: str = "bus0",
-        **kwargs
+        **kwargs,
     ):
         super().__init__(
             id=id,
@@ -61,6 +65,11 @@ class PowerPlant(BaseUnit):
 
         self.ramp_up = ramp_up
         self.ramp_down = ramp_down
+        # check ramping enabled
+        if self.ramp_down == -1:
+            self.ramp_down = max_power
+        if self.ramp_up == -1:
+            self.ramp_up = max_power
         self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
         self.min_down_time = min_down_time if min_down_time > 0 else 1
         self.downtime_hot_start = downtime_hot_start
@@ -83,9 +92,12 @@ class PowerPlant(BaseUnit):
         self.current_down_time = self.min_down_time
 
         self.total_power_output = pd.Series(0.0, index=self.index)
-        self.total_power_output.loc[
-            self.index[0] : self.index[0] + pd.Timedelta("24h")
-        ] = self.min_power
+        # workaround if market schedules do not match
+        # for example neg_reserve is required but market did not bid yet
+        # it does set a usage in times where no power is used by the market
+        # self.total_power_output.loc[:] = self.min_power + 0.5 * (
+        #    self.max_power - self.min_power
+        # )
 
         self.total_heat_output = pd.Series(0.0, index=self.index)
         self.power_loss_chp = pd.Series(0.0, index=self.index)
@@ -108,43 +120,33 @@ class PowerPlant(BaseUnit):
         operational_window : dict
             Dictionary containing the operational window for the next time step.
         """
-        start, end, only_hours = product_tuple
-        start = pd.Timestamp(start)
-        end = pd.Timestamp(end)
 
         if self.current_status == 0 and self.current_down_time < self.min_down_time:
             return None
 
-        current_power = self.total_power_output.loc[start]
+        start, end, only_hours = product_tuple
+        start = pd.Timestamp(start)
+        end = pd.Timestamp(end)
 
-        # check if min_power is a series or a float
-        min_power = (
-            self.min_power.at[start]
-            if type(self.min_power) is pd.Series
-            else self.min_power
-        )
+        if product_type == "energy":
+            return self.calculate_energy_operational_window(start, end)
+        elif product_type in {"capacity_pos", "capacity_neg"}:
+            return self.calculate_reserve_operational_window(start, end)
+
+    def calculate_energy_operational_window(
+        self, start: pd.Timestamp, end: pd.Timestamp
+    ) -> dict:
+        current_power = self.total_power_output.at[start - self.index.freq]
+
+        min_power, max_power = self.calculate_min_max_power(start, end)
 
         # adjust for ramp down speed
-        if self.ramp_down != -1:
-            min_power = max(current_power - self.ramp_down, min_power)
-        else:
-            min_power = min_power
+        min_power = max(current_power - self.ramp_down, min_power)
+        # adjust for ramp up speed
+        max_power = min(current_power + self.ramp_up, max_power)
 
         # adjust min_power if sold negative reserve capacity on control reserve market
         min_power = min_power + self.neg_capacity_reserve.at[start]
-
-        # check if max_power is a series or a float
-        max_power = (
-            self.capacity_factor.at[start] * self.max_power
-            if type(self.capacity_factor) is pd.Series
-            else self.capacity_factor * self.max_power
-        )
-
-        # adjust for ramp up speed
-        if self.ramp_up != -1:
-            max_power = min(current_power + self.ramp_up, max_power)
-        else:
-            max_power = max_power
 
         # adjust max_power if sold positive reserve capacity on control reserve market
         max_power = max_power - self.pos_capacity_reserve.at[start]
@@ -176,6 +178,35 @@ class PowerPlant(BaseUnit):
 
         return operational_window
 
+    def calculate_reserve_operational_window(
+        self, start: pd.Timestamp, end: pd.Timestamp
+    ) -> dict:
+        current_power = self.total_power_output.at[start - self.index.freq]
+
+        min_power, max_power = self.calculate_min_max_power(start, end)
+
+        # should be adjusted to account for ramping speeds
+        # and differences between resolutions of energy and reserve markets
+        available_pos_reserve = min(max_power - current_power, self.ramp_up)
+
+        available_pos_reserve = min(max_power - current_power, self.ramp_up)
+        available_neg_reserve = max(0, min(current_power - min_power, self.ramp_down))
+
+        operational_window = {
+            "window": {"start": start, "end": end},
+            "pos_reserve": {
+                "capacity": available_pos_reserve,
+            },
+            "neg_reserve": {
+                "capacity": available_neg_reserve,
+            },
+        }
+
+        if available_neg_reserve < 0:
+            logger.error("available_neg_reserve < 0")
+
+        return operational_window
+
     def calculate_bids(
         self,
         product_type,
@@ -186,23 +217,34 @@ class PowerPlant(BaseUnit):
             product_tuple=product_tuple,
         )
 
-    def get_dispatch_plan(self, dispatch_plan, time_period):
-        if dispatch_plan["total_power"] > self.min_power:
-            self.market_success_list[-1] += 1
-            self.current_status = 1
-            self.current_down_time = 0
-            self.total_power_output.loc[time_period] = dispatch_plan["total_power"]
+    def get_dispatch_plan(
+        self,
+        dispatch_plan: dict,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+        product_type: str,
+    ):
+        end_excl = end - self.index.freq
+        self.total_power_output.loc[start:end_excl] += dispatch_plan["total_power"]
 
-        elif dispatch_plan["total_power"] < self.min_power:
+        if self.total_power_output[start:end_excl].min() < self.min_power:
+            self.total_power_output.loc[start:end_excl] = 0
             self.current_status = 0
             self.current_down_time += 1
-            self.total_power_output.loc[time_period] = 0
-
             if self.market_success_list[-1] != 0:
                 self.mean_market_success = sum(self.market_success_list) / len(
                     self.market_success_list
                 )
                 self.market_success_list.append(0)
+        else:
+            self.market_success_list[-1] += 1
+            self.current_status = 1
+            self.current_down_time = 0
+
+        # TODO check if resulting power is < max_power
+        # if self.total_power_output[start:end_excl].max() > self.max_power:
+        #     max_pow = self.total_power_output[start:end_excl].max()
+        #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")
 
     def calc_marginal_cost(
         self,
@@ -271,3 +313,23 @@ class PowerPlant(BaseUnit):
         )
 
         return marginal_cost
+
+    def calculate_min_max_power(self, start: pd.Timestamp, end: pd.Timestamp):
+        base_load = self.total_power_output[start:end].min()
+        # check if min_power is a series or a float
+        min_power = (
+            self.min_power.at[start]
+            if type(self.min_power) is pd.Series
+            else self.min_power
+        )
+        min_power = max(min_power - base_load, 0)
+
+        # check if max_power is a series or a float
+        max_power = (
+            self.capacity_factor.at[start] * self.max_power
+            if type(self.capacity_factor) is pd.Series
+            else self.capacity_factor * self.max_power
+        )
+        max_power = max(max_power - base_load, 0)
+
+        return min_power, max_power

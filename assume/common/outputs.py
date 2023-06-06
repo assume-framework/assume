@@ -50,15 +50,15 @@ class WriteOutput(Role):
         self.db = db_engine
 
         # contruct all timeframe under which hourly values are written to excel and db
-        self.delay = (end - start).total_seconds()
         self.start = start
         self.end = end
 
         # initalizes dfs for storing and writing asynchron
-        self.write_dfs: dict[str, pd.DataFrame] = {
-            "unit_dispatch": pd.DataFrame(),
-            "market_meta": pd.DataFrame(),
-            "market_orders": pd.DataFrame(),
+        self.write_dfs: dict[str, []] = {
+            "unit_dispatch": [],
+            "market_dispatch": [],
+            "market_meta": [],
+            "market_orders": [],
         }
 
         # Loop throuph all database tabels
@@ -89,10 +89,11 @@ class WriteOutput(Role):
         )
 
         recurrency_task = rr.rrule(
-            rr.HOURLY,
+            freq=rr.HOURLY,
             interval=self.save_frequency_hours,
             dtstart=self.start,
             until=self.end,
+            cache=True,
         )
         self.context.schedule_recurrent_task(self.store_dfs, recurrency_task)
 
@@ -114,8 +115,11 @@ class WriteOutput(Role):
         elif content.get("type") == "store_units":
             self.write_units_definition(content.get("unit_type"), content.get("data"))
 
-        elif content.get("type") == "store_dispatch":
-            self.write_dispatch_plan(content.get("data"))
+        elif content.get("type") == "market_dispatch":
+            self.write_market_dispatch(content.get("data"))
+
+        elif content.get("type") == "unit_dispatch":
+            self.write_unit_dispatch(content.get("data"))
 
     def write_market_results(self, market_meta):
         """
@@ -126,10 +130,10 @@ class WriteOutput(Role):
         """
 
         df = pd.DataFrame(market_meta)
+        if df.empty:
+            return
         df["simulation"] = self.simulation_id
-        self.write_dfs["market_meta"] = pd.concat(
-            [self.write_dfs["market_meta"], df], axis=0
-        )
+        self.write_dfs["market_meta"].append(df)
 
     async def store_dfs(self):
         """
@@ -138,36 +142,38 @@ class WriteOutput(Role):
         """
 
         for table in self.write_dfs.keys():
-            df = self.write_dfs[table]
+            if len(self.write_dfs[table]) == 0:
+                continue
+            df = pd.concat(self.write_dfs[table], axis=0)
+            df.reset_index()
             if df.empty:
                 continue
-            df.reset_index()
             if self.export_csv_path:
                 data_path = self.p.joinpath(f"{table}.csv")
                 df.to_csv(data_path, mode="a", header=not data_path.exists())
 
             if self.db is not None:
                 df.to_sql(table, self.db.bind, if_exists="append")
-            self.write_dfs[table] = pd.DataFrame()
+            self.write_dfs[table] = []
 
-    def write_market_orders(self, market_result, market_name):
+    def write_market_orders(self, market_orders, market_id):
         """
         Writes market orders to the corresponding data frame.
-        Append new data until it is wirtten to db and csv with store_df function.
+        Append new data until it is written to db and csv with store_df function.
 
         Args:
             market_result: The market result including all orders.
-            market_name: The name of the market.
+            market_id: The name of the market.
         """
-
-        df = pd.DataFrame.from_records(market_result, index="start_time")
+        # check if market results list is empty and skip the funktion and raise a warning
+        if not market_orders:
+            return
+        df = pd.DataFrame.from_records(market_orders, index="start_time")
         del df["only_hours"]
         del df["agent_id"]
         df["simulation"] = self.simulation_id
-        df["market_name"] = market_name
-        self.write_dfs["market_orders"] = pd.concat(
-            [self.write_dfs["market_orders"], df], axis=0
-        )
+        df["market_id"] = market_id
+        self.write_dfs["market_orders"].append(df)
 
     def write_units_definition(self, unit_type, unit):
         """
@@ -241,10 +247,10 @@ class WriteOutput(Role):
         if self.db is not None and not df.empty:
             df.to_sql(table_name, self.db.bind, if_exists="append")
 
-    def write_dispatch_plan(self, data):
+    def write_market_dispatch(self, data):
         """
         Writes the planned dispatch of the units after the market clearing to a csv and db
-        In the case that we have no portfolio optimisation this equals the bids.
+        In the case that we have no portfolio optimisation this equals the resulting bids.
 
         Args:
             data: The records to be put into the table.
@@ -252,9 +258,18 @@ class WriteOutput(Role):
         """
         df = pd.DataFrame(data, columns=["datetime", "power", "market_id", "unit_id"])
         df["simulation"] = self.simulation_id
-        self.write_dfs["unit_dispatch"] = pd.concat(
-            [self.write_dfs["unit_dispatch"], df], axis=0
-        )
+        self.write_dfs["market_dispatch"].append(df)
+
+    def write_unit_dispatch(self, data):
+        """
+        Writes the actual dispatch of the units to a csv and db
+
+        Args:
+            data: The records to be put into the table.
+            Formatted like, "datetime, power, market_id, unit_id"
+        """
+        data["simulation"] = self.simulation_id
+        self.write_dfs["unit_dispatch"].append(data)
 
     async def on_stop(self):
         """
@@ -263,14 +278,14 @@ class WriteOutput(Role):
 
         # insert left records into db
         await self.store_dfs()
-        queries = {
-            "avg_price_mw": f"select name, avg(price) as avg_price from market_meta where simulation = '{self.simulation_id}' group by name",
-            "total_cost": f"select name, sum(price*demand_volume) as total_cost from market_meta where simulation = '{self.simulation_id}' group by name",
-            "total_volume": f"select name, sum(demand_volume) as total_volume from market_meta where simulation = '{self.simulation_id}' group by name",
-            "capacity_factor": f"select unit_id as name, market_id, avg(power/max_power) as capacity_factor from unit_dispatch ud join unit_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by name, market_id",
-        }
+        queries = [
+            f"select market_id as name, avg(price) as avg_price from market_meta where simulation = '{self.simulation_id}' group by market_id",
+            f"select market_id as name, sum(price*demand_volume) as total_cost from market_meta where simulation = '{self.simulation_id}' group by market_id",
+            f"select market_id as name, sum(demand_volume) as total_volume from market_meta where simulation = '{self.simulation_id}' group by market_id",
+            f"select unit_id as name, market_id, avg(power/max_power) as capacity_factor from market_dispatch ud join unit_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by name, market_id",
+        ]
         dfs = []
-        for query in queries.values():
+        for query in queries:
             df = pd.read_sql(query, self.db.bind)
             dfs.append(df.melt(id_vars=["name"]))
         df = pd.concat(dfs)

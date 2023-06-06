@@ -17,3 +17,39 @@ example_01a:
       maximum_volume: 1000000
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
+
+policy_case_01:
+  start_date: 2018-12-31 23:00
+  end_date: 2019-02-11 00:00
+  time_step: 1h
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-01-01 00:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_volume: 1000000
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+    # Long Term Market - 3d contracts
+    LTM:
+      operator: LTM_operator
+      product_type: energy
+      start_date: 2018-12-31 23:00
+      products:
+        - duration: 3d
+          count: 1
+          first_delivery: 2h
+      opening_frequency: 3d
+      opening_duration: 1h
+      volume_unit: MW
+      maximum_volume: 1000000
+      price_unit: EUR/MW
+      market_mechanism: pay_as_bid

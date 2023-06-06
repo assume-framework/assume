@@ -1,4 +1,5 @@
 import asyncio
+import calendar
 import logging
 import time
 from datetime import datetime
@@ -9,6 +10,7 @@ import pandas as pd
 import yaml
 from mango import RoleAgent, create_container
 from mango.util.clock import ExternalClock
+from mango.util.termination_detection import tasks_complete_or_sleeping
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -23,12 +25,14 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.markets import MarketRole, pay_as_bid, pay_as_clear
-from assume.strategies import (NaiveStrategy, 
-                               flexableEOM, 
-                               flexableEOMStorage, 
-                               flexableCRM, 
-                               flexableCRMStorage,
-                                )
+from assume.strategies import (
+    NaiveNegReserveStrategy,
+    NaivePosReserveStrategy,
+    NaiveStrategy,
+    flexableEOM,
+    flexableEOMStorage,
+    flexableCRMStorage,
+)
 from assume.units import Demand, PowerPlant, StorageUnit
 
 logging.basicConfig(level=logging.INFO)
@@ -76,7 +80,8 @@ class World:
             "naive": NaiveStrategy,
             "flexable_eom": flexableEOM,
             "flexable_eom_storage": flexableEOMStorage,
-            "flexable_crm": flexableCRM,
+            "naive_neg_reserve": NaiveNegReserveStrategy,
+            "naive_pos_reserve": NaivePosReserveStrategy,
             "flexable_crm_storage": flexableCRMStorage,
         }
         self.clearing_mechanisms = {
@@ -91,7 +96,7 @@ class World:
         self,
         start: pd.Timestamp,
     ):
-        self.clock = ExternalClock(start.timestamp())
+        self.clock = ExternalClock(0)
         self.container = await create_container(
             addr=self.addr, clock=self.clock, codec=mango_codec_factory()
         )
@@ -118,7 +123,12 @@ class World:
         path = f"{inputs_path}/{scenario}"
         with open(f"{path}/config.yml", "r") as f:
             config = yaml.safe_load(f)
+            if not study_case:
+                study_case = list(config.keys())[0]
             config = config[study_case]
+        self.logger.info(
+            f"Starting Scenario {scenario}/{study_case} from {inputs_path}"
+        )
 
         self.start = pd.Timestamp(config["start_date"])
         self.end = pd.Timestamp(config["end_date"])
@@ -176,6 +186,8 @@ class World:
             path=path, config=config, file_name="bidding_strategies"
         )
 
+        bidding_strategies_df = bidding_strategies_df.fillna(0)
+
         # cross_border_flows_df = load_file(
         #     path=path, config=config, file_name="cross_border_flows", index=self.index,
         # )
@@ -189,6 +201,7 @@ class World:
         simulation_id = study_case
         save_frequency_hours = config.get("save_frequency_hours", None)
 
+        self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to world
         output_role = WriteOutput(
             simulation_id,
@@ -198,8 +211,21 @@ class World:
             self.export_csv_path,
             save_frequency_hours,
         )
-        self.output_agent = RoleAgent(self.container, suggested_aid="export_agent_1")
-        self.output_agent.add_role(output_role)
+        same_process = True
+        if same_process:
+            self.output_agent = RoleAgent(
+                self.container, suggested_aid=self.output_agent_addr[1]
+            )
+            self.output_agent.add_role(output_role)
+        else:
+            # this does not set the clock in output_agent correctly yet
+            # see https://gitlab.com/mango-agents/mango/-/issues/59
+            # but still improves performance
+            def creator(container):
+                agent = RoleAgent(container, suggested_aid=self.output_agent_addr[1])
+                agent.add_role(output_role)
+
+            await self.container.as_agent_process(agent_creator=creator)
 
         # get the market config from the config file and add the markets
         self.logger.info("Adding markets")
@@ -313,7 +339,7 @@ class World:
                 ].to_dict()
             else:
                 self.logger.warning(
-                    f"No bidding strategies specified for {unit_name}. Using default strategies."
+                    f"No bidding strategies specified for {unit_name}. Using default strategies for all markets."
                 )
                 unit_params["bidding_strategies"] = {
                     market.product_type: "naive" for market in self.markets.values()
@@ -351,8 +377,8 @@ class World:
 
         # after creation of an agent - we set additional context params
         unit_operator_agent._role_context.data_dict = {
-            "output_agent_id": self.output_agent.aid,
-            "output_agent_addr": self.output_agent.addr,
+            "output_agent_addr": self.output_agent_addr[0],
+            "output_agent_id": self.output_agent_addr[1],
         }
 
     async def add_unit(
@@ -383,14 +409,18 @@ class World:
         if unit_class is None:
             raise ValueError(f"invalid unit type {unit_type}")
 
+        bidding_strategies = {}
         for product_type, strategy in unit_params["bidding_strategies"].items():
+            if not strategy:
+                continue
+
             try:
-                unit_params["bidding_strategies"][product_type] = self.bidding_types[
-                    strategy
-                ]()
+                bidding_strategies[product_type] = self.bidding_types[strategy]()
             except KeyError as e:
                 self.logger.error(f"Invalid bidding strategy {strategy}")
                 raise e
+
+        unit_params["bidding_strategies"] = bidding_strategies
 
         # create unit within the unit operator its associated with
         await self.unit_operators[unit_operator_id].add_unit(
@@ -421,8 +451,8 @@ class World:
 
         # after creation of an agent - we set additional context params
         market_operator_agent._role_context.data_dict = {
-            "output_agent_id": self.output_agent.aid,
-            "output_agent_addr": self.output_agent.addr,
+            "output_agent_addr": self.output_agent_addr[0],
+            "output_agent_id": self.output_agent_addr[1],
         }
         self.market_operators[id] = market_operator_agent
 
@@ -461,7 +491,6 @@ class World:
         next_activity = self.clock.get_next_activity()
         if not next_activity:
             self.logger.info("simulation finished - no schedules left")
-            self.clock.set_time(self.end.timestamp())
             return None
         delta = next_activity - self.clock.time
         self.clock.set_time(next_activity)
@@ -469,17 +498,25 @@ class World:
 
     async def run_simulation(self):
         # agent is implicit added to self.container._agents
-        total = self.end.timestamp() - self.start.timestamp()
-        pbar = tqdm(total=total)
-        self.clock.set_time(self.start.timestamp())
-        while self.clock.time < self.end.timestamp():
-            await asyncio.sleep(0.00001)
+
+        start_ts = calendar.timegm(self.start.utctimetuple())
+        end_ts = calendar.timegm(self.end.utctimetuple())
+        pbar = tqdm(total=end_ts - start_ts)
+
+        # allow registration before first opening
+        self.clock.set_time(start_ts - 1)
+        while self.clock.time < end_ts:
+            await asyncio.sleep(0)
             delta = await self.step()
             if delta:
                 pbar.update(delta)
                 pbar.set_description(
-                    f"{datetime.fromtimestamp(self.clock.time)}", refresh=False
+                    f"{datetime.utcfromtimestamp(self.clock.time)}", refresh=False
                 )
+            else:
+                self.clock.set_time(end_ts)
+
+            await tasks_complete_or_sleeping(self.container)
         pbar.close()
         await self.container.shutdown()
 

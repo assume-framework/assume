@@ -129,23 +129,26 @@ class UnitsOperator(Role):
             # map bid id to unit id
             order["unit_id"] = self.bids_map[order["bid_id"]]
         self.valid_orders.extend(orderbook)
+        marketconfig = self.registered_markets[content["market_id"]]
+        self.set_unit_dispatch(orderbook, marketconfig)
         self.write_actual_dispatch()
-        self.send_unit_dispatch(orderbook)
 
-    def send_unit_dispatch(self, orderbook):
+    def set_unit_dispatch(self, orderbook, marketconfig):
         """
         feeds the current market result back to the units
         this does not respect bids from multiple markets
         for the same time period
         """
-        time_period = [orderbook[0]["start_time"], orderbook[0]["end_time"]]
-
+        orderbook = list(sorted(orderbook, key=itemgetter("unit_id")))
         for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
-            total_power = sum(map(itemgetter("volume"), orders))
+            orders_l = list(orders)
+            total_power = sum(map(itemgetter("volume"), orders_l))
             dispatch_plan = {"total_power": total_power}
             self.units[unit_id].get_dispatch_plan(
                 dispatch_plan=dispatch_plan,
-                time_period=time_period,
+                start=orderbook[0]["start_time"],
+                end=orderbook[0]["end_time"],
+                product_type=marketconfig.product_type,
             )
 
     def write_actual_dispatch(self):
@@ -155,13 +158,26 @@ class UnitsOperator(Role):
         sends dispatch at or after it actually happens
         """
         last = self.last_sent_dispatch
+        if self.context.current_timestamp == last:
+            # stop if we exported at this time already
+            return
         self.last_sent_dispatch = self.context.current_timestamp
-        now = datetime.fromtimestamp(self.context.current_timestamp)
-        start = datetime.fromtimestamp(last)
 
-        actual_dispatch = aggregate_step_amount(
+        now = datetime.utcfromtimestamp(self.context.current_timestamp)
+        start = datetime.utcfromtimestamp(last)
+
+        market_dispatch = aggregate_step_amount(
             self.valid_orders, start, now, groupby=["market_id", "unit_id"]
         )
+        unit_dispatch_dfs = []
+        for unit_id, unit in self.units.items():
+            # end_excl = now - unit.index.freq
+            data = pd.DataFrame(
+                unit.total_power_output.loc[start:now], columns=["power"]
+            )
+            data["unit"] = unit_id
+            unit_dispatch_dfs.append(data)
+        unit_dispatch = pd.concat(unit_dispatch_dfs)
 
         db_aid = self.context.data_dict.get("output_agent_id")
         db_addr = self.context.data_dict.get("output_agent_addr")
@@ -171,10 +187,21 @@ class UnitsOperator(Role):
                 receiver_addr=db_addr,
                 content={
                     "context": "write_results",
-                    "type": "store_dispatch",
-                    "data": actual_dispatch,
+                    "type": "market_dispatch",
+                    "data": market_dispatch,
                 },
             )
+            if unit_dispatch_dfs:
+                unit_dispatch = pd.concat(unit_dispatch_dfs)
+                self.context.schedule_instant_acl_message(
+                    receiver_id=db_aid,
+                    receiver_addr=db_addr,
+                    content={
+                        "context": "write_results",
+                        "type": "unit_dispatch",
+                        "data": unit_dispatch,
+                    },
+                )
 
         self.valid_orders = list(
             filter(lambda x: x["end_time"] >= now, self.valid_orders)
@@ -244,13 +271,17 @@ class UnitsOperator(Role):
                     "only_hours": product[2],
                     "agent_id": (self.context.addr, self.context.aid),
                 }
-                self.bids_map = {}
+
                 for unit_id, unit in self.units.items():
                     # take price from bidding strategy
                     bids = unit.calculate_bids(
                         product_type=product_type,
                         product_tuple=product,
                     )
+
+                    if bids is None:
+                        continue
+
                     for i, bid in enumerate(bids):
                         price = bid["price"]
                         volume = bid["volume"]

@@ -72,7 +72,10 @@ class flexableEOM(BaseStrategy):
         )  # 1 prevents division by 0
 
         starting_cost = self.get_starting_costs(time=unit.current_down_time, unit=unit)
-        markup = starting_cost / av_operating_time / bid_quantity_inflex
+        if bid_quantity_inflex == 0:
+            markup = starting_cost / av_operating_time
+        else:
+            markup = starting_cost / av_operating_time / bid_quantity_inflex
 
         bid_price_inflex = min(marginal_cost_mr + markup, 3000.0)
 
@@ -108,7 +111,7 @@ class flexableEOM(BaseStrategy):
 
         bid_price_inflex = max(
             -price_reduction_restart - heat_gen_cost + marginal_cost_flex,
-            -2999.00,
+            -499.00,
         )
 
         return bid_price_inflex
