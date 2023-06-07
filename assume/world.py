@@ -306,41 +306,43 @@ class World:
                 unit_params=unit_params,
             )
 
-        for company_name in heatpumps_df.unit_operator.unique():
-            self.add_unit_operator(id=str(company_name))
+        if heatpumps_df is not None:
+            for company_name in heatpumps_df.unit_operator.unique():
+                self.add_unit_operator(id=str(company_name))
 
-        self.logger.info("Adding heat pump units")
-        for hp_name, unit_params in heatpumps_df.iterrows():
-            if (
-                bidding_strategies_df is not None
-                and hp_name in bidding_strategies_df.index
-            ):
-                unit_params["bidding_strategies"] = bidding_strategies_df.loc[
-                    hp_name
-                ].to_dict()
-            else:
-                self.logger.warning(
-                    f"No bidding strategies specified for {hp_name}. Using default strategies."
+            self.logger.info("Adding heat pump units")
+            for hp_name, unit_params in heatpumps_df.iterrows():
+                if (
+                    bidding_strategies_df is not None
+                    and hp_name in bidding_strategies_df.index
+                ):
+                    unit_params["bidding_strategies"] = bidding_strategies_df.loc[
+                        hp_name
+                    ].to_dict()
+                else:
+                    self.logger.warning(
+                        f"No bidding strategies specified for {hp_name}. Using default strategies."
+                    )
+                    unit_params["bidding_strategies"] = {
+                        market.product_type: "simple"
+                        for market in self.markets.values()
+                    }
+
+                if electricity_prices_df is not None:
+                    unit_params["electricity_price"] = electricity_prices_df[
+                        "electricity_price"
+                    ]
+
+                if temperature_df is not None:
+                    unit_params["source_temp"] = temperature_df["source_temperature"]
+                    unit_params["sink_temp"] = temperature_df["sink_temperature"]
+
+                await self.add_unit(
+                    id=hp_name,
+                    unit_type="heatpump",
+                    unit_operator_id=unit_params["unit_operator"],
+                    unit_params=unit_params,
                 )
-                unit_params["bidding_strategies"] = {
-                    market.product_type: "simple" for market in self.markets.values()
-                }
-
-            if electricity_prices_df is not None:
-                unit_params["electricity_price"] = electricity_prices_df[
-                    "electricity_price"
-                ]
-
-            if temperature_df is not None:
-                unit_params["source_temp"] = temperature_df["source_temperature"]
-                unit_params["sink_temp"] = temperature_df["sink_temperature"]
-
-            await self.add_unit(
-                id=hp_name,
-                unit_type="heatpump",
-                unit_operator_id=unit_params["unit_operator"],
-                unit_params=unit_params,
-            )
 
         # add the demand unit operators and units
         self.logger.info("Adding demand")
