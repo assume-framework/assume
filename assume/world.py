@@ -31,7 +31,7 @@ from assume.strategies import (
     NaiveStrategy,
     flexableEOM,
 )
-from assume.units import Demand, PowerPlant, HeatPump
+from assume.units import Demand, HeatPump, PowerPlant
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("mango").setLevel(logging.WARNING)
