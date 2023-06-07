@@ -1,0 +1,25 @@
+base_case:
+  id: example_03
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-10 23:00
+  time_step: 1h
+  powerplants: powerplants.csv
+  heatpumps: heatpumps.csv
+  demand: inflex_demand.csv
+  renewable_generation: renewable_generation.csv
+  fuel_prices: fuel_prices.csv
+  electricity_prices: electricity_prices.csv 
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_volume: 1000000
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear

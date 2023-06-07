@@ -31,7 +31,7 @@ from assume.strategies import (
     NaiveStrategy,
     flexableEOM,
 )
-from assume.units import Demand, PowerPlant
+from assume.units import Demand, PowerPlant, HeatPump
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("mango").setLevel(logging.WARNING)
@@ -71,6 +71,7 @@ class World:
 
         self.unit_types = {
             "power_plant": PowerPlant,
+            "heatpump": HeatPump,
             "demand": Demand,
         }
         self.bidding_types = {
@@ -163,6 +164,16 @@ class World:
             index=self.index,
         )
 
+        heatpumps_df = load_file(path=path, config=config, file_name="heatpumps")
+
+        temperature_df = load_file(
+            path=path, config=config, file_name="temperature", index=self.index
+        )
+
+        electricity_prices_df = load_file(
+            path=path, config=config, file_name="electricity_prices", index=self.index
+        )
+
         demand_df = load_file(
             path=path,
             config=config,
@@ -241,7 +252,7 @@ class World:
                 market_config=market_config,
             )
 
-        # add the unit operators using unique unit operator names in the powerplants csv
+        # add the unit operators using unique unit operator names in the powerplants and heatpumps csv
         self.logger.info("Adding unit operators")
         all_operators = np.concatenate(
             [
@@ -291,6 +302,42 @@ class World:
             await self.add_unit(
                 id=unit_name,
                 unit_type="power_plant",
+                unit_operator_id=unit_params["unit_operator"],
+                unit_params=unit_params,
+            )
+
+        for company_name in heatpumps_df.unit_operator.unique():
+            self.add_unit_operator(id=str(company_name))
+
+        self.logger.info("Adding heat pump units")
+        for hp_name, unit_params in heatpumps_df.iterrows():
+            if (
+                bidding_strategies_df is not None
+                and hp_name in bidding_strategies_df.index
+            ):
+                unit_params["bidding_strategies"] = bidding_strategies_df.loc[
+                    hp_name
+                ].to_dict()
+            else:
+                self.logger.warning(
+                    f"No bidding strategies specified for {hp_name}. Using default strategies."
+                )
+                unit_params["bidding_strategies"] = {
+                    market.product_type: "simple" for market in self.markets.values()
+                }
+
+            if electricity_prices_df is not None:
+                unit_params["electricity_price"] = electricity_prices_df[
+                    "electricity_price"
+                ]
+
+            if temperature_df is not None:
+                unit_params["source_temp"] = temperature_df["source_temperature"]
+                unit_params["sink_temp"] = temperature_df["sink_temperature"]
+
+            await self.add_unit(
+                id=hp_name,
+                unit_type="heatpump",
                 unit_operator_id=unit_params["unit_operator"],
                 unit_params=unit_params,
             )
