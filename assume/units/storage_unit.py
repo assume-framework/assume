@@ -1,7 +1,9 @@
+import logging
 import pandas as pd
 
-from assume.strategies import BaseStrategy
 from assume.units.base_unit import BaseUnit
+
+logger = logging.getLogger(__name__)
 
 class StorageUnit(BaseUnit):
     """A class for a storage unit.
@@ -337,15 +339,31 @@ class StorageUnit(BaseUnit):
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
         #capacity calculation has to be added
+        current_power = self.total_power_output.at[start - self.index.freq]
+
+        available_pos_reserve_discharge = None
+        available_neg_reserve_discharge = None
+        available_pos_reserve_charge = None
+        available_neg_reserve_charge = None
+        
         operational_window = {
             "window": {"start": start, "end": end},
-            "pos_reserve": {
-                "capacity": None,
+            "pos_reserve_discharge": {
+                "capacity": available_pos_reserve_discharge,
             },
-            "neg_reserve": {
-                "capacity": None,
+            "neg_reserve_discharge": {
+                "capacity": available_neg_reserve_discharge,
+            },
+            "pos_reserve_charge": {
+                "capacity": available_pos_reserve_charge,
+            },
+            "neg_reserve_charge": {
+                "capacity": available_neg_reserve_charge,
             },
         }   
+
+        if available_neg_reserve_discharge < 0:
+            logger.error("available_neg_reserve_discharge < 0")
 
         return operational_window
 

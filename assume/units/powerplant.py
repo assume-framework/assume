@@ -189,7 +189,6 @@ class PowerPlant(BaseUnit):
         # and differences between resolutions of energy and reserve markets
         available_pos_reserve = min(max_power - current_power, self.ramp_up)
 
-        available_pos_reserve = min(max_power - current_power, self.ramp_up)
         available_neg_reserve = max(0, min(current_power - min_power, self.ramp_down))
 
         operational_window = {
