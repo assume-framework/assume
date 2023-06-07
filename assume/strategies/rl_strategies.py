@@ -68,6 +68,8 @@ class RLStrategy(BaseStrategy):
 
         return bids
 
+
+"""
     # RL agent parameters
     self.obs_dim = self.world.obs_dim
     self.act_dim = self.world.act_dim
@@ -120,14 +122,7 @@ class RLStrategy(BaseStrategy):
         self.profits = [0.0 for _ in self.world.snapshots]
 
     def formulate_bids(self):
-        """
-        Take an action based on actor network, add exlorarion noise if needed
 
-        Returns
-        -------
-            action (PyTorch Variable): Actions for this agent
-
-        """
         if self.world.training:
             if self.world.episodes_done < self.world.learning_starts:
                 self.curr_action = (
@@ -298,3 +293,4 @@ class RLStrategy(BaseStrategy):
         if self.world.training:
             self.actor_target.load_state_dict(params["target_policy"])
             self.actor.optimizer.load_state_dict(params["policy_optimizer"])
+"""

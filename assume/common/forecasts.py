@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 from mango import Role
 from mango.messages.message import Performatives
+import os
 
 from assume.common.market_objects import (
     ClearingMessage,
@@ -18,6 +19,10 @@ from assume.common.market_objects import (
 from assume.common.utils import aggregate_step_amount
 from assume.strategies import BaseStrategy
 from assume.units import BaseUnit
+
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("mango").setLevel(logging.WARNING)
+logging.getLogger("assume").setLevel(logging.INFO)
 
 
 class ForecastProvider(Role):
@@ -31,6 +36,8 @@ class ForecastProvider(Role):
         demand: float or pd.Series = 0.0,
     ):
         super().__init__()
+
+        self.logger = logging.getLogger(__name__)
 
         self.bids_map = {}
         self.available_markets = available_markets
@@ -50,8 +57,17 @@ class ForecastProvider(Role):
             "Functionality of using the different markets and specified registration for the price forecast is not implemented yet"
         )
 
-    def calculate_marginal_price(
-        self, market, demand, renewable_capacity_factors, registered_power_plants
+        # calculate price forecast
+
+    def calculate_price_forecast(
+        self,
+        market,
+        path,
+        demand,
+        renewable_capacity_factors,
+        registered_power_plants,
+        fuel_prices,
+        co2_prices,
     ):
         """
         Function that calculates the merit order price, which is given as a price forecast to the Rl agents
@@ -62,61 +78,89 @@ class ForecastProvider(Role):
 
         # initialize price forecast
         price_forecast = pd.DataFrame(
-            index=renewable_capacity_factors.index,
-            columns=renewable_capacity_factors["wind_onshore_DE"],
-        ).fillna(0)
-
-        print(price_forecast)
+            index=renewable_capacity_factors.index, columns=["mcp", "residual_demand"]
+        )
 
         self.demand = list(demand.values)
+        forecast_file = path + "/price_forecast_EOM.csv"
 
-        contractedSupply = 0
+        # intialize potential orders
+        forecasted_orders = pd.DataFrame(columns=["mcp", "max_power"])
 
         if market == "EOM":
-            # calculate simplified marginal costs for each power plant
-            registered_power_plants["marginal_costs"] = (
-                self.fuel_prices / registered_power_plants["efficiency"]
-                + self.co2_price
-                * registered_power_plants["emission_factor"]
-                / registered_power_plants["efficiency"]
-                + registered_power_plants["fixed_cost"]
-            )
+            # Check if the forecast file already exists
+            if os.path.isfile(forecast_file):
+                # If inputs haven't changed, load the forecast from the CSV file and exit
+                price_forecast = pd.read_csv(forecast_file, index_col="Timestamp")
+                self.logger.info("Price forecast loaded from the existing file.")
 
-            registered_power_plants.sort_values(
-                "marginal_costs", ascending=True, axi=0, inplace=True
-            )
+                return price_forecast
 
             # calculate infeed of renewables and residual demand
             # check if max_power is a series or a float
-
-            i = 0
+            self.logger.info("Preparing market forecasts")
 
             for t in renewable_capacity_factors.index:
-                for pp in registered_power_plants:
-                    if pp.unit_name in renewable_capacity_factors.columns:
-                        capacity_factor = renewable_capacity_factors[pp.unit_name]
+                i = 0
+                res_demand = demand.at[t, "demand_DE"]
+                # reset potential orders
+                forecasted_orders = forecasted_orders.iloc[0:0]
 
-                        max_power = capacity_factor.at[t] * pp.max_power
+                for unit_name, unit_params in registered_power_plants.iterrows():
+                    # pp = pp[1]
+                    if unit_name in renewable_capacity_factors.columns:
+                        # adds availabel renewables to merrit order
+                        capacity_factor = renewable_capacity_factors[unit_name]
+
+                        max_power = capacity_factor.at[t] * unit_params["max_power"]
+                        mcp = 0
+
+                        res_demand = res_demand - max_power
 
                     else:
-                        max_power = pp.maxPower
+                        max_power = unit_params.max_power
 
-                    contractedSupply += max_power
-                    mcp = pp.marginal_cost[t]
+                        # calculate simplified marginal costs for each power plant
+                        mcp = (
+                            fuel_prices[unit_params.fuel_type].at[t]
+                            / unit_params["efficiency"]
+                            + co2_prices.at[t]
+                            * unit_params["emission_factor"]
+                            / unit_params["efficiency"]
+                            + unit_params["fixed_cost"]
+                        )
 
-                    if contractedSupply >= demand[i]:
-                        break
+                        forecasted_orders.loc[i] = {"mcp": mcp, "max_power": max_power}
+                        i += 1
 
-                    else:
-                        mcp = 3000
+                # Sort the DataFrame by the "mcp" column
+                forecasted_orders = forecasted_orders.sort_values("mcp")
 
-                i += 1
+                # Cumulate the "max_power" column
+                forecasted_orders["cumulative_max_power"] = forecasted_orders[
+                    "max_power"
+                ].cumsum()
 
-                price_forecast.at[t, "Price_forecast"] = mcp
+                # Find the row where "cumulative_max_power" exceeds a demand value
+                filtered_forecasted_orders = forecasted_orders[
+                    forecasted_orders["cumulative_max_power"] > res_demand
+                ]
+                if not filtered_forecasted_orders.empty:
+                    mcp = filtered_forecasted_orders.iloc[0]["mcp"]
+
+                else:
+                    # demand cannot be supplied by power plant fleet
+                    mcp = 3000
+
+                price_forecast.at[t, "mcp"] = mcp
+                price_forecast.at[t, "residual_demand"] = res_demand
 
         else:
             raise NotImplementedError(
                 "For this market the price forecast is not implemented yet"
             )
+
+        self.logger.info("Finished market forecasts")
+        price_forecast.to_csv(forecast_file, index_label="Timestamp")
 
         return price_forecast
