@@ -29,9 +29,9 @@ from assume.strategies import (
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
     NaiveStrategy,
+    flexableCRMStorage,
     flexableEOM,
     flexableEOMStorage,
-    flexableCRMStorage,
 )
 from assume.units import Demand, PowerPlant, StorageUnit
 
