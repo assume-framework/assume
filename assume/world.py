@@ -263,8 +263,6 @@ class World:
         for company_name in all_operators:
             self.add_unit_operator(id=str(company_name))
 
-        
-
         # add the units to corresponsing unit operators
         # if fuel prices are provided, add them to the unit params
         # if vre generation is provided, add them to the vre units
@@ -317,7 +315,8 @@ class World:
                         f"No bidding strategies specified for {storage_name}. Using default strategies."
                     )
                     unit_params["bidding_strategies"] = {
-                        market.product_type: "simple" for market in self.markets.values()
+                        market.product_type: "simple"
+                        for market in self.markets.values()
                     }
 
                 await self.add_unit(
@@ -400,7 +399,7 @@ class World:
 
         """
 
-        #check if unit operator exists
+        # check if unit operator exists
         if unit_operator_id not in self.unit_operators:
             raise ValueError(f"invalid unit operator {unit_operator_id}")
 

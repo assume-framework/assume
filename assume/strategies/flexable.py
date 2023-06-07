@@ -92,7 +92,7 @@ class flexableEOM(BaseStrategy):
         min_down_time = max(unit.min_down_time, 1)
 
         starting_cost = self.get_starting_costs(time=min_down_time, unit=unit)
-        
+
         price_reduction_restart = starting_cost / min_down_time / bid_quantity_inflex
 
         if unit.total_heat_output[t] > 0:

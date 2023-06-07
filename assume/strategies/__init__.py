@@ -8,4 +8,3 @@ from assume.strategies.naive_strategies import (
 from assume.strategies.rl_strategies import RLStrategy
 from assume.strategies.storage_strategies import complexEOMStorage
 from assume.strategies.flexable_storage import flexableEOMStorage, flexableCRMStorage
-

@@ -217,7 +217,7 @@ class WriteOutput(Role):
                     "unit_operator": unit.unit_operator,
                 }
             }
-            
+
             df = pd.DataFrame(unit_info).T
 
             table_name = "storage_meta"

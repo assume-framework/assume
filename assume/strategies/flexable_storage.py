@@ -4,6 +4,7 @@ import numpy as np
 from assume.strategies.base_strategy import BaseStrategy
 from assume.units.storage_unit import StorageUnit
 
+
 class flexableEOMStorage(BaseStrategy):
     def __init__(self):
         super().__init__()
@@ -28,40 +29,65 @@ class flexableEOMStorage(BaseStrategy):
             # =============================================================================
             # Storage Unit is either charging, discharging, or off
             # =============================================================================
-            self.current_time = operational_window["window"]["start"]  
+            self.current_time = operational_window["window"]["start"]
 
             average_price = self.calculate_price_average(unit)
 
-            if unit.price_forecast[self.current_time] >= average_price/unit.efficiency_discharge:
-            #place bid to discharge
-                bid_quantity = min(max(((unit.current_SOC - unit.min_SOC)
-                                    -unit.pos_capacity_reserve[self.current_time])
-                                   *unit.efficiency_discharge,0), unit.max_power_discharge)
-                
+            if (
+                unit.price_forecast[self.current_time]
+                >= average_price / unit.efficiency_discharge
+            ):
+                # place bid to discharge
+                bid_quantity = min(
+                    max(
+                        (
+                            (unit.current_SOC - unit.min_SOC)
+                            - unit.pos_capacity_reserve[self.current_time]
+                        )
+                        * unit.efficiency_discharge,
+                        0,
+                    ),
+                    unit.max_power_discharge,
+                )
+
                 bids = [{"price": average_price, "volume": bid_quantity}]
 
-            elif unit.price_forecast[self.current_time] <= average_price*unit.efficiency_charge:
-            #place bid to charge
-                bid_quantity = min(max(((unit.max_SOC-unit.current_SOC)
-                                    -unit.neg_capacity_reserve[self.current_time])
-                                   /unit.efficiency_charge,0), unit.max_power_charge)
+            elif (
+                unit.price_forecast[self.current_time]
+                <= average_price * unit.efficiency_charge
+            ):
+                # place bid to charge
+                bid_quantity = min(
+                    max(
+                        (
+                            (unit.max_SOC - unit.current_SOC)
+                            - unit.neg_capacity_reserve[self.current_time]
+                        )
+                        / unit.efficiency_charge,
+                        0,
+                    ),
+                    unit.max_power_charge,
+                )
 
                 bids = [{"price": average_price, "volume": -bid_quantity}]
-                
+
             else:
                 bids = []
 
         return bids
-    
+
     def calculate_price_average(self, unit):
         t = self.current_time
         """if t - self.foresight < pd.Timedelta("0h"):
             average_price = np.mean(unit.price_forecast[t-self.foresight:] 
                                     + unit.price_forecast[:t+self.foresight])
         else:"""
-        average_price = np.mean(unit.price_forecast[t-self.foresight:t+self.foresight])
-        
+        average_price = np.mean(
+            unit.price_forecast[t - self.foresight : t + self.foresight]
+        )
+
         return average_price
+
 
 class flexableCRMStorage(BaseStrategy):
     def __init__(self):
