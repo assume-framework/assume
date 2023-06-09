@@ -1,3 +1,5 @@
+import pandas as pd
+
 from assume.strategies.base_strategy import BaseStrategy
 from assume.units.base_unit import BaseUnit
 
@@ -6,15 +8,8 @@ class RLStrategy(BaseStrategy):
     def __init__(self):
         super().__init__()
 
-    def load_strategy():
-        """
-        In case the strategy is learned with RL the policy (mapping of states to actions) it needs
-        to be loaded from current model
-
-        Return: ?
-        """
-
-        raise NotImplementedError()
+        self.foresight = pd.Timedelta("12h")
+        self.current_time = None
 
     def calculate_bids(
         self,
@@ -68,229 +63,77 @@ class RLStrategy(BaseStrategy):
 
         return bids
 
+    def calculate_EOM_price_if_off(self, unit, marginal_cost_mr, bid_quantity_inflex):
+        # The powerplant is currently off and calculates a startup markup as an extra
+        # to the marginal cost
+        # Calculating the average uninterrupted operating period
+        av_operating_time = max(
+            unit.mean_market_success, unit.min_operating_time, 1
+        )  # 1 prevents division by 0
 
-"""
-    # RL agent parameters
-    self.obs_dim = self.world.obs_dim
-    self.act_dim = self.world.act_dim
+        starting_cost = self.get_starting_costs(time=unit.current_down_time, unit=unit)
+        markup = starting_cost / av_operating_time / bid_quantity_inflex
 
-    self.device = self.world.device
-    self.float_type = self.world.float_type
+        bid_price_inflex = min(marginal_cost_mr + markup, 3000.0)
 
-    self.actor = Actor(self.obs_dim, self.act_dim, self.float_type).to(self.device)
+        return bid_price_inflex
 
-    if self.world.training:
-        self.learning_rate = self.world.learning_rate
-        self.actor_target = Actor(self.obs_dim, self.act_dim, self.float_type).to(
-            self.device
-        )
-        self.actor_target.load_state_dict(self.actor.state_dict())
-        # Target networks should always be in eval mode
-        self.actor_target.train(mode=False)
+    def calculate_EOM_price_if_on(self, unit, marginal_cost_flex, bid_quantity_inflex):
+        """
+        Check the description provided by Thomas in last version, the average downtime is not available
+        """
+        if bid_quantity_inflex == 0:
+            return 0
 
-        self.actor.optimizer = Adam(self.actor.parameters(), lr=self.learning_rate)
-        self.action_noise = NormalActionNoise(
-            mu=0.0, sigma=0.2, action_dimension=self.act_dim, scale=1.0, dt=1.0
-        )  # dt=.999996)
+        t = self.current_time
 
-    if self.world.load_params:
-        self.load_params(self.world.load_params)
-
-    def reset(self):
-        self.total_capacity = [0.0 for _ in self.world.snapshots]
-        self.total_capacity[-1] = self.minPower + (self.maxPower - self.minPower) / 2
-
-        self.scaled_total_capacity = np.array(self.total_capacity).reshape(-1, 1)
-        self.total_scaled_capacity[-1] = self.total_capacity[-1] / self.maxPower
-
-        self.bids_mr = {n: (0.0, 0.0) for n in self.world.snapshots}
-        self.bids_flex = {n: (0.0, 0.0) for n in self.world.snapshots}
-
-        self.sent_bids = []
-
-        self.current_downtime = 0
-
-        self.curr_obs = self.create_obs(self.world.currstep)
-        self.next_obs = None
-
-        self.curr_action = None
-        self.curr_reward = None
-        self.curr_experience = []
-
-        self.rewards = [0.0 for _ in self.world.snapshots]
-        self.regrets = [0.0 for _ in self.world.snapshots]
-        self.profits = [0.0 for _ in self.world.snapshots]
-
-    def formulate_bids(self):
-
-        if self.world.training:
-            if self.world.episodes_done < self.world.learning_starts:
-                self.curr_action = (
-                    th.normal(
-                        mean=0.0, std=0.2, size=(1, self.act_dim), dtype=self.float_type
-                    )
-                    .to(self.device)
-                    .squeeze()
-                )
-
-                self.curr_action += th.tensor(
-                    self.scaled_marginal_cost[self.world.currstep],
-                    device=self.device,
-                    dtype=self.float_type,
-                )
-            else:
-                self.curr_action = self.actor(self.curr_obs).detach()
-                self.curr_action += th.tensor(
-                    self.action_noise.noise(), device=self.device, dtype=self.float_type
-                )
-        else:
-            self.curr_action = self.actor(self.curr_obs).detach()
-
-        return self.curr_action
-
-    def step(self):
-        t = self.world.currstep
-        self.total_capacity[t] = 0
-
-        for bid in self.sent_bids:
-            if "mrEOM" in bid.ID:
-                self.total_capacity[t] += bid.confirmedAmount
-                self.bids_mr[t] = (bid.confirmedAmount, bid.price)
-            elif "flexEOM" in bid.ID:
-                self.total_capacity[t] += bid.confirmedAmount
-                self.bids_flex[t] = (bid.confirmedAmount, bid.price)
-
-        # Calculates market success
-        if self.total_capacity[t] < self.minPower:
-            self.total_capacity[t] = 0
-
-        self.total_scaled_capacity[t] = self.total_capacity[t] / self.maxPower
-
-        price_difference = self.world.mcp[t] - self.marginal_cost[t]
-        profit = price_difference * self.total_capacity[t] * self.world.dt
-        opportunity_cost = (
-            price_difference * (self.maxPower - self.total_capacity[t]) * self.world.dt
-        )
-        opportunity_cost = max(opportunity_cost, 0)
-
-        scaling = 0.1 / self.maxPower
-        regret_scale = 0.2
-
-        if self.total_capacity[t] != 0 and self.total_capacity[t - 1] == 0:
-            profit = profit - self.hotStartCosts / 2
-        elif self.total_capacity[t] == 0 and self.total_capacity[t - 1] != 0:
-            profit = profit - self.hotStartCosts / 2
-
-        self.rewards[t] = (profit - regret_scale * opportunity_cost) * scaling
-        self.profits[t] = profit
-        self.regrets[t] = opportunity_cost
-
-        self.curr_reward = self.rewards[t]
-        self.next_obs = self.create_obs(self.world.currstep + 1)
-
-        self.curr_experience = [
-            self.curr_obs,
-            self.next_obs,
-            self.curr_action,
-            self.curr_reward,
-        ]
-
-        self.curr_obs = self.next_obs
-
-        self.sent_bids = []
-
-    def feedback(self, bid):
-        if bid.status in ["Confirmed", "PartiallyConfirmed"]:
-            t = self.world.currstep
-
-            if "CRMPosDem" in bid.ID:
-                self.confQtyCRM_pos.update(
-                    {t + _: bid.confirmedAmount for _ in range(self.crm_timestep)}
-                )
-
-            if "CRMNegDem" in bid.ID:
-                self.confQtyCRM_neg.update(
-                    {t + _: bid.confirmedAmount for _ in range(self.crm_timestep)}
-                )
-
-            if "steam" in bid.ID:
-                self.confQtyDHM_steam[t] = bid.confirmedAmount
-
-        if "steam" in bid.ID:
-            self.powerLossFPP(t, bid)
-
-        self.sent_bids.append(bid)
-
-    def create_obs(self, t):
-        obs_len = 4
-        obs = self.agent.obs.copy()
-
-        # get the marginal cost
-        if t < len(self.world.snapshots) - obs_len:
-            obs.extend(self.scaled_marginal_cost[t : t + obs_len])
-        else:
-            obs.extend(self.scaled_marginal_cost[t:])
-            obs.extend(
-                self.scaled_marginal_cost[: obs_len - (len(self.world.snapshots) - t)]
-            )
-
-        if t < obs_len:
-            obs.extend(
-                self.total_scaled_capacity[len(self.world.snapshots) - obs_len + t :]
-            )
-            obs.extend(self.total_scaled_capacity[:t])
-        else:
-            obs.extend(self.total_scaled_capacity[t - obs_len : t])
-
-        obs = np.array(obs)
-        obs = (
-            th.tensor(obs, dtype=self.float_type)
-            .to(self.device, non_blocking=True)
-            .view(-1)
+        starting_cost = self.get_starting_costs(time=unit.min_down_time, unit=unit)
+        price_reduction_restart = (
+            starting_cost / unit.min_down_time / bid_quantity_inflex
         )
 
-        return obs.detach().clone()
+        if unit.total_heat_output[t] > 0:
+            heat_gen_cost = (
+                unit.total_heat_output[t] * (unit.fuel_price["natural gas"][t] / 0.9)
+            ) / bid_quantity_inflex
+        else:
+            heat_gen_cost = 0.0
 
-    # powerplant function
-    def save_params(self, dir_name="best_policy"):
-        save_dir = self.world.save_params["save_dir"]
+        possible_revenue = self.get_possible_revenues(
+            marginal_cost=marginal_cost_flex,
+            unit=unit,
+        )
+        if possible_revenue >= 0 and unit.price_forecast[t] < marginal_cost_flex:
+            marginal_cost_flex = 0
 
-        def save_obj(obj, directory):
-            path = directory + self.name
-            th.save(obj, path)
+        bid_price_inflex = max(
+            -price_reduction_restart - heat_gen_cost + marginal_cost_flex,
+            -499.00,
+        )
 
-        obj = {
-            "policy": self.actor.state_dict(),
-            "target_policy": self.actor_target.state_dict(),
-            "policy_optimizer": self.actor.optimizer.state_dict(),
-        }
+        return bid_price_inflex
 
-        directory = save_dir + self.world.simulation_id + dir_name + "/"
+    def get_starting_costs(self, time, unit):
+        if time < unit.downtime_hot_start:
+            return unit.hot_start_cost
 
-        if not os.path.exists(directory):
-            os.makedirs(directory)
+        elif time < unit.downtime_warm_start:
+            return unit.warm_start_cost
 
-        save_obj(obj, directory)
+        else:
+            return unit.cold_start_cost
 
-    def load_params(self, load_params):
-        sim_id = load_params["id"]
-        load_dir = load_params["dir"]
+    def get_possible_revenues(self, marginal_cost, unit):
+        t = self.current_time
+        price_forecast = []
 
-        def load_obj(directory):
-            path = directory + self.name
-            return th.load(path, map_location=self.device)
+        if t + self.foresight > unit.price_forecast.index[-1]:
+            price_forecast = unit.price_forecast.loc[t:]
+        else:
+            price_forecast = unit.price_forecast.loc[t : t + self.foresight]
 
-        directory = load_params["policy_dir"] + sim_id + load_dir + "/"
+        possible_revenue = sum(
+            marketPrice - marginal_cost for marketPrice in price_forecast
+        )
 
-        if not os.path.exists(directory):
-            raise FileNotFoundError(
-                "Specified directory for loading the actors policy does not exist!"
-            )
-
-        params = load_obj(directory)
-
-        self.actor.load_state_dict(params["policy"])
-        if self.world.training:
-            self.actor_target.load_state_dict(params["target_policy"])
-            self.actor.optimizer.load_state_dict(params["policy_optimizer"])
-"""
+        return possible_revenue

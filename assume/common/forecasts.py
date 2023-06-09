@@ -77,7 +77,7 @@ class ForecastProvider(Role):
         """
 
         # initialize price forecast
-        price_forecast = pd.DataFrame(
+        price_resdemand_forecast = pd.DataFrame(
             index=renewable_capacity_factors.index, columns=["mcp", "residual_demand"]
         )
 
@@ -91,10 +91,15 @@ class ForecastProvider(Role):
             # Check if the forecast file already exists
             if os.path.isfile(forecast_file):
                 # If inputs haven't changed, load the forecast from the CSV file and exit
-                price_forecast = pd.read_csv(forecast_file, index_col="Timestamp")
+                price_resdemand_forecast = pd.read_csv(
+                    forecast_file, index_col="Timestamp"
+                )
                 self.logger.info("Price forecast loaded from the existing file.")
+                price_resdemand_forecast.index = pd.to_datetime(
+                    price_resdemand_forecast.index
+                )
 
-                return price_forecast
+                return price_resdemand_forecast
 
             # calculate infeed of renewables and residual demand
             # check if max_power is a series or a float
@@ -152,8 +157,8 @@ class ForecastProvider(Role):
                     # demand cannot be supplied by power plant fleet
                     mcp = 3000
 
-                price_forecast.at[t, "mcp"] = mcp
-                price_forecast.at[t, "residual_demand"] = res_demand
+                price_resdemand_forecast.at[t, "mcp"] = mcp
+                price_resdemand_forecast.at[t, "residual_demand"] = res_demand
 
         else:
             raise NotImplementedError(
@@ -161,6 +166,8 @@ class ForecastProvider(Role):
             )
 
         self.logger.info("Finished market forecasts")
-        price_forecast.to_csv(forecast_file, index_label="Timestamp")
+        price_resdemand_forecast.to_csv(forecast_file, index_label="Timestamp")
 
-        return price_forecast
+        price_resdemand_forecast.index = pd.to_datetime(price_resdemand_forecast.index)
+
+        return price_resdemand_forecast
