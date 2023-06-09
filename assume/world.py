@@ -31,10 +31,12 @@ from assume.strategies import (
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
     NaiveStrategy,
+    flexableCRMStorage,
     flexableEOM,
+    flexableEOMStorage,
     RLStrategy,
 )
-from assume.units import Demand, PowerPlant
+from assume.units import Demand, HeatPump, PowerPlant, StorageUnit
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("mango").setLevel(logging.WARNING)
@@ -74,13 +76,17 @@ class World:
 
         self.unit_types = {
             "power_plant": PowerPlant,
+            "heatpump": HeatPump,
             "demand": Demand,
+            "storage_unit": StorageUnit,
         }
         self.bidding_types = {
             "naive": NaiveStrategy,
             "flexable_eom": flexableEOM,
+            "flexable_eom_storage": flexableEOMStorage,
             "naive_neg_reserve": NaiveNegReserveStrategy,
             "naive_pos_reserve": NaivePosReserveStrategy,
+            "flexable_crm_storage": flexableCRMStorage,
             "rl_strategy": RLStrategy,
         }
         self.clearing_mechanisms = {
@@ -122,7 +128,12 @@ class World:
         path = f"{inputs_path}/{scenario}"
         with open(f"{path}/config.yml", "r") as f:
             config = yaml.safe_load(f)
+            if not study_case:
+                study_case = list(config.keys())[0]
             config = config[study_case]
+        self.logger.info(
+            f"Starting Scenario {scenario}/{study_case} from {inputs_path}"
+        )
 
         self.start = pd.Timestamp(config["start_date"])
         self.end = pd.Timestamp(config["end_date"])
@@ -160,6 +171,16 @@ class World:
             config=config,
             file_name="fuel_prices",
             index=self.index,
+        )
+
+        heatpumps_df = load_file(path=path, config=config, file_name="heatpumps")
+
+        temperature_df = load_file(
+            path=path, config=config, file_name="temperature", index=self.index
+        )
+
+        electricity_prices_df = load_file(
+            path=path, config=config, file_name="electricity_prices", index=self.index
         )
 
         demand_df = load_file(
@@ -326,6 +347,70 @@ class World:
                 unit_params=unit_params,
             )
 
+        if heatpumps_df is not None:
+            for company_name in heatpumps_df.unit_operator.unique():
+                self.add_unit_operator(id=str(company_name))
+
+            self.logger.info("Adding heat pump units")
+            for hp_name, unit_params in heatpumps_df.iterrows():
+                if (
+                    bidding_strategies_df is not None
+                    and hp_name in bidding_strategies_df.index
+                ):
+                    unit_params["bidding_strategies"] = bidding_strategies_df.loc[
+                        hp_name
+                    ].to_dict()
+                else:
+                    self.logger.warning(
+                        f"No bidding strategies specified for {hp_name}. Using default strategies."
+                    )
+                    unit_params["bidding_strategies"] = {
+                        market.product_type: "simple"
+                        for market in self.markets.values()
+                    }
+
+                if electricity_prices_df is not None:
+                    unit_params["electricity_price"] = electricity_prices_df[
+                        "electricity_price"
+                    ]
+
+                if temperature_df is not None:
+                    unit_params["source_temp"] = temperature_df["source_temperature"]
+                    unit_params["sink_temp"] = temperature_df["sink_temperature"]
+
+                await self.add_unit(
+                    id=hp_name,
+                    unit_type="heatpump",
+                    unit_operator_id=unit_params["unit_operator"],
+                    unit_params=unit_params,
+                )
+
+        self.logger.info("Adding storage units")
+        if storage_units is not None:
+            for storage_name, unit_params in storage_units.iterrows():
+                if (
+                    bidding_strategies_df is not None
+                    and storage_name in bidding_strategies_df.index
+                ):
+                    unit_params["bidding_strategies"] = bidding_strategies_df.loc[
+                        storage_name
+                    ].to_dict()
+                else:
+                    self.logger.warning(
+                        f"No bidding strategies specified for {storage_name}. Using default strategies."
+                    )
+                    unit_params["bidding_strategies"] = {
+                        market.product_type: "simple"
+                        for market in self.markets.values()
+                    }
+
+                await self.add_unit(
+                    id=storage_name,
+                    unit_type="storage_unit",
+                    unit_operator_id=unit_params["unit_operator"],
+                    unit_params=unit_params,
+                )
+
         # add the demand unit operators and units
         self.logger.info("Adding demand")
         for unit_name, unit_params in demand_units.iterrows():
@@ -398,6 +483,10 @@ class World:
         unit_params: dict
 
         """
+
+        # check if unit operator exists
+        if unit_operator_id not in self.unit_operators:
+            raise ValueError(f"invalid unit operator {unit_operator_id}")
 
         # provided unit type does not exist yet
         unit_class = self.unit_types.get(unit_type)

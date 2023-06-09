@@ -60,6 +60,15 @@ After these steps you can also run the example simulation:
 python examples/example_01a_sqlite.py
 ```
 
+You can also use the cli to run simulations:
+
+```
+assume -s example_01b -db "postgresql://assume:assume@localhost:5432/assume"
+```
+
+If you need help using the CLI run `assume -h`
+
+
 Please note that if you have python running on windows that you need to alter the same_process binary in world to True (to be changed). 
 
 Access to database and dashboards

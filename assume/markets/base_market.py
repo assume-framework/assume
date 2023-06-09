@@ -85,6 +85,9 @@ class MarketRole(Role):
         products = get_available_products(
             self.marketconfig.market_products, market_open
         )
+        if market_closing > self.marketconfig.opening_hours._until:
+            # this market should not open, as the clearing is after the markets end time
+            return
 
         opening_message = {
             "context": "opening",

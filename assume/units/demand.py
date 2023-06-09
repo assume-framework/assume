@@ -48,7 +48,7 @@ class Demand(BaseUnit):
 
         self.max_power = max_power
         self.min_power = min_power
-        self.volume = volume
+        self.volume = -volume  # demand is negative
         self.price = price
         self.location = location
         self.total_power_output = []
@@ -66,16 +66,19 @@ class Demand(BaseUnit):
         end = pd.Timestamp(end)
         """Calculate the operation window for the next time step."""
         if type(self.volume) == pd.Series:
-            bid_volume = self.volume.loc[start]
+            bid_volume = (self.volume - self.total_power_output).loc[start:end].max()
         else:
             bid_volume = self.volume
 
         if type(self.price) == pd.Series:
-            bid_price = self.price.loc[start]
+            bid_price = self.price.loc[start:end].mean()
         else:
             bid_price = self.price
 
-        return {"max_power": {"power": -bid_volume, "marginal_cost": bid_price}}
+        return {"max_power": {"power": bid_volume, "marginal_cost": bid_price}}
 
-    def get_dispatch_plan(self, dispatch_plan, time_period):
-        self.total_power_output.loc[time_period] = dispatch_plan["total_power"]
+    def get_dispatch_plan(
+        self, dispatch_plan, start: pd.Timestamp, end: pd.Timestamp, product_type: str
+    ):
+        end_excl = end - self.index.freq
+        self.total_power_output.loc[start:end_excl] += dispatch_plan["total_power"]

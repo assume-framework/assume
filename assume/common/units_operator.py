@@ -129,16 +129,16 @@ class UnitsOperator(Role):
             # map bid id to unit id
             order["unit_id"] = self.bids_map[order["bid_id"]]
         self.valid_orders.extend(orderbook)
+        marketconfig = self.registered_markets[content["market_id"]]
+        self.set_unit_dispatch(orderbook, marketconfig)
         self.write_actual_dispatch()
-        self.send_unit_dispatch(orderbook)
 
-    def send_unit_dispatch(self, orderbook):
+    def set_unit_dispatch(self, orderbook, marketconfig):
         """
         feeds the current market result back to the units
         this does not respect bids from multiple markets
         for the same time period
         """
-        time_period = [orderbook[0]["start_time"], orderbook[0]["end_time"]]
         orderbook = list(sorted(orderbook, key=itemgetter("unit_id")))
         for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
             orders_l = list(orders)
@@ -146,7 +146,9 @@ class UnitsOperator(Role):
             dispatch_plan = {"total_power": total_power}
             self.units[unit_id].get_dispatch_plan(
                 dispatch_plan=dispatch_plan,
-                time_period=time_period,
+                start=orderbook[0]["start_time"],
+                end=orderbook[0]["end_time"],
+                product_type=marketconfig.product_type,
             )
 
     def write_actual_dispatch(self):
@@ -169,6 +171,7 @@ class UnitsOperator(Role):
         )
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
+            # end_excl = now - unit.index.freq
             data = pd.DataFrame(
                 unit.total_power_output.loc[start:now], columns=["power"]
             )
