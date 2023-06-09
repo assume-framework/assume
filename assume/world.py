@@ -1,6 +1,7 @@
 import asyncio
 import calendar
 import logging
+import os
 import time
 from datetime import datetime
 
@@ -15,13 +16,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
 from tqdm import tqdm
-import os
 
 from assume.common import (
+    ForecastProvider,
     MarketConfig,
     UnitsOperator,
     WriteOutput,
-    ForecastProvider,
     load_file,
     make_market_config,
     mango_codec_factory,
@@ -31,10 +31,10 @@ from assume.strategies import (
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
     NaiveStrategy,
+    RLStrategy,
     flexableCRMStorage,
     flexableEOM,
     flexableEOMStorage,
-    RLStrategy,
 )
 from assume.units import Demand, HeatPump, PowerPlant, StorageUnit
 
@@ -316,7 +316,10 @@ class World:
                 ].to_dict()
 
                 # check if we have RL bidding strategy
-                if unit_params["bidding_strategies"]["energy"] == "rl_strategy":
+                if (
+                    unit_params["bidding_strategies"]["energy"] == "rl_strategy"
+                    and self.price_forecast is not None
+                ):
                     unit_params["price_forecast"] = self.price_forecast["mcp"]
                     unit_params["res_demand_forecast"] = self.price_forecast[
                         "residual_demand"

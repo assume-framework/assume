@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
@@ -7,7 +8,6 @@ from pathlib import Path
 import pandas as pd
 from mango import Role
 from mango.messages.message import Performatives
-import os
 
 from assume.common.market_objects import (
     ClearingMessage,
@@ -19,10 +19,6 @@ from assume.common.market_objects import (
 from assume.common.utils import aggregate_step_amount
 from assume.strategies import BaseStrategy
 from assume.units import BaseUnit
-
-logging.basicConfig(level=logging.INFO)
-logging.getLogger("mango").setLevel(logging.WARNING)
-logging.getLogger("assume").setLevel(logging.INFO)
 
 
 class ForecastProvider(Role):
@@ -77,6 +73,8 @@ class ForecastProvider(Role):
         """
 
         # initialize price forecast
+        if renewable_capacity_factors is None:
+            return None
         price_resdemand_forecast = pd.DataFrame(
             index=renewable_capacity_factors.index, columns=["mcp", "residual_demand"]
         )
