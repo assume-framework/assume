@@ -171,9 +171,9 @@ class UnitsOperator(Role):
         )
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
-            # end_excl = now - unit.index.freq
+            end_excl = now - unit.index.freq
             data = pd.DataFrame(
-                unit.total_power_output.loc[start:now], columns=["power"]
+                unit.total_power_output.loc[start:end_excl], columns=["power"]
             )
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
@@ -245,7 +245,6 @@ class UnitsOperator(Role):
         """
 
         orderbook: Orderbook = []
-        product_type = market.product_type
 
         # the given products just became available on our market
         # and we need to provide bids
@@ -259,7 +258,7 @@ class UnitsOperator(Role):
                 for unit_id, unit in self.units.items():
                     # get operational window for each unit
                     operational_window = unit.calculate_operational_window(
-                        product_type=product_type,
+                        product_type=market.product_type,
                         product_tuple=product,
                     )
                     op_windows.append(operational_window)
@@ -275,7 +274,7 @@ class UnitsOperator(Role):
                 for unit_id, unit in self.units.items():
                     # take price from bidding strategy
                     bids = unit.calculate_bids(
-                        product_type=product_type,
+                        market_config=market,
                         product_tuple=product,
                     )
 
@@ -299,3 +298,13 @@ class UnitsOperator(Role):
                         self.bids_map[order_c["bid_id"]] = unit_id
 
         return orderbook
+
+    # async def on_stop(self):
+    #     series = aggregate_step_amount(self.valid_orders)
+    #     df = pd.DataFrame(series)
+
+    #     if not df.empty:
+    #         import matplotlib.pyplot as plt
+    #         plt.plot(df[0], df[1])
+    #         plt.title(self.id)
+    #         plt.show()

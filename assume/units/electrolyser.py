@@ -122,11 +122,11 @@ class Electrolyser(BaseUnit):
 
     def calculate_bids(
         self,
-        product_type: str,
+        market_config,
         product_tuple: tuple,
     ):
         return super().calculate_bids(
-            product_type=product_type,
+            market_config=market_config,
             product_tuple=product_tuple,
         )
 

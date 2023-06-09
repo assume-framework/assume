@@ -502,7 +502,9 @@ class World:
                 continue
 
             try:
-                bidding_strategies[product_type] = self.bidding_types[strategy]()
+                bidding_strategies[product_type] = self.bidding_types[strategy](
+                    scale=0.9
+                )
             except KeyError as e:
                 self.logger.error(f"Invalid bidding strategy {strategy}")
                 raise e

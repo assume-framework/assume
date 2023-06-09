@@ -52,17 +52,17 @@ class BaseUnit:
 
     def calculate_bids(
         self,
-        product_type,
+        market_config,
         product_tuple,
     ):
         """Calculate the bids for the next time step."""
 
-        if product_type not in self.bidding_strategies:
+        if market_config.product_type not in self.bidding_strategies:
             return None
 
         # get operational window for each unit
         operational_window = self.calculate_operational_window(
-            product_type=product_type,
+            product_type=market_config.product_type,
             product_tuple=product_tuple,
         )
 
@@ -70,8 +70,9 @@ class BaseUnit:
         if operational_window is None:
             return None
 
-        return self.bidding_strategies[product_type].calculate_bids(
+        return self.bidding_strategies[market_config.product_type].calculate_bids(
             unit=self,
+            market_config=market_config,
             operational_window=operational_window,
         )
 

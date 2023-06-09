@@ -14,6 +14,7 @@ class RLStrategy(BaseStrategy):
     def calculate_bids(
         self,
         unit: BaseUnit = None,
+        market_config=None,
         operational_window: dict = None,
     ):
         bid_quantity_inflex, bid_price_inflex = 0, 0

@@ -67,15 +67,15 @@ crm_case_2019:
       maximum_volume: 1000000
       price_unit: EUR/MW
       market_mechanism: pay_as_bid
-policy_case:
-  start_date: 2018-12-31 20:00
+ltm_case:
+  start_date: 2018-12-31 23:00
   end_date: 2019-01-11 00:00
   time_step: 1h
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2018-12-31 23:00
+      start_date: 2019-01-01 00:00
       products:
         - duration: 1h
           count: 1
@@ -86,25 +86,49 @@ policy_case:
       maximum_volume: 1000000
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
-    CRM:
-      operator: CRM_operator
-      product_type: capacity
-      start_date: 2018-12-31 20:00
+
+# Long Term Market - 3d contracts
+    LTM_OTC:
+      operator: LTM_operator
+      product_type: energy
+      start_date: 2018-12-31 23:00
       products:
-        - duration: 4h
+        - duration: 3d
           count: 1
-          first_delivery: 4h
-      opening_frequency: 4h
+          first_delivery: 2h
+      opening_frequency: 3d
       opening_duration: 1h
       volume_unit: MW
       maximum_volume: 1000000
       price_unit: EUR/MW
       market_mechanism: pay_as_bid
+policy_case:
+  start_date: 2018-12-31 23:00
+  end_date: 2019-01-11 00:00
+  time_step: 1h
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-01-01 00:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_volume: 1000000
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
     # Policy market - contracts for next 7d 
     POL:
       operator: POL_operator
       product_type: energy
       start_date: 2018-12-31 20:00
+      additional_fields:
+        - contract
+        - sender_id
       products:
         - duration: 7d
           count: 5
@@ -114,4 +138,4 @@ policy_case:
       volume_unit: MW
       maximum_volume: 1000000
       price_unit: EUR/MW
-      market_mechanism: pay_as_clear
+      market_mechanism: pay_as_bid_contract

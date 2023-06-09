@@ -13,7 +13,12 @@ from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 
 logger = logging.getLogger(__name__)
 
-freq_map = {"h": rr.HOURLY, "m": rr.MINUTELY}
+freq_map = {
+    "h": rr.HOURLY,
+    "m": rr.MINUTELY,
+    "d": rr.DAILY,
+    "w": rr.WEEKLY,
+}
 
 
 def load_file(

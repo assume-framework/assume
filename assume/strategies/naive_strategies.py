@@ -1,14 +1,17 @@
+from assume.common.market_objects import MarketConfig
 from assume.strategies.base_strategy import BaseStrategy
 from assume.units.base_unit import BaseUnit
 
 
 class NaiveStrategy(BaseStrategy):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, scale=1.0, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.scale = scale
 
     def calculate_bids(
         self,
         unit: BaseUnit = None,
+        market_config: MarketConfig = None,
         operational_window: dict = None,
     ):
         """
@@ -19,17 +22,20 @@ class NaiveStrategy(BaseStrategy):
         """
         price = operational_window["max_power"]["marginal_cost"]
         volume = operational_window["max_power"]["power"]
+        if "OTC" in market_config.name:
+            volume *= self.scale
         bids = [{"price": price, "volume": volume}]
         return bids
 
 
 class NaivePosReserveStrategy(BaseStrategy):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def calculate_bids(
         self,
         unit: BaseUnit = None,
+        market_config=None,
         operational_window: dict = None,
     ):
         """
@@ -45,12 +51,13 @@ class NaivePosReserveStrategy(BaseStrategy):
 
 
 class NaiveNegReserveStrategy(BaseStrategy):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def calculate_bids(
         self,
         unit: BaseUnit = None,
+        market_config=None,
         operational_window: dict = None,
     ):
         """
