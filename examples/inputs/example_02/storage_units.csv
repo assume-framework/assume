@@ -1,4 +1,4 @@
-name,technology,max_power_ch,max_power_dis,efficiency_ch,efficiency_dis,min_soc,max_soc,variable_cost_ch,variable_cost_dis,natural_inflow,unit_operator
+name,technology,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_SOC,max_SOC,variable_cost_charge,variable_cost_discharge,natural_inflow,unit_operator
 Tanzmühle - Rabenleite,PSPP,25,35,0.81,0.88,1,404,0.28,0.28,0,GDF SUEZ ENERGIE DEUTSCHLAND
 Schwarzenbachwerk,PSPP,20,46,0.73,0.82,1,198,0.28,0.28,1.2,ENBW ENERGIE BADEN-WURTTEMBERG
 Leitzach II,PSPP,38,49,0.86,0.9,1,550,0.28,0.28,0.7,STADTWERKE MUENCHEN GMBH

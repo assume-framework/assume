@@ -29,9 +29,11 @@ from assume.strategies import (
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
     NaiveStrategy,
+    flexableCRMStorage,
     flexableEOM,
+    flexableEOMStorage,
 )
-from assume.units import Demand, HeatPump, PowerPlant
+from assume.units import Demand, HeatPump, PowerPlant, StorageUnit
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("mango").setLevel(logging.WARNING)
@@ -73,12 +75,15 @@ class World:
             "power_plant": PowerPlant,
             "heatpump": HeatPump,
             "demand": Demand,
+            "storage_unit": StorageUnit,
         }
         self.bidding_types = {
             "naive": NaiveStrategy,
             "flexable_eom": flexableEOM,
+            "flexable_eom_storage": flexableEOMStorage,
             "naive_neg_reserve": NaiveNegReserveStrategy,
             "naive_pos_reserve": NaivePosReserveStrategy,
+            "flexable_crm_storage": flexableCRMStorage,
         }
         self.clearing_mechanisms = {
             "pay_as_clear": pay_as_clear,
@@ -344,6 +349,32 @@ class World:
                     unit_params=unit_params,
                 )
 
+        self.logger.info("Adding storage units")
+        if storage_units is not None:
+            for storage_name, unit_params in storage_units.iterrows():
+                if (
+                    bidding_strategies_df is not None
+                    and storage_name in bidding_strategies_df.index
+                ):
+                    unit_params["bidding_strategies"] = bidding_strategies_df.loc[
+                        storage_name
+                    ].to_dict()
+                else:
+                    self.logger.warning(
+                        f"No bidding strategies specified for {storage_name}. Using default strategies."
+                    )
+                    unit_params["bidding_strategies"] = {
+                        market.product_type: "simple"
+                        for market in self.markets.values()
+                    }
+
+                await self.add_unit(
+                    id=storage_name,
+                    unit_type="storage_unit",
+                    unit_operator_id=unit_params["unit_operator"],
+                    unit_params=unit_params,
+                )
+
         # add the demand unit operators and units
         self.logger.info("Adding demand")
         for unit_name, unit_params in demand_units.iterrows():
@@ -416,6 +447,10 @@ class World:
         unit_params: dict
 
         """
+
+        # check if unit operator exists
+        if unit_operator_id not in self.unit_operators:
+            raise ValueError(f"invalid unit operator {unit_operator_id}")
 
         # provided unit type does not exist yet
         unit_class = self.unit_types.get(unit_type)
