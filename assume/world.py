@@ -1,6 +1,7 @@
 import asyncio
 import calendar
 import logging
+import os
 import time
 from datetime import datetime
 
@@ -17,6 +18,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from tqdm import tqdm
 
 from assume.common import (
+    ForecastProvider,
     MarketConfig,
     UnitsOperator,
     WriteOutput,
@@ -29,6 +31,7 @@ from assume.strategies import (
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
     NaiveStrategy,
+    RLStrategy,
     flexableCRMStorage,
     flexableEOM,
     flexableEOMStorage,
@@ -84,6 +87,7 @@ class World:
             "naive_neg_reserve": NaiveNegReserveStrategy,
             "naive_pos_reserve": NaivePosReserveStrategy,
             "flexable_crm_storage": flexableCRMStorage,
+            "rl_strategy": RLStrategy,
         }
         self.clearing_mechanisms = {
             "pay_as_clear": pay_as_clear,
@@ -257,7 +261,30 @@ class World:
                 market_config=market_config,
             )
 
-        # add the unit operators using unique unit operator names in the powerplants and heatpumps csv
+        # add making price forecast
+        forecast_role = ForecastProvider(
+            config["markets_config"].items(),
+            fuel_prices_df,
+            fuel_prices_df["co2"],
+            vre_cf_df,
+            powerplant_units,
+            demand_df,
+        )
+        forecast_agent = RoleAgent(self.container, suggested_aid="forecast_agent_1")
+        forecast_agent.add_role(forecast_role)
+
+        # write forecast
+        self.price_forecast = forecast_role.calculate_price_forecast(
+            "EOM",
+            path,
+            demand_df,
+            vre_cf_df,
+            powerplant_units,
+            fuel_prices_df,
+            fuel_prices_df["co2"],
+        )
+
+        # add the unit operators using unique unit operator names in the powerplants csv
         self.logger.info("Adding unit operators")
         all_operators = np.concatenate(
             [
@@ -277,6 +304,7 @@ class World:
         # add the units to corresponsing unit operators
         # if fuel prices are provided, add them to the unit params
         # if vre generation is provided, add them to the vre units
+        # if we have RL strategy, add price forecast to unit_params
         self.logger.info("Adding power plant units")
         for unit_name, unit_params in powerplant_units.iterrows():
             if (
@@ -286,6 +314,17 @@ class World:
                 unit_params["bidding_strategies"] = bidding_strategies_df.loc[
                     unit_name
                 ].to_dict()
+
+                # check if we have RL bidding strategy
+                if (
+                    unit_params["bidding_strategies"]["energy"] == "rl_strategy"
+                    and self.price_forecast is not None
+                ):
+                    unit_params["price_forecast"] = self.price_forecast["mcp"]
+                    unit_params["res_demand_forecast"] = self.price_forecast[
+                        "residual_demand"
+                    ]
+
             else:
                 self.logger.warning(
                     f"No bidding strategies specified for {unit_name}. Using default strategies."
