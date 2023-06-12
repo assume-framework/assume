@@ -9,7 +9,7 @@ from operator import itemgetter
 import dateutil.rrule as rr
 import pandas as pd
 
-from assume.common import MarketConfig, MarketProduct, Orderbook
+from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 
 logger = logging.getLogger(__name__)
 

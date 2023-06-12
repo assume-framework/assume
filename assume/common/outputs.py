@@ -203,6 +203,25 @@ class WriteOutput(Role):
 
             table_name = "unit_meta"
 
+        elif unit_type == "storage_unit":
+            unit_info = {
+                unit.id: {
+                    "simulation": self.simulation_id,
+                    "unit_type": unit_type,
+                    "technology": unit.technology,
+                    "max_power_charge": unit.max_power_charge,
+                    "max_power_discharge": unit.max_power_discharge,
+                    "min_power_charge": unit.min_power_charge,
+                    "min_power_discharge": unit.min_power_discharge,
+                    "efficiency_charge": unit.efficiency_discharge,
+                    "unit_operator": unit.unit_operator,
+                }
+            }
+
+            df = pd.DataFrame(unit_info).T
+
+            table_name = "storage_meta"
+
         elif unit_type == "demand":
             unit_info = {
                 unit.id: {
