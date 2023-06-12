@@ -1,0 +1,29 @@
+name,technology,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,fixed_cost,hot_start_cost,warm_start_cost,cold_start_cost,min_operating_time,minDowntime,heat_extraction,max_heat_extraction,unit_operator
+wind_onshore_DE,wind_onshore,renewable,0,3319,0,1,-1,-1,0,0,0,0,0,0,0,0,renewables_operator
+wind_offshore_DE,wind_offshore,renewable,0,356,0,1,-1,-1,0,0,0,0,0,0,0,0,renewables_operator
+solar_DE,solar,renewable,0,2886,0,1,-1,-1,0,0,0,0,0,0,0,0,renewables_operator
+water_DE,hydro,renewable,0,294,0,1,-1,-1,0,0,0,0,0,0,0,0,renewables_operator
+biomass_DE,biomass,biomass,0,2340,0,1,-1,-1,0,0,0,0,0,0,0,0,renewables_operator
+KKW ISAR 2,nuclear,uranium,0,1485,590,0.33,890,890,10.3,140,140,140,72,10,no,0,UNIPER
+KKW BROKDORF,nuclear,uranium,0,1480,590,0.33,890,890,10.3,140,140,140,72,10,no,0,UNIPER
+KKW NECKARWESTHEIM,nuclear,uranium,0,1400,560,0.33,840,840,10.3,140,140,140,72,10,no,0,ENBW ENERGIE BADEN-WURTTEMBERG
+KKW GUNDREMMINGEN C,nuclear,uranium,0,1344,540,0.33,810,810,10.3,140,140,140,72,10,no,0,RWE POWER AG
+NEURATH F,lignite,lignite,0.406,1120,560,0.434,590,590,1.65,30.4,47.5,69.3,10,7,no,0,RWE POWER AG
+BOXBERG Q,lignite,lignite,0.406,907,460,0.415,480,480,1.65,30.4,47.5,69.3,10,7,yes,65,VATTENFALL EUROPE AG
+MOORBURG B,hard coal,hard coal,0.335,865,350,0.465,590,590,1.3,30.4,47.5,69.3,7,6,yes,120,VATTENFALL EUROPE AG
+WESTFALEN E,hard coal,hard coal,0.335,820,330,0.452,560,560,1.3,30.4,47.5,69.3,7,6,no,0,RWE POWER AG
+IBBENBUEREN B NO 1,hard coal,hard coal,0.335,808,330,0.398,550,550,1.3,30.4,47.5,69.3,7,6,yes,20,RWE POWER AG
+WILHELMSHAVEN C,hard coal,hard coal,0.335,800,320,0.452,540,540,1.3,30.4,47.5,69.3,7,6,no,0,UNIPER
+WALSUM 10,hard coal,hard coal,0.335,790,320,0.454,540,540,1.3,30.4,47.5,69.3,7,6,yes,190,STEAG GMBH
+BERGKAMEN A,hard coal,hard coal,0.335,777,320,0.38,530,530,1.3,30.4,47.5,69.3,7,6,yes,20,EVONIK INDUSTRIES AG
+BEXBACH C 1,hard coal,hard coal,0.335,773,310,0.389,530,530,1.3,30.4,47.5,69.3,7,6,no,0,STEAG GMBH
+WILHELMSHAVEN A,hard coal,hard coal,0.335,770,310,0.373,520,520,1.3,30.4,47.5,69.3,7,6,no,0,UNIPER
+HEILBRONN 7,hard coal,hard coal,0.335,760,310,0.398,520,520,1.3,30.4,47.5,69.3,7,6,yes,550,ENBW ENERGIE BADEN-WURTTEMBERG
+KW BASF LUDWIGSHAFEN SUED,combined cycle gas turbine,natural gas,0.201,396,160,0.51,330,330,3.5,24.1,34.2,46.7,5,3,yes,420,BASF AG
+RDK (KARLSRUHE) 4RP,combined cycle gas turbine,natural gas,0.201,378,160,0.497,320,320,3.5,24.1,34.2,46.7,5,3,no,0,ENBW ENERGIE BADEN-WURTTEMBERG
+HKW DRESDEN NOSSENER BRUECKE,combined cycle gas turbine,natural gas,0.201,268,110,0.48,230,230,3.5,24.1,34.2,46.7,5,3,yes,455,DREWAG - STADTWERKE DRESDEN GMBH
+HKW HANNOVER LINDEN,combined cycle gas turbine,natural gas,0.201,242,100,0.53,200,200,3.5,24.1,34.2,46.7,5,3,yes,185,STADTWERKE HANNOVER AG
+HKW DUISBURG WANHEIM IIIB,combined cycle gas turbine,natural gas,0.201,230,100,0.54,190,190,3.5,24.1,34.2,46.7,5,3,yes,167,STADTWERKE DUISBURG AG
+HKW HAGEN KABEL,combined cycle gas turbine,natural gas,0.201,230,100,0.39,190,190,3.5,24.1,34.2,46.7,5,3,yes,108,ENERVIE - SUEDWESTFALEN ENERGIE
+HKW HOECHST BUSINESS PARK,combined cycle gas turbine,natural gas,0.201,200,80,0.55,170,170,3.5,24.1,34.2,46.7,5,3,yes,126,RWE POWER AG
+HKW JENA SUED,combined cycle gas turbine,natural gas,0.201,195,80,0.48,170,170,3.5,24.1,34.2,46.7,5,3,yes,225,UNIPER

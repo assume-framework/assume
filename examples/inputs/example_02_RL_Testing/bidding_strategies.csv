@@ -1,0 +1,291 @@
+name,energy,capacity_pos,capacity_neg
+demand_DE,naive,-,-
+pos_capacity_DE,-,naive,-
+neg_capacity_DE,-,-,naive
+wind_onshore_DE,naive,-,-
+wind_offshore_DE,naive,-,-
+solar_DE,naive,-,-
+water_DE,naive,-,-
+biomass_DE,naive,-,-
+KKW ISAR 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KKW BROKDORF,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KKW PHILIPPSBURG 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KKW GROHNDE,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KKW EMSLAND,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KKW NECKARWESTHEIM,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KKW GUNDREMMINGEN C,rl_strategy,naive_pos_reserve,naive_neg_reserve
+NEURATH F,rl_strategy,naive_pos_reserve,naive_neg_reserve
+NEURATH G,rl_strategy,naive_pos_reserve,naive_neg_reserve
+NIEDERAUSSEM K,rl_strategy,naive_pos_reserve,naive_neg_reserve
+LIPPENDORF R,rl_strategy,naive_pos_reserve,naive_neg_reserve
+LIPPENDORF S,rl_strategy,naive_pos_reserve,naive_neg_reserve
+BOXBERG Q,rl_strategy,naive_pos_reserve,naive_neg_reserve
+SCHWARZE PUMPE A,rl_strategy,naive_pos_reserve,naive_neg_reserve
+SCHWARZE PUMPE B,rl_strategy,naive_pos_reserve,naive_neg_reserve
+BOXBERG R,rl_strategy,naive_pos_reserve,naive_neg_reserve
+NIEDERAUSSEM G,rl_strategy,naive_pos_reserve,naive_neg_reserve
+NIEDERAUSSEM H,rl_strategy,naive_pos_reserve,naive_neg_reserve
+NEURATH D,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WEISWEILER H,rl_strategy,naive_pos_reserve,naive_neg_reserve
+NEURATH E,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WEISWEILER G,rl_strategy,naive_pos_reserve,naive_neg_reserve
+JAENSCHWALDE D,rl_strategy,naive_pos_reserve,naive_neg_reserve
+JAENSCHWALDE E,rl_strategy,naive_pos_reserve,naive_neg_reserve
+JAENSCHWALDE F,rl_strategy,naive_pos_reserve,naive_neg_reserve
+JAENSCHWALDE B,rl_strategy,naive_pos_reserve,naive_neg_reserve
+JAENSCHWALDE C,rl_strategy,naive_pos_reserve,naive_neg_reserve
+BOXBERG P,rl_strategy,naive_pos_reserve,naive_neg_reserve
+JAENSCHWALDE A,rl_strategy,naive_pos_reserve,naive_neg_reserve
+BOXBERG N,rl_strategy,naive_pos_reserve,naive_neg_reserve
+SCHKOPAU II A,rl_strategy,naive_pos_reserve,naive_neg_reserve
+SCHKOPAU II B,rl_strategy,naive_pos_reserve,naive_neg_reserve
+NIEDERAUSSEM C,rl_strategy,naive_pos_reserve,naive_neg_reserve
+NIEDERAUSSEM F,rl_strategy,naive_pos_reserve,naive_neg_reserve
+NIEDERAUSSEM E,rl_strategy,naive_pos_reserve,naive_neg_reserve
+NEURATH A,rl_strategy,naive_pos_reserve,naive_neg_reserve
+NEURATH B,rl_strategy,naive_pos_reserve,naive_neg_reserve
+NEURATH C,rl_strategy,naive_pos_reserve,naive_neg_reserve
+FRIMMERSDORF Q,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WEISWEILER E,rl_strategy,naive_pos_reserve,naive_neg_reserve
+FRIMMERSDORF P,rl_strategy,naive_pos_reserve,naive_neg_reserve
+NIEDERAUSSEM D,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WEISWEILER F,rl_strategy,naive_pos_reserve,naive_neg_reserve
+FRECHEN WACHTBERG,rl_strategy,naive_pos_reserve,naive_neg_reserve
+MERKENICH BLOCK 6,rl_strategy,naive_pos_reserve,naive_neg_reserve
+CHEMNITZ NORD II BLOCK C,rl_strategy,naive_pos_reserve,naive_neg_reserve
+CHEMNITZ NORD II BLOCK B,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KLINGENBERG 5,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KLINGENBERG 6,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KLINGENBERG 4,rl_strategy,naive_pos_reserve,naive_neg_reserve
+RDK (KARLSRUHE) 8,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GKM 9,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HEYDEN 4,rl_strategy,naive_pos_reserve,naive_neg_reserve
+MOORBURG A,rl_strategy,naive_pos_reserve,naive_neg_reserve
+MOORBURG B,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WESTFALEN E,rl_strategy,naive_pos_reserve,naive_neg_reserve
+IBBENBUEREN B NO 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WILHELMSHAVEN C,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WALSUM 10,rl_strategy,naive_pos_reserve,naive_neg_reserve
+BERGKAMEN A,rl_strategy,naive_pos_reserve,naive_neg_reserve
+BEXBACH C 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WILHELMSHAVEN A,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HEILBRONN 7,rl_strategy,naive_pos_reserve,naive_neg_reserve
+MEHRUM,rl_strategy,naive_pos_reserve,naive_neg_reserve
+LUENEN 2 STUMMHAFEN,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WEIHER 3,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GERSTEINWERK BLOCK K,rl_strategy,naive_pos_reserve,naive_neg_reserve
+ROSTOCK 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+RDK (KARLSRUHE) 7,rl_strategy,naive_pos_reserve,naive_neg_reserve
+STAUDINGER 5,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HERNE BLOCK 4,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GKM 8,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GKM 7,rl_strategy,naive_pos_reserve,naive_neg_reserve
+ZOLLING LEININGER 5,rl_strategy,naive_pos_reserve,naive_neg_reserve
+ALTBACH DEIZISAU HKW I,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WALSUM BLOCK 9,rl_strategy,naive_pos_reserve,naive_neg_reserve
+SCHOLVEN C,rl_strategy,naive_pos_reserve,naive_neg_reserve
+SCHOLVEN B,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW MUENCHEN NORD 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KIEL A,rl_strategy,naive_pos_reserve,naive_neg_reserve
+BREMEN FARGE,rl_strategy,naive_pos_reserve,naive_neg_reserve
+ALTBACH DEIZISAU HKW II,rl_strategy,naive_pos_reserve,naive_neg_reserve
+BREMEN HAFEN 6,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WERDOHL ELVERLINGSEN E4,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GKH HANNOVER,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW BERLIN REUTER WEST E,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW BERLIN REUTER WEST D,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GKM 6,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW FENNE C,rl_strategy,naive_pos_reserve,naive_neg_reserve
+MKW FENNE B,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HAMBURG TIEFSTACK,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WALHEIM 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WEDEL 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WEDEL 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW BERLIN REUTER BlOCK C,rl_strategy,naive_pos_reserve,naive_neg_reserve
+BREMEN HASTEDT 15,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HEILBRONN 6,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HEILBRONN 5,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WALHEIM 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WUPPERTAL ELBERFELD 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+BERLIN MOABIT A,rl_strategy,naive_pos_reserve,naive_neg_reserve
+FERNWAERMEKRAFTWERK BUER,rl_strategy,naive_pos_reserve,naive_neg_reserve
+STUTTGART MUENSTER K25,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW FRANKFURT WEST 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW FRANKFURT WEST 3,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW OFFENBACH 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HOECHST 3,rl_strategy,naive_pos_reserve,naive_neg_reserve
+ROEMERBRUCKE 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KARLSRUHE WEST 3,rl_strategy,naive_pos_reserve,naive_neg_reserve
+FLENSBURG 11,rl_strategy,naive_pos_reserve,naive_neg_reserve
+FLENSBURG 09,rl_strategy,naive_pos_reserve,naive_neg_reserve
+FLENSBURG 10,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KASSEL SWEW 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+ROMERBRUCKE 3,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KARLSRUHE WEST 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KARLSRUHE WEST 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+PFORZHEIM III NO 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+IRSCHING 5,rl_strategy,naive_pos_reserve,naive_neg_reserve
+EMSLAND LINGEN D,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GUD HUERTH KNAPSACK 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW LAUSWARD BLOCK FORTUNA GUD,rl_strategy,naive_pos_reserve,naive_neg_reserve
+DORMAGEN RWE,rl_strategy,naive_pos_reserve,naive_neg_reserve
+IRSCHING 4,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW BASF LUDWIGSHAFEN MITTE,rl_strategy,naive_pos_reserve,naive_neg_reserve
+EMSLAND LINGEN B,rl_strategy,naive_pos_reserve,naive_neg_reserve
+EMSLAND LINGEN C,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW BREMEN MITTELSBUEREN BLOCK 5 GUD,rl_strategy,naive_pos_reserve,naive_neg_reserve
+BERLIN MITTE HKW,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GUD HUERTH KNAPSACK 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW MUENCHEN SUED GUD,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW LAUSWARD BLOCK EMIL GUD,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW HERDECKE CUNO MARK E,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GERSTEINWERK BLOCK F,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GERSTEINWERK BLOCK G,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KOELN NIEHL 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HAMM UENTROP BLOCK 10,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HAMM UENTROP BLOCK 20,rl_strategy,naive_pos_reserve,naive_neg_reserve
+MAINZ III,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW BASF LUDWIGSHAFEN SUED,rl_strategy,naive_pos_reserve,naive_neg_reserve
+RDK (KARLSRUHE) 4RP,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW DRESDEN NOSSENER BRUECKE,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW HANNOVER LINDEN,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW DUISBURG WANHEIM IIIB,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW HAGEN KABEL,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW HOECHST BUSINESS PARK,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW JENA SUED,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW LEIPZIG NORD GUD,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KIRCHMOESER,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW KIRCHLENGERN,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW MUENCHEN FREIMANN GUD,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HAMBURG TIEFSTACK GUD,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW SAARBRUECKEN ROEMERBRUECKE GUD,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GUD LEUNA,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW ERFURT OST,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GUD BITTERFELD ENVIA,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GUD ANLAGE RÜSSELSHEIM OPEL,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GUD ROSTOCK MARIENEHE,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW KOELN MERKENICH GUD,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GUD MUENSTER HAFEN,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW LAUSWARD BLOCK ANTON GUD,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW PLATTLING DAIMLER AG,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HALLE TROTHA,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW BARMEN I WUPPERTAL,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW POTSDAM SUED,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW FRANKFURT ODER AM HOHEN FELD,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW SANDREUTH 1 NUERNBERG,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW SANDREUTH 2 NUERNBERG,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW GUD NEUBRANDENBURG,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GUD GERA NORD,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW FLENSBURG 12,rl_strategy,naive_pos_reserve,naive_neg_reserve
+SCHWERIN SUD,rl_strategy,naive_pos_reserve,naive_neg_reserve
+FREIBURG WVK,rl_strategy,naive_pos_reserve,naive_neg_reserve
+PKV KRAFTWERK VAREL,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW BASF LUDWIGSHAFEN NORD,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW ELTMANN,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW KASSEL KOMBI,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW HALLE DIESELSTRASSE BLOCK 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW HALLE DIESELSTRASSE BLOCK 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW FRIEDENSBRUECKE BLOCK IV,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW HILTROP BOCHUM,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW PFORZHEIM,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW GRENZACH WYHLEN 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW SUD SAARBRUECKEN,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GUD BIELEFELD HILLEGOSSEN,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW UNTERBREIZBACH,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW ERLANGEN,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW FRIEDENSBRUECKE BLOCK II,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KWK ANLAGE KREFELD,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KWK ANLAGE NEUSTADT,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW SCHWERIN LANKOW,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KWK ANLAGE MOHN MEDIA GÜTERSLOH,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW HBB RAUBLING,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW STAUDINGER 4,rl_strategy,naive_pos_reserve,naive_neg_reserve
+NUERNBERG FRANKEN 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+IRSCHING 3,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW HUNTORF CAES GT,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW DUISBURG HUCKINGEN BLOCK A,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW DUISBURG HUCKINGEN BLOCK B,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW WEISWEILER VGT BLOCK G,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW WEISWEILER VGT BLOCK H,rl_strategy,naive_pos_reserve,naive_neg_reserve
+DKW BGH O1 BURGHAUSEN WACKER CHEMIE,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW MITTELSBUEREN BLOCK 4,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW BREMEN HASTEDT 14,rl_strategy,naive_pos_reserve,naive_neg_reserve
+LICHTERFELDE 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW HANNOVER HERRENHAUSEN B,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW FRANKFURT WEST GT,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW MAINZ II GT,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW MARL BLOCK 312 EVONIK,rl_strategy,naive_pos_reserve,naive_neg_reserve
+CHARLOTTENBURG GT 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+CHARLOTTENBURG GT 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW CHEMNITZ NORD II BLOCK A,rl_strategy,naive_pos_reserve,naive_neg_reserve
+INDUSTRIEKRAFTWERK BERNBURG (IKB),rl_strategy,naive_pos_reserve,naive_neg_reserve
+ALTBACH II GT E,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW OBERNBURG GT1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GTKW BIELEFELD UMMELN,rl_strategy,naive_pos_reserve,naive_neg_reserve
+CHARLOTTENBURG GT 3,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW LANDESBERGEN GT,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GERSTEINWERK BLOCK I GT,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW ZIELITZ,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW EMDEN BLOCK 4 GT,rl_strategy,naive_pos_reserve,naive_neg_reserve
+IKW GENDORF INFRASERV,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GTKW DARMSTADT GT 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GTKW DARMSTADT GT 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+UPM SCHONGAU,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WOLFEN ENVIA,rl_strategy,naive_pos_reserve,naive_neg_reserve
+HKW DUISBURG WANHEIM IIIA,rl_strategy,naive_pos_reserve,naive_neg_reserve
+KW LEUNA GT 3,rl_strategy,naive_pos_reserve,naive_neg_reserve
+AHRENSFELDE GT D,rl_strategy,naive_pos_reserve,naive_neg_reserve
+AHRENSFELDE GT A,rl_strategy,naive_pos_reserve,naive_neg_reserve
+AHRENSFELDE GT B,rl_strategy,naive_pos_reserve,naive_neg_reserve
+THYROW GT E,rl_strategy,naive_pos_reserve,naive_neg_reserve
+AHRENSFELDE GT C,rl_strategy,naive_pos_reserve,naive_neg_reserve
+INGOLSTADT 3,rl_strategy,naive_pos_reserve,naive_neg_reserve
+INGOLSTADT 4,rl_strategy,naive_pos_reserve,naive_neg_reserve
+MARBACH 3,rl_strategy,naive_pos_reserve,naive_neg_reserve
+LICHTERFELDE 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WALHEIM GT 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+BARMEN II,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WILMERSDORF GT 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WILMERSDORF GT 3,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WERDOHL ELVERLINGSEN 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WERDOHL ELVERLINGSEN 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+ALTBACH I GT 3,rl_strategy,naive_pos_reserve,naive_neg_reserve
+MITTELSBUEREN GT 3,rl_strategy,naive_pos_reserve,naive_neg_reserve
+FLINGERN GT 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+ALTBACH I GT 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+MARBACH 3 GT 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+MARIENEHE 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WILHELMSHAVEN GT 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+NUERNBERG FRANKEN I GT 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WEDEL GT 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+WEDEL GT 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+ALTBACH I NO 5 GT 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+PEISSENBERG 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GROSSKAYNA GT 1,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GROSSKAYNA GT 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
+GROSSKAYNA GT 3,rl_strategy,naive_pos_reserve,naive_neg_reserve
+Tanzmühle - Rabenleite,flexable_eom_storage,-
+Schwarzenbachwerk,flexable_eom_storage,-
+Leitzach II,flexable_eom_storage,-
+Leitzach I,flexable_eom_storage,-
+Hohenwarte I,flexable_eom_storage,-
+Bleiloch,flexable_eom_storage,-
+Wendefurth,flexable_eom_storage,-
+Glems,flexable_eom_storage,-
+Reisach - Rabenleite,flexable_eom_storage,-
+Geesthacht,flexable_eom_storage,-
+Rönkhausen,flexable_eom_storage,-
+Waldeck I,flexable_eom_storage,-
+Häusern,flexable_eom_storage,-
+Koepchenwerk Herdecke II,flexable_eom_storage,-
+Happurg,flexable_eom_storage,-
+Langenprozelten,flexable_eom_storage,-
+Waldshut,flexable_eom_storage,-
+Erzhausen,flexable_eom_storage,-
+Witznau,flexable_eom_storage,-
+Hohenwarte II,flexable_eom_storage,-
+Säckingen,flexable_eom_storage,-
+Waldeck II,flexable_eom_storage,-
+Wehr,flexable_eom_storage,-
+Markersbach,flexable_eom_storage,-
+Goldisthal,flexable_eom_storage,-

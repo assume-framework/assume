@@ -510,6 +510,7 @@ class World:
             try:
                 bidding_strategies[product_type] = self.bidding_types[strategy]()
             except KeyError as e:
+                print(unit_params)
                 self.logger.error(f"Invalid bidding strategy {strategy}")
                 raise e
 
