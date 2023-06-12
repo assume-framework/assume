@@ -147,9 +147,9 @@ class PowerPlant(BaseUnit):
         min_power, max_power = self.calculate_min_max_power(start, end)
 
         # adjust for ramp down speed
-        min_power = max(current_power - self.ramp_down, min_power)
+        min_power = max(-self.ramp_down, min_power)
         # adjust for ramp up speed
-        max_power = min(current_power + self.ramp_up, max_power)
+        max_power = min(self.ramp_up, max_power)
 
         # adjust min_power if sold negative reserve capacity on control reserve market
         min_power = min_power + self.neg_capacity_reserve.at[start]

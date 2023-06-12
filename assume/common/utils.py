@@ -71,9 +71,8 @@ def attempt_resample(
         df.index = temp_index
         df = df.resample(index.freq).mean()
         logger.info("Resampling successful.")
-    elif len(df.index) < index.freq:  # < len(index)
+    elif len(df.index) < len(index):
         raise ValueError("Index length mismatch. Upsampling not supported.")
-
     return df
 
 

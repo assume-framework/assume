@@ -280,8 +280,8 @@ class WriteOutput(Role):
         await self.store_dfs()
         queries = [
             f"select market_id as name, avg(price) as avg_price from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select market_id as name, sum(price*demand_volume) as total_cost from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select market_id as name, sum(demand_volume) as total_volume from market_meta where simulation = '{self.simulation_id}' group by market_id",
+            f"select market_id as name, sum(price*demand_volume_energy) as total_cost from market_meta where simulation = '{self.simulation_id}' group by market_id",
+            f"select market_id as name, sum(demand_volume_energy) as total_volume from market_meta where simulation = '{self.simulation_id}' group by market_id",
             f"select unit_id as name, market_id, avg(power/max_power) as capacity_factor from market_dispatch ud join unit_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by name, market_id",
         ]
         dfs = []

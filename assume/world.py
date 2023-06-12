@@ -143,6 +143,9 @@ class World:
             end=self.end + pd.Timedelta(hours=4),
             freq=config["time_step"],
         )
+        # firm power capacity is used to bid longterm
+        # how much % of the fpc should be bid longterm
+        self.scale_fpc = config.get("scale_firm_power_capacity", 1)
 
         # load the data from the csv files
         # tries to load all files, returns a warning if file does not exist
@@ -503,7 +506,7 @@ class World:
 
             try:
                 bidding_strategies[product_type] = self.bidding_types[strategy](
-                    scale=0.9
+                    scale=self.scale_fpc
                 )
             except KeyError as e:
                 self.logger.error(f"Invalid bidding strategy {strategy}")

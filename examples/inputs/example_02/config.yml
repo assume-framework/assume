@@ -1,6 +1,6 @@
 base_case_2019:
   start_date: 2018-12-31 20:00
-  end_date: 2019-01-11 00:00
+  end_date: 2019-01-10 00:00
   time_step: 1h
   markets_config:
     EOM:
@@ -19,14 +19,14 @@ base_case_2019:
       market_mechanism: pay_as_clear
 
 crm_case_2019:
-  start_date: 2019-01-01 00:00
-  end_date: 2019-01-11 00:00
+  start_date: 2018-12-31 20:00
+  end_date: 2019-01-10 00:00
   time_step: 1h
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2019-01-01 01:00
+      start_date: 2018-12-31 23:00
       products:
         - duration: 1h
           count: 1
@@ -67,15 +67,16 @@ crm_case_2019:
       maximum_volume: 1000000
       price_unit: EUR/MW
       market_mechanism: pay_as_bid
-ltm_case:
-  start_date: 2018-12-31 23:00
-  end_date: 2019-01-11 00:00
+ltm_case01:
+  start_date: 2018-12-31 20:00
+  end_date: 2019-01-10 00:00
   time_step: 1h
+  scale_firm_power_capacity: 0.1
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2019-01-01 00:00
+      
       products:
         - duration: 1h
           count: 1
@@ -87,30 +88,245 @@ ltm_case:
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
 
-# Long Term Market - 3d contracts
+    # Long Term Market - 2d contracts
     LTM_OTC:
       operator: LTM_operator
       product_type: energy
-      start_date: 2018-12-31 23:00
+      start_date: 2018-12-31 22:00
       products:
-        - duration: 3d
+        - duration: 2d
           count: 1
           first_delivery: 2h
-      opening_frequency: 3d
+      opening_frequency: 2d
+      opening_duration: 1h
+      volume_unit: MW
+      maximum_volume: 1000000
+      price_unit: EUR/MW
+      market_mechanism: pay_as_bid
+ltm_case05:
+  start_date: 2018-12-31 20:00
+  end_date: 2019-01-10 00:00
+  time_step: 1h
+  scale_firm_power_capacity: 0.5
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_volume: 1000000
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+    # Long Term Market - 2d contracts
+    LTM_OTC:
+      operator: LTM_operator
+      product_type: energy
+      start_date: 2018-12-31 22:00
+      products:
+        - duration: 2d
+          count: 1
+          first_delivery: 2h
+      opening_frequency: 2d
+      opening_duration: 1h
+      volume_unit: MW
+      maximum_volume: 1000000
+      price_unit: EUR/MW
+      market_mechanism: pay_as_bid
+ltm_case06:
+  start_date: 2018-12-31 20:00
+  end_date: 2019-01-10 00:00
+  time_step: 1h
+  scale_firm_power_capacity: 0.6
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2018-12-31 23:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_volume: 1000000
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+    # Long Term Market - 2d contracts
+    LTM_OTC:
+      operator: LTM_operator
+      product_type: energy
+      start_date: 2018-12-31 22:00
+      products:
+        - duration: 2d
+          count: 1
+          first_delivery: 2h
+      opening_frequency: 2d
+      opening_duration: 1h
+      volume_unit: MW
+      maximum_volume: 1000000
+      price_unit: EUR/MW
+      market_mechanism: pay_as_bid
+ltm_case07:
+  start_date: 2018-12-31 20:00
+  end_date: 2019-01-10 00:00
+  time_step: 1h
+  scale_firm_power_capacity: 0.7
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_volume: 1000000
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+    # Long Term Market - 2d contracts
+    LTM_OTC:
+      operator: LTM_operator
+      product_type: energy
+      start_date: 2018-12-31 22:00
+      products:
+        - duration: 2d
+          count: 1
+          first_delivery: 2h
+      opening_frequency: 2d
+      opening_duration: 1h
+      volume_unit: MW
+      maximum_volume: 1000000
+      price_unit: EUR/MW
+      market_mechanism: pay_as_bid
+ltm_case08:
+  start_date: 2018-12-31 20:00
+  end_date: 2019-01-10 00:00
+  time_step: 1h
+  scale_firm_power_capacity: 0.8
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2018-12-31 23:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_volume: 1000000
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+    # Long Term Market - 2d contracts
+    LTM_OTC:
+      operator: LTM_operator
+      product_type: energy
+      start_date: 2018-12-31 22:00
+      products:
+        - duration: 2d
+          count: 1
+          first_delivery: 2h
+      opening_frequency: 2d
+      opening_duration: 1h
+      volume_unit: MW
+      maximum_volume: 1000000
+      price_unit: EUR/MW
+      market_mechanism: pay_as_bid
+ltm_case09:
+  start_date: 2018-12-31 20:00
+  end_date: 2019-01-10 00:00
+  time_step: 1h
+  scale_firm_power_capacity: 0.9
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2018-12-31 23:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_volume: 1000000
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+    # Long Term Market - 2d contracts
+    LTM_OTC:
+      operator: LTM_operator
+      product_type: energy
+      start_date: 2018-12-31 22:00
+      products:
+        - duration: 2d
+          count: 1
+          first_delivery: 2h
+      opening_frequency: 2d
+      opening_duration: 1h
+      volume_unit: MW
+      maximum_volume: 1000000
+      price_unit: EUR/MW
+      market_mechanism: pay_as_bid
+ltm_case10:
+  start_date: 2018-12-31 20:00
+  end_date: 2019-01-10 00:00
+  time_step: 1h
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2018-12-31 23:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_volume: 1000000
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+    # Long Term Market - 2d contracts
+    LTM_OTC:
+      operator: LTM_operator
+      product_type: energy
+      start_date: 2018-12-31 22:00
+      products:
+        - duration: 2d
+          count: 1
+          first_delivery: 2h
+      opening_frequency: 2d
       opening_duration: 1h
       volume_unit: MW
       maximum_volume: 1000000
       price_unit: EUR/MW
       market_mechanism: pay_as_bid
 policy_case:
-  start_date: 2018-12-31 23:00
-  end_date: 2019-01-11 00:00
+  start_date: 2018-12-31 20:00
+  end_date: 2019-01-10 00:00
   time_step: 1h
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2019-01-01 00:00
+      start_date: 2018-12-31 23:00
       products:
         - duration: 1h
           count: 1

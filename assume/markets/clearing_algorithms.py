@@ -110,11 +110,13 @@ def pay_as_clear(
         )
         supply_volume = sum(map(itemgetter("volume"), accepted_supply_orders))
         demand_volume = sum(map(itemgetter("volume"), accepted_demand_orders))
-
+        duration_hours = (product[1] - product[0]).total_seconds() / 60 / 60
         meta.append(
             {
                 "supply_volume": supply_volume,
                 "demand_volume": demand_volume,
+                "demand_volume_energy": demand_volume * duration_hours,
+                "supply_volume_energy": supply_volume * duration_hours,
                 "price": clear_price,
                 "max_price": clear_price,
                 "min_price": clear_price,
@@ -225,11 +227,13 @@ def pay_as_bid(
         prices = list(map(itemgetter("price"), accepted_supply_orders))
         if not prices:
             prices = [0]
-
+        duration_hours = (product[1] - product[0]).total_seconds() / 60 / 60
         meta.append(
             {
                 "supply_volume": supply_volume,
                 "demand_volume": demand_volume,
+                "demand_volume_energy": demand_volume * duration_hours,
+                "supply_volume_energy": supply_volume * duration_hours,
                 "price": sum(prices) / len(prices),
                 "max_price": max(prices),
                 "min_price": min(prices),
