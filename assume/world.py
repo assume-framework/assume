@@ -301,6 +301,10 @@ class World:
         for company_name in all_operators:
             self.add_unit_operator(id=str(company_name))
 
+        # add Rl unit operator
+        # to convert results from GPU to CPU need to have all RL bids at once, which is done by one unit operator
+        self.add_unit_operator(id="RL_unit_operator")
+
         # add the units to corresponsing unit operators
         # if fuel prices are provided, add them to the unit params
         # if vre generation is provided, add them to the vre units
@@ -315,7 +319,7 @@ class World:
                     unit_name
                 ].to_dict()
 
-                # check if we have RL bidding strategy
+                # check if we have RL bidding strategy and give
                 if (
                     unit_params["bidding_strategies"]["energy"] == "rl_strategy"
                     and self.price_forecast is not None
@@ -324,6 +328,8 @@ class World:
                     unit_params["res_demand_forecast"] = self.price_forecast[
                         "residual_demand"
                     ]
+                    # automatically asign Rl unit operator
+                    unit_params["unit_operator"] = "RL_unit_operator"
 
             else:
                 self.logger.warning(

@@ -2,6 +2,6 @@ name,energy
 KKW ISAR 2,naive
 NEURATH F,naive
 GKM 9,naive
-IRSCHING 5,naive
+IRSCHING 5,rl_strategy
 demand_DE,naive
 Tanzmühle - Rabenleite,flexable_eom_storage
