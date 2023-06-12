@@ -5,7 +5,7 @@ from os import getenv
 
 from assume import World
 
-elog = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 os.makedirs("./examples/outputs", exist_ok=True)
 EXPORT_CSV_PATH = str(getenv("EXPORT_CSV_PATH", "./examples/outputs"))
@@ -15,7 +15,7 @@ DATABASE_URI = getenv("DATABASE_URI", "sqlite:///./examples/local_db/assume_db_0
 # %%
 if __name__ == "__main__":
     scenario = "example_03"
-    study_case = "base_case"
+    study_case = "example_03"
 
     world = World(database_uri=DATABASE_URI, export_csv_path=EXPORT_CSV_PATH)
     world.load_scenario(

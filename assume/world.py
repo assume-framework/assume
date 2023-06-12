@@ -157,14 +157,18 @@ class World:
             file_name="demand_units",
         )
 
+        heatpumps = load_file(
+            path=path,
+            config=config,
+            file_name="heatpumps"
+        )
+
         fuel_prices_df = load_file(
             path=path,
             config=config,
             file_name="fuel_prices",
             index=self.index,
         )
-
-        heatpumps_df = load_file(path=path, config=config, file_name="heatpumps")
 
         temperature_df = load_file(
             path=path, config=config, file_name="temperature", index=self.index
@@ -257,6 +261,7 @@ class World:
         all_operators = np.concatenate(
             [
                 powerplant_units.unit_operator.unique(),
+                heatpumps.unit_operator.unique(),
                 demand_units.unit_operator.unique(),
             ]
         )
@@ -306,12 +311,12 @@ class World:
                 unit_params=unit_params,
             )
 
-        if heatpumps_df is not None:
-            for company_name in heatpumps_df.unit_operator.unique():
+        if heatpumps is not None:
+            for company_name in heatpumps.unit_operator.unique():
                 self.add_unit_operator(id=str(company_name))
 
             self.logger.info("Adding heat pump units")
-            for hp_name, unit_params in heatpumps_df.iterrows():
+            for hp_name, unit_params in heatpumps.iterrows():
                 if (
                     bidding_strategies_df is not None
                     and hp_name in bidding_strategies_df.index
