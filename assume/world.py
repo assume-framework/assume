@@ -26,7 +26,12 @@ from assume.common import (
     make_market_config,
     mango_codec_factory,
 )
-from assume.markets import MarketRole, pay_as_bid, pay_as_clear
+from assume.markets import (
+    MarketRole,
+    available_clearing_strategies,
+    pay_as_bid,
+    pay_as_clear,
+)
 from assume.strategies import (
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
@@ -103,10 +108,13 @@ class World:
             "otc_strategy": OTCStrategy,
             "rl_strategy": RLStrategy,
         }
-        self.clearing_mechanisms = {
-            "pay_as_clear": pay_as_clear,
-            "pay_as_bid": pay_as_bid,
-        }
+        self.clearing_mechanisms = available_clearing_strategies,
+        self.clearing_mechanisms.update(
+            {
+                "pay_as_clear": pay_as_clear,
+                "pay_as_bid": pay_as_bid,
+            }
+        )
         nest_asyncio.apply()
         self.loop = asyncio.get_event_loop()
         asyncio.set_event_loop(self.loop)

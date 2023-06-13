@@ -27,6 +27,7 @@ class flexableEOM(BaseStrategy):
         # Powerplant is either on, or is able to turn on
         # Calculating possible bid amount
         # =============================================================================
+        # TODO prices are far too negative when obligation for current time exists
         bid_quantity_inflex = operational_window["ops"]["min_power"]["volume"]
 
         marginal_cost_mr = operational_window["ops"]["min_power"]["cost"]
