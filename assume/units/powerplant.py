@@ -230,7 +230,18 @@ class PowerPlant(BaseUnit):
         product_type: str,
     ):
         end_excl = end - self.index.freq
-        self.total_power_output.loc[start:end_excl] += dispatch_plan["total_power"]
+
+        # based on product type
+        if product_type == "energy":
+            self.total_power_output.loc[start:end_excl] += dispatch_plan["total_power"]
+        elif product_type == "capacity_pos":
+            self.pos_capacity_reserve.loc[start:end_excl] += dispatch_plan[
+                "total_power"
+            ]
+        elif product_type == "capacity_neg":
+            self.neg_capacity_reserve.loc[start:end_excl] += dispatch_plan[
+                "total_power"
+            ]
 
         if self.total_power_output[start:end_excl].min() < self.min_power:
             self.total_power_output.loc[start:end_excl] = 0
