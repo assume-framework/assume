@@ -401,7 +401,7 @@ class StorageUnit(BaseUnit):
             product_tuple=product_tuple,
         )
 
-    def get_dispatch_plan(
+    def set_dispatch_plan(
         self,
         dispatch_plan: dict,
         start: pd.Timestamp,

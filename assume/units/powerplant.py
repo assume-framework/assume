@@ -169,14 +169,14 @@ class PowerPlant(BaseUnit):
             "min_power": {
                 "power": min_power,
                 "marginal_cost": self.calc_marginal_cost(
-                    power_output=min_power,
+                    power_output=current_power + min_power,
                     timestep=start,
                 ),
             },
             "max_power": {
                 "power": max_power,
                 "marginal_cost": self.calc_marginal_cost(
-                    power_output=max_power,
+                    power_output=current_power + max_power,
                     timestep=start,
                 ),
             },
@@ -187,15 +187,15 @@ class PowerPlant(BaseUnit):
     def calculate_reserve_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
-        current_power = self.total_power_output.at[start - self.index.freq]
+        previous_power = self.total_power_output.at[start - self.index.freq]
 
         min_power, max_power = self.calculate_min_max_power(start, end)
 
         # should be adjusted to account for ramping speeds
         # and differences between resolutions of energy and reserve markets
-        available_pos_reserve = min(max_power - current_power, self.ramp_up)
+        available_pos_reserve = min(max_power - previous_power, self.ramp_up)
 
-        available_neg_reserve = max(0, min(current_power - min_power, self.ramp_down))
+        available_neg_reserve = max(0, min(previous_power - min_power, self.ramp_down))
 
         operational_window = {
             "window": {"start": start, "end": end},
@@ -222,7 +222,7 @@ class PowerPlant(BaseUnit):
             product_tuple=product_tuple,
         )
 
-    def get_dispatch_plan(
+    def set_dispatch_plan(
         self,
         dispatch_plan: dict,
         start: pd.Timestamp,
@@ -232,6 +232,12 @@ class PowerPlant(BaseUnit):
         end_excl = end - self.index.freq
         self.total_power_output.loc[start:end_excl] += dispatch_plan["total_power"]
 
+    def execute_current_dispatch(
+        self,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+    ):
+        end_excl = end - self.index.freq
         if self.total_power_output[start:end_excl].min() < self.min_power:
             self.total_power_output.loc[start:end_excl] = 0
             self.current_status = 0
@@ -320,14 +326,14 @@ class PowerPlant(BaseUnit):
         return marginal_cost
 
     def calculate_min_max_power(self, start: pd.Timestamp, end: pd.Timestamp):
-        base_load = self.total_power_output[start:end].min()
+        base_load = self.total_power_output[start:end]
         # check if min_power is a series or a float
         min_power = (
             self.min_power.at[start]
             if type(self.min_power) is pd.Series
             else self.min_power
         )
-        min_power = max(min_power - base_load, 0)
+        min_delta = min_power - base_load.min()
 
         # check if max_power is a series or a float
         max_power = (
@@ -335,6 +341,6 @@ class PowerPlant(BaseUnit):
             if type(self.capacity_factor) is pd.Series
             else self.capacity_factor * self.max_power
         )
-        max_power = max(max_power - base_load, 0)
+        max_delta = max_power - base_load.max()
 
-        return min_power, max_power
+        return min_delta, max_delta

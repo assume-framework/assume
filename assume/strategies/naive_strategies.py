@@ -4,9 +4,9 @@ from assume.units.base_unit import BaseUnit
 
 
 class NaiveStrategy(BaseStrategy):
-    def __init__(self, *args, scale=1.0, **kwargs):
+    def __init__(self, *args, scale_firm_power_capacity=1.0, **kwargs):
         super().__init__(*args, **kwargs)
-        self.scale = scale
+        self.scale = scale_firm_power_capacity
 
     def calculate_bids(
         self,

@@ -38,7 +38,7 @@ def load_file(
         df = pd.read_csv(
             file_path,
             index_col=0,
-            encoding="Latin-1",
+            encoding="utf-8",
             na_values=["n.a.", "None", "-", "none", "nan"],
         )
         if index is not None:

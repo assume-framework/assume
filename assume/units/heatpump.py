@@ -220,7 +220,7 @@ class HeatPump(BaseUnit):
             product_tuple=product_tuple,
         )
 
-    def get_dispatch_plan(self, dispatch_plan, time_period):
+    def set_dispatch_plan(self, dispatch_plan, time_period):
         if dispatch_plan["total_power"] > self.min_power:
             self.market_success_list[-1] += 1
             self.current_status = 1

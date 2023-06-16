@@ -130,7 +130,7 @@ class Electrolyser(BaseUnit):
             product_tuple=product_tuple,
         )
 
-    def get_dispatch_plan(self, dispatch_plan, current_time):
+    def set_dispatch_plan(self, dispatch_plan, current_time):
         if dispatch_plan["total_capacity"] > self.min_power:
             self.current_status = 1
             self.current_down_time = 0

@@ -144,7 +144,7 @@ class UnitsOperator(Role):
             orders_l = list(orders)
             total_power = sum(map(itemgetter("volume"), orders_l))
             dispatch_plan = {"total_power": total_power}
-            self.units[unit_id].get_dispatch_plan(
+            self.units[unit_id].set_dispatch_plan(
                 dispatch_plan=dispatch_plan,
                 start=orderbook[0]["start_time"],
                 end=orderbook[0]["end_time"],
@@ -171,9 +171,8 @@ class UnitsOperator(Role):
         )
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
-            end_excl = now - unit.index.freq
             data = pd.DataFrame(
-                unit.total_power_output.loc[start:end_excl], columns=["power"]
+                unit.execute_current_dispatch(start, now), columns=["power"]
             )
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)

@@ -74,7 +74,7 @@ class Demand(BaseUnit):
 
         return {"max_power": {"power": bid_volume, "marginal_cost": bid_price}}
 
-    def get_dispatch_plan(
+    def set_dispatch_plan(
         self, dispatch_plan, start: pd.Timestamp, end: pd.Timestamp, product_type: str
     ):
         end_excl = end - self.index.freq
