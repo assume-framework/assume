@@ -163,14 +163,15 @@ class PowerPlant(BaseUnit):
     def calculate_energy_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
-        current_power = self.total_power_output.at[start - self.index.freq]
-
+        previous_power = self.total_power_output.at[start - self.index.freq]
+        current_power = self.total_power_output[start:end].min()
         min_power, max_power = self.calculate_min_max_power(start, end)
-
-        # adjust for ramp down speed
-        min_power = max(-self.ramp_down, min_power)
+        # disable ramping because previous value is not calculated yet in OTC scenario
+        # min power which needs to be bought from current
+        # respects ramping, min amount to reach min_power and output > 0
+        min_power = max(min_power, 0)
         # adjust for ramp up speed
-        max_power = min(self.ramp_up, max_power)
+        max_power = max(0, max_power)
 
         # adjust min_power if sold negative reserve capacity on control reserve market
         min_power = min_power + self.neg_capacity_reserve.at[start]
@@ -182,9 +183,9 @@ class PowerPlant(BaseUnit):
             return {
                 "window": {"start": start, "end": end},
                 "current_power": {
-                    "power": current_power,
+                    "power": previous_power,
                     "marginal_cost": self.calc_marginal_cost_with_partial_eff(
-                        power_output=current_power,
+                        power_output=previous_power,
                         timestep=start,
                     ),
                 },
@@ -212,8 +213,11 @@ class PowerPlant(BaseUnit):
         return {
             "window": {"start": start, "end": end},
             "current_power": {
-                "power": current_power,
-                "marginal_cost": marginal_cost,
+                "power": previous_power,
+                "marginal_cost": self.calc_marginal_cost(
+                    power_output=previous_power,
+                    timestep=start,
+                ),
             },
             "min_power": {
                 "power": min_power,
@@ -291,6 +295,8 @@ class PowerPlant(BaseUnit):
     ):
         end_excl = end - self.index.freq
         if self.total_power_output[start:end_excl].min() < self.min_power:
+            # TODO check if ramping down is actually feasible..?
+            # if current - self.ramp_down > 0 i can't turn off here
             self.total_power_output.loc[start:end_excl] = 0
             self.current_status = 0
             self.current_down_time += 1
@@ -304,11 +310,11 @@ class PowerPlant(BaseUnit):
             self.current_status = 1
             self.current_down_time = 0
 
-        # TODO check if resulting power is < max_power
-        # if self.total_power_output[start:end_excl].max() > self.max_power:
-        #     max_pow = self.total_power_output[start:end_excl].max()
-        #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")
-        return self.total_power_output.loc[start:end_excl]
+        if self.total_power_output[start:end_excl].max() > self.max_power:
+            max_filter = self.total_power_output[start:end_excl] > self.max_power
+            self.total_power_output[start:end_excl][max_filter] = self.max_power
+
+        return self.total_power_output[start:end_excl]
 
     def calc_simple_marginal_cost(
         self,

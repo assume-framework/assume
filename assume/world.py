@@ -82,7 +82,7 @@ class World:
         }
         self.bidding_types = {
             "naive": NaiveStrategy,
-            "flexable_eom": flexableEOM,
+            "flexable_eom": NaiveStrategy,
             "flexable_eom_storage": flexableEOMStorage,
             "naive_neg_reserve": NaiveNegReserveStrategy,
             "naive_pos_reserve": NaivePosReserveStrategy,
