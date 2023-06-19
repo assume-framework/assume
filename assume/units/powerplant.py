@@ -329,7 +329,7 @@ class PowerPlant(BaseUnit):
         base_load = self.total_power_output[start:end]
         # check if min_power is a series or a float
         min_power = (
-            self.min_power.at[start]
+            self.min_power[start:end].max()
             if type(self.min_power) is pd.Series
             else self.min_power
         )
@@ -337,7 +337,7 @@ class PowerPlant(BaseUnit):
 
         # check if max_power is a series or a float
         max_power = (
-            self.capacity_factor.at[start] * self.max_power
+            self.capacity_factor[start:end].min() * self.max_power
             if type(self.capacity_factor) is pd.Series
             else self.capacity_factor * self.max_power
         )
