@@ -314,7 +314,7 @@ class PowerPlant(BaseUnit):
             max_filter = self.total_power_output[start:end_excl] > self.max_power
             self.total_power_output[start:end_excl][max_filter] = self.max_power
 
-        return self.total_power_output[start:end_excl]
+        return self.total_power_output.loc[start:end_excl]
 
     def calc_simple_marginal_cost(
         self,
