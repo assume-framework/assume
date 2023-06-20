@@ -13,7 +13,12 @@ from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 
 logger = logging.getLogger(__name__)
 
-freq_map = {"h": rr.HOURLY, "m": rr.MINUTELY}
+freq_map = {
+    "h": rr.HOURLY,
+    "m": rr.MINUTELY,
+    "d": rr.DAILY,
+    "w": rr.WEEKLY,
+}
 
 
 def load_file(
@@ -33,7 +38,7 @@ def load_file(
         df = pd.read_csv(
             file_path,
             index_col=0,
-            encoding="Latin-1",
+            encoding="utf-8",
             na_values=["n.a.", "None", "-", "none", "nan"],
         )
         if index is not None:
@@ -66,9 +71,8 @@ def attempt_resample(
         df.index = temp_index
         df = df.resample(index.freq).mean()
         logger.info("Resampling successful.")
-    elif len(df.index) < index.freq:  # < len(index)
+    elif len(df.index) < len(index):
         raise ValueError("Index length mismatch. Upsampling not supported.")
-
     return df
 
 

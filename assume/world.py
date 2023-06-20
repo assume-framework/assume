@@ -143,6 +143,9 @@ class World:
             end=self.end + pd.Timedelta(hours=4),
             freq=config["time_step"],
         )
+        # firm power capacity is used to bid longterm
+        # how much % of the fpc should be bid longterm
+        self.bidding_params = config.get("bidding_strategy_params", {})
 
         # load the data from the csv files
         # tries to load all files, returns a warning if file does not exist
@@ -208,7 +211,7 @@ class World:
         # )
 
         if powerplant_units is None or demand_units is None:
-            raise ValueError("No power plant and demand units were provided!")
+            raise ValueError("No power plant or no demand units were provided!")
 
         await self.setup(self.start)
 
@@ -502,7 +505,9 @@ class World:
                 continue
 
             try:
-                bidding_strategies[product_type] = self.bidding_types[strategy]()
+                bidding_strategies[product_type] = self.bidding_types[strategy](
+                    **self.bidding_params
+                )
             except KeyError as e:
                 self.logger.error(f"Invalid bidding strategy {strategy}")
                 raise e

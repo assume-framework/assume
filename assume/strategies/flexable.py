@@ -5,8 +5,8 @@ from assume.units.base_unit import BaseUnit
 
 
 class flexableEOM(BaseStrategy):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         self.foresight = pd.Timedelta("12h")
         self.current_time = None
@@ -14,6 +14,7 @@ class flexableEOM(BaseStrategy):
     def calculate_bids(
         self,
         unit: BaseUnit = None,
+        market_config=None,
         operational_window: dict = None,
     ):
         bid_quantity_inflex, bid_price_inflex = 0, 0
@@ -143,8 +144,8 @@ class flexableEOM(BaseStrategy):
 
 
 class flexableCRM(BaseStrategy):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         self.foresight = pd.Timedelta("12h")
         self.current_time = None
@@ -152,6 +153,7 @@ class flexableCRM(BaseStrategy):
     def calculate_bids(
         self,
         unit: BaseUnit = None,
+        market_config=None,
         operational_window: dict = None,
     ):
         pass
