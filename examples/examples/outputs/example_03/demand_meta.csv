@@ -1,0 +1,2 @@
+,max_power,min_power,simulation,technology,unit_operator,unit_type
+AS-HEATPUMP,5000,0,example_03,heatpump,dummyper,demand

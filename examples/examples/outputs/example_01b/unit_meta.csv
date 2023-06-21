@@ -1,0 +1,5 @@
+,efficiency,emission_factor,max_power,min_power,simulation,technology,unit_operator,unit_type
+KKW ISAR 2,0.33,0.0,1485,590,example_01b,nuclear,UNIPER,power_plant
+NEURATH F,0.434,0.406,1120,560,example_01b,lignite,RWE POWER AG,power_plant
+GKM 9,0.454,0.335,911,370,example_01b,hard coal,GROSSKRAFTWERK MANNHEIM AG,power_plant
+IRSCHING 5,0.597,0.201,860,350,example_01b,combined cycle gas turbine,UNIPER,power_plant

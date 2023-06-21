@@ -1,0 +1,6 @@
+,name,variable,value,simulation
+0,EOM,avg_price,2.727272727272739,example_03
+0,EOM,total_cost,974002.3722052594,example_03
+0,EOM,total_volume,357134.2031419284,example_03
+0,KKW ISAR 2,market_id,EOM,example_03
+1,KKW ISAR 2,capacity_factor,0.9937527505816918,example_03
