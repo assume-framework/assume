@@ -267,6 +267,7 @@ class PowerPlant(BaseUnit):
         # if self.total_power_output[start:end_excl].max() > self.max_power:
         #     max_pow = self.total_power_output[start:end_excl].max()
         #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")
+        return self.total_power_output.loc[start:end_excl]
 
     def calc_marginal_cost(
         self,
