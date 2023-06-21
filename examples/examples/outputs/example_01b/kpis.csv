@@ -1,8 +1,0 @@
-,name,variable,value,simulation
-0,EOM,avg_price,12.008186521815697,example_01b
-0,EOM,total_cost,4319965.307416173,example_01b
-0,EOM,total_volume,354463.00728438236,example_01b
-0,KKW ISAR 2,market_id,EOM,example_01b
-1,NEURATH F,market_id,EOM,example_01b
-2,KKW ISAR 2,capacity_factor,0.9893325584616113,example_01b
-3,NEURATH F,capacity_factor,0.013537059459709243,example_01b
