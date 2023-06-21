@@ -160,7 +160,7 @@ class HeatPump(BaseUnit):
         if self.current_status == 0 and self.current_down_time < self.min_down_time:
             return None
 
-        # cop = self.calculate_cop(start)
+        cop = self.calculate_cop(start)
         # current_power_input = self.total_thermal_output.at[start - self.index.freq] / cop
         current_power = (
             self.volume.at[start - self.index.freq] / cop
