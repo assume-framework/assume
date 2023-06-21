@@ -8,3 +8,4 @@ from assume.strategies.naive_strategies import (
 )
 from assume.strategies.rl_strategies import RLStrategy
 from assume.strategies.storage_strategies import complexEOMStorage
+from assume.strategies.heatpump_strategies import HeatpumpStrategy

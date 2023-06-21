@@ -35,6 +35,7 @@ from assume.strategies import (
     flexableCRMStorage,
     flexableEOM,
     flexableEOMStorage,
+    HeatpumpStrategy,
 )
 from assume.units import Demand, HeatPump, PowerPlant, StorageUnit
 
@@ -76,14 +77,14 @@ class World:
 
         self.unit_types = {
             "power_plant": PowerPlant,
-            "heatpump": HeatPump,
-            "demand": Demand,
+            "demand": HeatPump,
             "storage_unit": StorageUnit,
         }
         self.bidding_types = {
             "naive": NaiveStrategy,
             "flexable_eom": flexableEOM,
             "flexable_eom_storage": flexableEOMStorage,
+            "heatpump_strategy": HeatpumpStrategy,
             "naive_neg_reserve": NaiveNegReserveStrategy,
             "naive_pos_reserve": NaivePosReserveStrategy,
             "flexable_crm_storage": flexableCRMStorage,
@@ -269,6 +270,8 @@ class World:
         forecast_role = ForecastProvider(
             config["markets_config"].items(),
             fuel_prices_df,
+            # electricity_prices_df,
+            # temperature_df,
             fuel_prices_df["co2"],
             vre_cf_df,
             powerplant_units,
@@ -284,6 +287,8 @@ class World:
             demand_df,
             vre_cf_df,
             powerplant_units,
+            # electricity_prices_df,
+            # temperature_df,
             fuel_prices_df,
             fuel_prices_df["co2"],
         )
@@ -293,7 +298,7 @@ class World:
         all_operators = np.concatenate(
             [
                 powerplant_units.unit_operator.unique(),
-                heatpumps.unit_operator.unique(),
+                # heatpumps.unit_operator.unique(),
                 demand_units.unit_operator.unique(),
             ]
         )
@@ -436,6 +441,12 @@ class World:
                 unit_params["bidding_strategies"] = {
                     market.product_type: "naive" for market in self.markets.values()
                 }
+            if electricity_prices_df is not None:
+                unit_params["electricity_price"] = electricity_prices_df["electricity_price"]
+
+            if temperature_df is not None:
+                unit_params["source_temp"] = temperature_df["source_temperature"]
+                unit_params["sink_temp"] = temperature_df["sink_temperature"]
 
             if demand_df is not None and unit_name in demand_df.columns:
                 unit_params["volume"] = demand_df[unit_name]

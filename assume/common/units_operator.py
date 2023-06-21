@@ -142,6 +142,20 @@ class UnitsOperator(Role):
         orderbook = list(sorted(orderbook, key=itemgetter("unit_id")))
         for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
             orders_l = list(orders)
+            # total_power = sum(map(itemgetter("volume"), orders_l))
+            # dispatch_plan = {"total_power": total_power}
+            #
+            # if "total_thermal_output" in dispatch_plan:
+            #     total_thermal_output = sum(map(itemgetter("volume"), orders_l))
+            #     dispatch_plan["total_thermal_output"] = total_thermal_output
+            #
+            # self.units[unit_id].get_dispatch_plan(
+            #     dispatch_plan=dispatch_plan,
+            #     start=orderbook[0]["start_time"],
+            #     end=orderbook[0]["end_time"],
+            #     product_type=marketconfig.product_type,
+            # )
+
             total_power = sum(map(itemgetter("volume"), orders_l))
             dispatch_plan = {"total_power": total_power}
             self.units[unit_id].get_dispatch_plan(
@@ -178,6 +192,21 @@ class UnitsOperator(Role):
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
         unit_dispatch = pd.concat(unit_dispatch_dfs)
+
+        # for unit_id, unit in self.units.items():
+        #     if hasattr(unit, 'total_power_output'):
+        #         data = pd.DataFrame(
+        #             unit.total_power_output.loc[start:now], columns=["power"]
+        #         )
+        #     else:
+        #         hasattr(unit, 'total_thermal_output')
+        #         data = pd.DataFrame(
+        #             unit.total_thermal_output.loc[start:now], columns=["power"]
+        #         )
+        #
+        #     data["unit"] = unit_id
+        #     unit_dispatch_dfs.append(data)
+        # unit_dispatch = pd.concat(unit_dispatch_dfs)
 
         db_aid = self.context.data_dict.get("output_agent_id")
         db_addr = self.context.data_dict.get("output_agent_addr")

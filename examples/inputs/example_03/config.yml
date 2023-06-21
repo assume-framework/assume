@@ -1,14 +1,10 @@
-base_case:
-  id: example_03
-  start_date: 2019-01-01 00:00
-  end_date: 2019-01-10 23:00
+example_03:
+  start_date: 2018-12-31 22:00
+  end_date: 2019-01-11 00:00
   time_step: 1h
-  powerplants: powerplants.csv
-  heatpumps: heatpumps.csv
-  demand: inflex_demand.csv
-  renewable_generation: renewable_generation.csv
-  fuel_prices: fuel_prices.csv
-  electricity_prices: electricity_prices.csv 
+#  fuel_prices: fuel_prices.csv
+#  temperature: temperature.csv
+#  electricity_prices: electricity_prices.csv
   markets_config:
     EOM:
       operator: EOM_operator
