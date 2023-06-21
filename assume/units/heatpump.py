@@ -226,38 +226,9 @@ class HeatPump(BaseUnit):
 
         return operational_window
 
-
-    #To be developed
-    def calculate_reserve_operational_window(
-        self, start: pd.Timestamp, end: pd.Timestamp
-    ) -> dict:
-
-        # cop = self.calculate_cop()
-        # current_power_input = self.total_thermal_output.at[start - self.index.freq] / cop.at[start, end]
-        #
-        # operational_window = {
-        #     "window": {"start": start, "end": end},
-        #     "pos_reserve": {
-        #         "capacity": available_pos_reserve,
-        #     },
-        #     "neg_reserve": {
-        #         "capacity": available_neg_reserve,
-        #     },
-        # }
-        #
-        # if available_neg_reserve < 0:
-        #     logger.error("available_neg_reserve < 0")
-
-        # return operational_window
-        pass
-
-    def calculate_bids(
-            self,
-            product_type,
-            product_tuple
-    ):
+    def calculate_bids(self, product_type, product_tuple):
         return super().calculate_bids(
-            product_type=product_type,
+            market_config=market_config,
             product_tuple=product_tuple,
         )
 

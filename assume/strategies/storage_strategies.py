@@ -14,6 +14,7 @@ class complexEOMStorage(BaseStrategy):
     def calculate_bids(
         self,
         unit: StorageUnit = None,
+        market_config=None,
         operational_window: dict = None,
     ):
         """
