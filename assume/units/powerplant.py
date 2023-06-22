@@ -59,7 +59,7 @@ class PowerPlant(BaseUnit):
         self.partial_load_eff = partial_load_eff
         self.fuel_type = fuel_type
         if type(fuel_price) is pd.Series and len(fuel_price) == 1:
-           fuel_price = fuel_price.item()
+            fuel_price = fuel_price.item()
         self.fuel_price = fuel_price
         if type(co2_price) is pd.Series and len(co2_price) == 1:
             co2_price = co2_price.item()
