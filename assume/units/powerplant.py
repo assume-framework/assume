@@ -157,7 +157,7 @@ class PowerPlant(BaseUnit):
 
         if product_type == "energy":
             return self.calculate_energy_operational_window(start, end)
-        elif product_type in ["capacity_pos", "capacity_neg"]:
+        elif product_type in {"capacity_pos", "capacity_neg"}:
             return self.calculate_reserve_operational_window(start, end)
 
     def calculate_energy_operational_window(

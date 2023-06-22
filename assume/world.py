@@ -607,7 +607,7 @@ class World:
 
         start_ts = calendar.timegm(self.start.utctimetuple())
         end_ts = calendar.timegm(self.end.utctimetuple())
-        pbar = tqdm(total=end_ts - start_ts, leave=True)
+        pbar = tqdm(total=end_ts - start_ts)
 
         # allow registration before first opening
         self.clock.set_time(start_ts - 1)
@@ -623,7 +623,7 @@ class World:
                 self.clock.set_time(end_ts)
 
             await tasks_complete_or_sleeping(self.container)
-        # pbar.close()
+        pbar.close()
         await self.container.shutdown()
 
         logging.info("Simulation finished")
