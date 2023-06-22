@@ -1,4 +1,4 @@
-,demand_DE,pos_capacity_DE,neg_capacity_DE,pos_reserve_energy_DE,neg_reserve_energy_DE
+,demand_EOM,demand_CRM_pos,demand_CRM_neg,pos_reserve_energy_DE,neg_reserve_energy_DE
 0,43932,2756,2827,4,576
 1,43460,2756,2827,632,1004
 2,42952,2756,2827,12,168

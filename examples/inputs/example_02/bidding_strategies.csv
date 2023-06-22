@@ -1,12 +1,12 @@
 name,energy,capacity_pos,capacity_neg
-demand_DE,naive,-,-
-pos_capacity_DE,-,naive,-
-neg_capacity_DE,-,-,naive
-wind_onshore_DE,naive,-,-
-wind_offshore_DE,naive,-,-
-solar_DE,naive,-,-
-water_DE,naive,-,-
-biomass_DE,naive,-,-
+demand_EOM,naive,-,-
+demand_CRM_pos,-,naive,-
+demand_CRM_neg,-,-,naive
+Wind onshore,naive,-,-
+Wind offshore,naive,-,-
+Solar,naive,-,-
+Hydro,naive,-,-
+Biomass,naive,-,-
 KKW ISAR 2,flexable_eom,naive_pos_reserve,naive_neg_reserve
 KKW BROKDORF,flexable_eom,naive_pos_reserve,naive_neg_reserve
 KKW PHILIPPSBURG 2,flexable_eom,naive_pos_reserve,naive_neg_reserve
