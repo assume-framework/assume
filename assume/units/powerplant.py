@@ -58,16 +58,12 @@ class PowerPlant(BaseUnit):
         self.efficiency = efficiency
         self.partial_load_eff = partial_load_eff
         self.fuel_type = fuel_type
-        self.fuel_price = (
-            fuel_price.item()
-            if type(fuel_price) is pd.Series and len(fuel_price) == 1
-            else fuel_price
-        )
-        self.co2_price = (
-            co2_price.item()
-            if type(co2_price) is pd.Series and len(co2_price) == 1
-            else co2_price
-        )
+        if type(fuel_price) is pd.Series and len(fuel_price) == 1:
+           fuel_price = fuel_price.item()
+        self.fuel_price = fuel_price
+        if type(co2_price) is pd.Series and len(co2_price) == 1:
+            co2_price = co2_price.item()
+        self.co2_price
         self.price_forecast = (
             pd.Series(0.0, index=self.index) if price_forecast.empty else price_forecast
         )
