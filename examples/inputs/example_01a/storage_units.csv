@@ -1,2 +1,0 @@
-name,technology,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_SOC,max_SOC,variable_cost_charge,variable_cost_discharge,natural_inflow,unit_operator
-Tanzmühle - Rabenleite,PSPP,25,35,0.81,0.88,1,404,0.28,0.28,0,GDF SUEZ ENERGIE DEUTSCHLAND

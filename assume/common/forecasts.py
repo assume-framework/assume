@@ -24,25 +24,35 @@ from assume.units import BaseUnit
 class ForecastProvider(Role):
     def __init__(
         self,
-        available_markets: list[MarketConfig],
-        fuel_prices: dict[str, pd.Series] = {},
-        co2_price: float or pd.Series = 0.0,
-        capacity_factors: dict[str, pd.Series] = {},
-        powerplants: dict[str, pd.Series] = {},
-        demand: float or pd.Series = 0.0,
+        market_id: str,
+        price_forecast_df: pd.DataFrame = None,
+        powerplants: dict[str, pd.Series] = None,
+        fuel_prices_df: dict[str, pd.Series] = None,
+        demand_df: float or pd.Series = 0.0,
+        vre_cf_df: dict[str, pd.Series] = None,
     ):
+        if fuel_prices_df is None:
+            fuel_prices_df = {}
+        if vre_cf_df is None:
+            vre_cf_df = {}
+        if powerplants is None:
+            powerplants = {}
+
         super().__init__()
 
         self.logger = logging.getLogger(__name__)
 
-        self.bids_map = {}
-        self.available_markets = available_markets
-        self.registered_markets: dict[str, MarketConfig] = {}
-        self.fuel_prices = fuel_prices
-        self.co2_price = co2_price
-        self.capacity_factors = capacity_factors
-        self.all_power_plants = powerplants
-        self.demand = demand
+        self.market_id = market_id
+        self.price_forecast_df = price_forecast_df
+        self.fuel_prices_df = fuel_prices_df
+        self.powerplants = powerplants
+        self.demand_df = demand_df
+        self.vre_cf_df = vre_cf_df
+
+        if self.price_forecast_df is None:
+            self.price_forecast_df = self.calculate_price_forecast(
+                market_id=self.market_id
+            )
 
     def get_registered_market_participants(self, market_id):
         """
@@ -55,16 +65,16 @@ class ForecastProvider(Role):
 
         # calculate price forecast
 
-    def calculate_price_forecast(
-        self,
-        market,
-        path,
-        demand,
-        renewable_capacity_factors,
-        registered_power_plants,
-        fuel_prices,
-        co2_prices,
-    ):
+    def calculate_price_forecast(self, market_id):
+        if market_id == "EOM":
+            self.logger.info(f"Preparing price forecast for {market_id}")
+            return self.calculate_EOM_price_forecast()
+        else:
+            self.logger.warning(
+                f"No price forecast for {market_id} is implemented yet. Please provide an external price forecast."
+            )
+
+    def calculate_EOM_price_forecast(self):
         """
         Function that calculates the merit order price, which is given as a price forecast to the Rl agents
         Here for the entire time horizon at once
@@ -72,100 +82,112 @@ class ForecastProvider(Role):
         TODO consider storages?
         """
 
-        # initialize price forecast
-        if renewable_capacity_factors is None:
-            return None
-        price_resdemand_forecast = pd.DataFrame(
-            index=renewable_capacity_factors.index, columns=["mcp", "residual_demand"]
+        # calculate infeed of renewables and residual demand_df
+        # check if max_power is a series or a float
+        powerplants = self.powerplants[
+            self.powerplants["fuel_type"] != "renewable"
+        ].copy()
+
+        price_forecast_df = pd.DataFrame(
+            columns=["mcp"], index=self.demand_df.index, data=0.0
         )
 
-        self.demand = list(demand.values)
-        forecast_file = path + "/price_forecast_EOM.csv"
+        marginal_costs = powerplants.apply(
+            self.calculate_marginal_cost, axis=1, fuel_prices=self.fuel_prices_df
+        )
+        marginal_costs = marginal_costs.T
+        if len(marginal_costs) == 1:
+            marginal_costs = marginal_costs.iloc[0].to_dict()
 
-        # intialize potential orders
-        forecasted_orders = pd.DataFrame(columns=["mcp", "max_power"])
+        vre_feed_in_df = pd.DataFrame(
+            index=self.demand_df.index, columns=self.vre_cf_df.keys(), data=0.0
+        )
 
-        if market == "EOM":
-            # Check if the forecast file already exists
-            if os.path.isfile(forecast_file):
-                # If inputs haven't changed, load the forecast from the CSV file and exit
-                price_resdemand_forecast = pd.read_csv(
-                    forecast_file, index_col="Timestamp"
-                )
-                self.logger.info("Price forecast loaded from the existing file.")
-                price_resdemand_forecast.index = pd.to_datetime(
-                    price_resdemand_forecast.index
-                )
-
-                return price_resdemand_forecast
-
-            # calculate infeed of renewables and residual demand
-            # check if max_power is a series or a float
-            self.logger.info("Preparing market forecasts")
-
-            for t in renewable_capacity_factors.index:
-                i = 0
-                res_demand = demand.at[t, "demand_DE"]
-                # reset potential orders
-                forecasted_orders = forecasted_orders.iloc[0:0]
-
-                for unit_name, unit_params in registered_power_plants.iterrows():
-                    # pp = pp[1]
-                    if unit_name in renewable_capacity_factors.columns:
-                        # adds availabel renewables to merrit order
-                        capacity_factor = renewable_capacity_factors[unit_name]
-
-                        max_power = capacity_factor.at[t] * unit_params["max_power"]
-                        mcp = 0
-
-                        res_demand = res_demand - max_power
-
-                    else:
-                        max_power = unit_params.max_power
-
-                        # calculate simplified marginal costs for each power plant
-                        mcp = (
-                            fuel_prices[unit_params.fuel_type].at[t]
-                            / unit_params["efficiency"]
-                            + co2_prices.at[t]
-                            * unit_params["emission_factor"]
-                            / unit_params["efficiency"]
-                            + unit_params["fixed_cost"]
-                        )
-
-                        forecasted_orders.loc[i] = {"mcp": mcp, "max_power": max_power}
-                        i += 1
-
-                # Sort the DataFrame by the "mcp" column
-                forecasted_orders = forecasted_orders.sort_values("mcp")
-
-                # Cumulate the "max_power" column
-                forecasted_orders["cumulative_max_power"] = forecasted_orders[
-                    "max_power"
-                ].cumsum()
-
-                # Find the row where "cumulative_max_power" exceeds a demand value
-                filtered_forecasted_orders = forecasted_orders[
-                    forecasted_orders["cumulative_max_power"] > res_demand
-                ]
-                if not filtered_forecasted_orders.empty:
-                    mcp = filtered_forecasted_orders.iloc[0]["mcp"]
-
-                else:
-                    # demand cannot be supplied by power plant fleet
-                    mcp = 3000
-
-                price_resdemand_forecast.at[t, "mcp"] = mcp
-                price_resdemand_forecast.at[t, "residual_demand"] = res_demand
-
-        else:
-            raise NotImplementedError(
-                "For this market the price forecast is not implemented yet"
+        for vre in self.vre_cf_df.keys():
+            vre_feed_in_df[vre] = (
+                self.vre_cf_df[vre] * self.powerplants.at[vre, "max_power"]
             )
 
-        self.logger.info("Finished market forecasts")
-        price_resdemand_forecast.to_csv(forecast_file, index_label="Timestamp")
+        for i in range(len(self.demand_df)):
+            pp_df = powerplants.copy()
+            pp_df["marginal_cost"] = (
+                marginal_costs.iloc[i]
+                if type(marginal_costs) == pd.DataFrame
+                else marginal_costs
+            )
+            mcp = self.calc_market_clearing_price(
+                powerplants=pp_df,
+                demand=self.demand_df.iat[i],
+                vre_feed_in=vre_feed_in_df.iloc[i].sum(),
+            )
+            price_forecast_df["mcp"].iat[i] = mcp
 
-        price_resdemand_forecast.index = pd.to_datetime(price_resdemand_forecast.index)
+        return price_forecast_df
 
-        return price_resdemand_forecast
+    def calculate_marginal_cost(self, pp_dict, fuel_prices):
+        """
+        Calculates the marginal cost of a power plant based on the fuel costs and efficiencies of the power plant.
+
+        Parameters
+        ----------
+        pp_dict : dict
+            Dictionary of power plant data.
+        fuel_prices : dict
+            Dictionary of fuel data.
+        emission_factors : dict
+            Dictionary of emission factors.
+
+        Returns
+        -------
+        marginal_cost : float
+            Marginal cost of the power plant.
+
+        """
+
+        fuel_price = fuel_prices[pp_dict["fuel_type"]]
+        emission_factor = pp_dict["emission_factor"]
+        co2_price = fuel_prices["co2"]
+
+        fuel_cost = fuel_price / pp_dict["efficiency"]
+        emissions_cost = co2_price * emission_factor / pp_dict["efficiency"]
+        variable_cost = pp_dict["var_cost"] if "var_cost" in pp_dict else 0.0
+
+        marginal_cost = fuel_cost + emissions_cost + variable_cost
+
+        return marginal_cost
+
+    def calc_market_clearing_price(self, powerplants, demand, vre_feed_in):
+        """
+        Calculates the market clearing price of the merit order model.
+
+        Parameters
+        ----------
+        powerplants : pandas.DataFrame
+            Dataframe containing the power plant data.
+        demand : float
+            Demand of the system.
+
+        Returns
+        -------
+        mcp : float
+            Market clearing price.
+
+        """
+
+        # Sort the power plants on marginal cost
+        powerplants.sort_values("marginal_cost", inplace=True)
+
+        # Calculate the cumulative capacity
+        powerplants["cum_cap"] = powerplants["max_power"].cumsum() + vre_feed_in
+
+        # Calculate the market clearing price
+        if powerplants["cum_cap"].iat[-1] < demand:
+            mcp = powerplants["marginal_cost"].iat[-1]
+        elif vre_feed_in > demand:
+            mcp = 0.0
+        else:
+            mcp = powerplants.loc[
+                powerplants["cum_cap"] >= demand, "marginal_cost"
+            ].iat[0]
+
+        return mcp

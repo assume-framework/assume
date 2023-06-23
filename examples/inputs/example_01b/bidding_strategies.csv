@@ -1,6 +1,6 @@
 name,energy
-KKW ISAR 2,flexable_eom
-NEURATH F,flexable_eom
-GKM 9,flexable_eom
-IRSCHING 5,flexable_eom
-demand_DE,naive
+demand_EOM,naive
+Unit 1,flexable_eom
+Unit 2,flexable_eom
+Unit 3,flexable_eom
+Unit 4,flexable_eom

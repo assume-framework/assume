@@ -1,4 +1,5 @@
 import logging
+from functools import cache, lru_cache
 
 import pandas as pd
 
@@ -18,7 +19,8 @@ class PowerPlant(BaseUnit):
         max_power: float or pd.Series,
         min_power: float or pd.Series = 0.0,
         capacity_factor: float or pd.Series = 1.0,
-        efficiency: float = 1,
+        efficiency: float = 1.0,
+        fixed_cost: float = 0.0,
         partial_load_eff: bool = False,
         fuel_type: str = "others",
         fuel_price: float or pd.Series = 0.0,
@@ -28,7 +30,6 @@ class PowerPlant(BaseUnit):
         emission_factor: float = 0.0,
         ramp_up: float = -1,
         ramp_down: float = -1,
-        fixed_cost: float = 0,
         hot_start_cost: float = 0,
         warm_start_cost: float = 0,
         cold_start_cost: float = 0,
@@ -57,8 +58,12 @@ class PowerPlant(BaseUnit):
         self.efficiency = efficiency
         self.partial_load_eff = partial_load_eff
         self.fuel_type = fuel_type
+        if type(fuel_price) is pd.Series and len(fuel_price) == 1:
+            fuel_price = fuel_price.item()
         self.fuel_price = fuel_price
-        self.co2_price = co2_price
+        if type(co2_price) is pd.Series and len(co2_price) == 1:
+            co2_price = co2_price.item()
+        self.co2_price
         self.price_forecast = (
             pd.Series(0.0, index=self.index) if price_forecast.empty else price_forecast
         )
@@ -90,6 +95,22 @@ class PowerPlant(BaseUnit):
         self.max_heat_extraction = max_heat_extraction
 
         self.location = location
+
+        if not self.partial_load_eff and type(self.fuel_price) is float:
+            fuel_prices = {self.fuel_type: self.fuel_price, "co2": self.co2_price}
+            self.marginal_cost = self.calc_simple_marginal_cost(fuel_prices)
+        elif not self.partial_load_eff:
+            # calculate the marginal cost for the whole time series of fuel prices
+            fuel_prices = pd.concat([self.fuel_price, self.co2_price], axis=1)
+            self.marginal_cost = pd.DataFrame(
+                index=self.index, columns=["marginal_cost"], data=0.0
+            )
+            self.marginal_cost["marginal_cost"] = fuel_prices.apply(
+                self.calc_simple_marginal_cost, axis=1
+            )
+            self.marginal_cost = self.marginal_cost["marginal_cost"].to_dict()
+        else:
+            self.marginal_cost = None
 
     def reset(self):
         """Reset the unit to its initial state."""
@@ -147,9 +168,9 @@ class PowerPlant(BaseUnit):
         min_power, max_power = self.calculate_min_max_power(start, end)
 
         # adjust for ramp down speed
-        min_power = max(current_power - self.ramp_down, min_power)
+        min_power = max(-self.ramp_down, min_power)
         # adjust for ramp up speed
-        max_power = min(current_power + self.ramp_up, max_power)
+        max_power = min(self.ramp_up, max_power)
 
         # adjust min_power if sold negative reserve capacity on control reserve market
         min_power = min_power + self.neg_capacity_reserve.at[start]
@@ -157,45 +178,65 @@ class PowerPlant(BaseUnit):
         # adjust max_power if sold positive reserve capacity on control reserve market
         max_power = max_power - self.pos_capacity_reserve.at[start]
 
-        operational_window = {
+        if self.marginal_cost is None:
+            return {
+                "window": {"start": start, "end": end},
+                "current_power": {
+                    "power": current_power,
+                    "marginal_cost": self.calc_marginal_cost_with_partial_eff(
+                        power_output=current_power,
+                        timestep=start,
+                    ),
+                },
+                "min_power": {
+                    "power": min_power,
+                    "marginal_cost": self.calc_marginal_cost_with_partial_eff(
+                        power_output=current_power + min_power,
+                        timestep=start,
+                    ),
+                },
+                "max_power": {
+                    "power": max_power,
+                    "marginal_cost": self.calc_marginal_cost_with_partial_eff(
+                        power_output=current_power + max_power,
+                        timestep=start,
+                    ),
+                },
+            }
+
+        marginal_cost = (
+            self.marginal_cost[start]
+            if type(self.marginal_cost) is dict
+            else self.marginal_cost
+        )
+        return {
             "window": {"start": start, "end": end},
             "current_power": {
                 "power": current_power,
-                "marginal_cost": self.calc_marginal_cost(
-                    power_output=current_power,
-                    timestep=start,
-                ),
+                "marginal_cost": marginal_cost,
             },
             "min_power": {
                 "power": min_power,
-                "marginal_cost": self.calc_marginal_cost(
-                    power_output=min_power,
-                    timestep=start,
-                ),
+                "marginal_cost": marginal_cost,
             },
             "max_power": {
                 "power": max_power,
-                "marginal_cost": self.calc_marginal_cost(
-                    power_output=max_power,
-                    timestep=start,
-                ),
+                "marginal_cost": marginal_cost,
             },
         }
-
-        return operational_window
 
     def calculate_reserve_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
-        current_power = self.total_power_output.at[start - self.index.freq]
+        previous_power = self.total_power_output.at[start - self.index.freq]
 
         min_power, max_power = self.calculate_min_max_power(start, end)
 
         # should be adjusted to account for ramping speeds
         # and differences between resolutions of energy and reserve markets
-        available_pos_reserve = min(max_power - current_power, self.ramp_up)
+        available_pos_reserve = min(max_power - previous_power, self.ramp_up)
 
-        available_neg_reserve = max(0, min(current_power - min_power, self.ramp_down))
+        available_neg_reserve = max(0, min(previous_power - min_power, self.ramp_down))
 
         operational_window = {
             "window": {"start": start, "end": end},
@@ -214,15 +255,15 @@ class PowerPlant(BaseUnit):
 
     def calculate_bids(
         self,
-        product_type,
+        market_config,
         product_tuple,
     ):
         return super().calculate_bids(
-            product_type=product_type,
+            market_config=market_config,
             product_tuple=product_tuple,
         )
 
-    def get_dispatch_plan(
+    def set_dispatch_plan(
         self,
         dispatch_plan: dict,
         start: pd.Timestamp,
@@ -230,8 +271,25 @@ class PowerPlant(BaseUnit):
         product_type: str,
     ):
         end_excl = end - self.index.freq
-        self.total_power_output.loc[start:end_excl] += dispatch_plan["total_power"]
 
+        # based on product type
+        if product_type == "energy":
+            self.total_power_output.loc[start:end_excl] += dispatch_plan["total_power"]
+        elif product_type == "capacity_pos":
+            self.pos_capacity_reserve.loc[start:end_excl] += dispatch_plan[
+                "total_power"
+            ]
+        elif product_type == "capacity_neg":
+            self.neg_capacity_reserve.loc[start:end_excl] += dispatch_plan[
+                "total_power"
+            ]
+
+    def execute_current_dispatch(
+        self,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+    ):
+        end_excl = end - self.index.freq
         if self.total_power_output[start:end_excl].min() < self.min_power:
             self.total_power_output.loc[start:end_excl] = 0
             self.current_status = 0
@@ -250,11 +308,25 @@ class PowerPlant(BaseUnit):
         # if self.total_power_output[start:end_excl].max() > self.max_power:
         #     max_pow = self.total_power_output[start:end_excl].max()
         #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")
+        return self.total_power_output.loc[start:end_excl]
 
-    def calc_marginal_cost(
+    def calc_simple_marginal_cost(
+        self,
+        fuel_prices: dict,
+    ):
+        marginal_cost = (
+            fuel_prices[self.fuel_type] / self.efficiency
+            + fuel_prices["co2"] * self.emission_factor / self.efficiency
+            + self.fixed_cost
+        )
+
+        return marginal_cost
+
+    @lru_cache(maxsize=256)
+    def calc_marginal_cost_with_partial_eff(
         self,
         power_output: float,
-        timestep: pd.Timestamp,
+        timestep: pd.Timestamp = None,
     ) -> float or pd.Series:
         fuel_price = (
             self.fuel_price.at[timestep]
@@ -266,16 +338,6 @@ class PowerPlant(BaseUnit):
             if type(self.co2_price) is pd.Series
             else self.co2_price
         )
-
-        # Partial load efficiency dependent marginal costs
-        if not self.partial_load_eff:
-            marginal_cost = (
-                fuel_price / self.efficiency
-                + co2_price * self.emission_factor / self.efficiency
-                + self.fixed_cost
-            )
-
-            return marginal_cost
 
         capacity_ratio = power_output / self.max_power
 
@@ -320,21 +382,21 @@ class PowerPlant(BaseUnit):
         return marginal_cost
 
     def calculate_min_max_power(self, start: pd.Timestamp, end: pd.Timestamp):
-        base_load = self.total_power_output[start:end].min()
+        base_load = self.total_power_output[start:end]
         # check if min_power is a series or a float
         min_power = (
-            self.min_power.at[start]
+            self.min_power[start:end].max()
             if type(self.min_power) is pd.Series
             else self.min_power
         )
-        min_power = max(min_power - base_load, 0)
+        min_delta = min_power - base_load.min()
 
         # check if max_power is a series or a float
         max_power = (
-            self.capacity_factor.at[start] * self.max_power
+            self.capacity_factor[start:end].min() * self.max_power
             if type(self.capacity_factor) is pd.Series
             else self.capacity_factor * self.max_power
         )
-        max_power = max(max_power - base_load, 0)
+        max_delta = max_power - base_load.max()
 
-        return min_power, max_power
+        return min_delta, max_delta
