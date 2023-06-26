@@ -339,12 +339,12 @@ class World:
                 # check if we have RL bidding strategy and give
                 if (
                     unit_params["bidding_strategies"]["energy"] == "rl_strategy"
-                    and self.price_forecast is not None
+                    and forecast_provider.price_forecast_df is not None
                 ):
-                    unit_params["price_forecast"] = self.price_forecast["mcp"]
-                    unit_params["res_demand_forecast"] = self.price_forecast[
-                        "residual_demand"
-                    ]
+                    unit_params["price_forecast"] = forecast_provider.price_forecast_df
+                    unit_params[
+                        "res_demand_forecast"
+                    ] = forecast_provider.residual_demand_forecast_df
                     # automatically asign Rl unit operator
                     unit_params["unit_operator"] = "RL_unit_operator"
 

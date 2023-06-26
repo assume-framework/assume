@@ -60,7 +60,6 @@ class ForecastProvider(Role):
         self.residual_demand_forecast_df = self.calculate_residual_demand_forecast(
             market_id=self.market_id
         )
-        print("ich intialisiere?"
 
         # calculate renewable forecast
         # TODO make different from actual realisations, like loading forecasts from ENTSO-E
@@ -87,12 +86,10 @@ class ForecastProvider(Role):
             )
 
     def calculate_residual_demand_forecast(self, market_id):
-        print("wir sind im demand forecast")
         if market_id == "EOM":
             vre_feed_in_df = pd.DataFrame(
                 index=self.demand_df.index, columns=self.vre_cf_df.keys(), data=0.0
             )
-            print("wir sind im EOM")
 
             for vre in self.vre_cf_df.keys():
                 vre_feed_in_df[vre] = (
@@ -100,13 +97,12 @@ class ForecastProvider(Role):
                 )
 
             res_demand_df = pd.DataFrame(
-                index=self.demand_df.index, columns="residual_demand", data=0.0
+                index=self.demand_df.index, columns=["residual_demand"], data=0.0
             )
 
             res_demand_df["residual_demand"] = self.demand_df - self.vre_cf_df.sum(
                 axis=1
             )
-            print(res_demand_df)
 
             return res_demand_df
 
