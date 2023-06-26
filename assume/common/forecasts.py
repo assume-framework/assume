@@ -54,6 +54,17 @@ class ForecastProvider(Role):
                 market_id=self.market_id
             )
 
+        # calculate the residual demand forecast
+        # TODO make this dependent on power plants active in the speciffic market
+        self.residual_demand_forecast_df = self.calculate_residual_demand_forecast(
+            market_id=self.market_id
+        )
+        print(self.residual_demand_forecast_df)
+
+        # calculate renewable forecast
+        # TODO make different from actual realisations, like loading forecasts from ENTSO-E
+        self.vre_cf_forecast_df = self.vre_cf_df
+
     def get_registered_market_participants(self, market_id):
         """
         get information about market aprticipants to make accurate price forecast
@@ -69,6 +80,32 @@ class ForecastProvider(Role):
         if market_id == "EOM":
             self.logger.info(f"Preparing price forecast for {market_id}")
             return self.calculate_EOM_price_forecast()
+        else:
+            self.logger.warning(
+                f"No price forecast for {market_id} is implemented yet. Please provide an external price forecast."
+            )
+
+    def calculate_residual_demand_forecast(self, market_id):
+        if market_id == "EOM":
+            vre_feed_in_df = pd.DataFrame(
+                index=self.demand_df.index, columns=self.vre_cf_df.keys(), data=0.0
+            )
+
+            for vre in self.vre_cf_df.keys():
+                vre_feed_in_df[vre] = (
+                    self.vre_cf_df[vre] * self.powerplants.at[vre, "max_power"]
+                )
+
+            res_demand_df = pd.DataFrame(
+                index=self.demand_df.index, columns="residual_demand", data=0.0
+            )
+
+            res_demand_df["residual_demand"] = self.demand_df - self.vre_cf_df.sum(
+                axis=1
+            )
+
+            return res_demand_df
+
         else:
             self.logger.warning(
                 f"No price forecast for {market_id} is implemented yet. Please provide an external price forecast."
@@ -121,6 +158,7 @@ class ForecastProvider(Role):
                 vre_feed_in=vre_feed_in_df.iloc[i].sum(),
             )
             price_forecast_df["mcp"].iat[i] = mcp
+            self.price_forecast_df = price_forecast_df
 
         return price_forecast_df
 

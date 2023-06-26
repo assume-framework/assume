@@ -7,7 +7,7 @@ Wind offshore,naive,-,-
 Solar,naive,-,-
 Hydro,naive,-,-
 Biomass,naive,-,-
-KKW ISAR 2,flexable_eom,naive_pos_reserve,naive_neg_reserve
+KKW ISAR 2,rl_strategy,naive_pos_reserve,naive_neg_reserve
 KKW BROKDORF,flexable_eom,naive_pos_reserve,naive_neg_reserve
 KKW PHILIPPSBURG 2,flexable_eom,naive_pos_reserve,naive_neg_reserve
 KKW GROHNDE,flexable_eom,naive_pos_reserve,naive_neg_reserve
