@@ -3,7 +3,14 @@ base_case_2019:
   end_date: 2019-01-11 00:00
   time_step: 1h
   rl_config:
-    is_rl_mode: True
+    is_rl_mode: False
+    does_training: False
+    learning_starts: 10
+    train_freq: 100
+    gradient_steps: -1
+    batch_size: 256
+    gamma: 0.999
+    training_episodes: 300
   markets_config:
     EOM:
       operator: EOM_operator

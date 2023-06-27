@@ -9,6 +9,8 @@ dependencies:
 - pandas
 - numpy
 - tqdm
+- pytorch
+- torchvision
 - SQLAlchemy
 
 - pip:

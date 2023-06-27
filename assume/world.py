@@ -15,12 +15,22 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import scoped_session, sessionmaker
 from tqdm import tqdm
+import pandas as pd
+import numpy as np
+import os
+import shutil
+import time
+
+import torch as th
+
+from assume.common.matd3 import TD3
 
 from assume.common import (
     ForecastProvider,
     MarketConfig,
     UnitsOperator,
     WriteOutput,
+    RL_UnitsOperator,
     load_file,
     make_market_config,
     mango_codec_factory,
@@ -42,7 +52,7 @@ logging.getLogger("mango").setLevel(logging.WARNING)
 logging.getLogger("assume").setLevel(logging.INFO)
 
 
-class World:
+class world:
     def __init__(
         self,
         ifac_addr: str = "localhost",
@@ -74,7 +84,7 @@ class World:
         self.unit_operators: dict[str, UnitsOperator] = {}
         self.forecast_providers: dict[str, ForecastProvider] = {}
 
-        #indicate wheter we are in an reinforcement learninf environment
+        # indicate wheter we are in an reinforcement learninf environment
         self.is_rl_mode = False
 
         self.unit_types = {
@@ -141,7 +151,7 @@ class World:
         self.start = pd.Timestamp(config["start_date"])
         self.end = pd.Timestamp(config["end_date"])
 
-        #define learning parameteres if the learning mode is activated
+        # define learning parameteres if the learning mode is activated
         self.is_rl_mode = config["rl_config"]["is_rl_mode"]
 
         if self.is_rl_mode:
@@ -152,29 +162,47 @@ class World:
             self.rl_algorithm = None
             self.does_training = config["rl_config"]["does_training"]
 
+            self.rl_eval_rewards = []
+            self.rl_eval_profits = []
+            self.rl_eval_regrets = []
+
             th.backends.cuda.matmul.allow_tf32 = True
             if not self.does_training:
-                self.device = th.device('cpu')
+                self.device = th.device("cpu")
             else:
-                cuda_device = f'cuda:{str(self.cuda_device)}'
-                self.device = th.device(cuda_device if th.cuda.is_available() else 'cpu')
+                cuda_device = f"cuda:{str(self.cuda_device)}"
+                self.device = th.device(
+                    cuda_device if th.cuda.is_available() else "cpu"
+                )
 
             self.float_type = th.float
-            #self.float_type = th.float16 if self.device.type == "cuda" else th.float
+            # self.float_type = th.float16 if self.device.type == "cuda" else th.float
 
             self.tensorboard_writer = None
 
             if self.does_training:
-                self.learning_rate = self.learning_params['learning_rate']
-                self.learning_starts = self.learning_params['learning_starts']
+                self.learning_rate = config["rl_config"]["learning_rate"]
+                self.learning_starts = config["rl_config"]["learning_starts"]
+                self.train_freq = config["rl_config"]["train_freq"]
+                self.gradient_steps = config["rl_config"]["gradient_steps"]
+                self.batch_size = config["rl_config"]["batch_size"]
+                self.gamma = config["rl_config"]["gamma"]
+                self.training_episodes = config["rl_config"]["training_episodes"]
                 self.eval_episodes_done = 0
                 self.max_eval_reward = -1e9
                 self.max_eval_regret = 1e9
                 self.max_eval_profit = -1e9
-                folder_path = 'runs/'+self.simulation_id
+                folder_path = "runs/" + self.simulation_id
                 if os.path.exists(folder_path):
                     shutil.rmtree(folder_path)
                     time.sleep(5)
+
+                self.create_learning_algorithm()
+                self.logger.info(
+                    "Reinforcement Learning Training mode active, MATD3 algorithm created"
+                )
+                device = th.cuda.get_device_name(device=self.device)
+                self.logger.info(f"Running on {device}")
 
         self.index = pd.date_range(
             start=self.start,
@@ -268,7 +296,7 @@ class World:
         save_frequency_hours = config.get("save_frequency_hours", None)
 
         self.output_agent_addr = (self.addr, "export_agent_1")
-        # Add output agent to world
+        # Add output agent to self
         output_role = WriteOutput(
             simulation_id,
             self.start,
@@ -299,8 +327,8 @@ class World:
             market_config = make_market_config(
                 id=market_id,
                 market_params=market_params,
-                world_start=self.start,
-                world_end=self.end,
+                self_start=self.start,
+                self_end=self.end,
             )
 
             operator_id = str(market_params["operator"])
@@ -358,7 +386,11 @@ class World:
 
         # add Rl unit operator
         # to convert results from GPU to CPU need to have all RL bids at once, which is done by one unit operator
-        self.add_unit_operator(id="RL_unit_operator")
+        self.add_unit_operator(
+            id="RL_unit_operator",
+            price_forecast=forecast_provider.price_forecast_df,
+            residual_demand_forecast=forecast_provider.residual_demand_forecast_df,
+        )
 
         # add the units to corresponsing unit operators
         # if fuel prices are provided, add them to the unit params
@@ -377,7 +409,8 @@ class World:
                 # check if we have RL bidding strategy and give it the respective price forecasts
                 if (
                     unit_params["bidding_strategies"]["energy"] == "rl_strategy"
-                    and forecast_provider.price_forecast_df is not None and self.is_rl_mode == True
+                    and forecast_provider.price_forecast_df is not None
+                    and self.is_rl_mode == True
                 ):
                     unit_params["price_forecast"] = forecast_provider.price_forecast_df
                     unit_params[
@@ -387,14 +420,16 @@ class World:
                     # automatically asign Rl unit operator
                     unit_params["unit_operator"] = "RL_unit_operator"
 
-                elif (self.is_rl_mode == False and unit_params["bidding_strategies"]["energy"] == "rl_strategy"):
-                    
+                elif (
+                    self.is_rl_mode == False
+                    and unit_params["bidding_strategies"]["energy"] == "rl_strategy"
+                ):
                     self.logger.warning(
-                    f"You specified a reinforcement learning startegie for {unit_name} but disabled learning. Using default strategies."
+                        f"You specified a reinforcement learning startegie for {unit_name} but disabled learning. Using default strategies."
                     )
-                    
+
                     unit_params["bidding_strategies"] = {
-                    market.product_type: "naive" for market in self.markets.values()
+                        market.product_type: "naive" for market in self.markets.values()
                     }
 
             else:
@@ -517,28 +552,51 @@ class World:
     def add_unit_operator(
         self,
         id: str,
+        price_forecast,
+        residual_demand_forecast,
     ) -> None:
         """
-        Create and add a new unit operator to the world.
+        Create and add a new unit operator to the self.
 
         Params
         ------
         id: str or int
 
         """
-        units_operator = UnitsOperator(available_markets=list(self.markets.values()))
-        # creating a new role agent and apply the role of a unitsoperator
-        unit_operator_agent = RoleAgent(self.container, suggested_aid=f"{id}")
-        unit_operator_agent.add_role(units_operator)
+        if id == "RL_unit_operator":
+            units_operator = RL_UnitsOperator(
+                available_markets=list(self.markets.values())
+            )
+            # creating a new role agent and apply the role of a unitsoperator
+            unit_operator_agent = RoleAgent(self.container, suggested_aid=f"{id}")
+            unit_operator_agent.add_role(units_operator)
 
-        # add the current unitsoperator to the list of operators currently existing
-        self.unit_operators[id] = units_operator
+            # add the current unitsoperator to the list of operators currently existing
+            self.unit_operators[id] = units_operator
 
-        # after creation of an agent - we set additional context params
-        unit_operator_agent._role_context.data_dict = {
-            "output_agent_addr": self.output_agent_addr[0],
-            "output_agent_id": self.output_agent_addr[1],
-        }
+            # after creation of an agent - we set additional context params
+
+            unit_operator_agent._role_context.data_dict = {
+                "output_agent_addr": self.output_agent_addr[0],
+                "output_agent_id": self.output_agent_addr[1],
+                "price_forecast": price_forecast,
+                "res_demand_forecast": residual_demand_forecast,
+            }
+
+        else:
+            units_operator = UnitsOperator(
+                available_markets=list(self.markets.values())
+            )
+            # creating a new role agent and apply the role of a unitsoperator
+            unit_operator_agent = RoleAgent(self.container, suggested_aid=f"{id}")
+            unit_operator_agent.add_role(units_operator)
+
+            # add the current unitsoperator to the list of operators currently existing
+            self.unit_operators[id] = units_operator
+            unit_operator_agent._role_context.data_dict = {
+                "output_agent_addr": self.output_agent_addr[0],
+                "output_agent_id": self.output_agent_addr[1],
+            }
 
     async def add_unit(
         self,
@@ -548,7 +606,7 @@ class World:
         unit_params: dict,
     ) -> None:
         """
-        Create and add a new unit to the world.
+        Create and add a new unit to the self.
 
         Params
         ------
@@ -649,6 +707,51 @@ class World:
         market_operator.markets.append(market_config)
         self.markets[f"{market_config.name}"] = market_config
 
+    def create_learning_algorithm(self):
+        buffer_size = int(5e5)
+        self.rl_algorithm = TD3(
+            env=self,
+            buffer_size=buffer_size,
+            learning_starts=self.learning_starts,
+            train_freq=self.train_freq,
+            gradient_steps=self.gradient_steps,
+            batch_size=self.batch_size,
+            gamma=self.gamma,
+        )
+
+    # in assume self
+    def compare_and_save_policies(self):
+        modes = ["reward", "profit", "regret"]
+        for mode in modes:
+            value = None
+
+            if mode == "reward" and self.rl_eval_rewards[-1] > self.max_eval_reward:
+                self.max_eval_reward = self.rl_eval_rewards[-1]
+                dir_name = "highest_reward"
+                value = self.max_eval_reward
+            elif mode == "profit" and self.rl_eval_profits[-1] > self.max_eval_profit:
+                self.max_eval_profit = self.rl_eval_profits[-1]
+                dir_name = "highest_profit"
+                value = self.max_eval_profit
+            elif (
+                mode == "regret"
+                and self.rl_eval_regrets[-1] < self.max_eval_regret
+                and self.rl_eval_regrets[-1] != 0
+            ):
+                self.max_eval_regret = self.rl_eval_regrets[-1]
+                dir_name = "lowest_regret"
+                value = self.max_eval_regret
+
+            if value is not None:
+                self.rl_algorithm.save_params(dir_name=dir_name)
+                for unit in self.rl_powerplants + self.rl_storages:
+                    if unit.learning:
+                        unit.save_params(dir_name=dir_name)
+
+                self.logger.info(
+                    f"Policies saved, episode: {self.eval_episodes_done + 1}, mode: {mode}, value: {value:.2f}"
+                )
+
     async def step(self):
         next_activity = self.clock.get_next_activity()
         if not next_activity:
@@ -659,9 +762,6 @@ class World:
         return delta
 
     async def run_simulation(self):
-
-
-
         # agent is implicit added to self.container._agents
 
         start_ts = calendar.timegm(self.start.utctimetuple())
@@ -702,4 +802,36 @@ class World:
         )
 
     def run(self):
-        return self.loop.run_until_complete(self.run_simulation())
+        # distinction wheter we first train multiple times the inital simulation time or not
+        if self.is_rl_mode == True:
+            training_start = datetime.now()
+            self.logger.info(f"Training started at: {training_start}")
+
+            for i_episode in tqdm(range(self.training_episodes), desc="Training"):
+                start = datetime.now()
+                self.run_simulation()
+                self.episodes_done += 1
+
+                # evaluate polciy every 5 episodes
+                if (
+                    (i_episode + 1) % 5 == 0
+                ) and self.episodes_done > self.learning_starts:
+                    self.does_training = False
+                    self.run_simulation()
+                    self.compare_and_save_policies()
+                    self.eval_episodes_done += 1
+                    self.training = True
+
+            self.rl_algorithm.save_params(dir_name="last_policy")
+            for unit in self.rl_powerplants + self.rl_storages:
+                unit.save_params(dir_name="last_policy")
+
+            training_end = datetime.now()
+            self.logger.info("################")
+            self.logger.info(f"Training time: {training_end - training_start}")
+
+            self.does_training = False
+            self.run_simulation()
+
+        else:
+            return self.loop.run_until_complete(self.run_simulation())

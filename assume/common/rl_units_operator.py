@@ -21,15 +21,17 @@ from assume.common.market_objects import (
 from assume.common.utils import aggregate_step_amount
 from assume.strategies import BaseStrategy
 from assume.units import BaseUnit
+from assume.common import UnitsOperator
 
 logger = logging.getLogger(__name__)
 
 
-class UnitsOperator(Role):
+class RL_UnitsOperator(UnitsOperator):
     def __init__(
         self,
         available_markets: list[MarketConfig],
         opt_portfolio: tuple[bool, BaseStrategy] = None,
+        world=None,
     ):
         super().__init__()
 
@@ -67,62 +69,7 @@ class UnitsOperator(Role):
                 self.register_market(market)
                 self.registered_markets[market.name] = market
 
-    async def add_unit(
-        self,
-        id: str,
-        unit_type: str,
-        unit_class: type[BaseUnit],
-        unit_params: dict,
-        index: pd.DatetimeIndex,
-    ):
-        """
-        Create a unit.
-        """
 
-        self.units[id] = unit_class(id=id, index=index, **unit_params)
-        self.units[id].reset()
-
-        db_aid = self.context.data_dict.get("output_agent_id")
-        db_addr = self.context.data_dict.get("output_agent_addr")
-        if db_aid and db_addr:
-            # send unit data to db agent to store it
-            message = {
-                "context": "write_results",
-                "type": "store_units",
-                "unit_type": unit_type,
-                "data": self.units[id],
-            }
-            await self.context.send_acl_message(
-                receiver_id=db_aid,
-                receiver_addr=db_addr,
-                content=message,
-            )
-
-    def participate(self, market):
-        # always participate at all markets
-        return True
-
-    def register_market(self, market):
-        self.context.schedule_timestamp_task(
-            self.context.send_acl_message(
-                {"context": "registration", "market": market.name},
-                market.addr,
-                receiver_id=market.aid,
-                acl_metadata={
-                    "sender_addr": self.context.addr,
-                    "sender_id": self.context.aid,
-                },
-            ),
-            1,  # register after time was updated for the first time
-        )
-        logger.debug(f"tried to register at market {market.name}")
-
-    def handle_opening(self, opening: OpeningMessage, meta: dict[str, str]):
-        logger.debug(
-            f'Operator {self.id} received opening from: {opening["market_id"]} {opening["start"]}.'
-        )
-        logger.debug(f'Operator {self.id} can bid until: {opening["stop"]}')
-        self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
 
     def handle_market_feedback(self, content: ClearingMessage, meta: dict[str, str]):
         logger.debug(f"got market result: {content}")
@@ -136,6 +83,7 @@ class UnitsOperator(Role):
         self.set_unit_dispatch(orderbook, marketconfig)
         self.write_actual_dispatch()
 
+#TODO send back market feedback 
     def set_unit_dispatch(self, orderbook, marketconfig):
         """
         feeds the current market result back to the units
@@ -238,6 +186,16 @@ class UnitsOperator(Role):
             acl_metadata=acl_metadata,
         )
 
+ 
+
+    def initialize(self, t=0):
+        if self.rl_agent:
+            self.create_obs(t)
+
+        for unit in self.units.items():
+            unit.reset()
+
+
     async def formulate_bids(self, market: MarketConfig, products: list[tuple]):
         """
         Takes information from all units that the unit operator manages and
@@ -255,211 +213,187 @@ class UnitsOperator(Role):
         sorted_products = sorted(products, key=lambda p: (p[0] - p[1], p[0]))
 
         for product in sorted_products:
-            if self.use_portfolio_opt:
-                op_windows = []
-                for unit_id, unit in self.units.items():
-                    # get operational window for each unit
-                    operational_window = unit.calculate_operational_window(
-                        product_type=market.product_type,
-                        product_tuple=product,
-                    )
-                    op_windows.append(operational_window)
-                    # TODO calculate bids from sum of op_windows
-            else:
-                order: Order = {
-                    "start_time": product[0],
-                    "end_time": product[1],
-                    "only_hours": product[2],
-                    "agent_id": (self.context.addr, self.context.aid),
-                }
 
-                for unit_id, unit in self.units.items():
-                    # take price from bidding strategy
-                    bids = unit.calculate_bids(
-                        market_config=market,
-                        product_tuple=product,
-                    )
+            order: Order = {
+                "start_time": product[0],
+                "end_time": product[1],
+                "only_hours": product[2],
+                "agent_id": (self.context.addr, self.context.aid),
+            }
 
-                    if bids is None:
-                        continue
+            actions = th.zeros(
+            size=(len(self.units), self.world.act_dim),
+            device=self.world.device,
+            )
 
-                    for i, bid in enumerate(bids):
-                        price = bid["price"]
-                        volume = bid["volume"]
-                        if market.volume_tick:
-                            volume = round(volume / market.volume_tick)
-                        if market.price_tick:
-                            price = round(price / market.price_tick)
+            for unit_id, unit in self.units.items():
+                # take price from bidding strategy
+                actions[unit_id, :] = unit.calculate_bids(
+                    market_config=market,
+                    product_tuple=product,
+                )
 
-                        order_c = order.copy()
-                        order_c["volume"] = volume
-                        order_c["price"] = price
-                        order_c["bid_id"] = f"{unit_id}_{i+1}"
-                        orderbook.append(order_c)
+            #convert actions from GPU onto CPU so that it is usable for the rest of the simulation
+            #done for all actions once since this is a rather lengthly process
+            actions = actions.clamp(-1, 1)
+            actions = actions.squeeze().cpu().numpy()
+            actions = actions.reshape(len(self.units), -1)
 
-                        self.bids_map[order_c["bid_id"]] = unit_id
+            if np.isnan(actions).any():
+                raise ValueError("A NaN action happened.")
+
+
+            for unit_id, unit in self.units.items():
+                
+                #append must run bid to oder book
+                price = actions[unit_id, :].min() * unit.max_price
+                volume = unit.minPower
+
+                if market.volume_tick:
+                    volume = round(volume / market.volume_tick)
+                if market.price_tick:
+                    price = round(price / market.price_tick)
+
+                order_c = order.copy()
+                order_c["volume"] = volume
+                order_c["price"] = price
+                order_c["bid_id"] = f"{unit_id}_{1}"
+                orderbook.append(order_c)
+
+
+                #append flexable bid to oder book
+                price = actions[unit_id, :].max() * unit.max_price
+                volume = unit.maxPower - unit.minPower
+
+                if market.volume_tick:
+                    volume = round(volume / market.volume_tick)
+                if market.price_tick:
+                    price = round(price / market.price_tick)
+
+                order_c = order.copy()
+                order_c["volume"] = volume
+                order_c["price"] = price
+                order_c["bid_id"] = f"{unit_id}_{2}"
+                orderbook.append(order_c)
+
+                self.bids_map[order_c["bid_id"]] = unit_id
 
         return orderbook
 
-    # async def on_stop(self):
-    #     series = aggregate_step_amount(self.valid_orders)
-    #     df = pd.DataFrame(series)
-
-    #     if not df.empty:
-    #         import matplotlib.pyplot as plt
-    #         plt.plot(df[0], df[1])
-    #         plt.title(self.id)
-    #         plt.show()
-
-    def initialize(self, t=0):
-        if self.rl_agent:
-            self.create_obs(t)
-
-        for unit in self.units.items():
-            unit.reset()
-
-    # in rl_units operator in ASSUME
-    # TODO merge with our formulate bids
-    def calculate_rl_bids(self):
-        actions = th.zeros(
-            size=(len(self.rl_powerplants | self.rl_storages), self.world.act_dim),
-            device=self.world.device,
-        )
-
-        for i, unit in enumerate((self.rl_powerplants | self.rl_storages).values()):
-            actions[i, :] = unit.formulate_bids()
-
-        actions = actions.clamp(-1, 1)
-        actions = actions.squeeze().cpu().numpy()
-        actions = actions.reshape(len(self.rl_powerplants | self.rl_storages), -1)
-
-        if np.isnan(actions).any():
-            raise ValueError("A NaN actions happened.")
-
-        for i, unit in enumerate((self.rl_powerplants | self.rl_storages).values()):
-            if unit.technology in ["PSPP", "Storage", "BES"]:
-                bid_price = actions[i, 0] * unit.max_price
-
-                bid_direction = "sell" if actions[i, 1] >= 0 else "buy"
-
-                bid_quantity_supply = min(
-                    (unit.soc[self.world.currstep] - unit.min_soc)
-                    / self.world.dt
-                    * self.efficiency_dis,
-                    unit.max_power_dis,
-                )
-
-                bid_quantity_demand = min(
-                    (unit.max_soc - unit.soc[self.world.currstep])
-                    / unit.efficiency_ch
-                    / self.world.dt,
-                    unit.max_power_ch,
-                )
-
-                if (
-                    bid_quantity_supply >= self.world.minBidEOM
-                    and bid_direction == "sell"
-                ):
-                    formulated_bid = Bid(
-                        issuer=unit,
-                        ID=f"{unit.name}_supplyEOM",
-                        price=bid_price,
-                        amount=bid_quantity_supply,
-                        status="Sent",
-                        bidType="Supply",
-                        node=unit.node,
-                    )
-
-                    self.bids.append(formulated_bid)
-
-                elif (
-                    bid_quantity_demand >= self.world.minBidEOM
-                    and bid_direction == "buy"
-                ):
-                    formulated_bid = Bid(
-                        issuer=unit,
-                        ID=f"{unit.name}_demandEOM",
-                        price=bid_price,
-                        amount=bid_quantity_demand,
-                        status="Sent",
-                        bidType="Demand",
-                        node=unit.node,
-                    )
-
-                    self.bids.append(formulated_bid)
-
-            else:
-                bid_price_mr = actions[i, :].min() * unit.max_price
-                bid_price_flex = actions[i, :].max() * unit.max_price
-                bid_quantity_mr, bid_quantity_flex = (
-                    unit.minPower,
-                    unit.maxPower - unit.minPower,
-                )
-
-                bid_mr = Bid(
-                    issuer=unit,
-                    ID=f"{unit.name}_mrEOM",
-                    price=bid_price_mr,
-                    amount=bid_quantity_mr,
-                    status="Sent",
-                    bidType="Supply",
-                    node=unit.node,
-                )
-
-                bid_flex = Bid(
-                    issuer=unit,
-                    ID=f"{unit.name}_flexEOM",
-                    price=bid_price_flex,
-                    amount=bid_quantity_flex,
-                    status="Sent",
-                    bidType="Supply",
-                    node=unit.node,
-                )
-
-                self.bids.extend([bid_mr, bid_flex])
-
-    # TODO merge with our submit bids
-    def request_bids(self, t, market="EOM"):
-        self.bids = []
-        self.calculate_conv_bids(t, market)
-        if self.rl_agent:
-            self.calculate_rl_bids()
-
-        return self.bids
 
     def step(self):
         self.create_obs(self.world.currstep + 1)
 
-        for powerplant in self.rl_powerplants.values():
-            powerplant.step()
+        for unit_id, unit in self.units.items():
+            unit.step(self.obs)
 
     # in rl_units operator in ASSUME
-    # TODO use forecasts
-    def create_obs(self, t):
+    # TODO consider that the last forecast_length time steps cant be used
+    # TODO enable difference between actual load realisation and residual load forecast
+    def create_obs(self):
+        start = world.start
+        end=world.end
+        now= datetime.utcfromtimestamp(self.context.current_timestamp)
+        delta_t=now-start #in metric of market
         obs = []
-        forecast_len = 30
+        forecast_len = 30 #in metric of market
 
-        if t < forecast_len:
-            obs.extend(self.world.scaled_res_load[-forecast_len + t :])
-            obs.extend(self.world.scaled_res_load_forecast[: t + forecast_len])
+        if delta_t < forecast_len:
+            obs.extend(self.context.data_dict.get("res_demand_forecast")[-forecast_len + delta_t :])
+            obs.extend(self.context.data_dict.get("res_demand_forecast")[: delta_t + forecast_len])
 
-            obs.extend(self.world.scaled_mcp[-forecast_len + t :])
-            obs.extend(self.world.scaled_pfc[: t + forecast_len])
+            obs.extend(self.context.data_dict.get("price_forecast")[-forecast_len + delta_t :])
+            obs.extend(self.context.data_dict.get("price_forecast")[: delta_t + forecast_len])
 
-        elif t < len(self.world.snapshots) - forecast_len:
-            obs.extend(self.world.scaled_res_load[t - forecast_len : t])
-            obs.extend(self.world.scaled_res_load_forecast[t : t + forecast_len])
+        elif delta_t < (end-start) - forecast_len:
+            obs.extend(self.context.data_dict.get("res_demand_forecast")[delta_t - forecast_len : delta_t])
+            obs.extend(self.context.data_dict.get("res_demand_forecast")[delta_t : delta_t + forecast_len])
 
-            obs.extend(self.world.scaled_mcp[t - forecast_len : t])
-            obs.extend(self.world.scaled_pfc[t : t + forecast_len])
+            obs.extend(self.context.data_dict.get("price_forecast")[delta_t - forecast_len : delta_t])
+            obs.extend(self.context.data_dict.get("price_forecast")[delta_t : delta_t + forecast_len])
 
         else:
-            obs.extend(self.world.scaled_res_load[t - forecast_len :])
+            obs.extend(self.context.data_dict.get("res_demand_forecast")[delta_t - forecast_len :])
             obs.extend(
-                self.world.scaled_res_load_forecast[: forecast_len * 2 - len(obs)]
+                self.context.data_dict.get("res_demand_forecast")[: forecast_len * 2 - len(obs)]
             )
 
-            obs.extend(self.world.scaled_mcp[t - forecast_len :])
-            obs.extend(self.world.scaled_pfc[: forecast_len * 4 - len(obs)])
+            obs.extend(self.context.data_dict.get("price_forecast")[t - forecast_len :])
+            obs.extend(self.context.data_dict.get("price_forecast")[: forecast_len * 4 - len(obs)])
 
         self.obs = obs
+
+#everything below is TODO
+
+    def collect_experience(self):
+        total_units = self.rl_algorithm.n_rl_agents
+        obs = th.zeros((2, total_units, self.obs_dim), device=self.device)
+        actions = th.zeros((total_units, self.act_dim), device=self.device)
+        rewards = []
+
+        for i, pp in enumerate(self.rl_algorithm.rl_agents):
+            obs[0][i] = pp.curr_experience[0]
+            obs[1][i] = pp.curr_experience[1]
+            actions[i] = pp.curr_experience[2]
+            rewards.append(pp.curr_experience[3])
+
+        return obs, actions, rewards
+    
+    #this function is used in flexable but I want this in the RL Units operator
+            if self.training:
+                obs, actions, rewards = self.collect_experience()
+                self.rl_algorithm.buffer.add(obs, actions, rewards)
+                self.rl_algorithm.update_policy()
+
+    # TODO check wiritng and if it should be in units operator and tensorboard
+    def extract_rl_episode_info(self):
+        total_rewards = 0
+        total_profits = 0
+        total_regrets = 0
+
+        for unit in self.rl_powerplants:
+            if unit.learning:
+                total_rewards += sum(unit.rewards)
+                total_profits += sum(unit.profits)
+                total_regrets += sum(unit.regrets)
+
+        for unit in self.rl_storages:
+            if unit.learning:
+                total_rewards += sum(unit.rewards)
+                total_rewards += sum(unit.rewards)
+                total_profits += sum(unit.profits)
+
+        total_rl_units = (
+            self.rl_algorithm.n_rl_agents
+            if self.rl_algorithm is not None
+            else len(self.rl_powerplants + self.rl_storages)
+        )
+        average_reward = total_rewards / total_rl_units / len(self.snapshots)
+        average_profit = total_profits / total_rl_units / len(self.snapshots)
+        average_regret = total_regrets / total_rl_units / len(self.snapshots)
+
+        if self.training:
+            self.tensorboard_writer.add_scalar(
+                "Train/Average Reward", average_reward, self.episodes_done
+            )
+            self.tensorboard_writer.add_scalar(
+                "Train/Average Profit", average_profit, self.episodes_done
+            )
+            self.tensorboard_writer.add_scalar(
+                "Train/Average Regret", average_regret, self.episodes_done
+            )
+        else:
+            self.rl_eval_rewards.append(average_reward)
+            self.rl_eval_profits.append(average_profit)
+            self.rl_eval_regrets.append(average_regret)
+
+            if self.tensorboard_writer:
+                self.tensorboard_writer.add_scalar(
+                    "Eval/Average Reward", average_reward, self.eval_episodes_done
+                )
+                self.tensorboard_writer.add_scalar(
+                    "Eval/Average Profit", average_profit, self.eval_episodes_done
+                )
+                self.tensorboard_writer.add_scalar(
+                    "Eval/Average Regret", average_regret, self.eval_episodes_done
+                )
