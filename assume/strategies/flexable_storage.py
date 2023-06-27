@@ -10,7 +10,6 @@ class flexableEOMStorage(BaseStrategy):
         super().__init__(*args, **kwargs)
 
         self.foresight = pd.Timedelta("12h")
-        
 
     def calculate_bids(
         self,
@@ -32,10 +31,11 @@ class flexableEOMStorage(BaseStrategy):
             # =============================================================================
             start = operational_window["window"]["start"]
             end = operational_window["window"]["end"]
-            time_delta = pd.date_range(start=start, 
-                                      end=end-unit.index.freq, 
-                                      freq=unit.index.freq,
-                                      )
+            time_delta = pd.date_range(
+                start=start,
+                end=end - unit.index.freq,
+                freq=unit.index.freq,
+            )
 
             average_price = self.calculate_price_average(unit, time_delta)
 
@@ -46,11 +46,13 @@ class flexableEOMStorage(BaseStrategy):
                 # place bid to discharge
                 bid_quantity = min(
                     max(
-                        ((
-                            (unit.current_SOC - unit.min_SOC)
-                            - np.sum(unit.pos_capacity_reserve[time_delta])
-                        )
-                        * unit.efficiency_discharge),
+                        (
+                            (
+                                (unit.current_SOC - unit.min_SOC)
+                                - np.sum(unit.pos_capacity_reserve[time_delta])
+                            )
+                            * unit.efficiency_discharge
+                        ),
                         0,
                     ),
                     operational_window["max_power_discharge"]["power_discharge"],
@@ -66,10 +68,12 @@ class flexableEOMStorage(BaseStrategy):
                 bid_quantity = max(
                     -max(
                         (
-                            ((unit.max_SOC - unit.current_SOC)
-                            - np.sum(unit.neg_capacity_reserve[time_delta])
-                        )
-                        / unit.efficiency_charge),
+                            (
+                                (unit.max_SOC - unit.current_SOC)
+                                - np.sum(unit.neg_capacity_reserve[time_delta])
+                            )
+                            / unit.efficiency_charge
+                        ),
                         0,
                     ),
                     operational_window["max_power_charge"]["power_charge"],
@@ -83,14 +87,15 @@ class flexableEOMStorage(BaseStrategy):
         return bids
 
     def calculate_price_average(self, unit, time_delta):
-        
         """if t - self.foresight < pd.Timedelta("0h"):
-            average_price = np.mean(unit.price_forecast[t-self.foresight:] 
+            average_price = np.mean(unit.price_forecast[t-self.foresight:]
                                     + unit.price_forecast[:t+self.foresight])
         else:"""
-        
+
         average_price = np.mean(
-            unit.price_forecast[time_delta[0] - self.foresight : time_delta[-1] + self.foresight]
+            unit.price_forecast[
+                time_delta[0] - self.foresight : time_delta[-1] + self.foresight
+            ]
         )
 
         return average_price
@@ -101,7 +106,6 @@ class flexableCRMStorage(BaseStrategy):
         super().__init__(*args, **kwargs)
 
         self.foresight = pd.Timedelta("12h")
-        
 
     def calculate_bids(
         self,

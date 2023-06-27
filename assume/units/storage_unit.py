@@ -206,7 +206,6 @@ class StorageUnit(BaseUnit):
         start, end, only_hours = product_tuple
         start = pd.Timestamp(start)
         end = pd.Timestamp(end)
-        
 
         if product_type == "energy":
             return self.calculate_energy_operational_window(start, end)
@@ -216,12 +215,12 @@ class StorageUnit(BaseUnit):
     def calculate_energy_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
-        
         end_excl = end - self.index.freq
-        time_delta = pd.date_range(start=start, 
-                                      end=end_excl, 
-                                      freq=self.index.freq,
-                                      )
+        time_delta = pd.date_range(
+            start=start,
+            end=end_excl,
+            freq=self.index.freq,
+        )
         if self.current_status == 0 and self.current_down_time < self.min_down_time:
             return None
 
@@ -303,9 +302,11 @@ class StorageUnit(BaseUnit):
             max_power_discharge,
             max(
                 0,
-                ((self.current_SOC - min_SOC - self.pos_capacity_reserve[start]) 
-                 * self.efficiency_discharge
-                / len(time_delta)),
+                (
+                    (self.current_SOC - min_SOC - self.pos_capacity_reserve[start])
+                    * self.efficiency_discharge
+                    / len(time_delta)
+                ),
             ),
         )
 
@@ -314,9 +315,11 @@ class StorageUnit(BaseUnit):
             max_power_charge,
             min(
                 0,
-                ((self.current_SOC - max_SOC - self.neg_capacity_reserve[start])
-                / self.efficiency_charge
-                / len(time_delta)),
+                (
+                    (self.current_SOC - max_SOC - self.neg_capacity_reserve[start])
+                    / self.efficiency_charge
+                    / len(time_delta)
+                ),
             ),
         )
 
@@ -371,12 +374,12 @@ class StorageUnit(BaseUnit):
     def calculate_reserve_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
-        
         end_excl = end - self.index.freq
-        time_delta = pd.date_range(start=start, 
-                                      end=end_excl, 
-                                      freq=self.index.freq,
-                                      )
+        time_delta = pd.date_range(
+            start=start,
+            end=end_excl,
+            freq=self.index.freq,
+        )
         # capacity calculation has to be added
         current_power = self.total_power_output.at[start - self.index.freq]
 
@@ -424,10 +427,11 @@ class StorageUnit(BaseUnit):
         product_type: str,
     ):
         end_excl = end - self.index.freq
-        time_delta = pd.date_range(start=start, 
-                                      end=end_excl, 
-                                      freq=self.index.freq,
-                                      )
+        time_delta = pd.date_range(
+            start=start,
+            end=end_excl,
+            freq=self.index.freq,
+        )
         self.total_power_output.loc[time_delta] += dispatch_plan["total_power"]
 
         # TODO check if resulting power is < max_power
@@ -442,7 +446,9 @@ class StorageUnit(BaseUnit):
             self.total_power_output.loc[time_delta] = dispatch_plan["total_power"]
             self.current_SOC = (
                 self.current_SOC
-                - dispatch_plan["total_power"] * len(time_delta) / self.efficiency_discharge
+                - dispatch_plan["total_power"]
+                * len(time_delta)
+                / self.efficiency_discharge
             )
 
         elif self.total_power_output[time_delta].max() <= -self.min_power_charge:
@@ -451,7 +457,10 @@ class StorageUnit(BaseUnit):
             self.current_down_time = 0
             self.total_power_output.loc[time_delta] = dispatch_plan["total_power"]
             self.current_SOC = (
-                self.current_SOC - dispatch_plan["total_power"] * len(time_delta) * self.efficiency_charge
+                self.current_SOC
+                - dispatch_plan["total_power"]
+                * len(time_delta)
+                * self.efficiency_charge
             )
 
         elif self.total_power_output[time_delta].min() < self.min_power_discharge:

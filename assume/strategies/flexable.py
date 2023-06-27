@@ -20,13 +20,14 @@ class flexableEOM(BaseStrategy):
         bid_quantity_flex, bid_price_flex = 0, 0
 
         if operational_window is not None:
-            #TODO: check where start has to be replaced by an aggregation over time_delta
+            # TODO: check where start has to be replaced by an aggregation over time_delta
             start = operational_window["window"]["start"]
             end = operational_window["window"]["end"]
-            time_delta = pd.date_range(start=start, 
-                                      end=end-unit.index.freq, 
-                                      freq=unit.index.freq,
-                                      )
+            time_delta = pd.date_range(
+                start=start,
+                end=end - unit.index.freq,
+                freq=unit.index.freq,
+            )
             # =============================================================================
             # Powerplant is either on, or is able to turn on
             # Calculating possible bid amount
@@ -49,8 +50,7 @@ class flexableEOM(BaseStrategy):
 
             if unit.total_heat_output[start] > 0:
                 power_loss_ratio = (
-                    unit.power_loss_chp[start]
-                    / unit.total_heat_output[start]
+                    unit.power_loss_chp[start] / unit.total_heat_output[start]
                 )
             else:
                 power_loss_ratio = 0.0
@@ -69,7 +69,9 @@ class flexableEOM(BaseStrategy):
 
         return bids
 
-    def calculate_EOM_price_if_off(self, unit, marginal_cost_mr, bid_quantity_inflex, time_delta):
+    def calculate_EOM_price_if_off(
+        self, unit, marginal_cost_mr, bid_quantity_inflex, time_delta
+    ):
         # The powerplant is currently off and calculates a startup markup as an extra
         # to the marginal cost
         # Calculating the average uninterrupted operating period
@@ -87,7 +89,9 @@ class flexableEOM(BaseStrategy):
 
         return bid_price_inflex
 
-    def calculate_EOM_price_if_on(self, unit, marginal_cost_flex, bid_quantity_inflex, time_delta):
+    def calculate_EOM_price_if_on(
+        self, unit, marginal_cost_flex, bid_quantity_inflex, time_delta
+    ):
         """
         Check the description provided by Thomas in last version, the average downtime is not available
         """
