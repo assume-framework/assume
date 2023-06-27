@@ -10,7 +10,7 @@ class flexableEOMStorage(BaseStrategy):
         super().__init__()
 
         self.foresight = pd.Timedelta("12h")
-        self.current_time = None
+        
 
     def calculate_bids(
         self,
@@ -29,61 +29,67 @@ class flexableEOMStorage(BaseStrategy):
             # =============================================================================
             # Storage Unit is either charging, discharging, or off
             # =============================================================================
-            self.current_time = operational_window["window"]["start"]
+            start = operational_window["window"]["start"]
+            end = operational_window["window"]["end"]
+            time_delta = pd.date_range(start=start, 
+                                      end=end-unit.index.freq, 
+                                      freq=unit.index.freq,
+                                      )
 
-            average_price = self.calculate_price_average(unit)
+            average_price = self.calculate_price_average(unit, time_delta)
 
             if (
-                unit.price_forecast[self.current_time]
+                np.mean(unit.price_forecast[time_delta])
                 >= average_price / unit.efficiency_discharge
             ):
                 # place bid to discharge
                 bid_quantity = min(
                     max(
-                        (
+                        ((
                             (unit.current_SOC - unit.min_SOC)
-                            - unit.pos_capacity_reserve[self.current_time]
+                            - np.sum(unit.pos_capacity_reserve[time_delta])
                         )
-                        * unit.efficiency_discharge,
+                        * unit.efficiency_discharge),
                         0,
                     ),
-                    unit.max_power_discharge,
+                    operational_window["max_power_discharge"]["power_discharge"],
                 )
 
                 bids = [{"price": average_price, "volume": bid_quantity}]
 
             elif (
-                unit.price_forecast[self.current_time]
+                np.mean(unit.price_forecast[time_delta])
                 <= average_price * unit.efficiency_charge
             ):
                 # place bid to charge
-                bid_quantity = min(
-                    max(
+                bid_quantity = max(
+                    -max(
                         (
-                            (unit.max_SOC - unit.current_SOC)
-                            - unit.neg_capacity_reserve[self.current_time]
+                            ((unit.max_SOC - unit.current_SOC)
+                            - np.sum(unit.neg_capacity_reserve[time_delta])
                         )
-                        / unit.efficiency_charge,
+                        / unit.efficiency_charge),
                         0,
                     ),
-                    unit.max_power_charge,
+                    operational_window["max_power_charge"]["power_charge"],
                 )
 
-                bids = [{"price": average_price, "volume": -bid_quantity}]
+                bids = [{"price": average_price, "volume": bid_quantity}]
 
             else:
                 bids = []
-
+            print(bids, unit.current_SOC)
         return bids
 
-    def calculate_price_average(self, unit):
-        t = self.current_time
+    def calculate_price_average(self, unit, time_delta):
+        
         """if t - self.foresight < pd.Timedelta("0h"):
             average_price = np.mean(unit.price_forecast[t-self.foresight:] 
                                     + unit.price_forecast[:t+self.foresight])
         else:"""
+        
         average_price = np.mean(
-            unit.price_forecast[t - self.foresight : t + self.foresight]
+            unit.price_forecast[time_delta[0] - self.foresight : time_delta[-1] + self.foresight]
         )
 
         return average_price
@@ -94,7 +100,7 @@ class flexableCRMStorage(BaseStrategy):
         super().__init__()
 
         self.foresight = pd.Timedelta("12h")
-        self.current_time = None
+        
 
     def calculate_bids(
         self,
