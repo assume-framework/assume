@@ -332,9 +332,11 @@ class World:
                     unit_name
                 ].to_dict()
 
-                unit_params["price_forecast"] = self.forecast_providers['EOM'].price_forecast_df
-                
-                #TODO: call forecast_providers from the units dependign on used markets
+                unit_params["price_forecast"] = self.forecast_providers[
+                    "EOM"
+                ].price_forecast_df
+
+                # TODO: call forecast_providers from the units dependign on used markets
                 # check if we have RL bidding strategy
                 # if (
                 #     unit_params["bidding_strategies"]["energy"] == "rl_strategy"
@@ -426,11 +428,13 @@ class World:
                         market.product_type: "simple"
                         for market in self.markets.values()
                     }
-                
+
                 # TODO: shift call of forecasts
                 # if self.price_forecast is not None:
                 #     unit_params["price_forecast"] = self.price_forecast["mcp"]
-                unit_params["price_forecast"] = self.forecast_providers['EOM'].price_forecast_df
+                unit_params["price_forecast"] = self.forecast_providers[
+                    "EOM"
+                ].price_forecast_df
 
                 await self.add_unit(
                     id=storage_name,
