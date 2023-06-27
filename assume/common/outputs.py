@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 class WriteOutput(Role):
     def __init__(
         self,
-        simulation_id: str,
+        scenario: str,
+        study_case: str,
         start: datetime,
         end: datetime,
         db_engine=None,
@@ -26,7 +27,7 @@ class WriteOutput(Role):
         Initializes an instance of the WriteOutput class.
 
         Args:
-            simulation_id (str): The ID of the simulation as a unique calssifier.
+            study_case (str): The ID of the simulation as a unique calssifier.
             start (datetime): The start datetime of the simulation run.
             end (datetime): The end datetime of the simulation run.
             db_engine (optional): The database engine. Defaults to None.
@@ -37,13 +38,13 @@ class WriteOutput(Role):
         super().__init__()
 
         # store needed date
-        self.simulation_id = simulation_id
+        self.study_case = study_case
         self.save_frequency_hours: int = save_frequency_hours or 1
 
         # make directory if not already present
         self.export_csv_path = export_csv_path
         if self.export_csv_path:
-            self.p = Path(self.export_csv_path, simulation_id)
+            self.p = Path(self.export_csv_path, study_case)
             if self.p.exists():
                 shutil.rmtree(self.p)
             self.p.mkdir(parents=True)
@@ -70,7 +71,7 @@ class WriteOutput(Role):
                 with self.db() as db:
                     # Read table into Pandas DataFrame
                     query = text(
-                        f"delete from {table_name} where simulation = '{self.simulation_id}'"
+                        f"delete from {table_name} where simulation = '{self.study_case}'"
                     )
                     rowcount = db.execute(query).rowcount
                     # has to be done manually with raw queries
@@ -132,7 +133,7 @@ class WriteOutput(Role):
         df = pd.DataFrame(market_meta)
         if df.empty:
             return
-        df["simulation"] = self.simulation_id
+        df["simulation"] = self.study_case
         self.write_dfs["market_meta"].append(df)
 
     async def store_dfs(self):
@@ -171,7 +172,7 @@ class WriteOutput(Role):
         df = pd.DataFrame.from_records(market_orders, index="start_time")
         del df["only_hours"]
         del df["agent_id"]
-        df["simulation"] = self.simulation_id
+        df["simulation"] = self.study_case
         df["market_id"] = market_id
         self.write_dfs["market_orders"].append(df)
 
@@ -188,7 +189,7 @@ class WriteOutput(Role):
         if unit_type == "power_plant":
             unit_info = {
                 unit.id: {
-                    "simulation": self.simulation_id,
+                    "simulation": self.study_case,
                     "unit_type": unit_type,
                     "technology": unit.technology,
                     "max_power": unit.max_power,
@@ -206,7 +207,7 @@ class WriteOutput(Role):
         elif unit_type == "storage_unit":
             unit_info = {
                 unit.id: {
-                    "simulation": self.simulation_id,
+                    "simulation": self.study_case,
                     "unit_type": unit_type,
                     "technology": unit.technology,
                     "max_power_charge": unit.max_power_charge,
@@ -225,7 +226,7 @@ class WriteOutput(Role):
         elif unit_type == "demand":
             unit_info = {
                 unit.id: {
-                    "simulation": self.simulation_id,
+                    "simulation": self.study_case,
                     "unit_type": unit_type,
                     "technology": unit.technology,
                     "max_power": unit.max_power,
@@ -257,7 +258,7 @@ class WriteOutput(Role):
             Formatted like, "datetime, power, market_id, unit_id"
         """
         df = pd.DataFrame(data, columns=["datetime", "power", "market_id", "unit_id"])
-        df["simulation"] = self.simulation_id
+        df["simulation"] = self.study_case
         self.write_dfs["market_dispatch"].append(df)
 
     def write_unit_dispatch(self, data):
@@ -268,7 +269,7 @@ class WriteOutput(Role):
             data: The records to be put into the table.
             Formatted like, "datetime, power, market_id, unit_id"
         """
-        data["simulation"] = self.simulation_id
+        data["simulation"] = self.study_case
         self.write_dfs["unit_dispatch"].append(data)
 
     async def on_stop(self):
@@ -279,10 +280,10 @@ class WriteOutput(Role):
         # insert left records into db
         await self.store_dfs()
         queries = [
-            f"select market_id as name, avg(price) as avg_price from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select market_id as name, sum(price*demand_volume_energy) as total_cost from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select market_id as name, sum(demand_volume_energy) as total_volume from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select unit_id as name, market_id, avg(power/max_power) as capacity_factor from market_dispatch ud join unit_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by name, market_id",
+            f"select market_id as name, avg(price) as avg_price from market_meta where simulation = '{self.study_case}' group by market_id",
+            f"select market_id as name, sum(price*demand_volume_energy) as total_cost from market_meta where simulation = '{self.study_case}' group by market_id",
+            f"select market_id as name, sum(demand_volume_energy) as total_volume from market_meta where simulation = '{self.study_case}' group by market_id",
+            f"select unit_id as name, market_id, avg(power/max_power) as capacity_factor from market_dispatch ud join unit_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.study_case}' group by name, market_id",
         ]
         dfs = []
         for query in queries:
@@ -290,7 +291,7 @@ class WriteOutput(Role):
             dfs.append(df.melt(id_vars=["name"]))
         df = pd.concat(dfs)
         df.reset_index()
-        df["simulation"] = self.simulation_id
+        df["simulation"] = self.study_case
         if self.export_csv_path:
             kpi_data_path = self.p.joinpath("kpis.csv")
             df.to_csv(kpi_data_path, mode="a", header=not kpi_data_path.exists())

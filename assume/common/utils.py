@@ -116,6 +116,7 @@ def make_market_config(
     market_config = MarketConfig(
         name=id,
         market_products=market_products,
+        product_type=market_params.get("product_type", "energy"),
         opening_hours=rr.rrule(
             freq=freq,
             interval=interval,
@@ -123,16 +124,17 @@ def make_market_config(
             until=end,
             cache=True,
         ),
-        additional_fields=market_params.get("additional_fields", []),
-        product_type=market_params.get("product_type", "energy"),
         opening_duration=pd.Timedelta(market_params["opening_duration"]),
+        market_mechanism=market_params["market_mechanism"],
+        maximum_bid_volume=market_params["maximum_bid_volume"],
+        maximum_bid_price=market_params["maximum_bid_price"],
+        minimum_bid_price=market_params["minimum_bid_price"],
         maximum_gradient=market_params.get("max_gradient"),
         volume_unit=market_params.get("volume_unit"),
         volume_tick=market_params.get("volume_tick"),
-        maximum_volume=market_params["maximum_volume"],
-        price_tick=market_params.get("price_tick"),
         price_unit=market_params["price_unit"],
-        market_mechanism=market_params["market_mechanism"],
+        price_tick=market_params.get("price_tick"),
+        additional_fields=market_params.get("additional_fields", []),
         supports_get_unmatched=market_params.get("supports_get_unmatched", False),
     )
 
