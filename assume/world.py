@@ -74,6 +74,9 @@ class World:
         self.unit_operators: dict[str, UnitsOperator] = {}
         self.forecast_providers: dict[str, ForecastProvider] = {}
 
+        #indicate wheter we are in an reinforcement learninf environment
+        self.is_rl_mode = False
+
         self.unit_types = {
             "power_plant": PowerPlant,
             "heatpump": HeatPump,
@@ -137,6 +140,41 @@ class World:
 
         self.start = pd.Timestamp(config["start_date"])
         self.end = pd.Timestamp(config["end_date"])
+
+        #define learning parameteres if the learning mode is activated
+        self.is_rl_mode = config["rl_config"]["is_rl_mode"]
+
+        if self.is_rl_mode:
+            self.obs_dim = 128
+            self.act_dim = 2
+            self.episodes_done = 0
+
+            self.rl_algorithm = None
+            self.does_training = config["rl_config"]["does_training"]
+
+            th.backends.cuda.matmul.allow_tf32 = True
+            if not self.does_training:
+                self.device = th.device('cpu')
+            else:
+                cuda_device = f'cuda:{str(self.cuda_device)}'
+                self.device = th.device(cuda_device if th.cuda.is_available() else 'cpu')
+
+            self.float_type = th.float
+            #self.float_type = th.float16 if self.device.type == "cuda" else th.float
+
+            self.tensorboard_writer = None
+
+            if self.does_training:
+                self.learning_rate = self.learning_params['learning_rate']
+                self.learning_starts = self.learning_params['learning_starts']
+                self.eval_episodes_done = 0
+                self.max_eval_reward = -1e9
+                self.max_eval_regret = 1e9
+                self.max_eval_profit = -1e9
+                folder_path = 'runs/'+self.simulation_id
+                if os.path.exists(folder_path):
+                    shutil.rmtree(folder_path)
+                    time.sleep(5)
 
         self.index = pd.date_range(
             start=self.start,
@@ -336,17 +374,28 @@ class World:
                     unit_name
                 ].to_dict()
 
-                # check if we have RL bidding strategy and give
+                # check if we have RL bidding strategy and give it the respective price forecasts
                 if (
                     unit_params["bidding_strategies"]["energy"] == "rl_strategy"
-                    and forecast_provider.price_forecast_df is not None
+                    and forecast_provider.price_forecast_df is not None and self.is_rl_mode == True
                 ):
                     unit_params["price_forecast"] = forecast_provider.price_forecast_df
                     unit_params[
                         "res_demand_forecast"
                     ] = forecast_provider.residual_demand_forecast_df
+
                     # automatically asign Rl unit operator
                     unit_params["unit_operator"] = "RL_unit_operator"
+
+                elif (self.is_rl_mode == False and unit_params["bidding_strategies"]["energy"] == "rl_strategy"):
+                    
+                    self.logger.warning(
+                    f"You specified a reinforcement learning startegie for {unit_name} but disabled learning. Using default strategies."
+                    )
+                    
+                    unit_params["bidding_strategies"] = {
+                    market.product_type: "naive" for market in self.markets.values()
+                    }
 
             else:
                 self.logger.warning(
@@ -610,6 +659,9 @@ class World:
         return delta
 
     async def run_simulation(self):
+
+
+
         # agent is implicit added to self.container._agents
 
         start_ts = calendar.timegm(self.start.utctimetuple())

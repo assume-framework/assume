@@ -4,6 +4,9 @@ from itertools import groupby
 from operator import itemgetter
 from pathlib import Path
 
+import torch as th
+import numpy as np
+
 import pandas as pd
 from mango import Role
 from mango.messages.message import Performatives
@@ -307,3 +310,156 @@ class UnitsOperator(Role):
     #         plt.plot(df[0], df[1])
     #         plt.title(self.id)
     #         plt.show()
+
+    def initialize(self, t=0):
+        if self.rl_agent:
+            self.create_obs(t)
+
+        for unit in self.units.items():
+            unit.reset()
+
+    # in rl_units operator in ASSUME
+    # TODO merge with our formulate bids
+    def calculate_rl_bids(self):
+        actions = th.zeros(
+            size=(len(self.rl_powerplants | self.rl_storages), self.world.act_dim),
+            device=self.world.device,
+        )
+
+        for i, unit in enumerate((self.rl_powerplants | self.rl_storages).values()):
+            actions[i, :] = unit.formulate_bids()
+
+        actions = actions.clamp(-1, 1)
+        actions = actions.squeeze().cpu().numpy()
+        actions = actions.reshape(len(self.rl_powerplants | self.rl_storages), -1)
+
+        if np.isnan(actions).any():
+            raise ValueError("A NaN actions happened.")
+
+        for i, unit in enumerate((self.rl_powerplants | self.rl_storages).values()):
+            if unit.technology in ["PSPP", "Storage", "BES"]:
+                bid_price = actions[i, 0] * unit.max_price
+
+                bid_direction = "sell" if actions[i, 1] >= 0 else "buy"
+
+                bid_quantity_supply = min(
+                    (unit.soc[self.world.currstep] - unit.min_soc)
+                    / self.world.dt
+                    * self.efficiency_dis,
+                    unit.max_power_dis,
+                )
+
+                bid_quantity_demand = min(
+                    (unit.max_soc - unit.soc[self.world.currstep])
+                    / unit.efficiency_ch
+                    / self.world.dt,
+                    unit.max_power_ch,
+                )
+
+                if (
+                    bid_quantity_supply >= self.world.minBidEOM
+                    and bid_direction == "sell"
+                ):
+                    formulated_bid = Bid(
+                        issuer=unit,
+                        ID=f"{unit.name}_supplyEOM",
+                        price=bid_price,
+                        amount=bid_quantity_supply,
+                        status="Sent",
+                        bidType="Supply",
+                        node=unit.node,
+                    )
+
+                    self.bids.append(formulated_bid)
+
+                elif (
+                    bid_quantity_demand >= self.world.minBidEOM
+                    and bid_direction == "buy"
+                ):
+                    formulated_bid = Bid(
+                        issuer=unit,
+                        ID=f"{unit.name}_demandEOM",
+                        price=bid_price,
+                        amount=bid_quantity_demand,
+                        status="Sent",
+                        bidType="Demand",
+                        node=unit.node,
+                    )
+
+                    self.bids.append(formulated_bid)
+
+            else:
+                bid_price_mr = actions[i, :].min() * unit.max_price
+                bid_price_flex = actions[i, :].max() * unit.max_price
+                bid_quantity_mr, bid_quantity_flex = (
+                    unit.minPower,
+                    unit.maxPower - unit.minPower,
+                )
+
+                bid_mr = Bid(
+                    issuer=unit,
+                    ID=f"{unit.name}_mrEOM",
+                    price=bid_price_mr,
+                    amount=bid_quantity_mr,
+                    status="Sent",
+                    bidType="Supply",
+                    node=unit.node,
+                )
+
+                bid_flex = Bid(
+                    issuer=unit,
+                    ID=f"{unit.name}_flexEOM",
+                    price=bid_price_flex,
+                    amount=bid_quantity_flex,
+                    status="Sent",
+                    bidType="Supply",
+                    node=unit.node,
+                )
+
+                self.bids.extend([bid_mr, bid_flex])
+
+    # TODO merge with our submit bids
+    def request_bids(self, t, market="EOM"):
+        self.bids = []
+        self.calculate_conv_bids(t, market)
+        if self.rl_agent:
+            self.calculate_rl_bids()
+
+        return self.bids
+
+    def step(self):
+        self.create_obs(self.world.currstep + 1)
+
+        for powerplant in self.rl_powerplants.values():
+            powerplant.step()
+
+    # in rl_units operator in ASSUME
+    # TODO use forecasts
+    def create_obs(self, t):
+        obs = []
+        forecast_len = 30
+
+        if t < forecast_len:
+            obs.extend(self.world.scaled_res_load[-forecast_len + t :])
+            obs.extend(self.world.scaled_res_load_forecast[: t + forecast_len])
+
+            obs.extend(self.world.scaled_mcp[-forecast_len + t :])
+            obs.extend(self.world.scaled_pfc[: t + forecast_len])
+
+        elif t < len(self.world.snapshots) - forecast_len:
+            obs.extend(self.world.scaled_res_load[t - forecast_len : t])
+            obs.extend(self.world.scaled_res_load_forecast[t : t + forecast_len])
+
+            obs.extend(self.world.scaled_mcp[t - forecast_len : t])
+            obs.extend(self.world.scaled_pfc[t : t + forecast_len])
+
+        else:
+            obs.extend(self.world.scaled_res_load[t - forecast_len :])
+            obs.extend(
+                self.world.scaled_res_load_forecast[: forecast_len * 2 - len(obs)]
+            )
+
+            obs.extend(self.world.scaled_mcp[t - forecast_len :])
+            obs.extend(self.world.scaled_pfc[: forecast_len * 4 - len(obs)])
+
+        self.obs = obs
