@@ -58,7 +58,10 @@ class flexableEOMStorage(BaseStrategy):
                     operational_window["max_power_discharge"]["power_discharge"],
                 )
 
-                bids = [{"price": average_price, "volume": bid_quantity}]
+                if bid_quantity < 1e-5 and bid_quantity > -1e-5:
+                    bids = []
+                else:
+                    bids = [{"price": average_price, "volume": bid_quantity}]
 
             elif (
                 np.mean(unit.price_forecast[time_delta])
@@ -79,11 +82,13 @@ class flexableEOMStorage(BaseStrategy):
                     operational_window["max_power_charge"]["power_charge"],
                 )
 
-                bids = [{"price": average_price, "volume": bid_quantity}]
-
+                if bid_quantity < 1e-5 and bid_quantity > -1e-5:
+                    bids = []
+                else:
+                    bids = [{"price": average_price, "volume": bid_quantity}]
             else:
                 bids = []
-            print(bids, unit.current_SOC)
+
         return bids
 
     def calculate_price_average(self, unit, time_delta):

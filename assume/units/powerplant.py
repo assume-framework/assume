@@ -63,7 +63,7 @@ class PowerPlant(BaseUnit):
         self.fuel_price = fuel_price
         if type(co2_price) is pd.Series and len(co2_price) == 1:
             co2_price = co2_price.item()
-        self.co2_price
+        self.co2_price = co2_price
         self.price_forecast = (
             pd.Series(0.0, index=self.index) if price_forecast.empty else price_forecast
         )

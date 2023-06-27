@@ -332,15 +332,18 @@ class World:
                     unit_name
                 ].to_dict()
 
+                unit_params["price_forecast"] = self.forecast_providers['EOM'].price_forecast_df
+                
+                #TODO: call forecast_providers from the units dependign on used markets
                 # check if we have RL bidding strategy
-                if (
-                    unit_params["bidding_strategies"]["energy"] == "rl_strategy"
-                    and self.price_forecast is not None
-                ):
-                    unit_params["price_forecast"] = self.price_forecast["mcp"]
-                    unit_params["res_demand_forecast"] = self.price_forecast[
-                        "residual_demand"
-                    ]
+                # if (
+                #     unit_params["bidding_strategies"]["energy"] == "rl_strategy"
+                #     and self.forecast_providers[market_id].price_forecast_df is not None
+                # ):
+                #     unit_params["price_forecast"] = self.price_forecast["mcp"]
+                #     unit_params["res_demand_forecast"] = self.price_forecast[
+                #         "residual_demand"
+                #     ]
 
             else:
                 self.logger.warning(
@@ -423,8 +426,11 @@ class World:
                         market.product_type: "simple"
                         for market in self.markets.values()
                     }
-                if self.price_forecast is not None:
-                    unit_params["price_forecast"] = self.price_forecast["mcp"]
+                
+                # TODO: shift call of forecasts
+                # if self.price_forecast is not None:
+                #     unit_params["price_forecast"] = self.price_forecast["mcp"]
+                unit_params["price_forecast"] = self.forecast_providers['EOM'].price_forecast_df
 
                 await self.add_unit(
                     id=storage_name,
