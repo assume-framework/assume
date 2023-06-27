@@ -340,6 +340,8 @@ class RL_UnitsOperator(UnitsOperator):
         return obs, actions, rewards
     
     #this function is used in flexable but I want this in the RL Units operator
+    #or does it have to be there because I intialize the MATD3 there and there it is needed 
+    # since it is overarching for different agents? 
             if self.training:
                 obs, actions, rewards = self.collect_experience()
                 self.rl_algorithm.buffer.add(obs, actions, rewards)

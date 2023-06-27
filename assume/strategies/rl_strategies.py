@@ -11,130 +11,197 @@ class RLStrategy(BaseStrategy):
         self.foresight = pd.Timedelta("12h")
         self.current_time = None
 
-    def calculate_bids(
+        # RL agent parameters
+        self.obs_dim = self.world.obs_dim
+        self.act_dim = self.world.act_dim
+
+        self.device = self.world.device
+        self.float_type = self.world.float_type
+
+        self.actor = Actor(self.obs_dim, self.act_dim, self.float_type).to(self.device)
+
+        if self.world.training:
+            self.learning_rate = self.world.learning_rate
+            self.actor_target = Actor(self.obs_dim, self.act_dim, self.float_type).to(
+                self.device
+            )
+            self.actor_target.load_state_dict(self.actor.state_dict())
+            # Target networks should always be in eval mode
+            self.actor_target.train(mode=False)
+
+            self.actor.optimizer = Adam(self.actor.parameters(), lr=self.learning_rate)
+            self.action_noise = NormalActionNoise(
+                mu=0.0, sigma=0.2, action_dimension=self.act_dim, scale=1.0, dt=1.0
+            )  # dt=.999996)
+
+        if self.world.load_params:
+            self.load_params(self.world.load_params)
+
+    def reset(self):
+        self.total_capacity = [0.0 for _ in self.world.snapshots]
+        self.total_capacity[-1] = self.minPower + (self.maxPower - self.minPower) / 2
+
+        self.scaled_total_capacity = np.array(self.total_capacity).reshape(-1, 1)
+        self.total_scaled_capacity[-1] = self.total_capacity[-1] / self.maxPower
+
+        self.bids_mr = {n: (0.0, 0.0) for n in self.world.snapshots}
+        self.bids_flex = {n: (0.0, 0.0) for n in self.world.snapshots}
+
+        self.sent_bids = []
+
+        self.current_downtime = 0
+
+        self.curr_obs = self.create_obs(self.world.currstep)
+        self.next_obs = None
+
+        self.curr_action = None
+        self.curr_reward = None
+        self.curr_experience = []
+
+        self.rewards = [0.0 for _ in self.world.snapshots]
+        self.regrets = [0.0 for _ in self.world.snapshots]
+        self.profits = [0.0 for _ in self.world.snapshots]
+
+    def formulate_bids(self):
+        """
+        Take an action based on actor network, add exlorarion noise if needed
+
+        Returns
+        -------
+            action (PyTorch Variable): Actions for this agent
+
+        """
+        if self.world.training:
+            if self.world.episodes_done < self.world.learning_starts:
+                self.curr_action = (
+                    th.normal(
+                        mean=0.0, std=0.2, size=(1, self.act_dim), dtype=self.float_type
+                    )
+                    .to(self.device)
+                    .squeeze()
+                )
+
+                self.curr_action += th.tensor(
+                    self.scaled_marginal_cost[self.world.currstep],
+                    device=self.device,
+                    dtype=self.float_type,
+                )
+            else:
+                self.curr_action = self.actor(self.curr_obs).detach()
+                self.curr_action += th.tensor(
+                    self.action_noise.noise(), device=self.device, dtype=self.float_type
+                )
+        else:
+            self.curr_action = self.actor(self.curr_obs).detach()
+
+        return self.curr_action
+
+    # TODO change to interconnect to send dispatch in unit operator
+    def step(
         self,
         unit: BaseUnit = None,
-        market_config=None,
-        operational_window: dict = None,
     ):
-        bid_quantity_inflex, bid_price_inflex = 0, 0
-        bid_quantity_flex, bid_price_flex = 0, 0
+        t = self.context.current_timestamp
 
-        if operational_window is not None:
-            self.current_time = operational_window["window"]["start"]
-            # =============================================================================
-            # Powerplant is either on, or is able to turn on
-            # Calculating possible bid amount
-            # =============================================================================
-            bid_quantity_inflex = operational_window["min_power"]["power"]
+        # Calculates market success
+        if unit.total_power_output[t] < self.minPower:
+            unit.total_power_output[t] = 0
 
-            marginal_cost_mr = operational_window["min_power"]["marginal_cost"]
-            marginal_cost_flex = operational_window["max_power"]["marginal_cost"]
-            # =============================================================================
-            # Calculating possible price
-            # =============================================================================
-            if unit.current_status:
-                bid_price_inflex = self.calculate_EOM_price_if_on(
-                    unit, marginal_cost_mr, bid_quantity_inflex
-                )
-            else:
-                bid_price_inflex = self.calculate_EOM_price_if_off(
-                    unit, marginal_cost_flex, bid_quantity_inflex
-                )
+        self.total_scaled_capacity[t] = unit.total_power_output[t] / self.maxPower
 
-            if unit.total_heat_output[self.current_time] > 0:
-                power_loss_ratio = (
-                    unit.power_loss_chp[self.current_time]
-                    / unit.total_heat_output[self.current_time]
-                )
-            else:
-                power_loss_ratio = 0.0
+        price_difference = self.world.mcp[t] - self.marginal_cost[t]
+        profit = price_difference * self.total_capacity[t] * self.world.dt
+        opportunity_cost = (
+            price_difference * (self.maxPower - self.total_capacity[t]) * self.world.dt
+        )
+        opportunity_cost = max(opportunity_cost, 0)
 
-            # Flex-bid price formulation
-            if unit.current_status:
-                bid_quantity_flex = (
-                    operational_window["max_power"]["power"] - bid_quantity_inflex
-                )
-                bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
+        scaling = 0.1 / self.maxPower
+        regret_scale = 0.2
 
-        bids = [
-            {"price": bid_price_inflex, "volume": bid_quantity_inflex},
-            {"price": bid_price_flex, "volume": bid_quantity_flex},
+        if unit.total_power_output[t] != 0 and unit.total_power_output[t - 1] == 0:
+            profit = profit - self.hotStartCosts / 2
+        elif unit.total_power_output[t] == 0 and unit.total_power_output[t - 1] != 0:
+            profit = profit - self.hotStartCosts / 2
+
+        self.rewards[t] = (profit - regret_scale * opportunity_cost) * scaling
+        self.profits[t] = profit
+        self.regrets[t] = opportunity_cost
+
+        self.curr_reward = self.rewards[t]
+        self.next_obs = self.create_obs(t + 1)
+
+        self.curr_experience = [
+            self.curr_obs,
+            self.next_obs,
+            self.curr_action,
+            self.curr_reward,
         ]
 
-        return bids
+        self.curr_obs = self.next_obs
 
-    def calculate_EOM_price_if_off(self, unit, marginal_cost_mr, bid_quantity_inflex):
-        # The powerplant is currently off and calculates a startup markup as an extra
-        # to the marginal cost
-        # Calculating the average uninterrupted operating period
-        av_operating_time = max(
-            unit.mean_market_success, unit.min_operating_time, 1
-        )  # 1 prevents division by 0
+        self.sent_bids = []
 
-        starting_cost = self.get_starting_costs(time=unit.current_down_time, unit=unit)
-        markup = starting_cost / av_operating_time / bid_quantity_inflex
+    def feedback(self, bid):
+        if bid.status in ["Confirmed", "PartiallyConfirmed"]:
+            t = self.world.currstep
 
-        bid_price_inflex = min(marginal_cost_mr + markup, 3000.0)
+            if "CRMPosDem" in bid.ID:
+                self.confQtyCRM_pos.update(
+                    {t + _: bid.confirmedAmount for _ in range(self.crm_timestep)}
+                )
 
-        return bid_price_inflex
+            if "CRMNegDem" in bid.ID:
+                self.confQtyCRM_neg.update(
+                    {t + _: bid.confirmedAmount for _ in range(self.crm_timestep)}
+                )
 
-    def calculate_EOM_price_if_on(self, unit, marginal_cost_flex, bid_quantity_inflex):
-        """
-        Check the description provided by Thomas in last version, the average downtime is not available
-        """
-        if bid_quantity_inflex == 0:
-            return 0
+            if "steam" in bid.ID:
+                self.confQtyDHM_steam[t] = bid.confirmedAmount
 
-        t = self.current_time
+        if "steam" in bid.ID:
+            self.powerLossFPP(t, bid)
 
-        starting_cost = self.get_starting_costs(time=unit.min_down_time, unit=unit)
-        price_reduction_restart = (
-            starting_cost / unit.min_down_time / bid_quantity_inflex
-        )
+        self.sent_bids.append(bid)
 
-        if unit.total_heat_output[t] > 0:
-            heat_gen_cost = (
-                unit.total_heat_output[t] * (unit.fuel_price["natural gas"][t] / 0.9)
-            ) / bid_quantity_inflex
-        else:
-            heat_gen_cost = 0.0
+    def save_params(self, dir_name="best_policy"):
+        save_dir = self.world.save_params["save_dir"]
 
-        possible_revenue = self.get_possible_revenues(
-            marginal_cost=marginal_cost_flex,
-            unit=unit,
-        )
-        if possible_revenue >= 0 and unit.price_forecast[t] < marginal_cost_flex:
-            marginal_cost_flex = 0
+        def save_obj(obj, directory):
+            path = directory + self.name
+            th.save(obj, path)
 
-        bid_price_inflex = max(
-            -price_reduction_restart - heat_gen_cost + marginal_cost_flex,
-            -499.00,
-        )
+        obj = {
+            "policy": self.actor.state_dict(),
+            "target_policy": self.actor_target.state_dict(),
+            "policy_optimizer": self.actor.optimizer.state_dict(),
+        }
 
-        return bid_price_inflex
+        directory = save_dir + self.world.simulation_id + dir_name + "/"
 
-    def get_starting_costs(self, time, unit):
-        if time < unit.downtime_hot_start:
-            return unit.hot_start_cost
+        if not os.path.exists(directory):
+            os.makedirs(directory)
 
-        elif time < unit.downtime_warm_start:
-            return unit.warm_start_cost
+        save_obj(obj, directory)
 
-        else:
-            return unit.cold_start_cost
+    def load_params(self, load_params):
+        sim_id = load_params["id"]
+        load_dir = load_params["dir"]
 
-    def get_possible_revenues(self, marginal_cost, unit):
-        t = self.current_time
-        price_forecast = []
+        def load_obj(directory):
+            path = directory + self.name
+            return th.load(path, map_location=self.device)
 
-        if t + self.foresight > unit.price_forecast.index[-1]:
-            price_forecast = unit.price_forecast.loc[t:]
-        else:
-            price_forecast = unit.price_forecast.loc[t : t + self.foresight]
+        directory = load_params["policy_dir"] + sim_id + load_dir + "/"
 
-        possible_revenue = sum(
-            marketPrice - marginal_cost for marketPrice in price_forecast
-        )
+        if not os.path.exists(directory):
+            raise FileNotFoundError(
+                "Specified directory for loading the actors policy does not exist!"
+            )
 
-        return possible_revenue
+        params = load_obj(directory)
+
+        self.actor.load_state_dict(params["policy"])
+        if self.world.training:
+            self.actor_target.load_state_dict(params["target_policy"])
+            self.actor.optimizer.load_state_dict(params["policy_optimizer"])
