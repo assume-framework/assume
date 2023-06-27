@@ -214,13 +214,13 @@ class HeatPump(BaseUnit):
 
         return operational_window
 
-    def calculate_bids(self, product_type, product_tuple):
+    def calculate_bids(self, market_config, product_tuple):
         return super().calculate_bids(
-            product_type=product_type,
+            market_config=market_config,
             product_tuple=product_tuple,
         )
 
-    def get_dispatch_plan(self, dispatch_plan, time_period):
+    def set_dispatch_plan(self, dispatch_plan, time_period):
         if dispatch_plan["total_power"] > self.min_power:
             self.market_success_list[-1] += 1
             self.current_status = 1

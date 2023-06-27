@@ -408,15 +408,15 @@ class StorageUnit(BaseUnit):
 
     def calculate_bids(
         self,
-        product_type,
+        market_config,
         product_tuple,
     ):
         return super().calculate_bids(
-            product_type=product_type,
+            market_config=market_config,
             product_tuple=product_tuple,
         )
 
-    def get_dispatch_plan(
+    def set_dispatch_plan(
         self,
         dispatch_plan: dict,
         start: pd.Timestamp,

@@ -6,8 +6,8 @@ from assume.units.storage_unit import StorageUnit
 
 
 class flexableEOMStorage(BaseStrategy):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         self.foresight = pd.Timedelta("12h")
         
@@ -15,6 +15,7 @@ class flexableEOMStorage(BaseStrategy):
     def calculate_bids(
         self,
         unit: StorageUnit = None,
+        market_config=None,
         operational_window: dict = None,
     ):
         """
@@ -96,8 +97,8 @@ class flexableEOMStorage(BaseStrategy):
 
 
 class flexableCRMStorage(BaseStrategy):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         self.foresight = pd.Timedelta("12h")
         
@@ -105,6 +106,7 @@ class flexableCRMStorage(BaseStrategy):
     def calculate_bids(
         self,
         unit: StorageUnit = None,
+        market_config=None,
         operational_window: dict = None,
     ):
         pass

@@ -122,15 +122,15 @@ class Electrolyser(BaseUnit):
 
     def calculate_bids(
         self,
-        product_type: str,
+        market_config,
         product_tuple: tuple,
     ):
         return super().calculate_bids(
-            product_type=product_type,
+            market_config=market_config,
             product_tuple=product_tuple,
         )
 
-    def get_dispatch_plan(self, dispatch_plan, current_time):
+    def set_dispatch_plan(self, dispatch_plan, current_time):
         if dispatch_plan["total_capacity"] > self.min_power:
             self.current_status = 1
             self.current_down_time = 0

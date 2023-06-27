@@ -1,7 +1,6 @@
 import asyncio
 import calendar
 import logging
-import os
 import time
 from datetime import datetime
 
@@ -73,6 +72,7 @@ class World:
         self.market_operators: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}
         self.unit_operators: dict[str, UnitsOperator] = {}
+        self.forecast_providers: dict[str, ForecastProvider] = {}
 
         self.unit_types = {
             "power_plant": PowerPlant,
@@ -143,6 +143,9 @@ class World:
             end=self.end + pd.Timedelta(hours=4),
             freq=config["time_step"],
         )
+        # firm power capacity is used to bid longterm
+        # how much % of the fpc should be bid longterm
+        self.bidding_params = config.get("bidding_strategy_params", {})
 
         # load the data from the csv files
         # tries to load all files, returns a warning if file does not exist
@@ -207,8 +210,18 @@ class World:
         #     path=path, config=config, file_name="cross_border_flows", index=self.index,
         # )
 
+        price_forecast_df = load_file(
+            path=path,
+            config=config,
+            file_name="price_forecasts",
+            index=self.index,
+        )
+
         if powerplant_units is None or demand_units is None:
-            raise ValueError("No power plant and demand units were provided!")
+            raise ValueError("No power plant or no demand units were provided!")
+
+        if demand_df is None:
+            raise ValueError("No demand time series was provided!")
 
         await self.setup(self.start)
 
@@ -244,9 +257,9 @@ class World:
 
         # get the market config from the config file and add the markets
         self.logger.info("Adding markets")
-        for id, market_params in config["markets_config"].items():
+        for market_id, market_params in config["markets_config"].items():
             market_config = make_market_config(
-                id=id,
+                id=market_id,
                 market_params=market_params,
                 world_start=self.start,
                 world_end=self.end,
@@ -261,28 +274,32 @@ class World:
                 market_config=market_config,
             )
 
-        # add making price forecast
-        forecast_role = ForecastProvider(
-            config["markets_config"].items(),
-            fuel_prices_df,
-            fuel_prices_df["co2"],
-            vre_cf_df,
-            powerplant_units,
-            demand_df,
-        )
-        forecast_agent = RoleAgent(self.container, suggested_aid="forecast_agent_1")
-        forecast_agent.add_role(forecast_role)
+        # add forecast providers for each market
+        self.logger.info("Adding forecast providers")
+        temp = pd.DataFrame()
+        for market_id, market_config in self.markets.items():
+            if price_forecast_df is not None and market_id in price_forecast_df.columns:
+                market_price_forecast = price_forecast_df[market_id]
+            else:
+                market_price_forecast = None
 
-        # write forecast
-        self.price_forecast = forecast_role.calculate_price_forecast(
-            "EOM",
-            path,
-            demand_df,
-            vre_cf_df,
-            powerplant_units,
-            fuel_prices_df,
-            fuel_prices_df["co2"],
-        )
+            forecast_provider = ForecastProvider(
+                market_id=market_id,
+                price_forecast_df=market_price_forecast,
+                fuel_prices_df=fuel_prices_df,
+                vre_cf_df=vre_cf_df,
+                powerplants=powerplant_units,
+                demand_df=demand_df[f"demand_{market_id}"],
+            )
+            forecast_agent = RoleAgent(
+                self.container, suggested_aid=f"forecast_agent_{market_id}"
+            )
+            forecast_agent.add_role(forecast_provider)
+            self.forecast_providers[market_id] = forecast_provider
+
+            temp[market_id] = forecast_provider.price_forecast_df
+
+        temp.to_csv(f"{path}/price_forecasts.csv", index=True)
 
         # add the unit operators using unique unit operator names in the powerplants csv
         self.logger.info("Adding unit operators")
@@ -504,7 +521,9 @@ class World:
                 continue
 
             try:
-                bidding_strategies[product_type] = self.bidding_types[strategy]()
+                bidding_strategies[product_type] = self.bidding_types[strategy](
+                    **self.bidding_params
+                )
             except KeyError as e:
                 self.logger.error(f"Invalid bidding strategy {strategy}")
                 raise e
@@ -608,6 +627,8 @@ class World:
             await tasks_complete_or_sleeping(self.container)
         pbar.close()
         await self.container.shutdown()
+
+        logging.info("Simulation finished")
 
     def load_scenario(
         self,
