@@ -406,6 +406,8 @@ class World:
                         market.product_type: "simple"
                         for market in self.markets.values()
                     }
+                if self.price_forecast is not None:
+                    unit_params["price_forecast"] = self.price_forecast["mcp"]
 
                 await self.add_unit(
                     id=storage_name,
