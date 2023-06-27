@@ -133,12 +133,12 @@ class flexablePosCRM(BaseStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        #check if kwargs contains crm_foresight argument
+        # check if kwargs contains crm_foresight argument
         if "crm_foresight" in kwargs:
             self.foresight = pd.Timedelta(kwargs["crm_foresight"])
         else:
             self.foresight = pd.Timedelta("4h")
-            
+
         self.current_time = None
 
     def calculate_bids(
@@ -190,7 +190,7 @@ class flexableNegCRM(BaseStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        #check if kwargs contains crm_foresight argument
+        # check if kwargs contains crm_foresight argument
         if "crm_foresight" in kwargs:
             self.foresight = pd.Timedelta(kwargs["crm_foresight"])
         else:

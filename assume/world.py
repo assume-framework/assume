@@ -34,8 +34,8 @@ from assume.strategies import (
     flexableCRMStorage,
     flexableEOM,
     flexableEOMStorage,
-    flexablePosCRM,
     flexableNegCRM,
+    flexablePosCRM,
 )
 from assume.units import Demand, HeatPump, PowerPlant, StorageUnit
 
@@ -147,7 +147,7 @@ class World:
             end=self.end + pd.Timedelta(hours=4),
             freq=config["time_step"],
         )
-        #get extra parameters for bidding strategies
+        # get extra parameters for bidding strategies
         self.bidding_params = config.get("bidding_strategy_params", {})
 
         # load the data from the csv files
@@ -335,12 +335,14 @@ class World:
                     unit_name
                 ].to_dict()
 
-                unit_params["price_forecast"] = self.forecast_providers['EOM'].price_forecast_df
+                unit_params["price_forecast"] = self.forecast_providers[
+                    "EOM"
+                ].price_forecast_df
 
                 # check if we have RL bidding strategy
                 if (
                     unit_params["bidding_strategies"]["energy"] == "rl_strategy"
-                    and self.forecast_providers['EOM'].price_forecast_df is not None
+                    and self.forecast_providers["EOM"].price_forecast_df is not None
                 ):
                     unit_params["price_forecast"] = self.price_forecast["mcp"]
                     unit_params["res_demand_forecast"] = self.price_forecast[
@@ -429,7 +431,9 @@ class World:
                         for market in self.markets.values()
                     }
 
-                unit_params["price_forecast"] = self.forecast_providers['EOM'].price_forecast_df
+                unit_params["price_forecast"] = self.forecast_providers[
+                    "EOM"
+                ].price_forecast_df
 
                 await self.add_unit(
                     id=storage_name,
