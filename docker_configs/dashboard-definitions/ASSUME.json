@@ -72,285 +72,6 @@
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "currencyEUR"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "total_volume"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "kwatth"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "average_cost"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "€/MW"
-              }
-            ]
-          },
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "total_cost",
-                  "average_cost"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 12,
-        "w": 11,
-        "x": 0,
-        "y": 5
-      },
-      "id": 67,
-      "options": {
-        "barRadius": 0,
-        "barWidth": 0.97,
-        "groupWidth": 0.7,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "orientation": "vertical",
-        "showValue": "never",
-        "stacking": "none",
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        },
-        "xField": "simulation",
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
-      },
-      "pluginVersion": "9.2.15",
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "format": "table",
-          "group": [],
-          "hide": false,
-          "metricColumn": "none",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  simulation,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_cost') as total_cost,\n  sum(round(CAST(value AS numeric), 2)*1000)  FILTER (WHERE variable = 'total_volume') as total_volume,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'avg_price') as average_cost\nFROM kpis\ngroup by simulation\nORDER BY simulation",
-          "refId": "A",
-          "select": [
-            [
-              {
-                "params": [
-                  "power"
-                ],
-                "type": "column"
-              }
-            ]
-          ],
-          "table": "market_dispatch",
-          "timeColumn": "datetime",
-          "timeColumnType": "timestamp",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        }
-      ],
-      "title": "Total Cost overview",
-      "type": "barchart"
-    },
-    {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "displayMode": "auto",
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "currencyEUR"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "total_volume"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "kwatth"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "average_cost"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "€/MW"
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 12,
-        "w": 8,
-        "x": 11,
-        "y": 5
-      },
-      "id": 69,
-      "options": {
-        "footer": {
-          "fields": "",
-          "reducer": [
-            "sum"
-          ],
-          "show": false
-        },
-        "showHeader": true,
-        "sortBy": [
-          {
-            "desc": true,
-            "displayName": "simulation"
-          }
-        ]
-      },
-      "pluginVersion": "9.2.15",
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "format": "table",
-          "group": [],
-          "hide": false,
-          "metricColumn": "none",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  simulation,\n  name,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'avg_price') as avg_price,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_cost') as total_cost,\n  sum(round(CAST(value AS numeric), 2)*1000)  FILTER (WHERE variable = 'total_volume') as total_volume\n  \nFROM kpis\nwhere variable in ('total_cost', 'total_volume', 'avg_price')\ngroup by simulation, name\nORDER BY simulation",
-          "refId": "A",
-          "select": [
-            [
-              {
-                "params": [
-                  "power"
-                ],
-                "type": "column"
-              }
-            ]
-          ],
-          "table": "market_dispatch",
-          "timeColumn": "datetime",
-          "timeColumnType": "timestamp",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        }
-      ],
-      "title": "Total Cost overview",
-      "type": "table"
-    },
-    {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
-      },
       "description": "Shows installed capacities in the simulation based on the fuel type",
       "fieldConfig": {
         "defaults": {
@@ -372,7 +93,7 @@
       "gridPos": {
         "h": 11,
         "w": 5,
-        "x": 19,
+        "x": 0,
         "y": 5
       },
       "id": 7,
@@ -462,7 +183,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 17
+        "y": 16
       },
       "id": 30,
       "panels": [],
@@ -478,7 +199,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 17
       },
       "id": 17,
       "options": {
@@ -613,17 +334,17 @@
           },
           {
             "matcher": {
-              "id": "byRegexp",
-              "options": "price .*"
+              "id": "byName",
+              "options": "Price"
             },
             "properties": [
               {
-                "id": "unit",
-                "value": "€/MWh"
+                "id": "custom.axisPlacement",
+                "value": "right"
               },
               {
-                "id": "custom.axisPlacement",
-                "value": "auto"
+                "id": "unit",
+                "value": "currencyEUR"
               }
             ]
           }
@@ -633,7 +354,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 21
+        "y": 20
       },
       "id": 11,
       "maxPerRow": 4,
@@ -664,8 +385,41 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  demand_volume AS \"Demand Volume\",\n  supply_volume AS \"Supply Volume\",\n  price\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, demand_volume, supply_volume, price\nORDER BY 1;\n",
+          "rawSql": "SELECT\n  product_start AS \"time\",\n  demand_volume AS \"Demand Volume\",\n  supply_volume AS \"Supply Volume\"\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, demand_volume, supply_volume\nORDER BY 1;\n",
           "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "supply_volume"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "market_meta",
+          "timeColumn": "product_start",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
+          "group": [],
+          "hide": false,
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  product_start AS \"time\",\n  price AS \"Price\"\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, price\nORDER BY 1;\n",
+          "refId": "B",
           "select": [
             [
               {
@@ -737,7 +491,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -753,7 +508,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 33
+        "y": 56
       },
       "id": 19,
       "options": {
@@ -911,7 +666,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -927,7 +683,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 33
+        "y": 56
       },
       "id": 20,
       "options": {
@@ -1045,7 +801,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 41
+        "y": 64
       },
       "id": 41,
       "panels": [],
@@ -1062,7 +818,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 65
       },
       "id": 22,
       "options": {
@@ -1135,7 +891,7 @@
               "tooltip": false,
               "viz": false
             },
-            "lineInterpolation": "smooth",
+            "lineInterpolation": "linear",
             "lineStyle": {
               "fill": "solid"
             },
@@ -1159,7 +915,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1169,13 +926,39 @@
           },
           "unit": "megwatt"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "market_dispatch {market_id=\"EOM\", unit_id=\"Unit 1\"}",
+                  "market_dispatch {market_id=\"CRM_pos\", unit_id=\"Unit 1\"}"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 45
+        "y": 68
       },
       "id": 24,
       "options": {
@@ -1270,7 +1053,7 @@
         "h": 17,
         "w": 6,
         "x": 18,
-        "y": 45
+        "y": 68
       },
       "id": 26,
       "options": {
@@ -1369,7 +1152,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1398,7 +1182,7 @@
         "h": 8,
         "w": 18,
         "x": 0,
-        "y": 54
+        "y": 77
       },
       "id": 70,
       "options": {
@@ -1516,7 +1300,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 62
+        "y": 85
       },
       "id": 39,
       "panels": [],
@@ -1533,7 +1317,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 63
+        "y": 86
       },
       "id": 35,
       "options": {
@@ -1627,7 +1411,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1668,7 +1453,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 66
+        "y": 89
       },
       "id": 36,
       "options": {
@@ -1762,7 +1547,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 66
+        "y": 89
       },
       "id": 37,
       "options": {
@@ -1821,7 +1606,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 75
+        "y": 98
       },
       "id": 44,
       "panels": [],
@@ -1840,7 +1625,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 76
+        "y": 99
       },
       "id": 45,
       "options": {
@@ -1950,7 +1735,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 79
+        "y": 102
       },
       "id": 65,
       "options": {
@@ -2044,7 +1829,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 79
+        "y": 102
       },
       "id": 47,
       "options": {
@@ -2107,8 +1892,8 @@
       {
         "current": {
           "selected": false,
-          "text": "base_case_2019",
-          "value": "base_case_2019"
+          "text": "example_01c_crm",
+          "value": "example_01c_crm"
         },
         "datasource": {
           "type": "postgres",
@@ -2131,8 +1916,8 @@
       {
         "current": {
           "selected": false,
-          "text": "EOM",
-          "value": "EOM"
+          "text": "CRM_pos",
+          "value": "CRM_pos"
         },
         "datasource": {
           "type": "postgres",
@@ -2156,12 +1941,10 @@
         "current": {
           "selected": true,
           "text": [
-            "KKW ISAR 2",
-            "NEURATH F"
+            "Unit 1"
           ],
           "value": [
-            "KKW ISAR 2",
-            "NEURATH F"
+            "Unit 1"
           ]
         },
         "datasource": {
@@ -2185,9 +1968,13 @@
       },
       {
         "current": {
-          "selected": false,
-          "text": "demand_DE",
-          "value": "demand_DE"
+          "selected": true,
+          "text": [
+            "demand_CRM_neg"
+          ],
+          "value": [
+            "demand_CRM_neg"
+          ]
         },
         "datasource": {
           "type": "postgres",
@@ -2210,9 +1997,13 @@
       },
       {
         "current": {
-          "selected": false,
-          "text": "Bleiloch",
-          "value": "Bleiloch"
+          "selected": true,
+          "text": [
+            "None"
+          ],
+          "value": [
+            ""
+          ]
         },
         "datasource": {
           "type": "postgres",
@@ -2236,13 +2027,13 @@
     ]
   },
   "time": {
-    "from": "2018-12-30T23:00:00.000Z",
-    "to": "2019-01-11T23:00:00.000Z"
+    "from": "2019-01-01T02:11:11.476Z",
+    "to": "2019-01-01T13:04:02.369Z"
   },
   "timepicker": {},
   "timezone": "",
   "title": "ASSUME",
-  "uid": "da5hSKlVz",
-  "version": 17,
+  "uid": "mQ3Lvkr4k",
+  "version": 4,
   "weekStart": ""
 }
