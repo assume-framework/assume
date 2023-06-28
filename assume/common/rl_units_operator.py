@@ -69,8 +69,6 @@ class RL_UnitsOperator(UnitsOperator):
                 self.register_market(market)
                 self.registered_markets[market.name] = market
 
-
-
     def handle_market_feedback(self, content: ClearingMessage, meta: dict[str, str]):
         logger.debug(f"got market result: {content}")
         orderbook: Orderbook = content["orderbook"]
@@ -80,15 +78,15 @@ class RL_UnitsOperator(UnitsOperator):
             order["unit_id"] = self.bids_map[order["bid_id"]]
         self.valid_orders.extend(orderbook)
         marketconfig = self.registered_markets[content["market_id"]]
-        self.set_unit_dispatch(orderbook, marketconfig)
+        self.set_unit_dispatch(orderbook, marketconfig, content["clearing_price"])
         self.write_actual_dispatch()
 
-#TODO send back market feedback 
-    def set_unit_dispatch(self, orderbook, marketconfig):
+    def set_unit_dispatch(self, orderbook, marketconfig, clearing_price):
         """
         feeds the current market result back to the units
         this does not respect bids from multiple markets
         for the same time period
+        Now it also has to give back the price to calculate the profit
         """
         orderbook = list(sorted(orderbook, key=itemgetter("unit_id")))
         for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
@@ -100,6 +98,7 @@ class RL_UnitsOperator(UnitsOperator):
                 start=orderbook[0]["start_time"],
                 end=orderbook[0]["end_time"],
                 product_type=marketconfig.product_type,
+                clearing_price=clearing_price,
             )
 
     def write_actual_dispatch(self):
@@ -186,15 +185,12 @@ class RL_UnitsOperator(UnitsOperator):
             acl_metadata=acl_metadata,
         )
 
- 
-
     def initialize(self, t=0):
         if self.rl_agent:
             self.create_obs(t)
 
         for unit in self.units.items():
             unit.reset()
-
 
     async def formulate_bids(self, market: MarketConfig, products: list[tuple]):
         """
@@ -213,7 +209,6 @@ class RL_UnitsOperator(UnitsOperator):
         sorted_products = sorted(products, key=lambda p: (p[0] - p[1], p[0]))
 
         for product in sorted_products:
-
             order: Order = {
                 "start_time": product[0],
                 "end_time": product[1],
@@ -222,19 +217,21 @@ class RL_UnitsOperator(UnitsOperator):
             }
 
             actions = th.zeros(
-            size=(len(self.units), self.world.act_dim),
-            device=self.world.device,
+                size=(len(self.units), self.world.act_dim),
+                device=self.world.device,
             )
 
+            # now intiates the step of the reinforcement learning algorithm
             for unit_id, unit in self.units.items():
                 # take price from bidding strategy
                 actions[unit_id, :] = unit.calculate_bids(
                     market_config=market,
                     product_tuple=product,
+                    observation=self.obs,
                 )
 
-            #convert actions from GPU onto CPU so that it is usable for the rest of the simulation
-            #done for all actions once since this is a rather lengthly process
+            # convert actions from GPU onto CPU so that it is usable for the rest of the simulation
+            # done for all actions once since this is a rather lengthly process
             actions = actions.clamp(-1, 1)
             actions = actions.squeeze().cpu().numpy()
             actions = actions.reshape(len(self.units), -1)
@@ -242,12 +239,10 @@ class RL_UnitsOperator(UnitsOperator):
             if np.isnan(actions).any():
                 raise ValueError("A NaN action happened.")
 
-
             for unit_id, unit in self.units.items():
-                
-                #append must run bid to oder book
+                # append must run bid to oder book
                 price = actions[unit_id, :].min() * unit.max_price
-                volume = unit.minPower
+                volume = unit.min_power
 
                 if market.volume_tick:
                     volume = round(volume / market.volume_tick)
@@ -260,10 +255,9 @@ class RL_UnitsOperator(UnitsOperator):
                 order_c["bid_id"] = f"{unit_id}_{1}"
                 orderbook.append(order_c)
 
-
-                #append flexable bid to oder book
+                # append flexable bid to oder book
                 price = actions[unit_id, :].max() * unit.max_price
-                volume = unit.maxPower - unit.minPower
+                volume = unit.max_power - unit.min_power
 
                 if market.volume_tick:
                     volume = round(volume / market.volume_tick)
@@ -280,122 +274,76 @@ class RL_UnitsOperator(UnitsOperator):
 
         return orderbook
 
-
-    def step(self):
-        self.create_obs(self.world.currstep + 1)
-
-        for unit_id, unit in self.units.items():
-            unit.step(self.obs)
-
     # in rl_units operator in ASSUME
     # TODO consider that the last forecast_length time steps cant be used
-    # TODO enable difference between actual load realisation and residual load forecast
+    # TODO enable difference between actual residual load realisation and residual load forecast
     def create_obs(self):
         start = world.start
-        end=world.end
-        now= datetime.utcfromtimestamp(self.context.current_timestamp)
-        delta_t=now-start #in metric of market
+        end = world.end
+        now = datetime.utcfromtimestamp(self.context.current_timestamp)
+        delta_t = now - start  # in metric of market
         obs = []
-        forecast_len = 30 #in metric of market
+        forecast_len = 30  # in metric of market
 
         if delta_t < forecast_len:
-            obs.extend(self.context.data_dict.get("res_demand_forecast")[-forecast_len + delta_t :])
-            obs.extend(self.context.data_dict.get("res_demand_forecast")[: delta_t + forecast_len])
+            obs.extend(
+                self.context.data_dict.get("res_demand_forecast")[
+                    -forecast_len + delta_t :
+                ]
+            )
+            obs.extend(
+                self.context.data_dict.get("res_demand_forecast")[
+                    : delta_t + forecast_len
+                ]
+            )
 
-            obs.extend(self.context.data_dict.get("price_forecast")[-forecast_len + delta_t :])
-            obs.extend(self.context.data_dict.get("price_forecast")[: delta_t + forecast_len])
+            obs.extend(
+                self.context.data_dict.get("price_forecast")[-forecast_len + delta_t :]
+            )
+            obs.extend(
+                self.context.data_dict.get("price_forecast")[: delta_t + forecast_len]
+            )
 
-        elif delta_t < (end-start) - forecast_len:
-            obs.extend(self.context.data_dict.get("res_demand_forecast")[delta_t - forecast_len : delta_t])
-            obs.extend(self.context.data_dict.get("res_demand_forecast")[delta_t : delta_t + forecast_len])
+        elif delta_t < (end - start) - forecast_len:
+            obs.extend(
+                self.context.data_dict.get("res_demand_forecast")[
+                    delta_t - forecast_len : delta_t
+                ]
+            )
+            obs.extend(
+                self.context.data_dict.get("res_demand_forecast")[
+                    delta_t : delta_t + forecast_len
+                ]
+            )
 
-            obs.extend(self.context.data_dict.get("price_forecast")[delta_t - forecast_len : delta_t])
-            obs.extend(self.context.data_dict.get("price_forecast")[delta_t : delta_t + forecast_len])
+            obs.extend(
+                self.context.data_dict.get("price_forecast")[
+                    delta_t - forecast_len : delta_t
+                ]
+            )
+            obs.extend(
+                self.context.data_dict.get("price_forecast")[
+                    delta_t : delta_t + forecast_len
+                ]
+            )
 
         else:
-            obs.extend(self.context.data_dict.get("res_demand_forecast")[delta_t - forecast_len :])
             obs.extend(
-                self.context.data_dict.get("res_demand_forecast")[: forecast_len * 2 - len(obs)]
+                self.context.data_dict.get("res_demand_forecast")[
+                    delta_t - forecast_len :
+                ]
+            )
+            obs.extend(
+                self.context.data_dict.get("res_demand_forecast")[
+                    : forecast_len * 2 - len(obs)
+                ]
             )
 
             obs.extend(self.context.data_dict.get("price_forecast")[t - forecast_len :])
-            obs.extend(self.context.data_dict.get("price_forecast")[: forecast_len * 4 - len(obs)])
+            obs.extend(
+                self.context.data_dict.get("price_forecast")[
+                    : forecast_len * 4 - len(obs)
+                ]
+            )
 
         self.obs = obs
-
-#everything below is TODO
-
-    def collect_experience(self):
-        total_units = self.rl_algorithm.n_rl_agents
-        obs = th.zeros((2, total_units, self.obs_dim), device=self.device)
-        actions = th.zeros((total_units, self.act_dim), device=self.device)
-        rewards = []
-
-        for i, pp in enumerate(self.rl_algorithm.rl_agents):
-            obs[0][i] = pp.curr_experience[0]
-            obs[1][i] = pp.curr_experience[1]
-            actions[i] = pp.curr_experience[2]
-            rewards.append(pp.curr_experience[3])
-
-        return obs, actions, rewards
-    
-    #this function is used in flexable but I want this in the RL Units operator
-    #or does it have to be there because I intialize the MATD3 there and there it is needed 
-    # since it is overarching for different agents? 
-            if self.training:
-                obs, actions, rewards = self.collect_experience()
-                self.rl_algorithm.buffer.add(obs, actions, rewards)
-                self.rl_algorithm.update_policy()
-
-    # TODO check wiritng and if it should be in units operator and tensorboard
-    def extract_rl_episode_info(self):
-        total_rewards = 0
-        total_profits = 0
-        total_regrets = 0
-
-        for unit in self.rl_powerplants:
-            if unit.learning:
-                total_rewards += sum(unit.rewards)
-                total_profits += sum(unit.profits)
-                total_regrets += sum(unit.regrets)
-
-        for unit in self.rl_storages:
-            if unit.learning:
-                total_rewards += sum(unit.rewards)
-                total_rewards += sum(unit.rewards)
-                total_profits += sum(unit.profits)
-
-        total_rl_units = (
-            self.rl_algorithm.n_rl_agents
-            if self.rl_algorithm is not None
-            else len(self.rl_powerplants + self.rl_storages)
-        )
-        average_reward = total_rewards / total_rl_units / len(self.snapshots)
-        average_profit = total_profits / total_rl_units / len(self.snapshots)
-        average_regret = total_regrets / total_rl_units / len(self.snapshots)
-
-        if self.training:
-            self.tensorboard_writer.add_scalar(
-                "Train/Average Reward", average_reward, self.episodes_done
-            )
-            self.tensorboard_writer.add_scalar(
-                "Train/Average Profit", average_profit, self.episodes_done
-            )
-            self.tensorboard_writer.add_scalar(
-                "Train/Average Regret", average_regret, self.episodes_done
-            )
-        else:
-            self.rl_eval_rewards.append(average_reward)
-            self.rl_eval_profits.append(average_profit)
-            self.rl_eval_regrets.append(average_regret)
-
-            if self.tensorboard_writer:
-                self.tensorboard_writer.add_scalar(
-                    "Eval/Average Reward", average_reward, self.eval_episodes_done
-                )
-                self.tensorboard_writer.add_scalar(
-                    "Eval/Average Profit", average_profit, self.eval_episodes_done
-                )
-                self.tensorboard_writer.add_scalar(
-                    "Eval/Average Regret", average_regret, self.eval_episodes_done
-                )

@@ -135,133 +135,77 @@ class RL_PowerPlant(PowerPlant):
         self.mean_market_success = 0
         self.market_success_list = [0]
 
-    def calculate_operational_window(
-        self,
-        product_type: str,
-        product_tuple: tuple,
-    ) -> dict:
-        """Calculate the operation window for the next time step.
-
-        Returns
-        -------
-        operational_window : dict
-            Dictionary containing the operational window for the next time step.
-        """
-
-        if self.current_status == 0 and self.current_down_time < self.min_down_time:
-            return None
-
-        start, end, only_hours = product_tuple
-        start = pd.Timestamp(start)
-        end = pd.Timestamp(end)
-
-        if product_type == "energy":
-            return self.calculate_energy_operational_window(start, end)
-        elif product_type in {"capacity_pos", "capacity_neg"}:
-            return self.calculate_reserve_operational_window(start, end)
-
-    def calculate_energy_operational_window(
-        self, start: pd.Timestamp, end: pd.Timestamp
-    ) -> dict:
-        current_power = self.total_power_output.at[start - self.index.freq]
-
-        min_power, max_power = self.calculate_min_max_power(start, end)
-
-        # adjust for ramp down speed
-        min_power = max(-self.ramp_down, min_power)
-        # adjust for ramp up speed
-        max_power = min(self.ramp_up, max_power)
-
-        # adjust min_power if sold negative reserve capacity on control reserve market
-        min_power = min_power + self.neg_capacity_reserve.at[start]
-
-        # adjust max_power if sold positive reserve capacity on control reserve market
-        max_power = max_power - self.pos_capacity_reserve.at[start]
-
-        if self.marginal_cost is None:
-            return {
-                "window": {"start": start, "end": end},
-                "current_power": {
-                    "power": current_power,
-                    "marginal_cost": self.calc_marginal_cost_with_partial_eff(
-                        power_output=current_power,
-                        timestep=start,
-                    ),
-                },
-                "min_power": {
-                    "power": min_power,
-                    "marginal_cost": self.calc_marginal_cost_with_partial_eff(
-                        power_output=current_power + min_power,
-                        timestep=start,
-                    ),
-                },
-                "max_power": {
-                    "power": max_power,
-                    "marginal_cost": self.calc_marginal_cost_with_partial_eff(
-                        power_output=current_power + max_power,
-                        timestep=start,
-                    ),
-                },
-            }
-
-        marginal_cost = (
-            self.marginal_cost[start]
-            if type(self.marginal_cost) is dict
-            else self.marginal_cost
-        )
-        return {
-            "window": {"start": start, "end": end},
-            "current_power": {
-                "power": current_power,
-                "marginal_cost": marginal_cost,
-            },
-            "min_power": {
-                "power": min_power,
-                "marginal_cost": marginal_cost,
-            },
-            "max_power": {
-                "power": max_power,
-                "marginal_cost": marginal_cost,
-            },
-        }
-
-    def calculate_reserve_operational_window(
-        self, start: pd.Timestamp, end: pd.Timestamp
-    ) -> dict:
-        previous_power = self.total_power_output.at[start - self.index.freq]
-
-        min_power, max_power = self.calculate_min_max_power(start, end)
-
-        # should be adjusted to account for ramping speeds
-        # and differences between resolutions of energy and reserve markets
-        available_pos_reserve = min(max_power - previous_power, self.ramp_up)
-
-        available_neg_reserve = max(0, min(previous_power - min_power, self.ramp_down))
-
-        operational_window = {
-            "window": {"start": start, "end": end},
-            "pos_reserve": {
-                "capacity": available_pos_reserve,
-            },
-            "neg_reserve": {
-                "capacity": available_neg_reserve,
-            },
-        }
-
-        if available_neg_reserve < 0:
-            logger.error("available_neg_reserve < 0")
-
-        return operational_window
-
     def calculate_bids(
         self,
         market_config,
         product_tuple,
+        observation,
     ):
-        return super().calculate_bids(
-            market_config=market_config,
-            product_tuple=product_tuple,
-        )
+        """Calculate the bids for the next time step."""
+
+        if self.bidding_strategies[market_config.product_type] == "rl_strategy":
+            # define unit wise observations
+            # add the total scaled capacity and marginal costs
+            # TODO store total capacity and marginal costs some where
+            start = world.start
+            end = world.end
+            now = datetime.utcfromtimestamp(self.context.current_timestamp)
+            delta_t = now - start  # in metric of market
+
+            obs_len = 4
+            obs = observation.copy()
+
+            # get the marginal cost
+            if delta_t < len(self.world.snapshots) - obs_len:
+                obs.extend(self.scaled_marginal_cost[delta_t : delta_t + obs_len])
+            else:
+                obs.extend(self.scaled_marginal_cost[delta_t:])
+                obs.extend(
+                    self.scaled_marginal_cost[
+                        : obs_len - (len(self.world.snapshots) - delta_t)
+                    ]
+                )
+
+            if delta_t < obs_len:
+                obs.extend(
+                    self.total_scaled_capacity[
+                        len(self.world.snapshots) - obs_len + delta_t :
+                    ]
+                )
+                obs.extend(self.total_scaled_capacity[:delta_t])
+            else:
+                obs.extend(self.total_scaled_capacity[delta_t - obs_len : delta_t])
+
+            obs = np.array(obs)
+            obs = (
+                th.tensor(obs, dtype=self.float_type)
+                .to(self.device, non_blocking=True)
+                .view(-1)
+            )
+
+            return self.bidding_strategies[market_config.product_type].step(
+                unit=self, observation=obs
+            )
+
+        else:
+            if market_config.product_type not in self.bidding_strategies:
+                return None
+
+            # get operational window for each unit
+            operational_window = self.calculate_operational_window(
+                product_type=market_config.product_type,
+                product_tuple=product_tuple,
+            )
+
+            # check if operational window is valid
+            if operational_window is None:
+                return None
+
+            return self.bidding_strategies[market_config.product_type].calculate_bids(
+                unit=self,
+                market_config=market_config,
+                operational_window=operational_window,
+            )
 
     def set_dispatch_plan(
         self,
@@ -269,6 +213,7 @@ class RL_PowerPlant(PowerPlant):
         start: pd.Timestamp,
         end: pd.Timestamp,
         product_type: str,
+        clearing_price: float,
     ):
         end_excl = end - self.index.freq
 
@@ -283,6 +228,8 @@ class RL_PowerPlant(PowerPlant):
             self.neg_capacity_reserve.loc[start:end_excl] += dispatch_plan[
                 "total_power"
             ]
+
+        # TODO add update of bidding strategy here
 
     def execute_current_dispatch(
         self,

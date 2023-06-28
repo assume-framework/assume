@@ -37,12 +37,15 @@ class RLStrategy(BaseStrategy):
         if self.world.load_params:
             self.load_params(self.world.load_params)
 
-    def reset(self):
-        self.total_capacity = [0.0 for _ in self.world.snapshots]
-        self.total_capacity[-1] = self.minPower + (self.maxPower - self.minPower) / 2
+    def reset(
+        self,
+        unit: BaseUnit = None,
+    ):
+        unit.total_capacity = [0.0 for _ in self.world.snapshots]
+        unit.total_capacity[-1] = unit.minPower + (unit.maxPower - unit.minPower) / 2
 
-        self.scaled_total_capacity = np.array(self.total_capacity).reshape(-1, 1)
-        self.total_scaled_capacity[-1] = self.total_capacity[-1] / self.maxPower
+        unit.scaled_total_capacity = np.array(unit.total_capacity).reshape(-1, 1)
+        unit.scaled_total_capacity[-1] = unit.total_capacity[-1] / unit.maxPower
 
         self.bids_mr = {n: (0.0, 0.0) for n in self.world.snapshots}
         self.bids_flex = {n: (0.0, 0.0) for n in self.world.snapshots}
@@ -51,6 +54,7 @@ class RLStrategy(BaseStrategy):
 
         self.current_downtime = 0
 
+        # TODO needs to come from unit
         self.curr_obs = self.create_obs(self.world.currstep)
         self.next_obs = None
 
@@ -62,7 +66,11 @@ class RLStrategy(BaseStrategy):
         self.regrets = [0.0 for _ in self.world.snapshots]
         self.profits = [0.0 for _ in self.world.snapshots]
 
-    def formulate_bids(self):
+    def calculate_bids(
+        self,
+        observation,
+        unit: BaseUnit = None,
+    ):
         """
         Take an action based on actor network, add exlorarion noise if needed
 
@@ -71,7 +79,10 @@ class RLStrategy(BaseStrategy):
             action (PyTorch Variable): Actions for this agent
 
         """
-        if self.world.training:
+
+        self.curr_obs = observation
+
+        if self.world.does_training:
             if self.world.episodes_done < self.world.learning_starts:
                 self.curr_action = (
                     th.normal(
@@ -104,25 +115,25 @@ class RLStrategy(BaseStrategy):
         t = self.context.current_timestamp
 
         # Calculates market success
-        if unit.total_power_output[t] < self.minPower:
+        if unit.total_power_output[t] < unit.min_power:
             unit.total_power_output[t] = 0
 
-        self.total_scaled_capacity[t] = unit.total_power_output[t] / self.maxPower
+        unit.total_scaled_capacity[t] = unit.total_power_output[t] / unit.max_power
 
-        price_difference = self.world.mcp[t] - self.marginal_cost[t]
-        profit = price_difference * self.total_capacity[t] * self.world.dt
+        price_difference = self.world.mcp[t] - unit.marginal_cost[t]
+        profit = price_difference * unit.total_capacity[t] * self.world.dt
         opportunity_cost = (
-            price_difference * (self.maxPower - self.total_capacity[t]) * self.world.dt
+            price_difference * (unit.max_power - unit.total_capacity[t]) * self.world.dt
         )
         opportunity_cost = max(opportunity_cost, 0)
 
-        scaling = 0.1 / self.maxPower
+        scaling = 0.1 / unit.max_power
         regret_scale = 0.2
 
         if unit.total_power_output[t] != 0 and unit.total_power_output[t - 1] == 0:
-            profit = profit - self.hotStartCosts / 2
+            profit = profit - unit.hot_start_cost / 2
         elif unit.total_power_output[t] == 0 and unit.total_power_output[t - 1] != 0:
-            profit = profit - self.hotStartCosts / 2
+            profit = profit - unit.hot_start_cost / 2
 
         self.rewards[t] = (profit - regret_scale * opportunity_cost) * scaling
         self.profits[t] = profit
@@ -142,27 +153,13 @@ class RLStrategy(BaseStrategy):
 
         self.sent_bids = []
 
-    def feedback(self, bid):
-        if bid.status in ["Confirmed", "PartiallyConfirmed"]:
-            t = self.world.currstep
-
-            if "CRMPosDem" in bid.ID:
-                self.confQtyCRM_pos.update(
-                    {t + _: bid.confirmedAmount for _ in range(self.crm_timestep)}
-                )
-
-            if "CRMNegDem" in bid.ID:
-                self.confQtyCRM_neg.update(
-                    {t + _: bid.confirmedAmount for _ in range(self.crm_timestep)}
-                )
-
-            if "steam" in bid.ID:
-                self.confQtyDHM_steam[t] = bid.confirmedAmount
-
-        if "steam" in bid.ID:
-            self.powerLossFPP(t, bid)
-
-        self.sent_bids.append(bid)
+        # TODO where to update stuff, if in each policy then done for every agent which does not make sense
+        # due to central crtici
+        # if done in overall simualtioon it will be based on events as well? so when? after what event?
+        if self.training:
+            obs, actions, rewards = self.collect_experience()
+            self.rl_algorithm.buffer.add(obs, actions, rewards)
+            self.rl_algorithm.update_policy()
 
     def save_params(self, dir_name="best_policy"):
         save_dir = self.world.save_params["save_dir"]
@@ -205,3 +202,76 @@ class RLStrategy(BaseStrategy):
         if self.world.training:
             self.actor_target.load_state_dict(params["target_policy"])
             self.actor.optimizer.load_state_dict(params["policy_optimizer"])
+
+    # everything below is TODO
+
+    def collect_experience(self):
+        total_units = self.rl_algorithm.n_rl_agents
+        obs = th.zeros((2, total_units, self.obs_dim), device=self.device)
+        actions = th.zeros((total_units, self.act_dim), device=self.device)
+        rewards = []
+
+        for i, pp in enumerate(self.rl_algorithm.rl_agents):
+            obs[0][i] = pp.curr_experience[0]
+            obs[1][i] = pp.curr_experience[1]
+            actions[i] = pp.curr_experience[2]
+            rewards.append(pp.curr_experience[3])
+
+        return obs, actions, rewards
+
+    # this function is used in flexable but I want this in the RL Units operator
+    # or does it have to be there because I intialize the MATD3 there and there it is needed
+    # since it is overarching for different agents?
+
+    # TODO check wiritng and if it should be in units operator and tensorboard
+    def extract_rl_episode_info(self):
+        total_rewards = 0
+        total_profits = 0
+        total_regrets = 0
+
+        for unit in self.rl_powerplants:
+            if unit.learning:
+                total_rewards += sum(unit.rewards)
+                total_profits += sum(unit.profits)
+                total_regrets += sum(unit.regrets)
+
+        for unit in self.rl_storages:
+            if unit.learning:
+                total_rewards += sum(unit.rewards)
+                total_rewards += sum(unit.rewards)
+                total_profits += sum(unit.profits)
+
+        total_rl_units = (
+            self.rl_algorithm.n_rl_agents
+            if self.rl_algorithm is not None
+            else len(self.rl_powerplants + self.rl_storages)
+        )
+        average_reward = total_rewards / total_rl_units / len(self.snapshots)
+        average_profit = total_profits / total_rl_units / len(self.snapshots)
+        average_regret = total_regrets / total_rl_units / len(self.snapshots)
+
+        if self.training:
+            self.tensorboard_writer.add_scalar(
+                "Train/Average Reward", average_reward, self.episodes_done
+            )
+            self.tensorboard_writer.add_scalar(
+                "Train/Average Profit", average_profit, self.episodes_done
+            )
+            self.tensorboard_writer.add_scalar(
+                "Train/Average Regret", average_regret, self.episodes_done
+            )
+        else:
+            self.rl_eval_rewards.append(average_reward)
+            self.rl_eval_profits.append(average_profit)
+            self.rl_eval_regrets.append(average_regret)
+
+            if self.tensorboard_writer:
+                self.tensorboard_writer.add_scalar(
+                    "Eval/Average Reward", average_reward, self.eval_episodes_done
+                )
+                self.tensorboard_writer.add_scalar(
+                    "Eval/Average Profit", average_profit, self.eval_episodes_done
+                )
+                self.tensorboard_writer.add_scalar(
+                    "Eval/Average Regret", average_regret, self.eval_episodes_done
+                )
