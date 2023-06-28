@@ -283,21 +283,21 @@ class World:
             else:
                 market_price_forecast = None
 
-            forecast_provider = ForecastProvider(
-                market_id=market_id,
-                price_forecast_df=market_price_forecast,
-                fuel_prices_df=fuel_prices_df,
-                vre_cf_df=vre_cf_df,
-                powerplants=powerplant_units,
-                demand_df=demand_df[f"demand_{market_id}"],
-            )
-            forecast_agent = RoleAgent(
-                self.container, suggested_aid=f"forecast_agent_{market_id}"
-            )
-            forecast_agent.add_role(forecast_provider)
-            self.forecast_providers[market_id] = forecast_provider
+            # forecast_provider = ForecastProvider(
+            #     market_id=market_id,
+            #     price_forecast_df=market_price_forecast,
+            #     fuel_prices_df=fuel_prices_df,
+            #     vre_cf_df=vre_cf_df,
+            #     powerplants=powerplant_units,
+            #     demand_df=demand_df[f"demand_{market_id}"],
+            # )
+            # forecast_agent = RoleAgent(
+            #     self.container, suggested_aid=f"forecast_agent_{market_id}"
+            # )
+            # forecast_agent.add_role(forecast_provider)
+            # self.forecast_providers[market_id] = forecast_provider
 
-            temp[market_id] = forecast_provider.price_forecast_df
+            # temp[market_id] = forecast_provider.price_forecast_df
 
         temp.to_csv(f"{path}/price_forecasts.csv", index=True)
 

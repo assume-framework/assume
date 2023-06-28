@@ -56,8 +56,8 @@ def plot_and_save_results():
     ## Data preparation
     eom = df[df["name"] == "EOM"]
     ltm = df[df["name"] == "LTM_OTC"].reset_index()
-    ltm.loc[0, "average_cost"] = None
-    xticks = list(ltm["simulation"])
+    # ltm.loc[0, "average_cost"] = None
+    xticks = list(eom["simulation"])
     # xlabels = [f"{i}%" for i in range(0, 101, 10)]
     xlabels = ["EOM", "EOM + LTM"]
     plt.style.use("seaborn-v0_8")
@@ -65,14 +65,20 @@ def plot_and_save_results():
     fig, (ax1, ax2) = plt.subplots(2, 1)
     # Total Dispatch cost
     ax1.bar(eom["simulation"], eom["total_cost"], label="EOM")
-    ax1.bar(ltm["simulation"], ltm["total_cost"], bottom=eom["total_cost"], label="LTM")
+    eom_ltm = eom[eom.simulation == "ltm_case10"]
+    ax1.bar(
+        ltm["simulation"],
+        ltm["total_cost"],
+        bottom=eom_ltm["total_cost"],
+        label="LTM",
+    )
     ax1.set_ylabel("Total dispatch cost \n per market [mill. $€$]")
     ax1.set_xticks(xticks, xlabels)
     ax1.legend()
     # Total Average Cost
     ax2.scatter(eom["simulation"], eom["average_cost"], label="EOM")
     ax2.scatter(ltm["simulation"], ltm["average_cost"], label="LTM")
-    ax2.bar(ltm["simulation"], ltm["total_cost"] * 0)
+    ax2.bar(eom["simulation"], eom["total_cost"] * 0)
     ax2.set_ylabel("Average cost \n for each scenario [$€/MWh$]")
     # ax2.set_xlabel("Fraction of base load traded on LTM in percent")
     ax2.set_xlabel("Selected electricity market design")
@@ -134,5 +140,5 @@ ORDER BY technology, market_id desc, 1
 
 
 if __name__ == "__main__":
-    run_cases()
+    # run_cases()
     plot_and_save_results()
