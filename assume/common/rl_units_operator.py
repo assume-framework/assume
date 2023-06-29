@@ -48,6 +48,8 @@ class RL_UnitsOperator(UnitsOperator):
             self.portfolio_strategy = opt_portfolio[1]
 
         self.valid_orders = []
+        # TODO splitte liste mit units die Rl strategy haben und rufe formulate bids einmal
+        # für Rl units auf mit GPU -> CPU und einmal für normale units
         self.units: dict[str, BaseUnit] = {}
 
     def setup(self):
@@ -220,6 +222,8 @@ class RL_UnitsOperator(UnitsOperator):
                 size=(len(self.units), self.world.act_dim),
                 device=self.world.device,
             )
+
+            #
 
             # now intiates the step of the reinforcement learning algorithm
             for unit_id, unit in self.units.items():

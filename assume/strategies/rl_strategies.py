@@ -4,6 +4,8 @@ from assume.strategies.base_strategy import BaseStrategy
 from assume.units.base_unit import BaseUnit
 
 
+# TODO learning role übergben die nur intiaiert wird wenn learning aktiv ist und dann entsprechend weiß
+# strategie ob sie gerade lernt oder nur ausführt
 class RLStrategy(BaseStrategy):
     def __init__(self):
         super().__init__()

@@ -6,6 +6,7 @@ import pandas as pd
 from assume.units.base_unit import BaseUnit
 
 logger = logging.getLogger(__name__)
+# TODO Kill
 
 
 class RL_PowerPlant(PowerPlant):
@@ -139,10 +140,10 @@ class RL_PowerPlant(PowerPlant):
         self,
         market_config,
         product_tuple,
-        observation,
+        global_observation,
     ):
         """Calculate the bids for the next time step."""
-
+        # TODO verschieben in rl_strategies, damit unit complete generisch bleibt, außer hinzufügen von obs
         if self.bidding_strategies[market_config.product_type] == "rl_strategy":
             # define unit wise observations
             # add the total scaled capacity and marginal costs

@@ -23,7 +23,7 @@ import time
 
 import torch as th
 
-from assume.common.matd3 import TD3
+from assume.rl_algorithms.matd3 import TD3
 
 from assume.common import (
     ForecastProvider,
