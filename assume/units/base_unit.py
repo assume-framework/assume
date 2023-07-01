@@ -102,3 +102,10 @@ class BaseUnit:
         """
         end_excl = end - self.index.freq
         return self.total_power_output[start:end_excl]
+
+    def as_dict(self) -> dict:
+        return {
+            "technology": self.technology,
+            "unit_operator": self.unit_operator,
+            "unit_type": "base_unit",
+        }

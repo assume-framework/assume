@@ -470,3 +470,18 @@ class StorageUnit(BaseUnit):
         marginal_cost = variable_cost / efficiency + self.fixed_cost
 
         return marginal_cost
+
+    def as_dict(self) -> dict:
+        unit_dict = super().as_dict()
+        unit_dict.update(
+            {
+                "max_power_charge": self.max_power_charge,
+                "max_power_discharge": self.max_power_discharge,
+                "min_power_charge": self.min_power_charge,
+                "min_power_discharge": self.min_power_discharge,
+                "efficiency_charge": self.efficiency_discharge,
+                "unit_type": "storage",
+            }
+        )
+
+        return unit_dict

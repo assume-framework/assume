@@ -67,7 +67,6 @@ class UnitsOperator(Role):
     async def add_unit(
         self,
         id: str,
-        unit_type: str,
         unit_class: type[BaseUnit],
         unit_params: dict,
         index: pd.DatetimeIndex,
@@ -86,7 +85,6 @@ class UnitsOperator(Role):
             message = {
                 "context": "write_results",
                 "type": "store_units",
-                "unit_type": unit_type,
                 "data": self.units[id],
             }
             await self.context.send_acl_message(

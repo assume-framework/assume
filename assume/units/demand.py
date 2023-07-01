@@ -79,3 +79,15 @@ class Demand(BaseUnit):
     ):
         end_excl = end - self.index.freq
         self.total_power_output.loc[start:end_excl] += dispatch_plan["total_power"]
+
+    def as_dict(self) -> dict:
+        unit_dict = super().as_dict()
+        unit_dict.update(
+            {
+                "max_power": self.max_power,
+                "min_power": self.min_power,
+                "unit_type": "demand",
+            }
+        )
+
+        return unit_dict

@@ -443,3 +443,17 @@ class PowerPlant(BaseUnit):
         max_delta = max_power - base_load.max()
 
         return min_delta, max_delta
+
+    def as_dict(self) -> dict:
+        unit_dict = super().as_dict()
+        unit_dict.update(
+            {
+                "max_power": self.max_power,
+                "min_power": self.min_power,
+                "emission_factor": self.emission_factor,
+                "efficiency": self.efficiency,
+                "unit_type": "power_plant",
+            }
+        )
+
+        return unit_dict
