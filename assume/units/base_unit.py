@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 import pandas as pd
 
 from assume.strategies import BaseStrategy
@@ -36,7 +38,7 @@ class BaseUnit:
         self.node = node
         self.bidding_strategies: dict[str, BaseStrategy] = bidding_strategies
         self.index = index
-        self.total_power_output = pd.Series(0.0, index=self.index)
+        self.outputs = defaultdict(lambda: pd.Series(0.0, index=self.index))
 
     def calculate_operational_window(
         self,
@@ -87,7 +89,8 @@ class BaseUnit:
         """
         adds dispatch plan from current market result to total dispatch plan
         """
-        pass
+        end_excl = end - self.index.freq
+        self.outputs[product_type].loc[start:end_excl] += dispatch_plan["total_power"]
 
     def execute_current_dispatch(
         self,
@@ -98,10 +101,10 @@ class BaseUnit:
         check if the total dispatch plan is feasible
         This checks if the market feedback is feasible for the given unit.
         And sets the closest dispatch if not.
-        The end date is inclusive.
+        The end param should be inclusive.
         """
         end_excl = end - self.index.freq
-        return self.total_power_output[start:end_excl]
+        return self.outputs["energy"][start:end_excl]
 
     def as_dict(self) -> dict:
         return {

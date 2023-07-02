@@ -176,17 +176,17 @@ class StorageUnit(BaseUnit):
         self.current_status = 1
         self.current_down_time = self.min_down_time
 
-        # total_power_output > 0 discharging, total_power_output < 0 charging
-        self.total_power_output = pd.Series(0.0, index=self.index)
+        # outputs["energy"] > 0 discharging, outputs["energy"] < 0 charging
+        self.outputs["energy"] = pd.Series(0.0, index=self.index)
 
         # always starting with discharging?
-        # self.total_power_output.iat[0] = self.min_power_discharge
+        # self.outputs["energy"].iat[0] = self.min_power_discharge
 
         # starting half way charged
         self.current_SOC = self.max_SOC * 0.5
 
-        self.pos_capacity_reserve = pd.Series(0.0, index=self.index)
-        self.neg_capacity_reserve = pd.Series(0.0, index=self.index)
+        self.outputs["pos_capacity"] = pd.Series(0.0, index=self.index)
+        self.outputs["neg_capacity"] = pd.Series(0.0, index=self.index)
 
         self.mean_market_success = 0
         self.market_success_list = [0]
@@ -219,14 +219,14 @@ class StorageUnit(BaseUnit):
             return None
 
         current_power_discharge = (
-            self.total_power_output.at[start - self.index.freq]
-            if self.total_power_output.at[start - self.index.freq] > 0
+            self.outputs["energy"].at[start - self.index.freq]
+            if self.outputs["energy"].at[start - self.index.freq] > 0
             else 0
         )
 
         current_power_charge = (
-            self.total_power_output.at[start - self.index.freq]
-            if self.total_power_output.at[start - self.index.freq] < 0
+            self.outputs["energy"].at[start - self.index.freq]
+            if self.outputs["energy"].at[start - self.index.freq] < 0
             else 0
         )
 
@@ -253,7 +253,7 @@ class StorageUnit(BaseUnit):
         )
 
         # was charging before
-        if self.min_down_time > 0 and self.total_power_output < 0:
+        if self.min_down_time > 0 and self.outputs["energy"] < 0:
             min_power_discharge = 0
             max_power_discharge = 0
         else:
@@ -270,7 +270,7 @@ class StorageUnit(BaseUnit):
                 )
 
         # was discharging before
-        if self.min_down_time > 0 and self.total_power_output > 0:
+        if self.min_down_time > 0 and self.outputs["energy"] > 0:
             min_power_charge = 0
             max_power_charge = 0
         else:
@@ -363,7 +363,7 @@ class StorageUnit(BaseUnit):
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
         # capacity calculation has to be added
-        current_power = self.total_power_output.at[start - self.index.freq]
+        current_power = self.outputs["energy"].at[start - self.index.freq]
 
         available_pos_reserve_discharge = None
         available_neg_reserve_discharge = None
@@ -409,36 +409,37 @@ class StorageUnit(BaseUnit):
         product_type: str,
     ):
         end_excl = end - self.index.freq
-        self.total_power_output.loc[start:end_excl] += dispatch_plan["total_power"]
+        self.outputs["energy"].loc[start:end_excl] += dispatch_plan["total_power"]
 
+        # TODO checks should be at execute_current_dispatch - see powerplant
         # TODO check if resulting power is < max_power
-        # if self.total_power_output[start:end_excl].max() > self.max_power:
-        #     max_pow = self.total_power_output[start:end_excl].max()
+        # if self.outputs["energy"][start:end_excl].max() > self.max_power:
+        #     max_pow = self.outputs["energy"][start:end_excl].max()
         #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")
 
-        if self.total_power_output[start:end_excl].min() >= self.min_power_discharge:
+        if self.outputs["energy"][start:end_excl].min() >= self.min_power_discharge:
             self.market_success_list[-1] += 1
             self.current_status = 1  # discharging
             self.current_down_time = 0
-            self.total_power_output.loc[start:end_excl] = dispatch_plan["total_power"]
+            self.outputs["energy"].loc[start:end_excl] = dispatch_plan["total_power"]
             self.current_SOC = (
                 self.current_SOC
                 - dispatch_plan["total_power"] / self.efficiency_discharge
             )
 
-        elif self.total_power_output[start:end_excl].max() <= -self.min_power_charge:
+        elif self.outputs["energy"][start:end_excl].max() <= -self.min_power_charge:
             self.market_success_list[-1] += 1
             self.current_status = 1  # charging
             self.current_down_time = 0
-            self.total_power_output.loc[start:end_excl] = dispatch_plan["total_power"]
+            self.outputs["energy"].loc[start:end_excl] = dispatch_plan["total_power"]
             self.current_SOC = (
                 self.current_SOC - dispatch_plan["total_power"] * self.efficiency_charge
             )
 
-        elif self.total_power_output[start:end_excl].min() < self.min_power_discharge:
+        elif self.outputs["energy"][start:end_excl].min() < self.min_power_discharge:
             self.current_status = 0
             self.current_down_time += 1
-            self.total_power_output.loc[start:end_excl] = 0
+            self.outputs["energy"].loc[start:end_excl] = 0
 
             if self.market_success_list[-1] != 0:
                 self.mean_market_success = sum(self.market_success_list) / len(
