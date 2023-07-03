@@ -234,8 +234,7 @@ class World:
         self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to world
         output_role = WriteOutput(
-            scenario=scenario,
-            study_case=study_case,
+            simulation_id=f"{scenario}_{study_case}",
             start=self.start,
             end=self.end,
             db_engine=self.db,
