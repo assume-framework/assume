@@ -1,5 +1,5 @@
 import logging
-from functools import cache, lru_cache
+from functools import lru_cache
 
 import pandas as pd
 
@@ -157,8 +157,10 @@ class PowerPlant(BaseUnit):
 
         if product_type == "energy":
             return self.calculate_energy_operational_window(start, end)
-        elif product_type in {"capacity_pos", "capacity_neg"}:
-            return self.calculate_reserve_operational_window(start, end)
+        elif product_type == "capacity_pos":
+            return self.calculate_pos_reserve_operational_window(start, end)
+        elif product_type == "capacity_neg":
+            return self.calculate_neg_reserve_operational_window(start, end)
 
     def calculate_energy_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
@@ -225,7 +227,7 @@ class PowerPlant(BaseUnit):
             },
         }
 
-    def calculate_reserve_operational_window(
+    def calculate_pos_reserve_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
         previous_power = self.total_power_output.at[start - self.index.freq]
@@ -236,15 +238,56 @@ class PowerPlant(BaseUnit):
         # and differences between resolutions of energy and reserve markets
         available_pos_reserve = min(max_power - previous_power, self.ramp_up)
 
-        available_neg_reserve = max(0, min(previous_power - min_power, self.ramp_down))
+        if self.marginal_cost is None:
+            marginal_cost = self.calc_marginal_cost_with_partial_eff(
+                power_output=self.max_power,
+                timestep=start,
+            )
+        else:
+            marginal_cost = (
+                self.marginal_cost[start]
+                if type(self.marginal_cost) is dict
+                else self.marginal_cost
+            )
 
         operational_window = {
             "window": {"start": start, "end": end},
             "pos_reserve": {
                 "capacity": available_pos_reserve,
+                "marginal_cost": marginal_cost,
             },
+        }
+
+        return operational_window
+
+    def calculate_neg_reserve_operational_window(
+        self, start: pd.Timestamp, end: pd.Timestamp
+    ) -> dict:
+        previous_power = self.total_power_output.at[start - self.index.freq]
+
+        min_power, max_power = self.calculate_min_max_power(start, end)
+
+        # should be adjusted to account for ramping speeds
+        # and differences between resolutions of energy and reserve markets
+        available_neg_reserve = max(0, min(previous_power - min_power, self.ramp_down))
+
+        if self.marginal_cost is None:
+            marginal_cost = self.calc_marginal_cost_with_partial_eff(
+                power_output=self.max_power,
+                timestep=start,
+            )
+        else:
+            marginal_cost = (
+                self.marginal_cost[start]
+                if type(self.marginal_cost) is dict
+                else self.marginal_cost
+            )
+
+        operational_window = {
+            "window": {"start": start, "end": end},
             "neg_reserve": {
                 "capacity": available_neg_reserve,
+                "marginal_cost": marginal_cost,
             },
         }
 

@@ -1,12 +1,12 @@
-base_case_2019:
-  start_date: 2018-12-31 20:00
-  end_date: 2019-01-21 00:00
+example_01c:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-02-01 00:00
   time_step: 1h
+  save_frequency_hours: 24
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2018-12-31 23:00
       products:
         - duration: 1h
           count: 1
@@ -20,15 +20,19 @@ base_case_2019:
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
 
-crm_case_2019:
-  start_date: 2018-12-31 20:00
+example_01c_crm:
+  start_date: 2019-01-01 00:00
   end_date: 2019-01-21 00:00
   time_step: 1h
+  
+  bidding_strategy_params:
+    crm_foresight: 4h
+
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2018-12-31 23:00
+      start_date: 2019-01-01 01:00
       products:
         - duration: 1h
           count: 1
@@ -45,13 +49,13 @@ crm_case_2019:
     CRM_pos:
       operator: CRM_operator
       product_type: capacity_pos
-      start_date: 2019-01-01 01:00
+      start_date: 2019-01-01 00:00
       products:
         - duration: 4h
           count: 1
           first_delivery: 1h
       opening_frequency: 4h
-      opening_duration: 1h
+      opening_duration: 30m
       volume_unit: MW
       maximum_bid_volume: 100000
       maximum_bid_price: 9999
@@ -61,18 +65,17 @@ crm_case_2019:
 
     CRM_neg:
       operator: CRM_operator
-      product_type: capacity_pos
-      start_date: 2019-01-01 01:00
+      product_type: capacity_neg
+      start_date: 2019-01-01 00:00
       products:
         - duration: 4h
           count: 1
           first_delivery: 1h
       opening_frequency: 4h
-      opening_duration: 1h
+      opening_duration: 30m
       volume_unit: MW
       maximum_bid_volume: 100000
       maximum_bid_price: 9999
-      minimum_bid_price: -9999
+      minimum_bid_price: -9999      
       price_unit: EUR/MW
       market_mechanism: pay_as_bid
-
