@@ -34,6 +34,8 @@ from assume.strategies import (
     flexableCRMStorage,
     flexableEOM,
     flexableEOMStorage,
+    flexableNegCRM,
+    flexablePosCRM,
 )
 from assume.units import Demand, HeatPump, PowerPlant, StorageUnit
 
@@ -83,6 +85,8 @@ class World:
         self.bidding_types = {
             "naive": NaiveStrategy,
             "flexable_eom": flexableEOM,
+            "flexable_pos_crm": flexablePosCRM,
+            "flexable_neg_crm": flexableNegCRM,
             "flexable_eom_storage": flexableEOMStorage,
             "naive_neg_reserve": NaiveNegReserveStrategy,
             "naive_pos_reserve": NaivePosReserveStrategy,
@@ -143,8 +147,7 @@ class World:
             end=self.end + pd.Timedelta(hours=4),
             freq=config["time_step"],
         )
-        # firm power capacity is used to bid longterm
-        # how much % of the fpc should be bid longterm
+        # get extra parameters for bidding strategies
         self.bidding_params = config.get("bidding_strategy_params", {})
 
         # load the data from the csv files
@@ -226,18 +229,17 @@ class World:
         await self.setup(self.start)
 
         # read writing properties form config
-        simulation_id = study_case
         save_frequency_hours = config.get("save_frequency_hours", None)
 
         self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to world
         output_role = WriteOutput(
-            simulation_id,
-            self.start,
-            self.end,
-            self.db,
-            self.export_csv_path,
-            save_frequency_hours,
+            simulation_id=f"{scenario}_{study_case}",
+            start=self.start,
+            end=self.end,
+            db_engine=self.db,
+            export_csv_path=self.export_csv_path,
+            save_frequency_hours=save_frequency_hours,
         )
         same_process = True
         if same_process:
@@ -332,10 +334,14 @@ class World:
                     unit_name
                 ].to_dict()
 
+                unit_params["price_forecast"] = self.forecast_providers[
+                    "EOM"
+                ].price_forecast_df
+
                 # check if we have RL bidding strategy
                 if (
                     unit_params["bidding_strategies"]["energy"] == "rl_strategy"
-                    and self.price_forecast is not None
+                    and self.forecast_providers["EOM"].price_forecast_df is not None
                 ):
                     unit_params["price_forecast"] = self.price_forecast["mcp"]
                     unit_params["res_demand_forecast"] = self.price_forecast[
@@ -423,6 +429,10 @@ class World:
                         market.product_type: "simple"
                         for market in self.markets.values()
                     }
+
+                unit_params["price_forecast"] = self.forecast_providers[
+                    "EOM"
+                ].price_forecast_df
 
                 await self.add_unit(
                     id=storage_name,

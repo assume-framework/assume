@@ -136,9 +136,9 @@ class MarketRole(Role):
         agent_addr = meta["sender_addr"]
         agent_id = meta["sender_id"]
         try:
-            max_price = self.marketconfig.maximum_bid
-            min_price = self.marketconfig.minimum_bid
-            max_volume = self.marketconfig.maximum_volume
+            max_price = self.marketconfig.maximum_bid_price
+            min_price = self.marketconfig.minimum_bid_price
+            max_volume = self.marketconfig.maximum_bid_volume
 
             if self.marketconfig.price_tick:
                 # max and min should be in units
@@ -151,8 +151,12 @@ class MarketRole(Role):
                 order["agent_id"] = (agent_addr, agent_id)
                 if not order.get("only_hours"):
                     order["only_hours"] = None
-                assert order["price"] <= max_price, f"max_bid {order['price']}"
-                assert order["price"] >= min_price, f"min_bid {order['price']}"
+                assert (
+                    order["price"] <= max_price
+                ), f"maximum_bid_price {order['price']}"
+                assert (
+                    order["price"] >= min_price
+                ), f"minimum_bid_price {order['price']}"
                 assert (
                     abs(order["volume"]) <= max_volume
                 ), f"max_volume {order['volume']}"

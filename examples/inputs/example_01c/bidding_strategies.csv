@@ -1,0 +1,13 @@
+name,energy,capacity_pos,capacity_neg
+demand_EOM,naive,-,-
+demand_CRM_pos,-,naive,-
+demand_CRM_neg,-,-,naive
+Wind onshore,naive,-,-
+Wind offshore,naive,-,-
+Solar,naive,-,-
+Hydro,naive,-,-
+Biomass,naive,-,-
+Unit 1,flexable_eom,flexable_pos_crm,flexable_neg_crm
+Unit 2,flexable_eom,flexable_pos_crm,flexable_neg_crm
+Unit 3,flexable_eom,flexable_pos_crm,flexable_neg_crm
+Unit 4,flexable_eom,flexable_pos_crm,flexable_neg_crm

@@ -20,6 +20,8 @@ base_case:
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh
-      maximum_volume: 1000000
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
