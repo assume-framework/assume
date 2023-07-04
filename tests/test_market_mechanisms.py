@@ -152,16 +152,14 @@ def test_market_mechanism():
         # import pandas as pd
         # print(pd.DataFrame(mr.all_orders))
         # print(pd.DataFrame(clearing_result))
-        print(meta)
+        # print(meta)
 
-    return mr.all_orders, meta
+    # return mr.all_orders, meta
 
 
 if __name__ == "__main__":
-    clearing_result, meta = test_market_mechanism()
     from assume.common.utils import plot_orderbook
 
-    fig, ax = plot_orderbook(clearing_result, meta)
-    fig.show()
-
-    print("finished")
+    # clearing_result, meta = test_market_mechanism()
+    # fig, ax = plot_orderbook(clearing_result, meta)
+    # fig.show()

@@ -30,6 +30,7 @@ from assume.strategies import (
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
     NaiveStrategy,
+    OTCStrategy,
     RLStrategy,
     flexableCRMStorage,
     flexableEOM,
@@ -83,14 +84,15 @@ class World:
             "storage": StorageUnit,
         }
         self.bidding_types = {
-            "naive": NaiveStrategy,
             "flexable_eom": flexableEOM,
             "flexable_pos_crm": flexablePosCRM,
             "flexable_neg_crm": flexableNegCRM,
+            "flexable_crm_storage": flexableCRMStorage,
             "flexable_eom_storage": flexableEOMStorage,
+            "naive": NaiveStrategy,
             "naive_neg_reserve": NaiveNegReserveStrategy,
             "naive_pos_reserve": NaivePosReserveStrategy,
-            "flexable_crm_storage": flexableCRMStorage,
+            "otc_strategy": OTCStrategy,
             "rl_strategy": RLStrategy,
         }
         self.clearing_mechanisms = {
