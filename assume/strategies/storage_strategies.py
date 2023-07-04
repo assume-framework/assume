@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from assume.strategies.base_strategy import BaseStrategy
-from assume.units.storage_unit import StorageUnit
+from assume.units.storage import StorageUnit
 
 
 class complexEOMStorage(BaseStrategy):

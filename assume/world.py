@@ -37,7 +37,7 @@ from assume.strategies import (
     flexableNegCRM,
     flexablePosCRM,
 )
-from assume.units import Demand, HeatPump, PowerPlant, StorageUnit
+from assume.units import Demand, HeatPump, PowerPlant, Storage
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("mango").setLevel(logging.WARNING)
@@ -80,7 +80,7 @@ class World:
             "power_plant": PowerPlant,
             "heatpump": HeatPump,
             "demand": Demand,
-            "storage": StorageUnit,
+            "storage": Storage,
         }
         self.bidding_types = {
             "naive": NaiveStrategy,
