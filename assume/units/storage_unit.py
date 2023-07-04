@@ -219,15 +219,11 @@ class StorageUnit(BaseUnit):
             return None
 
         current_power_discharge = (
-            self.outputs["energy"].at[start - self.index.freq]
-            if self.outputs["energy"].at[start - self.index.freq] > 0
-            else 0
+            self.get_output_before(start) if self.get_output_before(start) > 0 else 0
         )
 
         current_power_charge = (
-            self.outputs["energy"].at[start - self.index.freq]
-            if self.outputs["energy"].at[start - self.index.freq] < 0
-            else 0
+            self.get_output_before(start) if self.get_output_before(start) < 0 else 0
         )
 
         min_power_discharge = (
@@ -363,7 +359,7 @@ class StorageUnit(BaseUnit):
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
         # capacity calculation has to be added
-        current_power = self.outputs["energy"].at[start - self.index.freq]
+        current_power = self.get_output_before(start)
 
         available_pos_reserve_discharge = None
         available_neg_reserve_discharge = None

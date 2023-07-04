@@ -105,22 +105,22 @@ def test_reset_function(power_plant_1):
     assert power_plant_1.current_status == 1
 
     # check if total_power_output is reset
-    assert power_plant_1.total_power_output.equals(
+    assert power_plant_1.outputs["power"].equals(
         pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
     )
     # the same for pos and neg capacity reserve
-    assert power_plant_1.pos_capacity_reserve.equals(
+    assert power_plant_1.outputs["pos_capacity"].equals(
         pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
     )
-    assert power_plant_1.neg_capacity_reserve.equals(
+    assert power_plant_1.outputs["neg_capacity"].equals(
         pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
     )
 
     # the same for total_heat_output and power_loss_chp
-    assert power_plant_1.total_heat_output.equals(
+    assert power_plant_1.outputs["heat"].equals(
         pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
     )
-    assert power_plant_1.power_loss_chp.equals(
+    assert power_plant_1.outputs["power_loss"].equals(
         pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
     )
 

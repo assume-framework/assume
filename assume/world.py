@@ -71,6 +71,8 @@ class World:
                         f"could not connect to {database_uri}, trying again"
                     )
                     time.sleep(2)
+        else:
+            self.db = None
 
         self.market_operators: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}

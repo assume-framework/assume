@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import datetime
 
 import pandas as pd
 
@@ -105,6 +106,12 @@ class BaseUnit:
         """
         end_excl = end - self.index.freq
         return self.outputs["energy"][start:end_excl]
+
+    def get_output_before(self, datetime: datetime, product_type: str = "energy"):
+        if datetime - self.index.freq < self.index[0]:
+            return 0
+        else:
+            return self.outputs["energy"].at[datetime - self.index.freq]
 
     def as_dict(self) -> dict:
         return {
