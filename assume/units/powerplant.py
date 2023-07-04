@@ -96,12 +96,17 @@ class PowerPlant(BaseUnit):
 
         self.location = location
 
-        if not self.partial_load_eff and type(self.fuel_price) is float:
+        self.init_marginal_cost()
+
+    def init_marginal_cost(self):
+        if not self.partial_load_eff and type(self.fuel_price) is not pd.Series:
             fuel_prices = {self.fuel_type: self.fuel_price, "co2": self.co2_price}
             self.marginal_cost = self.calc_simple_marginal_cost(fuel_prices)
         elif not self.partial_load_eff:
             # calculate the marginal cost for the whole time series of fuel prices
             fuel_prices = pd.concat([self.fuel_price, self.co2_price], axis=1)
+            #rename columns of fuel_prices to fule_type and co2
+            fuel_prices.columns = [self.fuel_type, "co2"]
             self.marginal_cost = pd.DataFrame(
                 index=self.index, columns=["marginal_cost"], data=0.0
             )
