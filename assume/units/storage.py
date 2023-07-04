@@ -1,4 +1,5 @@
 import logging
+from functools import lru_cache
 
 import pandas as pd
 
@@ -221,8 +222,7 @@ class Storage(BaseUnit):
     def calculate_energy_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
-        end_excl = end - self.index.freq
-        duration = (end_excl - start).total_seconds() / 3600
+        duration = (end - start).total_seconds() / 3600
 
         if self.current_status == 0 and self.current_down_time < self.min_down_time:
             return None
@@ -269,28 +269,28 @@ class Storage(BaseUnit):
                 ),
             },
             "min_power_discharge": {
-                "power_discharge": min_max_power['min_power_discharge'],
+                "power_discharge": min_max_power["min_power_discharge"],
                 "marginal_cost": self.calc_marginal_cost(
                     timestep=start,
                     discharge=True,
                 ),
             },
             "max_power_discharge": {
-                "power_discharge": min_max_power['max_power_discharge'],
+                "power_discharge": min_max_power["max_power_discharge"],
                 "marginal_cost": self.calc_marginal_cost(
                     timestep=start,
                     discharge=True,
                 ),
             },
             "min_power_charge": {
-                "power_charge": min_max_power['min_power_charge'],
+                "power_charge": min_max_power["min_power_charge"],
                 "marginal_cost": self.calc_marginal_cost(
                     timestep=start,
                     discharge=False,
                 ),
             },
             "max_power_charge": {
-                "power_charge": min_max_power['max_power_charge'],
+                "power_charge": min_max_power["max_power_charge"],
                 "marginal_cost": self.calc_marginal_cost(
                     timestep=start,
                     discharge=False,
@@ -302,8 +302,7 @@ class Storage(BaseUnit):
     def calculate_reserve_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
-        end_excl = end - self.index.freq
-        duration = (end_excl - start).total_seconds() / 3600
+        duration = (end - start).total_seconds() / 3600
         # capacity calculation has to be added
         current_power = self.outputs["energy"].at[start - self.index.freq]
 
@@ -350,24 +349,23 @@ class Storage(BaseUnit):
         end: pd.Timestamp,
         product_type: str,
     ):
-        end_excl = end - self.index.freq
-        duration = (end_excl - start).total_seconds() / 3600
+        duration = (end - start).total_seconds() / 3600
 
         # TODO checks should be at execute_current_dispatch - see powerplant
         # TODO check if resulting power is < max_power
-        # if self.outputs["energy"][start:end_excl].max() > self.max_power:
-        #     max_pow = self.outputs["energy"][start:end_excl].max()
+        # if self.outputs["energy"][start:end].max() > self.max_power:
+        #     max_pow = self.outputs["energy"][start:end].max()
         #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")
 
-        if self.outputs["energy"][start:end_excl].min() >= self.min_power_discharge:
-            self.set_market_sucess(dispatch_plan, start, end_excl)
+        if self.outputs["energy"][start:end].min() >= self.min_power_discharge:
+            self.set_market_sucess(dispatch_plan, start, end)
             discharged_energy = (
                 dispatch_plan["total_power"] * duration / self.efficiency_discharge
             )
             self.current_SOC = self.current_SOC - discharged_energy
 
-        elif self.outputs["energy"][start:end_excl].max() <= -self.min_power_charge:
-            self.set_market_sucess(dispatch_plan, start, end_excl)
+        elif self.outputs["energy"][start:end].max() <= -self.min_power_charge:
+            self.set_market_sucess(dispatch_plan, start, end)
             # multiplied by -1 because the power when charging is negative
             charged_energy = (
                 dispatch_plan["total_power"] * duration * self.efficiency_charge * (-1)
@@ -377,7 +375,7 @@ class Storage(BaseUnit):
         else:
             self.current_status = 0
             self.current_down_time += 1
-            self.outputs["energy"].loc[start:end_excl] = 0
+            self.outputs["energy"].loc[start:end] = 0
 
             if self.market_success_list[-1] != 0:
                 self.mean_market_success = sum(self.market_success_list) / len(
@@ -385,12 +383,13 @@ class Storage(BaseUnit):
                 )
                 self.market_success_list.append(0)
 
-    def set_market_sucess(self, dispatch_plan, start, end_excl):
+    def set_market_sucess(self, dispatch_plan, start, end):
         self.market_success_list[-1] += 1
         self.current_status = 1  # discharging
         self.current_down_time = 0
-        self.outputs["energy"].loc[start:end_excl] += dispatch_plan["total_power"]
+        self.outputs["energy"].loc[start:end] += dispatch_plan["total_power"]
 
+    @lru_cache(maxsize=256)
     def calc_marginal_cost(
         self,
         timestep: pd.Timestamp,
@@ -519,7 +518,7 @@ class Storage(BaseUnit):
                 ),
             ),
         )
-        #pack values to a dict
+        # pack values to a dict
         min_max_power = {
             "min_power_discharge": min_power_discharge,
             "min_power_charge": min_power_charge,
@@ -527,7 +526,7 @@ class Storage(BaseUnit):
             "max_power_charge": max_power_charge,
         }
 
-        #if values are close to zero, set them to zero
+        # if values are close to zero, set them to zero
         for key, value in min_max_power.items():
             if abs(value) < 1e-3:
                 min_max_power[key] = 0

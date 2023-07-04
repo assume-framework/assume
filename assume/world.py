@@ -317,7 +317,7 @@ class World:
                 [all_operators, storage_units.unit_operator.unique()]
             )
 
-        for company_name in all_operators:
+        for company_name in set(all_operators):
             self.add_unit_operator(id=str(company_name))
 
         # add the units to corresponsing unit operators

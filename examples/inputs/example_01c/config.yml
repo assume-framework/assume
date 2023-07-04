@@ -1,4 +1,4 @@
-example_01c:
+eom_only_case:
   start_date: 2019-01-01 00:00
   end_date: 2019-02-01 00:00
   time_step: 1h
@@ -20,7 +20,7 @@ example_01c:
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
 
-example_01c_crm:
+crm_case:
   start_date: 2019-01-01 00:00
   end_date: 2019-01-21 00:00
   time_step: 1h

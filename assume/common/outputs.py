@@ -58,6 +58,9 @@ class WriteOutput(Role):
         self.write_dfs: dict = defaultdict(list)
 
         if self.db is not None:
+            # TODO: #84 check if simulation_id is already in db
+            # and warn user if so
+            # give the option to abort or continue and delete old data
             self.delete_db_scenario(self.simulation_id)
 
     def delete_db_scenario(self, simulation_id):

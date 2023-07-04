@@ -7,4 +7,3 @@ from assume.strategies.naive_strategies import (
     NaiveStrategy,
 )
 from assume.strategies.rl_strategies import RLStrategy
-from assume.strategies.storage_strategies import complexEOMStorage
