@@ -242,7 +242,7 @@ class Storage(BaseUnit):
             self.max_SOC[start] if type(self.max_SOC) is pd.Series else self.max_SOC
         )
 
-        temp = self.calculate_min_max_power(
+        min_max_power = self.calculate_min_max_power(
             start=start,
             current_power_charge=current_power_charge,
             current_power_discharge=current_power_discharge,
@@ -250,12 +250,6 @@ class Storage(BaseUnit):
             max_SOC=max_SOC,
             duration=duration,
         )
-        (
-            min_power_discharge,
-            min_power_charge,
-            max_power_discharge,
-            max_power_charge,
-        ) = temp
 
         # what form does the operational window have?
         operational_window = {
@@ -275,28 +269,28 @@ class Storage(BaseUnit):
                 ),
             },
             "min_power_discharge": {
-                "power_discharge": min_power_discharge,
+                "power_discharge": min_max_power['min_power_discharge'],
                 "marginal_cost": self.calc_marginal_cost(
                     timestep=start,
                     discharge=True,
                 ),
             },
             "max_power_discharge": {
-                "power_discharge": max_power_discharge,
+                "power_discharge": min_max_power['max_power_discharge'],
                 "marginal_cost": self.calc_marginal_cost(
                     timestep=start,
                     discharge=True,
                 ),
             },
             "min_power_charge": {
-                "power_charge": min_power_charge,
+                "power_charge": min_max_power['min_power_charge'],
                 "marginal_cost": self.calc_marginal_cost(
                     timestep=start,
                     discharge=False,
                 ),
             },
             "max_power_charge": {
-                "power_charge": max_power_charge,
+                "power_charge": min_max_power['max_power_charge'],
                 "marginal_cost": self.calc_marginal_cost(
                     timestep=start,
                     discharge=False,
@@ -506,7 +500,7 @@ class Storage(BaseUnit):
             max(
                 0,
                 (
-                    (self.current_SOC - min_SOC - self.pos_capacity_reserve[start])
+                    (self.current_SOC - min_SOC - self.outputs["pos_capacity"][start])
                     * self.efficiency_discharge
                     / duration
                 ),
@@ -519,16 +513,23 @@ class Storage(BaseUnit):
             min(
                 0,
                 (
-                    (self.current_SOC - max_SOC - self.neg_capacity_reserve[start])
+                    (self.current_SOC - max_SOC - self.outputs["neg_capacity"][start])
                     / self.efficiency_charge
                     / duration
                 ),
             ),
         )
+        #pack values to a dict
+        min_max_power = {
+            "min_power_discharge": min_power_discharge,
+            "min_power_charge": min_power_charge,
+            "max_power_discharge": max_power_discharge,
+            "max_power_charge": max_power_charge,
+        }
 
-        return (
-            min_power_discharge,
-            min_power_charge,
-            max_power_discharge,
-            max_power_charge,
-        )
+        #if values are close to zero, set them to zero
+        for key, value in min_max_power.items():
+            if abs(value) < 1e-3:
+                min_max_power[key] = 0
+
+        return min_max_power
