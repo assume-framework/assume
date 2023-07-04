@@ -1,6 +1,7 @@
 import logging
 import os
 import shutil
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -8,6 +9,8 @@ import pandas as pd
 from dateutil import rrule as rr
 from mango import Role
 from sqlalchemy import inspect, text
+
+from assume.units.base_unit import BaseUnit
 
 logger = logging.getLogger(__name__)
 
@@ -44,38 +47,34 @@ class WriteOutput(Role):
         self.export_csv_path = export_csv_path
         if self.export_csv_path:
             self.p = Path(self.export_csv_path, simulation_id)
-            if self.p.exists():
-                shutil.rmtree(self.p)
+            shutil.rmtree(self.p, ignore_errors=True)
             self.p.mkdir(parents=True)
         self.db = db_engine
 
         # contruct all timeframe under which hourly values are written to excel and db
         self.start = start
         self.end = end
-
         # initalizes dfs for storing and writing asynchron
-        self.write_dfs: dict[str, []] = {
-            "unit_dispatch": [],
-            "market_dispatch": [],
-            "market_meta": [],
-            "market_orders": [],
-        }
+        self.write_dfs: dict = defaultdict(list)
 
-        # Loop throuph all database tabels
-        # Get list of table names in database
         if self.db is not None:
-            table_names = inspect(self.db.bind).get_table_names()
-            # Iterate through each table
-            for table_name in table_names:
-                with self.db() as db:
-                    # Read table into Pandas DataFrame
-                    query = text(
-                        f"delete from {table_name} where simulation = '{self.simulation_id}'"
-                    )
-                    rowcount = db.execute(query).rowcount
-                    # has to be done manually with raw queries
-                    db.commit()
-                    logger.debug("deleted %s rows from %s", rowcount, table_name)
+            self.delete_db_scenario(self.simulation_id)
+
+    def delete_db_scenario(self, simulation_id):
+        # Loop throuph all database tables
+        # Get list of table names in database
+        table_names = inspect(self.db.bind).get_table_names()
+        # Iterate through each table
+        for table_name in table_names:
+            with self.db() as db:
+                # Read table into Pandas DataFrame
+                query = text(
+                    f"delete from {table_name} where simulation = '{simulation_id}'"
+                )
+                rowcount = db.execute(query).rowcount
+                # has to be done manually with raw queries
+                db.commit()
+                logger.debug("deleted %s rows from %s", rowcount, table_name)
 
     def setup(self):
         """
@@ -113,7 +112,7 @@ class WriteOutput(Role):
             self.write_market_results(content.get("data"))
 
         elif content.get("type") == "store_units":
-            self.write_units_definition(content.get("unit_type"), content.get("data"))
+            self.write_units_definition(content.get("data"))
 
         elif content.get("type") == "market_dispatch":
             self.write_market_dispatch(content.get("data"))
@@ -175,7 +174,7 @@ class WriteOutput(Role):
         df["market_id"] = market_id
         self.write_dfs["market_orders"].append(df)
 
-    def write_units_definition(self, unit_type, unit):
+    def write_units_definition(self, unit: BaseUnit):
         """
         Writes unit definitions to the corresponding data frame and directly store it in db and csv.
         Since that is only done once, no need for recurrent sheduling arises.
@@ -185,67 +184,17 @@ class WriteOutput(Role):
             unit_params: The parameters of the unit.
         """
 
-        if unit_type == "power_plant":
-            unit_info = {
-                unit.id: {
-                    "simulation": self.simulation_id,
-                    "unit_type": unit_type,
-                    "technology": unit.technology,
-                    "max_power": unit.max_power,
-                    "min_power": unit.min_power,
-                    "emission_factor": unit.emission_factor,
-                    "efficiency": unit.efficiency,
-                    "unit_operator": unit.unit_operator,
-                }
-            }
+        unit_info = unit.as_dict()
 
-            df = pd.DataFrame(unit_info).T
-
-            table_name = "unit_meta"
-
-        elif unit_type == "storage_unit":
-            unit_info = {
-                unit.id: {
-                    "simulation": self.simulation_id,
-                    "unit_type": unit_type,
-                    "technology": unit.technology,
-                    "max_power_charge": unit.max_power_charge,
-                    "max_power_discharge": unit.max_power_discharge,
-                    "min_power_charge": unit.min_power_charge,
-                    "min_power_discharge": unit.min_power_discharge,
-                    "efficiency_charge": unit.efficiency_discharge,
-                    "unit_operator": unit.unit_operator,
-                }
-            }
-
-            df = pd.DataFrame(unit_info).T
-
-            table_name = "storage_meta"
-
-        elif unit_type == "demand":
-            unit_info = {
-                unit.id: {
-                    "simulation": self.simulation_id,
-                    "unit_type": unit_type,
-                    "technology": unit.technology,
-                    "max_power": unit.max_power,
-                    "min_power": unit.min_power,
-                    "unit_operator": unit.unit_operator,
-                }
-            }
-
-            df = pd.DataFrame(unit_info).T
-
-            table_name = "demand_meta"
-        else:
-            logger.info(f"unknown {unit_type} is not exported")
+        table_name = unit_info["unit_type"] + "_meta"
+        if table_name is None:
+            logger.info(f"unknown {unit_info['unit_type']} is not exported")
             return False
+        del unit_info["unit_type"]
+        unit_info["simulation"] = self.simulation_id
+        u_info = {unit.id: unit_info}
 
-        if self.export_csv_path:
-            market_data_path = self.p.joinpath(f"{table_name}.csv")
-            df.to_csv(market_data_path, mode="a", header=not market_data_path.exists())
-        if self.db is not None and not df.empty:
-            df.to_sql(table_name, self.db.bind, if_exists="append")
+        self.write_dfs[table_name].append(pd.DataFrame(u_info).T)
 
     def write_market_dispatch(self, data):
         """

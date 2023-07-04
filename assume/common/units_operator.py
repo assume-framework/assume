@@ -42,6 +42,7 @@ class UnitsOperator(Role):
             self.use_portfolio_opt = opt_portfolio[0]
             self.portfolio_strategy = opt_portfolio[1]
 
+        # should be a list per product_type
         self.valid_orders = []
         self.units: dict[str, BaseUnit] = {}
 
@@ -67,7 +68,6 @@ class UnitsOperator(Role):
     async def add_unit(
         self,
         id: str,
-        unit_type: str,
         unit_class: type[BaseUnit],
         unit_params: dict,
         index: pd.DatetimeIndex,
@@ -86,7 +86,6 @@ class UnitsOperator(Role):
             message = {
                 "context": "write_results",
                 "type": "store_units",
-                "unit_type": unit_type,
                 "data": self.units[id],
             }
             await self.context.send_acl_message(
@@ -297,13 +296,3 @@ class UnitsOperator(Role):
                         self.bids_map[order_c["bid_id"]] = unit_id
 
         return orderbook
-
-    # async def on_stop(self):
-    #     series = aggregate_step_amount(self.valid_orders)
-    #     df = pd.DataFrame(series)
-
-    #     if not df.empty:
-    #         import matplotlib.pyplot as plt
-    #         plt.plot(df[0], df[1])
-    #         plt.title(self.id)
-    #         plt.show()

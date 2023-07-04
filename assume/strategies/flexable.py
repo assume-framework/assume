@@ -41,10 +41,10 @@ class flexableEOM(BaseStrategy):
                 unit, marginal_cost_flex, bid_quantity_inflex
             )
 
-        if unit.total_heat_output[self.current_time] > 0:
+        if unit.outputs["heat"][self.current_time] > 0:
             power_loss_ratio = (
                 unit.power_loss_chp[self.current_time]
-                / unit.total_heat_output[self.current_time]
+                / unit.outputs["heat"][self.current_time]
             )
         else:
             power_loss_ratio = 0.0
@@ -95,9 +95,9 @@ class flexableEOM(BaseStrategy):
 
         price_reduction_restart = starting_cost / min_down_time / bid_quantity_inflex
 
-        if unit.total_heat_output[t] > 0:
+        if unit.outputs["heat"][t] > 0:
             heat_gen_cost = (
-                unit.total_heat_output[t] * (unit.fuel_price["natural gas"][t] / 0.9)
+                unit.outputs["heat"][t] * (unit.fuel_price["natural gas"][t] / 0.9)
             ) / bid_quantity_inflex
         else:
             heat_gen_cost = 0.0

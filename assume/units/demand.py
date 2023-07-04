@@ -51,10 +51,9 @@ class Demand(BaseUnit):
         self.volume = -volume  # demand is negative
         self.price = price
         self.location = location
-        self.total_power_output = []
 
     def reset(self):
-        self.total_power_output = pd.Series(0, index=self.index)
+        self.outputs["energy"] = pd.Series(0, index=self.index)
 
     def calculate_operational_window(
         self,
@@ -65,7 +64,7 @@ class Demand(BaseUnit):
         start = pd.Timestamp(start)
         end = pd.Timestamp(end)
         """Calculate the operation window for the next time step."""
-        bid_volume = (self.volume - self.total_power_output).loc[start:end].max()
+        bid_volume = (self.volume - self.outputs[product_type]).loc[start:end].max()
 
         if type(self.price) == pd.Series:
             bid_price = self.price.loc[start:end].mean()
@@ -74,8 +73,14 @@ class Demand(BaseUnit):
 
         return {"max_power": {"power": bid_volume, "marginal_cost": bid_price}}
 
-    def set_dispatch_plan(
-        self, dispatch_plan, start: pd.Timestamp, end: pd.Timestamp, product_type: str
-    ):
-        end_excl = end - self.index.freq
-        self.total_power_output.loc[start:end_excl] += dispatch_plan["total_power"]
+    def as_dict(self) -> dict:
+        unit_dict = super().as_dict()
+        unit_dict.update(
+            {
+                "max_power": self.max_power,
+                "min_power": self.min_power,
+                "unit_type": "demand",
+            }
+        )
+
+        return unit_dict

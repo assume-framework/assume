@@ -80,7 +80,7 @@ class World:
             "power_plant": PowerPlant,
             "heatpump": HeatPump,
             "demand": Demand,
-            "storage_unit": StorageUnit,
+            "storage": StorageUnit,
         }
         self.bidding_types = {
             "naive": NaiveStrategy,
@@ -436,7 +436,7 @@ class World:
 
                 await self.add_unit(
                     id=storage_name,
-                    unit_type="storage_unit",
+                    unit_type="storage",
                     unit_operator_id=unit_params["unit_operator"],
                     unit_params=unit_params,
                 )
@@ -541,7 +541,6 @@ class World:
         # create unit within the unit operator its associated with
         await self.unit_operators[unit_operator_id].add_unit(
             id=id,
-            unit_type=unit_type,
             unit_class=unit_class,
             unit_params=unit_params,
             index=self.index,

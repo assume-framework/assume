@@ -79,13 +79,13 @@ class HeatPump(BaseUnit):
         self.current_status = 1
         self.current_down_time = self.min_down_time
 
-        self.total_thermal_output = pd.Series(0.0, index=self.index)
-        min_thermal_output = self.total_thermal_output.loc[
+        self.outputs["heat"] = pd.Series(0.0, index=self.index)
+        min_thermal_output = self.outputs["heat"].loc[
             self.index[0] : self.index[0] + pd.Timedelta("24h")
         ]
 
-        self.pos_capacity_reserve = pd.Series(0.0, index=self.index)
-        self.neg_capacity_reserve = pd.Series(0.0, index=self.index)
+        self.outputs["pos_capacity"] = pd.Series(0.0, index=self.index)
+        self.outputs["neg_capacity"] = pd.Series(0.0, index=self.index)
 
     def calculate_delta_t(self, source_temp, sink_temp):
         """
@@ -170,7 +170,7 @@ class HeatPump(BaseUnit):
         else:
             bid_volume = self.volume
 
-        current_power_input = self.total_thermal_output.at[start] / cop.at[start]
+        current_power_input = self.outputs["heat"].at[start] / cop.at[start]
 
         # adjust for ramp down speed
         if self.ramp_down != -1:
@@ -188,7 +188,7 @@ class HeatPump(BaseUnit):
             max_power = max_power
 
         # adjust max_power if sold positive reserve capacity on control reserve market
-        max_power = max_power - self.pos_capacity_reserve.at[start]
+        max_power = max_power - self.outputs["pos_capacity"].at[start]
 
         operational_window = {
             "window": {"start": start, "end": end},
@@ -220,17 +220,24 @@ class HeatPump(BaseUnit):
             product_tuple=product_tuple,
         )
 
-    def set_dispatch_plan(self, dispatch_plan, time_period):
+    def set_dispatch_plan(
+        self,
+        dispatch_plan: dict,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+        product_type: str,
+    ):
+        # TODO checks should be at execute_current_dispatch - see powerplant
         if dispatch_plan["total_power"] > self.min_power:
             self.market_success_list[-1] += 1
             self.current_status = 1
             self.current_down_time = 0
-            self.total_thermal_output.loc[time_period] = dispatch_plan["total_power"]
+            self.outputs["heat"].loc[time_period] = dispatch_plan["total_power"]
 
         elif dispatch_plan["total_power"] < self.min_power:
             self.current_status = 0
             self.current_down_time += 1
-            self.total_thermal_output.loc[time_period] = 0
+            self.outputs["heat"].loc[time_period] = 0
 
     def calc_marginal_cost(self, timestep: pd.Timestamp) -> float or pd.Series:
         """

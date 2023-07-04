@@ -43,7 +43,7 @@ class flexableEOMStorage(BaseStrategy):
                     max(
                         (
                             (unit.current_SOC - unit.min_SOC)
-                            - unit.pos_capacity_reserve[self.current_time]
+                            - unit.outputs["pos_capacity"][self.current_time]
                         )
                         * unit.efficiency_discharge,
                         0,

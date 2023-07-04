@@ -1016,7 +1016,7 @@
               "hide": false,
               "metricColumn": "none",
               "rawQuery": true,
-              "rawSql": "SELECT \n  NOW() as time_sec,\n  SUM(max_power),\n  technology\nFROM unit_meta\nWHERE \"simulation\" LIKE '$simulation'\nGROUP BY technology, simulation;\n\n\n",
+              "rawSql": "SELECT \n  NOW() as time_sec,\n  SUM(max_power),\n  technology\nFROM power_plant_meta\nWHERE \"simulation\" LIKE '$simulation'\nGROUP BY technology, simulation;\n\n\n",
               "refId": "Generation",
               "select": [
                 [
@@ -1040,7 +1040,7 @@
                   }
                 ]
               ],
-              "table": "unit_meta",
+              "table": "power_plant_meta",
               "timeColumn": "fuel_type",
               "timeColumnType": "text",
               "where": [
@@ -1314,7 +1314,7 @@
               "group": [],
               "metricColumn": "none",
               "rawQuery": true,
-              "rawSql": "SELECT * FROM unit_meta\nWHERE index in ($Gen_Units) and simulation = '$simulation'\n",
+              "rawSql": "SELECT * FROM power_plant_meta\nWHERE index in ($Gen_Units) and simulation = '$simulation'\n",
               "refId": "A",
               "select": [
                 [
@@ -2116,14 +2116,14 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT \n  simulation\nFROM unit_meta\ngroup by simulation;",
+        "definition": "SELECT \n  simulation\nFROM power_plant_meta\ngroup by simulation;",
         "description": "Can choose which simulation we want to show ",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "simulation",
         "options": [],
-        "query": "SELECT \n  simulation\nFROM unit_meta\ngroup by simulation;",
+        "query": "SELECT \n  simulation\nFROM power_plant_meta\ngroup by simulation;",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -2170,7 +2170,7 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT index\nFROM unit_meta\nwhere simulation = '$simulation';",
+        "definition": "SELECT index\nFROM power_plant_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which units we want to display ",
         "hide": 0,
         "includeAll": false,
@@ -2178,7 +2178,7 @@
         "multi": true,
         "name": "Gen_Units",
         "options": [],
-        "query": "SELECT index\nFROM unit_meta\nwhere simulation = '$simulation';",
+        "query": "SELECT index\nFROM power_plant_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
