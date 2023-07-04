@@ -47,12 +47,10 @@ class flexableEOMStorage(BaseStrategy):
                 bid_quantity = min(
                     max(
                         (
-                            (
-                                (unit.current_SOC - unit.min_SOC)
-                                - np.sum(unit.pos_capacity_reserve[time_delta])
-                            )
-                            * unit.efficiency_discharge
-                        ),
+                            (unit.current_SOC - unit.min_SOC)
+                            - unit.outputs["pos_capacity"][self.current_time]
+                        )
+                        * unit.efficiency_discharge,
                         0,
                     ),
                     operational_window["max_power_discharge"]["power_discharge"],
