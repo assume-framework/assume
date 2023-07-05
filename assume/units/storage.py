@@ -349,7 +349,7 @@ class Storage(BaseUnit):
         end: pd.Timestamp,
         product_type: str,
     ):
-        duration = (end - start).total_seconds() / 3600
+        end_excl = end - self.index.freq
 
         # TODO checks should be at execute_current_dispatch - see powerplant
         # TODO check if resulting power is < max_power
@@ -357,15 +357,36 @@ class Storage(BaseUnit):
         #     max_pow = self.outputs["energy"][start:end].max()
         #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")
 
-        if self.outputs["energy"][start:end].min() >= self.min_power_discharge:
-            self.set_market_sucess(dispatch_plan, start, end)
+        if product_type == "energy":
+            self.set_energy_dispatch_plan(
+                dispatch_plan=dispatch_plan,
+                start=start,
+                end=end,
+                product_type=product_type,
+            )
+        elif product_type in {"capacity_pos", "capacity_neg"}:
+            self.outputs[product_type].loc[start:end_excl] += dispatch_plan[
+                "total_power"
+            ]
+
+    def set_energy_dispatch_plan(
+        self,
+        dispatch_plan: dict,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+    ):
+        end_excl = end - self.index.freq
+        duration = (end - start).total_seconds() / 3600
+
+        if self.outputs["energy"][start:end_excl].min() >= self.min_power_discharge:
+            self.set_market_sucess(dispatch_plan, start, end_excl)
             discharged_energy = (
                 dispatch_plan["total_power"] * duration / self.efficiency_discharge
             )
             self.current_SOC = self.current_SOC - discharged_energy
 
-        elif self.outputs["energy"][start:end].max() <= -self.min_power_charge:
-            self.set_market_sucess(dispatch_plan, start, end)
+        elif self.outputs["energy"][start:end_excl].max() <= -self.min_power_charge:
+            self.set_market_sucess(dispatch_plan, start, end_excl)
             # multiplied by -1 because the power when charging is negative
             charged_energy = (
                 dispatch_plan["total_power"] * duration * self.efficiency_charge * (-1)
@@ -375,7 +396,7 @@ class Storage(BaseUnit):
         else:
             self.current_status = 0
             self.current_down_time += 1
-            self.outputs["energy"].loc[start:end] = 0
+            self.outputs["energy"].loc[start:end_excl] = 0
 
             if self.market_success_list[-1] != 0:
                 self.mean_market_success = sum(self.market_success_list) / len(
