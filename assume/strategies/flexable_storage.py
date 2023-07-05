@@ -2,19 +2,18 @@ import numpy as np
 import pandas as pd
 
 from assume.strategies.base_strategy import BaseStrategy
-from assume.units.storage_unit import StorageUnit
+from assume.units.storage import Storage
 
 
 class flexableEOMStorage(BaseStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.foresight = pd.Timedelta("12h")
-        self.current_time = None
+        self.foresight = pd.Timedelta(kwargs.get("eom_foresight", "12h"))
 
     def calculate_bids(
         self,
-        unit: StorageUnit = None,
+        unit: Storage = None,
         market_config=None,
         operational_window: dict = None,
     ):
@@ -26,65 +25,44 @@ class flexableEOMStorage(BaseStrategy):
         Strategy analogue to flexABLE
 
         """
-        if operational_window is not None:
-            # =============================================================================
-            # Storage Unit is either charging, discharging, or off
-            # =============================================================================
-            self.current_time = operational_window["window"]["start"]
+        # =============================================================================
+        # Storage Unit is either charging, discharging, or off
+        # =============================================================================
 
-            average_price = self.calculate_price_average(unit)
+        start = operational_window["window"]["start"]
+        end = operational_window["window"]["end"]
+        time_delta = pd.date_range(
+            start=start,
+            end=end - unit.index.freq,
+            freq=unit.index.freq,
+        )
 
-            if (
-                unit.price_forecast[self.current_time]
-                >= average_price / unit.efficiency_discharge
-            ):
-                # place bid to discharge
-                bid_quantity = min(
-                    max(
-                        (
-                            (unit.current_SOC - unit.min_SOC)
-                            - unit.outputs["pos_capacity"][self.current_time]
-                        )
-                        * unit.efficiency_discharge,
-                        0,
-                    ),
-                    unit.max_power_discharge,
-                )
+        average_price = self.calculate_price_average(unit, time_delta)
 
-                bids = [{"price": average_price, "volume": bid_quantity}]
+        bid_quantity = 0
 
-            elif (
-                unit.price_forecast[self.current_time]
-                <= average_price * unit.efficiency_charge
-            ):
-                # place bid to charge
-                bid_quantity = min(
-                    max(
-                        (
-                            (unit.max_SOC - unit.current_SOC)
-                            - unit.neg_capacity_reserve[self.current_time]
-                        )
-                        / unit.efficiency_charge,
-                        0,
-                    ),
-                    unit.max_power_charge,
-                )
+        if (
+            unit.price_forecast[start] >= average_price / unit.efficiency_discharge
+        ) and (operational_window["max_power_discharge"]["power_discharge"] > 0):
+            # place bid to discharge
+            bid_quantity = operational_window["max_power_discharge"]["power_discharge"]
 
-                bids = [{"price": average_price, "volume": -bid_quantity}]
+        elif (
+            unit.price_forecast[start] <= average_price * unit.efficiency_charge
+        ) and (operational_window["max_power_charge"]["power_charge"] < 0):
+            # place bid to charge
+            bid_quantity = operational_window["max_power_charge"]["power_charge"]
 
-            else:
-                bids = []
+        if bid_quantity != 0:
+            return [{"price": average_price, "volume": bid_quantity}]
+        else:
+            return []
 
-        return bids
-
-    def calculate_price_average(self, unit):
-        t = self.current_time
-        """if t - self.foresight < pd.Timedelta("0h"):
-            average_price = np.mean(unit.price_forecast[t-self.foresight:] 
-                                    + unit.price_forecast[:t+self.foresight])
-        else:"""
+    def calculate_price_average(self, unit, time_delta):
         average_price = np.mean(
-            unit.price_forecast[t - self.foresight : t + self.foresight]
+            unit.price_forecast[
+                time_delta[0] - self.foresight : time_delta[-1] + self.foresight
+            ]
         )
 
         return average_price
@@ -95,11 +73,10 @@ class flexableCRMStorage(BaseStrategy):
         super().__init__(*args, **kwargs)
 
         self.foresight = pd.Timedelta("12h")
-        self.current_time = None
 
     def calculate_bids(
         self,
-        unit: StorageUnit = None,
+        unit: Storage = None,
         market_config=None,
         operational_window: dict = None,
     ):
