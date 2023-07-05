@@ -72,9 +72,6 @@ class MarketRole(Role):
         current = datetime.utcfromtimestamp(self.context.current_timestamp)
         next_opening = self.marketconfig.opening_hours.after(current, inc=True)
         market_closing = next_opening + self.marketconfig.opening_duration
-        logger.debug(
-            f"first market opening: {self.marketconfig.name} - {next_opening} - {market_closing}"
-        )
         opening_ts = calendar.timegm(next_opening.utctimetuple())
         self.context.schedule_timestamp_task(self.opening(), opening_ts)
 
@@ -117,11 +114,12 @@ class MarketRole(Role):
         next_opening = self.marketconfig.opening_hours.after(market_open)
         if next_opening:
             next_opening_ts = calendar.timegm(next_opening.utctimetuple())
-            logger.debug(f"market {self.marketconfig.name} - does not reopen")
             self.context.schedule_timestamp_task(self.opening(), next_opening_ts)
             logger.debug(
-                f"next market opening: {self.marketconfig.name} - {next_opening} - {market_closing}"
+                f"market opening: {self.marketconfig.name} - {market_open} - {market_closing}"
             )
+        else:
+            logger.debug(f"market {self.marketconfig.name} - does not reopen")
 
     def handle_registration(self, content: dict, meta: dict):
         agent = meta["sender_id"]

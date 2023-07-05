@@ -53,7 +53,7 @@ crm_case:
       products:
         - duration: 4h
           count: 1
-          first_delivery: 1h
+          first_delivery: 2h
       opening_frequency: 4h
       opening_duration: 30m
       volume_unit: MW
@@ -70,7 +70,7 @@ crm_case:
       products:
         - duration: 4h
           count: 1
-          first_delivery: 1h
+          first_delivery: 2h
       opening_frequency: 4h
       opening_duration: 30m
       volume_unit: MW
