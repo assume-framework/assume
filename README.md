@@ -71,6 +71,17 @@ If you need help using the CLI run `assume -h`
 
 Please note that if you have python running on windows that you need to alter the same_process binary in world to True (to be changed). 
 
+
+Development
+-----------
+
+install pre-commit
+
+```
+pip install pre-commit
+pre-commit install
+```
+
 Access to database and dashboards
 ---------------------------------
 To save the simulation results to a database and be able to analyze them using Grafan dashboards, install the docker container:
