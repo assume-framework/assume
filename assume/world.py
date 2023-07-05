@@ -1,6 +1,7 @@
 import asyncio
 import calendar
 import logging
+import sys
 import time
 from datetime import datetime
 
@@ -40,9 +41,12 @@ from assume.strategies import (
 )
 from assume.units import Demand, HeatPump, PowerPlant, Storage
 
-logging.basicConfig(level=logging.INFO)
+file_handler = logging.FileHandler(filename="assume.log", mode="w+")
+stdout_handler = logging.StreamHandler(stream=sys.stdout)
+stdout_handler.setLevel(logging.WARNING)
+handlers = [file_handler, stdout_handler]
+logging.basicConfig(level=logging.INFO, handlers=handlers)
 logging.getLogger("mango").setLevel(logging.WARNING)
-logging.getLogger("assume").setLevel(logging.INFO)
 
 
 class World:
@@ -52,7 +56,9 @@ class World:
         port: int = 9099,
         database_uri: str = "",
         export_csv_path: str = "",
+        log_level: str = "INFO",
     ):
+        logging.getLogger("assume").setLevel(log_level)
         self.logger = logging.getLogger(__name__)
         self.addr = (ifac_addr, port)
 
