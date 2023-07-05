@@ -1,13 +1,9 @@
 from datetime import datetime, timedelta
 
-import pandas as pd
 from dateutil import rrule as rr
-from dateutil.relativedelta import relativedelta as rd
 
-from assume import World
-from assume.common.market_objects import MarketConfig, MarketProduct, Order, Orderbook
+from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.strategies import OTCStrategy
-from assume.units.demand import Demand
 
 start = datetime(2023, 7, 1)
 end = datetime(2023, 7, 2)

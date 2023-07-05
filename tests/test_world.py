@@ -1,12 +1,6 @@
-# %%
 import asyncio
-import logging
-import os
-from os import getenv
 
 from assume import World
-
-log = logging.getLogger(__name__)
 
 
 def test_world():

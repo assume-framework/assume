@@ -1,5 +1,7 @@
+import itertools
 from datetime import datetime, timedelta
 
+import numpy as np
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
 
@@ -91,11 +93,6 @@ def test_market():
     print(meta)
 
 
-import itertools
-
-import numpy as np
-
-
 def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
     if not order:
         start = datetime.today()
@@ -161,5 +158,6 @@ if __name__ == "__main__":
     from assume.common.utils import plot_orderbook
 
     # clearing_result, meta = test_market_mechanism()
+    # only works with per node clearing
     # fig, ax = plot_orderbook(clearing_result, meta)
     # fig.show()
