@@ -38,7 +38,7 @@ def plot_and_save_results():
     engine = create_engine(DB)
 
     sql = """
-    SELECT name,  simulation, 
+    SELECT name,  simulation,
     sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_cost') as total_cost,
     sum(round(CAST(value AS numeric), 2)*1000)  FILTER (WHERE variable = 'total_volume') as total_volume,
     sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'avg_price') as average_cost

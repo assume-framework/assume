@@ -68,7 +68,7 @@ testpaths = "tests"
 
 [tool.pytest.ini_options]
 filterwarnings = [
-    "ignore:Call to deprecated create function FieldDescriptor", 
+    "ignore:Call to deprecated create function FieldDescriptor",
     "ignore:Call to deprecated create function Descriptor",
     "ignore:Call to deprecated create function FileDescriptor",
     "ignore:Call to deprecated create function EnumValueDescriptor",
