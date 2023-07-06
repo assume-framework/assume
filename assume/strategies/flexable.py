@@ -44,7 +44,7 @@ class flexableEOM(BaseStrategy):
 
         if unit.outputs["heat"][self.current_time] > 0:
             power_loss_ratio = (
-                unit.power_loss_chp[self.current_time]
+                unit.outputs["power_loss"][self.current_time]
                 / unit.outputs["heat"][self.current_time]
             )
         else:

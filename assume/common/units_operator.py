@@ -111,17 +111,16 @@ class UnitsOperator(Role):
             ),
             1,  # register after time was updated for the first time
         )
-        logger.debug(f"tried to register at market {market.name}")
+        logger.debug(f"{self.id} tried to register at market {market.name}")
 
     def handle_opening(self, opening: OpeningMessage, meta: dict[str, str]):
         logger.debug(
-            f'Operator {self.id} received opening from: {opening["market_id"]} {opening["start"]}.'
+            f'{self.id} received opening from: {opening["market_id"]} {opening["start"]} until: {opening["stop"]}.'
         )
-        logger.debug(f'Operator {self.id} can bid until: {opening["stop"]}')
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
 
     def handle_market_feedback(self, content: ClearingMessage, meta: dict[str, str]):
-        logger.debug(f"got market result: {content}")
+        logger.debug(f"{self.id} got market result: {content}")
         orderbook: Orderbook = content["orderbook"]
         for order in orderbook:
             order["market_id"] = content["market_id"]
@@ -215,7 +214,7 @@ class UnitsOperator(Role):
 
         products = opening["products"]
         market = self.registered_markets[opening["market_id"]]
-        logger.debug(f"setting bids for {market.name}")
+        logger.debug(f"{self.id} setting bids for {market.name} - {products}")
         orderbook = await self.formulate_bids(market, products)
         acl_metadata = {
             "performative": Performatives.inform,

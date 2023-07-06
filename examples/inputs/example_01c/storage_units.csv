@@ -1,0 +1,2 @@
+name,technology,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_SOC,max_SOC,variable_cost_charge,variable_cost_discharge,natural_inflow,unit_operator
+Storage 1,PSPP,1000,992,0.86,0.9,1,6076,0.28,0.28,0,Operator 1

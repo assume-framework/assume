@@ -104,9 +104,13 @@ class ForecastProvider(Role):
         )
 
         for vre in self.vre_cf_df.keys():
-            vre_feed_in_df[vre] = (
-                self.vre_cf_df[vre] * self.powerplants.at[vre, "max_power"]
-            )
+            try:
+                vre_feed_in_df[vre] = (
+                    self.vre_cf_df[vre] * self.powerplants.at[vre, "max_power"]
+                )
+            except KeyError:
+                # no unit with this type
+                vre_feed_in_df[vre] = 0
 
         for i in range(len(self.demand_df)):
             pp_df = powerplants.copy()

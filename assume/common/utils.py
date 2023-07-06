@@ -90,10 +90,10 @@ def convert_to_rrule_freq(string):
 
 
 def make_market_config(
-    id,
-    market_params,
-    world_start,
-    world_end,
+    id: str,
+    market_params: dict,
+    world_start: datetime,
+    world_end: datetime,
 ):
     freq, interval = convert_to_rrule_freq(market_params["opening_frequency"])
     start = market_params.get("start_date")
@@ -152,7 +152,7 @@ def initializer(func):
     >>> p.cmd, p.reachable, p.user
     ('halt', True, 'root')
     """
-    names, varargs, keywords, defaults = inspect.getargspec(func)
+    names, varargs, keywords, defaults, *_ = inspect.getfullargspec(func)
 
     @wraps(func)
     def wrapper(self, *args, **kargs):
@@ -186,7 +186,7 @@ def get_available_products(market_products: list[MarketProduct], startdate: date
     return options
 
 
-def plot_orderbook(orderbook: Orderbook, results):
+def plot_orderbook(orderbook: Orderbook, results: list[dict]):
     """
     Plot the merit order of bids for each node in a separate subplot
     """
@@ -197,7 +197,7 @@ def plot_orderbook(orderbook: Orderbook, results):
     orderbook = sorted(orderbook, key=itemgetter("node_id"))
     for node_id, orders in groupby(orderbook, itemgetter("node_id")):
         bids[node_id].extend(list(map(itemgetter("price", "volume"), orders)))
-    number_of_nodes = len(bids.keys())
+    number_of_nodes = len(bids.keys()) or 1
 
     fig, ax = plt.subplots(1, number_of_nodes, sharey=True)
     if number_of_nodes == 1:
@@ -247,9 +247,14 @@ def plot_orderbook(orderbook: Orderbook, results):
                     "r-",
                 )
         # plot the market clearing price and quantity
-        price = results[i]["price"]
-        contracted_supply = results[i]["supply_volume"]
-        contracted_demand = results[i]["demand_volume"]
+        if len(results) == i:
+            price = 0
+            contracted_supply = 0
+            contracted_demand = 0
+        else:
+            price = results[i]["price"]
+            contracted_supply = results[i]["supply_volume"]
+            contracted_demand = results[i]["demand_volume"]
         inflow = contracted_supply - contracted_demand
         ax[i].plot([contracted_supply, contracted_supply], [0, price], "k--")
         ax[i].plot([0, contracted_supply], [price, price], "k--")

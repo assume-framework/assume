@@ -8,7 +8,7 @@ base_case:
   demand: inflex_demand.csv
   renewable_generation: renewable_generation.csv
   fuel_prices: fuel_prices.csv
-  electricity_prices: electricity_prices.csv 
+  electricity_prices: electricity_prices.csv
   markets_config:
     EOM:
       operator: EOM_operator

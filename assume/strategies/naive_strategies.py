@@ -22,8 +22,6 @@ class NaiveStrategy(BaseStrategy):
         """
         price = operational_window["max_power"]["marginal_cost"]
         volume = operational_window["max_power"]["power"]
-        if "OTC" in market_config.name:
-            volume *= self.scale
         bids = [{"price": price, "volume": volume}]
         return bids
 

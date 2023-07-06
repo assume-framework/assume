@@ -1,6 +1,7 @@
 import asyncio
 import calendar
 import logging
+import sys
 import time
 from datetime import datetime
 
@@ -30,6 +31,7 @@ from assume.strategies import (
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
     NaiveStrategy,
+    OTCStrategy,
     RLStrategy,
     flexableCRMStorage,
     flexableEOM,
@@ -39,9 +41,12 @@ from assume.strategies import (
 )
 from assume.units import Demand, HeatPump, PowerPlant, Storage
 
-logging.basicConfig(level=logging.INFO)
+file_handler = logging.FileHandler(filename="assume.log", mode="w+")
+stdout_handler = logging.StreamHandler(stream=sys.stdout)
+stdout_handler.setLevel(logging.WARNING)
+handlers = [file_handler, stdout_handler]
+logging.basicConfig(level=logging.INFO, handlers=handlers)
 logging.getLogger("mango").setLevel(logging.WARNING)
-logging.getLogger("assume").setLevel(logging.INFO)
 
 
 class World:
@@ -51,7 +56,9 @@ class World:
         port: int = 9099,
         database_uri: str = "",
         export_csv_path: str = "",
+        log_level: str = "INFO",
     ):
+        logging.getLogger("assume").setLevel(log_level)
         self.logger = logging.getLogger(__name__)
         self.addr = (ifac_addr, port)
 
@@ -70,6 +77,8 @@ class World:
                         f"could not connect to {database_uri}, trying again"
                     )
                     time.sleep(2)
+        else:
+            self.db = None
 
         self.market_operators: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}
@@ -83,14 +92,15 @@ class World:
             "storage": Storage,
         }
         self.bidding_types = {
-            "naive": NaiveStrategy,
             "flexable_eom": flexableEOM,
             "flexable_pos_crm": flexablePosCRM,
             "flexable_neg_crm": flexableNegCRM,
+            "flexable_crm_storage": flexableCRMStorage,
             "flexable_eom_storage": flexableEOMStorage,
+            "naive": NaiveStrategy,
             "naive_neg_reserve": NaiveNegReserveStrategy,
             "naive_pos_reserve": NaivePosReserveStrategy,
-            "flexable_crm_storage": flexableCRMStorage,
+            "otc_strategy": OTCStrategy,
             "rl_strategy": RLStrategy,
         }
         self.clearing_mechanisms = {
@@ -317,7 +327,7 @@ class World:
                 [all_operators, storage_units.unit_operator.unique()]
             )
 
-        for company_name in all_operators:
+        for company_name in set(all_operators):
             self.add_unit_operator(id=str(company_name))
 
         # add the units to corresponsing unit operators

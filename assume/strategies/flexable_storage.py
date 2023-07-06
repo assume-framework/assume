@@ -28,7 +28,7 @@ class flexableEOMStorage(BaseStrategy):
         # =============================================================================
         # Storage Unit is either charging, discharging, or off
         # =============================================================================
-        
+
         start = operational_window["window"]["start"]
         end = operational_window["window"]["end"]
         time_delta = pd.date_range(
@@ -49,7 +49,7 @@ class flexableEOMStorage(BaseStrategy):
 
         elif (
             unit.price_forecast[start] <= average_price * unit.efficiency_charge
-        ) and (operational_window["max_power_charge"]["power_charge"] > 0):
+        ) and (operational_window["max_power_charge"]["power_charge"] < 0):
             # place bid to charge
             bid_quantity = operational_window["max_power_charge"]["power_charge"]
 
