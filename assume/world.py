@@ -38,7 +38,7 @@ from assume.strategies import (
     flexableNegCRM,
     flexablePosCRM,
 )
-from assume.units import Demand, HeatPump, PowerPlant, StorageUnit
+from assume.units import Demand, HeatPump, PowerPlant, Storage
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("mango").setLevel(logging.WARNING)
@@ -83,7 +83,7 @@ class World:
             "power_plant": PowerPlant,
             "heatpump": HeatPump,
             "demand": Demand,
-            "storage": StorageUnit,
+            "storage": Storage,
         }
         self.bidding_types = {
             "flexable_eom": flexableEOM,
@@ -321,7 +321,7 @@ class World:
                 [all_operators, storage_units.unit_operator.unique()]
             )
 
-        for company_name in all_operators:
+        for company_name in set(all_operators):
             self.add_unit_operator(id=str(company_name))
 
         # add the units to corresponsing unit operators

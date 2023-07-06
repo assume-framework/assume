@@ -8,7 +8,8 @@ class flexableEOM(BaseStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.foresight = pd.Timedelta("12h")
+        # check if kwargs contains eom_foresight argument
+        self.foresight = pd.Timedelta(kwargs.get("eom_foresight", "12h"))
         self.current_time = None
 
     def calculate_bids(
