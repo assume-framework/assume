@@ -1,6 +1,7 @@
 import pandas as pd
 
-from assume.strategies.base_strategy import BaseStrategy
+from assume.common.market_objects import MarketConfig
+from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
 from assume.units.base_unit import BaseUnit
 
 
@@ -13,23 +14,23 @@ class RLStrategy(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: BaseUnit = None,
-        market_config=None,
-        operational_window: dict = None,
+        unit: BaseUnit,
+        operational_window: OperationalWindow,
+        market_config: MarketConfig,
     ):
         bid_quantity_inflex, bid_price_inflex = 0, 0
         bid_quantity_flex, bid_price_flex = 0, 0
 
         if operational_window is not None:
-            self.current_time = operational_window["window"]["start"]
+            self.current_time = operational_window["window"][0]
             # =============================================================================
             # Powerplant is either on, or is able to turn on
             # Calculating possible bid amount
             # =============================================================================
-            bid_quantity_inflex = operational_window["min_power"]["power"]
+            bid_quantity_inflex = operational_window["ops"]["min_power"]["volume"]
 
-            marginal_cost_mr = operational_window["min_power"]["marginal_cost"]
-            marginal_cost_flex = operational_window["max_power"]["marginal_cost"]
+            marginal_cost_mr = operational_window["ops"]["min_power"]["cost"]
+            marginal_cost_flex = operational_window["ops"]["max_power"]["cost"]
             # =============================================================================
             # Calculating possible price
             # =============================================================================
@@ -53,7 +54,8 @@ class RLStrategy(BaseStrategy):
             # Flex-bid price formulation
             if unit.current_status:
                 bid_quantity_flex = (
-                    operational_window["max_power"]["power"] - bid_quantity_inflex
+                    operational_window["ops"]["max_power"]["volume"]
+                    - bid_quantity_inflex
                 )
                 bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
 

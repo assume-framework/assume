@@ -34,8 +34,8 @@ def test_demand():
     )
     op_window = dem.calculate_operational_window("energy", product_tuple)
 
-    assert op_window["max_power"]["power"] == -150
-    assert op_window["max_power"]["marginal_cost"] == 2000
+    assert op_window["ops"]["max_power"]["volume"] == -150
+    assert op_window["ops"]["max_power"]["cost"] == 2000
 
     mc = MarketConfig(
         "Test",
@@ -86,9 +86,9 @@ def test_demand_series():
 
     # power should be the highest demand which is used throughout the period
     # in our case 80 MW
-    assert op_window["max_power"]["power"] == -80
+    assert op_window["ops"]["max_power"]["volume"] == -80
     # price is (0 + 1000) / 2 for this period
-    assert op_window["max_power"]["marginal_cost"] == 500
+    assert op_window["ops"]["max_power"]["cost"] == 500
 
     mc = MarketConfig(
         "Test",
@@ -104,8 +104,8 @@ def test_demand_series():
         assert "price" in bid.keys()
         assert "volume" in bid.keys()
     assert len(bids) == 1
-    assert bids[0]["volume"] == op_window["max_power"]["power"]
-    assert bids[0]["price"] == op_window["max_power"]["marginal_cost"]
+    assert bids[0]["volume"] == op_window["ops"]["max_power"]["volume"]
+    assert bids[0]["price"] == op_window["ops"]["max_power"]["cost"]
 
 
 if __name__ == "__main__":

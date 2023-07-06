@@ -3,6 +3,7 @@ from functools import lru_cache
 
 import pandas as pd
 
+from assume.strategies import OperationalWindow
 from assume.units.base_unit import BaseUnit
 
 logger = logging.getLogger(__name__)
@@ -144,7 +145,7 @@ class PowerPlant(BaseUnit):
         self,
         product_type: str,
         product_tuple: tuple,
-    ) -> dict:
+    ) -> OperationalWindow:
         """Calculate the operation window for the next time step.
 
         Returns
@@ -187,27 +188,29 @@ class PowerPlant(BaseUnit):
 
         if self.marginal_cost is None:
             return {
-                "window": {"start": start, "end": end},
-                "current_power": {
-                    "power": current_power,
-                    "marginal_cost": self.calc_marginal_cost_with_partial_eff(
-                        power_output=current_power,
-                        timestep=start,
-                    ),
-                },
-                "min_power": {
-                    "power": min_power,
-                    "marginal_cost": self.calc_marginal_cost_with_partial_eff(
-                        power_output=current_power + min_power,
-                        timestep=start,
-                    ),
-                },
-                "max_power": {
-                    "power": max_power,
-                    "marginal_cost": self.calc_marginal_cost_with_partial_eff(
-                        power_output=current_power + max_power,
-                        timestep=start,
-                    ),
+                "window": (start, end),
+                "ops": {
+                    "current_power": {
+                        "volume": current_power,
+                        "cost": self.calc_marginal_cost_with_partial_eff(
+                            power_output=current_power,
+                            timestep=start,
+                        ),
+                    },
+                    "min_power": {
+                        "volume": min_power,
+                        "cost": self.calc_marginal_cost_with_partial_eff(
+                            power_output=current_power + min_power,
+                            timestep=start,
+                        ),
+                    },
+                    "max_power": {
+                        "volume": max_power,
+                        "cost": self.calc_marginal_cost_with_partial_eff(
+                            power_output=current_power + max_power,
+                            timestep=start,
+                        ),
+                    },
                 },
             }
 
@@ -217,18 +220,20 @@ class PowerPlant(BaseUnit):
             else self.marginal_cost
         )
         return {
-            "window": {"start": start, "end": end},
-            "current_power": {
-                "power": current_power,
-                "marginal_cost": marginal_cost,
-            },
-            "min_power": {
-                "power": min_power,
-                "marginal_cost": marginal_cost,
-            },
-            "max_power": {
-                "power": max_power,
-                "marginal_cost": marginal_cost,
+            "window": (start, end),
+            "ops": {
+                "current_power": {
+                    "volume": current_power,
+                    "cost": marginal_cost,
+                },
+                "min_power": {
+                    "volume": min_power,
+                    "cost": marginal_cost,
+                },
+                "max_power": {
+                    "volume": max_power,
+                    "cost": marginal_cost,
+                },
             },
         }
 
@@ -256,10 +261,12 @@ class PowerPlant(BaseUnit):
             )
 
         operational_window = {
-            "window": {"start": start, "end": end},
-            "pos_reserve": {
-                "capacity": available_pos_reserve,
-                "marginal_cost": marginal_cost,
+            "window": (start, end),
+            "ops": {
+                "pos_reserve": {
+                    "volume": available_pos_reserve,
+                    "cost": marginal_cost,
+                },
             },
         }
 
@@ -289,10 +296,12 @@ class PowerPlant(BaseUnit):
             )
 
         operational_window = {
-            "window": {"start": start, "end": end},
-            "neg_reserve": {
-                "capacity": available_neg_reserve,
-                "marginal_cost": marginal_cost,
+            "window": (start, end),
+            "ops": {
+                "neg_reserve": {
+                    "volume": available_neg_reserve,
+                    "cost": marginal_cost,
+                },
             },
         }
 

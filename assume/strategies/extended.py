@@ -1,5 +1,5 @@
 from assume.common.market_objects import MarketConfig
-from assume.strategies.base_strategy import BaseStrategy
+from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
 from assume.units.base_unit import BaseUnit
 
 
@@ -12,7 +12,7 @@ class OTCStrategy(BaseStrategy):
         self,
         unit: BaseUnit = None,
         market_config: MarketConfig = None,
-        operational_window: dict = None,
+        operational_window: OperationalWindow = None,
     ):
         """
         Takes information from a unit that the unit operator manages and
@@ -20,8 +20,8 @@ class OTCStrategy(BaseStrategy):
 
         Return: volume, price
         """
-        price = operational_window["max_power"]["marginal_cost"]
-        volume = operational_window["max_power"]["power"]
+        price = operational_window["ops"]["max_power"]["cost"]
+        volume = operational_window["ops"]["max_power"]["volume"]
         if "OTC" in market_config.name:
             volume *= self.scale
         bids = [{"price": price, "volume": volume}]

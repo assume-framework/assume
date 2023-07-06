@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from assume.strategies import BaseStrategy
+from assume.strategies import BaseStrategy, OperationalWindow
 from assume.units.base_unit import BaseUnit
 
 
@@ -64,7 +64,7 @@ class Electrolyser(BaseUnit):
         self,
         product_type: str,
         product_tuple: tuple,
-    ) -> dict:
+    ) -> OperationalWindow:
         """Calculate the operational window for the next time step.
 
         Returns
@@ -103,18 +103,20 @@ class Electrolyser(BaseUnit):
         max_power = max_power - self.outputs["pos_capacity"].at[start]
 
         operational_window = {
-            "window": {"start": start, "end": end},
-            "current_power": {
-                "power": current_power_input,
-                "marginal_cost": self.calc_marginal_cost(start),
-            },
-            "min_power": {
-                "power": min_power,
-                "marginal_cost": self.calc_marginal_cost(start),
-            },
-            "max_power": {
-                "power": max_power,
-                "marginal_cost": self.calc_marginal_cost(start),
+            "window": (start, end),
+            "ops": {
+                "current_power": {
+                    "power": current_power_input,
+                    "marginal_cost": self.calc_marginal_cost(start),
+                },
+                "min_power": {
+                    "power": min_power,
+                    "marginal_cost": self.calc_marginal_cost(start),
+                },
+                "max_power": {
+                    "power": max_power,
+                    "marginal_cost": self.calc_marginal_cost(start),
+                },
             },
         }
 
