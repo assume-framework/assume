@@ -3,31 +3,33 @@ from datetime import datetime, timedelta
 from dateutil import rrule as rr
 
 from assume.common.market_objects import MarketConfig, MarketProduct
-from assume.strategies import OTCStrategy
+from assume.strategies import OperationalWindow, OTCStrategy
 
 start = datetime(2023, 7, 1)
 end = datetime(2023, 7, 2)
-operational_window = {
-    "window": {"start": start, "end": end},
-    "current_power": {
-        "power": 100,
-        "marginal_cost": 1,
-    },
-    "min_power": {
-        "power": 80,
-        "marginal_cost": 2,
-    },
-    "max_power": {
-        "power": 400,
-        "marginal_cost": 3,
-    },
-    "neg_reserve": {
-        "capacity": 10,
-        "marginal_cost": 4,
-    },
-    "pos_reserve": {
-        "capacity": 20,
-        "marginal_cost": 5,
+operational_window: OperationalWindow = {
+    "window": (start, end),
+    "ops": {
+        "current_power": {
+            "volume": 100,
+            "cost": 1,
+        },
+        "min_power": {
+            "volume": 80,
+            "cost": 2,
+        },
+        "max_power": {
+            "volume": 400,
+            "cost": 3,
+        },
+        "neg_reserve": {
+            "volume": 10,
+            "cost": 4,
+        },
+        "pos_reserve": {
+            "volume": 20,
+            "cost": 5,
+        },
     },
 }
 
@@ -45,8 +47,8 @@ def test_otc_strategy():
 
     bids = strategy.calculate_bids(None, mc, operational_window)
 
-    assert bids[0]["price"] == operational_window["max_power"]["marginal_cost"]
-    assert bids[0]["volume"] == operational_window["max_power"]["power"]
+    assert bids[0]["price"] == operational_window["ops"]["max_power"]["cost"]
+    assert bids[0]["volume"] == operational_window["ops"]["max_power"]["volume"]
     assert bids == [{"price": 3, "volume": 400}]
 
 
@@ -67,9 +69,9 @@ def test_otc_strategy_scaled(scale):
 
     bids = strategy.calculate_bids(None, mc, operational_window)
 
-    power = operational_window["max_power"]["power"] * scale
+    power = operational_window["ops"]["max_power"]["volume"] * scale
 
-    assert bids[0]["price"] == operational_window["max_power"]["marginal_cost"]
+    assert bids[0]["price"] == operational_window["ops"]["max_power"]["cost"]
     assert bids[0]["volume"] == power
     assert bids == [{"price": 3, "volume": power}]
 

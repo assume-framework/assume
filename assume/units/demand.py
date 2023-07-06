@@ -1,6 +1,6 @@
 import pandas as pd
 
-from assume.strategies import BaseStrategy
+from assume.strategies import BaseStrategy, OperationalWindow
 from assume.units.base_unit import BaseUnit
 
 
@@ -59,7 +59,7 @@ class Demand(BaseUnit):
         self,
         product_type: str,
         product_tuple: tuple,
-    ) -> dict:
+    ) -> OperationalWindow:
         start, end, only_hours = product_tuple
         start = pd.Timestamp(start)
         end = pd.Timestamp(end)
@@ -71,7 +71,10 @@ class Demand(BaseUnit):
         else:
             bid_price = self.price
 
-        return {"max_power": {"power": bid_volume, "marginal_cost": bid_price}}
+        return {
+            "window": (start, end),
+            "ops": {"max_power": {"volume": bid_volume, "cost": bid_price}},
+        }
 
     def as_dict(self) -> dict:
         unit_dict = super().as_dict()

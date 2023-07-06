@@ -3,6 +3,7 @@ from functools import lru_cache
 
 import pandas as pd
 
+from assume.strategies import OperationalWindow
 from assume.units.base_unit import BaseUnit
 
 logger = logging.getLogger(__name__)
@@ -202,7 +203,7 @@ class Storage(BaseUnit):
         self,
         product_type: str,
         product_tuple: tuple,
-    ) -> dict:
+    ) -> OperationalWindow:
         """Calculate the operation window for the next time step.
 
         Returns
@@ -253,48 +254,50 @@ class Storage(BaseUnit):
 
         # what form does the operational window have?
         operational_window = {
-            "window": {"start": start, "end": end},
-            "current_power_discharge": {
-                "power_discharge": current_power_discharge,
-                "marginal_cost": self.calc_marginal_cost(
-                    timestep=start,
-                    discharge=True,
-                ),
-            },
-            "current_power_charge": {
-                "power_charge": current_power_charge,
-                "marginal_cost": self.calc_marginal_cost(
-                    timestep=start,
-                    discharge=False,
-                ),
-            },
-            "min_power_discharge": {
-                "power_discharge": min_max_power["min_power_discharge"],
-                "marginal_cost": self.calc_marginal_cost(
-                    timestep=start,
-                    discharge=True,
-                ),
-            },
-            "max_power_discharge": {
-                "power_discharge": min_max_power["max_power_discharge"],
-                "marginal_cost": self.calc_marginal_cost(
-                    timestep=start,
-                    discharge=True,
-                ),
-            },
-            "min_power_charge": {
-                "power_charge": min_max_power["min_power_charge"],
-                "marginal_cost": self.calc_marginal_cost(
-                    timestep=start,
-                    discharge=False,
-                ),
-            },
-            "max_power_charge": {
-                "power_charge": min_max_power["max_power_charge"],
-                "marginal_cost": self.calc_marginal_cost(
-                    timestep=start,
-                    discharge=False,
-                ),
+            "window": (start, end),
+            "ops": {
+                "current_power_discharge": {
+                    "volume": current_power_discharge,
+                    "cost": self.calc_marginal_cost(
+                        timestep=start,
+                        discharge=True,
+                    ),
+                },
+                "current_power_charge": {
+                    "volume": current_power_charge,
+                    "cost": self.calc_marginal_cost(
+                        timestep=start,
+                        discharge=False,
+                    ),
+                },
+                "min_power_discharge": {
+                    "volume": min_max_power["min_power_discharge"],
+                    "cost": self.calc_marginal_cost(
+                        timestep=start,
+                        discharge=True,
+                    ),
+                },
+                "max_power_discharge": {
+                    "volume": min_max_power["max_power_discharge"],
+                    "cost": self.calc_marginal_cost(
+                        timestep=start,
+                        discharge=True,
+                    ),
+                },
+                "min_power_charge": {
+                    "volume": min_max_power["min_power_charge"],
+                    "cost": self.calc_marginal_cost(
+                        timestep=start,
+                        discharge=False,
+                    ),
+                },
+                "max_power_charge": {
+                    "volume": min_max_power["max_power_charge"],
+                    "cost": self.calc_marginal_cost(
+                        timestep=start,
+                        discharge=False,
+                    ),
+                },
             },
         }
         return operational_window
@@ -312,7 +315,7 @@ class Storage(BaseUnit):
         available_neg_reserve_charge = None
 
         operational_window = {
-            "window": {"start": start, "end": end},
+            "window": (start, end),
             "pos_reserve_discharge": {
                 "capacity": available_pos_reserve_discharge,
             },
@@ -362,7 +365,6 @@ class Storage(BaseUnit):
                 dispatch_plan=dispatch_plan,
                 start=start,
                 end=end,
-                product_type=product_type,
             )
         elif product_type in {"capacity_pos", "capacity_neg"}:
             self.outputs[product_type].loc[start:end_excl] += dispatch_plan[

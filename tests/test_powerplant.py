@@ -135,13 +135,13 @@ def test_calculate_operational_window(power_plant_1):
         product_tuple=product_tuple, product_type="energy"
     )
 
-    assert operational_window["min_power"]["power"] == 200
-    assert operational_window["min_power"]["marginal_cost"] == 40.0
+    assert operational_window["ops"]["min_power"]["volume"] == 200
+    assert operational_window["ops"]["min_power"]["cost"] == 40.0
 
-    assert operational_window["max_power"]["power"] == 1000
-    assert operational_window["max_power"]["marginal_cost"] == 40
+    assert operational_window["ops"]["max_power"]["volume"] == 1000
+    assert operational_window["ops"]["max_power"]["cost"] == 40
 
-    assert operational_window["current_power"]["power"] == 0
+    assert operational_window["ops"]["current_power"]["volume"] == 0
 
 
 if __name__ == "__main__":
