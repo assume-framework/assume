@@ -227,12 +227,12 @@ class Storage(BaseUnit):
         if self.current_status == 0 and self.current_down_time < self.min_down_time:
             return None
 
-        current_power_discharge = max(
-            self.outputs["energy"].at[start - self.index.freq], 0
+        current_power_discharge = (
+            self.get_output_before(start) if self.get_output_before(start) > 0 else 0
         )
 
-        current_power_charge = min(
-            self.outputs["energy"].at[start - self.index.freq], 0
+        current_power_charge = (
+            self.get_output_before(start) if self.get_output_before(start) < 0 else 0
         )
 
         min_SOC = (
@@ -304,7 +304,7 @@ class Storage(BaseUnit):
     ) -> dict:
         duration = (end - start).total_seconds() / 3600
         # capacity calculation has to be added
-        current_power = self.outputs["energy"].at[start - self.index.freq]
+        current_power = self.get_output_before(start)
 
         available_pos_reserve_discharge = None
         available_neg_reserve_discharge = None

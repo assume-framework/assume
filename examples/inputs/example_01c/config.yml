@@ -24,7 +24,7 @@ crm_case:
   start_date: 2019-01-01 00:00
   end_date: 2019-01-21 00:00
   time_step: 1h
-  
+
   bidding_strategy_params:
     crm_foresight: 4h
 
@@ -76,6 +76,6 @@ crm_case:
       volume_unit: MW
       maximum_bid_volume: 100000
       maximum_bid_price: 9999
-      minimum_bid_price: -9999      
+      minimum_bid_price: -9999
       price_unit: EUR/MW
       market_mechanism: pay_as_bid

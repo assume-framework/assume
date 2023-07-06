@@ -96,12 +96,17 @@ class PowerPlant(BaseUnit):
 
         self.location = location
 
-        if not self.partial_load_eff and type(self.fuel_price) is float:
+        self.init_marginal_cost()
+
+    def init_marginal_cost(self):
+        if not self.partial_load_eff and type(self.fuel_price) is not pd.Series:
             fuel_prices = {self.fuel_type: self.fuel_price, "co2": self.co2_price}
             self.marginal_cost = self.calc_simple_marginal_cost(fuel_prices)
         elif not self.partial_load_eff:
             # calculate the marginal cost for the whole time series of fuel prices
             fuel_prices = pd.concat([self.fuel_price, self.co2_price], axis=1)
+            # rename columns of fuel_prices to fule_type and co2
+            fuel_prices.columns = [self.fuel_type, "co2"]
             self.marginal_cost = pd.DataFrame(
                 index=self.index, columns=["marginal_cost"], data=0.0
             )
@@ -165,7 +170,7 @@ class PowerPlant(BaseUnit):
     def calculate_energy_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
-        current_power = self.outputs["energy"].at[start - self.index.freq]
+        current_power = self.get_output_before(start)
 
         min_power, max_power = self.calculate_min_max_power(start, end)
 
@@ -230,7 +235,7 @@ class PowerPlant(BaseUnit):
     def calculate_pos_reserve_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
-        previous_power = self.outputs["energy"].at[start - self.index.freq]
+        previous_power = self.get_output_before(start)
 
         min_power, max_power = self.calculate_min_max_power(start, end)
 
@@ -263,7 +268,7 @@ class PowerPlant(BaseUnit):
     def calculate_neg_reserve_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
-        previous_power = self.outputs["energy"].at[start - self.index.freq]
+        previous_power = self.get_output_before(start)
 
         min_power, max_power = self.calculate_min_max_power(start, end)
 
