@@ -1,10 +1,7 @@
 name: assume-doc
-channels:
-- conda-forge
 dependencies:
 - python>=3.10
 - pip
-- python
 - ipykernel
 - pandas
 - numpy
@@ -13,7 +10,8 @@ dependencies:
 
 - pip:
   - .
-  - sphinx<6
+  - sphinx<7
   - sphinx-book-theme
   - nbsphinx
   - nbsphinx_link
+  - sphinxcontrib-mermaid

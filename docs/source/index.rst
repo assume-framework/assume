@@ -32,6 +32,7 @@ Documentation
 * :doc:`introduction`
 * :doc:`installation`
 * :doc:`quick_start`
+* :doc:`market_config`
 
 .. toctree::
    :hidden:
@@ -41,6 +42,7 @@ Documentation
    introduction
    installation
    quick_start
+   market_config
 
 **Help & References**
 
