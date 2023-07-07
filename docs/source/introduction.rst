@@ -19,7 +19,7 @@ On the left side of the world class the markets are located and on the right sid
 which are here named units. Both world are connected via the orders that market participants place on the markets.
 The learning capacbility is sketched out with the yellow classes on the right side, namely the units side.
 
-.. image:: img/architecture.png
+.. image:: img/architecture.svg
     :align: center
     :width: 600px
 
