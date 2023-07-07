@@ -3,6 +3,7 @@ from functools import lru_cache
 
 import pandas as pd
 
+from assume.strategies import OperationalWindow
 from assume.units.base_unit import BaseUnit
 
 logger = logging.getLogger(__name__)
@@ -96,12 +97,17 @@ class PowerPlant(BaseUnit):
 
         self.location = location
 
-        if not self.partial_load_eff and type(self.fuel_price) is float:
+        self.init_marginal_cost()
+
+    def init_marginal_cost(self):
+        if not self.partial_load_eff and type(self.fuel_price) is not pd.Series:
             fuel_prices = {self.fuel_type: self.fuel_price, "co2": self.co2_price}
             self.marginal_cost = self.calc_simple_marginal_cost(fuel_prices)
         elif not self.partial_load_eff:
             # calculate the marginal cost for the whole time series of fuel prices
             fuel_prices = pd.concat([self.fuel_price, self.co2_price], axis=1)
+            # rename columns of fuel_prices to fule_type and co2
+            fuel_prices.columns = [self.fuel_type, "co2"]
             self.marginal_cost = pd.DataFrame(
                 index=self.index, columns=["marginal_cost"], data=0.0
             )
@@ -139,7 +145,7 @@ class PowerPlant(BaseUnit):
         self,
         product_type: str,
         product_tuple: tuple,
-    ) -> dict:
+    ) -> OperationalWindow:
         """Calculate the operation window for the next time step.
 
         Returns
@@ -165,7 +171,7 @@ class PowerPlant(BaseUnit):
     def calculate_energy_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
-        current_power = self.outputs["energy"].at[start - self.index.freq]
+        current_power = self.get_output_before(start)
 
         min_power, max_power = self.calculate_min_max_power(start, end)
 
@@ -182,27 +188,29 @@ class PowerPlant(BaseUnit):
 
         if self.marginal_cost is None:
             return {
-                "window": {"start": start, "end": end},
-                "current_power": {
-                    "power": current_power,
-                    "marginal_cost": self.calc_marginal_cost_with_partial_eff(
-                        power_output=current_power,
-                        timestep=start,
-                    ),
-                },
-                "min_power": {
-                    "power": min_power,
-                    "marginal_cost": self.calc_marginal_cost_with_partial_eff(
-                        power_output=current_power + min_power,
-                        timestep=start,
-                    ),
-                },
-                "max_power": {
-                    "power": max_power,
-                    "marginal_cost": self.calc_marginal_cost_with_partial_eff(
-                        power_output=current_power + max_power,
-                        timestep=start,
-                    ),
+                "window": (start, end),
+                "ops": {
+                    "current_power": {
+                        "volume": current_power,
+                        "cost": self.calc_marginal_cost_with_partial_eff(
+                            power_output=current_power,
+                            timestep=start,
+                        ),
+                    },
+                    "min_power": {
+                        "volume": min_power,
+                        "cost": self.calc_marginal_cost_with_partial_eff(
+                            power_output=current_power + min_power,
+                            timestep=start,
+                        ),
+                    },
+                    "max_power": {
+                        "volume": max_power,
+                        "cost": self.calc_marginal_cost_with_partial_eff(
+                            power_output=current_power + max_power,
+                            timestep=start,
+                        ),
+                    },
                 },
             }
 
@@ -212,25 +220,27 @@ class PowerPlant(BaseUnit):
             else self.marginal_cost
         )
         return {
-            "window": {"start": start, "end": end},
-            "current_power": {
-                "power": current_power,
-                "marginal_cost": marginal_cost,
-            },
-            "min_power": {
-                "power": min_power,
-                "marginal_cost": marginal_cost,
-            },
-            "max_power": {
-                "power": max_power,
-                "marginal_cost": marginal_cost,
+            "window": (start, end),
+            "ops": {
+                "current_power": {
+                    "volume": current_power,
+                    "cost": marginal_cost,
+                },
+                "min_power": {
+                    "volume": min_power,
+                    "cost": marginal_cost,
+                },
+                "max_power": {
+                    "volume": max_power,
+                    "cost": marginal_cost,
+                },
             },
         }
 
     def calculate_pos_reserve_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
-        previous_power = self.outputs["energy"].at[start - self.index.freq]
+        previous_power = self.get_output_before(start)
 
         min_power, max_power = self.calculate_min_max_power(start, end)
 
@@ -251,10 +261,12 @@ class PowerPlant(BaseUnit):
             )
 
         operational_window = {
-            "window": {"start": start, "end": end},
-            "pos_reserve": {
-                "capacity": available_pos_reserve,
-                "marginal_cost": marginal_cost,
+            "window": (start, end),
+            "ops": {
+                "pos_reserve": {
+                    "volume": available_pos_reserve,
+                    "cost": marginal_cost,
+                },
             },
         }
 
@@ -263,7 +275,7 @@ class PowerPlant(BaseUnit):
     def calculate_neg_reserve_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
-        previous_power = self.outputs["energy"].at[start - self.index.freq]
+        previous_power = self.get_output_before(start)
 
         min_power, max_power = self.calculate_min_max_power(start, end)
 
@@ -284,10 +296,12 @@ class PowerPlant(BaseUnit):
             )
 
         operational_window = {
-            "window": {"start": start, "end": end},
-            "neg_reserve": {
-                "capacity": available_neg_reserve,
-                "marginal_cost": marginal_cost,
+            "window": (start, end),
+            "ops": {
+                "neg_reserve": {
+                    "volume": available_neg_reserve,
+                    "cost": marginal_cost,
+                },
             },
         }
 

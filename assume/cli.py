@@ -49,6 +49,13 @@ def cli(args=None):
         default="examples/inputs",
         type=str,
     )
+    parser.add_argument(
+        "-l",
+        "--loglevel",
+        help="logging level used for file log",
+        default="INFO",
+        type=str,
+    )
 
     args = parser.parse_args(args)
     print(args)
@@ -58,17 +65,23 @@ def cli(args=None):
     else:
         db_uri = f"sqlite:///./examples/local_db/{name}.db"
 
-    world = World(database_uri=db_uri, export_csv_path=args.csv_export_path)
+    world = World(
+        database_uri=db_uri,
+        export_csv_path=args.csv_export_path,
+        log_level=args.loglevel,
+    )
     world.load_scenario(
         inputs_path=args.input_path,
         scenario=args.scenario,
         study_case=args.case_study,
     )
-    world.run()
+    try:
+        world.run()
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == "__main__":
     # cli()
-    args = "-s example_01a -c example_01a -db postgresql://assume:assume@localhost:5432/assume"
-    args = "-s example_02 -c ltm_case05 -db postgresql://assume:assume@localhost:5432/assume"
+    args = "-s example_01c -c crm_case -db postgresql://assume:assume@localhost:5432/assume"
     cli(args.split(" "))

@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from assume.strategies.base_strategy import BaseStrategy
-from assume.units.storage import StorageUnit
+from assume.units.storage import Storage
 
 
 class complexEOMStorage(BaseStrategy):
@@ -13,7 +13,7 @@ class complexEOMStorage(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: StorageUnit = None,
+        unit: Storage = None,
         market_config=None,
         operational_window: dict = None,
     ):

@@ -1,8 +1,9 @@
 from collections import defaultdict
+from datetime import datetime
 
 import pandas as pd
 
-from assume.strategies import BaseStrategy
+from assume.strategies import BaseStrategy, OperationalWindow
 
 
 class BaseUnit:
@@ -44,7 +45,7 @@ class BaseUnit:
         self,
         product_type: str,
         product_tuple: tuple,
-    ) -> dict:
+    ) -> OperationalWindow:
         """Calculate the operation window for the next time step."""
 
         raise NotImplementedError()
@@ -75,8 +76,8 @@ class BaseUnit:
 
         return self.bidding_strategies[market_config.product_type].calculate_bids(
             unit=self,
-            market_config=market_config,
             operational_window=operational_window,
+            market_config=market_config,
         )
 
     def set_dispatch_plan(
@@ -105,6 +106,12 @@ class BaseUnit:
         """
         end_excl = end - self.index.freq
         return self.outputs["energy"][start:end_excl]
+
+    def get_output_before(self, datetime: datetime, product_type: str = "energy"):
+        if datetime - self.index.freq < self.index[0]:
+            return 0
+        else:
+            return self.outputs["energy"].at[datetime - self.index.freq]
 
     def as_dict(self) -> dict:
         return {

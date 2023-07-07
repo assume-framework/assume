@@ -1,7 +1,9 @@
 import logging
+from functools import lru_cache
 
 import pandas as pd
 
+from assume.strategies import OperationalWindow
 from assume.units.base_unit import BaseUnit
 
 logger = logging.getLogger(__name__)
@@ -201,7 +203,7 @@ class Storage(BaseUnit):
         self,
         product_type: str,
         product_tuple: tuple,
-    ) -> dict:
+    ) -> OperationalWindow:
         """Calculate the operation window for the next time step.
 
         Returns
@@ -221,18 +223,17 @@ class Storage(BaseUnit):
     def calculate_energy_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
-        end_excl = end - self.index.freq
-        duration = (end_excl - start).total_seconds() / 3600
+        duration = (end - start).total_seconds() / 3600
 
         if self.current_status == 0 and self.current_down_time < self.min_down_time:
             return None
 
-        current_power_discharge = max(
-            self.outputs["energy"].at[start - self.index.freq], 0
+        current_power_discharge = (
+            self.get_output_before(start) if self.get_output_before(start) > 0 else 0
         )
 
-        current_power_charge = min(
-            self.outputs["energy"].at[start - self.index.freq], 0
+        current_power_charge = (
+            self.get_output_before(start) if self.get_output_before(start) < 0 else 0
         )
 
         min_SOC = (
@@ -253,48 +254,50 @@ class Storage(BaseUnit):
 
         # what form does the operational window have?
         operational_window = {
-            "window": {"start": start, "end": end},
-            "current_power_discharge": {
-                "power_discharge": current_power_discharge,
-                "marginal_cost": self.calc_marginal_cost(
-                    timestep=start,
-                    discharge=True,
-                ),
-            },
-            "current_power_charge": {
-                "power_charge": current_power_charge,
-                "marginal_cost": self.calc_marginal_cost(
-                    timestep=start,
-                    discharge=False,
-                ),
-            },
-            "min_power_discharge": {
-                "power_discharge": min_max_power['min_power_discharge'],
-                "marginal_cost": self.calc_marginal_cost(
-                    timestep=start,
-                    discharge=True,
-                ),
-            },
-            "max_power_discharge": {
-                "power_discharge": min_max_power['max_power_discharge'],
-                "marginal_cost": self.calc_marginal_cost(
-                    timestep=start,
-                    discharge=True,
-                ),
-            },
-            "min_power_charge": {
-                "power_charge": min_max_power['min_power_charge'],
-                "marginal_cost": self.calc_marginal_cost(
-                    timestep=start,
-                    discharge=False,
-                ),
-            },
-            "max_power_charge": {
-                "power_charge": min_max_power['max_power_charge'],
-                "marginal_cost": self.calc_marginal_cost(
-                    timestep=start,
-                    discharge=False,
-                ),
+            "window": (start, end),
+            "ops": {
+                "current_power_discharge": {
+                    "volume": current_power_discharge,
+                    "cost": self.calc_marginal_cost(
+                        timestep=start,
+                        discharge=True,
+                    ),
+                },
+                "current_power_charge": {
+                    "volume": current_power_charge,
+                    "cost": self.calc_marginal_cost(
+                        timestep=start,
+                        discharge=False,
+                    ),
+                },
+                "min_power_discharge": {
+                    "volume": min_max_power["min_power_discharge"],
+                    "cost": self.calc_marginal_cost(
+                        timestep=start,
+                        discharge=True,
+                    ),
+                },
+                "max_power_discharge": {
+                    "volume": min_max_power["max_power_discharge"],
+                    "cost": self.calc_marginal_cost(
+                        timestep=start,
+                        discharge=True,
+                    ),
+                },
+                "min_power_charge": {
+                    "volume": min_max_power["min_power_charge"],
+                    "cost": self.calc_marginal_cost(
+                        timestep=start,
+                        discharge=False,
+                    ),
+                },
+                "max_power_charge": {
+                    "volume": min_max_power["max_power_charge"],
+                    "cost": self.calc_marginal_cost(
+                        timestep=start,
+                        discharge=False,
+                    ),
+                },
             },
         }
         return operational_window
@@ -302,10 +305,9 @@ class Storage(BaseUnit):
     def calculate_reserve_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
-        end_excl = end - self.index.freq
-        duration = (end_excl - start).total_seconds() / 3600
+        duration = (end - start).total_seconds() / 3600
         # capacity calculation has to be added
-        current_power = self.outputs["energy"].at[start - self.index.freq]
+        current_power = self.get_output_before(start)
 
         available_pos_reserve_discharge = None
         available_neg_reserve_discharge = None
@@ -313,7 +315,7 @@ class Storage(BaseUnit):
         available_neg_reserve_charge = None
 
         operational_window = {
-            "window": {"start": start, "end": end},
+            "window": (start, end),
             "pos_reserve_discharge": {
                 "capacity": available_pos_reserve_discharge,
             },
@@ -351,13 +353,32 @@ class Storage(BaseUnit):
         product_type: str,
     ):
         end_excl = end - self.index.freq
-        duration = (end_excl - start).total_seconds() / 3600
 
         # TODO checks should be at execute_current_dispatch - see powerplant
         # TODO check if resulting power is < max_power
-        # if self.outputs["energy"][start:end_excl].max() > self.max_power:
-        #     max_pow = self.outputs["energy"][start:end_excl].max()
+        # if self.outputs["energy"][start:end].max() > self.max_power:
+        #     max_pow = self.outputs["energy"][start:end].max()
         #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")
+
+        if product_type == "energy":
+            self.set_energy_dispatch_plan(
+                dispatch_plan=dispatch_plan,
+                start=start,
+                end=end,
+            )
+        elif product_type in {"capacity_pos", "capacity_neg"}:
+            self.outputs[product_type].loc[start:end_excl] += dispatch_plan[
+                "total_power"
+            ]
+
+    def set_energy_dispatch_plan(
+        self,
+        dispatch_plan: dict,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+    ):
+        end_excl = end - self.index.freq
+        duration = (end - start).total_seconds() / 3600
 
         if self.outputs["energy"][start:end_excl].min() >= self.min_power_discharge:
             self.set_market_sucess(dispatch_plan, start, end_excl)
@@ -385,12 +406,13 @@ class Storage(BaseUnit):
                 )
                 self.market_success_list.append(0)
 
-    def set_market_sucess(self, dispatch_plan, start, end_excl):
+    def set_market_sucess(self, dispatch_plan, start, end):
         self.market_success_list[-1] += 1
         self.current_status = 1  # discharging
         self.current_down_time = 0
-        self.outputs["energy"].loc[start:end_excl] += dispatch_plan["total_power"]
+        self.outputs["energy"].loc[start:end] += dispatch_plan["total_power"]
 
+    @lru_cache(maxsize=256)
     def calc_marginal_cost(
         self,
         timestep: pd.Timestamp,
@@ -519,7 +541,7 @@ class Storage(BaseUnit):
                 ),
             ),
         )
-        #pack values to a dict
+        # pack values to a dict
         min_max_power = {
             "min_power_discharge": min_power_discharge,
             "min_power_charge": min_power_charge,
@@ -527,7 +549,7 @@ class Storage(BaseUnit):
             "max_power_charge": max_power_charge,
         }
 
-        #if values are close to zero, set them to zero
+        # if values are close to zero, set them to zero
         for key, value in min_max_power.items():
             if abs(value) < 1e-3:
                 min_max_power[key] = 0
