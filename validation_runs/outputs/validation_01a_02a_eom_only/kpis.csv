@@ -1,0 +1,16 @@
+,name,variable,value,simulation
+0,EOM,avg_price,132.97250859697309,validation_01a_02a_eom_only
+0,EOM,total_cost,1967136574.92453,validation_01a_02a_eom_only
+0,EOM,total_volume,14789468.300000003,validation_01a_02a_eom_only
+0,pp_04,market_id,EOM,validation_01a_02a_eom_only
+1,pp_02,market_id,EOM,validation_01a_02a_eom_only
+2,pp_01,market_id,EOM,validation_01a_02a_eom_only
+3,pp_05,market_id,EOM,validation_01a_02a_eom_only
+4,pp_06,market_id,EOM,validation_01a_02a_eom_only
+5,pp_03,market_id,EOM,validation_01a_02a_eom_only
+6,pp_04,capacity_factor,0.48182500000000006,validation_01a_02a_eom_only
+7,pp_02,capacity_factor,0.5,validation_01a_02a_eom_only
+8,pp_01,capacity_factor,0.5,validation_01a_02a_eom_only
+9,pp_05,capacity_factor,0.4998823492462312,validation_01a_02a_eom_only
+10,pp_06,capacity_factor,0.49898877970749533,validation_01a_02a_eom_only
+11,pp_03,capacity_factor,0.5,validation_01a_02a_eom_only

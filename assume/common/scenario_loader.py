@@ -265,6 +265,7 @@ async def load_scenario_folder_async(
         file_name="demand_df",
         index=index,
     )
+    demand_df['demand_EOM'] /= 20
 
     vre_cf_df = load_file(
         path=path,
