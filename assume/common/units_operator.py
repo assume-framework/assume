@@ -2,7 +2,6 @@ import logging
 from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
-from pathlib import Path
 
 import pandas as pd
 from mango import Role
