@@ -1,0 +1,4 @@
+,max_power,min_power,simulation,technology,unit_operator
+demand_EOM,1000000,0,validation_01a_02a_eom_only,inflex_demand,eom_de
+demand_CRM_pos,1000000,0,validation_01a_02a_eom_only,reserve_capacity,crm_de
+demand_CRM_neg,1000000,0,validation_01a_02a_eom_only,reserve_capacity,crm_de

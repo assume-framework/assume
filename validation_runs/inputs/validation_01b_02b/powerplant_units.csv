@@ -1,0 +1,7 @@
+name,bidding_energy,bidding_capacity_pos,bidding_capacity_neg,technology,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,fixed_cost,hot_start_cost,warm_start_cost,cold_start_cost,min_operating_time,min_down_time,heat_extraction,max_heat_extraction,unit_operator
+pp_01,flexable_eom,flexable_pos_crm,flexable_neg_crm,nuclear,uranium,0,1000,500,0.3,250,250,10,140,140,140,72,10,no,0,operator_1
+pp_02,flexable_eom,flexable_pos_crm,flexable_neg_crm,lignite,lignite,0.4,1000,500,0.4,250,250,2,30,50,70,10,10,no,0,operator_2
+pp_03,flexable_eom,flexable_pos_crm,flexable_neg_crm,hard coal,hard coal,0.3,1000,500,0.5,250,250,2,30,50,70,10,10,no,0,operator_3
+pp_04,flexable_eom,flexable_pos_crm,flexable_neg_crm,combined cycle gas turbine,natural gas,0.2,1000,500,0.6,250,250,4,25,35,45,5,3,no,0,operator_4
+pp_05,flexable_eom,flexable_pos_crm,flexable_neg_crm,open cycle gas turbine,natural gas,0.2,1000,500,0.3,250,250,6,15,20,30,0,0,no,0,operator_5
+pp_06,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,oil,0.8,1000,500,0.3,250,250,6,20,35,45,0,0,no,0,operator_6

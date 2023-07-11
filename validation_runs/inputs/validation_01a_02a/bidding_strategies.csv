@@ -1,0 +1,17 @@
+name,energy,capacity_pos,capacity_neg
+demand_EOM,naive,-,-
+demand_CRM_pos,-,naive,-
+demand_CRM_neg,-,-,naive
+Wind onshore,flexable_eom,-,-
+Wind offshore,flexable_eom,-,-
+Solar,flexable_eom,-,-
+Hydro,flexable_eom,-,-
+Biomass,flexable_eom,-,-
+pp_01,flexable_eom,flexable_pos_crm,flexable_neg_crm
+pp_02,flexable_eom,flexable_pos_crm,flexable_neg_crm
+pp_03,flexable_eom,flexable_pos_crm,flexable_neg_crm
+pp_04,flexable_eom,flexable_pos_crm,flexable_neg_crm
+pp_05,flexable_eom,flexable_pos_crm,flexable_neg_crm
+pp_06,flexable_eom,flexable_pos_crm,flexable_neg_crm
+storage_01,flexable_eom_storage,flexable_crm_storage,flexable_crm_storage
+storage_02,flexable_eom_storage,flexable_crm_storage,flexable_crm_storage

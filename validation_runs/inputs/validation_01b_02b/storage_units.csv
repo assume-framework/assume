@@ -1,0 +1,3 @@
+name,technology,bidding_energy,bidding_capacity_pos,bidding_capacity_neg,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_SOC,max_SOC,variable_cost_charge,variable_cost_discharge,natural_inflow,unit_operator
+storage_01,PSPP,flexable_eom_storage,flexable_crm_storage,flexable_crm_storage,500,500,0.87,0.92,1,3500,0.28,0.28,0,operator_1
+storage_02,PSPP,flexable_eom_storage,flexable_crm_storage,flexable_crm_storage,1000,992,0.86,0.9,1,6000,0.28,0.28,0,operator_2
