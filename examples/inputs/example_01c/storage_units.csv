@@ -1,2 +1,2 @@
-name,technology,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_SOC,max_SOC,variable_cost_charge,variable_cost_discharge,natural_inflow,unit_operator,bidding_energy,bidding_capacity_pos,bidding_capacity_neg
-Storage 1,PSPP,1000.0,992.0,0.86,0.9,1.0,6076.0,0.28,0.28,0.0,Operator 1,flexable_eom_storage,,
+name,technology,bidding_energy,bidding_capacity_pos,bidding_capacity_neg,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_SOC,max_SOC,variable_cost_charge,variable_cost_discharge,natural_inflow,unit_operator
+Storage 1,PSPP,flexable_eom_storage,,,1000.0,992.0,0.86,0.9,1.0,6076.0,0.28,0.28,0.0,Operator 1
