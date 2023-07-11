@@ -1,14 +1,14 @@
 import asyncio
 
-from assume import World
+from assume import World, load_scenario_folder
 
 
 def test_world():
     scenario = "example_01a"
     study_case = "example_01a"
     world = World(database_uri=None, export_csv_path=None)
-    world.load_scenario(
-        inputs_path="examples/inputs", scenario=scenario, study_case=study_case
+    load_scenario_folder(
+        world, inputs_path="examples/inputs", scenario=scenario, study_case=study_case
     )
 
     assert world.db is None

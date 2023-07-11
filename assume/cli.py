@@ -2,7 +2,7 @@ import argparse
 import os
 import sys
 
-from assume import World
+from assume import World, load_scenario_folder
 
 os.makedirs("./examples/outputs", exist_ok=True)
 os.makedirs("./examples/local_db", exist_ok=True)
@@ -70,7 +70,8 @@ def cli(args=None):
         export_csv_path=args.csv_export_path,
         log_level=args.loglevel,
     )
-    world.load_scenario(
+    load_scenario_folder(
+        world,
         inputs_path=args.input_path,
         scenario=args.scenario,
         study_case=args.case_study,
