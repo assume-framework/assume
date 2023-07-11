@@ -1,6 +1,9 @@
+from collections import defaultdict
+from datetime import datetime
+
 import pandas as pd
 
-from assume.strategies import BaseStrategy
+from assume.strategies import BaseStrategy, OperationalWindow
 
 
 class BaseUnit:
@@ -36,13 +39,13 @@ class BaseUnit:
         self.node = node
         self.bidding_strategies: dict[str, BaseStrategy] = bidding_strategies
         self.index = index
-        self.total_power_output = pd.Series(0.0, index=self.index)
+        self.outputs = defaultdict(lambda: pd.Series(0.0, index=self.index))
 
     def calculate_operational_window(
         self,
         product_type: str,
         product_tuple: tuple,
-    ) -> dict:
+    ) -> OperationalWindow:
         """Calculate the operation window for the next time step."""
 
         raise NotImplementedError()
@@ -73,8 +76,8 @@ class BaseUnit:
 
         return self.bidding_strategies[market_config.product_type].calculate_bids(
             unit=self,
-            market_config=market_config,
             operational_window=operational_window,
+            market_config=market_config,
         )
 
     def set_dispatch_plan(
@@ -87,7 +90,8 @@ class BaseUnit:
         """
         adds dispatch plan from current market result to total dispatch plan
         """
-        pass
+        end_excl = end - self.index.freq
+        self.outputs[product_type].loc[start:end_excl] += dispatch_plan["total_power"]
 
     def execute_current_dispatch(
         self,
@@ -98,7 +102,20 @@ class BaseUnit:
         check if the total dispatch plan is feasible
         This checks if the market feedback is feasible for the given unit.
         And sets the closest dispatch if not.
-        The end date is inclusive.
+        The end param should be inclusive.
         """
         end_excl = end - self.index.freq
-        return self.total_power_output[start:end_excl]
+        return self.outputs["energy"][start:end_excl]
+
+    def get_output_before(self, datetime: datetime, product_type: str = "energy"):
+        if datetime - self.index.freq < self.index[0]:
+            return 0
+        else:
+            return self.outputs["energy"].at[datetime - self.index.freq]
+
+    def as_dict(self) -> dict:
+        return {
+            "technology": self.technology,
+            "unit_operator": self.unit_operator,
+            "unit_type": "base_unit",
+        }

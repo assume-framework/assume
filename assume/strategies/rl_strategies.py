@@ -1,6 +1,7 @@
 import pandas as pd
 
-from assume.strategies.base_strategy import BaseStrategy
+from assume.common.market_objects import MarketConfig
+from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
 from assume.units.base_unit import BaseUnit
 
 

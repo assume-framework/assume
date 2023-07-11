@@ -42,6 +42,7 @@ class UnitsOperator(Role):
             self.use_portfolio_opt = opt_portfolio[0]
             self.portfolio_strategy = opt_portfolio[1]
 
+        # should be a list per product_type
         self.valid_orders = []
         self.units: dict[str, BaseUnit] = {}
 
@@ -67,7 +68,6 @@ class UnitsOperator(Role):
     async def add_unit(
         self,
         id: str,
-        unit_type: str,
         unit_class: type[BaseUnit],
         unit_params: dict,
         index: pd.DatetimeIndex,
@@ -86,7 +86,6 @@ class UnitsOperator(Role):
             message = {
                 "context": "write_results",
                 "type": "store_units",
-                "unit_type": unit_type,
                 "data": self.units[id],
             }
             await self.context.send_acl_message(
@@ -112,17 +111,16 @@ class UnitsOperator(Role):
             ),
             1,  # register after time was updated for the first time
         )
-        logger.debug(f"tried to register at market {market.name}")
+        logger.debug(f"{self.id} tried to register at market {market.name}")
 
     def handle_opening(self, opening: OpeningMessage, meta: dict[str, str]):
         logger.debug(
-            f'Operator {self.id} received opening from: {opening["market_id"]} {opening["start"]}.'
+            f'{self.id} received opening from: {opening["market_id"]} {opening["start"]} until: {opening["stop"]}.'
         )
-        logger.debug(f'Operator {self.id} can bid until: {opening["stop"]}')
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
 
     def handle_market_feedback(self, content: ClearingMessage, meta: dict[str, str]):
-        logger.debug(f"got market result: {content}")
+        logger.debug(f"{self.id} got market result: {content}")
         orderbook: Orderbook = content["orderbook"]
         for order in orderbook:
             order["market_id"] = content["market_id"]
@@ -216,7 +214,7 @@ class UnitsOperator(Role):
 
         products = opening["products"]
         market = self.registered_markets[opening["market_id"]]
-        logger.debug(f"setting bids for {market.name}")
+        logger.debug(f"{self.id} setting bids for {market.name} - {products}")
         orderbook = await self.formulate_bids(market, products)
         acl_metadata = {
             "performative": Performatives.inform,
@@ -297,13 +295,3 @@ class UnitsOperator(Role):
                         self.bids_map[order_c["bid_id"]] = unit_id
 
         return orderbook
-
-    # async def on_stop(self):
-    #     series = aggregate_step_amount(self.valid_orders)
-    #     df = pd.DataFrame(series)
-
-    #     if not df.empty:
-    #         import matplotlib.pyplot as plt
-    #         plt.plot(df[0], df[1])
-    #         plt.title(self.id)
-    #         plt.show()

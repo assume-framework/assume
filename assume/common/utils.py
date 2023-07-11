@@ -90,10 +90,10 @@ def convert_to_rrule_freq(string):
 
 
 def make_market_config(
-    id,
-    market_params,
-    world_start,
-    world_end,
+    id: str,
+    market_params: dict,
+    world_start: datetime,
+    world_end: datetime,
 ):
     freq, interval = convert_to_rrule_freq(market_params["opening_frequency"])
     start = market_params.get("start_date")
@@ -116,6 +116,7 @@ def make_market_config(
     market_config = MarketConfig(
         name=id,
         market_products=market_products,
+        product_type=market_params.get("product_type", "energy"),
         opening_hours=rr.rrule(
             freq=freq,
             interval=interval,
@@ -123,16 +124,17 @@ def make_market_config(
             until=end,
             cache=True,
         ),
-        additional_fields=market_params.get("additional_fields", []),
-        product_type=market_params.get("product_type", "energy"),
         opening_duration=pd.Timedelta(market_params["opening_duration"]),
-        maximum_gradient=market_params.get("max_gradient"),
-        volume_unit=market_params.get("volume_unit"),
-        volume_tick=market_params.get("volume_tick"),
-        maximum_volume=market_params["maximum_volume"],
-        price_tick=market_params.get("price_tick"),
-        price_unit=market_params["price_unit"],
         market_mechanism=market_params["market_mechanism"],
+        maximum_bid_volume=market_params.get("maximum_bid_volume", 1e6),
+        maximum_bid_price=market_params.get("maximum_bid_price", 3000),
+        minimum_bid_price=market_params.get("minimum_bid_price", -3000),
+        maximum_gradient=market_params.get("max_gradient"),
+        volume_unit=market_params.get("volume_unit", "MW"),
+        volume_tick=market_params.get("volume_tick"),
+        price_unit=market_params.get("price_unit", "€/MWh"),
+        price_tick=market_params.get("price_tick"),
+        additional_fields=market_params.get("additional_fields", []),
         supports_get_unmatched=market_params.get("supports_get_unmatched", False),
     )
 
@@ -150,7 +152,7 @@ def initializer(func):
     >>> p.cmd, p.reachable, p.user
     ('halt', True, 'root')
     """
-    names, varargs, keywords, defaults = inspect.getargspec(func)
+    names, varargs, keywords, defaults, *_ = inspect.getfullargspec(func)
 
     @wraps(func)
     def wrapper(self, *args, **kargs):
@@ -184,7 +186,7 @@ def get_available_products(market_products: list[MarketProduct], startdate: date
     return options
 
 
-def plot_orderbook(orderbook: Orderbook, results):
+def plot_orderbook(orderbook: Orderbook, results: list[dict]):
     """
     Plot the merit order of bids for each node in a separate subplot
     """
@@ -195,7 +197,7 @@ def plot_orderbook(orderbook: Orderbook, results):
     orderbook = sorted(orderbook, key=itemgetter("node_id"))
     for node_id, orders in groupby(orderbook, itemgetter("node_id")):
         bids[node_id].extend(list(map(itemgetter("price", "volume"), orders)))
-    number_of_nodes = len(bids.keys())
+    number_of_nodes = len(bids.keys()) or 1
 
     fig, ax = plt.subplots(1, number_of_nodes, sharey=True)
     if number_of_nodes == 1:
@@ -245,9 +247,14 @@ def plot_orderbook(orderbook: Orderbook, results):
                     "r-",
                 )
         # plot the market clearing price and quantity
-        price = results[i]["price"]
-        contracted_supply = results[i]["supply_volume"]
-        contracted_demand = results[i]["demand_volume"]
+        if len(results) == i:
+            price = 0
+            contracted_supply = 0
+            contracted_demand = 0
+        else:
+            price = results[i]["price"]
+            contracted_supply = results[i]["supply_volume"]
+            contracted_demand = results[i]["demand_volume"]
         inflow = contracted_supply - contracted_demand
         ax[i].plot([contracted_supply, contracted_supply], [0, price], "k--")
         ax[i].plot([0, contracted_supply], [price, price], "k--")

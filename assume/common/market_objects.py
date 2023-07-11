@@ -47,7 +47,6 @@ class MarketConfig:
     name: str
     addr = None
     aid = None
-    # filled by market agent
 
     # continuous markets are clearing just very fast and keep unmatched orders between clearings
     opening_hours: rr.rrule  # dtstart is start/introduction of market
@@ -55,14 +54,13 @@ class MarketConfig:
     market_mechanism: Union[
         market_mechanism, str
     ]  # market_mechanism determines wether old offers are deleted (auction) or not (continuous) after clearing
-
-    maximum_bid: float = 3000.0
-    minimum_bid: float = -500.0
-    maximum_gradient: float = None  # very specific - should be in market clearing
-    maximum_volume: float = 500.0
-    additional_fields: list[str] = field(default_factory=list)
-    product_type: str = "energy"
     market_products: list[MarketProduct] = field(default_factory=list)
+    product_type: str = "energy"
+    maximum_bid_volume: float = 2000.0
+    maximum_bid_price: float = 3000.0
+    minimum_bid_price: float = -500.0
+    maximum_gradient: float = None  # very specific - should be in market clearing
+    additional_fields: list[str] = field(default_factory=list)
     volume_unit: str = "MW"
     volume_tick: float or None = None  # steps in which the amount can be increased
     price_unit: str = "€/MWh"

@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from assume.strategies import BaseStrategy
+from assume.strategies import BaseStrategy, OperationalWindow
 from assume.units.base_unit import BaseUnit
 
 
@@ -64,7 +64,7 @@ class Electrolyser(BaseUnit):
         self,
         product_type: str,
         product_tuple: tuple,
-    ) -> dict:
+    ) -> OperationalWindow:
         """Calculate the operational window for the next time step.
 
         Returns
@@ -88,7 +88,7 @@ class Electrolyser(BaseUnit):
         else:
             min_power = min_power
 
-        current_power_input = self.total_hydrogen_output.at[start]
+        current_power_input = self.outputs["hydrogen"].at[start]
 
         # Adjust min_power if sold negative reserve capacity on control reserve market
         min_power = min_power + self.neg_capacity_reserve.at[start]
@@ -100,21 +100,23 @@ class Electrolyser(BaseUnit):
             max_power = max_power
 
         # Adjust max_power if sold positive reserve capacity on control reserve market
-        max_power = max_power - self.pos_capacity_reserve.at[start]
+        max_power = max_power - self.outputs["pos_capacity"].at[start]
 
         operational_window = {
-            "window": {"start": start, "end": end},
-            "current_power": {
-                "power": current_power_input,
-                "marginal_cost": self.calc_marginal_cost(start),
-            },
-            "min_power": {
-                "power": min_power,
-                "marginal_cost": self.calc_marginal_cost(start),
-            },
-            "max_power": {
-                "power": max_power,
-                "marginal_cost": self.calc_marginal_cost(start),
+            "window": (start, end),
+            "ops": {
+                "current_power": {
+                    "power": current_power_input,
+                    "marginal_cost": self.calc_marginal_cost(start),
+                },
+                "min_power": {
+                    "power": min_power,
+                    "marginal_cost": self.calc_marginal_cost(start),
+                },
+                "max_power": {
+                    "power": max_power,
+                    "marginal_cost": self.calc_marginal_cost(start),
+                },
             },
         }
 
@@ -130,18 +132,23 @@ class Electrolyser(BaseUnit):
             product_tuple=product_tuple,
         )
 
-    def set_dispatch_plan(self, dispatch_plan, current_time):
+    def set_dispatch_plan(
+        self,
+        dispatch_plan: dict,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+        product_type: str,
+    ):
+        # TODO checks should be at execute_current_dispatch - see powerplant
         if dispatch_plan["total_capacity"] > self.min_power:
             self.current_status = 1
             self.current_down_time = 0
-            self.total_hydrogen_output.at[current_time] = dispatch_plan[
-                "total_capacity"
-            ]
+            self.outputs["hydrogen"].at[current_time] = dispatch_plan["total_capacity"]
 
         elif dispatch_plan["total_capacity"] < self.min_power:
             self.current_status = 0
             self.current_down_time += 1
-            self.total_hydrogen_output.at[current_time] = 0
+            self.outputs["hydrogen"].at[current_time] = 0
 
     def calc_marginal_cost(
         self,

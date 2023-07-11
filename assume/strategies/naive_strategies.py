@@ -1,5 +1,5 @@
 from assume.common.market_objects import MarketConfig
-from assume.strategies.base_strategy import BaseStrategy
+from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
 from assume.units.base_unit import BaseUnit
 
 
@@ -10,9 +10,9 @@ class NaiveStrategy(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: BaseUnit = None,
-        market_config: MarketConfig = None,
-        operational_window: dict = None,
+        unit: BaseUnit,
+        operational_window: OperationalWindow,
+        market_config: MarketConfig,
     ):
         """
         Takes information from a unit that the unit operator manages and
@@ -20,10 +20,8 @@ class NaiveStrategy(BaseStrategy):
 
         Return: volume, price
         """
-        price = operational_window["max_power"]["marginal_cost"]
-        volume = operational_window["max_power"]["power"]
-        if "OTC" in market_config.name:
-            volume *= self.scale
+        price = operational_window["ops"]["max_power"]["cost"]
+        volume = operational_window["ops"]["max_power"]["volume"]
         bids = [{"price": price, "volume": volume}]
         return bids
 
@@ -34,9 +32,9 @@ class NaivePosReserveStrategy(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: BaseUnit = None,
-        market_config=None,
-        operational_window: dict = None,
+        unit: BaseUnit,
+        operational_window: OperationalWindow,
+        market_config: MarketConfig,
     ):
         """
         Takes information from a unit that the unit operator manages and
@@ -45,7 +43,7 @@ class NaivePosReserveStrategy(BaseStrategy):
         Return: volume, price
         """
         price = 0
-        volume = operational_window["pos_reserve"]["capacity"]
+        volume = operational_window["ops"]["pos_reserve"]["volume"]
         bids = [{"price": price, "volume": volume}]
         return bids
 
@@ -56,9 +54,9 @@ class NaiveNegReserveStrategy(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: BaseUnit = None,
-        market_config=None,
-        operational_window: dict = None,
+        unit: BaseUnit,
+        operational_window: OperationalWindow,
+        market_config: MarketConfig,
     ):
         """
         Takes information from a unit that the unit operator manages and
@@ -67,6 +65,6 @@ class NaiveNegReserveStrategy(BaseStrategy):
         Return: volume, price
         """
         price = 0
-        volume = operational_window["neg_reserve"]["capacity"]
+        volume = operational_window["ops"]["neg_reserve"]["volume"]
         bids = [{"price": price, "volume": volume}]
         return bids

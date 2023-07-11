@@ -1,6 +1,7 @@
 import asyncio
 import calendar
 import logging
+import sys
 import time
 from datetime import datetime
 
@@ -40,16 +41,22 @@ from assume.strategies import (
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
     NaiveStrategy,
+    OTCStrategy,
     RLStrategy,
     flexableCRMStorage,
     flexableEOM,
     flexableEOMStorage,
+    flexableNegCRM,
+    flexablePosCRM,
 )
-from assume.units import Demand, HeatPump, PowerPlant, StorageUnit
+from assume.units import Demand, HeatPump, PowerPlant, Storage
 
-logging.basicConfig(level=logging.INFO)
+file_handler = logging.FileHandler(filename="assume.log", mode="w+")
+stdout_handler = logging.StreamHandler(stream=sys.stdout)
+stdout_handler.setLevel(logging.WARNING)
+handlers = [file_handler, stdout_handler]
+logging.basicConfig(level=logging.INFO, handlers=handlers)
 logging.getLogger("mango").setLevel(logging.WARNING)
-logging.getLogger("assume").setLevel(logging.INFO)
 
 
 class world:
@@ -59,7 +66,9 @@ class world:
         port: int = 9099,
         database_uri: str = "",
         export_csv_path: str = "",
+        log_level: str = "INFO",
     ):
+        logging.getLogger("assume").setLevel(log_level)
         self.logger = logging.getLogger(__name__)
         self.addr = (ifac_addr, port)
 
@@ -78,6 +87,8 @@ class world:
                         f"could not connect to {database_uri}, trying again"
                     )
                     time.sleep(2)
+        else:
+            self.db = None
 
         self.market_operators: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}
@@ -91,15 +102,18 @@ class world:
             "power_plant": PowerPlant,
             "heatpump": HeatPump,
             "demand": Demand,
-            "storage_unit": StorageUnit,
+            "storage": Storage,
         }
         self.bidding_types = {
-            "naive": NaiveStrategy,
             "flexable_eom": flexableEOM,
+            "flexable_pos_crm": flexablePosCRM,
+            "flexable_neg_crm": flexableNegCRM,
+            "flexable_crm_storage": flexableCRMStorage,
             "flexable_eom_storage": flexableEOMStorage,
+            "naive": NaiveStrategy,
             "naive_neg_reserve": NaiveNegReserveStrategy,
             "naive_pos_reserve": NaivePosReserveStrategy,
-            "flexable_crm_storage": flexableCRMStorage,
+            "otc_strategy": OTCStrategy,
             "rl_strategy": RLStrategy,
         }
         self.clearing_mechanisms = {
@@ -209,8 +223,7 @@ class world:
             end=self.end + pd.Timedelta(hours=4),
             freq=config["time_step"],
         )
-        # firm power capacity is used to bid longterm
-        # how much % of the fpc should be bid longterm
+        # get extra parameters for bidding strategies
         self.bidding_params = config.get("bidding_strategy_params", {})
 
         # load the data from the csv files
@@ -292,18 +305,17 @@ class world:
         await self.setup(self.start)
 
         # read writing properties form config
-        simulation_id = study_case
         save_frequency_hours = config.get("save_frequency_hours", None)
 
         self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to self
         output_role = WriteOutput(
-            simulation_id,
-            self.start,
-            self.end,
-            self.db,
-            self.export_csv_path,
-            save_frequency_hours,
+            simulation_id=f"{scenario}_{study_case}",
+            start=self.start,
+            end=self.end,
+            db_engine=self.db,
+            export_csv_path=self.export_csv_path,
+            save_frequency_hours=save_frequency_hours,
         )
         same_process = True
         if same_process:
@@ -381,7 +393,7 @@ class world:
                 [all_operators, storage_units.unit_operator.unique()]
             )
 
-        for company_name in all_operators:
+        for company_name in set(all_operators):
             self.add_unit_operator(id=str(company_name))
 
         # add Rl unit operator
@@ -406,13 +418,16 @@ class world:
                     unit_name
                 ].to_dict()
 
-                # check if we have RL bidding strategy and give it the respective price forecasts
+                unit_params["price_forecast"] = self.forecast_providers[
+                    "EOM"
+                ].price_forecast_df
+
+                # check if we have RL bidding strategy
                 if (
                     unit_params["bidding_strategies"]["energy"] == "rl_strategy"
-                    and forecast_provider.price_forecast_df is not None
+                    and self.forecast_providers["EOM"].price_forecast_df is not None
                     and self.is_rl_mode == True
                 ):
-                    unit_params["price_forecast"] = forecast_provider.price_forecast_df
                     unit_params[
                         "res_demand_forecast"
                     ] = forecast_provider.residual_demand_forecast_df
@@ -514,9 +529,13 @@ class world:
                         for market in self.markets.values()
                     }
 
+                unit_params["price_forecast"] = self.forecast_providers[
+                    "EOM"
+                ].price_forecast_df
+
                 await self.add_unit(
                     id=storage_name,
-                    unit_type="storage_unit",
+                    unit_type="storage",
                     unit_operator_id=unit_params["unit_operator"],
                     unit_params=unit_params,
                 )
@@ -645,7 +664,6 @@ class world:
         # create unit within the unit operator its associated with
         await self.unit_operators[unit_operator_id].add_unit(
             id=id,
-            unit_type=unit_type,
             unit_class=unit_class,
             unit_params=unit_params,
             index=self.index,

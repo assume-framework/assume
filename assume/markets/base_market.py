@@ -72,9 +72,6 @@ class MarketRole(Role):
         current = datetime.utcfromtimestamp(self.context.current_timestamp)
         next_opening = self.marketconfig.opening_hours.after(current, inc=True)
         market_closing = next_opening + self.marketconfig.opening_duration
-        logger.debug(
-            f"first market opening: {self.marketconfig.name} - {next_opening} - {market_closing}"
-        )
         opening_ts = calendar.timegm(next_opening.utctimetuple())
         self.context.schedule_timestamp_task(self.opening(), opening_ts)
 
@@ -117,11 +114,12 @@ class MarketRole(Role):
         next_opening = self.marketconfig.opening_hours.after(market_open)
         if next_opening:
             next_opening_ts = calendar.timegm(next_opening.utctimetuple())
-            logger.debug(f"market {self.marketconfig.name} - does not reopen")
             self.context.schedule_timestamp_task(self.opening(), next_opening_ts)
             logger.debug(
-                f"next market opening: {self.marketconfig.name} - {next_opening} - {market_closing}"
+                f"market opening: {self.marketconfig.name} - {market_open} - {market_closing}"
             )
+        else:
+            logger.debug(f"market {self.marketconfig.name} - does not reopen")
 
     def handle_registration(self, content: dict, meta: dict):
         agent = meta["sender_id"]
@@ -136,9 +134,9 @@ class MarketRole(Role):
         agent_addr = meta["sender_addr"]
         agent_id = meta["sender_id"]
         try:
-            max_price = self.marketconfig.maximum_bid
-            min_price = self.marketconfig.minimum_bid
-            max_volume = self.marketconfig.maximum_volume
+            max_price = self.marketconfig.maximum_bid_price
+            min_price = self.marketconfig.minimum_bid_price
+            max_volume = self.marketconfig.maximum_bid_volume
 
             if self.marketconfig.price_tick:
                 # max and min should be in units
@@ -151,8 +149,12 @@ class MarketRole(Role):
                 order["agent_id"] = (agent_addr, agent_id)
                 if not order.get("only_hours"):
                     order["only_hours"] = None
-                assert order["price"] <= max_price, f"max_bid {order['price']}"
-                assert order["price"] >= min_price, f"min_bid {order['price']}"
+                assert (
+                    order["price"] <= max_price
+                ), f"maximum_bid_price {order['price']}"
+                assert (
+                    order["price"] >= min_price
+                ), f"minimum_bid_price {order['price']}"
                 assert (
                     abs(order["volume"]) <= max_volume
                 ), f"max_volume {order['volume']}"
