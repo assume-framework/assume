@@ -217,8 +217,10 @@ class Storage(BaseUnit):
 
         if product_type == "energy":
             return self.calculate_energy_operational_window(start, end)
-        elif product_type in {"capacity_pos", "capacity_neg"}:
-            return self.calculate_reserve_operational_window(start, end)
+        elif product_type == "capacity_pos":
+            return self.calculate_pos_reserve_operational_window(start, end)
+        elif product_type == "capacity_neg":
+            return self.calculate_neg_reserve_operational_window(start, end)
 
     def calculate_energy_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
@@ -252,7 +254,6 @@ class Storage(BaseUnit):
             duration=duration,
         )
 
-        # what form does the operational window have?
         operational_window = {
             "window": (start, end),
             "ops": {
@@ -278,7 +279,7 @@ class Storage(BaseUnit):
                     ),
                 },
                 "max_power_discharge": {
-                    "volume": min_max_power["max_power_discharge"],
+                    "volume": min_max_power["max_power_discharge"]-self.outputs["pos_capacity"].at[start],
                     "cost": self.calc_marginal_cost(
                         timestep=start,
                         discharge=True,
@@ -292,7 +293,7 @@ class Storage(BaseUnit):
                     ),
                 },
                 "max_power_charge": {
-                    "volume": min_max_power["max_power_charge"],
+                    "volume": min_max_power["max_power_charge"]-self.outputs["neg_capacity"].at[start],
                     "cost": self.calc_marginal_cost(
                         timestep=start,
                         discharge=False,
@@ -302,36 +303,98 @@ class Storage(BaseUnit):
         }
         return operational_window
 
-    def calculate_reserve_operational_window(
+    def calculate_pos_reserve_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
         duration = (end - start).total_seconds() / 3600
         # capacity calculation has to be added
-        current_power = self.get_output_before(start)
+        current_power_discharge = (
+            self.get_output_before(start) if self.get_output_before(start) > 0 else 0
+        )
 
-        available_pos_reserve_discharge = None
-        available_neg_reserve_discharge = None
-        available_pos_reserve_charge = None
-        available_neg_reserve_charge = None
+        current_power_charge = (
+            self.get_output_before(start) if self.get_output_before(start) < 0 else 0
+        )
+        
+        if self.current_status == 0 and self.current_down_time < self.min_down_time:
+            return None
+        
+        min_SOC = (
+            self.min_SOC[start] if type(self.min_SOC) is pd.Series else self.min_SOC
+        )
+        max_SOC = (
+            self.max_SOC[start] if type(self.max_SOC) is pd.Series else self.max_SOC
+        )
+        
+        min_max_power = self.calculate_min_max_power(
+            start=start,
+            current_power_charge=current_power_charge,
+            current_power_discharge=current_power_discharge,
+            min_SOC=min_SOC,
+            max_SOC=max_SOC,
+            duration=duration,
+        )
 
         operational_window = {
             "window": (start, end),
-            "pos_reserve_discharge": {
-                "capacity": available_pos_reserve_discharge,
-            },
-            "neg_reserve_discharge": {
-                "capacity": available_neg_reserve_discharge,
-            },
-            "pos_reserve_charge": {
-                "capacity": available_pos_reserve_charge,
-            },
-            "neg_reserve_charge": {
-                "capacity": available_neg_reserve_charge,
+            "ops": {
+                "pos_reserve": {
+                    "volume": min_max_power["max_power_discharge"],
+                    "cost": self.calc_marginal_cost(
+                        timestep=start,
+                        discharge=True,
+                    ),
+                },
             },
         }
 
-        if available_neg_reserve_discharge < 0:
-            logger.error("available_neg_reserve_discharge < 0")
+        return operational_window
+    
+
+    def calculate_neg_reserve_operational_window(
+        self, start: pd.Timestamp, end: pd.Timestamp
+    ) -> dict:
+        duration = (end - start).total_seconds() / 3600
+        # capacity calculation has to be added
+        current_power_discharge = (
+            self.get_output_before(start) if self.get_output_before(start) > 0 else 0
+        )
+
+        current_power_charge = (
+            self.get_output_before(start) if self.get_output_before(start) < 0 else 0
+        )
+        
+        if self.current_status == 0 and self.current_down_time < self.min_down_time:
+            return None
+        
+        min_SOC = (
+            self.min_SOC[start] if type(self.min_SOC) is pd.Series else self.min_SOC
+        )
+        max_SOC = (
+            self.max_SOC[start] if type(self.max_SOC) is pd.Series else self.max_SOC
+        )
+        
+        min_max_power = self.calculate_min_max_power(
+            start=start,
+            current_power_charge=current_power_charge,
+            current_power_discharge=current_power_discharge,
+            min_SOC=min_SOC,
+            max_SOC=max_SOC,
+            duration=duration,
+        )
+
+        operational_window = {
+            "window": (start, end),
+            "ops": {
+                "neg_reserve": {
+                    "volume": min_max_power["max_power_charge"],
+                    "cost": self.calc_marginal_cost(
+                        timestep=start,
+                        discharge=True,
+                    ),
+                },
+            },
+        }
 
         return operational_window
 
@@ -522,7 +585,7 @@ class Storage(BaseUnit):
             max(
                 0,
                 (
-                    (self.current_SOC - min_SOC - self.outputs["pos_capacity"][start])
+                    (self.current_SOC - min_SOC)
                     * self.efficiency_discharge
                     / duration
                 ),
@@ -535,7 +598,7 @@ class Storage(BaseUnit):
             min(
                 0,
                 (
-                    (self.current_SOC - max_SOC - self.outputs["neg_capacity"][start])
+                    (self.current_SOC - max_SOC)
                     / self.efficiency_charge
                     / duration
                 ),
