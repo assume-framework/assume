@@ -277,6 +277,33 @@ async def load_scenario_folder_async(
         path=path, config=config, file_name="bidding_strategies"
     ).fillna(0)
 
+    if True:
+        unit_dfs = {
+            "demand_units": demand_units,
+            "powerplant_units": powerplant_units,
+            "heatpumps": heatpump_units,
+            "storage_units": storage_units,
+        }
+
+        def appl(row):
+            if row.name not in bidding_strategies_df.index:
+                return None
+            else:
+                return bidding_strategies_df.loc[row.name].replace(0, None)
+
+        for filename, df in unit_dfs.items():
+            if df is None or df.empty:
+                continue
+            ddf = df.apply(appl, axis=1)
+            if isinstance(ddf, pd.Series):
+                continue
+            ddf.columns = ["bidding_" + c for c in ddf.columns]
+            df = df.join(ddf)
+            df.to_csv(path + "/" + filename + ".csv")
+        import os
+
+        os.remove(path + "/bidding_strategies.csv")
+
     cross_border_flows_df = load_file(
         path=path,
         config=config,
