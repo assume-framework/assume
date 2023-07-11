@@ -1,4 +1,4 @@
-name,technology,max_power,min_power,unit_operator
-demand_EOM,inflex_demand,1000000,0,eom_de
-demand_CRM_pos,reserve_capacity,1000000,0,crm_de
-demand_CRM_neg,reserve_capacity,1000000,0,crm_de
+name,technology,max_power,min_power,unit_operator,bidding_energy,bidding_capacity_pos,bidding_capacity_neg
+demand_EOM,inflex_demand,1000000.0,0.0,eom_de,naive,,
+demand_CRM_pos,reserve_capacity,1000000.0,0.0,crm_de,,naive,
+demand_CRM_neg,reserve_capacity,1000000.0,0.0,crm_de,,,naive
