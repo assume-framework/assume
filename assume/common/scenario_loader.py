@@ -21,25 +21,20 @@ freq_map = {
     "w": rr.WEEKLY,
 }
 
-
 def attempt_resample(
     df: pd.DataFrame,
     index: pd.DatetimeIndex,
 ) -> pd.DataFrame:
-    if len(df.index) > len(index):
-        temp_index = pd.date_range(start=index[0], end=index[-1], periods=len(df))
-        df.index = temp_index
+    
+    #check if df.index is a datetimeindex
+    if isinstance(df.index, pd.DatetimeIndex):
         df = df.resample(index.freq).mean()
         logger.info("Resampling successful.")
-        return df
-    elif len(df.index) < len(index):
-        logger.warning(
-            "Index length mismatch. Upsampling not supported. Returning None"
-        )
-        return None
     else:
-        return df
-
+        logger.warning("Index is not a datetimeindex. Returning None")
+        return None
+    
+    return df
 
 def load_file(
     path: str,
@@ -60,6 +55,7 @@ def load_file(
             index_col=0,
             encoding="utf-8",
             na_values=["n.a.", "None", "-", "none", "nan"],
+            parse_dates=True,
         )
 
         for col in df:
@@ -247,7 +243,7 @@ async def load_scenario_folder_async(
     fuel_prices_df = load_file(
         path=path,
         config=config,
-        file_name="fuel_prices",
+        file_name="fuel_prices_df",
         index=index,
     )
 
@@ -267,12 +263,14 @@ async def load_scenario_folder_async(
     )
     demand_df['demand_EOM'] /= 20
 
-    vre_cf_df = load_file(
+    availability = load_file(
         path=path,
         config=config,
-        file_name="vre_cf_df",
+        file_name="availability_df",
         index=index,
     )
+    if availability is not None:
+        availability /= 20
 
     bidding_strategies_df = load_file(
         path=path, config=config, file_name="bidding_strategies"
@@ -341,7 +339,7 @@ async def load_scenario_folder_async(
             market_id=market_id,
             price_forecast_df=market_price_forecast,
             fuel_prices_df=fuel_prices_df,
-            vre_cf_df=vre_cf_df,
+            availability=availability,
             powerplants=powerplant_units,
             demand_df=demand_df[f"demand_{market_id}"],
         )
@@ -380,12 +378,9 @@ async def load_scenario_folder_async(
     # if we have RL strategy, add price forecast to unit_params
     def powerplant_callback(unit_name, unit_params):
         # check if we have RL bidding strategy
-        if (
-            unit_params["bidding_strategies"]["energy"] == "rl_strategy"
-            and world.forecast_providers["EOM"].price_forecast_df is not None
-        ):
-            unit_params["price_forecast"] = world.price_forecast["mcp"]
-            unit_params["res_demand_forecast"] = world.price_forecast["residual_demand"]
+        unit_params["price_forecast"] = world.forecast_providers[
+            "EOM"
+        ].price_forecast_df
 
         if (
             fuel_prices_df is not None
@@ -394,8 +389,8 @@ async def load_scenario_folder_async(
             unit_params["fuel_price"] = fuel_prices_df[unit_params["fuel_type"]]
             unit_params["co2_price"] = fuel_prices_df["co2"]
 
-        if vre_cf_df is not None and unit_name in vre_cf_df.columns:
-            unit_params["capacity_factor"] = vre_cf_df[unit_name]
+        if availability is not None and unit_name in availability.columns:
+            unit_params["capacity_factor"] = availability[unit_name]
         return unit_params
 
     await add_units(

@@ -3,7 +3,7 @@ import logging
 import os
 from os import getenv
 
-from assume import World
+from assume import World, load_scenario_folder
 
 log = logging.getLogger(__name__)
 
@@ -14,11 +14,11 @@ os.makedirs("./examples/local_db", exist_ok=True)
 DATABASE_URI = getenv("DATABASE_URI", "sqlite:///./examples/local_db/assume_db_01a.db")
 # %%
 if __name__ == "__main__":
-    scenario = "example_01a"
-    study_case = "example_01a"
+    scenario = "validation_01a_02a"
+    study_case = "eom_only"
 
     world = World(database_uri=DATABASE_URI, export_csv_path=EXPORT_CSV_PATH)
-    world.load_scenario(
-        inputs_path="examples/inputs", scenario=scenario, study_case=study_case
+    load_scenario_folder(
+        world, inputs_path="validation_runs/inputs", scenario=scenario, study_case=study_case
     )
-    world.run()
+    world.run()    
