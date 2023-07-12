@@ -239,7 +239,7 @@ async def load_scenario_folder_async(
     heatpump_units = load_file(
         path=path,
         config=config,
-        file_name="heatpumps",
+        file_name="heatpump_units",
     )
 
     fuel_prices_df = load_file(
