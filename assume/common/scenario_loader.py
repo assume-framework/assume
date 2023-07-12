@@ -26,19 +26,15 @@ def attempt_resample(
     df: pd.DataFrame,
     index: pd.DatetimeIndex,
 ) -> pd.DataFrame:
-    if len(df.index) > len(index):
-        temp_index = pd.date_range(start=index[0], end=index[-1], periods=len(df))
-        df.index = temp_index
+    # check if df.index is a datetimeindex
+    if isinstance(df.index, pd.DatetimeIndex):
         df = df.resample(index.freq).mean()
         logger.info("Resampling successful.")
-        return df
-    elif len(df.index) < len(index):
-        logger.warning(
-            "Index length mismatch. Upsampling not supported. Returning None"
-        )
-        return None
     else:
-        return df
+        logger.warning("Index is not a datetimeindex. Returning None")
+        return None
+
+    return df
 
 
 def load_file(
@@ -60,6 +56,7 @@ def load_file(
             index_col=0,
             encoding="utf-8",
             na_values=["n.a.", "None", "-", "none", "nan"],
+            parse_dates=True,
         )
 
         for col in df:
@@ -145,34 +142,28 @@ def make_market_config(
 
 
 async def add_units(
-    dataframe: pd.DataFrame,
+    units_df: pd.DataFrame,
     unit_type: str,
     callback: Callable[[str, dict], dict],
     world: World,
-    bidding_strategies_df: pd.DataFrame,
 ):
     """
     This function adds units to the world from a given dataframe.
     The callback is used to adjust unit_params depending on the unit_type, before adding the unit to the world.
     """
-    if dataframe is None:
+    if units_df is None:
         return
+
     logger.info(f"Adding {unit_type} units")
-    for unit_name, unit_params in dataframe.iterrows():
-        if (
-            bidding_strategies_df is not None
-            and unit_name in bidding_strategies_df.index
-        ):
-            unit_params["bidding_strategies"] = bidding_strategies_df.loc[
-                unit_name
-            ].to_dict()
-        else:
-            logger.warning(
-                f"No bidding strategies specified for {unit_name}. Using default strategies."
-            )
-            unit_params["bidding_strategies"] = {
-                market.product_type: "naive" for market in world.markets.values()
-            }
+
+    units_df = units_df.fillna(0)
+    for unit_name, unit_params in units_df.iterrows():
+        bidding_strategies = {
+            key.split("bidding_")[1]: unit_params[key]
+            for key in unit_params.keys()
+            if key.startswith("bidding_")
+        }
+        unit_params["bidding_strategies"] = bidding_strategies
 
         unit_params = callback(unit_name, unit_params)
 
@@ -242,12 +233,16 @@ async def load_scenario_folder_async(
         file_name="demand_units",
     )
 
-    heatpump_units = load_file(path=path, config=config, file_name="heatpumps")
+    heatpump_units = load_file(
+        path=path,
+        config=config,
+        file_name="heatpump_units",
+    )
 
     fuel_prices_df = load_file(
         path=path,
         config=config,
-        file_name="fuel_prices",
+        file_name="fuel_prices_df",
         index=index,
     )
 
@@ -265,18 +260,13 @@ async def load_scenario_folder_async(
         file_name="demand_df",
         index=index,
     )
-    demand_df["demand_EOM"] /= 20
 
-    vre_cf_df = load_file(
+    availability = load_file(
         path=path,
         config=config,
-        file_name="vre_cf_df",
+        file_name="availability_df",
         index=index,
     )
-
-    bidding_strategies_df = load_file(
-        path=path, config=config, file_name="bidding_strategies"
-    ).fillna(0)
 
     cross_border_flows_df = load_file(
         path=path,
@@ -341,7 +331,7 @@ async def load_scenario_folder_async(
             market_id=market_id,
             price_forecast_df=market_price_forecast,
             fuel_prices_df=fuel_prices_df,
-            vre_cf_df=vre_cf_df,
+            availability=availability,
             powerplants=powerplant_units,
             demand_df=demand_df[f"demand_{market_id}"],
         )
@@ -361,14 +351,17 @@ async def load_scenario_folder_async(
         [
             powerplant_units.unit_operator.unique(),
             demand_units.unit_operator.unique(),
-            # heatpump_units.unit_operator.unique(),
-            # storage_units.unit_operator.unique(),
         ]
     )
 
     if storage_units is not None:
         all_operators = np.concatenate(
             [all_operators, storage_units.unit_operator.unique()]
+        )
+
+    if heatpump_units is not None:
+        all_operators = np.concatenate(
+            [all_operators, heatpump_units.unit_operator.unique()]
         )
 
     for company_name in set(all_operators):
@@ -379,13 +372,9 @@ async def load_scenario_folder_async(
     # if vre generation is provided, add them to the vre units
     # if we have RL strategy, add price forecast to unit_params
     def powerplant_callback(unit_name, unit_params):
-        # check if we have RL bidding strategy
-        if (
-            unit_params["bidding_strategies"]["energy"] == "rl_strategy"
-            and world.forecast_providers["EOM"].price_forecast_df is not None
-        ):
-            unit_params["price_forecast"] = world.price_forecast["mcp"]
-            unit_params["res_demand_forecast"] = world.price_forecast["residual_demand"]
+        unit_params["price_forecast"] = world.forecast_providers[
+            "EOM"
+        ].price_forecast_df
 
         if (
             fuel_prices_df is not None
@@ -394,8 +383,9 @@ async def load_scenario_folder_async(
             unit_params["fuel_price"] = fuel_prices_df[unit_params["fuel_type"]]
             unit_params["co2_price"] = fuel_prices_df["co2"]
 
-        if vre_cf_df is not None and unit_name in vre_cf_df.columns:
-            unit_params["capacity_factor"] = vre_cf_df[unit_name]
+        if availability is not None and unit_name in availability.columns:
+            unit_params["capacity_factor"] = availability[unit_name]
+
         return unit_params
 
     await add_units(
@@ -403,7 +393,6 @@ async def load_scenario_folder_async(
         "power_plant",
         powerplant_callback,
         world,
-        bidding_strategies_df,
     )
 
     def heatpump_callback(unit_name, unit_params):
@@ -418,26 +407,37 @@ async def load_scenario_folder_async(
         return unit_params
 
     await add_units(
-        heatpump_units, "heatpump", heatpump_callback, world, bidding_strategies_df
+        heatpump_units,
+        "heatpump",
+        heatpump_callback,
+        world,
     )
 
     def storage_callback(unit_name, unit_params):
         unit_params["price_forecast"] = world.forecast_providers[
             "EOM"
         ].price_forecast_df
+
         return unit_params
 
     await add_units(
-        storage_units, "storage", storage_callback, world, bidding_strategies_df
+        storage_units,
+        "storage",
+        storage_callback,
+        world,
     )
 
     def demand_callback(unit_name, unit_params):
         if demand_df is not None and unit_name in demand_df.columns:
             unit_params["volume"] = demand_df[unit_name]
+
         return unit_params
 
     await add_units(
-        demand_units, "demand", demand_callback, world, bidding_strategies_df
+        demand_units,
+        "demand",
+        demand_callback,
+        world,
     )
 
 
