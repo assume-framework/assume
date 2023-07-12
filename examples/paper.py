@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from sqlalchemy import create_engine
 
-from assume import World
+from assume import World, load_scenario_folder
 
 DB = "postgresql://assume:assume@localhost:5432/assume"
 
@@ -26,7 +26,8 @@ def run_cases():
     ]
     for case_study in case_studies:
         world = World(database_uri=DB)
-        world.load_scenario(
+        load_scenario_folder(
+            world,
             inputs_path="examples/inputs",
             scenario="example_02",
             study_case=case_study,

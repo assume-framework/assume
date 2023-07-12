@@ -3,7 +3,7 @@ import logging
 import os
 from os import getenv
 
-from assume import World
+from assume import World, load_scenario_folder
 
 log = logging.getLogger(__name__)
 
@@ -19,7 +19,8 @@ if __name__ == "__main__":
     scenario = "example_02"
     study_case = "base_case_2019"
     world = World(database_uri=DATABASE_URI, export_csv_path=EXPORT_CSV_PATH)
-    world.load_scenario(
+    load_scenario_folder(
+        world,
         inputs_path="examples/inputs",
         scenario=scenario,
         study_case=study_case,

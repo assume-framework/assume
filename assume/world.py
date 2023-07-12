@@ -6,10 +6,9 @@ import time
 from datetime import datetime
 
 import nest_asyncio
-import numpy as np
 import pandas as pd
-import yaml
 from mango import RoleAgent, create_container
+from mango.container.core import Container
 from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 from sqlalchemy import create_engine
@@ -22,8 +21,6 @@ from assume.common import (
     MarketConfig,
     UnitsOperator,
     WriteOutput,
-    load_file,
-    make_market_config,
     mango_codec_factory,
 )
 from assume.markets import MarketRole, pay_as_bid, pay_as_clear
@@ -62,6 +59,7 @@ class World:
         logging.getLogger("assume").setLevel(log_level)
         self.logger = logging.getLogger(__name__)
         self.addr = (ifac_addr, port)
+        self.container = None
 
         self.export_csv_path = export_csv_path
         # intialize db connection at beginning of simulation
@@ -115,140 +113,35 @@ class World:
 
     async def setup(
         self,
-        start: pd.Timestamp,
+        start: datetime,
+        end: datetime,
+        save_frequency_hours: int,
+        simulation_id: str,
+        bidding_params: dict,
+        index: pd.Series,
+        same_process: bool = True,
     ):
         self.clock = ExternalClock(0)
+        self.start = start
+        self.end = end
+        self.bidding_params = bidding_params
+        self.index = index
+
+        # kill old container if exists
+        if isinstance(self.container, Container) and self.container.running:
+            self.container.shutdown()
+
+        # create new container
         self.container = await create_container(
             addr=self.addr, clock=self.clock, codec=mango_codec_factory()
         )
 
-    async def async_load_scenario(
-        self,
-        inputs_path: str,
-        scenario: str,
-        study_case: str,
-    ) -> None:
-        """Load a scenario from a given path.
-
-        Args:
-            inputs_path (str): Path to the inputs folder.
-            scenario (str): Name of the scenario.
-            study_case (str): Name of the study case.
-
-        Raises:
-            ValueError: If the scenario or study case is not found.
-
-        """
-
-        # load the config file
-        path = f"{inputs_path}/{scenario}"
-        with open(f"{path}/config.yml", "r") as f:
-            config = yaml.safe_load(f)
-            if not study_case:
-                study_case = list(config.keys())[0]
-            config = config[study_case]
-        self.logger.info(
-            f"Starting Scenario {scenario}/{study_case} from {inputs_path}"
-        )
-
-        self.start = pd.Timestamp(config["start_date"])
-        self.end = pd.Timestamp(config["end_date"])
-
-        self.index = pd.date_range(
-            start=self.start,
-            end=self.end + pd.Timedelta(hours=4),
-            freq=config["time_step"],
-        )
-        # get extra parameters for bidding strategies
-        self.bidding_params = config.get("bidding_strategy_params", {})
-
-        # load the data from the csv files
-        # tries to load all files, returns a warning if file does not exist
-        # also attempts to resample the inputs if their resolution is higher than user specified time step
-        self.logger.info("Loading input data")
-        powerplant_units = load_file(
-            path=path,
-            config=config,
-            file_name="powerplant_units",
-        )
-
-        storage_units = load_file(
-            path=path,
-            config=config,
-            file_name="storage_units",
-        )
-
-        demand_units = load_file(
-            path=path,
-            config=config,
-            file_name="demand_units",
-        )
-
-        fuel_prices_df = load_file(
-            path=path,
-            config=config,
-            file_name="fuel_prices",
-            index=self.index,
-        )
-
-        heatpumps_df = load_file(path=path, config=config, file_name="heatpumps")
-
-        temperature_df = load_file(
-            path=path, config=config, file_name="temperature", index=self.index
-        )
-
-        electricity_prices_df = load_file(
-            path=path, config=config, file_name="electricity_prices", index=self.index
-        )
-
-        demand_df = load_file(
-            path=path,
-            config=config,
-            file_name="demand_df",
-            index=self.index,
-        )
-
-        vre_cf_df = load_file(
-            path=path,
-            config=config,
-            file_name="vre_cf_df",
-            index=self.index,
-        )
-
-        bidding_strategies_df = load_file(
-            path=path, config=config, file_name="bidding_strategies"
-        )
-
-        bidding_strategies_df = bidding_strategies_df.fillna(0)
-
-        # cross_border_flows_df = load_file(
-        #     path=path, config=config, file_name="cross_border_flows", index=self.index,
-        # )
-
-        price_forecast_df = load_file(
-            path=path,
-            config=config,
-            file_name="price_forecasts",
-            index=self.index,
-        )
-
-        if powerplant_units is None or demand_units is None:
-            raise ValueError("No power plant or no demand units were provided!")
-
-        if demand_df is None:
-            raise ValueError("No demand time series was provided!")
-
-        await self.setup(self.start)
-
-        # read writing properties form config
-        save_frequency_hours = config.get("save_frequency_hours", None)
-
         self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to world
         output_role = WriteOutput(
-            simulation_id=f"{scenario}_{study_case}",
-            start=self.start,
-            end=self.end,
+            simulation_id=simulation_id,
+            start=start,
+            end=end,
             db_engine=self.db,
             export_csv_path=self.export_csv_path,
             save_frequency_hours=save_frequency_hours,
@@ -268,218 +161,6 @@ class World:
                 agent.add_role(output_role)
 
             await self.container.as_agent_process(agent_creator=creator)
-
-        # get the market config from the config file and add the markets
-        self.logger.info("Adding markets")
-        for market_id, market_params in config["markets_config"].items():
-            market_config = make_market_config(
-                id=market_id,
-                market_params=market_params,
-                world_start=self.start,
-                world_end=self.end,
-            )
-
-            operator_id = str(market_params["operator"])
-            if operator_id not in self.market_operators:
-                self.add_market_operator(id=operator_id)
-
-            self.add_market(
-                market_operator_id=operator_id,
-                market_config=market_config,
-            )
-
-        # add forecast providers for each market
-        self.logger.info("Adding forecast providers")
-        temp = pd.DataFrame()
-        for market_id, market_config in self.markets.items():
-            if price_forecast_df is not None and market_id in price_forecast_df.columns:
-                market_price_forecast = price_forecast_df[market_id]
-            else:
-                market_price_forecast = None
-
-            forecast_provider = ForecastProvider(
-                market_id=market_id,
-                price_forecast_df=market_price_forecast,
-                fuel_prices_df=fuel_prices_df,
-                vre_cf_df=vre_cf_df,
-                powerplants=powerplant_units,
-                demand_df=demand_df[f"demand_{market_id}"],
-            )
-            forecast_agent = RoleAgent(
-                self.container, suggested_aid=f"forecast_agent_{market_id}"
-            )
-            forecast_agent.add_role(forecast_provider)
-            self.forecast_providers[market_id] = forecast_provider
-
-            temp[market_id] = forecast_provider.price_forecast_df
-
-        temp.to_csv(f"{path}/price_forecasts.csv", index=True)
-
-        # add the unit operators using unique unit operator names in the powerplants csv
-        self.logger.info("Adding unit operators")
-        all_operators = np.concatenate(
-            [
-                powerplant_units.unit_operator.unique(),
-                demand_units.unit_operator.unique(),
-            ]
-        )
-
-        if storage_units is not None:
-            all_operators = np.concatenate(
-                [all_operators, storage_units.unit_operator.unique()]
-            )
-
-        for company_name in set(all_operators):
-            self.add_unit_operator(id=str(company_name))
-
-        # add the units to corresponsing unit operators
-        # if fuel prices are provided, add them to the unit params
-        # if vre generation is provided, add them to the vre units
-        # if we have RL strategy, add price forecast to unit_params
-        self.logger.info("Adding power plant units")
-        for unit_name, unit_params in powerplant_units.iterrows():
-            if (
-                bidding_strategies_df is not None
-                and unit_name in bidding_strategies_df.index
-            ):
-                unit_params["bidding_strategies"] = bidding_strategies_df.loc[
-                    unit_name
-                ].to_dict()
-
-                unit_params["price_forecast"] = self.forecast_providers[
-                    "EOM"
-                ].price_forecast_df
-
-                # check if we have RL bidding strategy
-                if (
-                    unit_params["bidding_strategies"]["energy"] == "rl_strategy"
-                    and self.forecast_providers["EOM"].price_forecast_df is not None
-                ):
-                    unit_params["price_forecast"] = self.price_forecast["mcp"]
-                    unit_params["res_demand_forecast"] = self.price_forecast[
-                        "residual_demand"
-                    ]
-
-            else:
-                self.logger.warning(
-                    f"No bidding strategies specified for {unit_name}. Using default strategies."
-                )
-                unit_params["bidding_strategies"] = {
-                    market.product_type: "naive" for market in self.markets.values()
-                }
-
-            if (
-                fuel_prices_df is not None
-                and unit_params["fuel_type"] in fuel_prices_df.columns
-            ):
-                unit_params["fuel_price"] = fuel_prices_df[unit_params["fuel_type"]]
-                unit_params["co2_price"] = fuel_prices_df["co2"]
-
-            if vre_cf_df is not None and unit_name in vre_cf_df.columns:
-                unit_params["capacity_factor"] = vre_cf_df[unit_name]
-
-            await self.add_unit(
-                id=unit_name,
-                unit_type="power_plant",
-                unit_operator_id=unit_params["unit_operator"],
-                unit_params=unit_params,
-            )
-
-        if heatpumps_df is not None:
-            for company_name in heatpumps_df.unit_operator.unique():
-                self.add_unit_operator(id=str(company_name))
-
-            self.logger.info("Adding heat pump units")
-            for hp_name, unit_params in heatpumps_df.iterrows():
-                if (
-                    bidding_strategies_df is not None
-                    and hp_name in bidding_strategies_df.index
-                ):
-                    unit_params["bidding_strategies"] = bidding_strategies_df.loc[
-                        hp_name
-                    ].to_dict()
-                else:
-                    self.logger.warning(
-                        f"No bidding strategies specified for {hp_name}. Using default strategies."
-                    )
-                    unit_params["bidding_strategies"] = {
-                        market.product_type: "simple"
-                        for market in self.markets.values()
-                    }
-
-                if electricity_prices_df is not None:
-                    unit_params["electricity_price"] = electricity_prices_df[
-                        "electricity_price"
-                    ]
-
-                if temperature_df is not None:
-                    unit_params["source_temp"] = temperature_df["source_temperature"]
-                    unit_params["sink_temp"] = temperature_df["sink_temperature"]
-
-                await self.add_unit(
-                    id=hp_name,
-                    unit_type="heatpump",
-                    unit_operator_id=unit_params["unit_operator"],
-                    unit_params=unit_params,
-                )
-
-        self.logger.info("Adding storage units")
-        if storage_units is not None:
-            for storage_name, unit_params in storage_units.iterrows():
-                if (
-                    bidding_strategies_df is not None
-                    and storage_name in bidding_strategies_df.index
-                ):
-                    unit_params["bidding_strategies"] = bidding_strategies_df.loc[
-                        storage_name
-                    ].to_dict()
-                else:
-                    self.logger.warning(
-                        f"No bidding strategies specified for {storage_name}. Using default strategies."
-                    )
-                    unit_params["bidding_strategies"] = {
-                        market.product_type: "simple"
-                        for market in self.markets.values()
-                    }
-
-                unit_params["price_forecast"] = self.forecast_providers[
-                    "EOM"
-                ].price_forecast_df
-
-                await self.add_unit(
-                    id=storage_name,
-                    unit_type="storage",
-                    unit_operator_id=unit_params["unit_operator"],
-                    unit_params=unit_params,
-                )
-
-        # add the demand unit operators and units
-        self.logger.info("Adding demand")
-        for unit_name, unit_params in demand_units.iterrows():
-            if (
-                bidding_strategies_df is not None
-                and unit_name in bidding_strategies_df.index
-            ):
-                unit_params["bidding_strategies"] = bidding_strategies_df.loc[
-                    unit_name
-                ].to_dict()
-            else:
-                self.logger.warning(
-                    f"No bidding strategies specified for {unit_name}. Using default strategies for all markets."
-                )
-                unit_params["bidding_strategies"] = {
-                    market.product_type: "naive" for market in self.markets.values()
-                }
-
-            if demand_df is not None and unit_name in demand_df.columns:
-                unit_params["volume"] = demand_df[unit_name]
-
-            await self.add_unit(
-                id=unit_name,
-                unit_type="demand",
-                unit_operator_id=unit_params["unit_operator"],
-                unit_params=unit_params,
-            )
 
     def add_unit_operator(
         self,
@@ -623,7 +304,11 @@ class World:
         self.clock.set_time(next_activity)
         return delta
 
-    async def run_simulation(self):
+    async def run_async(self):
+        """
+        Run the simulation.
+        """
+
         # agent is implicit added to self.container._agents
 
         start_ts = calendar.timegm(self.start.utctimetuple())
@@ -649,19 +334,5 @@ class World:
 
         logging.info("Simulation finished")
 
-    def load_scenario(
-        self,
-        inputs_path: str,
-        scenario: str,
-        study_case: str,
-    ):
-        return self.loop.run_until_complete(
-            self.async_load_scenario(
-                inputs_path,
-                scenario,
-                study_case,
-            )
-        )
-
     def run(self):
-        return self.loop.run_until_complete(self.run_simulation())
+        return self.loop.run_until_complete(self.run_async())
