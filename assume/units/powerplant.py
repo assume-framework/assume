@@ -17,9 +17,9 @@ class PowerPlant(BaseUnit):
         technology: str,
         bidding_strategies: dict,
         index: pd.DatetimeIndex,
-        max_power: float or pd.Series,
-        min_power: float or pd.Series = 0.0,
-        capacity_factor: float or pd.Series = 1.0,
+        max_power: float,
+        min_power: float = 0.0,
+        availability: pd.Series = None,
         efficiency: float = 1.0,
         fixed_cost: float = 0.0,
         partial_load_eff: bool = False,
@@ -55,7 +55,7 @@ class PowerPlant(BaseUnit):
 
         self.max_power = max_power
         self.min_power = min_power
-        self.capacity_factor = capacity_factor
+        self.availability = availability.to_dict() if availability is not None else 1.0
         self.efficiency = efficiency
         self.partial_load_eff = partial_load_eff
         self.fuel_type = fuel_type
@@ -84,7 +84,9 @@ class PowerPlant(BaseUnit):
             self.ramp_up = max_power
         self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
         self.min_down_time = min_down_time if min_down_time > 0 else 1
-        self.downtime_hot_start = downtime_hot_start
+        self.downtime_hot_start = (
+            downtime_hot_start / self.index.freq.delta.total_seconds() / 3600
+        )
         self.downtime_warm_start = downtime_warm_start
 
         self.fixed_cost = fixed_cost
@@ -125,6 +127,7 @@ class PowerPlant(BaseUnit):
         self.current_down_time = self.min_down_time
 
         self.outputs["energy"] = pd.Series(0.0, index=self.index)
+        self.outputs["energy"].iloc[:1] = self.min_power
         # workaround if market schedules do not match
         # for example neg_reserve is required but market did not bid yet
         # it does set a usage in times where no power is used by the market
@@ -175,10 +178,13 @@ class PowerPlant(BaseUnit):
 
         min_power, max_power = self.calculate_min_max_power(start, end)
 
+        if self.id == "pp_02":
+            logger.debug(f"min_power: {min_power}")
+
         # adjust for ramp down speed
-        min_power = max(-self.ramp_down, min_power)
+        min_power = max(current_power - self.ramp_down, min_power)
         # adjust for ramp up speed
-        max_power = min(self.ramp_up, max_power)
+        max_power = min(current_power + self.ramp_up, max_power)
 
         # adjust min_power if sold negative reserve capacity on control reserve market
         min_power = min_power + self.outputs["capacity_neg"].at[start]
@@ -420,22 +426,16 @@ class PowerPlant(BaseUnit):
     def calculate_min_max_power(self, start: pd.Timestamp, end: pd.Timestamp):
         base_load = self.outputs["energy"][start:end]
         # check if min_power is a series or a float
-        min_power = (
-            self.min_power[start:end].max()
-            if type(self.min_power) is pd.Series
-            else self.min_power
-        )
-        min_delta = min_power - base_load.min()
+        min_power = max(self.min_power, base_load.min())
 
         # check if max_power is a series or a float
         max_power = (
-            self.capacity_factor[start:end].min() * self.max_power
-            if type(self.capacity_factor) is pd.Series
-            else self.capacity_factor * self.max_power
+            self.availability[start] * self.max_power
+            if type(self.availability) is dict
+            else self.max_power
         )
-        max_delta = max_power - base_load.max()
 
-        return min_delta, max_delta
+        return min_power, max_power
 
     def as_dict(self) -> dict:
         unit_dict = super().as_dict()

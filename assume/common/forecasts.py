@@ -25,12 +25,12 @@ class ForecastProvider(Role):
         powerplants: dict[str, pd.Series] = None,
         fuel_prices_df: dict[str, pd.Series] = None,
         demand_df: float or pd.Series = 0.0,
-        vre_cf_df: dict[str, pd.Series] = None,
+        availability: dict[str, pd.Series] = None,
     ):
         if fuel_prices_df is None:
             fuel_prices_df = {}
-        if vre_cf_df is None:
-            vre_cf_df = {}
+        if availability is None:
+            availability = {}
         if powerplants is None:
             powerplants = {}
 
@@ -43,7 +43,7 @@ class ForecastProvider(Role):
         self.fuel_prices_df = fuel_prices_df
         self.powerplants = powerplants
         self.demand_df = demand_df
-        self.vre_cf_df = vre_cf_df
+        self.availability = availability
 
         if self.price_forecast_df is None:
             self.price_forecast_df = self.calculate_price_forecast(
@@ -84,6 +84,10 @@ class ForecastProvider(Role):
             self.powerplants["fuel_type"] != "renewable"
         ].copy()
 
+        vre_powerplants = self.powerplants[
+            self.powerplants["fuel_type"] == "renewable"
+        ].copy()
+
         price_forecast_df = pd.DataFrame(
             columns=["mcp"], index=self.demand_df.index, data=0.0
         )
@@ -96,17 +100,11 @@ class ForecastProvider(Role):
             marginal_costs = marginal_costs.iloc[0].to_dict()
 
         vre_feed_in_df = pd.DataFrame(
-            index=self.demand_df.index, columns=self.vre_cf_df.keys(), data=0.0
+            index=self.demand_df.index, columns=vre_powerplants.index, data=0.0
         )
 
-        for vre in self.vre_cf_df.keys():
-            try:
-                vre_feed_in_df[vre] = (
-                    self.vre_cf_df[vre] * self.powerplants.at[vre, "max_power"]
-                )
-            except KeyError:
-                # no unit with this type
-                vre_feed_in_df[vre] = 0
+        for pp, cf in self.availability.items():
+            vre_feed_in_df[pp] = cf * vre_powerplants.at[pp, "max_power"]
 
         for i in range(len(self.demand_df)):
             pp_df = powerplants.copy()
