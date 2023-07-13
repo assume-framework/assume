@@ -418,7 +418,8 @@ class PowerPlant(BaseUnit):
         return marginal_cost
 
     def calculate_min_max_power(self, start: pd.Timestamp, end: pd.Timestamp):
-        base_load = self.outputs["energy"][start:end]
+        end_excl = end - self.index.freq
+        base_load = self.outputs["energy"][start:end_excl]
         # check if min_power is a series or a float
         min_power = (
             self.min_power[start:end].max()
