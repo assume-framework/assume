@@ -158,12 +158,12 @@ class PowerPlant(BaseUnit):
 
         start, end, only_hours = product_tuple
         start = pd.Timestamp(start)
-        end = pd.Timestamp(end) 
+        end = pd.Timestamp(end)
 
         # check if unit is currently off and cannot be turned on yet
         if self.current_status == 0 and self.current_down_time < self.min_down_time:
             return None
-        
+
         # check if units availability is 0
         if self.availability is not None and self.availability.at[start] == 0:
             return None
