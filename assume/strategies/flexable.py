@@ -154,7 +154,7 @@ class flexablePosCRM(BaseStrategy):
 
         marginal_cost = operational_window["ops"]["pos_reserve"]["cost"]
 
-        # Specific revenue if power was offered on the energy marke
+        # Specific revenue if power was offered on the energy market
         specific_revenue = get_specific_revenue(
             unit=unit,
             marginal_cost=marginal_cost,
