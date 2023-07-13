@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pandas as pd
 import pytest
 
@@ -195,6 +197,68 @@ def test_powerplant_feedback(power_plant_1):
     # now we can bid max_power and need min_power again
     assert operational_window["ops"]["min_power"]["volume"] == 200
     assert operational_window["ops"]["max_power"]["volume"] == 1000
+
+
+def test_powerplant_ramping(power_plant_1):
+    power_plant_1.ramp_down = 100
+    power_plant_1.ramp_up = 200
+    power_plant_1.reset()
+    product_tuple = (
+        datetime(2022, 1, 1, 0),
+        datetime(2022, 1, 1, 1),
+        None,
+    )
+    product_type = "energy"
+
+    operational_window = power_plant_1.calculate_operational_window(
+        product_tuple=product_tuple, product_type=product_type
+    )
+
+    assert operational_window["ops"]["min_power"]["volume"] == 200
+    assert operational_window["ops"]["min_power"]["cost"] == 40
+    assert operational_window["ops"]["max_power"]["volume"] == 200
+    assert operational_window["ops"]["max_power"]["cost"] == 40
+    assert operational_window["ops"]["current_power"]["volume"] == 0
+
+    # min_power gets accepted
+    dispatch_plan = {"total_power": 200}
+    power_plant_1.set_dispatch_plan(
+        dispatch_plan, product_tuple[0], product_tuple[1], product_type
+    )
+
+    # next hour
+    product_tuple = (
+        datetime(2022, 1, 1, 1),
+        datetime(2022, 1, 1, 2),
+        None,
+    )
+
+    operational_window = power_plant_1.calculate_operational_window(
+        product_tuple=product_tuple, product_type=product_type
+    )
+
+    assert operational_window["ops"]["min_power"]["volume"] == 200
+    assert operational_window["ops"]["max_power"]["volume"] == 400
+
+    # accept max_power
+    dispatch_plan = {"total_power": 400}
+    power_plant_1.set_dispatch_plan(
+        dispatch_plan, product_tuple[0], product_tuple[1], product_type
+    )
+
+    # next hour
+    product_tuple = (
+        datetime(2022, 1, 1, 2),
+        datetime(2022, 1, 1, 3),
+        None,
+    )
+
+    operational_window = power_plant_1.calculate_operational_window(
+        product_tuple=product_tuple, product_type=product_type
+    )
+
+    assert operational_window["ops"]["min_power"]["volume"] == 300
+    assert operational_window["ops"]["max_power"]["volume"] == 600
 
 
 if __name__ == "__main__":
