@@ -24,6 +24,10 @@ crm_case_2019:
   start_date: 2018-12-31 20:00
   end_date: 2019-01-21 00:00
   time_step: 1h
+
+  bidding_strategy_params:
+    crm_foresight: 4h
+
   markets_config:
     EOM:
       operator: EOM_operator
@@ -61,7 +65,7 @@ crm_case_2019:
 
     CRM_neg:
       operator: CRM_operator
-      product_type: capacity_pos
+      product_type: capacity_neg
       start_date: 2019-01-01 01:00
       products:
         - duration: 4h
