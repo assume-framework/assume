@@ -22,25 +22,6 @@ freq_map = {
 }
 
 
-def attempt_resample(
-    df: pd.DataFrame,
-    index: pd.DatetimeIndex,
-) -> pd.DataFrame:
-    if len(df.index) > len(index):
-        temp_index = pd.date_range(start=index[0], end=index[-1], periods=len(df))
-        df.index = temp_index
-        df = df.resample(index.freq).mean()
-        logger.info("Resampling successful.")
-        return df
-    elif len(df.index) < len(index):
-        logger.warning(
-            "Index length mismatch. Upsampling not supported. Returning None"
-        )
-        return None
-    else:
-        return df
-
-
 def load_file(
     path: str,
     config: dict,
@@ -60,6 +41,7 @@ def load_file(
             index_col=0,
             encoding="utf-8",
             na_values=["n.a.", "None", "-", "none", "nan"],
+            parse_dates=True,
         )
 
         for col in df:
@@ -72,13 +54,25 @@ def load_file(
             if len(df.index) == 1:
                 return df
 
-            if len(df.index) != len(index):
+            if len(df.index) != len(index) and not isinstance(
+                df.index, pd.DatetimeIndex
+            ):
                 logger.warning(
-                    f"Length of index does not match length of {file_name} dataframe. Attempting to resample."
+                    f"Simulation time line does not match length of {file_name} dataframe and index is not a datetimeindex. Returning None."
                 )
-                df = attempt_resample(df, index)
-            else:
-                df.index = index
+                return None
+
+            df.index.freq = df.index.inferred_freq
+
+            if df.index.freq < index.freq:
+                df = df.resample(index.freq).mean()
+                logger.info(f"Downsampling {file_name} successful.")
+
+            elif df.index.freq > index.freq:
+                logger.warning("Upsampling not implemented yet. Returning None.")
+                return None
+
+            df = df.loc[index]
 
         return df
 
@@ -245,7 +239,7 @@ async def load_scenario_folder_async(
     fuel_prices_df = load_file(
         path=path,
         config=config,
-        file_name="fuel_prices",
+        file_name="fuel_prices_df",
         index=index,
     )
 
@@ -264,10 +258,10 @@ async def load_scenario_folder_async(
         index=index,
     )
 
-    vre_cf_df = load_file(
+    availability = load_file(
         path=path,
         config=config,
-        file_name="vre_cf_df",
+        file_name="availability_df",
         index=index,
     )
 
@@ -279,10 +273,10 @@ async def load_scenario_folder_async(
     )
     cross_border_flows_df
 
-    price_forecast_df = load_file(
+    forecasts_df = load_file(
         path=path,
         config=config,
-        file_name="price_forecasts",
+        file_name="forecasts_df",
         index=index,
     )
 
@@ -325,16 +319,16 @@ async def load_scenario_folder_async(
     logger.info("Adding forecast providers")
     temp = pd.DataFrame()
     for market_id, market_config in world.markets.items():
-        if price_forecast_df is not None and market_id in price_forecast_df.columns:
-            market_price_forecast = price_forecast_df[market_id]
+        if forecasts_df is not None and market_id in forecasts_df.columns:
+            market_price_forecast = forecasts_df[market_id]
         else:
             market_price_forecast = None
 
         forecast_provider = ForecastProvider(
             market_id=market_id,
-            price_forecast_df=market_price_forecast,
+            forecasts_df=market_price_forecast,
             fuel_prices_df=fuel_prices_df,
-            vre_cf_df=vre_cf_df,
+            availability=availability,
             powerplants=powerplant_units,
             demand_df=demand_df[f"demand_{market_id}"],
         )
@@ -344,9 +338,7 @@ async def load_scenario_folder_async(
         forecast_agent.add_role(forecast_provider)
         world.forecast_providers[market_id] = forecast_provider
 
-        temp[market_id] = forecast_provider.price_forecast_df
-
-    temp.to_csv(f"{path}/price_forecasts.csv", index=True)
+        forecast_provider.save_forecasts(path)
 
     # add the unit operators using unique unit operator names in the powerplants csv
     logger.info("Adding unit operators")
@@ -375,9 +367,9 @@ async def load_scenario_folder_async(
     # if vre generation is provided, add them to the vre units
     # if we have RL strategy, add price forecast to unit_params
     def powerplant_callback(unit_name, unit_params):
-        unit_params["price_forecast"] = world.forecast_providers[
-            "EOM"
-        ].price_forecast_df
+        unit_params["price_forecast"] = world.forecast_providers["EOM"].forecasts[
+            "price_forecast"
+        ]
 
         if (
             fuel_prices_df is not None
@@ -386,8 +378,8 @@ async def load_scenario_folder_async(
             unit_params["fuel_price"] = fuel_prices_df[unit_params["fuel_type"]]
             unit_params["co2_price"] = fuel_prices_df["co2"]
 
-        if vre_cf_df is not None and unit_name in vre_cf_df.columns:
-            unit_params["capacity_factor"] = vre_cf_df[unit_name]
+        if availability is not None and unit_name in availability.columns:
+            unit_params["capacity_factor"] = availability[unit_name]
 
         return unit_params
 
@@ -417,9 +409,7 @@ async def load_scenario_folder_async(
     )
 
     def storage_callback(unit_name, unit_params):
-        unit_params["price_forecast"] = world.forecast_providers[
-            "EOM"
-        ].price_forecast_df
+        unit_params["price_forecast"] = world.forecast_providers["EOM"].forecasts_df
 
         return unit_params
 

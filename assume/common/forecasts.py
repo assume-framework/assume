@@ -21,16 +21,16 @@ class ForecastProvider(Role):
     def __init__(
         self,
         market_id: str,
-        price_forecast_df: pd.DataFrame = None,
+        forecasts_df: pd.DataFrame = None,
         powerplants: dict[str, pd.Series] = None,
         fuel_prices_df: dict[str, pd.Series] = None,
         demand_df: float or pd.Series = 0.0,
-        vre_cf_df: dict[str, pd.Series] = None,
+        availability: dict[str, pd.Series] = None,
     ):
         if fuel_prices_df is None:
             fuel_prices_df = {}
-        if vre_cf_df is None:
-            vre_cf_df = {}
+        if availability is None:
+            availability = {}
         if powerplants is None:
             powerplants = {}
 
@@ -39,16 +39,20 @@ class ForecastProvider(Role):
         self.logger = logging.getLogger(__name__)
 
         self.market_id = market_id
-        self.price_forecast_df = price_forecast_df
+        self.forecasts_df = forecasts_df
         self.fuel_prices_df = fuel_prices_df
         self.powerplants = powerplants
         self.demand_df = demand_df
-        self.vre_cf_df = vre_cf_df
+        self.availability = availability
 
-        if self.price_forecast_df is None:
-            self.price_forecast_df = self.calculate_price_forecast(
+        self.forecasts = {}
+        if self.forecasts_df is None:
+            self.forecasts["price_forecast"] = self.calculate_price_forecast(
                 market_id=self.market_id
             )
+        else:
+            for forecast in self.forecasts_df.columns:
+                self.forecasts[forecast] = self.forecasts_df[forecast]
 
     def get_registered_market_participants(self, market_id):
         """
@@ -84,9 +88,11 @@ class ForecastProvider(Role):
             self.powerplants["fuel_type"] != "renewable"
         ].copy()
 
-        price_forecast_df = pd.DataFrame(
-            columns=["mcp"], index=self.demand_df.index, data=0.0
-        )
+        vre_powerplants = self.powerplants[
+            self.powerplants["fuel_type"] == "renewable"
+        ].copy()
+
+        price_forecast = pd.Series(index=self.demand_df.index, data=0.0)
 
         marginal_costs = powerplants.apply(
             self.calculate_marginal_cost, axis=1, fuel_prices=self.fuel_prices_df
@@ -96,17 +102,11 @@ class ForecastProvider(Role):
             marginal_costs = marginal_costs.iloc[0].to_dict()
 
         vre_feed_in_df = pd.DataFrame(
-            index=self.demand_df.index, columns=self.vre_cf_df.keys(), data=0.0
+            index=self.demand_df.index, columns=vre_powerplants.index, data=0.0
         )
 
-        for vre in self.vre_cf_df.keys():
-            try:
-                vre_feed_in_df[vre] = (
-                    self.vre_cf_df[vre] * self.powerplants.at[vre, "max_power"]
-                )
-            except KeyError:
-                # no unit with this type
-                vre_feed_in_df[vre] = 0
+        for pp, cf in self.availability.items():
+            vre_feed_in_df[pp] = cf * vre_powerplants.at[pp, "max_power"]
 
         for i in range(len(self.demand_df)):
             pp_df = powerplants.copy()
@@ -120,9 +120,9 @@ class ForecastProvider(Role):
                 demand=self.demand_df.iat[i],
                 vre_feed_in=vre_feed_in_df.iloc[i].sum(),
             )
-            price_forecast_df["mcp"].iat[i] = mcp
+            price_forecast.iat[i] = mcp
 
-        return price_forecast_df
+        return price_forecast
 
     def calculate_marginal_cost(self, pp_dict, fuel_prices):
         """
@@ -191,3 +191,16 @@ class ForecastProvider(Role):
             ].iat[0]
 
         return mcp
+
+    def save_forecasts(self, path):
+        """
+        Saves the forecasts to a csv file.
+
+        Parameters
+        ----------
+        path : str
+
+        """
+
+        forecast_df = pd.DataFrame(self.forecasts)
+        forecast_df.to_csv(f"{path}/forecasts_df.csv", index=True)
