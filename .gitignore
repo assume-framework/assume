@@ -134,4 +134,5 @@ dmypy.json
 .vscode
 examples/outputs
 examples/local_db/
-validation_runs/
+validation_runs/outputs/
+validation_runs/local_db/

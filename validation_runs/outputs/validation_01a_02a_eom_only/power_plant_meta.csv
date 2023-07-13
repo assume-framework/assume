@@ -1,7 +1,0 @@
-,efficiency,emission_factor,max_power,min_power,simulation,technology,unit_operator
-pp_01,0.3,0.0,1000,500,validation_01a_02a_eom_only,nuclear,operator_1
-pp_02,0.4,0.4,1000,500,validation_01a_02a_eom_only,lignite,operator_2
-pp_03,0.5,0.3,1000,500,validation_01a_02a_eom_only,hard coal,operator_3
-pp_04,0.6,0.2,1000,200,validation_01a_02a_eom_only,combined cycle gas turbine,operator_4
-pp_05,0.3,0.2,1000,200,validation_01a_02a_eom_only,open cycle gas turbine,operator_5
-pp_06,0.3,0.8,3000,1,validation_01a_02a_eom_only,oil,operator_6
