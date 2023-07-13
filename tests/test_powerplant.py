@@ -200,5 +200,3 @@ def test_powerplant_feedback(power_plant_1):
 if __name__ == "__main__":
     # run pytest and enable prints
     pytest.main(["-s", __file__])
-    # run only test_calculate_operational_window test
-    # pytest.main(["-s", __file__,"-k test_calculate_operational_window"])
