@@ -64,7 +64,7 @@ class Demand(BaseUnit):
         start, end, only_hours = product_tuple
         start = pd.Timestamp(start)
         end = pd.Timestamp(end)
-        
+
         """Calculate the operation window for the next time step."""
         bid_volume = (self.volume - self.outputs[product_type]).loc[start:end].max()
 

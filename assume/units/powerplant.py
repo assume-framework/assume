@@ -55,7 +55,7 @@ class PowerPlant(BaseUnit):
 
         self.max_power = max_power
         self.min_power = min_power
-        self.availability = availability.to_dict() if availability is not None else 1.0
+        self.availability = availability.to_dict() if availability is not None else None
         self.efficiency = efficiency
         self.partial_load_eff = partial_load_eff
         self.fuel_type = fuel_type
@@ -84,7 +84,9 @@ class PowerPlant(BaseUnit):
             self.ramp_up = max_power
         self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
         self.min_down_time = min_down_time if min_down_time > 0 else 1
-        self.downtime_hot_start = downtime_hot_start/self.index.freq.delta.total_seconds()/3600
+        self.downtime_hot_start = (
+            downtime_hot_start / self.index.freq.delta.total_seconds() / 3600
+        )
         self.downtime_warm_start = downtime_warm_start
 
         self.fixed_cost = fixed_cost
@@ -155,12 +157,17 @@ class PowerPlant(BaseUnit):
             Dictionary containing the operational window for the next time step.
         """
 
-        if self.current_status == 0 and self.current_down_time < self.min_down_time:
-            return None
-
         start, end, only_hours = product_tuple
         start = pd.Timestamp(start)
         end = pd.Timestamp(end)
+
+        # check if unit is currently off and cannot be turned on yet
+        if self.current_status == 0 and self.current_down_time < self.min_down_time:
+            return None
+
+        # check if units availability is 0
+        if self.availability is not None and self.availability.at[start] == 0:
+            return None
 
         if product_type == "energy":
             return self.calculate_energy_operational_window(start, end)
@@ -180,9 +187,9 @@ class PowerPlant(BaseUnit):
             logger.debug(f"min_power: {min_power}")
 
         # adjust for ramp down speed
-        min_power = max(current_power-self.ramp_down, min_power)
+        min_power = max(current_power - self.ramp_down, min_power)
         # adjust for ramp up speed
-        max_power = min(current_power+self.ramp_up, max_power)
+        max_power = min(current_power + self.ramp_up, max_power)
 
         # adjust min_power if sold negative reserve capacity on control reserve market
         min_power = min_power + self.outputs["capacity_neg"].at[start]
@@ -422,9 +429,10 @@ class PowerPlant(BaseUnit):
         return marginal_cost
 
     def calculate_min_max_power(self, start: pd.Timestamp, end: pd.Timestamp):
-        base_load = self.outputs["energy"][start:end]
+        end_excl = end - self.index.freq
+        base_load = self.outputs["energy"][start:end_excl]
         # check if min_power is a series or a float
-        min_power = max(self.min_power, base_load.min())
+        min_power = self.min_power - base_load.min()
 
         # check if max_power is a series or a float
         max_power = (
@@ -432,6 +440,7 @@ class PowerPlant(BaseUnit):
             if type(self.availability) is dict
             else self.max_power
         )
+        max_power = max_power - base_load.max()
 
         return min_power, max_power
 

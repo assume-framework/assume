@@ -21,20 +21,6 @@ freq_map = {
     "w": rr.WEEKLY,
 }
 
-def attempt_resample(
-    df: pd.DataFrame,
-    index: pd.DatetimeIndex,
-) -> pd.DataFrame:
-    
-    #check if df.index is a datetimeindex
-    if isinstance(df.index, pd.DatetimeIndex):
-        df = df.resample(index.freq).mean()
-        logger.info("Resampling successful.")
-    else:
-        logger.warning("Index is not a datetimeindex. Returning None")
-        return None
-    
-    return df
 
 def load_file(
     path: str,
@@ -68,13 +54,25 @@ def load_file(
             if len(df.index) == 1:
                 return df
 
-            if len(df.index) != len(index):
+            if len(df.index) != len(index) and not isinstance(
+                df.index, pd.DatetimeIndex
+            ):
                 logger.warning(
-                    f"Length of index does not match length of {file_name} dataframe. Attempting to resample."
+                    f"Simulation time line does not match length of {file_name} dataframe and index is not a datetimeindex. Returning None."
                 )
-                df = attempt_resample(df, index)
-            else:
-                df.index = index
+                return None
+
+            df.index.freq = df.index.inferred_freq
+
+            if df.index.freq < index.freq:
+                df = df.resample(index.freq).mean()
+                logger.info(f"Downsampling {file_name} successful.")
+
+            elif df.index.freq > index.freq:
+                logger.warning("Upsampling not implemented yet. Returning None.")
+                return None
+
+            df = df.loc[index]
 
         return df
 
@@ -141,34 +139,28 @@ def make_market_config(
 
 
 async def add_units(
-    dataframe: pd.DataFrame,
+    units_df: pd.DataFrame,
     unit_type: str,
     callback: Callable[[str, dict], dict],
     world: World,
-    bidding_strategies_df: pd.DataFrame,
 ):
     """
     This function adds units to the world from a given dataframe.
     The callback is used to adjust unit_params depending on the unit_type, before adding the unit to the world.
     """
-    if dataframe is None:
+    if units_df is None:
         return
+
     logger.info(f"Adding {unit_type} units")
-    for unit_name, unit_params in dataframe.iterrows():
-        if (
-            bidding_strategies_df is not None
-            and unit_name in bidding_strategies_df.index
-        ):
-            unit_params["bidding_strategies"] = bidding_strategies_df.loc[
-                unit_name
-            ].to_dict()
-        else:
-            logger.warning(
-                f"No bidding strategies specified for {unit_name}. Using default strategies."
-            )
-            unit_params["bidding_strategies"] = {
-                market.product_type: "naive" for market in world.markets.values()
-            }
+
+    units_df = units_df.fillna(0)
+    for unit_name, unit_params in units_df.iterrows():
+        bidding_strategies = {
+            key.split("bidding_")[1]: unit_params[key]
+            for key in unit_params.keys()
+            if key.startswith("bidding_")
+        }
+        unit_params["bidding_strategies"] = bidding_strategies
 
         unit_params = callback(unit_name, unit_params)
 
@@ -238,7 +230,11 @@ async def load_scenario_folder_async(
         file_name="demand_units",
     )
 
-    heatpump_units = load_file(path=path, config=config, file_name="heatpumps")
+    heatpump_units = load_file(
+        path=path,
+        config=config,
+        file_name="heatpump_units",
+    )
 
     fuel_prices_df = load_file(
         path=path,
@@ -269,12 +265,6 @@ async def load_scenario_folder_async(
         file_name="availability_df",
         index=index,
     )
-    if availability is not None:
-        availability /= 20
-
-    bidding_strategies_df = load_file(
-        path=path, config=config, file_name="bidding_strategies"
-    ).fillna(0)
 
     cross_border_flows_df = load_file(
         path=path,
@@ -284,10 +274,10 @@ async def load_scenario_folder_async(
     )
     cross_border_flows_df
 
-    price_forecast_df = load_file(
+    forecasts_df = load_file(
         path=path,
         config=config,
-        file_name="price_forecasts",
+        file_name="forecasts_df",
         index=index,
     )
 
@@ -330,14 +320,14 @@ async def load_scenario_folder_async(
     logger.info("Adding forecast providers")
     temp = pd.DataFrame()
     for market_id, market_config in world.markets.items():
-        if price_forecast_df is not None and market_id in price_forecast_df.columns:
-            market_price_forecast = price_forecast_df[market_id]
+        if forecasts_df is not None and market_id in forecasts_df.columns:
+            market_price_forecast = forecasts_df[market_id]
         else:
             market_price_forecast = None
 
         forecast_provider = ForecastProvider(
             market_id=market_id,
-            price_forecast_df=market_price_forecast,
+            forecasts_df=market_price_forecast,
             fuel_prices_df=fuel_prices_df,
             availability=availability,
             powerplants=powerplant_units,
@@ -349,9 +339,7 @@ async def load_scenario_folder_async(
         forecast_agent.add_role(forecast_provider)
         world.forecast_providers[market_id] = forecast_provider
 
-        temp[market_id] = forecast_provider.price_forecast_df
-
-    temp.to_csv(f"{path}/price_forecasts.csv", index=True)
+        forecast_provider.save_forecasts(path)
 
     # add the unit operators using unique unit operator names in the powerplants csv
     logger.info("Adding unit operators")
@@ -359,14 +347,17 @@ async def load_scenario_folder_async(
         [
             powerplant_units.unit_operator.unique(),
             demand_units.unit_operator.unique(),
-            # heatpump_units.unit_operator.unique(),
-            # storage_units.unit_operator.unique(),
         ]
     )
 
     if storage_units is not None:
         all_operators = np.concatenate(
             [all_operators, storage_units.unit_operator.unique()]
+        )
+
+    if heatpump_units is not None:
+        all_operators = np.concatenate(
+            [all_operators, heatpump_units.unit_operator.unique()]
         )
 
     for company_name in set(all_operators):
@@ -377,10 +368,9 @@ async def load_scenario_folder_async(
     # if vre generation is provided, add them to the vre units
     # if we have RL strategy, add price forecast to unit_params
     def powerplant_callback(unit_name, unit_params):
-        # check if we have RL bidding strategy
-        unit_params["price_forecast"] = world.forecast_providers[
-            "EOM"
-        ].price_forecast_df
+        unit_params["price_forecast"] = world.forecast_providers["EOM"].forecasts[
+            "price_forecast"
+        ]
 
         if (
             fuel_prices_df is not None
@@ -391,6 +381,7 @@ async def load_scenario_folder_async(
 
         if availability is not None and unit_name in availability.columns:
             unit_params["capacity_factor"] = availability[unit_name]
+
         return unit_params
 
     await add_units(
@@ -398,7 +389,6 @@ async def load_scenario_folder_async(
         "power_plant",
         powerplant_callback,
         world,
-        bidding_strategies_df,
     )
 
     def heatpump_callback(unit_name, unit_params):
@@ -413,26 +403,35 @@ async def load_scenario_folder_async(
         return unit_params
 
     await add_units(
-        heatpump_units, "heatpump", heatpump_callback, world, bidding_strategies_df
+        heatpump_units,
+        "heatpump",
+        heatpump_callback,
+        world,
     )
 
     def storage_callback(unit_name, unit_params):
-        unit_params["price_forecast"] = world.forecast_providers[
-            "EOM"
-        ].price_forecast_df
+        unit_params["price_forecast"] = world.forecast_providers["EOM"].forecasts_df
+
         return unit_params
 
     await add_units(
-        storage_units, "storage", storage_callback, world, bidding_strategies_df
+        storage_units,
+        "storage",
+        storage_callback,
+        world,
     )
 
     def demand_callback(unit_name, unit_params):
         if demand_df is not None and unit_name in demand_df.columns:
             unit_params["volume"] = demand_df[unit_name]
+
         return unit_params
 
     await add_units(
-        demand_units, "demand", demand_callback, world, bidding_strategies_df
+        demand_units,
+        "demand",
+        demand_callback,
+        world,
     )
 
 

@@ -1,0 +1,5 @@
+name,technology,fuel_type,emission_factor,max_power,min_power,efficiency,unit_operator,bidding_energy,bidding_capacity
+KKW ISAR 2,nuclear,uranium,0.0,1485.0,590.0,0.33,UNIPER,flexable_eom,naive
+NEURATH F,lignite,lignite,0.406,1120.0,560.0,0.434,RWE POWER AG,flexable_eom,naive
+GKM 9,hard coal,hard coal,0.335,911.0,370.0,0.454,GROSSKRAFTWERK MANNHEIM AG,flexable_eom,naive
+IRSCHING 5,combined cycle gas turbine,natural gas,0.201,860.0,350.0,0.597,UNIPER,flexable_eom,naive

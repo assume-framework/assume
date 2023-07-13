@@ -136,3 +136,4 @@ examples/outputs
 examples/local_db/
 validation_runs/outputs/
 validation_runs/local_db/
+validation_runs
