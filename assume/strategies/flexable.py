@@ -255,10 +255,6 @@ def get_specific_revenue(
     else:
         price_forecast = unit.price_forecast.loc[t : t + foresight]
 
-    price_forecast = price_forecast.values
-
-    possible_revenue = sum(
-        market_price - marginal_cost for market_price in price_forecast
-    )
+    possible_revenue = (price_forecast - marginal_cost).sum()
 
     return possible_revenue

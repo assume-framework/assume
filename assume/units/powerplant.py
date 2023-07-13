@@ -178,9 +178,6 @@ class PowerPlant(BaseUnit):
 
         min_power, max_power = self.calculate_min_max_power(start, end)
 
-        if self.id == "pp_02":
-            logger.debug(f"min_power: {min_power}")
-
         # adjust for ramp down speed
         min_power = max(current_power - self.ramp_down, min_power)
         # adjust for ramp up speed
