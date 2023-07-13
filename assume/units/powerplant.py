@@ -127,7 +127,6 @@ class PowerPlant(BaseUnit):
         self.current_down_time = self.min_down_time
 
         self.outputs["energy"] = pd.Series(0.0, index=self.index)
-        self.outputs["energy"].iloc[:1] = self.min_power
         # workaround if market schedules do not match
         # for example neg_reserve is required but market did not bid yet
         # it does set a usage in times where no power is used by the market
@@ -421,9 +420,10 @@ class PowerPlant(BaseUnit):
         return marginal_cost
 
     def calculate_min_max_power(self, start: pd.Timestamp, end: pd.Timestamp):
-        base_load = self.outputs["energy"][start:end]
+        end_excl = end - self.index.freq
+        base_load = self.outputs["energy"][start:end_excl]
         # check if min_power is a series or a float
-        min_power = max(self.min_power, base_load.min())
+        min_power = self.min_power - base_load.min()
 
         # check if max_power is a series or a float
         max_power = (
@@ -431,6 +431,7 @@ class PowerPlant(BaseUnit):
             if type(self.availability) is dict
             else self.max_power
         )
+        max_power = max_power - base_load.max()
 
         return min_power, max_power
 
