@@ -55,7 +55,7 @@ class PowerPlant(BaseUnit):
 
         self.max_power = max_power
         self.min_power = min_power
-        self.availability = availability.to_dict() if availability is not None else 1.0
+        self.availability = availability.to_dict() if availability is not None else None
         self.efficiency = efficiency
         self.partial_load_eff = partial_load_eff
         self.fuel_type = fuel_type
@@ -156,12 +156,17 @@ class PowerPlant(BaseUnit):
             Dictionary containing the operational window for the next time step.
         """
 
-        if self.current_status == 0 and self.current_down_time < self.min_down_time:
-            return None
-
         start, end, only_hours = product_tuple
         start = pd.Timestamp(start)
-        end = pd.Timestamp(end)
+        end = pd.Timestamp(end) 
+
+        # check if unit is currently off and cannot be turned on yet
+        if self.current_status == 0 and self.current_down_time < self.min_down_time:
+            return None
+        
+        # check if units availability is 0
+        if self.availability is not None and self.availability.at[start] == 0:
+            return None
 
         if product_type == "energy":
             return self.calculate_energy_operational_window(start, end)
