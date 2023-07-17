@@ -33,21 +33,28 @@ class ForecastProvider(Role):
         self.availability = availability
 
         self.forecasts = {}
-        
-        if self.forecasts_df is not None and "price_forecast" in self.forecasts_df.columns:
+
+        if (
+            self.forecasts_df is not None
+            and "price_forecast" in self.forecasts_df.columns
+        ):
             self.forecasts["price_forecast"] = self.forecasts_df["price_forecast"]
         else:
             self.forecasts["price_forecast"] = self.calculate_price_forecast(
                 market_id=self.market_id
             )
-        
-        if self.forecasts_df is not None and "residual_load_forecast" in self.forecasts_df.columns:
-            self.forecasts["residual_load_forecast"] = self.forecasts_df["residual_load_forecast"]
+
+        if (
+            self.forecasts_df is not None
+            and "residual_load_forecast" in self.forecasts_df.columns
+        ):
+            self.forecasts["residual_load_forecast"] = self.forecasts_df[
+                "residual_load_forecast"
+            ]
         else:
             self.forecasts[
                 "residual_load_forecast"
             ] = self.calculate_residual_demand_forecast(market_id=self.market_id)
-        
 
     def get_registered_market_participants(self, market_id):
         """
@@ -62,7 +69,9 @@ class ForecastProvider(Role):
 
     def calculate_residual_demand_forecast(self, market_id):
         if market_id == "EOM":
-            vre_powerplants = self.powerplants[self.powerplants["fuel_type"] == "renewable"].copy()
+            vre_powerplants = self.powerplants[
+                self.powerplants["fuel_type"] == "renewable"
+            ].copy()
 
             vre_feed_in_df = pd.DataFrame(
                 index=self.demand_df.index, columns=vre_powerplants.index, data=0.0

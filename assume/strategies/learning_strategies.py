@@ -1,11 +1,11 @@
+import numpy as np
 import pandas as pd
 import torch as th
-import numpy as np
 
+from assume.common.learning_utils import Actor, NormalActionNoise
 from assume.common.market_objects import MarketConfig
 from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
 from assume.units.base_unit import BaseUnit
-from assume.common.learning_utils import NormalActionNoise, Actor
 
 
 class RLStrategy(BaseStrategy):
@@ -84,11 +84,10 @@ class RLStrategy(BaseStrategy):
         bid_quantity_flex, bid_price_flex = 0, 0
 
         if operational_window is not None:
-
             # =============================================================================
             # Calculate bid-prices from action output of RL strategies
             # Calculating possible bid amount
-            # artificially force inflex_bid to be the smaller price 
+            # artificially force inflex_bid to be the smaller price
             # =============================================================================
 
             bid_prices = self.get_actions(
@@ -113,7 +112,6 @@ class RLStrategy(BaseStrategy):
                     - bid_quantity_inflex
                 )
                 bid_price_flex = max(bid_prices)
-                
 
         bids = [
             {"price": bid_price_inflex, "volume": bid_quantity_inflex},
@@ -121,7 +119,7 @@ class RLStrategy(BaseStrategy):
         ]
 
         return bids
-    
+
     def get_actions(self, unit, data_dict: dict, operational_window):
         self.curr_obs = self.create_obs(unit, data_dict, operational_window)
 
@@ -153,7 +151,6 @@ class RLStrategy(BaseStrategy):
         self.curr_action = self.curr_action.clamp(-1, 1)
 
         return self.curr_action
-
 
     def create_obs(
         self,
@@ -256,4 +253,3 @@ class RLStrategy(BaseStrategy):
             self.curr_action,
             self.curr_reward,
         ]
-

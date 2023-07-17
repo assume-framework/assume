@@ -297,7 +297,9 @@ async def load_scenario_folder_async(
             "load_learned_path"
         ] = f"{inputs_path}/'learned_strategies'/{sim_id}/"
 
-    await world.setup(start, end, save_frequency_hours, sim_id, bidding_strategy_params, index)
+    await world.setup(
+        start, end, save_frequency_hours, sim_id, bidding_strategy_params, index
+    )
 
     # get the market config from the config file and add the markets
     logger.info("Adding markets")
@@ -368,7 +370,7 @@ async def load_scenario_folder_async(
         unit_operator.context.data_dict[
             "res_demand_forecast"
         ] = world.forecast_providers["EOM"].forecasts["residual_load_forecast"]
-    
+
     for company_name in set(all_operators):
         world.add_unit_operator(id=str(company_name))
         unit_operator_callback(world.unit_operators[company_name])

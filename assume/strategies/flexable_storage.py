@@ -5,6 +5,7 @@ from assume.common.market_objects import MarketConfig
 from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
 from assume.units.base_unit import BaseUnit
 
+
 class flexableEOMStorage(BaseStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
