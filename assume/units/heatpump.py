@@ -1,7 +1,5 @@
-import numpy as np
 import pandas as pd
 
-from assume.strategies import BaseStrategy, OperationalWindow
 from assume.units.base_unit import BaseUnit
 
 

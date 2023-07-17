@@ -1,20 +1,7 @@
 import logging
-from itertools import groupby
 
 import pandas as pd
 from mango import Role
-from mango.messages.message import Performatives
-
-from assume.common.market_objects import (
-    ClearingMessage,
-    MarketConfig,
-    OpeningMessage,
-    Order,
-    Orderbook,
-)
-from assume.common.utils import aggregate_step_amount
-from assume.strategies import BaseStrategy
-from assume.units import BaseUnit
 
 
 class ForecastProvider(Role):
