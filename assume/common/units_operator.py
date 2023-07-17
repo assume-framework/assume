@@ -214,7 +214,11 @@ class UnitsOperator(Role):
         products = opening["products"]
         market = self.registered_markets[opening["market_id"]]
         logger.debug(f"{self.id} setting bids for {market.name} - {products}")
-        orderbook = await self.formulate_bids(market, products)
+        orderbook = await self.formulate_bids(
+            market=market,
+            products=products,
+            data_dict=self.context.data_dict,
+        )
         acl_metadata = {
             "performative": Performatives.inform,
             "sender_id": self.context.aid,
@@ -232,7 +236,12 @@ class UnitsOperator(Role):
             acl_metadata=acl_metadata,
         )
 
-    async def formulate_bids(self, market: MarketConfig, products: list[tuple]):
+    async def formulate_bids(
+        self,
+        market: MarketConfig,
+        products: list[tuple],
+        data_dict: dict,
+    ):
         """
         Takes information from all units that the unit operator manages and
         formulates the bid to the market from that according to the bidding strategy.
@@ -267,16 +276,18 @@ class UnitsOperator(Role):
                     "agent_id": (self.context.addr, self.context.aid),
                 }
 
-                for unit_id, unit in self.units.items():
-                    # take price from bidding strategy
-                    bids = unit.calculate_bids(
+                bids = {
+                    unit_id: unit.calculate_bids(
                         market_config=market,
                         product_tuple=product,
+                        data_dict=data_dict,
                     )
+                    for unit_id, unit in self.units.items()
+                }
 
+                for unit_id, bids in bids.items():
                     if bids is None:
                         continue
-
                     for i, bid in enumerate(bids):
                         price = bid["price"]
                         volume = bid["volume"]

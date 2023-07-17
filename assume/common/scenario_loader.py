@@ -291,10 +291,13 @@ async def load_scenario_folder_async(
     save_frequency_hours = config.get("save_frequency_hours", None)
     sim_id = f"{scenario}_{study_case}"
 
-    bidding_params = config.get("bidding_strategy_params", {})
-    await world.setup(start, end, save_frequency_hours, sim_id, bidding_params, index)
+    bidding_strategy_params = config.get("bidding_strategy_params", {})
+    if "load_learned_path" not in bidding_strategy_params:
+        bidding_strategy_params[
+            "load_learned_path"
+        ] = f"{inputs_path}/'learned_strategies'/{sim_id}/"
 
-    # add Agents to world
+    await world.setup(start, end, save_frequency_hours, sim_id, bidding_strategy_params, index)
 
     # get the market config from the config file and add the markets
     logger.info("Adding markets")
@@ -317,7 +320,6 @@ async def load_scenario_folder_async(
 
     # add forecast providers for each market
     logger.info("Adding forecast providers")
-    temp = pd.DataFrame()
     for market_id, market_config in world.markets.items():
         if forecasts_df is not None and market_id in forecasts_df.columns:
             market_price_forecast = forecasts_df[market_id]
@@ -359,8 +361,17 @@ async def load_scenario_folder_async(
             [all_operators, heatpump_units.unit_operator.unique()]
         )
 
+    def unit_operator_callback(unit_operator):
+        unit_operator.context.data_dict["price_forecast"] = world.forecast_providers[
+            "EOM"
+        ].forecasts["price_forecast"]
+        unit_operator.context.data_dict[
+            "res_demand_forecast"
+        ] = world.forecast_providers["EOM"].forecasts["residual_load_forecast"]
+    
     for company_name in set(all_operators):
         world.add_unit_operator(id=str(company_name))
+        unit_operator_callback(world.unit_operators[company_name])
 
     # add the units to corresponsing unit operators
     # if fuel prices are provided, add them to the unit params

@@ -58,6 +58,7 @@ class BaseUnit:
         self,
         market_config,
         product_tuple,
+        data_dict,
     ):
         """Calculate the bids for the next time step."""
 
@@ -78,6 +79,7 @@ class BaseUnit:
             unit=self,
             operational_window=operational_window,
             market_config=market_config,
+            data_dict=data_dict,
         )
 
     def set_dispatch_plan(

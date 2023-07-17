@@ -335,16 +335,6 @@ class Storage(BaseUnit):
 
         return operational_window
 
-    def calculate_bids(
-        self,
-        market_config,
-        product_tuple,
-    ):
-        return super().calculate_bids(
-            market_config=market_config,
-            product_tuple=product_tuple,
-        )
-
     def set_dispatch_plan(
         self,
         dispatch_plan: dict,

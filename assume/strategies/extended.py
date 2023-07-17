@@ -10,9 +10,10 @@ class OTCStrategy(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: BaseUnit = None,
-        market_config: MarketConfig = None,
-        operational_window: OperationalWindow = None,
+        unit: BaseUnit,
+        operational_window: OperationalWindow,
+        market_config: MarketConfig,
+        **kwargs,
     ):
         """
         Takes information from a unit that the unit operator manages and

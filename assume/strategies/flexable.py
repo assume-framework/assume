@@ -18,6 +18,7 @@ class flexableEOM(BaseStrategy):
         unit: BaseUnit,
         operational_window: OperationalWindow,
         market_config: MarketConfig,
+        **kwargs,
     ):
         bid_quantity_inflex, bid_price_inflex = 0, 0
         bid_quantity_flex, bid_price_flex = 0, 0

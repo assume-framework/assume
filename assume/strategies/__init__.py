@@ -7,4 +7,4 @@ from assume.strategies.naive_strategies import (
     NaivePosReserveStrategy,
     NaiveStrategy,
 )
-from assume.strategies.rl_strategies import RLStrategy
+from assume.strategies.learning_strategies import RLStrategy

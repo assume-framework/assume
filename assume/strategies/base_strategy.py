@@ -26,6 +26,7 @@ class BaseStrategy:
     """
 
     def __init__(self, *args, **kwargs):
+        is_learning_strategy = False
         pass
 
     def calculate_bids(

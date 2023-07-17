@@ -3,8 +3,7 @@ import pandas as pd
 
 from assume.common.market_objects import MarketConfig
 from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
-from assume.units.storage import Storage
-
+from assume.units.base_unit import BaseUnit
 
 class flexableEOMStorage(BaseStrategy):
     def __init__(self, *args, **kwargs):
@@ -14,9 +13,10 @@ class flexableEOMStorage(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: Storage,
+        unit: BaseUnit,
         operational_window: OperationalWindow,
         market_config: MarketConfig,
+        **kwargs,
     ):
         """
         Takes information from a unit that the unit operator manages and
@@ -77,8 +77,9 @@ class flexableCRMStorage(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: Storage,
+        unit: BaseUnit,
         operational_window: OperationalWindow,
         market_config: MarketConfig,
+        **kwargs,
     ):
         pass

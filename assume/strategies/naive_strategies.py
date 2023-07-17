@@ -13,6 +13,7 @@ class NaiveStrategy(BaseStrategy):
         unit: BaseUnit,
         operational_window: OperationalWindow,
         market_config: MarketConfig,
+        **kwargs,
     ):
         """
         Takes information from a unit that the unit operator manages and
@@ -35,6 +36,7 @@ class NaivePosReserveStrategy(BaseStrategy):
         unit: BaseUnit,
         operational_window: OperationalWindow,
         market_config: MarketConfig,
+        **kwargs,
     ):
         """
         Takes information from a unit that the unit operator manages and
@@ -57,6 +59,7 @@ class NaiveNegReserveStrategy(BaseStrategy):
         unit: BaseUnit,
         operational_window: OperationalWindow,
         market_config: MarketConfig,
+        **kwargs,
     ):
         """
         Takes information from a unit that the unit operator manages and
