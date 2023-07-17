@@ -76,8 +76,7 @@ class flexablePosCRMStorage(BaseStrategy):
         operational_window: OperationalWindow,
         market_config: MarketConfig,
     ):
-        start = operational_window["window"][0]
-        end = operational_window["window"][1]
+        self.current_time = operational_window["window"][0]
         
         bid_quantity = operational_window["ops"]["pos_reserve"]["volume"]
         if bid_quantity == 0:
@@ -85,38 +84,18 @@ class flexablePosCRMStorage(BaseStrategy):
         
         marginal_cost = operational_window["ops"]["pos_reserve"]["cost"]
 
-        duration = (end - start).total_seconds() / 3600
+        specific_revenue = get_specific_revenue(
+            unit=unit,
+            marginal_cost=marginal_cost,
+            current_time=self.current_time,
+            foresight=self.foresight,
+        )
+        if specific_revenue >= 0:
+            capacity_price = specific_revenue
+        else:
+            capacity_price = abs(specific_revenue) * unit.min_power_discharge / bid_quantity
         
-        SOC_theoretical = unit.current_SOC
-        revenue_theoretical = []
-
-        for tick in pd.date_range(start, end-pd.Timedelta('1h'), freq='h'):
-            
-            average_price = calculate_price_average(unit, tick, self.foresight)
-            operational_window_theoretical = unit.calculate_pos_reserve_operational_window(
-                start=tick,
-                end=pd.Timestamp(tick+pd.Timedelta(duration, 'h'))
-            )
-            bid_quantity_theoretical = operational_window_theoretical["ops"]["pos_reserve"]["volume"]
-   
-            if (
-                unit.price_forecast[tick] >= average_price / unit.efficiency_discharge
-            ) and (bid_quantity_theoretical > 0):
-                # place bid to discharge
-                SOC_theoretical -= bid_quantity_theoretical / unit.efficiency_discharge
-                revenue_theoretical.append(unit.price_forecast[tick] * bid_quantity_theoretical)
-
-        capacity_price = abs(sum(revenue_theoretical))
-        #TODO compare to flexable: energyPrice = -self.dictEnergyCost[self.world.currstep] / self.dictSOC[t]
-        '''
-        with 
-        self.dictEnergyCost[self.world.currstep + 1] = (self.dictEnergyCost[self.world.currstep] 
-                                                                + self.dictCapacity[self.world.currstep] 
-                                                                * self.world.PFC[self.world.currstep] * self.world.dt) 
-        and dictCapacity aggregted bid.confirmedAmount
-        whats the difference to capacity_price?
-        '''
-        energy_price = -marginal_cost / unit.current_SOC
+        energy_price = capacity_price / unit.current_SOC
 
         if market_config.product_type == "capacity_pos":
             bids = [
@@ -153,7 +132,7 @@ class flexableNegCRMStorage(BaseStrategy):
         bid_quantity = operational_window["ops"]["neg_reserve"]["volume"]
         if bid_quantity == 0:
             return []
-        #if bid_quantity >= min_bid_neg_CRM   
+        #if bid_quantity >= min_bid_volume  
 
         if market_config.product_type == "capacity_neg":
             bids = [
@@ -179,6 +158,34 @@ def calculate_price_average(unit, current_time, foresight):
     )
 
     return average_price
+
+def get_specific_revenue(
+    unit,
+    marginal_cost,
+    current_time,
+    foresight,
+):
+    t = current_time
+    price_forecast = []
+
+    if t + foresight > unit.price_forecast.index[-1]:
+        price_forecast = unit.price_forecast.loc[t:]
+    else:
+        price_forecast = unit.price_forecast.loc[t : t + foresight]
+
+    possible_revenue = 0
+    theoretic_SOC = unit.current_SOC
+    for market_price in price_forecast:
+        theoretic_power_discharge = min(max(theoretic_SOC-unit.min_SOC, 0), 
+                                                                 unit.max_power_discharge)
+        possible_revenue += (market_price - marginal_cost) * theoretic_power_discharge
+        theoretic_SOC -= theoretic_power_discharge
+
+    if unit.current_SOC - theoretic_SOC != 0:
+        possible_revenue = possible_revenue / (unit.current_SOC - theoretic_SOC)
+    
+
+    return possible_revenue
 
     """
     def calculatingBidPricesSTO_CRM(self, t):

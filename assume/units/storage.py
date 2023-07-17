@@ -225,6 +225,7 @@ class Storage(BaseUnit):
     def calculate_energy_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
+        end_excl = end - self.index.freq
         duration = (end - start).total_seconds() / 3600
 
         if self.current_status == 0 and self.current_down_time < self.min_down_time:
@@ -260,10 +261,10 @@ class Storage(BaseUnit):
         )
 
         min_power_discharge = min_max_power["min_power_discharge"]
-        max_power_discharge = min_max_power["max_power_discharge"]-self.outputs["pos_capacity"].at[start]#loc[start:end_excl].max()
+        max_power_discharge = min_max_power["max_power_discharge"]-self.outputs["pos_capacity"].loc[start:end_excl].max()
         min_power_discharge = min(min_power_discharge, max(0, max_power_discharge))
         min_power_charge = min_max_power["min_power_charge"]
-        max_power_charge = min_max_power["max_power_charge"]+self.outputs["neg_capacity"].at[start]
+        max_power_charge = min_max_power["max_power_charge"]+self.outputs["neg_capacity"].loc[start:end_excl].min()
         min_power_charge = max(min_power_charge, min(0, max_power_charge))
 
         operational_window = {
@@ -318,6 +319,7 @@ class Storage(BaseUnit):
     def calculate_pos_reserve_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
+        end_excl = end - self.index.freq
         duration = (end - start).total_seconds() / 3600
         # capacity calculation has to be added
         current_power_discharge = (
@@ -347,12 +349,15 @@ class Storage(BaseUnit):
             duration=duration,
         )
         #check eom bidding
+        max_power_discharge = (min_max_power["max_power_discharge"] 
+                               - self.outputs["energy"].loc[start:end_excl].max()
+                               )
 
         operational_window = {
             "window": (start, end),
             "ops": {
                 "pos_reserve": {
-                    "volume": min_max_power["max_power_discharge"],
+                    "volume": max_power_discharge,
                     "cost": self.calc_marginal_cost(
                         timestep=start,
                         discharge=True,
@@ -367,6 +372,7 @@ class Storage(BaseUnit):
     def calculate_neg_reserve_operational_window(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> dict:
+        end_excl = end - self.index.freq
         duration = (end - start).total_seconds() / 3600
         # capacity calculation has to be added
         current_power_discharge = (
@@ -396,11 +402,13 @@ class Storage(BaseUnit):
             duration=duration,
         )
         #check eom market
+        max_power_charge = (min_max_power["max_power_charge"] 
+                            - self.outputs["energy"].loc[start:end_excl].min())
         operational_window = {
             "window": (start, end),
             "ops": {
                 "neg_reserve": {
-                    "volume": min_max_power["max_power_charge"],
+                    "volume": max_power_charge,
                     "cost": self.calc_marginal_cost(
                         timestep=start,
                         discharge=True,
@@ -428,11 +436,7 @@ class Storage(BaseUnit):
             end: pd.Timestamp
         ):
         end_excl = end - self.index.freq
-        # TODO check if resulting power is < max_power
-        # if self.outputs["energy"][start:end].max() > self.max_power:
-        #     max_pow = self.outputs["energy"][start:end].max()
-        #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")  
-        
+ 
         for t in self.outputs["energy"][start:end].index:
         #for t in pd.date_range(start = start, end=end_excl,freq=self.index.freq):
             if self.outputs["energy"][t] > self.max_power_discharge:
