@@ -238,12 +238,17 @@ class Storage(BaseUnit):
             self.get_output_before(start) if self.get_output_before(start) < 0 else 0
         )
 
-        min_SOC = (
-            self.min_SOC[start] if type(self.min_SOC) is pd.Series else self.min_SOC
-        )
         max_SOC = (
             self.max_SOC[start] if type(self.max_SOC) is pd.Series else self.max_SOC
         )
+        max_SOC -= sum(self.outputs["pos_capacity"][start:])
+        max_SOC = max(0, max_SOC)
+
+        min_SOC = (
+            self.min_SOC[start] if type(self.min_SOC) is pd.Series else self.min_SOC
+        )
+        min_SOC -= sum(self.outputs["neg_capacity"][start:])
+        min_SOC = min(max(0, min_SOC), max_SOC)
 
         min_max_power = self.calculate_min_max_power(
             start=start,
@@ -253,6 +258,13 @@ class Storage(BaseUnit):
             max_SOC=max_SOC,
             duration=duration,
         )
+
+        min_power_discharge = min_max_power["min_power_discharge"]
+        max_power_discharge = min_max_power["max_power_discharge"]-self.outputs["pos_capacity"].at[start]#loc[start:end_excl].max()
+        min_power_discharge = min(min_power_discharge, max(0, max_power_discharge))
+        min_power_charge = min_max_power["min_power_charge"]
+        max_power_charge = min_max_power["max_power_charge"]+self.outputs["neg_capacity"].at[start]
+        min_power_charge = max(min_power_charge, min(0, max_power_charge))
 
         operational_window = {
             "window": (start, end),
@@ -272,28 +284,28 @@ class Storage(BaseUnit):
                     ),
                 },
                 "min_power_discharge": {
-                    "volume": min_max_power["min_power_discharge"],
+                    "volume": min_power_discharge,
                     "cost": self.calc_marginal_cost(
                         timestep=start,
                         discharge=True,
                     ),
                 },
                 "max_power_discharge": {
-                    "volume": min_max_power["max_power_discharge"]-self.outputs["pos_capacity"].at[start],
+                    "volume": max_power_discharge,
                     "cost": self.calc_marginal_cost(
                         timestep=start,
                         discharge=True,
                     ),
                 },
                 "min_power_charge": {
-                    "volume": min_max_power["min_power_charge"],
+                    "volume": min_power_charge,
                     "cost": self.calc_marginal_cost(
                         timestep=start,
                         discharge=False,
                     ),
                 },
                 "max_power_charge": {
-                    "volume": min_max_power["max_power_charge"]-self.outputs["neg_capacity"].at[start],
+                    "volume": max_power_charge,
                     "cost": self.calc_marginal_cost(
                         timestep=start,
                         discharge=False,
@@ -334,6 +346,7 @@ class Storage(BaseUnit):
             max_SOC=max_SOC,
             duration=duration,
         )
+        #check eom bidding
 
         operational_window = {
             "window": (start, end),
@@ -382,7 +395,7 @@ class Storage(BaseUnit):
             max_SOC=max_SOC,
             duration=duration,
         )
-
+        #check eom market
         operational_window = {
             "window": (start, end),
             "ops": {
@@ -408,72 +421,79 @@ class Storage(BaseUnit):
             product_tuple=product_tuple,
         )
 
-    def set_dispatch_plan(
-        self,
-        dispatch_plan: dict,
-        start: pd.Timestamp,
-        end: pd.Timestamp,
-        product_type: str,
-    ):
+       
+    def execute_current_dispatch(
+            self, 
+            start: pd.Timestamp, 
+            end: pd.Timestamp
+        ):
         end_excl = end - self.index.freq
-
-        # TODO checks should be at execute_current_dispatch - see powerplant
         # TODO check if resulting power is < max_power
         # if self.outputs["energy"][start:end].max() > self.max_power:
         #     max_pow = self.outputs["energy"][start:end].max()
-        #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")
+        #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")  
+        
+        for t in self.outputs["energy"][start:end].index:
+        #for t in pd.date_range(start = start, end=end_excl,freq=self.index.freq):
+            if self.outputs["energy"][t] > self.max_power_discharge:
+                self.outputs["energy"][t] = self.max_power_discharge
+                #self.set_market_failure(start, end_excl)
+                logger.error(f"The energy dispatched is greater the maximum power to discharge")
+            elif self.outputs["energy"][t] < self.max_power_charge:
+                self.outputs["energy"][t] = self.max_power_charge
+                logger.error(f"The energy dispatched is greater than the maximum power to charge")
 
-        if product_type == "energy":
-            self.set_energy_dispatch_plan(
-                dispatch_plan=dispatch_plan,
-                start=start,
-                end=end,
+            elif (self.outputs["energy"][t] < self.min_power_discharge
+                and
+                self.outputs["energy"][t] > self.min_power_charge):
+                self.set_market_failure(start, end_excl)
+                logger.error(f"The energy dispatched is between min_power_charge and min_power_discharge")
+                return self.outputs["energy"].loc[start:end_excl]
+            #discharging
+            elif self.outputs["energy"][t] > 0:
+                if (self.current_SOC - (self.outputs["energy"][t] 
+                                        * pd.Timedelta(self.index.freq).total_seconds()/3600 
+                                        / self.efficiency_discharge)
+                                        < self.min_SOC):
+                    self.set_market_failure(start, end_excl)
+                    logger.error(f'The energy dispatched exceeds the minimum SOC.')
+                    return self.outputs["energy"].loc[start:end_excl]
+                else:
+                    self.current_SOC -= (self.outputs["energy"][t] 
+                                        * pd.Timedelta(self.index.freq).total_seconds()/3600 
+                                        / self.efficiency_discharge)
+                    self.set_market_sucess()
+            #charging
+            elif self.outputs["energy"][t] < 0:
+                if (self.current_SOC - (self.outputs["energy"][t] 
+                                        * pd.Timedelta(self.index.freq).total_seconds()/3600 
+                                        * self.efficiency_charge) 
+                                        > self.max_SOC):
+                    self.set_market_failure(start, end_excl)
+                    logger.error(f'The energy dispatched exceeds the maximum SOC.')
+                else:
+                    self.current_SOC -= (self.outputs["energy"][t] 
+                                        * pd.Timedelta(self.index.freq).total_seconds()/3600 
+                                        * self.efficiency_charge)
+                    self.set_market_sucess()
+
+        return self.outputs["energy"].loc[start:end_excl]
+
+    def set_market_failure(self, start, end_excl):
+        self.outputs["energy"].loc[start:end_excl] = 0
+        self.current_status = 0
+        self.current_down_time += 1
+        if self.market_success_list[-1] != 0:
+            self.mean_market_success = sum(self.market_success_list) / len(
+                self.market_success_list
             )
-        elif product_type in {"capacity_pos", "capacity_neg"}:
-            self.outputs[product_type].loc[start:end_excl] += dispatch_plan[
-                "total_power"
-            ]
+            self.market_success_list.append(0)
 
-    def set_energy_dispatch_plan(
-        self,
-        dispatch_plan: dict,
-        start: pd.Timestamp,
-        end: pd.Timestamp,
-    ):
-        end_excl = end - self.index.freq
-        duration = (end - start).total_seconds() / 3600
-
-        if self.outputs["energy"][start:end_excl].min() >= self.min_power_discharge:
-            self.set_market_sucess(dispatch_plan, start, end_excl)
-            discharged_energy = (
-                dispatch_plan["total_power"] * duration / self.efficiency_discharge
-            )
-            self.current_SOC = self.current_SOC - discharged_energy
-
-        elif self.outputs["energy"][start:end_excl].max() <= -self.min_power_charge:
-            self.set_market_sucess(dispatch_plan, start, end_excl)
-            # multiplied by -1 because the power when charging is negative
-            charged_energy = (
-                dispatch_plan["total_power"] * duration * self.efficiency_charge * (-1)
-            )
-            self.current_SOC = self.current_SOC + charged_energy
-
-        else:
-            self.current_status = 0
-            self.current_down_time += 1
-            self.outputs["energy"].loc[start:end_excl] = 0
-
-            if self.market_success_list[-1] != 0:
-                self.mean_market_success = sum(self.market_success_list) / len(
-                    self.market_success_list
-                )
-                self.market_success_list.append(0)
-
-    def set_market_sucess(self, dispatch_plan, start, end):
+    def set_market_sucess(self):
         self.market_success_list[-1] += 1
         self.current_status = 1  # discharging
         self.current_down_time = 0
-        self.outputs["energy"].loc[start:end] += dispatch_plan["total_power"]
+        
 
     @lru_cache(maxsize=256)
     def calc_marginal_cost(
