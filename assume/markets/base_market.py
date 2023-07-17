@@ -4,7 +4,6 @@ from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
 
-import pandas as pd
 from mango import Role
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Order, Orderbook
@@ -71,7 +70,6 @@ class MarketRole(Role):
 
         current = datetime.utcfromtimestamp(self.context.current_timestamp)
         next_opening = self.marketconfig.opening_hours.after(current, inc=True)
-        market_closing = next_opening + self.marketconfig.opening_duration
         opening_ts = calendar.timegm(next_opening.utctimetuple())
         self.context.schedule_timestamp_task(self.opening(), opening_ts)
 
@@ -252,8 +250,8 @@ class MarketRole(Role):
 
         return self.market_result, market_meta
 
-    async def store_order_book(self, orderbook):
-        # Send a message to the DBRole to update data in the database
+    async def store_order_book(self, orderbook: Orderbook):
+        # Send a message to the OutputRole to update data in the database
         message = {
             "context": "write_results",
             "type": "store_order_book",
@@ -270,7 +268,7 @@ class MarketRole(Role):
             )
 
     async def store_market_results(self, market_meta):
-        # Send a message to the DBRole to update data in the database
+        # Send a message to the OutputRole to update data in the database
         message = {
             "context": "write_results",
             "type": "store_market_results",
