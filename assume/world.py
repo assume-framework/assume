@@ -99,7 +99,7 @@ class World:
             "naive_neg_reserve": NaiveNegReserveStrategy,
             "naive_pos_reserve": NaivePosReserveStrategy,
             "otc_strategy": OTCStrategy,
-            "rl_strategy": RLStrategy,
+            "learning": RLStrategy,
         }
         self.clearing_mechanisms = {
             "pay_as_clear": pay_as_clear,

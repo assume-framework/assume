@@ -190,7 +190,7 @@ class HeatPump(BaseUnit):
 
         operational_window = {
             "window": (start, end),
-            "ops": {
+            "states": {
                 "current_power": {
                     "power": -current_power_input,
                     "marginal_cost": self.calc_marginal_cost(

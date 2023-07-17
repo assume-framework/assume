@@ -137,13 +137,13 @@ def test_calculate_operational_window(power_plant_1):
         product_tuple=product_tuple, product_type="energy"
     )
 
-    assert operational_window["ops"]["min_power"]["volume"] == 200
-    assert operational_window["ops"]["min_power"]["cost"] == 40.0
+    assert operational_window["states"]["min_power"]["volume"] == 200
+    assert operational_window["states"]["min_power"]["cost"] == 40.0
 
-    assert operational_window["ops"]["max_power"]["volume"] == 1000
-    assert operational_window["ops"]["max_power"]["cost"] == 40
+    assert operational_window["states"]["max_power"]["volume"] == 1000
+    assert operational_window["states"]["max_power"]["cost"] == 40
 
-    assert operational_window["ops"]["current_power"]["volume"] == 0
+    assert operational_window["states"]["current_power"]["volume"] == 0
 
 
 def test_powerplant_feedback(power_plant_1):
@@ -160,11 +160,11 @@ def test_powerplant_feedback(power_plant_1):
         product_tuple=product_tuple, product_type=product_type
     )
 
-    assert operational_window["ops"]["min_power"]["volume"] == 200
-    assert operational_window["ops"]["min_power"]["cost"] == 40
-    assert operational_window["ops"]["max_power"]["volume"] == 1000
-    assert operational_window["ops"]["max_power"]["cost"] == 40
-    assert operational_window["ops"]["current_power"]["volume"] == 0
+    assert operational_window["states"]["min_power"]["volume"] == 200
+    assert operational_window["states"]["min_power"]["cost"] == 40
+    assert operational_window["states"]["max_power"]["volume"] == 1000
+    assert operational_window["states"]["max_power"]["cost"] == 40
+    assert operational_window["states"]["current_power"]["volume"] == 0
 
     # min_power gets accepted
     dispatch_plan = {"total_power": 200}
@@ -178,11 +178,11 @@ def test_powerplant_feedback(power_plant_1):
     )
 
     # we do not need additional min_power, as our runtime requirement is fulfilled
-    assert operational_window["ops"]["min_power"]["volume"] == 0
-    assert operational_window["ops"]["min_power"]["cost"] == 40
+    assert operational_window["states"]["min_power"]["volume"] == 0
+    assert operational_window["states"]["min_power"]["cost"] == 40
     # we can not bid the maximum anymore, because we already provide energy on the other market
-    assert operational_window["ops"]["max_power"]["volume"] == 800
-    assert operational_window["ops"]["max_power"]["cost"] == 40
+    assert operational_window["states"]["max_power"]["volume"] == 800
+    assert operational_window["states"]["max_power"]["cost"] == 40
 
     # second market for other interval
     product_tuple = (
@@ -195,8 +195,8 @@ def test_powerplant_feedback(power_plant_1):
     )
 
     # now we can bid max_power and need min_power again
-    assert operational_window["ops"]["min_power"]["volume"] == 200
-    assert operational_window["ops"]["max_power"]["volume"] == 1000
+    assert operational_window["states"]["min_power"]["volume"] == 200
+    assert operational_window["states"]["max_power"]["volume"] == 1000
 
 
 def test_powerplant_ramping(power_plant_1):
@@ -214,11 +214,11 @@ def test_powerplant_ramping(power_plant_1):
         product_tuple=product_tuple, product_type=product_type
     )
 
-    assert operational_window["ops"]["min_power"]["volume"] == 200
-    assert operational_window["ops"]["min_power"]["cost"] == 40
-    assert operational_window["ops"]["max_power"]["volume"] == 200
-    assert operational_window["ops"]["max_power"]["cost"] == 40
-    assert operational_window["ops"]["current_power"]["volume"] == 0
+    assert operational_window["states"]["min_power"]["volume"] == 200
+    assert operational_window["states"]["min_power"]["cost"] == 40
+    assert operational_window["states"]["max_power"]["volume"] == 200
+    assert operational_window["states"]["max_power"]["cost"] == 40
+    assert operational_window["states"]["current_power"]["volume"] == 0
 
     # min_power gets accepted
     dispatch_plan = {"total_power": 200}
@@ -237,8 +237,8 @@ def test_powerplant_ramping(power_plant_1):
         product_tuple=product_tuple, product_type=product_type
     )
 
-    assert operational_window["ops"]["min_power"]["volume"] == 200
-    assert operational_window["ops"]["max_power"]["volume"] == 400
+    assert operational_window["states"]["min_power"]["volume"] == 200
+    assert operational_window["states"]["max_power"]["volume"] == 400
 
     # accept max_power
     dispatch_plan = {"total_power": 400}
@@ -257,8 +257,8 @@ def test_powerplant_ramping(power_plant_1):
         product_tuple=product_tuple, product_type=product_type
     )
 
-    assert operational_window["ops"]["min_power"]["volume"] == 300
-    assert operational_window["ops"]["max_power"]["volume"] == 600
+    assert operational_window["states"]["min_power"]["volume"] == 300
+    assert operational_window["states"]["max_power"]["volume"] == 600
 
 
 if __name__ == "__main__":

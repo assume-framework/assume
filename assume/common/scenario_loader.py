@@ -295,7 +295,7 @@ async def load_scenario_folder_async(
     if "load_learned_path" not in bidding_strategy_params:
         bidding_strategy_params[
             "load_learned_path"
-        ] = f"{inputs_path}/'learned_strategies'/{sim_id}/"
+        ] = f"{inputs_path}/learned_strategies/{sim_id}/"
 
     await world.setup(
         start, end, save_frequency_hours, sim_id, bidding_strategy_params, index
@@ -368,7 +368,7 @@ async def load_scenario_folder_async(
             "EOM"
         ].forecasts["price_forecast"]
         unit_operator.context.data_dict[
-            "res_demand_forecast"
+            "residual_load_forecast"
         ] = world.forecast_providers["EOM"].forecasts["residual_load_forecast"]
 
     for company_name in set(all_operators):

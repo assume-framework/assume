@@ -74,7 +74,7 @@ class Demand(BaseUnit):
 
         return {
             "window": (start, end),
-            "ops": {"max_power": {"volume": bid_volume, "cost": bid_price}},
+            "states": {"max_power": {"volume": -300, "cost": bid_price}},
         }
 
     def as_dict(self) -> dict:

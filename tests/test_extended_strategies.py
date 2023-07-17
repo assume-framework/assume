@@ -9,7 +9,7 @@ start = datetime(2023, 7, 1)
 end = datetime(2023, 7, 2)
 operational_window: OperationalWindow = {
     "window": (start, end),
-    "ops": {
+    "states": {
         "current_power": {
             "volume": 100,
             "cost": 1,
@@ -47,8 +47,8 @@ def test_otc_strategy():
 
     bids = strategy.calculate_bids(None, mc, operational_window)
 
-    assert bids[0]["price"] == operational_window["ops"]["max_power"]["cost"]
-    assert bids[0]["volume"] == operational_window["ops"]["max_power"]["volume"]
+    assert bids[0]["price"] == operational_window["states"]["max_power"]["cost"]
+    assert bids[0]["volume"] == operational_window["states"]["max_power"]["volume"]
     assert bids == [{"price": 3, "volume": 400}]
 
 
@@ -69,9 +69,9 @@ def test_otc_strategy_scaled(scale):
 
     bids = strategy.calculate_bids(None, mc, operational_window)
 
-    power = operational_window["ops"]["max_power"]["volume"] * scale
+    power = operational_window["states"]["max_power"]["volume"] * scale
 
-    assert bids[0]["price"] == operational_window["ops"]["max_power"]["cost"]
+    assert bids[0]["price"] == operational_window["states"]["max_power"]["cost"]
     assert bids[0]["volume"] == power
     assert bids == [{"price": 3, "volume": power}]
 

@@ -127,6 +127,9 @@ class PowerPlant(BaseUnit):
         self.current_down_time = self.min_down_time
 
         self.outputs["energy"] = pd.Series(0.0, index=self.index)
+        self.outputs["energy"].iloc[0] = self.min_power + 0.5 * (
+            self.max_power - self.min_power
+        )
         # workaround if market schedules do not match
         # for example neg_reserve is required but market did not bid yet
         # it does set a usage in times where no power is used by the market
@@ -139,6 +142,10 @@ class PowerPlant(BaseUnit):
 
         self.outputs["capacity_pos"] = pd.Series(0.0, index=self.index)
         self.outputs["capacity_neg"] = pd.Series(0.0, index=self.index)
+
+        self.outputs["profits"] = pd.Series(0.0, index=self.index)
+        self.outputs["rewards"] = pd.Series(0.0, index=self.index)
+        self.outputs["regrets"] = pd.Series(0.0, index=self.index)
 
         self.mean_market_success = 0
         self.market_success_list = [0]
@@ -196,7 +203,7 @@ class PowerPlant(BaseUnit):
         if self.marginal_cost is None:
             return {
                 "window": (start, end),
-                "ops": {
+                "states": {
                     "current_power": {
                         "volume": current_power,
                         "cost": self.calc_marginal_cost_with_partial_eff(
@@ -228,7 +235,7 @@ class PowerPlant(BaseUnit):
         )
         return {
             "window": (start, end),
-            "ops": {
+            "states": {
                 "current_power": {
                     "volume": current_power,
                     "cost": marginal_cost,
@@ -269,7 +276,7 @@ class PowerPlant(BaseUnit):
 
         operational_window = {
             "window": (start, end),
-            "ops": {
+            "states": {
                 "pos_reserve": {
                     "volume": available_pos_reserve,
                     "cost": marginal_cost,
@@ -304,7 +311,7 @@ class PowerPlant(BaseUnit):
 
         operational_window = {
             "window": (start, end),
-            "ops": {
+            "states": {
                 "neg_reserve": {
                     "volume": available_neg_reserve,
                     "cost": marginal_cost,

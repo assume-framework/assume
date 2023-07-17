@@ -28,10 +28,10 @@ class flexableEOM(BaseStrategy):
         # Powerplant is either on, or is able to turn on
         # Calculating possible bid amount
         # =============================================================================
-        bid_quantity_inflex = operational_window["ops"]["min_power"]["volume"]
+        bid_quantity_inflex = operational_window["states"]["min_power"]["volume"]
 
-        marginal_cost_mr = operational_window["ops"]["min_power"]["cost"]
-        marginal_cost_flex = operational_window["ops"]["max_power"]["cost"]
+        marginal_cost_mr = operational_window["states"]["min_power"]["cost"]
+        marginal_cost_flex = operational_window["states"]["max_power"]["cost"]
         # =============================================================================
         # Calculating possible price
         # =============================================================================
@@ -55,7 +55,7 @@ class flexableEOM(BaseStrategy):
         # Flex-bid price formulation
         if unit.current_status:
             bid_quantity_flex = (
-                operational_window["ops"]["max_power"]["volume"] - bid_quantity_inflex
+                operational_window["states"]["max_power"]["volume"] - bid_quantity_inflex
             )
             bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
 
@@ -149,11 +149,11 @@ class flexablePosCRM(BaseStrategy):
     ):
         self.current_time = operational_window["window"][0]
 
-        bid_quantity = operational_window["ops"]["pos_reserve"]["volume"]
+        bid_quantity = operational_window["states"]["pos_reserve"]["volume"]
         if bid_quantity == 0:
             return []
 
-        marginal_cost = operational_window["ops"]["pos_reserve"]["cost"]
+        marginal_cost = operational_window["states"]["pos_reserve"]["cost"]
 
         # Specific revenue if power was offered on the energy marke
         specific_revenue = get_specific_revenue(
@@ -203,11 +203,11 @@ class flexableNegCRM(BaseStrategy):
     ):
         self.current_time = operational_window["window"][0]
 
-        bid_quantity = operational_window["ops"]["neg_reserve"]["volume"]
+        bid_quantity = operational_window["states"]["neg_reserve"]["volume"]
         if bid_quantity == 0:
             return []
 
-        marginal_cost = operational_window["ops"]["neg_reserve"]["cost"]
+        marginal_cost = operational_window["states"]["neg_reserve"]["cost"]
 
         # Specific revenue if power was offered on the energy marke
         specific_revenue = get_specific_revenue(

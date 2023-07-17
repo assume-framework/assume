@@ -12,15 +12,17 @@ class RLStrategy(BaseStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.is_learning_strategy = True
         self.foresight = pd.Timedelta("12h")
         self.current_time = None
 
         # RL agent parameters
-        self.obs_dim = kwargs.get("observation_dimension", 128)
+        self.obs_dim = kwargs.get("observation_dimension", 52)
         self.act_dim = kwargs.get("action_dimension", 2)
         self.max_bid_price = kwargs.get("max_bid_price", 100)
+        self.max_demand = kwargs.get("max_demand", 10e3)
 
-        device = kwargs.get("device", "cpu")
+        device = kwargs.get("device", "cuda:0")
         self.device = th.device(device)
 
         float_type = kwargs.get("float_type", "float32")
@@ -61,17 +63,12 @@ class RLStrategy(BaseStrategy):
 
     def reset(
         self,
-        unit: BaseUnit = None,
     ):
         self.next_obs = None
 
         self.curr_action = None
         self.curr_reward = None
         self.curr_experience = []
-
-        self.profits = [0.0 for _ in unit.index]
-        self.rewards = [0.0 for _ in unit.index]
-        self.regrets = [0.0 for _ in unit.index]
 
     def calculate_bids(
         self,
@@ -91,7 +88,9 @@ class RLStrategy(BaseStrategy):
             # =============================================================================
 
             bid_prices = self.get_actions(
-                data_dict, operational_window.window[0], operational_window.window[1]
+                unit=unit,
+                operational_window=operational_window,
+                data_dict=data_dict,
             )
             bid_prices *= self.max_bid_price
 
@@ -102,13 +101,13 @@ class RLStrategy(BaseStrategy):
             # Powerplant is either on, or is able to turn on
             # Calculating possible bid amount
             # =============================================================================
-            bid_quantity_inflex = operational_window["ops"]["min_power"]["volume"]
+            bid_quantity_inflex = operational_window["states"]["min_power"]["volume"]
             bid_price_inflex = min(bid_prices)
 
             # Flex-bid price formulation
             if unit.current_status:
                 bid_quantity_flex = (
-                    operational_window["ops"]["max_power"]["volume"]
+                    operational_window["states"]["max_power"]["volume"]
                     - bid_quantity_inflex
                 )
                 bid_price_flex = max(bid_prices)
@@ -120,10 +119,13 @@ class RLStrategy(BaseStrategy):
 
         return bids
 
-    def get_actions(self, unit, data_dict: dict, operational_window):
-        self.curr_obs = self.create_obs(unit, data_dict, operational_window)
+    def get_actions(self, unit, operational_window, data_dict):
+        self.curr_obs = self.create_obs(
+            unit=unit,
+            operational_window=operational_window,
+            data_dict=data_dict,
+        )
 
-        # TODO ersetzen mit parameteren von learning role
         if self.learning_mode:
             if self.collect_initial_experience:
                 self.curr_action = (
@@ -154,33 +156,38 @@ class RLStrategy(BaseStrategy):
 
     def create_obs(
         self,
-        unit: BaseUnit,
-        data_dict: dict,
-        operational_window: OperationalWindow,
+        unit,
+        operational_window,
+        data_dict,
     ):
         start = operational_window["window"][0]
-        end = operational_window["window"][1]
+        end_excl = operational_window["window"][1] - unit.index.freq
+
 
         # in rl_units operator in ASSUME
         # TODO consider that the last forecast_length time steps cant be used
         # TODO enable difference between actual residual load realisation and residual load forecast
         # currently no difference so historical res_demand values can also be taken from res_demand_forecast
-        obs = []
-        forecast_len = 30  # in metric of market
+        forecast_len = pd.Timedelta('24h')  # in metric of market
 
-        obs.extend(data_dict.res_demand_forecast[start : end + forecast_len])
+        scaled_res_load_forecast = data_dict["residual_load_forecast"].loc[start : end_excl + forecast_len].values / self.max_demand
 
-        obs.extend(data_dict.price_forecast[start : end + forecast_len])
+        scaled_price_forecast = data_dict["price_forecast"].loc[start : end_excl + forecast_len].values / self.max_bid_price
 
         # scale unit outpus
-        self.total_scaled_capacity = unit.outputs["energy"] / unit.max_power
-        self.scaled_marginal_cost = (
-            operational_window["obs"]["current_power"]["costs"] / unit.max_bid_price
+        scaled_total_capacity = operational_window["states"]["current_power"]["volume"] / unit.max_power
+        scaled_marginal_cost = (
+            operational_window["states"]["current_power"]["cost"] / self.max_bid_price
         )
 
-        obs.extend([self.total_scaled_capacity, self.scaled_marginal_cost])
+        obs = np.concatenate(
+            [
+                scaled_res_load_forecast,
+                scaled_price_forecast,
+                np.array([scaled_total_capacity, scaled_marginal_cost]),
+            ]
+        )
 
-        obs = np.array(obs)
         obs = (
             th.tensor(obs, dtype=self.float_type)
             .to(self.device, non_blocking=True)

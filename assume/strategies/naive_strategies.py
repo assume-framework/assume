@@ -21,8 +21,8 @@ class NaiveStrategy(BaseStrategy):
 
         Return: volume, price
         """
-        price = operational_window["ops"]["max_power"]["cost"]
-        volume = operational_window["ops"]["max_power"]["volume"]
+        price = operational_window["states"]["max_power"]["cost"]
+        volume = operational_window["states"]["max_power"]["volume"]
         bids = [{"price": price, "volume": volume}]
         return bids
 
@@ -45,7 +45,7 @@ class NaivePosReserveStrategy(BaseStrategy):
         Return: volume, price
         """
         price = 0
-        volume = operational_window["ops"]["pos_reserve"]["volume"]
+        volume = operational_window["states"]["pos_reserve"]["volume"]
         bids = [{"price": price, "volume": volume}]
         return bids
 
@@ -68,6 +68,6 @@ class NaiveNegReserveStrategy(BaseStrategy):
         Return: volume, price
         """
         price = 0
-        volume = operational_window["ops"]["neg_reserve"]["volume"]
+        volume = operational_window["states"]["neg_reserve"]["volume"]
         bids = [{"price": price, "volume": volume}]
         return bids

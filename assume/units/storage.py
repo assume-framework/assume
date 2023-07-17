@@ -255,7 +255,7 @@ class Storage(BaseUnit):
         # what form does the operational window have?
         operational_window = {
             "window": (start, end),
-            "ops": {
+            "states": {
                 "current_power_discharge": {
                     "volume": current_power_discharge,
                     "cost": self.calc_marginal_cost(

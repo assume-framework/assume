@@ -20,6 +20,10 @@ from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
 
+try:
+    import torch as th
+except ImportError:
+    th = None
 
 class UnitsOperator(Role):
     def __init__(
@@ -285,10 +289,11 @@ class UnitsOperator(Role):
                     for unit_id, unit in self.units.items()
                 }
 
-                for unit_id, bids in bids.items():
-                    if bids is None:
+                
+                for unit_id, unit_bids in bids.items():
+                    if unit_bids is None:
                         continue
-                    for i, bid in enumerate(bids):
+                    for i, bid in enumerate(unit_bids):
                         price = bid["price"]
                         volume = bid["volume"]
                         if market.volume_tick:

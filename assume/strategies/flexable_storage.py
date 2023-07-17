@@ -45,15 +45,15 @@ class flexableEOMStorage(BaseStrategy):
 
         if (
             unit.price_forecast[start] >= average_price / unit.efficiency_discharge
-        ) and (operational_window["ops"]["max_power_discharge"]["volume"] > 0):
+        ) and (operational_window["states"]["max_power_discharge"]["volume"] > 0):
             # place bid to discharge
-            bid_quantity = operational_window["ops"]["max_power_discharge"]["volume"]
+            bid_quantity = operational_window["states"]["max_power_discharge"]["volume"]
 
         elif (
             unit.price_forecast[start] <= average_price * unit.efficiency_charge
-        ) and (operational_window["ops"]["max_power_charge"]["volume"] < 0):
+        ) and (operational_window["states"]["max_power_charge"]["volume"] < 0):
             # place bid to charge
-            bid_quantity = operational_window["ops"]["max_power_charge"]["volume"]
+            bid_quantity = operational_window["states"]["max_power_charge"]["volume"]
 
         if bid_quantity != 0:
             return [{"price": average_price, "volume": bid_quantity}]
