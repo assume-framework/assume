@@ -69,7 +69,7 @@ def load_file(
                     f"{file_name}: simulation time line is longer than length of the dataframe. Returning None."
                 )
                 return None
-            
+
             if df.index.freq < index.freq:
                 df = df.resample(index.freq).mean()
                 logger.info(f"Downsampling {file_name} successful.")

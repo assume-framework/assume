@@ -5,10 +5,10 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+import torch as th
 from dateutil import rrule as rr
 from mango import Role
 from sqlalchemy import inspect, text
-import torch as th
 
 from assume.units.base_unit import BaseUnit
 
@@ -147,9 +147,9 @@ class WriteOutput(Role):
             df.reset_index()
             if df.empty:
                 continue
-            
+
             df = df.apply(self.check_for_tensors)
-            
+
             if self.export_csv_path:
                 data_path = self.p.joinpath(f"{table}.csv")
                 df.to_csv(data_path, mode="a", header=not data_path.exists())
@@ -158,15 +158,14 @@ class WriteOutput(Role):
                 df.to_sql(table, self.db.bind, if_exists="append")
             self.write_dfs[table] = []
 
-    
     def check_for_tensors(self, data):
         if data.map(lambda x: isinstance(x, th.Tensor)).any():
             for i, value in enumerate(data):
                 if isinstance(value, th.Tensor):
                     data.iat[i] = value.item()
-        
+
         return data
-    
+
     def write_market_orders(self, market_orders, market_id):
         """
         Writes market orders to the corresponding data frame.

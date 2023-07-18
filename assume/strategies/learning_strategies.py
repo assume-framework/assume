@@ -168,19 +168,20 @@ class RLStrategy(BaseStrategy):
         # TODO consider that the last forecast_length time steps cant be used
         # TODO enable difference between actual residual load realisation and residual load forecast
         # currently no difference so historical res_demand values can also be taken from res_demand_forecast
-        forecast_len = pd.Timedelta((self.foresight-1)*unit.index.freq)  # in metric of market
+        forecast_len = pd.Timedelta(
+            (self.foresight - 1) * unit.index.freq
+        )  # in metric of market
 
         if end_excl + forecast_len > data_dict["residual_load_forecast"].index[-1]:
             scaled_res_load_forecast = (
-                data_dict["residual_load_forecast"]
-                .loc[start:]
-                .values
-                / self.max_demand
+                data_dict["residual_load_forecast"].loc[start:].values / self.max_demand
             )
             scaled_res_load_forecast = np.concatenate(
                 [
                     scaled_res_load_forecast,
-                    data_dict["residual_load_forecast"].iloc[:self.foresight - len(scaled_res_load_forecast)],
+                    data_dict["residual_load_forecast"].iloc[
+                        : self.foresight - len(scaled_res_load_forecast)
+                    ],
                 ]
             )
 
@@ -194,23 +195,20 @@ class RLStrategy(BaseStrategy):
 
         if end_excl + forecast_len > data_dict["price_forecast"].index[-1]:
             scaled_price_forecast = (
-                data_dict["price_forecast"]
-                .loc[start:]
-                .values
-                / self.max_bid_price
+                data_dict["price_forecast"].loc[start:].values / self.max_bid_price
             )
             scaled_price_forecast = np.concatenate(
                 [
                     scaled_price_forecast,
-                    data_dict["price_forecast"].iloc[:self.foresight - len(scaled_price_forecast)],
+                    data_dict["price_forecast"].iloc[
+                        : self.foresight - len(scaled_price_forecast)
+                    ],
                 ]
             )
 
         else:
             scaled_price_forecast = (
-                data_dict["price_forecast"]
-                .loc[start : end_excl + forecast_len]
-                .values
+                data_dict["price_forecast"].loc[start : end_excl + forecast_len].values
                 / self.max_bid_price
             )
 
