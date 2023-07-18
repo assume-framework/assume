@@ -86,19 +86,16 @@ class RLStrategy(BaseStrategy):
         # Calculating possible bid amount
         # artificially force inflex_bid to be the smaller price
         # =============================================================================
-        
+
         self.next_observation = self.create_observation(
             unit=unit,
             operational_window=operational_window,
             data_dict=data_dict,
         )
-        
+
         self.curr_action = self.get_actions()
 
         bid_prices = self.curr_action * self.max_bid_price
-
-        bid_price_inflex = min(bid_prices)
-        bid_price_flex = max(bid_prices)
 
         # =============================================================================
         # Powerplant is either on, or is able to turn on
@@ -147,7 +144,8 @@ class RLStrategy(BaseStrategy):
                     self.action_noise.noise(), device=self.device, dtype=self.float_type
                 )
         else:
-            curr_action = self.actor(self.next_observation).detach()
+            #curr_action = self.actor(self.next_observation).detach()
+            curr_action = (5, 5)
 
         curr_action = curr_action.clamp(-1, 1)
 
@@ -240,39 +238,44 @@ class RLStrategy(BaseStrategy):
         end_excl,
         product_type,
         clearing_price,
-        unit: BaseUnit = None,
+        unit: BaseUnit,
     ):
+        
+        if not self.is_learning_strategy:
+            return
+        
         # gets market feedback from set_dispacth
-
-        # Calculates market success
-        # first for sold capacity
-        if unit.outputs[product_type].loc[start:end_excl] < unit.min_power:
-            unit.outputs[product_type].loc[start:end_excl] = 0
+        # based on calculated market success in dispatch we calculate the profit
 
         unit.total_scaled_capacity[start] = (
             unit.outputs[product_type].loc[start:end_excl] / unit.max_power
         )
 
-        # calculate profit, now based on actual mc considering the power output
-        price_difference = clearing_price - unit.calc_marginal_cost_with_partial_eff(
-            power_output=unit.outputs[product_type].loc[start:end_excl], timestep=start
+            # calculate profit, now based on actual mc considering the power output
+        marginal_cost = (
+            unit.marginal_cost.loc[start]
+            if unit.marginal_cost is not None
+            else unit.calc_marginal_cost_with_partial_eff(
+                power_output=unit.outputs[product_type].loc[start:end_excl],
+                timestep=start,
+            )
         )
-        profit = (
-            price_difference
-            * unit.outputs[product_type].loc[start:end_excl]
-            * (start - end_excl).total_seconds()
-            / 3600
-        )
+        price_difference = clearing_price - marginal_cost
+
+
+        profit = (unit.outputs["cashflow"].loc[start:end_excl] - marginal_cost*unit.outputs[product_type].loc[start:end_excl] * (start - end_excl).total_seconds()
+            / 3600).sum()
+
+
         opportunity_cost = (
             price_difference
-            * (unit.max_power - unit.outputs[product_type].loc[start:end_excl])
+            * (unit.max_power - unit.outputs[product_type].loc[start:end_excl]).sum()
             * (start - end_excl).total_seconds()
             / 3600
         )
         opportunity_cost = max(opportunity_cost, 0)
 
-        scaling = 0.1 / unit.max_power
-        regret_scale = 0.2
+
 
         if (
             unit.outputs[product_type].loc[start:end_excl] != 0
@@ -285,16 +288,13 @@ class RLStrategy(BaseStrategy):
         ):
             profit = profit - unit.hot_start_cost / 2
 
-        self.rewards[start] = (profit - regret_scale * opportunity_cost) * scaling
-        self.profits[start] = profit
-        self.regrets[start] = opportunity_cost
+        scaling = 0.1 / unit.max_power
+        regret_scale = 0.2
+
+        unit.outputs["rewards"].loc[start:end_excl]=(profit - regret_scale * opportunity_cost) * scaling
+        unit.outputs["profit"].loc[start:end_excl]=profit
+        unit.outputs["regret"].loc[start:end_excl]=opportunity_cost
 
         self.curr_reward = self.rewards[start]
 
-        # TODO I do not have next observation yet, since I get it in calculate rewards
-        self.curr_experience = [
-            self.curr_observation,
-            self.next_observation,
-            self.curr_action,
-            self.curr_reward,
-        ]
+

@@ -133,7 +133,7 @@ class UnitsOperator(Role):
         self.valid_orders.extend(orderbook)
         marketconfig = self.registered_markets[content["market_id"]]
         self.set_unit_dispatch(orderbook, marketconfig)
-        self.write_actual_dispatch()
+        self.write_actual_dispatch( clearing_price=content['clearing_price'])
 
     def set_unit_dispatch(self, orderbook, marketconfig):
         """
@@ -153,7 +153,7 @@ class UnitsOperator(Role):
                 product_type=marketconfig.product_type,
             )
 
-    def write_actual_dispatch(self):
+    def write_actual_dispatch(self, clearing_price):
         """
         sends the actual aggregated dispatch curve
         works across multiple markets
@@ -174,7 +174,7 @@ class UnitsOperator(Role):
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
             data = pd.DataFrame(
-                unit.execute_current_dispatch(start, now), columns=["power"]
+                unit.execute_current_dispatch(start, now, clearing_price), columns=["power"]
             )
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
