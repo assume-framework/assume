@@ -30,6 +30,8 @@ class RLStrategy(BaseStrategy):
 
         self.learning_mode = kwargs.get("learning_mode", False)
 
+        self.actor = Actor(self.obs_dim, self.act_dim, self.float_type).to(self.device)
+
         if self.learning_mode:
             self.learning_role = None
             self.collect_initial_experience = kwargs.get(
@@ -232,10 +234,10 @@ class RLStrategy(BaseStrategy):
     def calculate_reward(
         self,
         start,
-        end_excl,
+        end,
         product_type,
         clearing_price,
-        unit: BaseUnit,
+        unit,
     ):
         if not self.is_learning_strategy:
             return
@@ -243,55 +245,57 @@ class RLStrategy(BaseStrategy):
         # gets market feedback from set_dispacth
         # based on calculated market success in dispatch we calculate the profit
 
-        unit.total_scaled_capacity[start] = (
-            unit.outputs[product_type].loc[start:end_excl] / unit.max_power
-        )
+        end_excl = end - unit.index.freq
 
         # calculate profit, now based on actual mc considering the power output
-        marginal_cost = (
-            unit.marginal_cost.loc[start]
-            if unit.marginal_cost is not None
-            else unit.calc_marginal_cost_with_partial_eff(
+
+        if unit.marginal_cost is not None:
+            marginal_cost = (
+                unit.marginal_cost[start]
+                if type(unit.marginal_cost) is dict
+                else unit.marginal_cost
+            )
+        else:
+            marginal_cost = unit.calc_marginal_cost_with_partial_eff(
                 power_output=unit.outputs[product_type].loc[start:end_excl],
                 timestep=start,
             )
-        )
+
         price_difference = clearing_price - marginal_cost
+
+        duration = (end - start).total_seconds() / 3600
 
         profit = (
             unit.outputs["cashflow"].loc[start:end_excl]
-            - marginal_cost
-            * unit.outputs[product_type].loc[start:end_excl]
-            * (start - end_excl).total_seconds()
-            / 3600
+            - marginal_cost * unit.outputs[product_type].loc[start:end_excl] * duration
         ).sum()
 
         opportunity_cost = (
             price_difference
             * (unit.max_power - unit.outputs[product_type].loc[start:end_excl]).sum()
-            * (start - end_excl).total_seconds()
-            / 3600
+            * duration
         )
         opportunity_cost = max(opportunity_cost, 0)
 
+        # consideration of start-up costs, which are evenly divided between the
+        # upward and downward regulation events
         if (
-            unit.outputs[product_type].loc[start:end_excl] != 0
-            and unit.outputs[product_type].loc[start - unit.index.freq : start] == 0
+            unit.outputs[product_type].loc[start] != 0
+            and unit.outputs[product_type].loc[start - unit.index.freq] == 0
         ):
             profit = profit - unit.hot_start_cost / 2
         elif (
-            unit.outputs[product_type].loc[start:end_excl] == 0
-            and unit.outputs[product_type].loc[start - unit.index.freq : start] != 0
+            unit.outputs[product_type].loc[start] == 0
+            and unit.outputs[product_type].loc[start - unit.index.freq] != 0
         ):
             profit = profit - unit.hot_start_cost / 2
 
         scaling = 0.1 / unit.max_power
         regret_scale = 0.2
 
-        unit.outputs["rewards"].loc[start:end_excl] = (
-            profit - regret_scale * opportunity_cost
-        ) * scaling
+        reward = (profit - regret_scale * opportunity_cost) * scaling
+        unit.outputs["rewards"].loc[start:end_excl] = reward
         unit.outputs["profit"].loc[start:end_excl] = profit
         unit.outputs["regret"].loc[start:end_excl] = opportunity_cost
 
-        self.curr_reward = self.rewards[start]
+        self.curr_reward = reward

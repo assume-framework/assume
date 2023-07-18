@@ -325,7 +325,6 @@ class PowerPlant(BaseUnit):
         self,
         start: pd.Timestamp,
         end: pd.Timestamp,
-        clearing_price,
     ):
         end_excl = end - self.index.freq
         if self.outputs["energy"][start:end_excl].min() < self.min_power:
@@ -342,15 +341,6 @@ class PowerPlant(BaseUnit):
             self.current_status = 1
             self.current_down_time = 0
 
-        self.calculate_cashflow(start=start, end=end, clearing_price=clearing_price)
-        self.bidding_strategies["energy"].calculate_reward(
-            start=start,
-            end=end,
-            product_type="energy",
-            clearing_price=clearing_price,
-            unit=self,
-        )
-
         # TODO check if resulting power is < max_power
         # if self.outputs["energy"][start:end_excl].max() > self.max_power:
         #     max_pow = self.outputs["energy"][start:end_excl].max()
@@ -364,7 +354,7 @@ class PowerPlant(BaseUnit):
         self.outputs["cashflow"].loc[start:end_excl] = (
             clearing_price
             * self.outputs["energy"].loc[start:end_excl]
-            * (start - end_excl).total_seconds()
+            * (end - start).total_seconds()
             / 3600
         )
 

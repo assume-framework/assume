@@ -132,6 +132,8 @@ class WriteOutput(Role):
         """
 
         df = pd.DataFrame.from_records(rl_params)
+        if df.empty:
+            return
         df["simulation"] = self.simulation_id
         self.write_dfs["rl_params"].append(df)
 

@@ -133,7 +133,7 @@ class UnitsOperator(Role):
         self.valid_orders.extend(orderbook)
         marketconfig = self.registered_markets[content["market_id"]]
         self.set_unit_dispatch(orderbook, marketconfig)
-        self.write_actual_dispatch(clearing_price=content["clearing_price"])
+        self.write_actual_dispatch()
 
     def set_unit_dispatch(self, orderbook, marketconfig):
         """
@@ -151,9 +151,10 @@ class UnitsOperator(Role):
                 start=orderbook[0]["start_time"],
                 end=orderbook[0]["end_time"],
                 product_type=marketconfig.product_type,
+                clearing_price=orders_l[0]["price"],
             )
 
-    def write_actual_dispatch(self, clearing_price):
+    def write_actual_dispatch(self):
         """
         sends the actual aggregated dispatch curve
         works across multiple markets
@@ -175,7 +176,7 @@ class UnitsOperator(Role):
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
             data = pd.DataFrame(
-                unit.execute_current_dispatch(start, now, clearing_price),
+                unit.execute_current_dispatch(start, now),
                 columns=["power"],
             )
             data["unit"] = unit_id
@@ -210,7 +211,7 @@ class UnitsOperator(Role):
             filter(lambda x: x["end_time"] >= now, self.valid_orders)
         )
 
-        self.write_learning_params()
+        self.write_learning_params(now)
 
     async def submit_bids(self, opening: OpeningMessage):
         """
@@ -313,36 +314,37 @@ class UnitsOperator(Role):
 
         return orderbook
 
-    def write_learning_params(self):
+    def write_learning_params(self, start):
         """
         sends the current rl_strategy update to the output agent
         """
 
         unit_rl_strategy_dfs = []
         for unit_id, unit in self.units.items():
-            if unit.bidding_strategies.is_learning_strategy:
+            if unit.bidding_strategies["energy"].is_learning_strategy:
                 data = pd.DataFrame(
                     {
-                        unit.outputs.iloc[-1, "profit"],
-                        unit.outputs.iloc[-1, "reward"],
-                        unit.outputs.iloc[-1, "regret"],
+                        "profit": unit.outputs["profit"].loc[start],
+                        "reward": unit.outputs["reward"].loc[start],
+                        "regret": unit.outputs["regret"].loc[start],
                     },
-                    columns=["profit", "reward", "regret"],
+                    index=[start],
                 )
                 data["unit"] = unit_id
                 unit_rl_strategy_dfs.append(data)
 
-        unit_rl_startegy = pd.concat(unit_rl_strategy_dfs)
+        if len(unit_rl_strategy_dfs):
+            learning_data = pd.concat(unit_rl_strategy_dfs)
 
-        db_aid = self.context.data_dict.get("output_agent_id")
-        db_addr = self.context.data_dict.get("output_agent_addr")
-        if db_aid and db_addr and unit_rl_startegy:
-            self.context.schedule_instant_acl_message(
-                receiver_id=db_aid,
-                receiver_addr=db_addr,
-                content={
-                    "context": "write_results",
-                    "type": "rl_learning_params",
-                    "data": unit_rl_startegy,
-                },
-            )
+            db_aid = self.context.data_dict.get("output_agent_id")
+            db_addr = self.context.data_dict.get("output_agent_addr")
+            if db_aid and db_addr:
+                self.context.schedule_instant_acl_message(
+                    receiver_id=db_aid,
+                    receiver_addr=db_addr,
+                    content={
+                        "context": "write_results",
+                        "type": "rl_learning_params",
+                        "data": learning_data,
+                    },
+                )
