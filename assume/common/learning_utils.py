@@ -10,6 +10,7 @@ import torch as th
 from torch import nn
 from torch.nn import functional as F
 
+
 class CriticTD3(nn.Module):
     """Initialize parameters and build model.
     Args:

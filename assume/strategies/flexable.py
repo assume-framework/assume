@@ -55,7 +55,8 @@ class flexableEOM(BaseStrategy):
         # Flex-bid price formulation
         if unit.current_status:
             bid_quantity_flex = (
-                operational_window["states"]["max_power"]["volume"] - bid_quantity_inflex
+                operational_window["states"]["max_power"]["volume"]
+                - bid_quantity_inflex
             )
             bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
 
