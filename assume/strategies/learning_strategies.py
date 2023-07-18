@@ -28,8 +28,6 @@ class RLStrategy(BaseStrategy):
         float_type = kwargs.get("float_type", "float32")
         self.float_type = th.float if float_type == "float32" else th.float16
 
-
-
         self.learning_mode = kwargs.get("learning_mode", False)
 
         if self.learning_mode:
@@ -38,12 +36,12 @@ class RLStrategy(BaseStrategy):
                 "collect_initial_experience", False
             )
 
-            #self.actor_target = Actor(self.obs_dim, self.act_dim, self.float_type).to(
-            #    self.device
+            self.actor_target = Actor(self.obs_dim, self.act_dim, self.float_type).to(
+                self.device
             )
-            #self.actor_target.load_state_dict(self.actor.state_dict())
+            self.actor_target.load_state_dict(self.actor.state_dict())
             # Target networks should always be in eval mode
-            #self.actor_target.train(mode=False)
+            self.actor_target.train(mode=False)
 
             self.action_noise = NormalActionNoise(
                 mu=0.0,
@@ -64,7 +62,7 @@ class RLStrategy(BaseStrategy):
     def reset(
         self,
     ):
-        self.observation = None
+        self.curr_observation = None
         self.next_observation = None
 
         self.curr_action = None
@@ -144,7 +142,7 @@ class RLStrategy(BaseStrategy):
                     self.action_noise.noise(), device=self.device, dtype=self.float_type
                 )
         else:
-            #curr_action = self.actor(self.next_observation).detach()
+            # curr_action = self.actor(self.next_observation).detach()
             curr_action = (5, 5)
 
         curr_action = curr_action.clamp(-1, 1)
@@ -240,10 +238,9 @@ class RLStrategy(BaseStrategy):
         clearing_price,
         unit: BaseUnit,
     ):
-        
         if not self.is_learning_strategy:
             return
-        
+
         # gets market feedback from set_dispacth
         # based on calculated market success in dispatch we calculate the profit
 
@@ -251,7 +248,7 @@ class RLStrategy(BaseStrategy):
             unit.outputs[product_type].loc[start:end_excl] / unit.max_power
         )
 
-            # calculate profit, now based on actual mc considering the power output
+        # calculate profit, now based on actual mc considering the power output
         marginal_cost = (
             unit.marginal_cost.loc[start]
             if unit.marginal_cost is not None
@@ -262,10 +259,13 @@ class RLStrategy(BaseStrategy):
         )
         price_difference = clearing_price - marginal_cost
 
-
-        profit = (unit.outputs["cashflow"].loc[start:end_excl] - marginal_cost*unit.outputs[product_type].loc[start:end_excl] * (start - end_excl).total_seconds()
-            / 3600).sum()
-
+        profit = (
+            unit.outputs["cashflow"].loc[start:end_excl]
+            - marginal_cost
+            * unit.outputs[product_type].loc[start:end_excl]
+            * (start - end_excl).total_seconds()
+            / 3600
+        ).sum()
 
         opportunity_cost = (
             price_difference
@@ -274,8 +274,6 @@ class RLStrategy(BaseStrategy):
             / 3600
         )
         opportunity_cost = max(opportunity_cost, 0)
-
-
 
         if (
             unit.outputs[product_type].loc[start:end_excl] != 0
@@ -291,10 +289,10 @@ class RLStrategy(BaseStrategy):
         scaling = 0.1 / unit.max_power
         regret_scale = 0.2
 
-        unit.outputs["rewards"].loc[start:end_excl]=(profit - regret_scale * opportunity_cost) * scaling
-        unit.outputs["profit"].loc[start:end_excl]=profit
-        unit.outputs["regret"].loc[start:end_excl]=opportunity_cost
+        unit.outputs["rewards"].loc[start:end_excl] = (
+            profit - regret_scale * opportunity_cost
+        ) * scaling
+        unit.outputs["profit"].loc[start:end_excl] = profit
+        unit.outputs["regret"].loc[start:end_excl] = opportunity_cost
 
         self.curr_reward = self.rewards[start]
-
-

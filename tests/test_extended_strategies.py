@@ -45,7 +45,9 @@ def test_otc_strategy():
         [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
     )
 
-    bids = strategy.calculate_bids(None, mc, operational_window)
+    bids = strategy.calculate_bids(
+        unit=None, market_config=mc, operational_window=operational_window
+    )
 
     assert bids[0]["price"] == operational_window["states"]["max_power"]["cost"]
     assert bids[0]["volume"] == operational_window["states"]["max_power"]["volume"]
@@ -67,7 +69,9 @@ def test_otc_strategy_scaled(scale):
         [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
     )
 
-    bids = strategy.calculate_bids(None, mc, operational_window)
+    bids = strategy.calculate_bids(
+        unit=None, market_config=mc, operational_window=operational_window
+    )
 
     power = operational_window["states"]["max_power"]["volume"] * scale
 

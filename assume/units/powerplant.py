@@ -127,9 +127,6 @@ class PowerPlant(BaseUnit):
         self.current_down_time = self.min_down_time
 
         self.outputs["energy"] = pd.Series(0.0, index=self.index)
-        self.outputs["energy"].iloc[0] = self.min_power + 0.5 * (
-            self.max_power - self.min_power
-        )
         # workaround if market schedules do not match
         # for example neg_reserve is required but market did not bid yet
         # it does set a usage in times where no power is used by the market
@@ -346,16 +343,21 @@ class PowerPlant(BaseUnit):
             self.current_down_time = 0
 
         self.calculate_cashflow(start=start, end=end, clearing_price=clearing_price)
-        self.bidding_strategies["energy"].calculate_reward(start=start, end=end, product_type="energy", clearing_price=clearing_price, unit=self)
+        self.bidding_strategies["energy"].calculate_reward(
+            start=start,
+            end=end,
+            product_type="energy",
+            clearing_price=clearing_price,
+            unit=self,
+        )
 
         # TODO check if resulting power is < max_power
         # if self.outputs["energy"][start:end_excl].max() > self.max_power:
         #     max_pow = self.outputs["energy"][start:end_excl].max()
         #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")
         return self.outputs["energy"].loc[start:end_excl]
-    
-    def calculate_cashflow(self, start, end, clearing_price):
 
+    def calculate_cashflow(self, start, end, clearing_price):
         start = start
         end_excl = end - self.index.freq
 

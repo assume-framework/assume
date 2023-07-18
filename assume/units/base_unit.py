@@ -58,7 +58,7 @@ class BaseUnit:
         self,
         market_config,
         product_tuple,
-        data_dict,
+        data_dict=None,
     ):
         """Calculate the bids for the next time step."""
 
