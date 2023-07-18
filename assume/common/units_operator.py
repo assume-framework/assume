@@ -133,7 +133,7 @@ class UnitsOperator(Role):
         self.valid_orders.extend(orderbook)
         marketconfig = self.registered_markets[content["market_id"]]
         self.set_unit_dispatch(orderbook, marketconfig)
-        self.write_actual_dispatch( clearing_price=content['clearing_price'])
+        self.write_actual_dispatch(clearing_price=content["clearing_price"])
 
     def set_unit_dispatch(self, orderbook, marketconfig):
         """
@@ -159,6 +159,7 @@ class UnitsOperator(Role):
         works across multiple markets
         sends dispatch at or after it actually happens
         """
+
         last = self.last_sent_dispatch
         if self.context.current_timestamp == last:
             # stop if we exported at this time already
@@ -174,7 +175,8 @@ class UnitsOperator(Role):
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
             data = pd.DataFrame(
-                unit.execute_current_dispatch(start, now, clearing_price), columns=["power"]
+                unit.execute_current_dispatch(start, now, clearing_price),
+                columns=["power"],
             )
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
@@ -207,6 +209,8 @@ class UnitsOperator(Role):
         self.valid_orders = list(
             filter(lambda x: x["end_time"] >= now, self.valid_orders)
         )
+
+        self.write_learning_params()
 
     async def submit_bids(self, opening: OpeningMessage):
         """
@@ -308,3 +312,37 @@ class UnitsOperator(Role):
                         self.bids_map[order_c["bid_id"]] = unit_id
 
         return orderbook
+
+    def write_learning_params(self):
+        """
+        sends the current rl_strategy update to the output agent
+        """
+
+        unit_rl_strategy_dfs = []
+        for unit_id, unit in self.units.items():
+            if unit.bidding_strategies.is_learning_strategy:
+                data = pd.DataFrame(
+                    {
+                        unit.outputs.iloc[-1, "profit"],
+                        unit.outputs.iloc[-1, "reward"],
+                        unit.outputs.iloc[-1, "regret"],
+                    },
+                    columns=["profit", "reward", "regret"],
+                )
+                data["unit"] = unit_id
+                unit_rl_strategy_dfs.append(data)
+
+        unit_rl_startegy = pd.concat(unit_rl_strategy_dfs)
+
+        db_aid = self.context.data_dict.get("output_agent_id")
+        db_addr = self.context.data_dict.get("output_agent_addr")
+        if db_aid and db_addr and unit_rl_startegy:
+            self.context.schedule_instant_acl_message(
+                receiver_id=db_aid,
+                receiver_addr=db_addr,
+                content={
+                    "context": "write_results",
+                    "type": "rl_learning_params",
+                    "data": unit_rl_startegy,
+                },
+            )

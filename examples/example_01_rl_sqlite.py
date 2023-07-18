@@ -7,6 +7,7 @@ from assume import World, load_scenario_folder
 
 log = logging.getLogger(__name__)
 
+
 os.makedirs("./examples/outputs", exist_ok=True)
 EXPORT_CSV_PATH = str(getenv("EXPORT_CSV_PATH", "./examples/outputs"))
 

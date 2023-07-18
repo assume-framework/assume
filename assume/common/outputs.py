@@ -120,6 +120,23 @@ class WriteOutput(Role):
         elif content.get("type") == "unit_dispatch":
             self.write_unit_dispatch(content.get("data"))
 
+        elif content.get("type") == "rl_learning_params":
+            self.write_rl_params(content.get("data"))
+
+    def write_rl_params(self, rl_params):
+        """
+        Writes the RL parameters to the corresponding data frame.
+
+        Args:
+            rl_params: The RL parameters.
+        """
+
+        df = pd.DataFrame.from_records(rl_params)
+        df["simulation"] = self.simulation_id
+        self.write_dfs["rl_params"].append(df)
+
+        print(df)
+
     def write_market_results(self, market_meta):
         """
         Writes market results to the corresponding data frame.

@@ -28,7 +28,7 @@ class RLStrategy(BaseStrategy):
         float_type = kwargs.get("float_type", "float32")
         self.float_type = th.float if float_type == "float32" else th.float16
 
-        self.actor = Actor(self.obs_dim, self.act_dim, self.float_type).to(self.device)
+
 
         self.learning_mode = kwargs.get("learning_mode", False)
 
@@ -38,12 +38,12 @@ class RLStrategy(BaseStrategy):
                 "collect_initial_experience", False
             )
 
-            self.actor_target = Actor(self.obs_dim, self.act_dim, self.float_type).to(
-                self.device
+            #self.actor_target = Actor(self.obs_dim, self.act_dim, self.float_type).to(
+            #    self.device
             )
-            self.actor_target.load_state_dict(self.actor.state_dict())
+            #self.actor_target.load_state_dict(self.actor.state_dict())
             # Target networks should always be in eval mode
-            self.actor_target.train(mode=False)
+            #self.actor_target.train(mode=False)
 
             self.action_noise = NormalActionNoise(
                 mu=0.0,
