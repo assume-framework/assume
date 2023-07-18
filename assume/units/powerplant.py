@@ -443,7 +443,7 @@ class PowerPlant(BaseUnit):
         end_excl = end - self.index.freq
         base_load = self.outputs["energy"][start:end_excl]
         # check if min_power is a series or a float
-        min_power = self.min_power - base_load.min()
+        min_power = max(self.min_power - base_load.min(), 0)
 
         # check if max_power is a series or a float
         max_power = (
@@ -451,7 +451,7 @@ class PowerPlant(BaseUnit):
             if type(self.availability) is dict
             else self.max_power
         )
-        max_power = max_power - base_load.max()
+        max_power = max(max_power - base_load.max(), 0)
 
         return min_power, max_power
 

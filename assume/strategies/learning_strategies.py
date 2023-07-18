@@ -132,7 +132,7 @@ class RLStrategy(BaseStrategy):
 
                 # trick that makes the bidding close to marginal cost for exploration purposes
                 curr_action += th.tensor(
-                    self.next_observation[-1],  # this doesnt work yet
+                    self.next_observation[-1],
                     device=self.device,
                     dtype=self.float_type,
                 )
@@ -142,8 +142,7 @@ class RLStrategy(BaseStrategy):
                     self.action_noise.noise(), device=self.device, dtype=self.float_type
                 )
         else:
-            # curr_action = self.actor(self.next_observation).detach()
-            curr_action = (5, 5)
+            curr_action = self.actor(self.next_observation).detach()
 
         curr_action = curr_action.clamp(-1, 1)
 
