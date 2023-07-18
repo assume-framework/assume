@@ -292,7 +292,7 @@ async def load_scenario_folder_async(
     sim_id = f"{scenario}_{study_case}"
 
     bidding_strategy_params = config.get("bidding_strategy_params", {})
-    if "load_learned_path" not in bidding_strategy_params:
+    if "load_learned_path" not in bidding_strategy_params.keys():
         bidding_strategy_params[
             "load_learned_path"
         ] = f"{inputs_path}/learned_strategies/{sim_id}/"
