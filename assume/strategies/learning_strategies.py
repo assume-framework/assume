@@ -13,16 +13,16 @@ class RLStrategy(BaseStrategy):
         super().__init__(*args, **kwargs)
 
         self.is_learning_strategy = True
-        self.foresight = pd.Timedelta("12h")
+        self.foresight = kwargs.get("foresight", 24)
         self.current_time = None
 
         # RL agent parameters
-        self.obs_dim = kwargs.get("observation_dimension", 52)
+        self.obs_dim = kwargs.get("observation_dimension", 50)
         self.act_dim = kwargs.get("action_dimension", 2)
         self.max_bid_price = kwargs.get("max_bid_price", 100)
         self.max_demand = kwargs.get("max_demand", 10e3)
 
-        device = kwargs.get("device", "cuda:0")
+        device = kwargs.get("device", "cpu")
         self.device = th.device(device)
 
         float_type = kwargs.get("float_type", "float32")
@@ -168,19 +168,51 @@ class RLStrategy(BaseStrategy):
         # TODO consider that the last forecast_length time steps cant be used
         # TODO enable difference between actual residual load realisation and residual load forecast
         # currently no difference so historical res_demand values can also be taken from res_demand_forecast
-        forecast_len = pd.Timedelta("24h")  # in metric of market
+        forecast_len = pd.Timedelta((self.foresight-1)*unit.index.freq)  # in metric of market
 
-        scaled_res_load_forecast = (
-            data_dict["residual_load_forecast"]
-            .loc[start : end_excl + forecast_len]
-            .values
-            / self.max_demand
-        )
+        if end_excl + forecast_len > data_dict["residual_load_forecast"].index[-1]:
+            scaled_res_load_forecast = (
+                data_dict["residual_load_forecast"]
+                .loc[start:]
+                .values
+                / self.max_demand
+            )
+            scaled_res_load_forecast = np.concatenate(
+                [
+                    scaled_res_load_forecast,
+                    data_dict["residual_load_forecast"].iloc[:self.foresight - len(scaled_res_load_forecast)],
+                ]
+            )
 
-        scaled_price_forecast = (
-            data_dict["price_forecast"].loc[start : end_excl + forecast_len].values
-            / self.max_bid_price
-        )
+        else:
+            scaled_res_load_forecast = (
+                data_dict["residual_load_forecast"]
+                .loc[start : end_excl + forecast_len]
+                .values
+                / self.max_demand
+            )
+
+        if end_excl + forecast_len > data_dict["price_forecast"].index[-1]:
+            scaled_price_forecast = (
+                data_dict["price_forecast"]
+                .loc[start:]
+                .values
+                / self.max_bid_price
+            )
+            scaled_price_forecast = np.concatenate(
+                [
+                    scaled_price_forecast,
+                    data_dict["price_forecast"].iloc[:self.foresight - len(scaled_price_forecast)],
+                ]
+            )
+
+        else:
+            scaled_price_forecast = (
+                data_dict["price_forecast"]
+                .loc[start : end_excl + forecast_len]
+                .values
+                / self.max_bid_price
+            )
 
         # scale unit outpus
         scaled_total_capacity = (

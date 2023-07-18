@@ -58,17 +58,23 @@ def load_file(
                 df.index, pd.DatetimeIndex
             ):
                 logger.warning(
-                    f"Simulation time line does not match length of {file_name} dataframe and index is not a datetimeindex. Returning None."
+                    f"{file_name}: simulation time line does not match length of dataframe and index is not a datetimeindex. Returning None."
                 )
                 return None
 
             df.index.freq = df.index.inferred_freq
 
+            if len(df.index) < len(index) and df.index.freq == index.freq:
+                logger.warning(
+                    f"{file_name}: simulation time line is longer than length of the dataframe. Returning None."
+                )
+                return None
+            
             if df.index.freq < index.freq:
                 df = df.resample(index.freq).mean()
                 logger.info(f"Downsampling {file_name} successful.")
 
-            elif df.index.freq > index.freq:
+            elif df.index.freq > index.freq or len(df.index) < len(index):
                 logger.warning("Upsampling not implemented yet. Returning None.")
                 return None
 
@@ -77,7 +83,7 @@ def load_file(
         return df
 
     except FileNotFoundError:
-        logger.warning(f"File {file_name} not found. Returning None")
+        logger.warning(f"{file_name} not found. Returning None")
 
 
 def convert_to_rrule_freq(string):
