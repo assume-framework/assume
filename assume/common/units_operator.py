@@ -25,6 +25,7 @@ try:
 except ImportError:
     th = None
 
+
 class UnitsOperator(Role):
     def __init__(
         self,
@@ -221,7 +222,6 @@ class UnitsOperator(Role):
         orderbook = await self.formulate_bids(
             market=market,
             products=products,
-            data_dict=self.context.data_dict,
         )
         acl_metadata = {
             "performative": Performatives.inform,
@@ -244,7 +244,6 @@ class UnitsOperator(Role):
         self,
         market: MarketConfig,
         products: list[tuple],
-        data_dict: dict,
     ):
         """
         Takes information from all units that the unit operator manages and
@@ -284,12 +283,11 @@ class UnitsOperator(Role):
                     unit_id: unit.calculate_bids(
                         market_config=market,
                         product_tuple=product,
-                        data_dict=data_dict,
+                        data_dict=self.context.data_dict,
                     )
                     for unit_id, unit in self.units.items()
                 }
 
-                
                 for unit_id, unit_bids in bids.items():
                     if unit_bids is None:
                         continue
