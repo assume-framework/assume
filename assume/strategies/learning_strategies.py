@@ -81,55 +81,53 @@ class RLStrategy(BaseStrategy):
         bid_quantity_inflex, bid_price_inflex = 0, 0
         bid_quantity_flex, bid_price_flex = 0, 0
 
-        if operational_window is not None:
-            # =============================================================================
-            # Calculate bid-prices from action output of RL strategies
-            # Calculating possible bid amount
-            # artificially force inflex_bid to be the smaller price
-            # =============================================================================
+        # =============================================================================
+        # Calculate bid-prices from action output of RL strategies
+        # Calculating possible bid amount
+        # artificially force inflex_bid to be the smaller price
+        # =============================================================================
+        
+        self.next_observation = self.create_observation(
+            unit=unit,
+            operational_window=operational_window,
+            data_dict=data_dict,
+        )
+        
+        self.curr_action = self.get_actions()
 
-            bid_prices = self.get_actions(
-                unit=unit,
-                operational_window=operational_window,
-                data_dict=data_dict,
+        bid_prices = self.curr_action * self.max_bid_price
+
+        bid_price_inflex = min(bid_prices)
+        bid_price_flex = max(bid_prices)
+
+        # =============================================================================
+        # Powerplant is either on, or is able to turn on
+        # Calculating possible bid amount
+        # =============================================================================
+        bid_quantity_inflex = operational_window["states"]["min_power"]["volume"]
+        bid_price_inflex = min(bid_prices)
+
+        # Flex-bid price formulation
+        if unit.current_status:
+            bid_quantity_flex = (
+                operational_window["states"]["max_power"]["volume"]
+                - bid_quantity_inflex
             )
-            bid_prices *= self.max_bid_price
-
-            bid_price_inflex = min(bid_prices)
             bid_price_flex = max(bid_prices)
-
-            # =============================================================================
-            # Powerplant is either on, or is able to turn on
-            # Calculating possible bid amount
-            # =============================================================================
-            bid_quantity_inflex = operational_window["states"]["min_power"]["volume"]
-            bid_price_inflex = min(bid_prices)
-
-            # Flex-bid price formulation
-            if unit.current_status:
-                bid_quantity_flex = (
-                    operational_window["states"]["max_power"]["volume"]
-                    - bid_quantity_inflex
-                )
-                bid_price_flex = max(bid_prices)
 
         bids = [
             {"price": bid_price_inflex, "volume": bid_quantity_inflex},
             {"price": bid_price_flex, "volume": bid_quantity_flex},
         ]
 
+        self.curr_observation = self.next_observation
+
         return bids
 
-    def get_actions(self, unit, operational_window, data_dict):
-        self.curr_observation = self.create_observation(
-            unit=unit,
-            operational_window=operational_window,
-            data_dict=data_dict,
-        )
-
+    def get_actions(self):
         if self.learning_mode:
             if self.collect_initial_experience:
-                self.curr_action = (
+                curr_action = (
                     th.normal(
                         mean=0.0, std=0.2, size=(1, self.act_dim), dtype=self.float_type
                     )
@@ -138,22 +136,22 @@ class RLStrategy(BaseStrategy):
                 )
 
                 # trick that makes the bidding close to marginal cost for exploration purposes
-                self.curr_action += th.tensor(
-                    self.curr_observation[-1],  # this doesnt work yet
+                curr_action += th.tensor(
+                    self.next_observation[-1],  # this doesnt work yet
                     device=self.device,
                     dtype=self.float_type,
                 )
             else:
-                self.curr_action = self.actor(self.curr_observation).detach()
-                self.curr_action += th.tensor(
+                curr_action = self.actor(self.next_observation).detach()
+                curr_action += th.tensor(
                     self.action_noise.noise(), device=self.device, dtype=self.float_type
                 )
         else:
-            self.curr_action = self.actor(self.curr_observation).detach()
+            curr_action = self.actor(self.next_observation).detach()
 
-        self.curr_action = self.curr_action.clamp(-1, 1)
+        curr_action = curr_action.clamp(-1, 1)
 
-        return self.curr_action
+        return curr_action
 
     def create_observation(
         self,
