@@ -25,6 +25,7 @@ try:
 except ImportError:
     th = None
 
+
 class UnitsOperator(Role):
     def __init__(
         self,
@@ -289,7 +290,6 @@ class UnitsOperator(Role):
                     for unit_id, unit in self.units.items()
                 }
 
-                
                 for unit_id, unit_bids in bids.items():
                     if unit_bids is None:
                         continue

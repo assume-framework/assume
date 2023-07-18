@@ -64,7 +64,8 @@ class RLStrategy(BaseStrategy):
     def reset(
         self,
     ):
-        self.next_obs = None
+        self.observation = None
+        self.next_observation = None
 
         self.curr_action = None
         self.curr_reward = None
@@ -120,7 +121,7 @@ class RLStrategy(BaseStrategy):
         return bids
 
     def get_actions(self, unit, operational_window, data_dict):
-        self.curr_obs = self.create_obs(
+        self.curr_observation = self.create_observation(
             unit=unit,
             operational_window=operational_window,
             data_dict=data_dict,
@@ -138,23 +139,23 @@ class RLStrategy(BaseStrategy):
 
                 # trick that makes the bidding close to marginal cost for exploration purposes
                 self.curr_action += th.tensor(
-                    self.curr_obs[-1],  # this doesnt work yet
+                    self.curr_observation[-1],  # this doesnt work yet
                     device=self.device,
                     dtype=self.float_type,
                 )
             else:
-                self.curr_action = self.actor(self.curr_obs).detach()
+                self.curr_action = self.actor(self.curr_observation).detach()
                 self.curr_action += th.tensor(
                     self.action_noise.noise(), device=self.device, dtype=self.float_type
                 )
         else:
-            self.curr_action = self.actor(self.curr_obs).detach()
+            self.curr_action = self.actor(self.curr_observation).detach()
 
         self.curr_action = self.curr_action.clamp(-1, 1)
 
         return self.curr_action
 
-    def create_obs(
+    def create_observation(
         self,
         unit,
         operational_window,
@@ -163,24 +164,33 @@ class RLStrategy(BaseStrategy):
         start = operational_window["window"][0]
         end_excl = operational_window["window"][1] - unit.index.freq
 
-
         # in rl_units operator in ASSUME
         # TODO consider that the last forecast_length time steps cant be used
         # TODO enable difference between actual residual load realisation and residual load forecast
         # currently no difference so historical res_demand values can also be taken from res_demand_forecast
-        forecast_len = pd.Timedelta('24h')  # in metric of market
+        forecast_len = pd.Timedelta("24h")  # in metric of market
 
-        scaled_res_load_forecast = data_dict["residual_load_forecast"].loc[start : end_excl + forecast_len].values / self.max_demand
+        scaled_res_load_forecast = (
+            data_dict["residual_load_forecast"]
+            .loc[start : end_excl + forecast_len]
+            .values
+            / self.max_demand
+        )
 
-        scaled_price_forecast = data_dict["price_forecast"].loc[start : end_excl + forecast_len].values / self.max_bid_price
+        scaled_price_forecast = (
+            data_dict["price_forecast"].loc[start : end_excl + forecast_len].values
+            / self.max_bid_price
+        )
 
         # scale unit outpus
-        scaled_total_capacity = operational_window["states"]["current_power"]["volume"] / unit.max_power
+        scaled_total_capacity = (
+            operational_window["states"]["current_power"]["volume"] / unit.max_power
+        )
         scaled_marginal_cost = (
             operational_window["states"]["current_power"]["cost"] / self.max_bid_price
         )
 
-        obs = np.concatenate(
+        observation = np.concatenate(
             [
                 scaled_res_load_forecast,
                 scaled_price_forecast,
@@ -188,13 +198,13 @@ class RLStrategy(BaseStrategy):
             ]
         )
 
-        obs = (
-            th.tensor(obs, dtype=self.float_type)
+        observation = (
+            th.tensor(observation, dtype=self.float_type)
             .to(self.device, non_blocking=True)
             .view(-1)
         )
 
-        return obs.detach().clone()
+        return observation.detach().clone()
 
     def calculate_reward(
         self,
@@ -253,10 +263,10 @@ class RLStrategy(BaseStrategy):
 
         self.curr_reward = self.rewards[start]
 
-        # TODO I do not have next obs yet, since I get it in calculate rewards
+        # TODO I do not have next observation yet, since I get it in calculate rewards
         self.curr_experience = [
-            self.curr_obs,
-            self.next_obs,
+            self.curr_observation,
+            self.next_observation,
             self.curr_action,
             self.curr_reward,
         ]
