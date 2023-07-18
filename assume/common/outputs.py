@@ -135,8 +135,6 @@ class WriteOutput(Role):
         df["simulation"] = self.simulation_id
         self.write_dfs["rl_params"].append(df)
 
-        print(df)
-
     def write_market_results(self, market_meta):
         """
         Writes market results to the corresponding data frame.

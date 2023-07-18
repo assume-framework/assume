@@ -220,7 +220,7 @@ class MarketRole(Role):
         ):
             addr, aid = agent
             meta = {"sender_addr": self.context.addr, "sender_id": self.context.aid}
-            print(market_meta["price"])
+
             await self.context.send_acl_message(
                 {
                     "context": "clearing",
