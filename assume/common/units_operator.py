@@ -224,10 +224,22 @@ class UnitsOperator(Role):
         products = opening["products"]
         market = self.registered_markets[opening["market_id"]]
         logger.debug(f"{self.id} setting bids for {market.name} - {products}")
-        orderbook = await self.formulate_bids(
-            market=market,
-            products=products,
-        )
+
+        # the given products just became available on our market
+        # and we need to provide bids
+        # [whole_next_hour, quarter1, quarter2, quarter3, quarter4]
+        # algorithm should buy as much baseload as possible, then add up with quarters
+        sorted_products = sorted(products, key=lambda p: (p[0] - p[1], p[0]))
+        if self.use_portfolio_opt:
+            orderbook = await self.formulate_bids_portfolio(
+                market=market,
+                products=sorted_products,
+            )
+        else:
+            orderbook = await self.formulate_bids(
+                market=market,
+                products=sorted_products,
+            )
         acl_metadata = {
             "performative": Performatives.inform,
             "sender_id": self.context.aid,
@@ -245,11 +257,20 @@ class UnitsOperator(Role):
             acl_metadata=acl_metadata,
         )
 
-    async def formulate_bids(
-        self,
-        market: MarketConfig,
-        products: list[tuple],
-    ):
+    async def formulate_bids_portfolio(
+        orderbook: Orderbook = []
+        op_windows = []
+        for unit_id, unit in self.units.items():
+            for product in products:
+                # get operational window for each unit
+                operational_window = unit.calculate_operational_window(
+                    product_type=market.product_type,
+                    product_tuple=product,
+                )
+                op_windows.append(operational_window)
+                # TODO calculate bids from sum of op_windows
+
+    async def formulate_bids(self, market: MarketConfig, products: list[tuple]):
         """
         Takes information from all units that the unit operator manages and
         formulates the bid to the market from that according to the bidding strategy.
@@ -259,58 +280,34 @@ class UnitsOperator(Role):
 
         orderbook: Orderbook = []
 
-        # the given products just became available on our market
-        # and we need to provide bids
-        # [whole_next_hour, quarter1, quarter2, quarter3, quarter4]
-        # algorithm should buy as much baseload as possible, then add up with quarters
-        sorted_products = sorted(products, key=lambda p: (p[0] - p[1], p[0]))
+        for unit_id, unit in self.units.items():
+            for product in products:
+                product_bids = unit.calculate_bids(
+                    market_config=market,
+                    product_tuple=product,
+                )
 
-        for product in sorted_products:
-            if self.use_portfolio_opt:
-                op_windows = []
-                for unit_id, unit in self.units.items():
-                    # get operational window for each unit
-                    operational_window = unit.calculate_operational_window(
-                        product_type=market.product_type,
-                        product_tuple=product,
-                    )
-                    op_windows.append(operational_window)
-                    # TODO calculate bids from sum of op_windows
-            else:
                 order: Order = {
                     "start_time": product[0],
                     "end_time": product[1],
                     "only_hours": product[2],
                     "agent_id": (self.context.addr, self.context.aid),
                 }
+                for i, bid in enumerate(product_bids):
+                    order_c = order.copy()
+                    price = bid["price"]
+                    volume = bid["volume"]
 
-                bids = {
-                    unit_id: unit.calculate_bids(
-                        market_config=market,
-                        product_tuple=product,
-                        data_dict=self.context.data_dict,
-                    )
-                    for unit_id, unit in self.units.items()
-                }
+                    if market.volume_tick:
+                        volume = round(volume / market.volume_tick)
+                    if market.price_tick:
+                        price = round(price / market.price_tick)
 
-                for unit_id, unit_bids in bids.items():
-                    if unit_bids is None:
-                        continue
-                    for i, bid in enumerate(unit_bids):
-                        price = bid["price"]
-                        volume = bid["volume"]
-                        if market.volume_tick:
-                            volume = round(volume / market.volume_tick)
-                        if market.price_tick:
-                            price = round(price / market.price_tick)
-
-                        order_c = order.copy()
-                        order_c["volume"] = volume
-                        order_c["price"] = price
-                        order_c["bid_id"] = f"{unit_id}_{i+1}"
-                        orderbook.append(order_c)
-
-                        self.bids_map[order_c["bid_id"]] = unit_id
+                    order_c["volume"] = volume
+                    order_c["price"] = price
+                    order_c["bid_id"] = f"{unit_id}_{i+1}_{product}"
+                    orderbook.append(order_c)
+                    self.bids_map[order_c["bid_id"]] = unit_id
 
         return orderbook
 
