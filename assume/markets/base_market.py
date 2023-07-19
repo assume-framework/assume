@@ -193,7 +193,7 @@ class MarketRole(Role):
                     and o["only_hours"] == order["only_hours"]
                 )
 
-            available_orders = filter(order_matches_req, self.all_orders)
+            available_orders = list(filter(order_matches_req, self.all_orders))
         else:
             available_orders = self.all_orders
 
@@ -214,7 +214,7 @@ class MarketRole(Role):
             self, market_products
         )
 
-        self.market_result = sorted(self.market_result, key=itemgetter("agent_id"))
+        self.market_result.sort(key=itemgetter("agent_id"))
         for agent, accepted_orderbook in groupby(
             self.market_result, itemgetter("agent_id")
         ):

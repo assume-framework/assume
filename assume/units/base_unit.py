@@ -59,11 +59,11 @@ class BaseUnit:
         market_config,
         product_tuple,
         data_dict=None,
-    ):
+    ) -> list:
         """Calculate the bids for the next time step."""
 
         if market_config.product_type not in self.bidding_strategies:
-            return None
+            return []
 
         # get operational window for each unit
         operational_window = self.calculate_operational_window(

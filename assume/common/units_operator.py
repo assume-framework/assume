@@ -141,7 +141,7 @@ class UnitsOperator(Role):
         this does not respect bids from multiple markets
         for the same time period
         """
-        orderbook = list(sorted(orderbook, key=itemgetter("unit_id")))
+        orderbook.sort(key=itemgetter("unit_id"))
         for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
             orders_l = list(orders)
             total_power = sum(map(itemgetter("volume"), orders_l))
@@ -229,16 +229,16 @@ class UnitsOperator(Role):
         # and we need to provide bids
         # [whole_next_hour, quarter1, quarter2, quarter3, quarter4]
         # algorithm should buy as much baseload as possible, then add up with quarters
-        sorted_products = sorted(products, key=lambda p: (p[0] - p[1], p[0]))
+        products.sort(key=lambda p: (p[0] - p[1], p[0]))
         if self.use_portfolio_opt:
             orderbook = await self.formulate_bids_portfolio(
                 market=market,
-                products=sorted_products,
+                products=products,
             )
         else:
             orderbook = await self.formulate_bids(
                 market=market,
-                products=sorted_products,
+                products=products,
             )
         acl_metadata = {
             "performative": Performatives.inform,
