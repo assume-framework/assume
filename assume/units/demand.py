@@ -1,6 +1,6 @@
 import pandas as pd
 
-from assume.strategies import BaseStrategy, OperationalWindow
+from assume.strategies import OperationalWindow
 from assume.units.base_unit import BaseUnit
 
 
@@ -29,8 +29,8 @@ class Demand(BaseUnit):
         technology: str,
         bidding_strategies: dict,
         index: pd.DatetimeIndex,
-        max_power: float or pd.Series,
-        min_power: float or pd.Series,
+        max_power: float,
+        min_power: float,
         volume: float or pd.Series,
         node: str = "bus0",
         price: float or pd.Series = 3000.0,
@@ -63,6 +63,7 @@ class Demand(BaseUnit):
         start, end, only_hours = product_tuple
         start = pd.Timestamp(start)
         end = pd.Timestamp(end)
+
         """Calculate the operation window for the next time step."""
         bid_volume = (self.volume - self.outputs[product_type]).loc[start:end].max()
 
@@ -73,7 +74,7 @@ class Demand(BaseUnit):
 
         return {
             "window": (start, end),
-            "ops": {"max_power": {"volume": bid_volume, "cost": bid_price}},
+            "states": {"max_power": {"volume": bid_volume, "cost": bid_price}},
         }
 
     def as_dict(self) -> dict:

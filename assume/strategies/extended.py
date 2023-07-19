@@ -10,9 +10,10 @@ class OTCStrategy(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: BaseUnit = None,
-        market_config: MarketConfig = None,
-        operational_window: OperationalWindow = None,
+        unit: BaseUnit,
+        operational_window: OperationalWindow,
+        market_config: MarketConfig,
+        **kwargs,
     ):
         """
         Takes information from a unit that the unit operator manages and
@@ -20,8 +21,8 @@ class OTCStrategy(BaseStrategy):
 
         Return: volume, price
         """
-        price = operational_window["ops"]["max_power"]["cost"]
-        volume = operational_window["ops"]["max_power"]["volume"]
+        price = operational_window["states"]["max_power"]["cost"]
+        volume = operational_window["states"]["max_power"]["volume"]
         if "OTC" in market_config.name:
             volume *= self.scale
         bids = [{"price": price, "volume": volume}]

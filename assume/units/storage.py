@@ -269,7 +269,7 @@ class Storage(BaseUnit):
 
         operational_window = {
             "window": (start, end),
-            "ops": {
+            "states": {
                 "current_power_discharge": {
                     "volume": current_power_discharge,
                     "cost": self.calc_marginal_cost(
@@ -419,6 +419,7 @@ class Storage(BaseUnit):
 
         return operational_window
 
+    
     def calculate_bids(
         self,
         market_config,

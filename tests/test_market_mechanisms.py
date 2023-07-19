@@ -155,8 +155,8 @@ def test_market_mechanism():
 
 
 if __name__ == "__main__":
-    from assume.common.utils import plot_orderbook
-
+    pass
+    # from assume.common.utils import plot_orderbook
     # clearing_result, meta = test_market_mechanism()
     # only works with per node clearing
     # fig, ax = plot_orderbook(clearing_result, meta)

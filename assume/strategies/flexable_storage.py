@@ -3,7 +3,7 @@ import pandas as pd
 
 from assume.common.market_objects import MarketConfig
 from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
-from assume.units.storage import Storage
+from assume.units.base_unit import BaseUnit
 
 
 class flexableEOMStorage(BaseStrategy):
@@ -14,9 +14,10 @@ class flexableEOMStorage(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: Storage,
+        unit: BaseUnit,
         operational_window: OperationalWindow,
         market_config: MarketConfig,
+        **kwargs,
     ):
         """
         Takes information from a unit that the unit operator manages and
@@ -43,15 +44,15 @@ class flexableEOMStorage(BaseStrategy):
 
         if (
             unit.price_forecast[start] >= average_price / unit.efficiency_discharge
-        ) and (operational_window["ops"]["max_power_discharge"]["volume"] > 0):
+        ) and (operational_window["states"]["max_power_discharge"]["volume"] > 0):
             # place bid to discharge
-            bid_quantity = operational_window["ops"]["max_power_discharge"]["volume"]
+            bid_quantity = operational_window["states"]["max_power_discharge"]["volume"]
 
         elif (
             unit.price_forecast[start] <= average_price * unit.efficiency_charge
-        ) and (operational_window["ops"]["max_power_charge"]["volume"] < 0):
+        ) and (operational_window["states"]["max_power_charge"]["volume"] < 0):
             # place bid to charge
-            bid_quantity = operational_window["ops"]["max_power_charge"]["volume"]
+            bid_quantity = operational_window["states"]["max_power_charge"]["volume"]
 
         if bid_quantity != 0:
             return [{"price": average_price, "volume": bid_quantity}]
@@ -72,9 +73,10 @@ class flexablePosCRMStorage(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: Storage,
+        unit: BaseUnit,
         operational_window: OperationalWindow,
         market_config: MarketConfig,
+        **kwargs,
     ):
         self.current_time = operational_window["window"][0]
         

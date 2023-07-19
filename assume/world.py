@@ -29,7 +29,7 @@ from assume.strategies import (
     NaivePosReserveStrategy,
     NaiveStrategy,
     OTCStrategy,
-    RLStrategy,
+    flexableCRMStorage,
     flexableEOM,
     flexablePosCRMStorage,
     flexableNegCRMStorage,
@@ -101,8 +101,13 @@ class World:
             "naive_neg_reserve": NaiveNegReserveStrategy,
             "naive_pos_reserve": NaivePosReserveStrategy,
             "otc_strategy": OTCStrategy,
-            "rl_strategy": RLStrategy,
         }
+        try:
+            from assume.strategies.learning_strategies import RLStrategy
+
+            self.bidding_types["learning"] = RLStrategy
+        except ImportError:
+            pass
         self.clearing_mechanisms = {
             "pay_as_clear": pay_as_clear,
             "pay_as_bid": pay_as_bid,

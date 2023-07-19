@@ -7,9 +7,8 @@ from itertools import groupby
 from operator import itemgetter
 
 import dateutil.rrule as rr
-import pandas as pd
 
-from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
+from assume.common.market_objects import MarketProduct, Orderbook
 
 logger = logging.getLogger(__name__)
 
@@ -157,8 +156,8 @@ def plot_orderbook(orderbook: Orderbook, results: list[dict]):
         if i == number_of_nodes - 1:
             ax[i].legend(
                 handles=[
-                    Line2D([0], [0], 1, color="b", label="Supply"),
-                    Line2D([0], [0], 1, color="r", label="Demand"),
+                    Line2D([0], [0], linewidth=1, color="b", label="Supply"),
+                    Line2D([0], [0], linewidth=1, color="r", label="Demand"),
                 ],
                 bbox_to_anchor=(1.05, 1),
                 loc="upper left",

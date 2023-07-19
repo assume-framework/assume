@@ -4,7 +4,6 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 from dateutil import rrule as rr
-from dateutil.relativedelta import relativedelta as rd
 
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.scenario_loader import convert_to_rrule_freq, make_market_config

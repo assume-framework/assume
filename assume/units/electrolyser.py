@@ -1,7 +1,6 @@
-import numpy as np
 import pandas as pd
 
-from assume.strategies import BaseStrategy, OperationalWindow
+from assume.strategies import OperationalWindow
 from assume.units.base_unit import BaseUnit
 
 
@@ -104,7 +103,7 @@ class Electrolyser(BaseUnit):
 
         operational_window = {
             "window": (start, end),
-            "ops": {
+            "states": {
                 "current_power": {
                     "power": current_power_input,
                     "marginal_cost": self.calc_marginal_cost(start),
@@ -121,16 +120,6 @@ class Electrolyser(BaseUnit):
         }
 
         return operational_window
-
-    def calculate_bids(
-        self,
-        market_config,
-        product_tuple: tuple,
-    ):
-        return super().calculate_bids(
-            market_config=market_config,
-            product_tuple=product_tuple,
-        )
 
     def set_dispatch_plan(
         self,
