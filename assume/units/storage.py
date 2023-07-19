@@ -338,6 +338,7 @@ class Storage(BaseUnit):
     def set_dispatch_plan(
         self,
         dispatch_plan: dict,
+        clearing_price: float,
         start: pd.Timestamp,
         end: pd.Timestamp,
         product_type: str,
