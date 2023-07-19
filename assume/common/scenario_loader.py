@@ -84,6 +84,7 @@ def load_file(
 
     except FileNotFoundError:
         logger.warning(f"{file_name} not found. Returning None")
+        return None
 
 
 def convert_to_rrule_freq(string):

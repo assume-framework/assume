@@ -5,7 +5,6 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
-import torch as th
 from dateutil import rrule as rr
 from mango import Role
 from sqlalchemy import inspect, text
@@ -176,10 +175,15 @@ class WriteOutput(Role):
             self.write_dfs[table] = []
 
     def check_for_tensors(self, data):
-        if data.map(lambda x: isinstance(x, th.Tensor)).any():
-            for i, value in enumerate(data):
-                if isinstance(value, th.Tensor):
-                    data.iat[i] = value.item()
+        try:
+            import torch as th
+
+            if data.map(lambda x: isinstance(x, th.Tensor)).any():
+                for i, value in enumerate(data):
+                    if isinstance(value, th.Tensor):
+                        data.iat[i] = value.item()
+        except ImportError:
+            pass
 
         return data
 

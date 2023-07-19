@@ -3,6 +3,7 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
+from assume.strategies.naive_strategies import NaiveStrategy
 from assume.units import PowerPlant
 
 
@@ -13,7 +14,7 @@ def power_plant_1():
         id="test_pp",
         unit_operator="test_operator",
         technology="coal",
-        bidding_strategies={"energy": "naive"},
+        bidding_strategies={"energy": NaiveStrategy()},
         index=pd.date_range("2022-01-01", periods=4, freq="H"),
         max_power=1000,
         min_power=200,
@@ -37,7 +38,7 @@ def power_plant_2():
         id="test_pp",
         unit_operator="test_operator",
         technology="coal",
-        bidding_strategies={"energy": "naive"},
+        bidding_strategies={"energy": NaiveStrategy()},
         index=pd.date_range("2022-01-01", periods=4, freq="H"),
         max_power=1000,
         min_power=0,
@@ -57,7 +58,7 @@ def power_plant_3():
         id="test_pp",
         unit_operator="test_operator",
         technology="coal",
-        bidding_strategies={"energy": "naive"},
+        bidding_strategies={"energy": NaiveStrategy()},
         index=pd.date_range("2022-01-01", periods=4, freq="H"),
         max_power=1000,
         min_power=0,
@@ -169,7 +170,7 @@ def test_powerplant_feedback(power_plant_1):
     # min_power gets accepted
     dispatch_plan = {"total_power": 200}
     power_plant_1.set_dispatch_plan(
-        dispatch_plan, product_tuple[0], product_tuple[1], product_type
+        dispatch_plan, 20, product_tuple[0], product_tuple[1], product_type
     )
 
     # second market request for same interval
@@ -223,7 +224,7 @@ def test_powerplant_ramping(power_plant_1):
     # min_power gets accepted
     dispatch_plan = {"total_power": 200}
     power_plant_1.set_dispatch_plan(
-        dispatch_plan, product_tuple[0], product_tuple[1], product_type
+        dispatch_plan, 20, product_tuple[0], product_tuple[1], product_type
     )
 
     # next hour
@@ -243,7 +244,7 @@ def test_powerplant_ramping(power_plant_1):
     # accept max_power
     dispatch_plan = {"total_power": 400}
     power_plant_1.set_dispatch_plan(
-        dispatch_plan, product_tuple[0], product_tuple[1], product_type
+        dispatch_plan, 20, product_tuple[0], product_tuple[1], product_type
     )
 
     # next hour
