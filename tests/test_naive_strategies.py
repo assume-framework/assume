@@ -11,7 +11,7 @@ start = datetime(2023, 7, 1)
 end = datetime(2023, 7, 2)
 operational_window: OperationalWindow = {
     "window": (start, end),
-    "ops": {
+    "states": {
         "current_power": {
             "volume": 100,
             "cost": 1,
@@ -39,7 +39,7 @@ operational_window: OperationalWindow = {
 def test_naive_strategy():
     strategy = NaiveStrategy()
     bids = strategy.calculate_bids(None, operational_window, None)
-    mp = operational_window["ops"]["max_power"]
+    mp = operational_window["states"]["max_power"]
     assert bids[0]["price"] == mp["cost"]
     assert bids[0]["volume"] == mp["volume"]
     assert bids == [{"price": 3, "volume": 400}]
@@ -53,7 +53,7 @@ def test_naive_pos_strategy():
     bids = strategy.calculate_bids(None, operational_window, None)
 
     assert bids[0]["price"] == 0
-    assert bids[0]["volume"] == operational_window["ops"]["pos_reserve"]["volume"]
+    assert bids[0]["volume"] == operational_window["states"]["pos_reserve"]["volume"]
     assert bids == [{"price": 0, "volume": 20}]
 
 
@@ -62,7 +62,7 @@ def test_naive_neg_strategy():
     bids = strategy.calculate_bids(None, operational_window, None)
 
     assert bids[0]["price"] == 0
-    assert bids[0]["volume"] == operational_window["ops"]["neg_reserve"]["volume"]
+    assert bids[0]["volume"] == operational_window["states"]["neg_reserve"]["volume"]
     assert bids == [{"price": 0, "volume": 10}]
 
 

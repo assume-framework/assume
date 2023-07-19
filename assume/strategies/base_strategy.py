@@ -26,7 +26,7 @@ class BaseStrategy:
     """
 
     def __init__(self, *args, **kwargs):
-        pass
+        self.is_learning_strategy = False
 
     def calculate_bids(
         self,
@@ -35,3 +35,13 @@ class BaseStrategy:
         market_config: MarketConfig,
     ):
         raise NotImplementedError()
+
+    def calculate_reward(
+        self,
+        start,
+        end,
+        product_type,
+        clearing_price,
+        unit,
+    ):
+        pass

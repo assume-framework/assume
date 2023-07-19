@@ -255,7 +255,7 @@ class Storage(BaseUnit):
         # what form does the operational window have?
         operational_window = {
             "window": (start, end),
-            "ops": {
+            "states": {
                 "current_power_discharge": {
                     "volume": current_power_discharge,
                     "cost": self.calc_marginal_cost(
@@ -334,16 +334,6 @@ class Storage(BaseUnit):
             logger.error("available_neg_reserve_discharge < 0")
 
         return operational_window
-
-    def calculate_bids(
-        self,
-        market_config,
-        product_tuple,
-    ):
-        return super().calculate_bids(
-            market_config=market_config,
-            product_tuple=product_tuple,
-        )
 
     def set_dispatch_plan(
         self,

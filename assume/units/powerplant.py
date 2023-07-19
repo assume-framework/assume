@@ -140,6 +140,10 @@ class PowerPlant(BaseUnit):
         self.outputs["capacity_pos"] = pd.Series(0.0, index=self.index)
         self.outputs["capacity_neg"] = pd.Series(0.0, index=self.index)
 
+        self.outputs["profits"] = pd.Series(0.0, index=self.index)
+        self.outputs["rewards"] = pd.Series(0.0, index=self.index)
+        self.outputs["regrets"] = pd.Series(0.0, index=self.index)
+
         self.mean_market_success = 0
         self.market_success_list = [0]
 
@@ -196,7 +200,7 @@ class PowerPlant(BaseUnit):
         if self.marginal_cost is None:
             return {
                 "window": (start, end),
-                "ops": {
+                "states": {
                     "current_power": {
                         "volume": current_power,
                         "cost": self.calc_marginal_cost_with_partial_eff(
@@ -228,7 +232,7 @@ class PowerPlant(BaseUnit):
         )
         return {
             "window": (start, end),
-            "ops": {
+            "states": {
                 "current_power": {
                     "volume": current_power,
                     "cost": marginal_cost,
@@ -269,7 +273,7 @@ class PowerPlant(BaseUnit):
 
         operational_window = {
             "window": (start, end),
-            "ops": {
+            "states": {
                 "pos_reserve": {
                     "volume": available_pos_reserve,
                     "cost": marginal_cost,
@@ -304,7 +308,7 @@ class PowerPlant(BaseUnit):
 
         operational_window = {
             "window": (start, end),
-            "ops": {
+            "states": {
                 "neg_reserve": {
                     "volume": available_neg_reserve,
                     "cost": marginal_cost,
@@ -316,16 +320,6 @@ class PowerPlant(BaseUnit):
             logger.error("available_neg_reserve < 0")
 
         return operational_window
-
-    def calculate_bids(
-        self,
-        market_config,
-        product_tuple,
-    ):
-        return super().calculate_bids(
-            market_config=market_config,
-            product_tuple=product_tuple,
-        )
 
     def execute_current_dispatch(
         self,
@@ -352,6 +346,17 @@ class PowerPlant(BaseUnit):
         #     max_pow = self.outputs["energy"][start:end_excl].max()
         #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")
         return self.outputs["energy"].loc[start:end_excl]
+
+    def calculate_cashflow(self, start, end, clearing_price):
+        start = start
+        end_excl = end - self.index.freq
+
+        self.outputs["cashflow"].loc[start:end_excl] = (
+            clearing_price
+            * self.outputs["energy"].loc[start:end_excl]
+            * (end - start).total_seconds()
+            / 3600
+        )
 
     def calc_simple_marginal_cost(
         self,
@@ -428,7 +433,7 @@ class PowerPlant(BaseUnit):
         end_excl = end - self.index.freq
         base_load = self.outputs["energy"][start:end_excl]
         # check if min_power is a series or a float
-        min_power = self.min_power - base_load.min()
+        min_power = max(self.min_power - base_load.min(), 0)
 
         # check if max_power is a series or a float
         max_power = (
@@ -436,7 +441,7 @@ class PowerPlant(BaseUnit):
             if type(self.availability) is dict
             else self.max_power
         )
-        max_power = max_power - base_load.max()
+        max_power = max(max_power - base_load.max(), 0)
 
         return min_power, max_power
 

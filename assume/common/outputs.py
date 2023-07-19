@@ -119,6 +119,23 @@ class WriteOutput(Role):
         elif content.get("type") == "unit_dispatch":
             self.write_unit_dispatch(content.get("data"))
 
+        elif content.get("type") == "rl_learning_params":
+            self.write_rl_params(content.get("data"))
+
+    def write_rl_params(self, rl_params):
+        """
+        Writes the RL parameters to the corresponding data frame.
+
+        Args:
+            rl_params: The RL parameters.
+        """
+
+        df = pd.DataFrame.from_records(rl_params)
+        if df.empty:
+            return
+        df["simulation"] = self.simulation_id
+        self.write_dfs["rl_params"].append(df)
+
     def write_market_results(self, market_meta):
         """
         Writes market results to the corresponding data frame.
@@ -146,6 +163,9 @@ class WriteOutput(Role):
             df.reset_index()
             if df.empty:
                 continue
+
+            df = df.apply(self.check_for_tensors)
+
             if self.export_csv_path:
                 data_path = self.p.joinpath(f"{table}.csv")
                 df.to_csv(data_path, mode="a", header=not data_path.exists())
@@ -153,6 +173,19 @@ class WriteOutput(Role):
             if self.db is not None:
                 df.to_sql(table, self.db.bind, if_exists="append")
             self.write_dfs[table] = []
+
+    def check_for_tensors(self, data):
+        try:
+            import torch as th
+
+            if data.map(lambda x: isinstance(x, th.Tensor)).any():
+                for i, value in enumerate(data):
+                    if isinstance(value, th.Tensor):
+                        data.iat[i] = value.item()
+        except ImportError:
+            pass
+
+        return data
 
     def write_market_orders(self, market_orders, market_id):
         """

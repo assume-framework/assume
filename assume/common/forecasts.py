@@ -33,13 +33,28 @@ class ForecastProvider(Role):
         self.availability = availability
 
         self.forecasts = {}
-        if self.forecasts_df is None:
+
+        if (
+            self.forecasts_df is not None
+            and "price_forecast" in self.forecasts_df.columns
+        ):
+            self.forecasts["price_forecast"] = self.forecasts_df["price_forecast"]
+        else:
             self.forecasts["price_forecast"] = self.calculate_price_forecast(
                 market_id=self.market_id
             )
+
+        if (
+            self.forecasts_df is not None
+            and "residual_load_forecast" in self.forecasts_df.columns
+        ):
+            self.forecasts["residual_load_forecast"] = self.forecasts_df[
+                "residual_load_forecast"
+            ]
         else:
-            for forecast in self.forecasts_df.columns:
-                self.forecasts[forecast] = self.forecasts_df[forecast]
+            self.forecasts[
+                "residual_load_forecast"
+            ] = self.calculate_residual_demand_forecast(market_id=self.market_id)
 
     def get_registered_market_participants(self, market_id):
         """
@@ -51,6 +66,28 @@ class ForecastProvider(Role):
         )
 
         # calculate price forecast
+
+    def calculate_residual_demand_forecast(self, market_id):
+        if market_id == "EOM":
+            vre_powerplants = self.powerplants[
+                self.powerplants["fuel_type"] == "renewable"
+            ].copy()
+
+            vre_feed_in_df = pd.DataFrame(
+                index=self.demand_df.index, columns=vre_powerplants.index, data=0.0
+            )
+
+            for pp, cf in self.availability.items():
+                vre_feed_in_df[pp] = cf * vre_powerplants.at[pp, "max_power"]
+
+            res_demand_df = self.demand_df - vre_feed_in_df.sum(axis=1)
+
+            return res_demand_df
+
+        else:
+            self.logger.warning(
+                f"No residual load forecast for {market_id} is implemented yet. Please provide an external price forecast."
+            )
 
     def calculate_price_forecast(self, market_id):
         if market_id == "EOM":

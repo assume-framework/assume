@@ -58,6 +58,7 @@ class BaseUnit:
         self,
         market_config,
         product_tuple,
+        data_dict=None,
     ):
         """Calculate the bids for the next time step."""
 
@@ -78,11 +79,13 @@ class BaseUnit:
             unit=self,
             operational_window=operational_window,
             market_config=market_config,
+            data_dict=data_dict,
         )
 
     def set_dispatch_plan(
         self,
         dispatch_plan: dict,
+        clearing_price: float,
         start: pd.Timestamp,
         end: pd.Timestamp,
         product_type: str,
@@ -92,6 +95,16 @@ class BaseUnit:
         """
         end_excl = end - self.index.freq
         self.outputs[product_type].loc[start:end_excl] += dispatch_plan["total_power"]
+
+        self.calculate_cashflow(start=start, end=end, clearing_price=clearing_price)
+
+        self.bidding_strategies[product_type].calculate_reward(
+            start=start,
+            end=end,
+            product_type=product_type,
+            clearing_price=clearing_price,
+            unit=self,
+        )
 
     def execute_current_dispatch(
         self,
@@ -119,3 +132,11 @@ class BaseUnit:
             "unit_operator": self.unit_operator,
             "unit_type": "base_unit",
         }
+
+    def calculate_cashflow(
+        self,
+        start,
+        end,
+        clearing_price,
+    ):
+        pass

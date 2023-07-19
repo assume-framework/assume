@@ -20,6 +20,11 @@ from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
 
+try:
+    import torch as th
+except ImportError:
+    th = None
+
 
 class UnitsOperator(Role):
     def __init__(
@@ -146,6 +151,7 @@ class UnitsOperator(Role):
                 start=orderbook[0]["start_time"],
                 end=orderbook[0]["end_time"],
                 product_type=marketconfig.product_type,
+                clearing_price=orders_l[0]["price"],
             )
 
     def write_actual_dispatch(self):
@@ -154,6 +160,7 @@ class UnitsOperator(Role):
         works across multiple markets
         sends dispatch at or after it actually happens
         """
+
         last = self.last_sent_dispatch
         if self.context.current_timestamp == last:
             # stop if we exported at this time already
@@ -169,7 +176,8 @@ class UnitsOperator(Role):
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
             data = pd.DataFrame(
-                unit.execute_current_dispatch(start, now), columns=["power"]
+                unit.execute_current_dispatch(start, now),
+                columns=["power"],
             )
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
@@ -203,6 +211,8 @@ class UnitsOperator(Role):
             filter(lambda x: x["end_time"] >= now, self.valid_orders)
         )
 
+        self.write_learning_params(now)
+
     async def submit_bids(self, opening: OpeningMessage):
         """
         formulates an orderbook and sends it to the market.
@@ -214,7 +224,10 @@ class UnitsOperator(Role):
         products = opening["products"]
         market = self.registered_markets[opening["market_id"]]
         logger.debug(f"{self.id} setting bids for {market.name} - {products}")
-        orderbook = await self.formulate_bids(market, products)
+        orderbook = await self.formulate_bids(
+            market=market,
+            products=products,
+        )
         acl_metadata = {
             "performative": Performatives.inform,
             "sender_id": self.context.aid,
@@ -232,7 +245,11 @@ class UnitsOperator(Role):
             acl_metadata=acl_metadata,
         )
 
-    async def formulate_bids(self, market: MarketConfig, products: list[tuple]):
+    async def formulate_bids(
+        self,
+        market: MarketConfig,
+        products: list[tuple],
+    ):
         """
         Takes information from all units that the unit operator manages and
         formulates the bid to the market from that according to the bidding strategy.
@@ -267,17 +284,19 @@ class UnitsOperator(Role):
                     "agent_id": (self.context.addr, self.context.aid),
                 }
 
-                for unit_id, unit in self.units.items():
-                    # take price from bidding strategy
-                    bids = unit.calculate_bids(
+                bids = {
+                    unit_id: unit.calculate_bids(
                         market_config=market,
                         product_tuple=product,
+                        data_dict=self.context.data_dict,
                     )
+                    for unit_id, unit in self.units.items()
+                }
 
-                    if bids is None:
+                for unit_id, unit_bids in bids.items():
+                    if unit_bids is None:
                         continue
-
-                    for i, bid in enumerate(bids):
+                    for i, bid in enumerate(unit_bids):
                         price = bid["price"]
                         volume = bid["volume"]
                         if market.volume_tick:
@@ -294,3 +313,38 @@ class UnitsOperator(Role):
                         self.bids_map[order_c["bid_id"]] = unit_id
 
         return orderbook
+
+    def write_learning_params(self, start):
+        """
+        sends the current rl_strategy update to the output agent
+        """
+
+        unit_rl_strategy_dfs = []
+        for unit_id, unit in self.units.items():
+            if unit.bidding_strategies["energy"].is_learning_strategy:
+                data = pd.DataFrame(
+                    {
+                        "profit": unit.outputs["profit"].loc[start],
+                        "reward": unit.outputs["reward"].loc[start],
+                        "regret": unit.outputs["regret"].loc[start],
+                    },
+                    index=[start],
+                )
+                data["unit"] = unit_id
+                unit_rl_strategy_dfs.append(data)
+
+        if len(unit_rl_strategy_dfs):
+            learning_data = pd.concat(unit_rl_strategy_dfs)
+
+            db_aid = self.context.data_dict.get("output_agent_id")
+            db_addr = self.context.data_dict.get("output_agent_addr")
+            if db_aid and db_addr:
+                self.context.schedule_instant_acl_message(
+                    receiver_id=db_aid,
+                    receiver_addr=db_addr,
+                    content={
+                        "context": "write_results",
+                        "type": "rl_learning_params",
+                        "data": learning_data,
+                    },
+                )

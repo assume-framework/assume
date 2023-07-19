@@ -237,7 +237,6 @@ class MarketRole(Role):
                 f"{self.context.current_timestamp} Market result {market_products} for market {self.marketconfig.name} are empty!"
             )
         await self.store_order_book(self.market_result)
-        # clear_price = sorted(self.market_result, lambda o: o['price'])[0]
 
         for meta in market_meta:
             logger.debug(
