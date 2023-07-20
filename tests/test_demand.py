@@ -32,7 +32,7 @@ def test_demand():
         150,
         price=2000,
     )
-    op_window = dem.calculate_operational_window("energy", product_tuple)
+    op_window = dem.calculate_operational_window("energy", [product_tuple])
 
     assert op_window["states"]["max_power"]["volume"] == -150
     assert op_window["states"]["max_power"]["cost"] == 2000
@@ -45,7 +45,7 @@ def test_demand():
         [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
     )
 
-    bids = dem.calculate_bids(mc, product_tuple)
+    bids = dem.calculate_bids(mc, [product_tuple])
 
     for bid in bids:
         assert "price" in bid.keys()
@@ -82,7 +82,7 @@ def test_demand_series():
         demand,
         price=price,
     )
-    op_window = dem.calculate_operational_window("energy", product_tuple)
+    op_window = dem.calculate_operational_window("energy", [product_tuple])
 
     # power should be the highest demand which is used throughout the period
     # in our case 80 MW
@@ -98,7 +98,7 @@ def test_demand_series():
         [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
     )
 
-    bids = dem.calculate_bids(mc, product_tuple)
+    bids = dem.calculate_bids(mc, [product_tuple])
 
     for bid in bids:
         assert "price" in bid.keys()

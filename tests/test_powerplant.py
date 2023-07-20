@@ -8,7 +8,7 @@ from assume.units import PowerPlant
 
 
 @pytest.fixture
-def power_plant_1():
+def power_plant_1() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
     return PowerPlant(
         id="test_pp",
@@ -32,7 +32,7 @@ def power_plant_1():
 
 
 @pytest.fixture
-def power_plant_2():
+def power_plant_2() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
     return PowerPlant(
         id="test_pp",
@@ -52,7 +52,7 @@ def power_plant_2():
 
 
 @pytest.fixture
-def power_plant_3():
+def power_plant_3() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
     return PowerPlant(
         id="test_pp",
@@ -135,7 +135,7 @@ def test_calculate_operational_window(power_plant_1):
         None,
     )
     operational_window = power_plant_1.calculate_operational_window(
-        product_tuple=product_tuple, product_type="energy"
+        product_tuples=[product_tuple], product_type="energy"
     )
 
     assert operational_window["states"]["min_power"]["volume"] == 200
@@ -158,7 +158,7 @@ def test_powerplant_feedback(power_plant_1):
     product_type = "energy"
 
     operational_window = power_plant_1.calculate_operational_window(
-        product_tuple=product_tuple, product_type=product_type
+        product_tuples=[product_tuple], product_type=product_type
     )
 
     assert operational_window["states"]["min_power"]["volume"] == 200
@@ -175,7 +175,7 @@ def test_powerplant_feedback(power_plant_1):
 
     # second market request for same interval
     operational_window = power_plant_1.calculate_operational_window(
-        product_tuple=product_tuple, product_type=product_type
+        product_tuples=[product_tuple], product_type=product_type
     )
 
     # we do not need additional min_power, as our runtime requirement is fulfilled
@@ -192,7 +192,7 @@ def test_powerplant_feedback(power_plant_1):
         None,
     )
     operational_window = power_plant_1.calculate_operational_window(
-        product_tuple=product_tuple, product_type=product_type
+        product_tuples=[product_tuple], product_type=product_type
     )
 
     # now we can bid max_power and need min_power again
@@ -212,7 +212,7 @@ def test_powerplant_ramping(power_plant_1):
     product_type = "energy"
 
     operational_window = power_plant_1.calculate_operational_window(
-        product_tuple=product_tuple, product_type=product_type
+        product_tuples=[product_tuple], product_type=product_type
     )
 
     assert operational_window["states"]["min_power"]["volume"] == 200
@@ -235,7 +235,7 @@ def test_powerplant_ramping(power_plant_1):
     )
 
     operational_window = power_plant_1.calculate_operational_window(
-        product_tuple=product_tuple, product_type=product_type
+        product_tuples=[product_tuple], product_type=product_type
     )
 
     assert operational_window["states"]["min_power"]["volume"] == 200
@@ -255,7 +255,7 @@ def test_powerplant_ramping(power_plant_1):
     )
 
     operational_window = power_plant_1.calculate_operational_window(
-        product_tuple=product_tuple, product_type=product_type
+        product_tuples=[product_tuple], product_type=product_type
     )
 
     assert operational_window["states"]["min_power"]["volume"] == 300

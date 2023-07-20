@@ -6,7 +6,14 @@ from operator import itemgetter
 
 from mango import Role
 
-from assume.common.market_objects import MarketConfig, MarketProduct, Order, Orderbook
+from assume.common.market_objects import (
+    ClearingMessage,
+    MarketConfig,
+    MarketProduct,
+    OpeningMessage,
+    Order,
+    Orderbook,
+)
 from assume.common.utils import get_available_products
 
 logger = logging.getLogger(__name__)
@@ -84,7 +91,7 @@ class MarketRole(Role):
             # this market should not open, as the clearing is after the markets end time
             return
 
-        opening_message = {
+        opening_message: OpeningMessage = {
             "context": "opening",
             "market_id": self.marketconfig.name,
             "start": market_open,
@@ -220,13 +227,13 @@ class MarketRole(Role):
         ):
             addr, aid = agent
             meta = {"sender_addr": self.context.addr, "sender_id": self.context.aid}
-
+            closing: ClearingMessage = {
+                "context": "clearing",
+                "market_id": self.marketconfig.name,
+                "orderbook": list(accepted_orderbook),
+            }
             await self.context.send_acl_message(
-                {
-                    "context": "clearing",
-                    "market_id": self.marketconfig.name,
-                    "orderbook": list(accepted_orderbook),
-                },
+                closing,
                 receiver_addr=addr,
                 receiver_id=aid,
                 acl_metadata=meta,

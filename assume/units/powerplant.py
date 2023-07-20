@@ -144,7 +144,7 @@ class PowerPlant(BaseUnit):
         self.market_success_list = [0]
 
     def calculate_operational_window(
-        self, product_type: str, product_tuple: tuple, product_tuples: list[tuple] = []
+        self, product_type: str, product_tuples: list[tuple] = []
     ) -> OperationalWindow:
         """Calculate the operation window for the next time step.
 
@@ -277,7 +277,7 @@ class PowerPlant(BaseUnit):
 
                 if available_neg_reserve < 0:
                     logger.error("available_neg_reserve < 0")
-            return {"window": (start, end), "ops": states}
+            return {"window": (start, end), "states": states}
 
     def execute_current_dispatch(
         self,

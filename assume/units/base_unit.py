@@ -44,8 +44,8 @@ class BaseUnit:
     def calculate_operational_window(
         self,
         product_type: str,
-        product_tuple: tuple,
-    ) -> "OperationalWindow":
+        product_tuples: list[tuple] = [],
+    ) -> list["OperationalWindow"]:
         """Calculate the operation window for the next time step."""
 
         raise NotImplementedError()
@@ -57,7 +57,7 @@ class BaseUnit:
     def calculate_bids(
         self,
         market_config,
-        product_tuple,
+        product_tuples: list[tuple],
         data_dict=None,
     ) -> list:
         """Calculate the bids for the next time step."""
@@ -68,7 +68,7 @@ class BaseUnit:
         # get operational window for each unit
         operational_window = self.calculate_operational_window(
             product_type=market_config.product_type,
-            product_tuple=product_tuple,
+            product_tuples=product_tuples,
         )
 
         # check if operational window is valid

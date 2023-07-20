@@ -127,7 +127,7 @@ class HeatPump(BaseUnit):
         self,
         # source: str,
         product_type: str,
-        product_tuple: tuple,
+        product_tuples: list[tuple] = [],
     ) -> dict:
         """Calculate the operation window for the next time step.
 

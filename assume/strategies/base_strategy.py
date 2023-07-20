@@ -1,6 +1,6 @@
 from typing import TypedDict
 
-from assume.common.market_objects import MarketConfig
+from assume.common.market_objects import MarketConfig, Product
 
 
 class SingleWindow(TypedDict):
@@ -9,7 +9,7 @@ class SingleWindow(TypedDict):
 
 
 class OperationalWindow(TypedDict):
-    window: tuple
+    window: Product
     ops: dict[str, SingleWindow]
 
 

@@ -58,9 +58,11 @@ class Demand(BaseUnit):
     def calculate_operational_window(
         self,
         product_type: str,
-        product_tuple: tuple,
+        product_tuples: list[tuple] = [],
     ) -> OperationalWindow:
-        start, end, only_hours = product_tuple
+        start = product_tuples[0][0]
+        end = product_tuples[-1][1]
+        only_hours = product_tuples[0][1]
         start = pd.Timestamp(start)
         end = pd.Timestamp(end)
 

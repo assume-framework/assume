@@ -258,19 +258,24 @@ class UnitsOperator(Role):
         )
 
     async def formulate_bids_portfolio(
+        self, market: MarketConfig, products: list[tuple]
+    ) -> Orderbook:
         orderbook: Orderbook = []
         op_windows = []
         for unit_id, unit in self.units.items():
-            for product in products:
-                # get operational window for each unit
-                operational_window = unit.calculate_operational_window(
-                    product_type=market.product_type,
-                    product_tuple=product,
-                )
-                op_windows.append(operational_window)
-                # TODO calculate bids from sum of op_windows
+            # get operational window for each unit
+            operational_window = unit.calculate_operational_window(
+                product_type=market.product_type,
+                product_tuples=products,
+            )
+            op_windows.append(operational_window)
+            # TODO calculate bids from sum of op_windows
 
-    async def formulate_bids(self, market: MarketConfig, products: list[tuple]):
+        return orderbook
+
+    async def formulate_bids(
+        self, market: MarketConfig, products: list[tuple]
+    ) -> Orderbook:
         """
         Takes information from all units that the unit operator manages and
         formulates the bid to the market from that according to the bidding strategy.
@@ -281,33 +286,31 @@ class UnitsOperator(Role):
         orderbook: Orderbook = []
 
         for unit_id, unit in self.units.items():
-            for product in products:
-                product_bids = unit.calculate_bids(
-                    market_config=market,
-                    product_tuple=product,
-                )
-
+            product_bids = unit.calculate_bids(
+                market_config=market,
+                product_tuples=products,
+            )
+            product = products[0]
+            for i, bid in enumerate(product_bids):
                 order: Order = {
                     "start_time": product[0],
                     "end_time": product[1],
                     "only_hours": product[2],
                     "agent_id": (self.context.addr, self.context.aid),
                 }
-                for i, bid in enumerate(product_bids):
-                    order_c = order.copy()
-                    price = bid["price"]
-                    volume = bid["volume"]
+                price = bid["price"]
+                volume = bid["volume"]
 
-                    if market.volume_tick:
-                        volume = round(volume / market.volume_tick)
-                    if market.price_tick:
-                        price = round(price / market.price_tick)
+                if market.volume_tick:
+                    volume = round(volume / market.volume_tick)
+                if market.price_tick:
+                    price = round(price / market.price_tick)
 
-                    order_c["volume"] = volume
-                    order_c["price"] = price
-                    order_c["bid_id"] = f"{unit_id}_{i+1}_{product}"
-                    orderbook.append(order_c)
-                    self.bids_map[order_c["bid_id"]] = unit_id
+                order["volume"] = volume
+                order["price"] = price
+                order["bid_id"] = f"{unit_id}_{i+1}_{product}"
+                orderbook.append(order)
+                self.bids_map[order["bid_id"]] = unit_id
 
         return orderbook
 

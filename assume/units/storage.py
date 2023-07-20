@@ -202,7 +202,7 @@ class Storage(BaseUnit):
     def calculate_operational_window(
         self,
         product_type: str,
-        product_tuple: tuple,
+        product_tuples: list[tuple] = [],
     ) -> OperationalWindow:
         """Calculate the operation window for the next time step.
 
