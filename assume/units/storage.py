@@ -309,10 +309,10 @@ class Storage(BaseUnit):
         # capacity calculation has to be added
         current_power = self.get_output_before(start)
 
-        available_pos_reserve_discharge = None
-        available_neg_reserve_discharge = None
-        available_pos_reserve_charge = None
-        available_neg_reserve_charge = None
+        available_pos_reserve_discharge = 0
+        available_neg_reserve_discharge = 0
+        available_pos_reserve_charge = 0
+        available_neg_reserve_charge = 0
 
         operational_window = {
             "window": (start, end),

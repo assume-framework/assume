@@ -321,7 +321,7 @@ class UnitsOperator(Role):
 
         unit_rl_strategy_dfs = []
         for unit_id, unit in self.units.items():
-            #rl only for energy market for now!
+            # rl only for energy market for now!
             if "energy" in unit.bidding_strategies:
                 if unit.bidding_strategies["energy"].is_learning_strategy:
                     data = pd.DataFrame(
