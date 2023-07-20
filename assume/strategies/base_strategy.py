@@ -26,13 +26,14 @@ class BaseStrategy:
     """
 
     def __init__(self, *args, **kwargs):
-        self.is_learning_strategy = False
+        pass
 
     def calculate_bids(
         self,
         unit,
-        operational_window: OperationalWindow,
         market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
     ):
         raise NotImplementedError()
 
@@ -45,3 +46,11 @@ class BaseStrategy:
         unit,
     ):
         pass
+
+
+class LearningStrategy(BaseStrategy):
+    """
+    A strategy which provides learning functionality, has a method to calculate the reward.
+    """
+
+    pass

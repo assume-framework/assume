@@ -3,16 +3,14 @@ import pandas as pd
 import torch as th
 
 from assume.common.learning_utils import Actor, NormalActionNoise
-from assume.common.market_objects import MarketConfig
-from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
+from assume.strategies.base_strategy import LearningStrategy, OperationalWindow
 from assume.units.base_unit import BaseUnit
 
 
-class RLStrategy(BaseStrategy):
+class RLStrategy(LearningStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.is_learning_strategy = True
         self.foresight = kwargs.get("foresight", 24)
         self.current_time = None
 
@@ -239,10 +237,10 @@ class RLStrategy(BaseStrategy):
         clearing_price,
         unit,
     ):
-        if not self.is_learning_strategy:
-            return
+        # if not self.learning_mode:
+        #    return
 
-        # gets market feedback from set_dispacth
+        # gets market feedback from set_dispatch
         # based on calculated market success in dispatch we calculate the profit
 
         end_excl = end - unit.index.freq
