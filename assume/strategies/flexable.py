@@ -147,6 +147,7 @@ class flexablePosCRM(BaseStrategy):
         unit: BaseUnit,
         operational_window: OperationalWindow,
         market_config: MarketConfig,
+        **kwargs,
     ):
         self.current_time = operational_window["window"][0]
 
@@ -201,6 +202,7 @@ class flexableNegCRM(BaseStrategy):
         unit: BaseUnit,
         operational_window: OperationalWindow,
         market_config: MarketConfig,
+        **kwargs,
     ):
         self.current_time = operational_window["window"][0]
 

@@ -226,5 +226,6 @@ class ForecastProvider(Role):
             forecast_df = pd.DataFrame(self.forecasts)
             forecast_df.to_csv(f"{path}/forecasts_df.csv", index=True)
         except ValueError:
-            self.logger.error(f'No forecasts for {self.market_id} provided, so none saved.')
-
+            self.logger.error(
+                f"No forecasts for {self.market_id} provided, so none saved."
+            )
