@@ -70,15 +70,20 @@ class ForecastProvider(Role):
     def calculate_residual_demand_forecast(self, market_id):
         if market_id == "EOM":
             vre_powerplants = self.powerplants[
-                self.powerplants["fuel_type"] == "renewable"
+                self.powerplants["technology"].isin(
+                    ["wind_onshore", "wind_offshore", "solar"]
+                )
             ].copy()
+
+            if self.availability is None:
+                return self.demand_df
 
             vre_feed_in_df = pd.DataFrame(
                 index=self.demand_df.index, columns=vre_powerplants.index, data=0.0
             )
 
-            for pp, cf in self.availability.items():
-                vre_feed_in_df[pp] = cf * vre_powerplants.at[pp, "max_power"]
+            for pp, max_power in vre_powerplants["max_power"].items():
+                vre_feed_in_df[pp] = self.availability[pp] * max_power
 
             res_demand_df = self.demand_df - vre_feed_in_df.sum(axis=1)
 
@@ -108,15 +113,7 @@ class ForecastProvider(Role):
 
         # calculate infeed of renewables and residual demand_df
         # check if max_power is a series or a float
-        powerplants = self.powerplants[
-            self.powerplants["fuel_type"] != "renewable"
-        ].copy()
-
-        vre_powerplants = self.powerplants[
-            self.powerplants["fuel_type"] == "renewable"
-        ].copy()
-
-        price_forecast = pd.Series(index=self.demand_df.index, data=0.0)
+        powerplants = self.powerplants
 
         marginal_costs = powerplants.apply(
             self.calculate_marginal_cost, axis=1, fuel_prices=self.fuel_prices_df
@@ -125,13 +122,7 @@ class ForecastProvider(Role):
         if len(marginal_costs) == 1:
             marginal_costs = marginal_costs.iloc[0].to_dict()
 
-        vre_feed_in_df = pd.DataFrame(
-            index=self.demand_df.index, columns=vre_powerplants.index, data=0.0
-        )
-
-        for pp, cf in self.availability.items():
-            vre_feed_in_df[pp] = cf * vre_powerplants.at[pp, "max_power"]
-
+        price_forecast = pd.Series(index=self.demand_df.index, data=0.0)
         for i in range(len(self.demand_df)):
             pp_df = powerplants.copy()
             pp_df["marginal_cost"] = (
@@ -139,10 +130,14 @@ class ForecastProvider(Role):
                 if type(marginal_costs) == pd.DataFrame
                 else marginal_costs
             )
+
+            # change max_power of power plant to the value in the availability dict
+            for pp, cf in self.availability.items():
+                pp_df.at[pp, "max_power"] = cf.iloc[i] * pp_df.at[pp, "max_power"]
+
             mcp = self.calc_market_clearing_price(
                 powerplants=pp_df,
                 demand=self.demand_df.iat[i],
-                vre_feed_in=vre_feed_in_df.iloc[i].sum(),
             )
             price_forecast.iat[i] = mcp
 
@@ -168,7 +163,7 @@ class ForecastProvider(Role):
 
         """
 
-        fuel_price = fuel_prices[pp_dict["fuel_type"]]
+        fuel_price = fuel_prices.get(pp_dict["fuel_type"], 0.0)
         emission_factor = pp_dict["emission_factor"]
         co2_price = fuel_prices["co2"]
 
@@ -180,7 +175,11 @@ class ForecastProvider(Role):
 
         return marginal_cost
 
-    def calc_market_clearing_price(self, powerplants, demand, vre_feed_in):
+    def calc_market_clearing_price(
+        self,
+        powerplants,
+        demand,
+    ):
         """
         Calculates the market clearing price of the merit order model.
 
@@ -202,13 +201,11 @@ class ForecastProvider(Role):
         powerplants.sort_values("marginal_cost", inplace=True)
 
         # Calculate the cumulative capacity
-        powerplants["cum_cap"] = powerplants["max_power"].cumsum() + vre_feed_in
+        powerplants["cum_cap"] = powerplants["max_power"].cumsum()
 
         # Calculate the market clearing price
         if powerplants["cum_cap"].iat[-1] < demand:
             mcp = powerplants["marginal_cost"].iat[-1]
-        elif vre_feed_in > demand:
-            mcp = 0.0
         else:
             mcp = powerplants.loc[
                 powerplants["cum_cap"] >= demand, "marginal_cost"
@@ -225,6 +222,10 @@ class ForecastProvider(Role):
         path : str
 
         """
-
-        forecast_df = pd.DataFrame(self.forecasts)
-        forecast_df.to_csv(f"{path}/forecasts_df.csv", index=True)
+        try:
+            forecast_df = pd.DataFrame(self.forecasts)
+            forecast_df.to_csv(f"{path}/forecasts_df.csv", index=True)
+        except ValueError:
+            self.logger.error(
+                f"No forecasts for {self.market_id} provided, so none saved."
+            )

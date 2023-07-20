@@ -309,10 +309,10 @@ class Storage(BaseUnit):
         # capacity calculation has to be added
         current_power = self.get_output_before(start)
 
-        available_pos_reserve_discharge = None
-        available_neg_reserve_discharge = None
-        available_pos_reserve_charge = None
-        available_neg_reserve_charge = None
+        available_pos_reserve_discharge = 0
+        available_neg_reserve_discharge = 0
+        available_pos_reserve_charge = 0
+        available_neg_reserve_charge = 0
 
         operational_window = {
             "window": (start, end),
@@ -338,6 +338,7 @@ class Storage(BaseUnit):
     def set_dispatch_plan(
         self,
         dispatch_plan: dict,
+        clearing_price: float,
         start: pd.Timestamp,
         end: pd.Timestamp,
         product_type: str,
