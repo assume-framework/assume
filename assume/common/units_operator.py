@@ -321,17 +321,19 @@ class UnitsOperator(Role):
 
         unit_rl_strategy_dfs = []
         for unit_id, unit in self.units.items():
-            if unit.bidding_strategies["energy"].is_learning_strategy:
-                data = pd.DataFrame(
-                    {
-                        "profit": unit.outputs["profit"].loc[start],
-                        "reward": unit.outputs["reward"].loc[start],
-                        "regret": unit.outputs["regret"].loc[start],
-                    },
-                    index=[start],
-                )
-                data["unit"] = unit_id
-                unit_rl_strategy_dfs.append(data)
+            # rl only for energy market for now!
+            if "energy" in unit.bidding_strategies:
+                if unit.bidding_strategies["energy"].is_learning_strategy:
+                    data = pd.DataFrame(
+                        {
+                            "profit": unit.outputs["profit"].loc[start],
+                            "reward": unit.outputs["reward"].loc[start],
+                            "regret": unit.outputs["regret"].loc[start],
+                        },
+                        index=[start],
+                    )
+                    data["unit"] = unit_id
+                    unit_rl_strategy_dfs.append(data)
 
         if len(unit_rl_strategy_dfs):
             learning_data = pd.concat(unit_rl_strategy_dfs)
