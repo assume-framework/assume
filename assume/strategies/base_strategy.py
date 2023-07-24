@@ -33,6 +33,7 @@ class BaseStrategy:
         unit,
         operational_window: OperationalWindow,
         market_config: MarketConfig,
+        **kwargs,
     ):
         raise NotImplementedError()
 

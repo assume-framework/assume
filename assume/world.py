@@ -29,7 +29,6 @@ from assume.strategies import (
     NaivePosReserveStrategy,
     NaiveStrategy,
     OTCStrategy,
-    flexableCRMStorage,
     flexableEOM,
     flexablePosCRMStorage,
     flexableNegCRMStorage,
