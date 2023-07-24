@@ -419,17 +419,18 @@ class Storage(BaseUnit):
 
         return operational_window
 
-    
+    '''
     def calculate_bids(
         self,
         market_config,
         product_tuple,
+        **kwargs,
     ):
         return super().calculate_bids(
             market_config=market_config,
             product_tuple=product_tuple,
         )
-
+    '''
        
     def execute_current_dispatch(
             self, 
@@ -544,12 +545,15 @@ class Storage(BaseUnit):
     def calculate_min_max_power(
         self,
         start,
+        end,
         current_power_charge,
         current_power_discharge,
         min_SOC,
         max_SOC,
         duration,
     ) -> tuple:
+        
+        end_excl = end - self.index.freq
         min_power_discharge = (
             self.min_power_discharge[start]
             if type(self.min_power_discharge) is pd.Series
@@ -590,7 +594,7 @@ class Storage(BaseUnit):
                 )
 
         # was discharging before
-        if self.min_down_time > 0 and self.outputs["energy"] > 0:
+        if self.min_down_time > 0 and self.outputs["energy"][start] > 0:
             min_power_charge = 0
             max_power_charge = 0
         else:
