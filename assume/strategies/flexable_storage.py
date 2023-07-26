@@ -97,14 +97,13 @@ class flexablePosCRMStorage(BaseStrategy):
             foresight=self.foresight,
             price_forecast=data_dict["price_forecast"],
         )
-        """
+
         if specific_revenue >= 0:
             capacity_price = specific_revenue
         else:
-            capacity_price = abs(specific_revenue) * unit.min_power_discharge / bid_quantity
-        """
-        # might have to be changed - check again with flexABLE
-        capacity_price = abs(marginal_cost)
+            capacity_price = (
+                abs(specific_revenue) * unit.min_power_discharge / bid_quantity
+            )
 
         energy_price = capacity_price / unit.current_SOC
 
