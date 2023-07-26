@@ -35,9 +35,9 @@ class flexableEOMStorage(BaseStrategy):
         start = operational_window["window"][0]
         end = operational_window["window"][1]
 
-        price_forecast=data_dict["price_forecast"]
+        price_forecast = data_dict["price_forecast"]
         average_price = calculate_price_average(
-            unit=unit, 
+            unit=unit,
             current_time=start,
             foresight=self.foresight,
             price_forecast=price_forecast,
@@ -45,26 +45,24 @@ class flexableEOMStorage(BaseStrategy):
 
         bid_quantity = 0
 
-        if (
-            price_forecast[start] >= average_price / unit.efficiency_discharge
-        ) and (operational_window["states"]["max_power_discharge"]["volume"] > 0):
+        if (price_forecast[start] >= average_price / unit.efficiency_discharge) and (
+            operational_window["states"]["max_power_discharge"]["volume"] > 0
+        ):
             # place bid to discharge
             bid_quantity = operational_window["states"]["max_power_discharge"]["volume"]
 
-        elif (
-            price_forecast[start] <= average_price * unit.efficiency_charge
-        ) and (operational_window["states"]["max_power_charge"]["volume"] < 0):
+        elif (price_forecast[start] <= average_price * unit.efficiency_charge) and (
+            operational_window["states"]["max_power_charge"]["volume"] < 0
+        ):
             # place bid to charge
             bid_quantity = operational_window["states"]["max_power_charge"]["volume"]
 
-        #marginal costs are not reflected in any way
+        # marginal costs are not reflected in any way
 
         if bid_quantity != 0:
             return [{"price": average_price, "volume": bid_quantity}]
         else:
             return []
-
-
 
 
 class flexablePosCRMStorage(BaseStrategy):
@@ -85,11 +83,11 @@ class flexablePosCRMStorage(BaseStrategy):
         **kwargs,
     ):
         self.current_time = operational_window["window"][0]
-        
+
         bid_quantity = operational_window["ops"]["pos_reserve"]["volume"]
         if bid_quantity == 0:
             return []
-        
+
         marginal_cost = operational_window["ops"]["pos_reserve"]["cost"]
 
         specific_revenue = get_specific_revenue(
@@ -97,17 +95,17 @@ class flexablePosCRMStorage(BaseStrategy):
             marginal_cost=marginal_cost,
             current_time=self.current_time,
             foresight=self.foresight,
-            price_forecast=data_dict['price_forecast'],
+            price_forecast=data_dict["price_forecast"],
         )
-        '''
+        """
         if specific_revenue >= 0:
             capacity_price = specific_revenue
         else:
             capacity_price = abs(specific_revenue) * unit.min_power_discharge / bid_quantity
-        '''
+        """
         # might have to be changed - check again with flexABLE
-        capacity_price = abs(marginal_cost)    
-        
+        capacity_price = abs(marginal_cost)
+
         energy_price = capacity_price / unit.current_SOC
 
         if market_config.product_type == "capacity_pos":
@@ -124,7 +122,6 @@ class flexablePosCRMStorage(BaseStrategy):
             )
 
         return bids
-    
 
 
 class flexableNegCRMStorage(BaseStrategy):
@@ -143,11 +140,11 @@ class flexableNegCRMStorage(BaseStrategy):
         data_dict: dict,
         **kwargs,
     ):
-        #in flexable no prices calculated for CRM_neg
+        # in flexable no prices calculated for CRM_neg
         bid_quantity = operational_window["ops"]["neg_reserve"]["volume"]
         if bid_quantity == 0:
             return []
-        #if bid_quantity >= min_bid_volume  
+        # if bid_quantity >= min_bid_volume
 
         if market_config.product_type == "capacity_neg":
             bids = [
@@ -167,20 +164,13 @@ class flexableNegCRMStorage(BaseStrategy):
 
 def calculate_price_average(unit, current_time, foresight, price_forecast):
     average_price = np.mean(
-        price_forecast[
-            current_time - foresight : current_time + foresight
-        ]
+        price_forecast[current_time - foresight : current_time + foresight]
     )
 
     return average_price
 
-def get_specific_revenue(
-    unit,
-    marginal_cost,
-    current_time,
-    foresight,
-    price_forecast
-):
+
+def get_specific_revenue(unit, marginal_cost, current_time, foresight, price_forecast):
     t = current_time
 
     if t + foresight > price_forecast.index[-1]:
@@ -191,14 +181,14 @@ def get_specific_revenue(
     possible_revenue = 0
     theoretic_SOC = unit.current_SOC
     for market_price in price_forecast:
-        theoretic_power_discharge = min(max(theoretic_SOC-unit.min_SOC, 0), 
-                                                                 unit.max_power_discharge)
+        theoretic_power_discharge = min(
+            max(theoretic_SOC - unit.min_SOC, 0), unit.max_power_discharge
+        )
         possible_revenue += (market_price - marginal_cost) * theoretic_power_discharge
         theoretic_SOC -= theoretic_power_discharge
 
     if unit.current_SOC - theoretic_SOC != 0:
         possible_revenue = possible_revenue / (unit.current_SOC - theoretic_SOC)
-    
 
     return possible_revenue
 

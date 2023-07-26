@@ -198,7 +198,7 @@ class PowerPlant(BaseUnit):
         max_power = max_power - self.outputs["capacity_pos"].at[start]
 
         # ensure min_power < max_power
-        min_power = min(min_power, max(0,max_power))
+        min_power = min(min_power, max(0, max_power))
 
         if self.marginal_cost is None:
             return {

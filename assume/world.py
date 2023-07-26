@@ -30,11 +30,11 @@ from assume.strategies import (
     NaiveStrategy,
     OTCStrategy,
     flexableEOM,
-    flexablePosCRMStorage,
-    flexableNegCRMStorage,
     flexableEOMStorage,
     flexableNegCRM,
+    flexableNegCRMStorage,
     flexablePosCRM,
+    flexablePosCRMStorage,
 )
 from assume.units import Demand, HeatPump, PowerPlant, Storage
 
