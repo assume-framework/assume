@@ -81,8 +81,6 @@ class Storage(BaseUnit):
     -------
     reset()
         Reset the storage unit.
-    calculate_operational_window()
-        Calculate the operation window for the next time step.
     calc_marginal_cost(power_output, partial_load_eff)
         Calculate the marginal cost of the storage unit.
     """
@@ -211,7 +209,8 @@ class Storage(BaseUnit):
         operational_window : dict
             Dictionary containing the operational window for the next time step.
         """
-        start, end, only_hours = product_tuple
+        start = product_tuples[0][0]
+        end = product_tuples[0][1]
         start = pd.Timestamp(start)
         end = pd.Timestamp(end)
 

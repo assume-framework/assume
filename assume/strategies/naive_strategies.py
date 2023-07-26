@@ -1,41 +1,53 @@
-from assume.common.market_objects import MarketConfig
-from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
+from datetime import datetime
+
+from assume.common.market_objects import MarketConfig, Product
+from assume.strategies.base_strategy import BaseStrategy
 from assume.units.base_unit import BaseUnit
 
+# from assume.units import PowerPlant
 
-class NaiveStrategy(BaseStrategy):
-    def __init__(self, *args, scale_firm_power_capacity=1.0, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.scale = scale_firm_power_capacity
+
+class PowerPlantStrategy(BaseStrategy):
+    def calculate_simple(
+        self,
+        unit: "PowerPlant",
+        start: datetime,
+        end: datetime,
+        **kwargs,
+    ):
+        min_power, max_power = unit.calculate_min_max_power(start, end)
+        previous_power = unit.get_output_before(start)
+        marginal_cost = unit.calculate_marginal_cost(start, previous_power)
+
+        return marginal_cost, max_power
 
     def calculate_bids(
         self,
         unit: BaseUnit,
-        operational_window: OperationalWindow,
         market_config: MarketConfig,
+        product_tuples: list[Product],
         **kwargs,
     ):
-        """
-        Takes information from a unit that the unit operator manages and
-        defines how it is dispatched to the market
-
-        Return: volume, price
-        """
-        price = operational_window["states"]["max_power"]["cost"]
-        volume = operational_window["states"]["max_power"]["volume"]
-        bids = [{"price": price, "volume": volume}]
+        bids = []
+        for product in product_tuples:
+            price, volume = self.calculate_simple(unit, product[0], product[1])
+            bids.append({"price": price, "volume": volume})
         return bids
 
 
-class NaivePosReserveStrategy(BaseStrategy):
+class NaiveStrategy(PowerPlantStrategy):
+    pass
+
+
+class NaivePosReserveStrategy(PowerPlantStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def calculate_bids(
         self,
         unit: BaseUnit,
-        operational_window: OperationalWindow,
         market_config: MarketConfig,
+        product_tuples: list[Product],
         **kwargs,
     ):
         """
@@ -44,21 +56,27 @@ class NaivePosReserveStrategy(BaseStrategy):
 
         Return: volume, price
         """
-        price = 0
-        volume = operational_window["states"]["pos_reserve"]["volume"]
-        bids = [{"price": price, "volume": volume}]
+        bids = []
+        for product in product_tuples:
+            start = product[0]
+            end = product[1]
+            previous_power = unit.get_output_before(start)
+            min_power, max_power = unit.calculate_min_max_power(start, end)
+            volume = min(max_power - previous_power, unit.ramp_up)
+            price = 0
+            bids.append({"price": price, "volume": volume})
         return bids
 
 
-class NaiveNegReserveStrategy(BaseStrategy):
+class NaiveNegReserveStrategy(PowerPlantStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def calculate_bids(
         self,
         unit: BaseUnit,
-        operational_window: OperationalWindow,
         market_config: MarketConfig,
+        product_tuples: list[Product],
         **kwargs,
     ):
         """
@@ -67,7 +85,13 @@ class NaiveNegReserveStrategy(BaseStrategy):
 
         Return: volume, price
         """
-        price = 0
-        volume = operational_window["states"]["neg_reserve"]["volume"]
-        bids = [{"price": price, "volume": volume}]
+        bids = []
+        for product in product_tuples:
+            start = product[0]
+            end = product[1]
+            previous_power = unit.get_output_before(start)
+            min_power, max_power = unit.calculate_min_max_power(start, end)
+            volume = max(0, min(previous_power - min_power, unit.ramp_down))
+            price = 0
+            bids.append({"price": price, "volume": volume})
         return bids

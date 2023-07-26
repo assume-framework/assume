@@ -1,15 +1,15 @@
 import logging
+from datetime import datetime
 from functools import lru_cache
 
 import pandas as pd
 
-from assume.strategies import OperationalWindow
-from assume.units.base_unit import BaseUnit
+from assume.units.base_unit import BaseUnit, OperationData, SupportsMinMax
 
 logger = logging.getLogger(__name__)
 
 
-class PowerPlant(BaseUnit):
+class PowerPlant(SupportsMinMax):
     def __init__(
         self,
         id: str,
@@ -55,7 +55,7 @@ class PowerPlant(BaseUnit):
 
         self.max_power = max_power
         self.min_power = min_power
-        self.availability = availability.to_dict() if availability is not None else None
+        self.availability = availability or pd.Series(1, index=self.index)
         self.efficiency = efficiency
         self.partial_load_eff = partial_load_eff
         self.fuel_type = fuel_type
@@ -142,142 +142,6 @@ class PowerPlant(BaseUnit):
 
         self.mean_market_success = 0
         self.market_success_list = [0]
-
-    def calculate_operational_window(
-        self, product_type: str, product_tuples: list[tuple] = []
-    ) -> OperationalWindow:
-        """Calculate the operation window for the next time step.
-
-        Returns
-        -------
-        operational_window : dict
-            Dictionary containing the operational window for the next time step.
-        """
-        all_start = product_tuples[0][0]
-        all_end = product_tuples[-1][1]
-        for product_tuple in product_tuples:
-            start, end, only_hours = product_tuple
-            start = pd.Timestamp(start)
-            end = pd.Timestamp(end)
-
-            diff_hour = (end - start) / pd.Timedelta(hours=1)
-
-            # check if unit is currently off and cannot be turned on yet
-            if self.current_status == 0 and self.current_down_time < self.min_down_time:
-                continue
-
-            self.current_down_time += diff_hour
-
-            # check if units availability is 0
-            if self.availability is not None and self.availability.at[start] == 0:
-                continue
-
-            previous_power = self.get_output_before(all_start)
-
-            min_power, max_power = self.calculate_min_max_power(start, end)
-            states = {}
-            if product_type == "energy":
-                # adjust for ramp down speed
-                min_power = max(previous_power - self.ramp_down, min_power)
-                # adjust for ramp up speed
-                max_power = min(previous_power + self.ramp_up, max_power)
-
-                # adjust min_power if sold negative reserve capacity on control reserve market
-                min_power = min_power + self.outputs["capacity_neg"].at[start]
-
-                # adjust max_power if sold positive reserve capacity on control reserve market
-                max_power = max_power - self.outputs["capacity_pos"].at[start]
-
-                if self.marginal_cost is not None:
-                    marginal_cost = (
-                        self.marginal_cost[start]
-                        if type(self.marginal_cost) is dict
-                        else self.marginal_cost
-                    )
-                    states = {
-                        "current_power": {
-                            "volume": previous_power,
-                            "cost": marginal_cost,
-                        },
-                        "min_power": {
-                            "volume": min_power,
-                            "cost": marginal_cost,
-                        },
-                        "max_power": {
-                            "volume": max_power,
-                            "cost": marginal_cost,
-                        },
-                    }
-                else:
-                    states["previous_power"] = {
-                        "volume": previous_power,
-                        "cost": self.calc_marginal_cost_with_partial_eff(
-                            power_output=previous_power,
-                            timestep=start,
-                        ),
-                    }
-                    states["min_power"] = {
-                        "volume": min_power,
-                        "cost": self.calc_marginal_cost_with_partial_eff(
-                            power_output=previous_power + min_power,
-                            timestep=start,
-                        ),
-                    }
-                    states["max_power"] = {
-                        "volume": max_power,
-                        "cost": self.calc_marginal_cost_with_partial_eff(
-                            power_output=previous_power + max_power,
-                            timestep=start,
-                        ),
-                    }
-            elif product_type == "capacity_pos":
-                # should be adjusted to account for ramping speeds
-                # and differences between resolutions of energy and reserve markets
-                available_pos_reserve = min(max_power - previous_power, self.ramp_up)
-
-                if self.marginal_cost is None:
-                    marginal_cost = self.calc_marginal_cost_with_partial_eff(
-                        power_output=self.max_power,
-                        timestep=start,
-                    )
-                else:
-                    marginal_cost = (
-                        self.marginal_cost[start]
-                        if type(self.marginal_cost) is dict
-                        else self.marginal_cost
-                    )
-
-                states["pos_reserve"] = {
-                    "volume": available_pos_reserve,
-                    "cost": marginal_cost,
-                }
-            elif product_type == "capacity_neg":
-                # should be adjusted to account for ramping speeds
-                # and differences between resolutions of energy and reserve markets
-                available_neg_reserve = max(
-                    0, min(previous_power - min_power, self.ramp_down)
-                )
-
-                if self.marginal_cost is None:
-                    marginal_cost = self.calc_marginal_cost_with_partial_eff(
-                        power_output=self.max_power,
-                        timestep=start,
-                    )
-                else:
-                    marginal_cost = (
-                        self.marginal_cost[start]
-                        if type(self.marginal_cost) is dict
-                        else self.marginal_cost
-                    )
-
-                states["neg_reserve"] = {
-                    "volume": available_neg_reserve,
-                    "cost": marginal_cost,
-                }
-
-                if available_neg_reserve < 0:
-                    logger.error("available_neg_reserve < 0")
-            return {"window": (start, end), "states": states}
 
     def execute_current_dispatch(
         self,
@@ -387,21 +251,86 @@ class PowerPlant(BaseUnit):
 
         return marginal_cost
 
-    def calculate_min_max_power(self, start: pd.Timestamp, end: pd.Timestamp):
+    def calculate_min_max_power(
+        self, start: pd.Timestamp, end: pd.Timestamp
+    ) -> tuple[float]:
+        """
+        does not include ramping
+        can be used for arbitrary start times in the future
+        """
         end_excl = end - self.index.freq
+
+        # check if unit is currently off and cannot be turned on yet
+        # if unit.current_status == 0 and unit.current_down_time < unit.min_down_time:
+        #    return 0, 0
+
         base_load = self.outputs["energy"][start:end_excl]
-        # check if min_power is a series or a float
-        min_power = max(self.min_power - base_load.min(), 0)
+        heat_demand = self.outputs["heat"][start:end_excl]
+        assert heat_demand.min() >= 0
 
-        # check if max_power is a series or a float
-        max_power = (
-            self.availability[start] * self.max_power
-            if type(self.availability) is dict
-            else self.max_power
-        )
-        max_power = max(max_power - base_load.max(), 0)
+        capacity_neg = self.outputs["capacity_neg"][start:end_excl]
+        # needed minimum + capacity_neg - what is already sold is actual minimum
+        min_power = self.min_power + capacity_neg - base_load
+        # min_power should be at least the heat demand at that time
+        min_power = min_power.where(min_power >= heat_demand, heat_demand)
 
-        return min_power, max_power
+        max_power = self.availability[start:end_excl] * self.max_power
+        # provide reserve for capacity_pos
+        max_power = max_power - self.outputs["capacity_pos"][start:end_excl]
+        # remove what has already been bid
+        max_power = max_power - base_load
+        # make sure that max_power is > 0 for all timesteps
+        max_power = max_power.where(max_power >= 0, 0)
+
+        # TODO until here we are working with series - in the future, we should return series here too
+        return max(min_power), min(max_power)
+
+    def calculate_marginal_cost(self, start: datetime, power: float):
+        if self.marginal_cost is not None:
+            if isinstance(self.marginal_cost, dict):
+                return self.marginal_cost[start]
+            else:
+                return self.marginal_cost
+        else:
+            return self.calc_marginal_cost_with_partial_eff(
+                power_output=power,
+                timestep=start,
+            )
+
+    def calculate_min_max_price(
+        self, start: pd.Timestamp, end: pd.Timestamp
+    ) -> OperationData:
+        """
+        calculates prices, checks for ramping too
+        is only valid for single time frame orders
+        """
+        min_power, max_power = self.calculate_min_max_power(start, end)
+        previous_power = self.get_output_before(start)
+
+        # adjust for ramp down speed
+        min_power = max(previous_power - self.ramp_down, min_power)
+        # adjust for ramp up speed
+        max_power = min(previous_power + self.ramp_up, max_power)
+
+        if self.marginal_cost:
+            marginal_cost = (
+                self.marginal_cost[start]
+                if type(self.marginal_cost) is dict
+                else self.marginal_cost
+            )
+
+            max_cost = marginal_cost
+            min_cost = marginal_cost
+        else:
+            min_cost = self.calc_marginal_cost_with_partial_eff(
+                power_output=previous_power + min_power,
+                timestep=start,
+            )
+            max_cost = self.calc_marginal_cost_with_partial_eff(
+                power_output=previous_power + max_power,
+                timestep=start,
+            )
+        return OperationData(min_power, min_cost, max_power, max_cost)
 
     def as_dict(self) -> dict:
         unit_dict = super().as_dict()

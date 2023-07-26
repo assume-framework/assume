@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from assume.common.market_objects import MarketConfig
+from assume.common.market_objects import MarketConfig, Product
 from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
 from assume.units.base_unit import BaseUnit
 
@@ -15,8 +15,8 @@ class flexableEOMStorage(BaseStrategy):
     def calculate_bids(
         self,
         unit: BaseUnit,
-        operational_window: OperationalWindow,
         market_config: MarketConfig,
+        product_tuples: list[Product],
         **kwargs,
     ):
         """
@@ -30,6 +30,11 @@ class flexableEOMStorage(BaseStrategy):
         # =============================================================================
         # Storage Unit is either charging, discharging, or off
         # =============================================================================
+
+        operational_window = unit.calculate_operational_window(
+            product_type=market_config.product_type,
+            product_tuples=product_tuples,
+        )
 
         start = operational_window["window"][0]
         end = operational_window["window"][1]
@@ -79,8 +84,8 @@ class flexableCRMStorage(BaseStrategy):
     def calculate_bids(
         self,
         unit: BaseUnit,
-        operational_window: OperationalWindow,
         market_config: MarketConfig,
+        product_tuples: list[Product],
         **kwargs,
     ):
         pass

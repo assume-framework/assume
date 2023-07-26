@@ -1,9 +1,10 @@
 from collections import defaultdict
 from datetime import datetime
+from typing import NamedTuple
 
 import pandas as pd
 
-# from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
+# from assume.strategies.base_strategy import BaseStrategy
 
 
 class BaseUnit:
@@ -20,8 +21,6 @@ class BaseUnit:
 
     Methods
     -------
-    calculate_operational_window(product)
-        Calculate the operation window for the next time step.
     """
 
     def __init__(
@@ -41,15 +40,6 @@ class BaseUnit:
         self.index = index
         self.outputs = defaultdict(lambda: pd.Series(0.0, index=self.index))
 
-    def calculate_operational_window(
-        self,
-        product_type: str,
-        product_tuples: list[tuple] = [],
-    ) -> list["OperationalWindow"]:
-        """Calculate the operation window for the next time step."""
-
-        raise NotImplementedError()
-
     def reset(self):
         """Reset the unit to its initial state."""
         raise NotImplementedError()
@@ -65,20 +55,10 @@ class BaseUnit:
         if market_config.product_type not in self.bidding_strategies:
             return []
 
-        # get operational window for each unit
-        operational_window = self.calculate_operational_window(
-            product_type=market_config.product_type,
-            product_tuples=product_tuples,
-        )
-
-        # check if operational window is valid
-        if operational_window is None:
-            return None
-
         return self.bidding_strategies[market_config.product_type].calculate_bids(
             unit=self,
-            operational_window=operational_window,
             market_config=market_config,
+            product_tuples=product_tuples,
             data_dict=data_dict,
         )
 
@@ -139,4 +119,24 @@ class BaseUnit:
         end,
         clearing_price,
     ):
+        pass
+
+
+class OperationData(NamedTuple):
+    min_power: float
+    min_price: float
+    max_power: float
+    max_price: float
+
+
+class SupportsMinMax(BaseUnit):
+    min_power: float
+    max_power: float
+
+    def calculate_min_max_power(
+        self, start: pd.Timestamp, end: pd.Timestamp
+    ) -> tuple[float]:
+        pass
+
+    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         pass

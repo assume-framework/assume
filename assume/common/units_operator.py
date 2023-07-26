@@ -20,11 +20,6 @@ from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
 
-try:
-    import torch as th
-except ImportError:
-    th = None
-
 
 class UnitsOperator(Role):
     def __init__(
@@ -261,15 +256,11 @@ class UnitsOperator(Role):
         self, market: MarketConfig, products: list[tuple]
     ) -> Orderbook:
         orderbook: Orderbook = []
-        op_windows = []
+        # TODO sort units by priority
+        # execute operator bidding strategy..?
         for unit_id, unit in self.units.items():
-            # get operational window for each unit
-            operational_window = unit.calculate_operational_window(
-                product_type=market.product_type,
-                product_tuples=products,
-            )
-            op_windows.append(operational_window)
-            # TODO calculate bids from sum of op_windows
+            unit.technology
+            # TODO calculate bids from sum of available power
 
         return orderbook
 
