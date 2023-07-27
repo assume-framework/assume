@@ -5,7 +5,11 @@ from assume.strategies.base_strategy import (
 )
 from assume.strategies.extended import OTCStrategy
 from assume.strategies.flexable import flexableEOM, flexableNegCRM, flexablePosCRM
-from assume.strategies.flexable_storage import flexableCRMStorage, flexableEOMStorage
+from assume.strategies.flexable_storage import (
+    flexableEOMStorage,
+    flexableNegCRMStorage,
+    flexablePosCRMStorage,
+)
 
 try:
     from assume.strategies.learning_strategies import RLStrategy

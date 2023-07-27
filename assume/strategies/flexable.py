@@ -171,7 +171,7 @@ class flexablePosCRM(BaseStrategy):
         if bid_quantity == 0:
             return []
 
-        # Specific revenue if power was offered on the energy marke
+        # Specific revenue if power was offered on the energy market
         specific_revenue = get_specific_revenue(
             unit=unit,
             marginal_cost=marginal_cost,
