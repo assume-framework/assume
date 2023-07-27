@@ -29,11 +29,12 @@ from assume.strategies import (
     NaivePosReserveStrategy,
     NaiveStrategy,
     OTCStrategy,
-    flexableCRMStorage,
     flexableEOM,
     flexableEOMStorage,
     flexableNegCRM,
+    flexableNegCRMStorage,
     flexablePosCRM,
+    flexablePosCRMStorage,
 )
 from assume.units import Demand, HeatPump, PowerPlant, Storage
 
@@ -92,8 +93,9 @@ class World:
             "flexable_eom": flexableEOM,
             "flexable_pos_crm": flexablePosCRM,
             "flexable_neg_crm": flexableNegCRM,
-            "flexable_crm_storage": flexableCRMStorage,
             "flexable_eom_storage": flexableEOMStorage,
+            "flexable_pos_crm_storage": flexablePosCRMStorage,
+            "flexable_neg_crm_storage": flexableNegCRMStorage,
             "naive": NaiveStrategy,
             "naive_neg_reserve": NaiveNegReserveStrategy,
             "naive_pos_reserve": NaivePosReserveStrategy,
