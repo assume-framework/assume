@@ -4,7 +4,7 @@ from functools import lru_cache
 
 import pandas as pd
 
-from assume.units.base_unit import BaseUnit, OperationData, SupportsMinMax
+from assume.units.base_unit import BaseUnit, SupportsMinMax
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +139,10 @@ class PowerPlant(SupportsMinMax):
 
         self.outputs["capacity_pos"] = pd.Series(0.0, index=self.index)
         self.outputs["capacity_neg"] = pd.Series(0.0, index=self.index)
+
+        self.outputs["profits"] = pd.Series(0.0, index=self.index)
+        self.outputs["rewards"] = pd.Series(0.0, index=self.index)
+        self.outputs["regrets"] = pd.Series(0.0, index=self.index)
 
         self.mean_market_success = 0
         self.market_success_list = [0]
@@ -297,9 +301,7 @@ class PowerPlant(SupportsMinMax):
                 timestep=start,
             )
 
-    def calculate_min_max_price(
-        self, start: pd.Timestamp, end: pd.Timestamp
-    ) -> OperationData:
+    def calculate_min_max_price(self, start: pd.Timestamp, end: pd.Timestamp):
         """
         calculates prices, checks for ramping too
         is only valid for single time frame orders
@@ -330,7 +332,7 @@ class PowerPlant(SupportsMinMax):
                 power_output=previous_power + max_power,
                 timestep=start,
             )
-        return OperationData(min_power, min_cost, max_power, max_cost)
+        return min_power, min_cost, max_power, max_cost
 
     def as_dict(self) -> dict:
         unit_dict = super().as_dict()

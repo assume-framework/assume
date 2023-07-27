@@ -122,13 +122,6 @@ class BaseUnit:
         pass
 
 
-class OperationData(NamedTuple):
-    min_power: float
-    min_price: float
-    max_power: float
-    max_price: float
-
-
 class SupportsMinMax(BaseUnit):
     min_power: float
     max_power: float

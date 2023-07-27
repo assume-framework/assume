@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from assume.common.market_objects import MarketConfig, Product
-from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
+from assume.strategies.base_strategy import BaseStrategy
 from assume.units.base_unit import BaseUnit
 
 
@@ -16,8 +16,8 @@ class flexableEOMStorage(BaseStrategy):
         self,
         unit: BaseUnit,
         market_config: MarketConfig,
-        data_dict: dict,
         product_tuples: list[Product],
+        data_dict: dict,
         **kwargs,
     ):
         """
@@ -32,15 +32,17 @@ class flexableEOMStorage(BaseStrategy):
         # Storage Unit is either charging, discharging, or off
         # =============================================================================
 
-        operational_window = unit.calculate_operational_window(
-            product_type=market_config.product_type,
-            product_tuples=product_tuples,
-        )
+        start = product_tuples[0][0]
+        end = product_tuples[0][1]
+        end_excl = end - unit.index.freq
 
-        start = operational_window["window"][0]
-        end = operational_window["window"][1]
+        min_max_power = unit.calculate_min_max_power(start, end)
+
+        max_power_discharge = min_max_power["max_power_discharge"]
+        max_power_charge = min_max_power["max_power_charge"]
 
         price_forecast = data_dict["price_forecast"]
+
         average_price = calculate_price_average(
             unit=unit,
             current_time=start,
@@ -50,24 +52,17 @@ class flexableEOMStorage(BaseStrategy):
 
         bid_quantity = 0
 
-        if (price_forecast[start] >= average_price / unit.efficiency_discharge) and (
-            operational_window["states"]["max_power_discharge"]["volume"] > 0
-        ):
-            # place bid to discharge
-            bid_quantity = operational_window["states"]["max_power_discharge"]["volume"]
+        bid_quantity = max_power_discharge.where(
+            price_forecast[start:end_excl] >= average_price / unit.efficiency_discharge,
+            bid_quantity,
+        )
 
-        elif (price_forecast[start] <= average_price * unit.efficiency_charge) and (
-            operational_window["states"]["max_power_charge"]["volume"] < 0
-        ):
-            # place bid to charge
-            bid_quantity = operational_window["states"]["max_power_charge"]["volume"]
+        bid_quantity = max_power_charge.where(
+            price_forecast[start:end_excl] <= average_price * unit.efficiency_charge,
+            bid_quantity,
+        )
 
-        # marginal costs are not reflected in any way
-
-        if bid_quantity != 0:
-            return [{"price": average_price, "volume": bid_quantity}]
-        else:
-            return []
+        return [{"price": average_price, "volume": bid_quantity.max()}]
 
 
 class flexablePosCRMStorage(BaseStrategy):
@@ -82,18 +77,22 @@ class flexablePosCRMStorage(BaseStrategy):
     def calculate_bids(
         self,
         unit: BaseUnit,
-        operational_window: OperationalWindow,
         market_config: MarketConfig,
         data_dict: dict,
+        product_tuples: list[Product],
         **kwargs,
     ):
-        self.current_time = operational_window["window"][0]
+        start = product_tuples[0][0]
+        end = product_tuples[0][1]
 
-        bid_quantity = operational_window["ops"]["pos_reserve"]["volume"]
+        min_max_power = unit.calculate_min_max_power(start, end)
+        max_power_discharge = min_max_power["max_power_discharge"]
+
+        bid_quantity = max_power_discharge
         if bid_quantity == 0:
             return []
 
-        marginal_cost = operational_window["ops"]["pos_reserve"]["cost"]
+        marginal_cost = unit.calc_margnal_cost(timestep=start, discharge=True)
 
         specific_revenue = get_specific_revenue(
             unit=unit,
@@ -133,19 +132,24 @@ class flexableNegCRMStorage(BaseStrategy):
         super().__init__(*args, **kwargs)
 
         self.foresight = pd.Timedelta(kwargs.get("crm_foresight", "4h"))
-
         self.current_time = None
 
     def calculate_bids(
         self,
         unit: BaseUnit,
         market_config: MarketConfig,
-        data_dict: dict,
         product_tuples: list[Product],
+        data_dict: dict,
         **kwargs,
     ):
+        start = product_tuples[0][0]
+        end = product_tuples[0][1]
+
+        min_max_power = unit.calculate_min_max_power(start, end)
+        max_power_charge = min_max_power["max_power_charge"]
+
         # in flexable no prices calculated for CRM_neg
-        bid_quantity = operational_window["ops"]["neg_reserve"]["volume"]
+        bid_quantity = max_power_charge
         if bid_quantity == 0:
             return []
         # if bid_quantity >= min_bid_volume
@@ -195,30 +199,3 @@ def get_specific_revenue(unit, marginal_cost, current_time, foresight, price_for
         possible_revenue = possible_revenue / (unit.current_SOC - theoretic_SOC)
 
     return possible_revenue
-
-    """
-    def calculatingBidPricesSTO_CRM(self, t):
-        fl = int(4 / self.world.dt)
-        SOC_theoretical = self.soc[t]
-        revenue_theoretical = []
-
-        for tick in range(t, t + fl):
-            BidSTO_EOM = self.calculate_bids_eom(tick       SOC_theoretical)
-
-            if len(BidSTO_EOM) == 0:
-                continue
-
-            BidSTO_EOM = BidSTO_EOM[0]
-            if BidSTO_EOM.bidType == 'Demand':
-                SOC_theoretical += BidSTO_EOM.amount * self.efficiency_ch * self.world.dt
-                revenue_theoretical.append(- self.world.pfc[t] * BidSTO_EOM.amount * self.world.dt)
-
-            elif BidSTO_EOM.bidType == 'Supply':
-                SOC_theoretical -= BidSTO_EOM.amount / self.efficiency_dis * self.world.dt
-                revenue_theoretical.append(self.world.pfc[t] * BidSTO_EOM.amount * self.world.dt)
-
-        capacityPrice = abs(sum(revenue_theoretical))
-        energyPrice = -self.energy_cost[self.world.currstep] / self.soc[t]
-
-        return capacityPrice, energyPrice
-    """

@@ -280,6 +280,7 @@ class UnitsOperator(Role):
             product_bids = unit.calculate_bids(
                 market_config=market,
                 product_tuples=products,
+                data_dict=self.context.data_dict,
             )
             product = products[0]
             for i, bid in enumerate(product_bids):

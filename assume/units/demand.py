@@ -1,7 +1,6 @@
 import pandas as pd
 
-from assume.strategies import OperationalWindow
-from assume.units.base_unit import OperationData, SupportsMinMax
+from assume.units.base_unit import SupportsMinMax
 
 
 class Demand(SupportsMinMax):
@@ -59,9 +58,7 @@ class Demand(SupportsMinMax):
         bid_volume = (self.volume - self.outputs[product_type]).loc[start:end].max()
         return bid_volume, bid_volume
 
-    def calculate_marginal_cost(
-        self, start: pd.Timestamp, power: float
-    ) -> OperationData:
+    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         return self.price.at[start]
 
     def as_dict(self) -> dict:
