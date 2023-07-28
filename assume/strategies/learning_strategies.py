@@ -132,7 +132,6 @@ class RLStrategy(BaseStrategy):
                     .squeeze()
                 )
 
-                # trick that makes the bidding close to marginal cost for exploration purposes
                 curr_action += th.tensor(
                     self.next_observation[-1],
                     device=self.device,
