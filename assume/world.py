@@ -19,6 +19,7 @@ from tqdm import tqdm
 from assume.common import (
     ForecastProvider,
     MarketConfig,
+    Learning,
     UnitsOperator,
     WriteOutput,
     mango_codec_factory,
@@ -123,15 +124,15 @@ class World:
         start: datetime,
         end: datetime,
         save_frequency_hours: int,
+        learning_config: None,
         simulation_id: str,
-        bidding_params: dict,
         index: pd.Series,
         same_process: bool = True,
     ):
         self.clock = ExternalClock(0)
         self.start = start
         self.end = end
-        self.bidding_params = bidding_params
+        self.learning_config = learning_config
         self.index = index
 
         # kill old container if exists
@@ -142,6 +143,28 @@ class World:
         self.container = await create_container(
             addr=self.addr, clock=self.clock, codec=mango_codec_factory()
         )
+
+        # initiate learning if the learning mode is one and hence we want to learn new strategies
+        if learning_config["learning_mode"] == True:
+            # if so we initate the rl leanring role with parameteres
+
+            learning_role = Learning(
+                learning_config=learning_config,
+            )
+
+            same_process = True
+            if same_process:
+                self.rl_agent = RoleAgent(self.container)
+                self.rl_agent.add_role(learning_role)
+            else:
+                # this does not set the clock in output_agent correctly yet
+                # see https://gitlab.com/mango-agents/mango/-/issues/59
+                # but still improves performance
+                def creator(container):
+                    agent = RoleAgent(container, suggested_aid="learning")
+                    agent.add_role(learning_role)
+
+                await self.container.as_agent_process(agent_creator=creator)
 
         self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to world
@@ -230,7 +253,7 @@ class World:
 
             try:
                 bidding_strategies[product_type] = self.bidding_types[strategy](
-                    **self.bidding_params
+                    **self.learning_config
                 )
             except KeyError as e:
                 self.logger.error(f"Invalid bidding strategy {strategy}")
@@ -311,15 +334,14 @@ class World:
         self.clock.set_time(next_activity)
         return delta
 
-    async def run_async(self):
+    async def run_async(self, start_ts, end_ts):
         """
         Run the simulation.
+        either in learning mode where we run multiple times or in normal mode
         """
 
         # agent is implicit added to self.container._agents
 
-        start_ts = calendar.timegm(self.start.utctimetuple())
-        end_ts = calendar.timegm(self.end.utctimetuple())
         pbar = tqdm(total=end_ts - start_ts)
 
         # allow registration before first opening
@@ -339,7 +361,37 @@ class World:
         pbar.close()
         await self.container.shutdown()
 
-        logging.info("Simulation finished")
-
     def run(self):
-        return self.loop.run_until_complete(self.run_async())
+        start_ts = calendar.timegm(self.start.utctimetuple())
+        end_ts = calendar.timegm(self.end.utctimetuple())
+
+        if self.rl_agent is not None:
+            # we are in learning mode
+
+            pbar = tqdm(total=self.rl_agent.roles[0].training_episodes)
+
+            for i_episode in tqdm(
+                range(self.rl_agent.roles[0].training_episodes),
+                desc=f"Training Episode {self.rl_agent.roles[0].episodes_done}",
+            ):
+                # reset time to start time so that mango does not get confused
+                self.clock.set_time(t=start_ts - 1)
+                self.loop.run_until_complete(
+                    self.run_async(start_ts=start_ts, end_ts=end_ts)
+                )
+
+                self.rl_agent.roles[0].episodes_done = +1
+                pbar.update(1)
+
+            self.logger.info("################")
+            self.logger.info(f"Training finished, Start evaluation run")
+
+            self.rl_agent.roles[0].learning_mode = False
+
+            return self.loop.run_until_complete(self.run_async())
+
+        else:
+            # we are not in learning mode
+            return self.loop.run_until_complete(
+                self.run_async(start_ts=start_ts, end_ts=end_ts)
+            )

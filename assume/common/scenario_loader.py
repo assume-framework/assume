@@ -298,14 +298,19 @@ async def load_scenario_folder_async(
     save_frequency_hours = config.get("save_frequency_hours", None)
     sim_id = f"{scenario}_{study_case}"
 
-    bidding_strategy_params = config.get("bidding_strategy_params", {})
-    if "load_learned_path" not in bidding_strategy_params.keys():
-        bidding_strategy_params[
+    learning_config = config.get("learning_config", {})
+    if "load_learned_path" not in learning_config.keys():
+        learning_config[
             "load_learned_path"
         ] = f"{inputs_path}/learned_strategies/{sim_id}/"
 
     await world.setup(
-        start, end, save_frequency_hours, sim_id, bidding_strategy_params, index
+        start=start,
+        end=end,
+        save_frequency_hours=save_frequency_hours,
+        simulation_id=sim_id,
+        learning_config=learning_config,
+        index=index,
     )
 
     # get the market config from the config file and add the markets

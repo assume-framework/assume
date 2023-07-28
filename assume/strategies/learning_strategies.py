@@ -28,7 +28,8 @@ class RLStrategy(BaseStrategy):
         float_type = kwargs.get("float_type", "float32")
         self.float_type = th.float if float_type == "float32" else th.float16
 
-        self.learning_mode = kwargs.get("learning_mode", False)
+        # self.learning_mode = kwargs.get("learning_mode", False)
+        self.learning_mode = False
 
         self.actor = Actor(self.obs_dim, self.act_dim, self.float_type).to(self.device)
 
