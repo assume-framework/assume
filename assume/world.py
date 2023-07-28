@@ -375,7 +375,6 @@ class World:
                 desc=f"Training Episode {self.rl_agent.roles[0].episodes_done}",
             ):
                 # reset time to start time so that mango does not get confused
-                self.clock.set_time(t=start_ts - 1)
                 self.loop.run_until_complete(
                     self.run_async(start_ts=start_ts, end_ts=end_ts)
                 )
@@ -388,7 +387,9 @@ class World:
 
             self.rl_agent.roles[0].learning_mode = False
 
-            return self.loop.run_until_complete(self.run_async())
+            return self.loop.run_until_complete(
+                self.run_async(start_ts=start_ts, end_ts=end_ts)
+            )
 
         else:
             # we are not in learning mode
