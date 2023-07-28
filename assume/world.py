@@ -106,6 +106,9 @@ class World:
 
             self.bidding_types["learning"] = RLStrategy
         except ImportError:
+            self.logger.error(
+                "You are trying to use reinforcement learning strategies, but the their import failed. Check if you have all required packages installed"
+            )
             pass
         self.clearing_mechanisms = {
             "pay_as_clear": pay_as_clear,

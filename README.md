@@ -82,6 +82,12 @@ pip install pre-commit
 pre-commit install
 ```
 
+Use Learning Capabilities
+---------------------------------
+If you want to use the reinforcement learning strategies of Assume please make sure to install torch on top of the requirements listed in the requirements.txt. If you Ressources do not have a GPU available use the CPU only version of torch, which can be installed like this:
+
+pip install torch==2.0.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+
 Access to database and dashboards
 ---------------------------------
 To save the simulation results to a database and be able to analyze them using Grafan dashboards, install the docker container:
