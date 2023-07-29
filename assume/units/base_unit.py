@@ -123,10 +123,38 @@ class BaseUnit:
 
 
 class SupportsMinMax(BaseUnit):
+    """
+    Base Class used for Powerplant derived classes
+    """
+
     min_power: float
     max_power: float
 
     def calculate_min_max_power(
+        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
+    ) -> tuple[float]:
+        pass
+
+    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
+        pass
+
+
+class SupportsMinMaxCharge(BaseUnit):
+    """
+    Base Class used for Storage derived classes
+    """
+
+    min_power_charge: float
+    max_power_charge: float
+    min_power_discharge: float
+    max_power_discharge: float
+
+    def calculate_min_max_charge(
+        self, start: pd.Timestamp, end: pd.Timestamp
+    ) -> tuple[float]:
+        pass
+
+    def calculate_min_max_discharge(
         self, start: pd.Timestamp, end: pd.Timestamp
     ) -> tuple[float]:
         pass

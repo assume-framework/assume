@@ -43,6 +43,8 @@ class Demand(SupportsMinMax):
 
         self.max_power = max_power
         self.min_power = min_power
+        if isinstance(volume, float):
+            volume = pd.Series(volume, index=self.index)
         self.volume = -volume  # demand is negative
         if isinstance(price, float):
             price = pd.Series(price, index=self.index)
@@ -51,6 +53,14 @@ class Demand(SupportsMinMax):
 
     def reset(self):
         self.outputs["energy"] = pd.Series(0, index=self.index)
+
+    def execute_current_dispatch(
+        self,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+    ):
+        end_excl = end - self.index.freq
+        return self.volume[start:end_excl]
 
     def calculate_min_max_power(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"

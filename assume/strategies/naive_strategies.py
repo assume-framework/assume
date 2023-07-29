@@ -61,7 +61,9 @@ class NaivePosReserveStrategy(PowerPlantStrategy):
             start = product[0]
             end = product[1]
             previous_power = unit.get_output_before(start)
-            min_power, max_power = unit.calculate_min_max_power(start, end)
+            min_power, max_power = unit.calculate_min_max_power(
+                start, end, market_config.product_type
+            )
             volume = min(max_power - previous_power, unit.ramp_up)
             price = 0
             bids.append({"price": price, "volume": volume})
@@ -90,7 +92,9 @@ class NaiveNegReserveStrategy(PowerPlantStrategy):
             start = product[0]
             end = product[1]
             previous_power = unit.get_output_before(start)
-            min_power, max_power = unit.calculate_min_max_power(start, end)
+            min_power, max_power = unit.calculate_min_max_power(
+                start, end, market_config.product_type
+            )
             volume = max(0, min(previous_power - min_power, unit.ramp_down))
             price = 0
             bids.append({"price": price, "volume": volume})
