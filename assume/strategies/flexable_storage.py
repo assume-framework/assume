@@ -3,7 +3,7 @@ import pandas as pd
 
 from assume.common.market_objects import MarketConfig, Product
 from assume.strategies.base_strategy import BaseStrategy
-from assume.units.base_unit import BaseUnit
+from assume.units.base_unit import SupportsMinMaxCharge
 
 
 class flexableEOMStorage(BaseStrategy):
@@ -14,7 +14,7 @@ class flexableEOMStorage(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: BaseUnit,
+        unit: SupportsMinMaxCharge,
         market_config: MarketConfig,
         product_tuples: list[Product],
         data_dict: dict,
@@ -36,10 +36,10 @@ class flexableEOMStorage(BaseStrategy):
         end = product_tuples[0][1]
         end_excl = end - unit.index.freq
 
-        min_max_power = unit.calculate_min_max_power(start, end)
-
-        max_power_discharge = min_max_power["max_power_discharge"]
-        max_power_charge = min_max_power["max_power_charge"]
+        min_power_charge, max_power_charge = unit.calculate_min_max_charge(start, end)
+        min_power_discharge, max_power_discharge = unit.calculate_min_max_discharge(
+            start, end
+        )
 
         price_forecast = data_dict["price_forecast"]
 
@@ -49,9 +49,7 @@ class flexableEOMStorage(BaseStrategy):
             foresight=self.foresight,
             price_forecast=price_forecast,
         )
-
         bid_quantity = 0
-
         bid_quantity = max_power_discharge.where(
             price_forecast[start:end_excl] >= average_price / unit.efficiency_discharge,
             bid_quantity,
@@ -76,7 +74,7 @@ class flexablePosCRMStorage(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: BaseUnit,
+        unit: SupportsMinMaxCharge,
         market_config: MarketConfig,
         data_dict: dict,
         product_tuples: list[Product],
@@ -85,14 +83,15 @@ class flexablePosCRMStorage(BaseStrategy):
         start = product_tuples[0][0]
         end = product_tuples[0][1]
 
-        min_max_power = unit.calculate_min_max_power(start, end)
-        max_power_discharge = min_max_power["max_power_discharge"]
+        min_power_discharge, max_power_discharge = unit.calculate_min_max_discharge(
+            start, end
+        )
 
-        bid_quantity = max_power_discharge
+        bid_quantity = max(max_power_discharge)
         if bid_quantity == 0:
             return []
 
-        marginal_cost = unit.calc_margnal_cost(timestep=start, discharge=True)
+        marginal_cost = unit.calc_marginal_cost(timestep=start, discharge=True)
 
         specific_revenue = get_specific_revenue(
             unit=unit,
@@ -136,7 +135,7 @@ class flexableNegCRMStorage(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: BaseUnit,
+        unit: SupportsMinMaxCharge,
         market_config: MarketConfig,
         product_tuples: list[Product],
         data_dict: dict,
@@ -145,11 +144,10 @@ class flexableNegCRMStorage(BaseStrategy):
         start = product_tuples[0][0]
         end = product_tuples[0][1]
 
-        min_max_power = unit.calculate_min_max_power(start, end)
-        max_power_charge = min_max_power["max_power_charge"]
+        min_power_charge, max_power_charge = unit.calculate_min_max_charge(start, end)
 
         # in flexable no prices calculated for CRM_neg
-        bid_quantity = max_power_charge
+        bid_quantity = max(max_power_charge)
         if bid_quantity == 0:
             return []
         # if bid_quantity >= min_bid_volume

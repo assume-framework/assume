@@ -75,13 +75,9 @@ class PowerPlant(SupportsMinMax):
         )
         self.emission_factor = emission_factor
 
-        self.ramp_up = ramp_up
-        self.ramp_down = ramp_down
         # check ramping enabled
-        if self.ramp_down == -1:
-            self.ramp_down = max_power
-        if self.ramp_up == -1:
-            self.ramp_up = max_power
+        self.ramp_down = ramp_down if ramp_down != -1 else max_power
+        self.ramp_up = ramp_up if ramp_up != -1 else max_power
         self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
         self.min_down_time = min_down_time if min_down_time > 0 else 1
         self.downtime_hot_start = (
@@ -256,7 +252,7 @@ class PowerPlant(SupportsMinMax):
         return marginal_cost
 
     def calculate_min_max_power(
-        self, start: pd.Timestamp, end: pd.Timestamp
+        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[float]:
         """
         does not include ramping

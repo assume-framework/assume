@@ -1,8 +1,9 @@
 import numpy as np
 import pandas as pd
 
+from assume.common.market_objects import MarketConfig, Product
 from assume.strategies.base_strategy import BaseStrategy
-from assume.units.storage import Storage
+from assume.units.base_unit import SupportsMinMaxCharge
 
 
 class complexEOMStorage(BaseStrategy):
@@ -13,9 +14,11 @@ class complexEOMStorage(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: Storage = None,
-        market_config=None,
-        operational_window: dict = None,
+        unit: SupportsMinMaxCharge,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        data_dict: dict,
+        **kwargs,
     ):
         """
         Takes information from a unit that the unit operator manages and
@@ -25,128 +28,112 @@ class complexEOMStorage(BaseStrategy):
         Strategy analogue to flexABLE
 
         """
-        bid_quantity_mr_charge, bid_price_mr_charge = 0, 0
-        bid_quantity_mr_discharge, bid_price_mr_discharge = 0, 0
-        bid_quantity_flex_charge, bid_price_flex_charge = 0, 0
-        bid_quantity_flex_discharge, bid_price_flex_discharge = 0, 0
+        start = product_tuples[0][0]
+        end = product_tuples[0][1]
 
-        if operational_window is not None:
-            # =============================================================================
-            # Storage Unit is either charging, discharging, or off
-            # =============================================================================
-            bid_quantity_mr_discharge = operational_window["min_power_discharge"][
-                "power_discharge"
-            ]
-            bid_quantity_flex_discharge = (
-                operational_window["max_power_discharge"]["power_discharge"]
-                - bid_quantity_mr_discharge
-            )
-            bid_quantity_mr_charge = operational_window["min_power_charge"][
-                "power_charge"
-            ]
-            bid_quantity_flex_charge = (
-                operational_window["max_power_charge"]["power_charge"]
-                - bid_quantity_mr_charge
-            )
+        price_forecast = data_dict["price_forecast"]
+        self.price_forecast = price_forecast
 
-            marginal_cost_mr_discharge = operational_window["min_power_discharge"][
-                "marginal_cost"
-            ]
-            marginal_cost_flex_discharge = operational_window["max_power_discharge"][
-                "marginal_cost"
-            ]
-            marginal_cost_mr_charge = operational_window["min_power_charge"][
-                "marginal_cost"
-            ]
-            marginal_cost_flex_charge = operational_window["max_power_charge"][
-                "marginal_cost"
-            ]
+        min_power_charge, max_power_charge = unit.calculate_min_max_charge(start, end)
+        min_power_discharge, max_power_discharge = unit.calculate_min_max_discharge(
+            start, end
+        )
 
-            average_price = self.calculate_price_average(unit)
+        # =============================================================================
+        # Storage Unit is either charging, discharging, or off
+        # =============================================================================
+        bid_quantity_mr_discharge = min_power_discharge
+        bid_quantity_flex_discharge = max_power_discharge - min_power_discharge
+        bid_quantity_mr_charge = min_power_charge
+        bid_quantity_flex_charge = max_power_charge - min_power_charge
 
-            if (
-                unit.price_forecast[unit.current_time]
-                >= average_price / unit.efficiency_discharge
-            ):
-                # place bid to discharge
+        cost_mr_discharge = unit.calculate_marginal_cost(start, min_power_discharge)
+        cost_flex_discharge = unit.calculate_marginal_cost(start, max_power_discharge)
+        cost_mr_charge = unit.calculate_marginal_cost(start, min_power_charge)
+        cost_flex_charge = unit.calculate_marginal_cost(start, max_power_charge)
 
-                if operational_window["current_power_discharge"]["power_discharge"] > 0:
-                    # was discharging before
-                    bid_price_mr = self.calculate_EOM_price_continue_discharging(
-                        unit, marginal_cost_mr_discharge, bid_quantity_mr_discharge
+        average_price = self.calculate_price_average(unit)
+
+        previous_power = unit.get_output_before(start)
+
+        if price_forecast[start] >= average_price / unit.efficiency_discharge:
+            # place bid to discharge
+            if previous_power > 0:
+                # was discharging before
+                bid_price_mr = self.calculate_EOM_price_continue_discharging(
+                    unit, cost_mr_discharge, bid_quantity_mr_discharge
+                )
+                bid_quantity_mr = bid_quantity_mr_discharge
+                bid_price_flex = cost_flex_discharge
+                bid_quantity_flex = bid_quantity_flex_discharge
+
+            elif previous_power < 0:
+                # was charging before
+                if unit.min_down_time > 0:
+                    bid_quantity_mr = 0
+                    bid_price_mr = 0
+
+                else:
+                    bid_price_mr = self.calculate_EOM_price_if_off(
+                        unit,
+                        cost_flex_discharge,
+                        bid_quantity_mr_discharge,
                     )
                     bid_quantity_mr = bid_quantity_mr_discharge
-                    bid_price_flex = marginal_cost_flex_discharge
+                    bid_price_flex = cost_flex_discharge
                     bid_quantity_flex = bid_quantity_flex_discharge
-
-                elif operational_window["current_power_charge"]["power_charge"] < 0:
-                    # was charging before
-                    if unit.min_down_time > 0:
-                        bid_quantity_mr = 0
-                        bid_price_mr = 0
-
-                    else:
-                        bid_price_mr = self.calculate_EOM_price_if_off(
-                            unit,
-                            marginal_cost_flex_discharge,
-                            bid_quantity_mr_discharge,
-                        )
-                        bid_quantity_mr = bid_quantity_mr_discharge
-                        bid_price_flex = marginal_cost_flex_discharge
-                        bid_quantity_flex = bid_quantity_flex_discharge
-                else:
-                    bid_price_mr = 0
-                    bid_quantity_mr = 0
-                    bid_price_flex = 0
-                    bid_quantity_flex = 0
-
-            elif (
-                unit.price_forecast[unit.current_time]
-                <= average_price * unit.efficiency_charge
-            ):
-                # place bid to charge
-                if operational_window["current_power_discharge"]["power_discharge"] > 0:
-                    # was discharging before
-                    if unit.min_down_time > 0:
-                        bid_quantity_mr = 0
-                        bid_price_mr = 0
-                    else:
-                        bid_price_mr = self.calculate_EOM_price_if_off(
-                            unit, marginal_cost_mr_charge, bid_quantity_mr_charge
-                        )
-                        bid_quantity_mr = bid_quantity_mr_charge
-                        bid_price_flex = marginal_cost_flex_charge
-                        bid_quantity_flex = bid_quantity_flex_charge
-
-                elif operational_window["current_power_charge"]["power_charge"] < 0:
-                    # was charging before
-                    bid_price_mr = bid_quantity_mr_charge
-                    bid_quantity_mr = marginal_cost_mr_charge
-                    bid_price_flex = marginal_cost_flex_charge
-                    bid_quantity_flex = bid_quantity_flex_charge
-                else:
-                    bid_price_mr = 0
-                    bid_quantity_mr = 0
-                    bid_price_flex = 0
-                    bid_quantity_flex = 0
-
             else:
                 bid_price_mr = 0
                 bid_quantity_mr = 0
                 bid_price_flex = 0
                 bid_quantity_flex = 0
 
-            bids = [
-                {"price": bid_price_mr, "volume": bid_quantity_mr},
-                {"price": bid_price_flex, "volume": bid_quantity_flex},
-            ]
+        elif (
+            price_forecast[unit.current_time] <= average_price * unit.efficiency_charge
+        ):
+            # place bid to charge
+            if previous_power > 0:
+                # was discharging before
+                if unit.min_down_time > 0:
+                    bid_quantity_mr = 0
+                    bid_price_mr = 0
+                else:
+                    bid_price_mr = self.calculate_EOM_price_if_off(
+                        unit, cost_mr_charge, bid_quantity_mr_charge
+                    )
+                    bid_quantity_mr = bid_quantity_mr_charge
+                    bid_price_flex = cost_flex_charge
+                    bid_quantity_flex = bid_quantity_flex_charge
+
+            elif previous_power < 0:
+                # was charging before
+                bid_price_mr = bid_quantity_mr_charge
+                bid_quantity_mr = cost_mr_charge
+                bid_price_flex = cost_flex_charge
+                bid_quantity_flex = bid_quantity_flex_charge
+            else:
+                bid_price_mr = 0
+                bid_quantity_mr = 0
+                bid_price_flex = 0
+                bid_quantity_flex = 0
+
+        else:
+            bid_price_mr = 0
+            bid_quantity_mr = 0
+            bid_price_flex = 0
+            bid_quantity_flex = 0
+
+        bids = [
+            {"price": bid_price_mr, "volume": bid_quantity_mr},
+            {"price": bid_price_flex, "volume": bid_quantity_flex},
+        ]
 
         return bids
 
     def calculate_price_average(self, unit):
         t = unit.current_time
         """if t - self.foresight < pd.Timedelta("0h"):
-            average_price = np.mean(unit.price_forecast[t-self.foresight:] 
+            average_price = np.mean(unit.price_forecast[t-self.foresight:]
                                     + unit.price_forecast[:t+self.foresight])
         else:"""
         average_price = np.mean(

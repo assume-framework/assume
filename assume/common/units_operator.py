@@ -170,10 +170,9 @@ class UnitsOperator(Role):
         )
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
-            data = pd.DataFrame(
-                unit.execute_current_dispatch(start, now),
-                columns=["power"],
-            )
+            current_dispatch = unit.execute_current_dispatch(start, now)
+            current_dispatch.name = "power"
+            data = pd.DataFrame(current_dispatch)
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
         unit_dispatch = pd.concat(unit_dispatch_dfs)
@@ -300,7 +299,8 @@ class UnitsOperator(Role):
 
                 order["volume"] = volume
                 order["price"] = price
-                order["bid_id"] = f"{unit_id}_{i+1}_{product}"
+                order["bid_id"] = f"{unit_id}_{i+1}"
+                order["product"] = product
                 orderbook.append(order)
                 self.bids_map[order["bid_id"]] = unit_id
 
