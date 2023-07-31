@@ -62,8 +62,8 @@ class HeatPump(SupportsMinMax):
         self.fixed_cost = fixed_cost
 
         # check ramping enabled
-        self.ramp_down = ramp_down if ramp_down != -1 else max_power
-        self.ramp_up = ramp_up if ramp_up != -1 else max_power
+        self.ramp_down = max_power if ramp_down == -1 else ramp_down
+        self.ramp_up = max_power if ramp_up == -1 else ramp_up
         self.min_operating_time = min_operating_time
         self.min_down_time = min_down_time
         self.downtime_hot_start = downtime_hot_start

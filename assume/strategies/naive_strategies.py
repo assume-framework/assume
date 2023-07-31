@@ -2,7 +2,7 @@ from datetime import datetime
 
 from assume.common.market_objects import MarketConfig, Product
 from assume.strategies.base_strategy import BaseStrategy
-from assume.units.base_unit import BaseUnit
+from assume.units.base_unit import BaseUnit, SupportsMinMax
 
 # from assume.units import PowerPlant
 
@@ -10,7 +10,7 @@ from assume.units.base_unit import BaseUnit
 class PowerPlantStrategy(BaseStrategy):
     def calculate_simple(
         self,
-        unit: "PowerPlant",
+        unit: SupportsMinMax,
         start: datetime,
         end: datetime,
         **kwargs,
@@ -18,6 +18,8 @@ class PowerPlantStrategy(BaseStrategy):
         min_power, max_power = unit.calculate_min_max_power(start, end)
         previous_power = unit.get_output_before(start)
         marginal_cost = unit.calculate_marginal_cost(start, previous_power)
+        current_power = unit.outputs["energy"].at[start]
+        max_power = unit.calculate_ramp_up(previous_power, max_power, current_power)
 
         return marginal_cost, max_power
 
@@ -64,7 +66,8 @@ class NaivePosReserveStrategy(PowerPlantStrategy):
             min_power, max_power = unit.calculate_min_max_power(
                 start, end, market_config.product_type
             )
-            volume = min(max_power - previous_power, unit.ramp_up)
+            current_power = unit.outputs["energy"].at[start]
+            volume = unit.calculate_ramp_up(previous_power, max_power, current_power)
             price = 0
             bids.append({"price": price, "volume": volume})
         return bids
@@ -95,7 +98,8 @@ class NaiveNegReserveStrategy(PowerPlantStrategy):
             min_power, max_power = unit.calculate_min_max_power(
                 start, end, market_config.product_type
             )
-            volume = max(0, min(previous_power - min_power, unit.ramp_down))
+            current_power = unit.outputs["energy"].at[start]
+            volume = unit.calculate_ramp_down(previous_power, min_power, current_power)
             price = 0
             bids.append({"price": price, "volume": volume})
         return bids
