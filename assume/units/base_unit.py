@@ -129,6 +129,8 @@ class SupportsMinMax(BaseUnit):
 
     min_power: float
     max_power: float
+    ramp_down: float
+    ramp_up: float
 
     def calculate_min_max_power(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
@@ -137,6 +139,14 @@ class SupportsMinMax(BaseUnit):
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         pass
+
+    def calculate_ramp_up(self, previous_power, max_power, current_power=0):
+        # max_power + current_power < previous_power + unit.ramp_up
+        return min(max_power, previous_power + self.ramp_up - current_power)
+
+    def calculate_ramp_down(self, previous_power, min_power, current_power=0):
+        # min_power + current_power > previous_power - unit.ramp_down
+        return max(min_power, previous_power - self.ramp_down - current_power)
 
 
 class SupportsMinMaxCharge(BaseUnit):
