@@ -3,13 +3,12 @@ from functools import lru_cache
 
 import pandas as pd
 
-from assume.strategies import OperationalWindow
-from assume.units.base_unit import BaseUnit
+from assume.units.base_unit import BaseUnit, SupportsMinMaxCharge
 
 logger = logging.getLogger(__name__)
 
 
-class Storage(BaseUnit):
+class Storage(SupportsMinMaxCharge):
     """A class for a storage unit.
 
     Attributes
@@ -81,8 +80,6 @@ class Storage(BaseUnit):
     -------
     reset()
         Reset the storage unit.
-    calculate_operational_window()
-        Calculate the operation window for the next time step.
     calc_marginal_cost(power_output, partial_load_eff)
         Calculate the marginal cost of the storage unit.
     """
@@ -99,6 +96,7 @@ class Storage(BaseUnit):
         min_power_charge: float or pd.Series = 0.0,
         min_power_discharge: float or pd.Series = 0.0,
         min_SOC: float = 0.0,
+        availability: pd.Series = None,
         efficiency_charge: float = 1,
         efficiency_discharge: float = 1,
         variable_cost_charge: float or pd.Series = 0.0,
@@ -143,6 +141,8 @@ class Storage(BaseUnit):
         self.max_SOC = max_SOC
         self.min_SOC = min_SOC
 
+        self.availability = availability or pd.Series(1, index=self.index)
+
         self.efficiency_charge = efficiency_charge if 0 < efficiency_charge < 1 else 1
         self.efficiency_discharge = (
             efficiency_discharge if 0 < efficiency_discharge < 1 else 1
@@ -157,12 +157,20 @@ class Storage(BaseUnit):
 
         self.emission_factor = emission_factor
 
-        self.ramp_up_charge = ramp_up_charge if ramp_up_charge <= 0 else -ramp_up_charge
-        self.ramp_down_charge = (
-            ramp_down_charge if ramp_down_charge <= 0 else -ramp_up_charge
+        self.ramp_up_charge = (
+            self.max_power_charge if ramp_up_charge == 0 else -abs(ramp_up_charge)
         )
-        self.ramp_up_discharge = ramp_up_discharge
-        self.ramp_down_discharge = ramp_down_discharge
+        self.ramp_down_charge = (
+            self.min_power_charge if ramp_down_charge == 0 else -abs(ramp_down_charge)
+        )
+        self.ramp_up_discharge = (
+            self.max_power_discharge if ramp_up_discharge == -1 else ramp_up_discharge
+        )
+        self.ramp_down_discharge = (
+            self.min_power_discharge
+            if ramp_down_discharge == -1
+            else ramp_down_discharge
+        )
 
         self.min_operating_time = min_operating_time
         self.min_down_time = min_down_time
@@ -198,251 +206,6 @@ class Storage(BaseUnit):
 
         self.mean_market_success = 0
         self.market_success_list = [0]
-
-    def calculate_operational_window(
-        self,
-        product_type: str,
-        product_tuple: tuple,
-    ) -> OperationalWindow:
-        """Calculate the operation window for the next time step.
-
-        Returns
-        -------
-        operational_window : dict
-            Dictionary containing the operational window for the next time step.
-        """
-        start, end, only_hours = product_tuple
-        start = pd.Timestamp(start)
-        end = pd.Timestamp(end)
-
-        if product_type == "energy":
-            return self.calculate_energy_operational_window(start, end)
-        elif product_type == "capacity_pos":
-            return self.calculate_pos_reserve_operational_window(start, end)
-        elif product_type == "capacity_neg":
-            return self.calculate_neg_reserve_operational_window(start, end)
-
-    def calculate_energy_operational_window(
-        self, start: pd.Timestamp, end: pd.Timestamp
-    ) -> dict:
-        end_excl = end - self.index.freq
-        duration = (end - start).total_seconds() / 3600
-
-        if self.current_status == 0 and self.current_down_time < self.min_down_time:
-            return None
-
-        current_power_discharge = (
-            self.get_output_before(start) if self.get_output_before(start) > 0 else 0
-        )
-
-        current_power_charge = (
-            self.get_output_before(start) if self.get_output_before(start) < 0 else 0
-        )
-
-        max_SOC = (
-            self.max_SOC[start] if type(self.max_SOC) is pd.Series else self.max_SOC
-        )
-        # -pos_capcaity is double
-        max_SOC -= sum(self.outputs["pos_capacity"][start:])
-        max_SOC = max(0, max_SOC)
-
-        min_SOC = (
-            self.min_SOC[start] if type(self.min_SOC) is pd.Series else self.min_SOC
-        )
-        min_SOC -= sum(self.outputs["neg_capacity"][start:])
-        min_SOC = min(max(0, min_SOC), max_SOC)
-
-        min_max_power = self.calculate_min_max_power(
-            start=start,
-            end=end,
-            current_power_charge=current_power_charge,
-            current_power_discharge=current_power_discharge,
-            min_SOC=min_SOC,
-            max_SOC=max_SOC,
-            duration=duration,
-        )
-
-        min_power_discharge = min_max_power["min_power_discharge"]
-        max_power_discharge = (
-            min_max_power["max_power_discharge"]
-            - self.outputs["pos_capacity"].loc[start:end_excl].max()
-        )
-        min_power_discharge = min(min_power_discharge, max(0, max_power_discharge))
-        min_power_charge = min_max_power["min_power_charge"]
-        max_power_charge = (
-            min_max_power["max_power_charge"]
-            - self.outputs["neg_capacity"].loc[start:end_excl].min()
-        )
-        min_power_charge = max(min_power_charge, min(0, max_power_charge))
-
-        operational_window = {
-            "window": (start, end),
-            "states": {
-                "current_power_discharge": {
-                    "volume": current_power_discharge,
-                    "cost": self.calc_marginal_cost(
-                        timestep=start,
-                        discharge=True,
-                    ),
-                },
-                "current_power_charge": {
-                    "volume": current_power_charge,
-                    "cost": self.calc_marginal_cost(
-                        timestep=start,
-                        discharge=False,
-                    ),
-                },
-                "min_power_discharge": {
-                    "volume": min_power_discharge,
-                    "cost": self.calc_marginal_cost(
-                        timestep=start,
-                        discharge=True,
-                    ),
-                },
-                "max_power_discharge": {
-                    "volume": max_power_discharge,
-                    "cost": self.calc_marginal_cost(
-                        timestep=start,
-                        discharge=True,
-                    ),
-                },
-                "min_power_charge": {
-                    "volume": min_power_charge,
-                    "cost": self.calc_marginal_cost(
-                        timestep=start,
-                        discharge=False,
-                    ),
-                },
-                "max_power_charge": {
-                    "volume": max_power_charge,
-                    "cost": self.calc_marginal_cost(
-                        timestep=start,
-                        discharge=False,
-                    ),
-                },
-            },
-        }
-        return operational_window
-
-    def calculate_pos_reserve_operational_window(
-        self, start: pd.Timestamp, end: pd.Timestamp
-    ) -> dict:
-        end_excl = end - self.index.freq
-        duration = (end - start).total_seconds() / 3600
-        # capacity calculation has to be added
-        current_power_discharge = (
-            self.get_output_before(start) if self.get_output_before(start) > 0 else 0
-        )
-
-        current_power_charge = (
-            self.get_output_before(start) if self.get_output_before(start) < 0 else 0
-        )
-
-        if self.current_status == 0 and self.current_down_time < self.min_down_time:
-            return None
-
-        min_SOC = (
-            self.min_SOC[start] if type(self.min_SOC) is pd.Series else self.min_SOC
-        )
-        max_SOC = (
-            self.max_SOC[start] if type(self.max_SOC) is pd.Series else self.max_SOC
-        )
-
-        min_max_power = self.calculate_min_max_power(
-            start=start,
-            end=end,
-            current_power_charge=current_power_charge,
-            current_power_discharge=current_power_discharge,
-            min_SOC=min_SOC,
-            max_SOC=max_SOC,
-            duration=duration,
-        )
-        # check eom bidding
-        max_power_discharge = (
-            min_max_power["max_power_discharge"]
-            - self.outputs["energy"].loc[start:end_excl].max()
-        )
-
-        operational_window = {
-            "window": (start, end),
-            "ops": {
-                "pos_reserve": {
-                    "volume": max_power_discharge,
-                    "cost": self.calc_marginal_cost(
-                        timestep=start,
-                        discharge=True,
-                    ),
-                },
-            },
-        }
-
-        return operational_window
-
-    def calculate_neg_reserve_operational_window(
-        self, start: pd.Timestamp, end: pd.Timestamp
-    ) -> dict:
-        end_excl = end - self.index.freq
-        duration = (end - start).total_seconds() / 3600
-        # capacity calculation has to be added
-        current_power_discharge = (
-            self.get_output_before(start) if self.get_output_before(start) > 0 else 0
-        )
-
-        current_power_charge = (
-            self.get_output_before(start) if self.get_output_before(start) < 0 else 0
-        )
-
-        if self.current_status == 0 and self.current_down_time < self.min_down_time:
-            return None
-
-        min_SOC = (
-            self.min_SOC[start] if type(self.min_SOC) is pd.Series else self.min_SOC
-        )
-        max_SOC = (
-            self.max_SOC[start] if type(self.max_SOC) is pd.Series else self.max_SOC
-        )
-
-        min_max_power = self.calculate_min_max_power(
-            start=start,
-            end=end,
-            current_power_charge=current_power_charge,
-            current_power_discharge=current_power_discharge,
-            min_SOC=min_SOC,
-            max_SOC=max_SOC,
-            duration=duration,
-        )
-        # check eom market
-        max_power_charge = (
-            min_max_power["max_power_charge"]
-            - self.outputs["energy"].loc[start:end_excl].min()
-        )
-        operational_window = {
-            "window": (start, end),
-            "ops": {
-                "neg_reserve": {
-                    "volume": max_power_charge,
-                    "cost": self.calc_marginal_cost(
-                        timestep=start,
-                        discharge=True,
-                    ),
-                },
-            },
-        }
-
-        return operational_window
-
-    """
-    def calculate_bids(
-        self,
-        market_config,
-        product_tuple,
-        **kwargs,
-    ):
-        return super().calculate_bids(
-            market_config=market_config,
-            product_tuple=product_tuple,
-        )
-    """
 
     def execute_current_dispatch(self, start: pd.Timestamp, end: pd.Timestamp):
         end_excl = end - self.index.freq
@@ -581,118 +344,103 @@ class Storage(BaseUnit):
                 "min_power_charge": self.min_power_charge,
                 "min_power_discharge": self.min_power_discharge,
                 "efficiency_charge": self.efficiency_discharge,
+                "efficiency_discharge": self.efficiency_charge,
                 "unit_type": "storage",
             }
         )
 
         return unit_dict
 
-    def calculate_min_max_power(
-        self,
-        start,
-        end,
-        current_power_charge,
-        current_power_discharge,
-        min_SOC,
-        max_SOC,
-        duration,
-    ) -> tuple:
+    def calculate_min_max_charge(
+        self, start: pd.Timestamp, end: pd.Timestamp
+    ) -> tuple[float]:
         end_excl = end - self.index.freq
-        base_load = self.outputs["energy"][start:end_excl]
+        duration = pd.Timedelta(end - start).seconds / 3600
 
-        min_power_discharge = (
-            self.min_power_discharge[start]
-            if type(self.min_power_discharge) is pd.Series
-            else self.min_power_discharge
-        )
-        min_power_discharge = max(min_power_discharge - base_load.min(), 0)
+        base_load = self.outputs["energy"][start:end_excl]
+        capacity_neg = self.outputs["capacity_neg"][start:end_excl]
+
+        previous_output = self.get_output_before(start)
+        current_power_charge = min(previous_output, 0)
 
         min_power_charge = (
-            self.min_power_charge[start]
+            self.min_power_charge[start:end_excl]
             if type(self.min_power_charge) is pd.Series
             else self.min_power_charge
         )
-        min_power_charge = min(min_power_charge - base_load.max(), 0)
+        min_power_charge -= base_load
+        min_power_charge = (min_power_charge).where(min_power_charge <= 0, 0)
 
-        max_power_discharge = (
-            self.max_power_discharge[start]
-            if type(self.max_power_discharge) is pd.Series
-            else self.max_power_discharge
-        )
-        max_power_discharge = max(max_power_discharge - base_load.max(), 0)
         max_power_charge = (
-            self.max_power_charge[start]
+            self.max_power_charge[start:end_excl]
             if type(self.max_power_charge) is pd.Series
             else self.max_power_charge
         )
-        max_power_charge = min(max_power_charge - base_load.min(), 0)
+        max_power_charge -= base_load + capacity_neg
+        max_power_charge = max_power_charge.where(
+            max_power_charge <= min_power_charge, 0
+        )
 
-        # was charging before
-        if (
-            self.min_down_time > 0
-            and self.outputs["energy"][start - self.index.freq] < 0
-        ):
-            min_power_discharge = 0
-            max_power_discharge = 0
-        else:
-            if self.ramp_down_discharge != -1:
-                min_power_discharge = max(
-                    current_power_discharge - self.ramp_down_discharge,
-                    min_power_discharge,
-                )
-
-            if self.ramp_up_discharge != -1:
-                max_power_discharge = min(
-                    self.ramp_up_discharge + current_power_discharge,
-                    max_power_discharge,
-                )
-
-        # was discharging before
-        if (
-            self.min_down_time > 0
-            and self.outputs["energy"][start - self.index.freq] > 0
-        ):
-            min_power_charge = 0
-            max_power_charge = 0
-        else:
-            if self.ramp_down_charge < 0:
-                min_power_charge = max(
-                    current_power_charge - self.ramp_down_charge, min_power_charge
-                )
-
-            if self.ramp_up_charge < 0:
-                max_power_charge = max(
-                    current_power_charge + self.ramp_up_charge, max_power_charge
-                )
-
-        # restrict according to min_SOC
-        max_power_discharge = min(
-            max_power_discharge,
-            max(
-                0,
-                ((self.current_SOC - min_SOC) * self.efficiency_discharge / duration),
-            ),
+        min_power_charge = min_power_charge.where(
+            min_power_charge > max_power_charge, 0
         )
 
         # restrict charging according to max_SOC
-        max_power_charge = max(
-            max_power_charge,
-            min(
-                0,
-                ((self.current_SOC - max_SOC) / self.efficiency_charge / duration),
-            ),
+        max_SOC_charge = min(
+            0,
+            ((self.current_SOC - self.max_SOC) / self.efficiency_charge / duration),
         )
-        # pack values to a dict
-        min_max_power = {
-            "min_power_discharge": min_power_discharge,
-            "min_power_charge": min_power_charge,
-            "max_power_discharge": max_power_discharge,
-            "max_power_charge": max_power_charge,
-        }
+        max_power_charge = max_power_charge.where(
+            max_power_charge > max_SOC_charge, max_SOC_charge
+        )
+        max_power_charge = round(max_power_charge, 3)
+        min_power_charge = round(min_power_charge, 3)
 
-        # if values are close to zero, set them to zero
-        for key, value in min_max_power.items():
-            if abs(value) < 1e-3:
-                min_max_power[key] = 0
+        return min_power_charge, max_power_charge
 
-        return min_max_power
+    def calculate_min_max_discharge(
+        self, start: pd.Timestamp, end: pd.Timestamp
+    ) -> tuple[float]:
+        end_excl = end - self.index.freq
+        duration = pd.Timedelta(end - start).seconds / 3600
+
+        base_load = self.outputs["energy"][start:end_excl]
+        capacity_pos = self.outputs["capacity_pos"][start:end_excl]
+
+        previous_output = self.get_output_before(start)
+        current_power_discharge = max(previous_output, 0)
+
+        min_power_discharge = (
+            self.min_power_discharge[start:end_excl]
+            if type(self.min_power_discharge) is pd.Series
+            else self.min_power_discharge
+        )
+        min_power_discharge -= base_load
+        min_power_discharge = (min_power_discharge).where(min_power_discharge >= 0, 0)
+
+        max_power_discharge = (
+            self.max_power_discharge[start:end_excl]
+            if type(self.max_power_discharge) is pd.Series
+            else self.max_power_discharge
+        )
+        max_power_discharge -= base_load + capacity_pos
+        max_power_discharge = max_power_discharge.where(
+            max_power_discharge >= min_power_discharge, 0
+        )
+
+        min_power_discharge = min_power_discharge.where(
+            min_power_discharge < max_power_discharge, 0
+        )
+
+        # restrict according to min_SOC
+        max_SOC_discharge = max(
+            0,
+            ((self.current_SOC - self.min_SOC) * self.efficiency_discharge / duration),
+        )
+        max_power_discharge = max_power_discharge.where(
+            max_power_discharge < max_SOC_discharge, max_SOC_discharge
+        )
+        max_power_discharge = round(max_power_discharge, 3)
+        min_power_discharge = round(min_power_discharge, 3)
+
+        return min_power_discharge, max_power_discharge

@@ -1,8 +1,8 @@
 import pandas as pd
 
-from assume.common.market_objects import MarketConfig
-from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
-from assume.units.base_unit import BaseUnit
+from assume.common.market_objects import MarketConfig, Product
+from assume.strategies.base_strategy import BaseStrategy
+from assume.units.base_unit import SupportsMinMax
 
 
 class flexableEOM(BaseStrategy):
@@ -15,23 +15,44 @@ class flexableEOM(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: BaseUnit,
-        operational_window: OperationalWindow,
+        unit: SupportsMinMax,
         market_config: MarketConfig,
+        product_tuples: list[Product],
         **kwargs,
     ):
         bid_quantity_inflex, bid_price_inflex = 0, 0
         bid_quantity_flex, bid_price_flex = 0, 0
 
-        self.current_time = operational_window["window"][0]
+        # TODO only works for single bids for now
+        # should work with all other bids too
+        start = product_tuples[0][0]
+        end = product_tuples[0][1]
+
+        # not adjusted for ramp up speed
+        min_power, max_power = unit.calculate_min_max_power(start, end)
+        previous_power = unit.get_output_before(start)
+        current_power = unit.outputs["energy"].at[start]
+
+        # adjust for ramp down speed
+        max_power = unit.calculate_ramp_up(previous_power, max_power, current_power)
+        # adjust for ramp up speed
+        min_power = unit.calculate_ramp_down(previous_power, min_power, current_power)
+
+        bid_quantity_inflex = min_power
+
         # =============================================================================
         # Powerplant is either on, or is able to turn on
-        # Calculating possible bid amount
+        # Calculating possible bid amount and cost
         # =============================================================================
-        bid_quantity_inflex = operational_window["states"]["min_power"]["volume"]
 
-        marginal_cost_mr = operational_window["states"]["min_power"]["cost"]
-        marginal_cost_flex = operational_window["states"]["max_power"]["cost"]
+        marginal_cost_mr = unit.calculate_marginal_cost(
+            start, current_power + bid_quantity_inflex
+        )
+        marginal_cost_flex = unit.calculate_marginal_cost(
+            start, current_power + max_power
+        )
+        self.current_time = start
+
         # =============================================================================
         # Calculating possible price
         # =============================================================================
@@ -54,10 +75,7 @@ class flexableEOM(BaseStrategy):
 
         # Flex-bid price formulation
         if unit.current_status:
-            bid_quantity_flex = (
-                operational_window["states"]["max_power"]["volume"]
-                - bid_quantity_inflex
-            )
+            bid_quantity_flex = max_power - bid_quantity_inflex
             bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
 
         bids = [
@@ -144,18 +162,25 @@ class flexablePosCRM(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: BaseUnit,
-        operational_window: OperationalWindow,
+        unit: SupportsMinMax,
         market_config: MarketConfig,
+        product_tuples: list[Product],
         **kwargs,
     ):
-        self.current_time = operational_window["window"][0]
+        start = product_tuples[0][0]
+        end = product_tuples[0][1]
+        self.current_time = start
+        min_power, max_power = unit.calculate_min_max_power(start, end)
+        marginal_cost = 0
 
-        bid_quantity = operational_window["states"]["pos_reserve"]["volume"]
+        previous_power = unit.get_output_before(start)
+        # calculate pos reserve volume
+        current_power = unit.outputs["energy"].at[start]
+        # max_power + current_power < previous_power + unit.ramp_up
+        bid_quantity = unit.calculate_ramp_up(previous_power, max_power, current_power)
+
         if bid_quantity == 0:
             return []
-
-        marginal_cost = operational_window["states"]["pos_reserve"]["cost"]
 
         # Specific revenue if power was offered on the energy market
         specific_revenue = get_specific_revenue(
@@ -199,18 +224,28 @@ class flexableNegCRM(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: BaseUnit,
-        operational_window: OperationalWindow,
+        unit: SupportsMinMax,
         market_config: MarketConfig,
+        product_tuples: list[Product],
         **kwargs,
     ):
-        self.current_time = operational_window["window"][0]
+        start = product_tuples[0][0]
+        end = product_tuples[0][1]
+        self.current_time = start
+        min_power, max_power = unit.calculate_min_max_power(start, end)
+        marginal_cost = 0
 
-        bid_quantity = operational_window["states"]["neg_reserve"]["volume"]
+        previous_power = unit.get_output_before(start)
+        current_power = unit.outputs["energy"].at[start]
+
+        # min_power + current_power > previous_power - unit.ramp_down
+        bid_quantity = unit.calculate_ramp_down(
+            previous_power, min_power, current_power
+        )
         if bid_quantity == 0:
             return []
 
-        marginal_cost = operational_window["states"]["neg_reserve"]["cost"]
+        marginal_cost = unit.calculate_marginal_cost(start, previous_power - min_power)
 
         # Specific revenue if power was offered on the energy marke
         specific_revenue = get_specific_revenue(

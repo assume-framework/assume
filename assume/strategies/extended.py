@@ -1,6 +1,6 @@
-from assume.common.market_objects import MarketConfig
-from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
-from assume.units.base_unit import BaseUnit
+from assume.common.market_objects import MarketConfig, Product
+from assume.strategies.base_strategy import BaseStrategy
+from assume.units.base_unit import SupportsMinMax
 
 
 class OTCStrategy(BaseStrategy):
@@ -10,9 +10,9 @@ class OTCStrategy(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: BaseUnit,
-        operational_window: OperationalWindow,
+        unit: SupportsMinMax,
         market_config: MarketConfig,
+        product_tuples: list[Product],
         **kwargs,
     ):
         """
@@ -21,9 +21,19 @@ class OTCStrategy(BaseStrategy):
 
         Return: volume, price
         """
-        price = operational_window["states"]["max_power"]["cost"]
-        volume = operational_window["states"]["max_power"]["volume"]
-        if "OTC" in market_config.name:
-            volume *= self.scale
-        bids = [{"price": price, "volume": volume}]
+        bids = []
+        for product_tuple in product_tuples:
+            start = product_tuple[0]
+            end = product_tuple[1]
+
+            min_power, max_power = unit.calculate_min_max_power(start, end)
+            current_power = unit.outputs["energy"].at[start]
+            min_price = unit.calculate_marginal_cost(start, current_power - min_power)
+            max_price = unit.calculate_marginal_cost(start, current_power + max_power)
+
+            price = max_price
+            volume = max_power
+            if "OTC" in market_config.name:
+                volume *= self.scale
+            bids.append({"price": price, "volume": volume})
         return bids

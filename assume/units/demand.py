@@ -1,10 +1,9 @@
 import pandas as pd
 
-from assume.strategies import OperationalWindow
-from assume.units.base_unit import BaseUnit
+from assume.units.base_unit import SupportsMinMax
 
 
-class Demand(BaseUnit):
+class Demand(SupportsMinMax):
     """A demand unit.
 
     Attributes
@@ -16,10 +15,6 @@ class Demand(BaseUnit):
     node : str
         The node of the unit.
 
-    Methods
-    -------
-    calculate_operational_window(product)
-        Calculate the operation window for the next time step.
     """
 
     def __init__(
@@ -48,34 +43,35 @@ class Demand(BaseUnit):
 
         self.max_power = max_power
         self.min_power = min_power
+        self.ramp_down = max_power
+        self.ramp_up = max_power
+        if isinstance(volume, float):
+            volume = pd.Series(volume, index=self.index)
         self.volume = -volume  # demand is negative
+        if isinstance(price, float):
+            price = pd.Series(price, index=self.index)
         self.price = price
         self.location = location
 
     def reset(self):
         self.outputs["energy"] = pd.Series(0, index=self.index)
 
-    def calculate_operational_window(
+    def execute_current_dispatch(
         self,
-        product_type: str,
-        product_tuple: tuple,
-    ) -> OperationalWindow:
-        start, end, only_hours = product_tuple
-        start = pd.Timestamp(start)
-        end = pd.Timestamp(end)
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+    ):
+        end_excl = end - self.index.freq
+        return self.volume[start:end_excl]
 
-        """Calculate the operation window for the next time step."""
+    def calculate_min_max_power(
+        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
+    ) -> dict:
         bid_volume = (self.volume - self.outputs[product_type]).loc[start:end].max()
+        return bid_volume, bid_volume
 
-        if type(self.price) == pd.Series:
-            bid_price = self.price.loc[start:end].mean()
-        else:
-            bid_price = self.price
-
-        return {
-            "window": (start, end),
-            "states": {"max_power": {"volume": bid_volume, "cost": bid_price}},
-        }
+    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
+        return self.price.at[start]
 
     def as_dict(self) -> dict:
         unit_dict = super().as_dict()

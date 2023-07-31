@@ -66,7 +66,7 @@ def plot_orderbook(orderbook: Orderbook, results: list[dict]):
     from matplotlib.lines import Line2D
 
     bids = defaultdict(list)
-    orderbook = sorted(orderbook, key=itemgetter("node_id"))
+    orderbook.sort(key=itemgetter("node_id"))
     for node_id, orders in groupby(orderbook, itemgetter("node_id")):
         bids[node_id].extend(list(map(itemgetter("price", "volume"), orders)))
     number_of_nodes = len(bids.keys()) or 1

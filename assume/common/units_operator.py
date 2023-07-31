@@ -15,15 +15,10 @@ from assume.common.market_objects import (
     Orderbook,
 )
 from assume.common.utils import aggregate_step_amount
-from assume.strategies import BaseStrategy
+from assume.strategies import BaseStrategy, LearningStrategy
 from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
-
-try:
-    import torch as th
-except ImportError:
-    th = None
 
 
 class UnitsOperator(Role):
@@ -141,7 +136,7 @@ class UnitsOperator(Role):
         this does not respect bids from multiple markets
         for the same time period
         """
-        orderbook = list(sorted(orderbook, key=itemgetter("unit_id")))
+        orderbook.sort(key=itemgetter("unit_id"))
         for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
             orders_l = list(orders)
             total_power = sum(map(itemgetter("volume"), orders_l))
@@ -175,10 +170,9 @@ class UnitsOperator(Role):
         )
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
-            data = pd.DataFrame(
-                unit.execute_current_dispatch(start, now),
-                columns=["power"],
-            )
+            current_dispatch = unit.execute_current_dispatch(start, now)
+            current_dispatch.name = "power"
+            data = pd.DataFrame(current_dispatch)
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
         unit_dispatch = pd.concat(unit_dispatch_dfs)
@@ -224,10 +218,22 @@ class UnitsOperator(Role):
         products = opening["products"]
         market = self.registered_markets[opening["market_id"]]
         logger.debug(f"{self.id} setting bids for {market.name} - {products}")
-        orderbook = await self.formulate_bids(
-            market=market,
-            products=products,
-        )
+
+        # the given products just became available on our market
+        # and we need to provide bids
+        # [whole_next_hour, quarter1, quarter2, quarter3, quarter4]
+        # algorithm should buy as much baseload as possible, then add up with quarters
+        products.sort(key=lambda p: (p[0] - p[1], p[0]))
+        if self.use_portfolio_opt:
+            orderbook = await self.formulate_bids_portfolio(
+                market=market,
+                products=products,
+            )
+        else:
+            orderbook = await self.formulate_bids(
+                market=market,
+                products=products,
+            )
         acl_metadata = {
             "performative": Performatives.inform,
             "sender_id": self.context.aid,
@@ -245,11 +251,21 @@ class UnitsOperator(Role):
             acl_metadata=acl_metadata,
         )
 
+    async def formulate_bids_portfolio(
+        self, market: MarketConfig, products: list[tuple]
+    ) -> Orderbook:
+        orderbook: Orderbook = []
+        # TODO sort units by priority
+        # execute operator bidding strategy..?
+        for unit_id, unit in self.units.items():
+            unit.technology
+            # TODO calculate bids from sum of available power
+
+        return orderbook
+
     async def formulate_bids(
-        self,
-        market: MarketConfig,
-        products: list[tuple],
-    ):
+        self, market: MarketConfig, products: list[tuple]
+    ) -> Orderbook:
         """
         Takes information from all units that the unit operator manages and
         formulates the bid to the market from that according to the bidding strategy.
@@ -259,58 +275,34 @@ class UnitsOperator(Role):
 
         orderbook: Orderbook = []
 
-        # the given products just became available on our market
-        # and we need to provide bids
-        # [whole_next_hour, quarter1, quarter2, quarter3, quarter4]
-        # algorithm should buy as much baseload as possible, then add up with quarters
-        sorted_products = sorted(products, key=lambda p: (p[0] - p[1], p[0]))
-
-        for product in sorted_products:
-            if self.use_portfolio_opt:
-                op_windows = []
-                for unit_id, unit in self.units.items():
-                    # get operational window for each unit
-                    operational_window = unit.calculate_operational_window(
-                        product_type=market.product_type,
-                        product_tuple=product,
-                    )
-                    op_windows.append(operational_window)
-                    # TODO calculate bids from sum of op_windows
-            else:
+        for unit_id, unit in self.units.items():
+            product_bids = unit.calculate_bids(
+                market_config=market,
+                product_tuples=products,
+                data_dict=self.context.data_dict,
+            )
+            product = products[0]
+            for i, bid in enumerate(product_bids):
                 order: Order = {
                     "start_time": product[0],
                     "end_time": product[1],
                     "only_hours": product[2],
                     "agent_id": (self.context.addr, self.context.aid),
                 }
+                price = bid["price"]
+                volume = bid["volume"]
 
-                bids = {
-                    unit_id: unit.calculate_bids(
-                        market_config=market,
-                        product_tuple=product,
-                        data_dict=self.context.data_dict,
-                    )
-                    for unit_id, unit in self.units.items()
-                }
+                if market.volume_tick:
+                    volume = round(volume / market.volume_tick)
+                if market.price_tick:
+                    price = round(price / market.price_tick)
 
-                for unit_id, unit_bids in bids.items():
-                    if unit_bids is None:
-                        continue
-                    for i, bid in enumerate(unit_bids):
-                        price = bid["price"]
-                        volume = bid["volume"]
-                        if market.volume_tick:
-                            volume = round(volume / market.volume_tick)
-                        if market.price_tick:
-                            price = round(price / market.price_tick)
-
-                        order_c = order.copy()
-                        order_c["volume"] = volume
-                        order_c["price"] = price
-                        order_c["bid_id"] = f"{unit_id}_{i+1}"
-                        orderbook.append(order_c)
-
-                        self.bids_map[order_c["bid_id"]] = unit_id
+                order["volume"] = volume
+                order["price"] = price
+                order["bid_id"] = f"{unit_id}_{i+1}"
+                order["product"] = product
+                orderbook.append(order)
+                self.bids_map[order["bid_id"]] = unit_id
 
         return orderbook
 
@@ -322,18 +314,17 @@ class UnitsOperator(Role):
         unit_rl_strategy_dfs = []
         for unit_id, unit in self.units.items():
             # rl only for energy market for now!
-            if "energy" in unit.bidding_strategies:
-                if unit.bidding_strategies["energy"].is_learning_strategy:
-                    data = pd.DataFrame(
-                        {
-                            "profit": unit.outputs["profit"].loc[start],
-                            "reward": unit.outputs["reward"].loc[start],
-                            "regret": unit.outputs["regret"].loc[start],
-                        },
-                        index=[start],
-                    )
-                    data["unit"] = unit_id
-                    unit_rl_strategy_dfs.append(data)
+            if isinstance(unit.bidding_strategies.get("energy"), LearningStrategy):
+                data = pd.DataFrame(
+                    {
+                        "profit": unit.outputs["profit"].loc[start],
+                        "reward": unit.outputs["reward"].loc[start],
+                        "regret": unit.outputs["regret"].loc[start],
+                    },
+                    index=[start],
+                )
+                data["unit"] = unit_id
+                unit_rl_strategy_dfs.append(data)
 
         if len(unit_rl_strategy_dfs):
             learning_data = pd.concat(unit_rl_strategy_dfs)

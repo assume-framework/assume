@@ -1,10 +1,22 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Callable, TypedDict, Union
+from typing import Callable, NamedTuple, TypedDict, Union
 
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
 from mango import Agent, Role
+
+
+class OnlyHours(NamedTuple):
+    """
+    Used for peak and off-peak bids.
+    Allows to set a begin and hour of the peak.
+
+    For example OnlyHours(8,16) would be used to have a bid which is valid for every day from 8 to 16 a clock.
+    """
+
+    begin_hour: int
+    end_hour: int
 
 
 # describes an order which can be either generation (volume > 0) or demand (volume < 0)
@@ -14,7 +26,7 @@ class Order(TypedDict):
     end_time: Union[datetime, float]
     volume: int  # positive if generation
     price: int
-    only_hours: tuple[int, int]
+    only_hours: OnlyHours or None = None
     agent_id: str
 
 
@@ -33,13 +45,20 @@ class MarketProduct:
         rd()
     )  # when does the first delivery begin, in relation to market start
     # this should be a multiple of duration
-    only_hours: Union[
-        tuple[int, int], None
-    ] = None  # e.g. (8,20) - for peak trade, (20, 8) for off-peak, none for base
-    eligible_lambda_function: Union[eligible_lambda, None] = None
+    only_hours: OnlyHours or None = None
+    # e.g. (8,20) - for peak trade, (20, 8) for off-peak, none for base
+    eligible_lambda_function: eligible_lambda or None = None
 
 
 market_mechanism = Callable[[Role, list[MarketProduct]], tuple[Orderbook, dict]]
+
+
+class Product(NamedTuple):
+    """an actual product with start and end"""
+
+    start: datetime
+    end: datetime
+    only_hours: OnlyHours or None = None
 
 
 @dataclass
@@ -77,7 +96,7 @@ class OpeningMessage(TypedDict):
     market_id: str
     start: float
     stop: float
-    products: list[MarketProduct]
+    products: list[Product]
 
 
 class ClearingMessage(TypedDict):

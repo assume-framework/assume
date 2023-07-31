@@ -1,9 +1,10 @@
 from collections import defaultdict
 from datetime import datetime
+from typing import NamedTuple
 
 import pandas as pd
 
-# from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
+# from assume.strategies.base_strategy import BaseStrategy
 
 
 class BaseUnit:
@@ -20,8 +21,6 @@ class BaseUnit:
 
     Methods
     -------
-    calculate_operational_window(product)
-        Calculate the operation window for the next time step.
     """
 
     def __init__(
@@ -41,15 +40,6 @@ class BaseUnit:
         self.index = index
         self.outputs = defaultdict(lambda: pd.Series(0.0, index=self.index))
 
-    def calculate_operational_window(
-        self,
-        product_type: str,
-        product_tuple: tuple,
-    ) -> "OperationalWindow":
-        """Calculate the operation window for the next time step."""
-
-        raise NotImplementedError()
-
     def reset(self):
         """Reset the unit to its initial state."""
         raise NotImplementedError()
@@ -57,28 +47,18 @@ class BaseUnit:
     def calculate_bids(
         self,
         market_config,
-        product_tuple,
+        product_tuples: list[tuple],
         data_dict=None,
-    ):
+    ) -> list:
         """Calculate the bids for the next time step."""
 
         if market_config.product_type not in self.bidding_strategies:
-            return None
-
-        # get operational window for each unit
-        operational_window = self.calculate_operational_window(
-            product_type=market_config.product_type,
-            product_tuple=product_tuple,
-        )
-
-        # check if operational window is valid
-        if operational_window is None:
-            return None
+            return []
 
         return self.bidding_strategies[market_config.product_type].calculate_bids(
             unit=self,
-            operational_window=operational_window,
             market_config=market_config,
+            product_tuples=product_tuples,
             data_dict=data_dict,
         )
 
@@ -140,3 +120,86 @@ class BaseUnit:
         clearing_price,
     ):
         pass
+
+
+class SupportsMinMax(BaseUnit):
+    """
+    Base Class used for Powerplant derived classes
+    """
+
+    min_power: float
+    max_power: float
+    ramp_down: float
+    ramp_up: float
+
+    def calculate_min_max_power(
+        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
+    ) -> tuple[float]:
+        pass
+
+    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
+        pass
+
+    def calculate_ramp_up(self, previous_power, max_power, current_power=0):
+        # max_power + current_power < previous_power + unit.ramp_up
+        return min(max_power, previous_power + self.ramp_up - current_power)
+
+    def calculate_ramp_down(self, previous_power, min_power, current_power=0):
+        # min_power + current_power > previous_power - unit.ramp_down
+        return max(min_power, previous_power - self.ramp_down - current_power)
+
+
+class SupportsMinMaxCharge(BaseUnit):
+    """
+    Base Class used for Storage derived classes
+    """
+
+    min_power_charge: float
+    max_power_charge: float
+    min_power_discharge: float
+    max_power_discharge: float
+    ramp_up_discharge: float
+    ramp_down_discharge: float
+    ramp_up_charge: float
+    ramp_down_charge: float
+
+    def calculate_min_max_charge(
+        self, start: pd.Timestamp, end: pd.Timestamp
+    ) -> tuple[float]:
+        pass
+
+    def calculate_min_max_discharge(
+        self, start: pd.Timestamp, end: pd.Timestamp
+    ) -> tuple[float]:
+        pass
+
+    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
+        pass
+
+    def calculate_ramp_up_discharge(
+        self, previous_power, max_power_discharge, current_power=0
+    ):
+        return min(
+            max_power_discharge, previous_power + self.ramp_up_discharge - current_power
+        )
+
+    def calculate_ramp_down_discharge(
+        self, previous_power, min_power_discharge, current_power=0
+    ):
+        return max(
+            min_power_discharge, previous_power - self.ramp_up_discharge - current_power
+        )
+
+    def calculate_ramp_up_charge(
+        self, previous_power, max_power_charge, current_power=0
+    ):
+        return max(
+            max_power_charge, previous_power + self.ramp_up_charge - current_power
+        )
+
+    def calculate_ramp_down_charge(
+        self, previous_power, min_power_charge, current_power=0
+    ):
+        return min(
+            min_power_charge, previous_power - self.ramp_up_discharge - current_power
+        )

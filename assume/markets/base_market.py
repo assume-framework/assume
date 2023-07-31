@@ -6,7 +6,14 @@ from operator import itemgetter
 
 from mango import Role
 
-from assume.common.market_objects import MarketConfig, MarketProduct, Order, Orderbook
+from assume.common.market_objects import (
+    ClearingMessage,
+    MarketConfig,
+    MarketProduct,
+    OpeningMessage,
+    Order,
+    Orderbook,
+)
 from assume.common.utils import get_available_products
 
 logger = logging.getLogger(__name__)
@@ -84,7 +91,7 @@ class MarketRole(Role):
             # this market should not open, as the clearing is after the markets end time
             return
 
-        opening_message = {
+        opening_message: OpeningMessage = {
             "context": "opening",
             "market_id": self.marketconfig.name,
             "start": market_open,
@@ -193,7 +200,7 @@ class MarketRole(Role):
                     and o["only_hours"] == order["only_hours"]
                 )
 
-            available_orders = filter(order_matches_req, self.all_orders)
+            available_orders = list(filter(order_matches_req, self.all_orders))
         else:
             available_orders = self.all_orders
 
@@ -214,19 +221,19 @@ class MarketRole(Role):
             self, market_products
         )
 
-        self.market_result = sorted(self.market_result, key=itemgetter("agent_id"))
+        self.market_result.sort(key=itemgetter("agent_id"))
         for agent, accepted_orderbook in groupby(
             self.market_result, itemgetter("agent_id")
         ):
             addr, aid = agent
             meta = {"sender_addr": self.context.addr, "sender_id": self.context.aid}
-
+            closing: ClearingMessage = {
+                "context": "clearing",
+                "market_id": self.marketconfig.name,
+                "orderbook": list(accepted_orderbook),
+            }
             await self.context.send_acl_message(
-                {
-                    "context": "clearing",
-                    "market_id": self.marketconfig.name,
-                    "orderbook": list(accepted_orderbook),
-                },
+                closing,
                 receiver_addr=addr,
                 receiver_id=aid,
                 acl_metadata=meta,
