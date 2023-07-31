@@ -139,7 +139,7 @@ class Electrolyser(BaseUnit):
         """
         efficiency_t = self.efficiency.loc[timestep]
 
-        if type(self.electricity_price) == pd.Series:
+        if isinstance(self.electricity_price, pd.Series):
             bid_price = self.electricity_price.at[timestep] / efficiency_t
         else:
             bid_price = self.electricity_price / efficiency_t

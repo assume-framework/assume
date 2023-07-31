@@ -254,7 +254,7 @@ class RLStrategy(LearningStrategy):
         if unit.marginal_cost is not None:
             marginal_cost = (
                 unit.marginal_cost[start]
-                if type(unit.marginal_cost) is dict
+                if isinstance(self.marginal_cost, dict)
                 else unit.marginal_cost
             )
         else:

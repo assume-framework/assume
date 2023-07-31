@@ -127,7 +127,7 @@ class ForecastProvider(Role):
             pp_df = powerplants.copy()
             pp_df["marginal_cost"] = (
                 marginal_costs.iloc[i]
-                if type(marginal_costs) == pd.DataFrame
+                if isinstance(marginal_costs, pd.DataFrame)
                 else marginal_costs
             )
 

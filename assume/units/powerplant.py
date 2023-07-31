@@ -59,10 +59,10 @@ class PowerPlant(SupportsMinMax):
         self.efficiency = efficiency
         self.partial_load_eff = partial_load_eff
         self.fuel_type = fuel_type
-        if type(fuel_price) is pd.Series and len(fuel_price) == 1:
+        if isinstance(fuel_price, pd.Series) and len(fuel_price) == 1:
             fuel_price = fuel_price.item()
         self.fuel_price = fuel_price
-        if type(co2_price) is pd.Series and len(co2_price) == 1:
+        if isinstance(co2_price, pd.Series) and len(co2_price) == 1:
             co2_price = co2_price.item()
         self.co2_price = co2_price
         self.price_forecast = (
@@ -98,7 +98,7 @@ class PowerPlant(SupportsMinMax):
         self.init_marginal_cost()
 
     def init_marginal_cost(self):
-        if not self.partial_load_eff and type(self.fuel_price) is not pd.Series:
+        if not self.partial_load_eff and not isinstance(self.fuel_price, pd.Series):
             fuel_prices = {self.fuel_type: self.fuel_price, "co2": self.co2_price}
             self.marginal_cost = self.calc_simple_marginal_cost(fuel_prices)
         elif not self.partial_load_eff:
@@ -200,12 +200,12 @@ class PowerPlant(SupportsMinMax):
     ) -> float or pd.Series:
         fuel_price = (
             self.fuel_price.at[timestep]
-            if type(self.fuel_price) is pd.Series
+            if isinstance(self.fuel_price, pd.Series)
             else self.fuel_price
         )
         co2_price = (
             self.co2_price.at[timestep]
-            if type(self.co2_price) is pd.Series
+            if isinstance(self.co2_price, pd.Series)
             else self.co2_price
         )
 
@@ -313,7 +313,7 @@ class PowerPlant(SupportsMinMax):
         if self.marginal_cost:
             marginal_cost = (
                 self.marginal_cost[start]
-                if type(self.marginal_cost) is dict
+                if isinstance(self.marginal_cost, dict)
                 else self.marginal_cost
             )
 
