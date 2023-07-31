@@ -157,12 +157,20 @@ class Storage(SupportsMinMaxCharge):
 
         self.emission_factor = emission_factor
 
-        self.ramp_up_charge = ramp_up_charge if ramp_up_charge <= 0 else -ramp_up_charge
-        self.ramp_down_charge = (
-            ramp_down_charge if ramp_down_charge <= 0 else -ramp_up_charge
+        self.ramp_up_charge = (
+            self.max_power_charge if ramp_up_charge == 0 else -abs(ramp_up_charge)
         )
-        self.ramp_up_discharge = ramp_up_discharge
-        self.ramp_down_discharge = ramp_down_discharge
+        self.ramp_down_charge = (
+            self.min_power_charge if ramp_down_charge == 0 else -abs(ramp_down_charge)
+        )
+        self.ramp_up_discharge = (
+            self.max_power_discharge if ramp_up_discharge == -1 else ramp_up_discharge
+        )
+        self.ramp_down_discharge = (
+            self.min_power_discharge
+            if ramp_down_discharge == -1
+            else ramp_down_discharge
+        )
 
         self.min_operating_time = min_operating_time
         self.min_down_time = min_down_time
@@ -376,21 +384,7 @@ class Storage(SupportsMinMaxCharge):
         min_power_charge = min_power_charge.where(
             min_power_charge > max_power_charge, 0
         )
-        # TODO: ramping restrictions have to be adjusted for series
-        # was discharging before
-        if self.min_down_time > 0 and previous_output > 0:
-            min_power_charge[0] = 0
-            max_power_charge[0] = 0
-        else:
-            if self.ramp_down_charge < 0:
-                min_power_charge = max(
-                    current_power_charge - self.ramp_down_charge, min_power_charge
-                )
 
-            if self.ramp_up_charge < 0:
-                max_power_charge = max(
-                    current_power_charge + self.ramp_up_charge, max_power_charge
-                )
         # restrict charging according to max_SOC
         max_SOC_charge = min(
             0,
@@ -429,7 +423,7 @@ class Storage(SupportsMinMaxCharge):
             if type(self.max_power_discharge) is pd.Series
             else self.max_power_discharge
         )
-        max_power_discharge = max_power_discharge - (base_load - capacity_pos)
+        max_power_discharge -= base_load + capacity_pos
         max_power_discharge = max_power_discharge.where(
             max_power_discharge >= min_power_discharge, 0
         )
@@ -438,33 +432,13 @@ class Storage(SupportsMinMaxCharge):
             min_power_discharge < max_power_discharge, 0
         )
 
-        # TODO: ramping restrictions have to be adjusted for series
-        # was charging before
-        if self.min_down_time > 0 and previous_output < 0:
-            min_power_discharge[0] = 0
-            max_power_discharge[0] = 0
-        else:
-            if self.ramp_down_discharge != -1:
-                # change according to previous hour
-                min_power_discharge = min_power_discharge.where(
-                    min_power_discharge
-                    >= current_power_discharge - self.ramp_down_discharge,
-                    current_power_discharge - self.ramp_down_discharge,
-                )
-
-            if self.ramp_up_discharge != -1:
-                max_power_discharge = max_power_discharge.where(
-                    max_power_discharge
-                    <= current_power_discharge + self.ramp_up_discharge,
-                    current_power_discharge + self.ramp_up_discharge,
-                )
         # restrict according to min_SOC
         max_SOC_discharge = max(
             0,
             ((self.current_SOC - self.min_SOC) * self.efficiency_discharge / duration),
         )
         max_power_discharge = max_power_discharge.where(
-            max_power_discharge > max_SOC_discharge, max_SOC_discharge
+            max_power_discharge < max_SOC_discharge, max_SOC_discharge
         )
         max_power_discharge = round(max_power_discharge, 3)
         min_power_discharge = round(min_power_discharge, 3)

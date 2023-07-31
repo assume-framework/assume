@@ -36,10 +36,31 @@ class flexableEOMStorage(BaseStrategy):
         end = product_tuples[0][1]
         end_excl = end - unit.index.freq
 
+        previous_power = unit.get_output_before(start)
+        current_power = unit.outputs["energy"].at[start]
+        current_power_discharge = max(current_power, 0)
+        current_power_charge = min(current_power, 0)
+
         min_power_charge, max_power_charge = unit.calculate_min_max_charge(start, end)
         min_power_discharge, max_power_discharge = unit.calculate_min_max_discharge(
             start, end
         )
+
+        for t in unit.index[start:end_excl]:
+            max_power_discharge[t] = unit.calculate_ramp_up_discharge(
+                previous_power, max_power_discharge[t], current_power_discharge
+            )
+            min_power_discharge[t] = unit.calculate_ramp_down_discharge(
+                previous_power, min_power_discharge[t], current_power_discharge
+            )
+            max_power_charge[t] = unit.calculate_ramp_up_charge(
+                previous_power, max_power_charge[t], current_power_charge
+            )
+            min_power_charge[t] = unit.calculate_ramp_down_charge(
+                previous_power, min_power_charge[t], current_power_charge
+            )
+            previous_power = current_power
+            current_power = max_power_charge[t]
 
         price_forecast = data_dict["price_forecast"]
 
@@ -82,10 +103,23 @@ class flexablePosCRMStorage(BaseStrategy):
     ):
         start = product_tuples[0][0]
         end = product_tuples[0][1]
+        end_excl = end - unit.index.freq
+
+        previous_power = unit.get_output_before(start)
+        current_power = unit.outputs["energy"].at[start]
 
         min_power_discharge, max_power_discharge = unit.calculate_min_max_discharge(
             start, end
         )
+
+        for t in unit.index[start:end_excl]:
+            max_power_discharge[t] = unit.calculate_ramp_up_discharge(
+                previous_power,
+                max_power_discharge[t],
+                current_power,
+            )
+            previous_power = current_power
+            current_power = max_power_discharge[t]
 
         bid_quantity = max(max_power_discharge)
         if bid_quantity == 0:
@@ -143,8 +177,21 @@ class flexableNegCRMStorage(BaseStrategy):
     ):
         start = product_tuples[0][0]
         end = product_tuples[0][1]
+        end_excl = end - unit.index.freq
+
+        previous_power = unit.get_output_before(start)
+        current_power = unit.outputs["energy"].at[start]
 
         min_power_charge, max_power_charge = unit.calculate_min_max_charge(start, end)
+
+        for t in unit.index[start:end_excl]:
+            max_power_charge[t] = unit.calculate_ramp_up_charge(
+                previous_power,
+                max_power_charge[t],
+                current_power,
+            )
+            previous_power = current_power
+            current_power = max_power_charge[t]
 
         # in flexable no prices calculated for CRM_neg
         bid_quantity = max(max_power_charge)

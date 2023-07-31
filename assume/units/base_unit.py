@@ -158,6 +158,10 @@ class SupportsMinMaxCharge(BaseUnit):
     max_power_charge: float
     min_power_discharge: float
     max_power_discharge: float
+    ramp_up_discharge: float
+    ramp_down_discharge: float
+    ramp_up_charge: float
+    ramp_down_charge: float
 
     def calculate_min_max_charge(
         self, start: pd.Timestamp, end: pd.Timestamp
@@ -171,3 +175,31 @@ class SupportsMinMaxCharge(BaseUnit):
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         pass
+
+    def calculate_ramp_up_discharge(
+        self, previous_power, max_power_discharge, current_power=0
+    ):
+        return min(
+            max_power_discharge, previous_power + self.ramp_up_discharge - current_power
+        )
+
+    def calculate_ramp_down_discharge(
+        self, previous_power, min_power_discharge, current_power=0
+    ):
+        return max(
+            min_power_discharge, previous_power - self.ramp_up_discharge - current_power
+        )
+
+    def calculate_ramp_up_charge(
+        self, previous_power, max_power_charge, current_power=0
+    ):
+        return max(
+            max_power_charge, previous_power + self.ramp_up_charge - current_power
+        )
+
+    def calculate_ramp_down_charge(
+        self, previous_power, min_power_charge, current_power=0
+    ):
+        return min(
+            min_power_charge, previous_power - self.ramp_up_discharge - current_power
+        )
