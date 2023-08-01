@@ -318,7 +318,7 @@ class Storage(SupportsMinMaxCharge):
         if discharge:
             variable_cost = (
                 self.variable_cost_discharge.at[timestep]
-                if type(self.variable_cost_discharge) is pd.Series
+                if isinstance(self.variable_cost_discharge, pd.Series)
                 else self.variable_cost_discharge
             )
             efficiency = self.efficiency_discharge
@@ -326,7 +326,7 @@ class Storage(SupportsMinMaxCharge):
         else:
             variable_cost = (
                 self.variable_cost_charge.at[timestep]
-                if type(self.variable_cost_charge) is pd.Series
+                if isinstance(self.variable_cost_charge, pd.Series)
                 else self.variable_cost_charge
             )
             efficiency = self.efficiency_charge
@@ -365,7 +365,7 @@ class Storage(SupportsMinMaxCharge):
 
         min_power_charge = (
             self.min_power_charge[start:end_excl]
-            if type(self.min_power_charge) is pd.Series
+            if isinstance(self.min_power_charge, pd.Series)
             else self.min_power_charge
         )
         min_power_charge -= base_load
@@ -373,7 +373,7 @@ class Storage(SupportsMinMaxCharge):
 
         max_power_charge = (
             self.max_power_charge[start:end_excl]
-            if type(self.max_power_charge) is pd.Series
+            if isinstance(self.max_power_charge, pd.Series)
             else self.max_power_charge
         )
         max_power_charge -= base_load + capacity_neg
@@ -412,7 +412,7 @@ class Storage(SupportsMinMaxCharge):
 
         min_power_discharge = (
             self.min_power_discharge[start:end_excl]
-            if type(self.min_power_discharge) is pd.Series
+            if isinstance(self.min_power_discharge, pd.Series)
             else self.min_power_discharge
         )
         min_power_discharge -= base_load
@@ -420,7 +420,7 @@ class Storage(SupportsMinMaxCharge):
 
         max_power_discharge = (
             self.max_power_discharge[start:end_excl]
-            if type(self.max_power_discharge) is pd.Series
+            if isinstance(self.max_power_discharge, pd.Series)
             else self.max_power_discharge
         )
         max_power_discharge -= base_load + capacity_pos

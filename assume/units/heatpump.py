@@ -128,14 +128,14 @@ class HeatPump(SupportsMinMax):
         # check if min_power is a series or a float
         min_power = (
             self.min_power.at[start]
-            if type(self.min_power) is pd.Series
+            if isinstance(self.min_power, pd.Series)
             else self.min_power
         )
 
         # check if max_power is a series or a float
         max_power = (
             self.max_power.at[start]
-            if type(self.max_power) is pd.Series
+            if isinstance(self.max_power, pd.Series)
             else self.max_power
         )
 
@@ -202,7 +202,7 @@ class HeatPump(SupportsMinMax):
         cop = self.calculate_cop()
         cop_t = cop.loc[timestep]
 
-        if type(self.electricity_price) == pd.Series:
+        if isinstance(self.electricity_price, pd.Series):
             bid_price = self.electricity_price.at[timestep] / cop_t
         else:
             bid_price = self.electricity_price / cop_t
