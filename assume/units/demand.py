@@ -1,6 +1,6 @@
 import pandas as pd
 
-from assume.units.base_unit import SupportsMinMax
+from assume.common.base import SupportsMinMax
 
 
 class Demand(SupportsMinMax):
@@ -26,9 +26,9 @@ class Demand(SupportsMinMax):
         index: pd.DatetimeIndex,
         max_power: float,
         min_power: float,
-        volume: float or pd.Series,
+        volume: float | pd.Series,
         node: str = "bus0",
-        price: float or pd.Series = 3000.0,
+        price: float | pd.Series = 3000.0,
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs
     ):

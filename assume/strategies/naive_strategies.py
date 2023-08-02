@@ -1,8 +1,7 @@
 from datetime import datetime
 
+from assume.common.base import BaseStrategy, BaseUnit, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Product
-from assume.strategies.base_strategy import BaseStrategy
-from assume.units.base_unit import BaseUnit, SupportsMinMax
 
 # from assume.units import PowerPlant
 

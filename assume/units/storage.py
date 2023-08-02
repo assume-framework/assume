@@ -3,7 +3,7 @@ from functools import lru_cache
 
 import pandas as pd
 
-from assume.units.base_unit import BaseUnit, SupportsMinMaxCharge
+from assume.common.base import BaseUnit, SupportsMinMaxCharge
 
 logger = logging.getLogger(__name__)
 
@@ -90,17 +90,17 @@ class Storage(SupportsMinMaxCharge):
         unit_operator: str,
         technology: str,
         bidding_strategies: dict,
-        max_power_charge: float or pd.Series,
-        max_power_discharge: float or pd.Series,
+        max_power_charge: float | pd.Series,
+        max_power_discharge: float | pd.Series,
         max_SOC: float,
-        min_power_charge: float or pd.Series = 0.0,
-        min_power_discharge: float or pd.Series = 0.0,
+        min_power_charge: float | pd.Series = 0.0,
+        min_power_discharge: float | pd.Series = 0.0,
         min_SOC: float = 0.0,
         availability: pd.Series = None,
         efficiency_charge: float = 1,
         efficiency_discharge: float = 1,
-        variable_cost_charge: float or pd.Series = 0.0,
-        variable_cost_discharge: float or pd.Series = 0.0,
+        variable_cost_charge: float | pd.Series = 0.0,
+        variable_cost_discharge: float | pd.Series = 0.0,
         price_forecast: pd.Series = None,
         emission_factor: float = 0.0,
         ramp_up_charge: float = 0.0,

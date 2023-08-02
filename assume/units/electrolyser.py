@@ -1,7 +1,6 @@
 import pandas as pd
 
-from assume.strategies import OperationalWindow
-from assume.units.base_unit import BaseUnit
+from assume.common.base import BaseUnit
 
 
 class Electrolyser(BaseUnit):
@@ -10,11 +9,11 @@ class Electrolyser(BaseUnit):
         id: str,
         technology: str,
         bidding_strategies: dict,
-        max_hydrogen_output: float or pd.Series,
-        min_hydrogen_output: float or pd.Series,
-        efficiency: float or pd.Series,
-        volume: float or pd.Series = 1000,
-        electricity_price: float or pd.Series = 3000,
+        max_hydrogen_output: float | pd.Series,
+        min_hydrogen_output: float | pd.Series,
+        efficiency: float | pd.Series,
+        volume: float | pd.Series = 1000,
+        electricity_price: float | pd.Series = 3000,
         ramp_up: float = -1,
         ramp_down: float = 1,
         fixed_cost: float = 0,
@@ -123,7 +122,7 @@ class Electrolyser(BaseUnit):
     def calc_marginal_cost(
         self,
         timestep: pd.Timestamp,
-    ) -> float or pd.Series:
+    ) -> float | pd.Series:
         """
         Calculate the marginal cost for the electrolyser at the given time step.
 
@@ -134,7 +133,7 @@ class Electrolyser(BaseUnit):
 
         Returns
         -------
-        bid_price : float or pd.Series
+        bid_price : float | pd.Series
             The calculated bid price.
         """
         efficiency_t = self.efficiency.loc[timestep]

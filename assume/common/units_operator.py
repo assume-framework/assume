@@ -25,7 +25,7 @@ class UnitsOperator(Role):
     def __init__(
         self,
         available_markets: list[MarketConfig],
-        opt_portfolio: tuple[bool, BaseStrategy] = None,
+        opt_portfolio: tuple[bool, BaseStrategy] | None = None,
     ):
         super().__init__()
 

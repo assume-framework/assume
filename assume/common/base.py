@@ -4,7 +4,11 @@ from typing import NamedTuple
 
 import pandas as pd
 
-# from assume.strategies.base_strategy import BaseStrategy
+from assume.common.market_objects import MarketConfig, Product
+
+
+class BaseStrategy:
+    pass
 
 
 class BaseUnit:
@@ -28,7 +32,7 @@ class BaseUnit:
         id: str,
         unit_operator: str,
         technology: str,
-        bidding_strategies: dict,
+        bidding_strategies: dict[str, BaseStrategy],
         index: pd.DatetimeIndex,
         node: str,
     ):
@@ -36,7 +40,7 @@ class BaseUnit:
         self.unit_operator = unit_operator
         self.technology = technology
         self.node = node
-        self.bidding_strategies: dict[str, "BaseStrategy"] = bidding_strategies
+        self.bidding_strategies: dict[str, BaseStrategy] = bidding_strategies
         self.index = index
         self.outputs = defaultdict(lambda: pd.Series(0.0, index=self.index))
 
@@ -134,17 +138,21 @@ class SupportsMinMax(BaseUnit):
 
     def calculate_min_max_power(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
-    ) -> tuple[float]:
+    ) -> tuple[float, float]:
         pass
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         pass
 
-    def calculate_ramp_up(self, previous_power, max_power, current_power=0):
+    def calculate_ramp_up(
+        self, previous_power: float, max_power: float, current_power: float = 0
+    ):
         # max_power + current_power < previous_power + unit.ramp_up
         return min(max_power, previous_power + self.ramp_up - current_power)
 
-    def calculate_ramp_down(self, previous_power, min_power, current_power=0):
+    def calculate_ramp_down(
+        self, previous_power: float, min_power: float, current_power: float = 0
+    ):
         # min_power + current_power > previous_power - unit.ramp_down
         return max(min_power, previous_power - self.ramp_down - current_power)
 
@@ -165,41 +173,90 @@ class SupportsMinMaxCharge(BaseUnit):
 
     def calculate_min_max_charge(
         self, start: pd.Timestamp, end: pd.Timestamp
-    ) -> tuple[float]:
+    ) -> tuple[float, float]:
         pass
 
     def calculate_min_max_discharge(
         self, start: pd.Timestamp, end: pd.Timestamp
-    ) -> tuple[float]:
+    ) -> tuple[float, float]:
         pass
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         pass
 
     def calculate_ramp_up_discharge(
-        self, previous_power, max_power_discharge, current_power=0
+        self,
+        previous_power: float,
+        max_power_discharge: float,
+        current_power: float = 0,
     ):
         return min(
             max_power_discharge, previous_power + self.ramp_up_discharge - current_power
         )
 
     def calculate_ramp_down_discharge(
-        self, previous_power, min_power_discharge, current_power=0
+        self,
+        previous_power: float,
+        min_power_discharge: float,
+        current_power: float = 0,
     ):
         return max(
             min_power_discharge, previous_power - self.ramp_up_discharge - current_power
         )
 
     def calculate_ramp_up_charge(
-        self, previous_power, max_power_charge, current_power=0
+        self, previous_power: float, max_power_charge: float, current_power: float = 0
     ):
         return max(
             max_power_charge, previous_power + self.ramp_up_charge - current_power
         )
 
     def calculate_ramp_down_charge(
-        self, previous_power, min_power_charge, current_power=0
+        self, previous_power: float, min_power_charge: float, current_power: float = 0
     ):
         return min(
             min_power_charge, previous_power - self.ramp_up_discharge - current_power
         )
+
+
+class BaseStrategy:
+    """A base class for a bidding strategy.
+
+    Attributes
+    ----------
+
+
+    Methods
+    -------
+
+    """
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def calculate_bids(
+        self,
+        unit: BaseUnit,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ):
+        raise NotImplementedError()
+
+    def calculate_reward(
+        self,
+        start,
+        end,
+        product_type,
+        clearing_price,
+        unit,
+    ):
+        pass
+
+
+class LearningStrategy(BaseStrategy):
+    """
+    A strategy which provides learning functionality, has a method to calculate the reward.
+    """
+
+    pass

@@ -4,7 +4,7 @@ from functools import lru_cache
 
 import pandas as pd
 
-from assume.units.base_unit import BaseUnit, SupportsMinMax
+from assume.common.base import BaseUnit, SupportsMinMax
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +24,8 @@ class PowerPlant(SupportsMinMax):
         fixed_cost: float = 0.0,
         partial_load_eff: bool = False,
         fuel_type: str = "others",
-        fuel_price: float or pd.Series = 0.0,
-        co2_price: float or pd.Series = 0.0,
+        fuel_price: float | pd.Series = 0.0,
+        co2_price: float | pd.Series = 0.0,
         price_forecast: pd.Series = pd.Series(),
         res_demand_forecast: pd.Series = pd.Series(),
         emission_factor: float = 0.0,
@@ -197,7 +197,7 @@ class PowerPlant(SupportsMinMax):
         self,
         power_output: float,
         timestep: pd.Timestamp = None,
-    ) -> float or pd.Series:
+    ) -> float | pd.Series:
         fuel_price = (
             self.fuel_price.at[timestep]
             if isinstance(self.fuel_price, pd.Series)
