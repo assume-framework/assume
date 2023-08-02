@@ -1,6 +1,5 @@
+from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Product
-from assume.strategies.base_strategy import BaseStrategy
-from assume.units.base_unit import SupportsMinMax
 
 
 class OTCStrategy(BaseStrategy):

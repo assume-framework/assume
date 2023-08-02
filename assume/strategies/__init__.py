@@ -1,8 +1,4 @@
-from assume.strategies.base_strategy import (
-    BaseStrategy,
-    LearningStrategy,
-    OperationalWindow,
-)
+from assume.common.base import BaseStrategy, LearningStrategy
 from assume.strategies.extended import OTCStrategy
 from assume.strategies.flexable import flexableEOM, flexableNegCRM, flexablePosCRM
 from assume.strategies.flexable_storage import (

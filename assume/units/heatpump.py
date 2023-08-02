@@ -1,6 +1,6 @@
 import pandas as pd
 
-from assume.units.base_unit import BaseUnit, SupportsMinMax
+from assume.common.base import BaseUnit, SupportsMinMax
 
 
 class HeatPump(SupportsMinMax):
@@ -9,11 +9,11 @@ class HeatPump(SupportsMinMax):
         id: str,
         technology: str,
         bidding_strategies: dict,
-        # max_thermal_output: float or pd.Series,
-        # min_thermal_output: float or pd.Series,
-        max_power: float or pd.Series,
-        min_power: float or pd.Series,
-        volume: float or pd.Series = 1000,
+        # max_thermal_output: float | pd.Series,
+        # min_thermal_output: float | pd.Series,
+        max_power: float | pd.Series,
+        min_power: float | pd.Series,
+        volume: float | pd.Series = 1000,
         electricity_price: pd.Series = pd.Series(),
         ramp_up: float = -1,
         ramp_down: float = 1,
@@ -23,8 +23,8 @@ class HeatPump(SupportsMinMax):
         downtime_hot_start: int = 0.001,  # hours
         downtime_warm_start: int = 0.005,  # hours
         source: str = None,
-        source_temp: float or pd.Series = 15,
-        sink_temp: float or pd.Series = 35,
+        source_temp: float | pd.Series = 15,
+        sink_temp: float | pd.Series = 35,
         index: pd.DatetimeIndex = None,
         location: tuple[float, float] = None,
         node: str = None,
@@ -185,7 +185,7 @@ class HeatPump(SupportsMinMax):
             ]
         return self.outputs["energy"][start:end_excl]
 
-    def calc_marginal_cost(self, timestep: pd.Timestamp) -> float or pd.Series:
+    def calc_marginal_cost(self, timestep: pd.Timestamp) -> float | pd.Series:
         """
         Calculate the marginal cost for the heat pump at the given time step.
 

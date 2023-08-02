@@ -4,10 +4,9 @@ import numpy as np
 import pandas as pd
 import torch as th
 
+from assume.common.base import BaseUnit, LearningStrategy
 from assume.common.learning_utils import Actor, NormalActionNoise
 from assume.common.market_objects import MarketConfig, Product
-from assume.strategies.base_strategy import LearningStrategy
-from assume.units.base_unit import BaseUnit
 
 
 class RLStrategy(LearningStrategy):

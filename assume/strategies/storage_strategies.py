@@ -1,9 +1,8 @@
 import numpy as np
 import pandas as pd
 
+from assume.common.base import BaseStrategy, SupportsMinMaxCharge
 from assume.common.market_objects import MarketConfig, Product
-from assume.strategies.base_strategy import BaseStrategy
-from assume.units.base_unit import SupportsMinMaxCharge
 
 
 class complexEOMStorage(BaseStrategy):
