@@ -1,4 +1,4 @@
-from assume.units.heatpump import HeatPump
+from assume.units.dst_units import HeatPump
 import pandas as pd
 import pyomo.environ as pyo
 from pyomo.environ import *

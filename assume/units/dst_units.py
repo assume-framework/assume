@@ -152,35 +152,35 @@ class HeatPump(DST):
     def define_variables(self) -> None:
         self.model.power_in = Var(self.model.heat_pumps, self.model.time_steps, domain=pyo.NonNegativeReals)
         self.model.power_out = Var(self.model.heat_pumps, self.model.time_steps, domain=pyo.NonNegativeReals)
-        # self.model.s_on = Var(self.model.time_steps, domain=pyo.Binary)
-        # self.model.s_start = Var(self.model.time_steps, domain=pyo.Binary)
-        # self.model.s_stop = Var(self.model.time_steps, domain=pyo.Binary)
+        self.model.s_on = Var(self.model.time_steps, domain=pyo.Binary)
+        self.model.s_start = Var(self.model.time_steps, domain=pyo.Binary)
+        self.model.s_stop = Var(self.model.time_steps, domain=pyo.Binary)
         self.model.c = Var(self.model.heat_pumps, self.model.time_steps, domain=pyo.Reals)
 
     # Define constraints
     def define_constraints(self):
 
-        # @self.model.Constraint(self.model.time_steps, self.model.heat_pumps)
-        # def s_on_power_out_relation(m, t, h):
-        #     return m.s_on[t, h] == (1 if value(m.power_out[t, h]) > 0 else 0)
-        #
-        # # Constraint to set s_start[t] to 1 and s_stop[t] to 0 if s_on[t - 1] is 0
-        # @self.model.Constraint(self.model.time_steps)
-        # def s_start_s_stop_s_on_relation(m, t):
-        #     return m.s_start[t] + m.s_stop[t] + (1 - m.s_on[t - 1] if t > 0 else 0) <= 1
-        #
-        # # Constraints to maintain the relations between s_on, s_start, and s_stop
-        # @self.model.Constraint(self.model.time_steps)
-        # def s_on_s_start_relation(m, t):
-        #     return m.s_on[t] - (m.s_on[t - 1] if t > 0 else 0) == m.s_start[t] - m.s_stop[t]
-        #
+        @self.model.Constraint(self.model.time_steps, self.model.heat_pumps)
+        def s_on_power_out_relation(m, t, h):
+            return m.s_on[t, h] == (1 if value(m.power_out[t, h]) > 0 else 0)
+
+        # Constraint to set s_start[t] to 1 and s_stop[t] to 0 if s_on[t - 1] is 0
+        @self.model.Constraint(self.model.time_steps)
+        def s_start_s_stop_s_on_relation(m, t):
+            return m.s_start[t] + m.s_stop[t] + (1 - m.s_on[t - 1] if t > 0 else 0) <= 1
+
+        # Constraints to maintain the relations between s_on, s_start, and s_stop
+        @self.model.Constraint(self.model.time_steps)
+        def s_on_s_start_relation(m, t):
+            return m.s_on[t] - (m.s_on[t - 1] if t > 0 else 0) == m.s_start[t] - m.s_stop[t]
+
         # @self.model.Constraint(self.model.time_steps)
         # def s_on_s_start_relation(m, t):
         #     return m.s_on[t] - m.s_on[t - 1] == m.s_start[t] - m.s_stop[t] if t > 0 else Constraint.Skip
-        #
-        # @self.model.Constraint(self.model.time_steps, self.model.heat_pumps)
-        # def s_start_s_stop_relation(m, t):  # pylint: disable=W0612
-        #     return m.s_start[t] + m.s_stop[t] <= 1
+
+        @self.model.Constraint(self.model.time_steps, self.model.heat_pumps)
+        def s_start_s_stop_relation(m, t):  # pylint: disable=W0612
+            return m.s_start[t] + m.s_stop[t] <= 1
 
         @self.model.Constraint(self.model.time_steps, self.model.heat_pumps)
         def p_output_lower_bound(h, t):  # pylint: disable=W0612
