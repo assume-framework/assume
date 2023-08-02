@@ -154,14 +154,16 @@ class World:
 
             same_process = True
             if same_process:
-                self.rl_agent = RoleAgent(self.container)
+                self.rl_agent = RoleAgent(
+                    self.container, suggested_aid="learning_agent_1"
+                )
                 self.rl_agent.add_role(learning_role)
             else:
                 # this does not set the clock in output_agent correctly yet
                 # see https://gitlab.com/mango-agents/mango/-/issues/59
                 # but still improves performance
                 def creator(container):
-                    agent = RoleAgent(container, suggested_aid="learning")
+                    agent = RoleAgent(container, suggested_aid="learning_agent_1")
                     agent.add_role(learning_role)
 
                 await self.container.as_agent_process(agent_creator=creator)
