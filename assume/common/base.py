@@ -201,7 +201,8 @@ class SupportsMinMaxCharge(BaseUnit):
         current_power: float = 0,
     ):
         return max(
-            min_power_discharge, previous_power - self.ramp_up_discharge - current_power
+            min_power_discharge,
+            previous_power - self.ramp_down_discharge - current_power,
         )
 
     def calculate_ramp_up_charge(
