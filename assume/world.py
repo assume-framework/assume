@@ -365,34 +365,12 @@ class World:
         start_ts = calendar.timegm(self.start.utctimetuple())
         end_ts = calendar.timegm(self.end.utctimetuple())
 
-        if self.rl_agent is not None:
-            # we are in learning mode
+        return self.loop.run_until_complete(
+            self.run_async(start_ts=start_ts, end_ts=end_ts)
+        )
 
-            pbar = tqdm(total=self.rl_agent.roles[0].training_episodes)
-
-            for i_episode in tqdm(
-                range(self.rl_agent.roles[0].training_episodes),
-                desc=f"Training Episode {self.rl_agent.roles[0].episodes_done}",
-            ):
-                # reset time to start time so that mango does not get confused
-                self.loop.run_until_complete(
-                    self.run_async(start_ts=start_ts, end_ts=end_ts)
-                )
-
-                self.rl_agent.roles[0].episodes_done = +1
-                pbar.update(1)
-
-            self.logger.info("################")
-            self.logger.info(f"Training finished, Start evaluation run")
-
-            self.rl_agent.roles[0].learning_mode = False
-
-            return self.loop.run_until_complete(
-                self.run_async(start_ts=start_ts, end_ts=end_ts)
-            )
-
-        else:
-            # we are not in learning mode
-            return self.loop.run_until_complete(
-                self.run_async(start_ts=start_ts, end_ts=end_ts)
-            )
+    def reset(self):
+        self.market_operators = {}
+        self.markets = {}
+        self.unit_operators = {}
+        self.forecast_providers = {}

@@ -22,7 +22,11 @@ if __name__ == "__main__":
     study_case = "example_01a"
 
     world = World(database_uri=DATABASE_URI, export_csv_path=EXPORT_CSV_PATH)
+
     load_scenario_folder(
-        world, inputs_path="examples/inputs", scenario=scenario, study_case=study_case
+        world,
+        inputs_path="examples/inputs",
+        scenario=scenario,
+        study_case=study_case,
     )
     world.run()

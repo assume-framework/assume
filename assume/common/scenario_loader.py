@@ -1,6 +1,8 @@
 import logging
 from datetime import datetime
 from typing import Callable
+import calendar
+from tqdm import tqdm
 
 import dateutil.rrule as rr
 import numpy as np
@@ -184,6 +186,7 @@ async def load_scenario_folder_async(
     inputs_path: str,
     scenario: str,
     study_case: str,
+    learning_mode: bool,
 ):
     """Load a scenario from a given path.
 
@@ -204,6 +207,8 @@ async def load_scenario_folder_async(
             study_case = list(config.keys())[0]
         config = config[study_case]
     logger.info(f"Starting Scenario {scenario}/{study_case} from {inputs_path}")
+
+    world.reset()
 
     start = pd.Timestamp(config["start_date"])
     end = pd.Timestamp(config["end_date"])
@@ -294,24 +299,25 @@ async def load_scenario_folder_async(
         raise ValueError("No demand time series was provided!")
 
     # Initialize world
+    # just if we are not in leanring mode, that would mean we want to restart the simulation without losing the output and learning agent
+    if not learning_mode:
+        save_frequency_hours = config.get("save_frequency_hours", None)
+        sim_id = f"{scenario}_{study_case}"
 
-    save_frequency_hours = config.get("save_frequency_hours", None)
-    sim_id = f"{scenario}_{study_case}"
+        learning_config = config.get("learning_config", {})
+        if "load_learned_path" not in learning_config.keys():
+            learning_config[
+                "load_learned_path"
+            ] = f"{inputs_path}/learned_strategies/{sim_id}/"
 
-    learning_config = config.get("learning_config", {})
-    if "load_learned_path" not in learning_config.keys():
-        learning_config[
-            "load_learned_path"
-        ] = f"{inputs_path}/learned_strategies/{sim_id}/"
-
-    await world.setup(
-        start=start,
-        end=end,
-        save_frequency_hours=save_frequency_hours,
-        simulation_id=sim_id,
-        learning_config=learning_config,
-        index=index,
-    )
+        await world.setup(
+            start=start,
+            end=end,
+            save_frequency_hours=save_frequency_hours,
+            simulation_id=sim_id,
+            learning_config=learning_config,
+            index=index,
+        )
 
     # get the market config from the config file and add the markets
     logger.info("Adding markets")
@@ -468,11 +474,47 @@ def load_scenario_folder(
     """
     Load a scenario from a given path.
     """
-    return world.loop.run_until_complete(
+
+    world.loop.run_until_complete(
         load_scenario_folder_async(
             world,
             inputs_path,
             scenario,
             study_case,
+            0,
         )
     )
+
+    start_ts = calendar.timegm(world.start.utctimetuple())
+    end_ts = calendar.timegm(world.end.utctimetuple())
+
+    if world.rl_agent is not None:
+        # we are in learning mode
+
+        for i_episode in tqdm(
+            range(world.rl_agent.roles[0].training_episodes),
+            desc=f"Training Episode {world.rl_agent.roles[0].episodes_done}",
+        ):
+            world.loop.run_until_complete(
+                world.run_async(start_ts=start_ts, end_ts=end_ts)
+            )
+            world.reset()
+
+            world.rl_agent.roles[0].episodes_done = i_episode
+
+            # reset time to start time so that mango does not get confused
+            world.clock.set_time(start_ts - 1)
+            world.loop.run_until_complete(
+                load_scenario_folder_async(
+                    world,
+                    inputs_path,
+                    scenario,
+                    study_case,
+                    1,
+                )
+            )
+
+        world.logger.info("################")
+        world.logger.info(f"Training finished, Start evaluation run")
+
+        world.rl_agent.roles[0].learning_mode = False
