@@ -21,18 +21,25 @@ class OTCStrategy(BaseStrategy):
         Return: volume, price
         """
         bids = []
-        for product_tuple in product_tuples:
-            start = product_tuple[0]
-            end = product_tuple[1]
+        for product in product_tuples:
+            start = product[0]
+            end = product[1]
 
             min_power, max_power = unit.calculate_min_max_power(start, end)
             current_power = unit.outputs["energy"].at[start]
-            min_price = unit.calculate_marginal_cost(start, current_power - min_power)
             max_price = unit.calculate_marginal_cost(start, current_power + max_power)
 
             price = max_price
             volume = max_power
             if "OTC" in market_config.name:
                 volume *= self.scale
-            bids.append({"price": price, "volume": volume})
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": product[2],
+                    "price": price,
+                    "volume": volume,
+                }
+            )
         return bids

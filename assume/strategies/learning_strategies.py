@@ -116,8 +116,20 @@ class RLStrategy(LearningStrategy):
             bid_price_flex = max(bid_prices)
 
         bids = [
-            {"price": bid_price_inflex, "volume": bid_quantity_inflex},
-            {"price": bid_price_flex, "volume": bid_quantity_flex},
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "price": bid_price_inflex,
+                "volume": bid_quantity_inflex,
+            },
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "price": bid_price_flex,
+                "volume": bid_quantity_flex,
+            },
         ]
 
         self.curr_observation = self.next_observation

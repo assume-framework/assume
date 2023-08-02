@@ -78,8 +78,20 @@ class flexableEOM(BaseStrategy):
             bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
 
         bids = [
-            {"price": bid_price_inflex, "volume": bid_quantity_inflex},
-            {"price": bid_price_flex, "volume": bid_quantity_flex},
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "price": bid_price_inflex,
+                "volume": bid_quantity_inflex,
+            },
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "price": bid_price_flex,
+                "volume": bid_quantity_flex,
+            },
         ]
 
         return bids
@@ -197,19 +209,23 @@ class flexablePosCRM(BaseStrategy):
         energy_price = marginal_cost
 
         if market_config.product_type == "capacity_pos":
-            bids = [
-                {"price": capacity_price, "volume": bid_quantity},
-            ]
+            price = capacity_price
         elif market_config.product_type == "energy_pos":
-            bids = [
-                {"price": energy_price, "volume": bid_quantity},
-            ]
+            price = energy_price
         else:
             raise ValueError(
                 f"Product {market_config.product_type} is not supported by this strategy."
             )
 
-        return bids
+        return [
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "price": price,
+                "volume": bid_quantity,
+            },
+        ]
 
 
 class flexableNegCRM(BaseStrategy):
@@ -264,19 +280,23 @@ class flexableNegCRM(BaseStrategy):
         energy_price = marginal_cost * (-1)
 
         if market_config.product_type == "capacity_neg":
-            bids = [
-                {"price": capacity_price, "volume": bid_quantity},
-            ]
+            price = capacity_price
         elif market_config.product_type == "energy_neg":
-            bids = [
-                {"price": energy_price, "volume": bid_quantity},
-            ]
+            price = energy_price
         else:
             raise ValueError(
                 f"Product {market_config.product_type} is not supported by this strategy."
             )
 
-        return bids
+        return [
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "price": price,
+                "volume": bid_quantity,
+            },
+        ]
 
 
 def get_specific_revenue(

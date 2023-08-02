@@ -80,7 +80,15 @@ class flexableEOMStorage(BaseStrategy):
             bid_quantity,
         )
 
-        return [{"price": average_price, "volume": bid_quantity.max()}]
+        return [
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "price": average_price,
+                "volume": bid_quantity.max(),
+            },
+        ]
 
 
 class flexablePosCRMStorage(BaseStrategy):
@@ -144,19 +152,23 @@ class flexablePosCRMStorage(BaseStrategy):
         energy_price = capacity_price / unit.current_SOC
 
         if market_config.product_type == "capacity_pos":
-            bids = [
-                {"price": capacity_price, "volume": bid_quantity},
-            ]
+            price = capacity_price
         elif market_config.product_type == "energy_pos":
-            bids = [
-                {"price": energy_price, "volume": bid_quantity},
-            ]
+            price = energy_price
         else:
             raise ValueError(
                 f"Product {market_config.product_type} is not supported by this strategy."
             )
 
-        return bids
+        return [
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "price": price,
+                "volume": bid_quantity.max(),
+            },
+        ]
 
 
 class flexableNegCRMStorage(BaseStrategy):
@@ -198,20 +210,15 @@ class flexableNegCRMStorage(BaseStrategy):
             return []
         # if bid_quantity >= min_bid_volume
 
-        if market_config.product_type == "capacity_neg":
-            bids = [
-                {"price": 0, "volume": bid_quantity},
-            ]
-        elif market_config.product_type == "energy_neg":
-            bids = [
-                {"price": 0, "volume": bid_quantity},
-            ]
-        else:
-            raise ValueError(
-                f"Product {market_config.product_type} is not supported by this strategy."
-            )
-
-        return bids
+        return [
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "price": 0,
+                "volume": bid_quantity.max(),
+            },
+        ]
 
 
 def calculate_price_average(unit, current_time, foresight, price_forecast):
