@@ -250,7 +250,7 @@ class MarketRole(Role):
                 f'clearing price for {self.marketconfig.name} is {round(meta["price"],2)}, volume: {meta["demand_volume"]}'
             )
             meta["market_id"] = self.marketconfig.name
-            meta["time"] = self.context.current_timestamp
+            meta["time"] = meta["product_start"]
 
         await self.store_market_results(market_meta)
 

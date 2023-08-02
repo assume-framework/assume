@@ -2,11 +2,6 @@ import logging
 from itertools import groupby
 from operator import itemgetter
 
-try:
-    import torch as th
-except ImportError:
-    th = None
-
 from assume.common.market_objects import MarketProduct, Order, Orderbook
 from assume.markets.base_market import MarketRole
 
@@ -98,8 +93,6 @@ def pay_as_clear(
         )
         if accepted_supply_orders:
             clear_price = max(map(itemgetter("price"), accepted_supply_orders))
-            if th is not None and isinstance(clear_price, th.Tensor):
-                clear_price = clear_price.item()
         else:
             clear_price = 0
         for order in accepted_product_orders:
