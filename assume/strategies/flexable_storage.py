@@ -51,16 +51,16 @@ class flexableEOMStorage(BaseStrategy):
             current_power_discharge = max(current_power, 0)
             current_power_charge = min(current_power, 0)
 
-            max_power_discharge[start] = unit.calculate_ramp_up_discharge(
+            max_power_discharge[start] = unit.calculate_ramp_discharge(
                 previous_power, max_power_discharge[start], current_power_discharge
             )
-            min_power_discharge[start] = unit.calculate_ramp_down_discharge(
+            min_power_discharge[start] = unit.calculate_ramp_discharge(
                 previous_power, min_power_discharge[start], current_power_discharge
             )
-            max_power_charge[start] = unit.calculate_ramp_up_charge(
+            max_power_charge[start] = unit.calculate_ramp_charge(
                 previous_power, max_power_charge[start], current_power_charge
             )
-            min_power_charge[start] = unit.calculate_ramp_down_charge(
+            min_power_charge[start] = unit.calculate_ramp_charge(
                 previous_power, min_power_charge[start], current_power_charge
             )
 
@@ -124,7 +124,7 @@ class flexablePosCRMStorage(BaseStrategy):
             start = product[0]
             current_power = unit.outputs["energy"].at[start]
 
-            bid_quantity = unit.calculate_ramp_up_discharge(
+            bid_quantity = unit.calculate_ramp_discharge(
                 previous_power,
                 max_power_discharge[start],
                 current_power,
@@ -207,7 +207,7 @@ class flexableNegCRMStorage(BaseStrategy):
         for product in product_tuples:
             start = product[0]
             current_power = unit.outputs["energy"].at[start]
-            bid_quantity = unit.calculate_ramp_up_charge(
+            bid_quantity = unit.calculate_ramp_charge(
                 previous_power,
                 max_power_charge[start],
                 current_power,

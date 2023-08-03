@@ -1,6 +1,6 @@
 import pandas as pd
 
-from assume.common.base import BaseUnit, SupportsMinMax
+from assume.common.base import SupportsMinMax
 
 
 class HeatPump(SupportsMinMax):

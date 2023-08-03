@@ -1,10 +1,9 @@
 from collections import defaultdict
 from datetime import datetime
-from typing import NamedTuple
 
 import pandas as pd
 
-from assume.common.market_objects import MarketConfig, Product
+from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
 class BaseStrategy:
@@ -53,7 +52,7 @@ class BaseUnit:
         market_config,
         product_tuples: list[tuple],
         data_dict=None,
-    ) -> list:
+    ) -> Orderbook:
         """Calculate the bids for the next time step."""
 
         if market_config.product_type not in self.bidding_strategies:
@@ -73,7 +72,7 @@ class BaseUnit:
         start: pd.Timestamp,
         end: pd.Timestamp,
         product_type: str,
-    ):
+    ) -> None:
         """
         adds dispatch plan from current market result to total dispatch plan
         """
@@ -94,7 +93,7 @@ class BaseUnit:
         self,
         start: pd.Timestamp,
         end: pd.Timestamp,
-    ):
+    ) -> pd.Series:
         """
         check if the total dispatch plan is feasible
         This checks if the market feedback is feasible for the given unit.
@@ -104,7 +103,9 @@ class BaseUnit:
         end_excl = end - self.index.freq
         return self.outputs["energy"][start:end_excl]
 
-    def get_output_before(self, datetime: datetime, product_type: str = "energy"):
+    def get_output_before(
+        self, datetime: datetime, product_type: str = "energy"
+    ) -> float:
         if datetime - self.index.freq < self.index[0]:
             return 0
         else:
@@ -144,17 +145,26 @@ class SupportsMinMax(BaseUnit):
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         pass
 
-    def calculate_ramp_up(
-        self, previous_power: float, max_power: float, current_power: float = 0
-    ):
+    def calculate_ramp(
+        self, previous_power: float, power: float, current_power: float = 0
+    ) -> float:
+        if power == 0:
+            return power
+        # ramp up constraint
         # max_power + current_power < previous_power + unit.ramp_up
-        return min(max_power, previous_power + self.ramp_up - current_power)
-
-    def calculate_ramp_down(
-        self, previous_power: float, min_power: float, current_power: float = 0
-    ):
+        power = min(
+            power,
+            previous_power + self.ramp_up - current_power,
+            self.max_power - current_power,
+        )
+        # ramp down constraint
         # min_power + current_power > previous_power - unit.ramp_down
-        return max(min_power, previous_power - self.ramp_down - current_power)
+        power = max(
+            power,
+            previous_power - self.ramp_down - current_power,
+            self.min_power - current_power,
+        )
+        return power
 
 
 class SupportsMinMaxCharge(BaseUnit):
@@ -184,40 +194,37 @@ class SupportsMinMaxCharge(BaseUnit):
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         pass
 
-    def calculate_ramp_up_discharge(
+    def calculate_ramp_discharge(
         self,
         previous_power: float,
-        max_power_discharge: float,
+        power_discharge: float,
         current_power: float = 0,
-    ):
-        return min(
-            max_power_discharge, previous_power + self.ramp_up_discharge - current_power
+    ) -> float:
+        if power_discharge == 0:
+            return power_discharge
+        power_discharge = min(
+            power_discharge,
+            previous_power + self.ramp_up_discharge - current_power,
         )
 
-    def calculate_ramp_down_discharge(
-        self,
-        previous_power: float,
-        min_power_discharge: float,
-        current_power: float = 0,
-    ):
-        return max(
-            min_power_discharge,
+        power_discharge = max(
+            power_discharge,
             previous_power - self.ramp_down_discharge - current_power,
         )
+        return power_discharge
 
-    def calculate_ramp_up_charge(
-        self, previous_power: float, max_power_charge: float, current_power: float = 0
-    ):
-        return max(
-            max_power_charge, previous_power + self.ramp_up_charge - current_power
+    def calculate_ramp_charge(
+        self, previous_power: float, power_charge: float, current_power: float = 0
+    ) -> float:
+        if power_charge == 0:
+            return power_charge
+        power_charge = max(
+            power_charge, previous_power + self.ramp_up_charge - current_power
         )
-
-    def calculate_ramp_down_charge(
-        self, previous_power: float, min_power_charge: float, current_power: float = 0
-    ):
-        return min(
-            min_power_charge, previous_power - self.ramp_up_discharge - current_power
+        power_charge = min(
+            power_charge, previous_power - self.ramp_down_charge - current_power
         )
+        return power_charge
 
 
 class BaseStrategy:
@@ -241,7 +248,7 @@ class BaseStrategy:
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,
-    ):
+    ) -> Orderbook:
         raise NotImplementedError()
 
     def calculate_reward(
@@ -259,5 +266,3 @@ class LearningStrategy(BaseStrategy):
     """
     A strategy which provides learning functionality, has a method to calculate the reward.
     """
-
-    pass
