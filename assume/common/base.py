@@ -49,7 +49,7 @@ class BaseUnit:
 
     def calculate_bids(
         self,
-        market_config,
+        market_config: MarketConfig,
         product_tuples: list[tuple],
         data_dict=None,
     ) -> Orderbook:
@@ -67,27 +67,28 @@ class BaseUnit:
 
     def set_dispatch_plan(
         self,
-        dispatch_plan: dict,
-        clearing_price: float,
-        start: pd.Timestamp,
-        end: pd.Timestamp,
-        product_type: str,
+        market_config: MarketConfig,
+        orderbook: Orderbook,
     ) -> None:
         """
         adds dispatch plan from current market result to total dispatch plan
         """
-        end_excl = end - self.index.freq
-        self.outputs[product_type].loc[start:end_excl] += dispatch_plan["total_power"]
+        product_type = market_config.product_type
+        for order in orderbook:
+            start = order["start_time"]
+            end = order["end_time"]
+            end_excl = end - self.index.freq
+            self.outputs[product_type].loc[start:end_excl] += order["volume"]
 
-        self.calculate_cashflow(start=start, end=end, clearing_price=clearing_price)
+            self.calculate_cashflow(start=start, end=end, clearing_price=order["price"])
 
-        self.bidding_strategies[product_type].calculate_reward(
-            start=start,
-            end=end,
-            product_type=product_type,
-            clearing_price=clearing_price,
-            unit=self,
-        )
+            self.bidding_strategies[product_type].calculate_reward(
+                start=start,
+                end=end,
+                product_type=product_type,
+                clearing_price=order["price"],
+                unit=self,
+            )
 
     def execute_current_dispatch(
         self,
