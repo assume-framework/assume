@@ -29,7 +29,7 @@ def nodal_pricing_pyomo(market_agent: MarketRole, market_products: list[MarketPr
     # define list of nodes
     nodes = [0, 1, 2]
 
-    # define a dict with connections between nodes as a tupple of (node1, node2, capacity)
+    # define a dict with connections between nodes as a tuple of (node1, node2, capacity)
     network = {"Line_0": (0, 1, 0), "Line_1": (1, 2, 0), "Line_2": (2, 0, 0)}
 
     # add congestion
@@ -46,24 +46,50 @@ def nodal_pricing_pyomo(market_agent: MarketRole, market_products: list[MarketPr
     meta = []
     market_agent.all_orders = sorted(market_agent.all_orders, key=market_getter)
     for product, product_orders in groupby(market_agent.all_orders, market_getter):
-        accepted_product_orders: Orderbook = []
+        product_orders = list(product_orders)
         if product[0:3] not in market_products:
             rejected_orders.extend(product_orders)
             # log.debug(f'found unwanted bids for {product} should be {market_products}')
             continue
 
-        product_orders = list(product_orders)
-        demand_orders = filter(lambda x: x["volume"] < 0, product_orders)
-        supply_orders = filter(lambda x: x["volume"] > 0, product_orders)
+        demand_orders = list(filter(lambda x: x["volume"] < 0, product_orders))
+        supply_orders = list(filter(lambda x: x["volume"] > 0, product_orders))
         # volume 0 is ignored/invalid
-        supply_bids = list(
-            map(itemgetter("node_id", "price", "volume", "agent_id"), supply_orders)
-        )
-        demand_bids = []
-        for order in demand_orders:
-            demand_bids.append(
-                (order["node_id"], order["price"], -order["volume"], order["agent_id"])
+
+        if "acceptance_ratio" in market_agent.marketconfig.additional_fields:
+            supply_bids = list(
+                map(
+                    itemgetter(
+                        "node_id", "price", "volume", "agent_id", "acceptance_ratio"
+                    ),
+                    supply_orders,
+                )
             )
+            demand_bids = []
+            for order in demand_orders:
+                demand_bids.append(
+                    (
+                        order["node_id"],
+                        order["price"],
+                        -order["volume"],
+                        order["agent_id"],
+                        order["acceptance_ratio"],
+                    )
+                )
+        else:
+            supply_bids = list(
+                map(itemgetter("node_id", "price", "volume", "agent_id"), supply_orders)
+            )
+            demand_bids = []
+            for order in demand_orders:
+                demand_bids.append(
+                    (
+                        order["node_id"],
+                        order["price"],
+                        -order["volume"],
+                        order["agent_id"],
+                    )
+                )
         # Create a model
         model = ConcreteModel()
 
@@ -104,15 +130,42 @@ def nodal_pricing_pyomo(market_agent: MarketRole, market_products: list[MarketPr
                 == 0
             )
 
-        # Maximum power generation constraint
-        model.max_generation = ConstraintList()
-        for i, (node, price, quantity, bid_id) in enumerate(supply_bids):
-            model.max_generation.add(model.p_generation[i] <= quantity)
+        if "acceptance_ratio" in market_agent.marketconfig.additional_fields:
+            # Maximum power generation constraint
+            model.max_generation = ConstraintList()
+            for i, (node, price, volume, bid_id, ratio) in enumerate(supply_bids):
+                model.max_generation.add(model.p_generation[i] <= volume)
 
-        # Maximum power consumption constraint
-        model.max_consumption = ConstraintList()
-        for i, (node, price, quantity, bid_id) in enumerate(demand_bids):
-            model.max_consumption.add(model.p_consumption[i] <= quantity)
+            # Maximum power consumption constraint
+            model.max_consumption = ConstraintList()
+            for i, (node, price, volume, bid_id, ratio) in enumerate(demand_bids):
+                model.max_consumption.add(model.p_consumption[i] <= volume)
+
+            # Minimum power generation constraint
+            model.min_generation = ConstraintList()
+            for i, (node, price, volume, bid_id, ratio) in enumerate(supply_bids):
+                model.max_generation.add(
+                    model.p_generation[i] == 0
+                    or model.p_generation[i] >= volume * ratio
+                )
+
+            # Minimum power consumption constraint
+            model.min_consumption = ConstraintList()
+            for i, (node, price, volume, bid_id, ratio) in enumerate(demand_bids):
+                model.max_consumption.add(
+                    model.p_consumption[i] == 0
+                    or model.p_generation[i] >= volume * ratio
+                )
+        else:
+            # Maximum power generation constraint
+            model.max_generation = ConstraintList()
+            for i, (node, price, volume, bid_id) in enumerate(supply_bids):
+                model.max_generation.add(model.p_generation[i] <= volume)
+
+            # Maximum power consumption constraint
+            model.max_consumption = ConstraintList()
+            for i, (node, price, volume, bid_id) in enumerate(demand_bids):
+                model.max_consumption.add(model.p_consumption[i] <= volume)
 
         # Obective function
         model.obj = Objective(
@@ -143,24 +196,26 @@ def nodal_pricing_pyomo(market_agent: MarketRole, market_products: list[MarketPr
         duals_dict = {str(key): -model.dual[key] for key in model.dual.keys()}
 
         # Find sum of generation per node
-        generation = {
-            node: sum(
-                model.p_generation[i]()
-                for i in range(len(supply_bids))
-                if supply_bids[i][0] == node
-            )
-            for node in nodes
-        }
+        generation = {node: 0 for node in nodes}
+        consumption = {node: 0 for node in nodes}
+        # add demand to accepted orders with confirmed volume
+        for i in range(len(demand_orders)):
+            node = demand_orders[i]["node_id"]
+            opt_volume = model.p_consumption[i].value
+            consumption[node] += opt_volume
+            demand_orders[i]["volume"] = -opt_volume
+            demand_orders[i]["price"] = duals_dict[f"balance_constraint[{node+1}]"]
+            if opt_volume != 0:
+                accepted_orders.append(demand_orders[i])
 
-        # Find sum of generation per node
-        consumption = {
-            node: sum(
-                model.p_consumption[i]()
-                for i in range(len(demand_bids))
-                if demand_bids[i][0] == node
-            )
-            for node in nodes
-        }
+        for i in range(len(supply_orders)):
+            node = supply_orders[i]["node_id"]
+            opt_volume = model.p_generation[i].value
+            generation[node] += opt_volume
+            supply_orders[i]["volume"] = opt_volume
+            supply_orders[i]["price"] = duals_dict[f"balance_constraint[{node+1}]"]
+            if opt_volume != 0:
+                accepted_orders.append(supply_orders[i])
 
         # Find sum of power flowing into each node
         power_in = {
@@ -169,7 +224,6 @@ def nodal_pricing_pyomo(market_agent: MarketRole, market_products: list[MarketPr
             )
             for node in nodes
         }
-        # accepted_orders.extend()
         for node in nodes:
             meta.append(
                 {
@@ -184,5 +238,4 @@ def nodal_pricing_pyomo(market_agent: MarketRole, market_products: list[MarketPr
                     "only_hours": product[2],
                 }
             )
-        # TODO add to accepted_orders..
     return accepted_orders, meta
