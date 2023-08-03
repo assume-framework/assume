@@ -1,5 +1,5 @@
 from assume.units.heatpump import HeatPump
-from assume.strategies.dr_strategies.dr_programmes import RealTimeTariffDR
+from assume.strategies.dr_strategies import RealTimeTariffDR
 import pyomo.environ as pyo
 from pyomo.environ import *
 from enum import Enum
