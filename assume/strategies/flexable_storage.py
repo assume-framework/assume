@@ -30,57 +30,60 @@ class flexableEOMStorage(BaseStrategy):
         # =============================================================================
         # Storage Unit is either charging, discharging, or off
         # =============================================================================
-
         start = product_tuples[0][0]
-        end = product_tuples[0][1]
-        end_excl = end - unit.index.freq
+        end_all = product_tuples[-1][1]
 
         previous_power = unit.get_output_before(start)
-        current_power = unit.outputs["energy"].at[start]
-        current_power_discharge = max(current_power, 0)
-        current_power_charge = min(current_power, 0)
-
-        min_power_charge, max_power_charge = unit.calculate_min_max_charge(start, end)
+        min_power_charge, max_power_charge = unit.calculate_min_max_charge(
+            start, end_all
+        )
         min_power_discharge, max_power_discharge = unit.calculate_min_max_discharge(
-            start, end
+            start, end_all
         )
 
-        for t in unit.index[start:end_excl]:
-            max_power_discharge[t] = unit.calculate_ramp_up_discharge(
-                previous_power, max_power_discharge[t], current_power_discharge
-            )
-            min_power_discharge[t] = unit.calculate_ramp_down_discharge(
-                previous_power, min_power_discharge[t], current_power_discharge
-            )
-            max_power_charge[t] = unit.calculate_ramp_up_charge(
-                previous_power, max_power_charge[t], current_power_charge
-            )
-            min_power_charge[t] = unit.calculate_ramp_down_charge(
-                previous_power, min_power_charge[t], current_power_charge
-            )
-            previous_power = current_power
-            current_power = max_power_charge[t]
+        bids = []
+        for product in product_tuples:
+            start = product[0]
+            end = product[1]
+            end_excl = end - unit.index.freq
 
-        price_forecast = data_dict["price_forecast"]
+            current_power = unit.outputs["energy"].at[start]
+            current_power_discharge = max(current_power, 0)
+            current_power_charge = min(current_power, 0)
 
-        average_price = calculate_price_average(
-            unit=unit,
-            current_time=start,
-            foresight=self.foresight,
-            price_forecast=price_forecast,
-        )
-        bid_quantity = 0
-        bid_quantity = max_power_discharge.where(
-            price_forecast[start:end_excl] >= average_price / unit.efficiency_discharge,
-            bid_quantity,
-        )
+            max_power_discharge[start] = unit.calculate_ramp_up_discharge(
+                previous_power, max_power_discharge[start], current_power_discharge
+            )
+            min_power_discharge[start] = unit.calculate_ramp_down_discharge(
+                previous_power, min_power_discharge[start], current_power_discharge
+            )
+            max_power_charge[start] = unit.calculate_ramp_up_charge(
+                previous_power, max_power_charge[start], current_power_charge
+            )
+            min_power_charge[start] = unit.calculate_ramp_down_charge(
+                previous_power, min_power_charge[start], current_power_charge
+            )
 
-        bid_quantity = max_power_charge.where(
-            price_forecast[start:end_excl] <= average_price * unit.efficiency_charge,
-            bid_quantity,
-        )
+            price_forecast = data_dict["price_forecast"]
 
-        return [{"price": average_price, "volume": bid_quantity.max()}]
+            average_price = calculate_price_average(
+                unit=unit,
+                current_time=start,
+                foresight=self.foresight,
+                price_forecast=price_forecast,
+            )
+
+            if price_forecast[start] >= average_price / unit.efficiency_discharge:
+                bid_quantity = max_power_discharge[start]
+            elif price_forecast[start] <= average_price * unit.efficiency_charge:
+                bid_quantity = max_power_charge[start]
+            else:
+                bid_quantity = 0
+
+            bids.append({"price": average_price, "volume": bid_quantity})
+            previous_power = bid_quantity + current_power
+
+        return bids
 
 
 class flexablePosCRMStorage(BaseStrategy):
@@ -101,60 +104,55 @@ class flexablePosCRMStorage(BaseStrategy):
         **kwargs,
     ):
         start = product_tuples[0][0]
-        end = product_tuples[0][1]
-        end_excl = end - unit.index.freq
+        end = product_tuples[-1][1]
 
         previous_power = unit.get_output_before(start)
-        current_power = unit.outputs["energy"].at[start]
 
         min_power_discharge, max_power_discharge = unit.calculate_min_max_discharge(
             start, end
         )
+        bids = []
+        for product in product_tuples:
+            start = product[0]
+            current_power = unit.outputs["energy"].at[start]
 
-        for t in unit.index[start:end_excl]:
-            max_power_discharge[t] = unit.calculate_ramp_up_discharge(
+            bid_quantity = unit.calculate_ramp_up_discharge(
                 previous_power,
-                max_power_discharge[t],
+                max_power_discharge[start],
                 current_power,
             )
-            previous_power = current_power
-            current_power = max_power_discharge[t]
 
-        bid_quantity = max(max_power_discharge)
-        if bid_quantity == 0:
-            return []
+            if bid_quantity == 0:
+                return []
 
-        marginal_cost = unit.calc_marginal_cost(timestep=start, discharge=True)
+            marginal_cost = unit.calc_marginal_cost(timestep=start, discharge=True)
 
-        specific_revenue = get_specific_revenue(
-            unit=unit,
-            marginal_cost=marginal_cost,
-            current_time=self.current_time,
-            foresight=self.foresight,
-            price_forecast=data_dict["price_forecast"],
-        )
-
-        if specific_revenue >= 0:
-            capacity_price = specific_revenue
-        else:
-            capacity_price = (
-                abs(specific_revenue) * unit.min_power_discharge / bid_quantity
+            specific_revenue = get_specific_revenue(
+                unit=unit,
+                marginal_cost=marginal_cost,
+                current_time=self.current_time,
+                foresight=self.foresight,
+                price_forecast=data_dict["price_forecast"],
             )
 
-        energy_price = capacity_price / unit.current_SOC
+            if specific_revenue >= 0:
+                capacity_price = specific_revenue
+            else:
+                capacity_price = (
+                    abs(specific_revenue) * unit.min_power_discharge / bid_quantity
+                )
 
-        if market_config.product_type == "capacity_pos":
-            bids = [
-                {"price": capacity_price, "volume": bid_quantity},
-            ]
-        elif market_config.product_type == "energy_pos":
-            bids = [
-                {"price": energy_price, "volume": bid_quantity},
-            ]
-        else:
-            raise ValueError(
-                f"Product {market_config.product_type} is not supported by this strategy."
-            )
+            energy_price = capacity_price / unit.current_SOC
+
+            if market_config.product_type == "capacity_pos":
+                bids.appen({"price": capacity_price, "volume": bid_quantity})
+            elif market_config.product_type == "energy_pos":
+                bids.append({"price": energy_price, "volume": bid_quantity})
+            else:
+                raise ValueError(
+                    f"Product {market_config.product_type} is not supported by this strategy."
+                )
+            previous_power = bid_quantity + current_power
 
         return bids
 
@@ -175,41 +173,35 @@ class flexableNegCRMStorage(BaseStrategy):
         **kwargs,
     ):
         start = product_tuples[0][0]
-        end = product_tuples[0][1]
-        end_excl = end - unit.index.freq
+        end = product_tuples[-1][1]
 
         previous_power = unit.get_output_before(start)
-        current_power = unit.outputs["energy"].at[start]
 
         min_power_charge, max_power_charge = unit.calculate_min_max_charge(start, end)
 
-        for t in unit.index[start:end_excl]:
-            max_power_charge[t] = unit.calculate_ramp_up_charge(
+        bids = []
+        for product in product_tuples:
+            start = product[0]
+            current_power = unit.outputs["energy"].at[start]
+            bid_quantity = unit.calculate_ramp_up_charge(
                 previous_power,
-                max_power_charge[t],
+                max_power_charge[start],
                 current_power,
             )
-            previous_power = current_power
-            current_power = max_power_charge[t]
 
-        # in flexable no prices calculated for CRM_neg
-        bid_quantity = max(max_power_charge)
-        if bid_quantity == 0:
-            return []
-        # if bid_quantity >= min_bid_volume
+            if bid_quantity == 0:
+                return []
+            # if bid_quantity >= min_bid_volume
 
-        if market_config.product_type == "capacity_neg":
-            bids = [
-                {"price": 0, "volume": bid_quantity},
-            ]
-        elif market_config.product_type == "energy_neg":
-            bids = [
-                {"price": 0, "volume": bid_quantity},
-            ]
-        else:
-            raise ValueError(
-                f"Product {market_config.product_type} is not supported by this strategy."
-            )
+            if market_config.product_type == "capacity_neg":
+                bids.append({"price": 0, "volume": bid_quantity})
+            elif market_config.product_type == "energy_neg":
+                bids.appen({"price": 0, "volume": bid_quantity})
+            else:
+                raise ValueError(
+                    f"Product {market_config.product_type} is not supported by this strategy."
+                )
+            previous_power = current_power + bid_quantity
 
         return bids
 

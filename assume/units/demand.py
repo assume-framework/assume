@@ -47,7 +47,7 @@ class Demand(SupportsMinMax):
         self.ramp_up = max_power
         if isinstance(volume, float):
             volume = pd.Series(volume, index=self.index)
-        self.volume = -volume  # demand is negative
+        self.volume = -abs(volume)  # demand is negative
         if isinstance(price, float):
             price = pd.Series(price, index=self.index)
         self.price = price
@@ -66,8 +66,8 @@ class Demand(SupportsMinMax):
 
     def calculate_min_max_power(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
-    ) -> dict:
-        bid_volume = (self.volume - self.outputs[product_type]).loc[start:end].max()
+    ) -> tuple[pd.Series, pd.Series]:
+        bid_volume = (self.volume - self.outputs[product_type]).loc[start:end]
         return bid_volume, bid_volume
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
