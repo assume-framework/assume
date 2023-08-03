@@ -146,7 +146,7 @@ class complexEOMStorage(BaseStrategy):
     def calculate_price_average(self, unit):
         t = unit.current_time
         """if t - self.foresight < pd.Timedelta("0h"):
-            average_price = np.mean(unit.price_forecast[t-self.foresight:] 
+            average_price = np.mean(unit.price_forecast[t-self.foresight:]
                                     + unit.price_forecast[:t+self.foresight])
         else:"""
         average_price = np.mean(

@@ -18,8 +18,8 @@ from tqdm import tqdm
 
 from assume.common import (
     ForecastProvider,
-    MarketConfig,
     Learning,
+    MarketConfig,
     UnitsOperator,
     WriteOutput,
     mango_codec_factory,

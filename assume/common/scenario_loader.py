@@ -1,14 +1,14 @@
+import calendar
 import logging
 from datetime import datetime
 from typing import Callable
-import calendar
-from tqdm import tqdm
 
 import dateutil.rrule as rr
 import numpy as np
 import pandas as pd
 import yaml
 from mango import RoleAgent
+from tqdm import tqdm
 
 from assume.common import ForecastProvider
 from assume.common.market_objects import MarketConfig, MarketProduct
@@ -475,35 +475,31 @@ def load_scenario_folder(
     Load a scenario from a given path.
     """
 
-    world.loop.run_until_complete(
-        load_scenario_folder_async(
-            world,
-            inputs_path,
-            scenario,
-            study_case,
-            0,
-        )
-    )
-
     start_ts = calendar.timegm(world.start.utctimetuple())
     end_ts = calendar.timegm(world.end.utctimetuple())
 
-    if world.rl_agent is not None:
+    if world.rl_agent is None:
+        world.loop.run_until_complete(
+            load_scenario_folder_async(
+                world,
+                inputs_path,
+                scenario,
+                study_case,
+                1,
+            )
+        )
+
+    else:
         # we are in learning mode
+
+        # buffer anlegen für die Daten
 
         for i_episode in tqdm(
             range(world.rl_agent.roles[0].training_episodes),
             desc=f"Training Episode {world.rl_agent.roles[0].episodes_done}",
         ):
-            world.loop.run_until_complete(
-                world.run_async(start_ts=start_ts, end_ts=end_ts)
-            )
-            world.reset()
-
-            world.rl_agent.roles[0].episodes_done = i_episode
-
-            # reset time to start time so that mango does not get confused
-            world.clock.set_time(start_ts - 1)
+            # container anlegen
+            # buffer an Rl agent übergeben
             world.loop.run_until_complete(
                 load_scenario_folder_async(
                     world,
@@ -513,7 +509,14 @@ def load_scenario_folder(
                     1,
                 )
             )
+            world.loop.run_until_complete(
+                world.run_async(start_ts=start_ts, end_ts=end_ts)
+            )
+            world.reset()
 
+            world.rl_agent.roles[0].episodes_done = i_episode
+
+            # container abräumen
         world.logger.info("################")
         world.logger.info(f"Training finished, Start evaluation run")
 
