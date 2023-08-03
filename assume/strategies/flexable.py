@@ -36,11 +36,11 @@ class flexableEOM(BaseStrategy):
             current_power = unit.outputs["energy"].at[start]
 
             # adjust for ramp down speed
-            max_power[start] = unit.calculate_ramp_up(
+            max_power[start] = unit.calculate_ramp(
                 previous_power, max_power[start], current_power
             )
             # adjust for ramp up speed
-            min_power[start] = unit.calculate_ramp_down(
+            min_power[start] = unit.calculate_ramp(
                 previous_power, min_power[start], current_power
             )
 
@@ -201,7 +201,7 @@ class flexablePosCRM(BaseStrategy):
             # calculate pos reserve volume
             current_power = unit.outputs["energy"].at[start]
             # max_power + current_power < previous_power + unit.ramp_up
-            bid_quantity = unit.calculate_ramp_up(
+            bid_quantity = unit.calculate_ramp(
                 previous_power, max_power[start], current_power
             )
 
@@ -228,29 +228,22 @@ class flexablePosCRM(BaseStrategy):
             energy_price = marginal_cost
 
             if market_config.product_type == "capacity_pos":
-                bids.append(
-                    {
-                        "start_time": start,
-                        "end_time": end,
-                        "only_hours": None,
-                        "price": capacity_price,
-                        "volume": bid_quantity,
-                    }
-                )
+                price = capacity_price
             elif market_config.product_type == "energy_pos":
-                bids.append(
-                    {
-                        "start_time": start,
-                        "end_time": end,
-                        "only_hours": None,
-                        "price": energy_price,
-                        "volume": bid_quantity,
-                    }
-                )
+                price = energy_price
             else:
                 raise ValueError(
                     f"Product {market_config.product_type} is not supported by this strategy."
                 )
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": None,
+                    "price": price,
+                    "volume": bid_quantity,
+                }
+            )
             previous_power = bid_quantity + current_power
 
         return bids
@@ -283,7 +276,7 @@ class flexableNegCRM(BaseStrategy):
             current_power = unit.outputs["energy"].at[start]
 
             # min_power + current_power > previous_power - unit.ramp_down
-            min_power[start] = unit.calculate_ramp_down(
+            min_power[start] = unit.calculate_ramp(
                 previous_power, min_power[start], current_power
             )
             bid_quantity = min_power[start] - previous_power
@@ -315,29 +308,22 @@ class flexableNegCRM(BaseStrategy):
             energy_price = marginal_cost * (-1)
 
             if market_config.product_type == "capacity_neg":
-                bids.append(
-                    {
-                        "start_time": start,
-                        "end_time": end,
-                        "only_hours": None,
-                        "price": capacity_price,
-                        "volume": bid_quantity,
-                    }
-                )
+                price = capacity_price
             elif market_config.product_type == "energy_neg":
-                bids.append(
-                    {
-                        "start_time": start,
-                        "end_time": end,
-                        "only_hours": None,
-                        "price": energy_price,
-                        "volume": bid_quantity,
-                    }
-                )
+                price = energy_price
             else:
                 raise ValueError(
                     f"Product {market_config.product_type} is not supported by this strategy."
                 )
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": None,
+                    "price": price,
+                    "volume": bid_quantity,
+                }
+            )
             previous_power = current_power + bid_quantity
 
         return bids

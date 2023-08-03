@@ -4,7 +4,7 @@ from functools import lru_cache
 
 import pandas as pd
 
-from assume.common.base import BaseUnit, SupportsMinMax
+from assume.common.base import SupportsMinMax
 
 logger = logging.getLogger(__name__)
 

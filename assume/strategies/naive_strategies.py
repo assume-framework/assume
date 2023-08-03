@@ -22,7 +22,7 @@ class PowerPlantStrategy(BaseStrategy):
             start = product[0]
             current_power = unit.outputs["energy"].at[start]
             marginal_cost = unit.calculate_marginal_cost(start, previous_power)
-            volume = unit.calculate_ramp_up(
+            volume = unit.calculate_ramp(
                 previous_power, max_power[start], current_power
             )
             bids.append(
@@ -72,7 +72,7 @@ class NaivePosReserveStrategy(PowerPlantStrategy):
         for product in product_tuples:
             start = product[0]
             current_power = unit.outputs["energy"].at[start]
-            volume = unit.calculate_ramp_up(
+            volume = unit.calculate_ramp(
                 previous_power, max_power[start], current_power
             )
             price = 0
@@ -118,7 +118,7 @@ class NaiveNegReserveStrategy(PowerPlantStrategy):
             start = product[0]
             previous_power = unit.get_output_before(start)
             current_power = unit.outputs["energy"].at[start]
-            volume = unit.calculate_ramp_down(
+            volume = unit.calculate_ramp(
                 previous_power, min_power[start], current_power
             )
             price = 0

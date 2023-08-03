@@ -40,11 +40,13 @@ class Demand(SupportsMinMax):
             index=index,
             node=node,
         )
-
         self.max_power = max_power
         self.min_power = min_power
-        self.ramp_down = max_power
-        self.ramp_up = max_power
+        if max_power > 0 and min_power <= 0:
+            self.max_power = min_power
+            self.min_power = -max_power
+        self.ramp_down = max(abs(min_power), abs(max_power))
+        self.ramp_up = max(abs(min_power), abs(max_power))
         if isinstance(volume, float):
             volume = pd.Series(volume, index=self.index)
         self.volume = -abs(volume)  # demand is negative
