@@ -282,23 +282,13 @@ class UnitsOperator(Role):
                 data_dict=self.context.data_dict,
             )
             product = products[0]
-            for i, bid in enumerate(product_bids):
-                order: Order = {
-                    "start_time": product[0],
-                    "end_time": product[1],
-                    "only_hours": product[2],
-                    "agent_id": (self.context.addr, self.context.aid),
-                }
-                price = bid["price"]
-                volume = bid["volume"]
-
+            for i, order in enumerate(product_bids):
+                order["agent_id"] = (self.context.addr, self.context.aid)
                 if market.volume_tick:
-                    volume = round(volume / market.volume_tick)
+                    order["volume"] = round(order["volume"] / market.volume_tick)
                 if market.price_tick:
-                    price = round(price / market.price_tick)
+                    order["price"] = round(order["price"] / market.price_tick)
 
-                order["volume"] = volume
-                order["price"] = price
                 order["bid_id"] = f"{unit_id}_{i+1}"
                 order["product"] = product
                 orderbook.append(order)

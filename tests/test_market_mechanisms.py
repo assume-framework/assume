@@ -5,13 +5,9 @@ import numpy as np
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
 
-from assume import World
 from assume.common.market_objects import MarketConfig, MarketProduct, Order, Orderbook
 from assume.common.utils import get_available_products
-from assume.markets.base_market import MarketRole
-
-w = World()
-available_clearing_strategies = w.clearing_mechanisms
+from assume.markets import MarketRole, clearing_mechanisms
 
 simple_dayahead_auction_config = MarketConfig(
     "simple_dayahead_auction",
@@ -77,7 +73,7 @@ def test_market():
             "only_hours": None,
         },
     ]
-    simple_dayahead_auction_config.market_mechanism = available_clearing_strategies[
+    simple_dayahead_auction_config.market_mechanism = clearing_mechanisms[
         simple_dayahead_auction_config.market_mechanism
     ]
     mr.all_orders = orderbook
@@ -127,7 +123,7 @@ def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
 def test_market_mechanism():
     import copy
 
-    for name, mechanism in available_clearing_strategies.items():
+    for name, mechanism in clearing_mechanisms.items():
         print(name)
         market_config = copy.copy(simple_dayahead_auction_config)
         market_config.market_mechanism = mechanism

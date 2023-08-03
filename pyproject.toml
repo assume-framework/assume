@@ -58,9 +58,10 @@ pytest-asyncio = "^0.21.1"
 
 
 [tool.poetry.extras]
-test = ["black", "isort", "matplotlib", "pytest", "pytest-cov", "pytest-asyncio"]
 learning = ["torch"]
 optimize = ["pyomo", "glpk"]
+test = ["black", "isort", "matplotlib", "pytest", "pytest-cov", "pytest-asyncio", "pyomo"]
+
 
 [tool.poetry.scripts]
 assume = "assume.cli:cli"

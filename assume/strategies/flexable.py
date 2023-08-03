@@ -82,10 +82,24 @@ class flexableEOM(BaseStrategy):
                 bid_quantity_flex = max_power[start] - bid_quantity_inflex
                 bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
 
-            # TODO How to match the bids to the correct times?
-            bids.append({"price": bid_price_inflex, "volume": bid_quantity_inflex})
-            bids.append({"price": bid_price_flex, "volume": bid_quantity_flex})
-
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": None,
+                    "price": bid_price_inflex,
+                    "volume": bid_quantity_inflex,
+                }
+            )
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": None,
+                    "price": bid_price_flex,
+                    "volume": bid_quantity_flex,
+                },
+            )
             # calculate previous power with planned dispatch (bid_quantity)
             previous_power = bid_quantity_inflex + bid_quantity_flex + current_power
 
@@ -214,9 +228,25 @@ class flexablePosCRM(BaseStrategy):
             energy_price = marginal_cost
 
             if market_config.product_type == "capacity_pos":
-                bids.append({"price": capacity_price, "volume": bid_quantity})
+                bids.append(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": None,
+                        "price": capacity_price,
+                        "volume": bid_quantity,
+                    }
+                )
             elif market_config.product_type == "energy_pos":
-                bids.append({"price": energy_price, "volume": bid_quantity})
+                bids.append(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": None,
+                        "price": energy_price,
+                        "volume": bid_quantity,
+                    }
+                )
             else:
                 raise ValueError(
                     f"Product {market_config.product_type} is not supported by this strategy."
@@ -285,9 +315,25 @@ class flexableNegCRM(BaseStrategy):
             energy_price = marginal_cost * (-1)
 
             if market_config.product_type == "capacity_neg":
-                bids.append({"price": capacity_price, "volume": bid_quantity})
+                bids.append(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": None,
+                        "price": capacity_price,
+                        "volume": bid_quantity,
+                    }
+                )
             elif market_config.product_type == "energy_neg":
-                bids.append({"price": energy_price, "volume": bid_quantity})
+                bids.append(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": None,
+                        "price": energy_price,
+                        "volume": bid_quantity,
+                    }
+                )
             else:
                 raise ValueError(
                     f"Product {market_config.product_type} is not supported by this strategy."

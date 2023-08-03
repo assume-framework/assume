@@ -25,7 +25,15 @@ class PowerPlantStrategy(BaseStrategy):
             volume = unit.calculate_ramp_up(
                 previous_power, max_power[start], current_power
             )
-            bids.append({"price": marginal_cost, "volume": volume})
+            bids.append(
+                {
+                    "start_time": product[0],
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": marginal_cost,
+                    "volume": volume,
+                }
+            )
 
             previous_power = volume + current_power
 
@@ -68,7 +76,15 @@ class NaivePosReserveStrategy(PowerPlantStrategy):
                 previous_power, max_power[start], current_power
             )
             price = 0
-            bids.append({"price": price, "volume": volume})
+            bids.append(
+                {
+                    "start_time": product[0],
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": price,
+                    "volume": volume,
+                }
+            )
             previous_power = volume + current_power
         return bids
 
@@ -106,6 +122,14 @@ class NaiveNegReserveStrategy(PowerPlantStrategy):
                 previous_power, min_power[start], current_power
             )
             price = 0
-            bids.append({"price": price, "volume": current_power - volume})
+            bids.append(
+                {
+                    "start_time": product[0],
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": price,
+                    "volume": volume,
+                }
+            )
             previous_power = volume + current_power
         return bids

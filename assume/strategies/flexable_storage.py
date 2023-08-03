@@ -80,7 +80,15 @@ class flexableEOMStorage(BaseStrategy):
             else:
                 bid_quantity = 0
 
-            bids.append({"price": average_price, "volume": bid_quantity})
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": None,
+                    "price": average_price,
+                    "volume": bid_quantity,
+                }
+            )
             previous_power = bid_quantity + current_power
 
         return bids
@@ -145,9 +153,25 @@ class flexablePosCRMStorage(BaseStrategy):
             energy_price = capacity_price / unit.current_SOC
 
             if market_config.product_type == "capacity_pos":
-                bids.appen({"price": capacity_price, "volume": bid_quantity})
+                bids.appen(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": None,
+                        "price": capacity_price,
+                        "volume": bid_quantity,
+                    }
+                )
             elif market_config.product_type == "energy_pos":
-                bids.append({"price": energy_price, "volume": bid_quantity})
+                bids.append(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": None,
+                        "price": energy_price,
+                        "volume": bid_quantity,
+                    }
+                )
             else:
                 raise ValueError(
                     f"Product {market_config.product_type} is not supported by this strategy."
@@ -189,14 +213,28 @@ class flexableNegCRMStorage(BaseStrategy):
                 current_power,
             )
 
-            if bid_quantity == 0:
-                return []
-            # if bid_quantity >= min_bid_volume
+            # if bid_quantity >= min_bid_volume  --> not checked here
 
             if market_config.product_type == "capacity_neg":
-                bids.append({"price": 0, "volume": bid_quantity})
+                bids.append(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": None,
+                        "price": 0,
+                        "volume": bid_quantity,
+                    }
+                )
             elif market_config.product_type == "energy_neg":
-                bids.appen({"price": 0, "volume": bid_quantity})
+                bids.appen(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": None,
+                        "price": 0,
+                        "volume": bid_quantity,
+                    }
+                )
             else:
                 raise ValueError(
                     f"Product {market_config.product_type} is not supported by this strategy."

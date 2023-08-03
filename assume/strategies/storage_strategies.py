@@ -27,8 +27,9 @@ class complexEOMStorage(BaseStrategy):
         Strategy analogue to flexABLE
 
         """
-        start = product_tuples[0][0]
-        end = product_tuples[0][1]
+        product = product_tuples[0]
+        start = product[0]
+        end = product[1]
 
         price_forecast = data_dict["price_forecast"]
         self.price_forecast = price_forecast
@@ -123,10 +124,21 @@ class complexEOMStorage(BaseStrategy):
             bid_quantity_flex = 0
 
         bids = [
-            {"price": bid_price_mr, "volume": bid_quantity_mr},
-            {"price": bid_price_flex, "volume": bid_quantity_flex},
+            {
+                "start_time": product[0],
+                "end_time": product[1],
+                "only_hours": product[2],
+                "price": bid_price_mr,
+                "volume": bid_quantity_mr,
+            },
+            {
+                "start_time": product[0],
+                "end_time": product[1],
+                "only_hours": product[2],
+                "price": bid_price_flex,
+                "volume": bid_quantity_flex,
+            },
         ]
-
         return bids
 
     def calculate_price_average(self, unit):

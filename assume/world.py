@@ -23,7 +23,7 @@ from assume.common import (
     WriteOutput,
     mango_codec_factory,
 )
-from assume.markets import MarketRole, pay_as_bid, pay_as_clear
+from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import (
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
@@ -54,6 +54,7 @@ class World:
         database_uri: str = "",
         export_csv_path: str = "",
         log_level: str = "INFO",
+        additional_clearing_mechanisms: dict = {},
     ):
         logging.getLogger("assume").setLevel(log_level)
         self.logger = logging.getLogger(__name__)
@@ -107,10 +108,8 @@ class World:
             self.bidding_types["learning"] = RLStrategy
         except ImportError:
             pass
-        self.clearing_mechanisms = {
-            "pay_as_clear": pay_as_clear,
-            "pay_as_bid": pay_as_bid,
-        }
+        self.clearing_mechanisms = clearing_mechanisms
+        self.clearing_mechanisms.update(additional_clearing_mechanisms)
         nest_asyncio.apply()
         self.loop = asyncio.get_event_loop()
         asyncio.set_event_loop(self.loop)
