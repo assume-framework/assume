@@ -290,7 +290,6 @@ class UnitsOperator(Role):
                     order["price"] = round(order["price"] / market.price_tick)
 
                 order["bid_id"] = f"{unit_id}_{i+1}"
-                order["product"] = product
                 orderbook.append(order)
                 self.bids_map[order["bid_id"]] = unit_id
 

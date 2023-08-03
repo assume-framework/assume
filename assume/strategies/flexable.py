@@ -1,7 +1,7 @@
 import pandas as pd
 
 from assume.common.base import BaseStrategy, SupportsMinMax
-from assume.common.market_objects import MarketConfig, Product
+from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
 class flexableEOM(BaseStrategy):
@@ -10,7 +10,6 @@ class flexableEOM(BaseStrategy):
 
         # check if kwargs contains eom_foresight argument
         self.foresight = pd.Timedelta(kwargs.get("eom_foresight", "12h"))
-        start = None
 
     def calculate_bids(
         self,
@@ -18,7 +17,7 @@ class flexableEOM(BaseStrategy):
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,
-    ):
+    ) -> Orderbook:
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
 
@@ -186,7 +185,7 @@ class flexablePosCRM(BaseStrategy):
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,
-    ):
+    ) -> Orderbook:
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
@@ -264,7 +263,7 @@ class flexableNegCRM(BaseStrategy):
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,
-    ):
+    ) -> Orderbook:
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)

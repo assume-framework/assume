@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from assume.common.base import BaseStrategy, SupportsMinMaxCharge
-from assume.common.market_objects import MarketConfig, Product
+from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
 class complexEOMStorage(BaseStrategy):
@@ -18,7 +18,7 @@ class complexEOMStorage(BaseStrategy):
         product_tuples: list[Product],
         data_dict: dict,
         **kwargs,
-    ):
+    ) -> Orderbook:
         """
         Takes information from a unit that the unit operator manages and
         defines how it is dispatched to the market
