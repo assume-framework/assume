@@ -353,9 +353,9 @@ class Storage(SupportsMinMaxCharge):
 
     def calculate_min_max_charge(
         self, start: pd.Timestamp, end: pd.Timestamp
-    ) -> tuple[float]:
+    ) -> tuple[pd.Series]:
         end_excl = end - self.index.freq
-        duration = pd.Timedelta(end - start).seconds / 3600
+        duration = pd.Timedelta(self.index.freq).seconds / 3600
 
         base_load = self.outputs["energy"][start:end_excl]
         capacity_neg = self.outputs["capacity_neg"][start:end_excl]
@@ -400,9 +400,9 @@ class Storage(SupportsMinMaxCharge):
 
     def calculate_min_max_discharge(
         self, start: pd.Timestamp, end: pd.Timestamp
-    ) -> tuple[float]:
+    ) -> tuple[pd.Series]:
         end_excl = end - self.index.freq
-        duration = pd.Timedelta(end - start).seconds / 3600
+        duration = pd.Timedelta(self.index.freq).seconds / 3600
 
         base_load = self.outputs["energy"][start:end_excl]
         capacity_pos = self.outputs["capacity_pos"][start:end_excl]

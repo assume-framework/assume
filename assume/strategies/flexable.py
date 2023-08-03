@@ -10,7 +10,7 @@ class flexableEOM(BaseStrategy):
 
         # check if kwargs contains eom_foresight argument
         self.foresight = pd.Timedelta(kwargs.get("eom_foresight", "12h"))
-        self.current_time = None
+        start = None
 
     def calculate_bids(
         self,
@@ -19,68 +19,89 @@ class flexableEOM(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ):
-        bid_quantity_inflex, bid_price_inflex = 0, 0
-        bid_quantity_flex, bid_price_flex = 0, 0
-
-        # TODO only works for single bids for now
-        # should work with all other bids too
         start = product_tuples[0][0]
-        end = product_tuples[0][1]
+        end = product_tuples[-1][1]
 
-        # not adjusted for ramp up speed
-        min_power, max_power = unit.calculate_min_max_power(start, end)
         previous_power = unit.get_output_before(start)
-        current_power = unit.outputs["energy"].at[start]
+        min_power, max_power = unit.calculate_min_max_power(start, end)
 
-        # adjust for ramp down speed
-        max_power = unit.calculate_ramp_up(previous_power, max_power, current_power)
-        # adjust for ramp up speed
-        min_power = unit.calculate_ramp_down(previous_power, min_power, current_power)
+        bids = []
+        for product in product_tuples:
+            bid_quantity_inflex, bid_price_inflex = 0, 0
+            bid_quantity_flex, bid_price_flex = 0, 0
 
-        bid_quantity_inflex = min_power
+            start = product[0]
+            end = product[1]
 
-        # =============================================================================
-        # Powerplant is either on, or is able to turn on
-        # Calculating possible bid amount and cost
-        # =============================================================================
+            current_power = unit.outputs["energy"].at[start]
 
-        marginal_cost_mr = unit.calculate_marginal_cost(
-            start, current_power + bid_quantity_inflex
-        )
-        marginal_cost_flex = unit.calculate_marginal_cost(
-            start, current_power + max_power
-        )
-        self.current_time = start
-
-        # =============================================================================
-        # Calculating possible price
-        # =============================================================================
-        if unit.current_status:
-            bid_price_inflex = self.calculate_EOM_price_if_on(
-                unit, marginal_cost_mr, bid_quantity_inflex
+            # adjust for ramp down speed
+            max_power[start] = unit.calculate_ramp_up(
+                previous_power, max_power[start], current_power
             )
-        else:
-            bid_price_inflex = self.calculate_EOM_price_if_off(
-                unit, marginal_cost_flex, bid_quantity_inflex
+            # adjust for ramp up speed
+            min_power[start] = unit.calculate_ramp_down(
+                previous_power, min_power[start], current_power
             )
 
-        if unit.outputs["heat"][self.current_time] > 0:
-            power_loss_ratio = (
-                unit.outputs["power_loss"][self.current_time]
-                / unit.outputs["heat"][self.current_time]
+            bid_quantity_inflex = min_power[start]
+
+            # =============================================================================
+            # Powerplant is either on, or is able to turn on
+            # Calculating possible bid amount and cost
+            # =============================================================================
+
+            marginal_cost_mr = unit.calculate_marginal_cost(
+                start, current_power + bid_quantity_inflex
             )
-        else:
-            power_loss_ratio = 0.0
+            marginal_cost_flex = unit.calculate_marginal_cost(
+                start, current_power + max_power[start]
+            )
 
-        # Flex-bid price formulation
-        if unit.current_status:
-            bid_quantity_flex = max_power - bid_quantity_inflex
-            bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
+            # =============================================================================
+            # Calculating possible price
+            # =============================================================================
+            if unit.current_status:
+                bid_price_inflex = self.calculate_EOM_price_if_on(
+                    unit, start, marginal_cost_mr, bid_quantity_inflex
+                )
+            else:
+                bid_price_inflex = self.calculate_EOM_price_if_off(
+                    unit, marginal_cost_flex, bid_quantity_inflex
+                )
 
-        bids = [
-            {"price": bid_price_inflex, "volume": bid_quantity_inflex},
-            {"price": bid_price_flex, "volume": bid_quantity_flex},
-        ]
+            if unit.outputs["heat"][start] > 0:
+                power_loss_ratio = (
+                    unit.outputs["power_loss"][start] / unit.outputs["heat"][start]
+                )
+            else:
+                power_loss_ratio = 0.0
+
+            # Flex-bid price formulation
+            if unit.current_status:
+                bid_quantity_flex = max_power[start] - bid_quantity_inflex
+                bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
+
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": None,
+                    "price": bid_price_inflex,
+                    "volume": bid_quantity_inflex,
+                }
+            )
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": None,
+                    "price": bid_price_flex,
+                    "volume": bid_quantity_flex,
+                },
+            )
+            # calculate previous power with planned dispatch (bid_quantity)
+            previous_power = bid_quantity_inflex + bid_quantity_flex + current_power
 
         return bids
 
@@ -102,14 +123,16 @@ class flexableEOM(BaseStrategy):
 
         return bid_price_inflex
 
-    def calculate_EOM_price_if_on(self, unit, marginal_cost_flex, bid_quantity_inflex):
+    def calculate_EOM_price_if_on(
+        self, unit, start, marginal_cost_flex, bid_quantity_inflex
+    ):
         """
         Check the description provided by Thomas in last version, the average downtime is not available
         """
         if bid_quantity_inflex == 0:
             return 0
 
-        t = self.current_time
+        t = start
         min_down_time = max(unit.min_down_time, 1)
 
         starting_cost = self.get_starting_costs(time=min_down_time, unit=unit)
@@ -126,7 +149,7 @@ class flexableEOM(BaseStrategy):
         possible_revenue = get_specific_revenue(
             unit=unit,
             marginal_cost=marginal_cost_flex,
-            current_time=self.current_time,
+            current_time=start,
             foresight=self.foresight,
         )
         if possible_revenue >= 0 and unit.price_forecast[t] < marginal_cost_flex:
@@ -157,8 +180,6 @@ class flexablePosCRM(BaseStrategy):
         # check if kwargs contains crm_foresight argument
         self.foresight = pd.Timedelta(kwargs.get("crm_foresight", "4h"))
 
-        self.current_time = None
-
     def calculate_bids(
         self,
         unit: SupportsMinMax,
@@ -167,47 +188,70 @@ class flexablePosCRM(BaseStrategy):
         **kwargs,
     ):
         start = product_tuples[0][0]
-        end = product_tuples[0][1]
-        self.current_time = start
-        min_power, max_power = unit.calculate_min_max_power(start, end)
-        marginal_cost = 0
-
+        end = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
-        # calculate pos reserve volume
-        current_power = unit.outputs["energy"].at[start]
-        # max_power + current_power < previous_power + unit.ramp_up
-        bid_quantity = unit.calculate_ramp_up(previous_power, max_power, current_power)
-
-        if bid_quantity == 0:
-            return []
-
-        # Specific revenue if power was offered on the energy market
-        specific_revenue = get_specific_revenue(
-            unit=unit,
-            marginal_cost=marginal_cost,
-            current_time=self.current_time,
-            foresight=self.foresight,
+        min_power, max_power = unit.calculate_min_max_power(
+            start, end, market_config.product_type
         )
 
-        if specific_revenue >= 0:
-            capacity_price = specific_revenue
-        else:
-            capacity_price = abs(specific_revenue) * unit.min_power / bid_quantity
+        bids = []
+        for product in product_tuples:
+            start = product[0]
 
-        energy_price = marginal_cost
-
-        if market_config.product_type == "capacity_pos":
-            bids = [
-                {"price": capacity_price, "volume": bid_quantity},
-            ]
-        elif market_config.product_type == "energy_pos":
-            bids = [
-                {"price": energy_price, "volume": bid_quantity},
-            ]
-        else:
-            raise ValueError(
-                f"Product {market_config.product_type} is not supported by this strategy."
+            # calculate pos reserve volume
+            current_power = unit.outputs["energy"].at[start]
+            # max_power + current_power < previous_power + unit.ramp_up
+            bid_quantity = unit.calculate_ramp_up(
+                previous_power, max_power[start], current_power
             )
+
+            if bid_quantity == 0:
+                return []
+
+            marginal_cost = unit.calculate_marginal_cost(
+                start,
+                previous_power + bid_quantity,
+            )
+            # Specific revenue if power was offered on the energy market
+            specific_revenue = get_specific_revenue(
+                unit=unit,
+                marginal_cost=marginal_cost,
+                current_time=start,
+                foresight=self.foresight,
+            )
+
+            if specific_revenue >= 0:
+                capacity_price = specific_revenue
+            else:
+                capacity_price = abs(specific_revenue) * unit.min_power / bid_quantity
+
+            energy_price = marginal_cost
+
+            if market_config.product_type == "capacity_pos":
+                bids.append(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": None,
+                        "price": capacity_price,
+                        "volume": bid_quantity,
+                    }
+                )
+            elif market_config.product_type == "energy_pos":
+                bids.append(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": None,
+                        "price": energy_price,
+                        "volume": bid_quantity,
+                    }
+                )
+            else:
+                raise ValueError(
+                    f"Product {market_config.product_type} is not supported by this strategy."
+                )
+            previous_power = bid_quantity + current_power
 
         return bids
 
@@ -219,7 +263,7 @@ class flexableNegCRM(BaseStrategy):
         # check if kwargs contains crm_foresight argument
         self.foresight = pd.Timedelta(kwargs.get("crm_foresight", "4h"))
 
-        self.current_time = None
+        start = None
 
     def calculate_bids(
         self,
@@ -229,52 +273,72 @@ class flexableNegCRM(BaseStrategy):
         **kwargs,
     ):
         start = product_tuples[0][0]
-        end = product_tuples[0][1]
-        self.current_time = start
-        min_power, max_power = unit.calculate_min_max_power(start, end)
-        marginal_cost = 0
-
+        end = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
-        current_power = unit.outputs["energy"].at[start]
+        min_power, max_power = unit.calculate_min_max_power(start, end)
 
-        # min_power + current_power > previous_power - unit.ramp_down
-        bid_quantity = unit.calculate_ramp_down(
-            previous_power, min_power, current_power
-        )
-        if bid_quantity == 0:
-            return []
+        bids = []
+        for product in product_tuples:
+            start = product[0]
+            current_power = unit.outputs["energy"].at[start]
 
-        marginal_cost = unit.calculate_marginal_cost(start, previous_power - min_power)
-
-        # Specific revenue if power was offered on the energy marke
-        specific_revenue = get_specific_revenue(
-            unit=unit,
-            marginal_cost=marginal_cost,
-            current_time=self.current_time,
-            foresight=self.foresight,
-        )
-
-        if specific_revenue < 0:
-            capacity_price = (
-                abs(specific_revenue) * (unit.min_power + bid_quantity) / bid_quantity
+            # min_power + current_power > previous_power - unit.ramp_down
+            min_power[start] = unit.calculate_ramp_down(
+                previous_power, min_power[start], current_power
             )
-        else:
-            capacity_price = 0.0
+            bid_quantity = min_power[start] - previous_power
+            if bid_quantity >= 0:
+                return []
 
-        energy_price = marginal_cost * (-1)
-
-        if market_config.product_type == "capacity_neg":
-            bids = [
-                {"price": capacity_price, "volume": bid_quantity},
-            ]
-        elif market_config.product_type == "energy_neg":
-            bids = [
-                {"price": energy_price, "volume": bid_quantity},
-            ]
-        else:
-            raise ValueError(
-                f"Product {market_config.product_type} is not supported by this strategy."
+            # bid_quantity < 0
+            marginal_cost = unit.calculate_marginal_cost(
+                start, previous_power + bid_quantity
             )
+
+            # Specific revenue if power was offered on the energy market
+            specific_revenue = get_specific_revenue(
+                unit=unit,
+                marginal_cost=marginal_cost,
+                current_time=start,
+                foresight=self.foresight,
+            )
+
+            if specific_revenue < 0:
+                capacity_price = (
+                    abs(specific_revenue)
+                    * (unit.min_power + bid_quantity)
+                    / bid_quantity
+                )
+            else:
+                capacity_price = 0.0
+
+            energy_price = marginal_cost * (-1)
+
+            if market_config.product_type == "capacity_neg":
+                bids.append(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": None,
+                        "price": capacity_price,
+                        "volume": bid_quantity,
+                    }
+                )
+            elif market_config.product_type == "energy_neg":
+                bids.append(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": None,
+                        "price": energy_price,
+                        "volume": bid_quantity,
+                    }
+                )
+            else:
+                raise ValueError(
+                    f"Product {market_config.product_type} is not supported by this strategy."
+                )
+            previous_power = current_power + bid_quantity
 
         return bids
 

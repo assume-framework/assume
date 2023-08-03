@@ -7,6 +7,8 @@ from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)
 
+SOLVERS = ["glpk", "cbc", "gurobi", "cplex"]
+
 
 def nodal_pricing_pyomo(market_agent: MarketRole, market_products: list[MarketProduct]):
     assert "node_id" in market_agent.marketconfig.additional_fields
@@ -22,7 +24,7 @@ def nodal_pricing_pyomo(market_agent: MarketRole, market_products: list[MarketPr
         Var,
         maximize,
     )
-    from pyomo.opt import SolverFactory
+    from pyomo.opt import SolverFactory, check_available_solvers
 
     # define list of nodes
     nodes = [0, 1, 2]
@@ -126,7 +128,10 @@ def nodal_pricing_pyomo(market_agent: MarketRole, market_products: list[MarketPr
         )
 
         # Create a solver
-        solver = SolverFactory("glpk")  # glpk
+        solvers = check_available_solvers(*SOLVERS)
+        if len(solvers) < 1:
+            raise Exception(f"None of {SOLVERS} are available")
+        solver = SolverFactory(solvers[0])
 
         # Solve the model
         result = solver.solve(model)

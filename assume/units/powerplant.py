@@ -253,7 +253,7 @@ class PowerPlant(SupportsMinMax):
 
     def calculate_min_max_power(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
-    ) -> tuple[float]:
+    ) -> tuple[pd.Series, pd.Series]:
         """
         does not include ramping
         can be used for arbitrary start times in the future
@@ -282,8 +282,7 @@ class PowerPlant(SupportsMinMax):
         # make sure that max_power is > 0 for all timesteps
         max_power = max_power.where(max_power >= 0, 0)
 
-        # TODO until here we are working with series - in the future, we should return series here too
-        return max(min_power), min(max_power)
+        return min_power, max_power
 
     def calculate_marginal_cost(self, start: datetime, power: float):
         if self.marginal_cost is not None:
