@@ -106,7 +106,7 @@ class HeatPump(DST):
 
             real_time_prices: float or pd.Series = None,
             electricity_prices: float or pd.Series = None,
-            load_profile: float or pd.Series = None,
+            demand: float or pd.Series = None,
     ):
         self.time_steps = time_steps
         self.heat_pump = heat_pump
@@ -119,7 +119,7 @@ class HeatPump(DST):
         self.sink_temp = sink_temp
         self.electricity_prices = electricity_prices
         self.real_time_prices = real_time_prices
-        self.load_profile = load_profile
+        self.demand = demand
         return self
 
     # Define sets
@@ -141,8 +141,8 @@ class HeatPump(DST):
         # self.model.heat_pump_COP = Param(initialize=se)
         self.model.electricity_prices = Param(self.model.time_steps,
                                               initialize={idx: v for idx, v in enumerate(self.electricity_prices)})
-        self.model.load_profile = Param(self.model.time_steps,
-                                              initialize={idx: v for idx, v in enumerate(self.load_profile)})
+        self.model.demand = Param(self.model.time_steps,
+                                              initialize={idx: v for idx, v in enumerate(self.demand)})
         # self.model.real_time_prices = Param(self.model.time_steps, initialize=self.real_time_prices)
 
         # self.model.electricity_prices = Param(self.model.time_steps, initialize=self.electricity_prices)
@@ -152,55 +152,49 @@ class HeatPump(DST):
     def define_variables(self) -> None:
         self.model.power_in = Var(self.model.heat_pumps, self.model.time_steps, domain=pyo.NonNegativeReals)
         self.model.power_out = Var(self.model.heat_pumps, self.model.time_steps, domain=pyo.NonNegativeReals)
-        self.model.s_on = Var(self.model.time_steps, domain=pyo.Binary)
-        self.model.s_start = Var(self.model.time_steps, domain=pyo.Binary)
-        self.model.s_stop = Var(self.model.time_steps, domain=pyo.Binary)
+        self.model.s_on = Var(self.model.time_steps, domain=pyo.Boolean)
+        self.model.s_start = Var(self.model.time_steps, domain=pyo.Boolean)
+        self.model.s_stop = Var(self.model.time_steps, domain=pyo.Boolean)
         self.model.c = Var(self.model.heat_pumps, self.model.time_steps, domain=pyo.Reals)
 
     # Define constraints
     def define_constraints(self):
 
-        @self.model.Constraint(self.model.time_steps, self.model.heat_pumps)
-        def s_on_power_out_relation(m, t, h):
-            return m.s_on[t, h] == (1 if value(m.power_out[t, h]) > 0 else 0)
-
-        # Constraint to set s_start[t] to 1 and s_stop[t] to 0 if s_on[t - 1] is 0
         @self.model.Constraint(self.model.time_steps)
-        def s_start_s_stop_s_on_relation(m, t):
-            return m.s_start[t] + m.s_stop[t] + (1 - m.s_on[t - 1] if t > 0 else 0) <= 1
+        def start_up_constraint(m, t):
+            return m.s_on[t] >= m.demand[t] / m.max_power
 
-        # Constraints to maintain the relations between s_on, s_start, and s_stop
         @self.model.Constraint(self.model.time_steps)
         def s_on_s_start_relation(m, t):
-            return m.s_on[t] - (m.s_on[t - 1] if t > 0 else 0) == m.s_start[t] - m.s_stop[t]
+            return m.s_on[t] - m.s_on[t - 1] == m.s_start[t] - m.s_stop[t] if t > 0 else Constraint.Skip
 
-        # @self.model.Constraint(self.model.time_steps)
-        # def s_on_s_start_relation(m, t):
-        #     return m.s_on[t] - m.s_on[t - 1] == m.s_start[t] - m.s_stop[t] if t > 0 else Constraint.Skip
-
-        @self.model.Constraint(self.model.time_steps, self.model.heat_pumps)
-        def s_start_s_stop_relation(m, t):  # pylint: disable=W0612
+        @self.model.Constraint(self.model.time_steps)
+        def s_start_s_stop_relation(m, t):
             return m.s_start[t] + m.s_stop[t] <= 1
 
-        @self.model.Constraint(self.model.time_steps, self.model.heat_pumps)
-        def p_output_lower_bound(h, t):  # pylint: disable=W0612
-            return self.model.power_out[h, t] >= self.model.min_power[h]  # * m.s_on[t]
+        # @self.model.Constraint(self.model.time_steps)
+        # def shut_down_constraint(m, t):
+        #     return m.s_on[t] <= 1 - m.demand[t] / m.max_power
 
-        @self.model.Constraint(self.model.time_steps, self.model.heat_pumps)
-        def p_output_upper_bound(h, t):  # pylint: disable=W0612
-            return self.model.power_out[h, t] <= self.model.max_power[h] # * m.s_on[t]
+        @self.model.Constraint(self.model.heat_pumps, self.model.time_steps)
+        def p_output_lower_bound(m, h, t):  # pylint: disable=W0612
+            return m.power_out[h, t] * m.s_on[t] >= m.min_power  # * m.s_on[t]
 
-        @self.model.Constraint(self.model.time_steps, self.model.heat_pumps)
-        def energy_balance_rule(h, t):
-            return self.model.power_out[h, t] >= self.model.load_profile[t] # ==
+        @self.model.Constraint(self.model.heat_pumps, self.model.time_steps)
+        def p_output_upper_bound(m, h, t):  # pylint: disable=W0612
+            return m.power_out[h, t] * m.s_on[t] <= m.max_power # * m.s_on[t]
 
-        @self.model.Constraint(self.model.time_steps, self.model.heat_pumps)
-        def p_input_lower_bound(h, t):  # pylint: disable=W0612
-            return self.model.power_in[h, t] == self.model.power_out[h, t]  # / 3  COP
+        @self.model.Constraint(self.model.heat_pumps, self.model.time_steps)
+        def energy_balance_rule(m, h, t):
+            return m.power_out[h, t] == m.demand[t]
 
-        @self.model.Constraint(self.model.time_steps, self.model.heat_pumps)
-        def cost_def(h, t):
-            return self.model.c[h, t] == self.model.power_out[h, t] * self.model.electricity_prices[t]
+        @self.model.Constraint(self.model.heat_pumps, self.model.time_steps)
+        def p_input_lower_bound(m, h, t):
+            return m.power_in[h, t] == m.power_out[h, t] / 3
+
+        @self.model.Constraint(self.model.heat_pumps, self.model.time_steps)
+        def cost_def(m, h, t):
+            return m.c[h, t] == m.power_out[h, t] * m.electricity_prices[t]
 
         # self.model.ramp_up_constraint = Constraint(self.model.heat_pumps, self.model.time_steps,
         #                                               rule=self.ramp_up_constraint_hp_rule)
@@ -212,7 +206,7 @@ class HeatPump(DST):
     def define_objective(self):
         # objective function
         self.model.obj = Objective(
-            expr=sum(self.model.c[t, h] for t in self.model.time_steps for h in self.model.heat_pumps), sense=minimize)
+            expr=sum(self.model.c[h, t] for h in self.model.heat_pumps for t in self.model.time_steps), sense=minimize)
 
     # def calculate_delta_t(self, timestamp):
     #     # Calculate temperature difference between the source and sink temperatures for the heat pump

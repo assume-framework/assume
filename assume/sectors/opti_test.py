@@ -7,7 +7,6 @@ logger = logging.getLogger(__name__)
 
 
 def run_optimization(heat_pump):
-    model = ConcreteModel()
     # Create the optimization model
     heat_pump.create_model(model=heat_pump.model)
 
@@ -48,7 +47,7 @@ def run_optimization(heat_pump):
     # Print the values of load_profile for each time step
     print("Load Profile:")
     for t in heat_pump.model.time_steps:
-        print(f"Time step {t}: {heat_pump.model.load_profile[t]}")
+        print(f"Time step {t}: {heat_pump.model.demand[t]}")
 
     # Print objective value
     print("Objective Value:", heat_pump.model.obj())
@@ -73,7 +72,7 @@ def run_optimization(heat_pump):
     # Print the values of load_profile after solving for each time step
     print("Load Profile after solving:")
     for t in heat_pump.model.time_steps:
-        print(f"Time step {t}: {heat_pump.model.load_profile[t]}")
+        print(f"Time step {t}: {heat_pump.model.demand[t]}")
 
 
 if __name__ == "__main__":
@@ -84,21 +83,24 @@ if __name__ == "__main__":
         technology="HeatPumpTechnology",
         sector="Sector1",
         bidding_strategies={},
-        index=pd.DatetimeIndex(["2023-07-31 00:00:00", "2023-07-31 01:00:00", "2023-07-31 02:00:00"]),  # Specify your time steps here
+        index=pd.DatetimeIndex(["2023-07-31 00:00:00", "2023-07-31 01:00:00",
+                                "2023-07-31 02:00:00", "2023-07-31 03:00:00"]),  # Specify your time steps here
     )
     heat_pump.add_model_parameters(
-        time_steps=pd.DatetimeIndex(["2023-07-31 00:00:00", "2023-07-31 01:00:00", "2023-07-31 02:00:00"]),
+        time_steps=pd.DatetimeIndex(["2023-07-31 00:00:00", "2023-07-31 01:00:00",
+                                     "2023-07-31 02:00:00", "2023-07-31 03:00:00"]),
         max_power=150,  # Replace with actual max_power data
         min_power=0,  # Replace with actual min_power data
+        heat_pump=[0],
         heat_pump_type="Type1",
-        source_temp=pd.Series([15, 20, 20], index=pd.DatetimeIndex(["2023-07-31 00:00:00", "2023-07-31 01:00:00",
-                                                                    "2023-07-31 02:00:00"])),
-        sink_temp=pd.Series([35, 30, 30], index=pd.DatetimeIndex(["2023-07-31 00:00:00", "2023-07-31 01:00:00",
-                                                                  "2023-07-31 02:00:00"])),
-        electricity_prices=pd.Series([40, 45, 30], index=pd.DatetimeIndex(["2023-07-31 00:00:00", "2023-07-31 01:00:00",
-                                                                       "2023-07-31 02:00:00"])),
-        load_profile=pd.Series([0, 80, 100], index=pd.DatetimeIndex(["2023-07-31 00:00:00", "2023-07-31 01:00:00",
-                                                                     "2023-07-31 02:00:00"])),
+        source_temp=pd.Series([15, 20, 20, 10], index=pd.DatetimeIndex(["2023-07-31 00:00:00", "2023-07-31 01:00:00",
+                                                                    "2023-07-31 02:00:00", "2023-07-31 03:00:00"])),
+        sink_temp=pd.Series([35, 30, 30, 20], index=pd.DatetimeIndex(["2023-07-31 00:00:00", "2023-07-31 01:00:00",
+                                                                  "2023-07-31 02:00:00", "2023-07-31 03:00:00"])),
+        electricity_prices=pd.Series([1, 3, 2, 2], index=pd.DatetimeIndex(["2023-07-31 00:00:00", "2023-07-31 01:00:00",
+                                                                       "2023-07-31 02:00:00", "2023-07-31 03:00:00"])),
+        demand=pd.Series([0, 80, 100, 0], index=pd.DatetimeIndex(["2023-07-31 00:00:00", "2023-07-31 01:00:00",
+                                                               "2023-07-31 02:00:00", "2023-07-31 03:00:00"])),
     )
 
     # Run the optimization
