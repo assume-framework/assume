@@ -10,7 +10,7 @@ import yaml
 from mango import RoleAgent
 from tqdm import tqdm
 
-from assume.common import ForecastProvider
+from assume.common import ForecastProvider, ReplayBuffer
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.world import World
 
@@ -186,7 +186,6 @@ async def load_scenario_folder_async(
     inputs_path: str,
     scenario: str,
     study_case: str,
-    learning_mode: bool,
 ):
     """Load a scenario from a given path.
 
@@ -299,25 +298,24 @@ async def load_scenario_folder_async(
         raise ValueError("No demand time series was provided!")
 
     # Initialize world
-    # just if we are not in leanring mode, that would mean we want to restart the simulation without losing the output and learning agent
-    if not learning_mode:
-        save_frequency_hours = config.get("save_frequency_hours", None)
-        sim_id = f"{scenario}_{study_case}"
 
-        learning_config = config.get("learning_config", {})
-        if "load_learned_path" not in learning_config.keys():
-            learning_config[
-                "load_learned_path"
-            ] = f"{inputs_path}/learned_strategies/{sim_id}/"
+    save_frequency_hours = config.get("save_frequency_hours", None)
+    sim_id = f"{scenario}_{study_case}"
 
-        await world.setup(
-            start=start,
-            end=end,
-            save_frequency_hours=save_frequency_hours,
-            simulation_id=sim_id,
-            learning_config=learning_config,
-            index=index,
-        )
+    learning_config = config.get("learning_config", {})
+    if "load_learned_path" not in learning_config.keys():
+        learning_config[
+            "load_learned_path"
+        ] = f"{inputs_path}/learned_strategies/{sim_id}/"
+
+    await world.setup(
+        start=start,
+        end=end,
+        save_frequency_hours=save_frequency_hours,
+        simulation_id=sim_id,
+        learning_config=learning_config,
+        index=index,
+    )
 
     # get the market config from the config file and add the markets
     logger.info("Adding markets")
@@ -475,48 +473,64 @@ def load_scenario_folder(
     Load a scenario from a given path.
     """
 
+    world.loop.run_until_complete(
+        load_scenario_folder_async(
+            world,
+            inputs_path,
+            scenario,
+            study_case,
+        )
+    )
+
     start_ts = calendar.timegm(world.start.utctimetuple())
     end_ts = calendar.timegm(world.end.utctimetuple())
 
-    if world.rl_agent is None:
-        world.loop.run_until_complete(
-            load_scenario_folder_async(
-                world,
-                inputs_path,
-                scenario,
-                study_case,
-                1,
-            )
-        )
-
-    else:
+    if world.rl_agent is not None:
         # we are in learning mode
 
-        # buffer anlegen für die Daten
+        # initiate buffer for rl agent
+        # please initiate an instance of the class Replaybuffer here
+        buffer = ReplayBuffer(
+            buffer_size=1000000,
+            obs_dim=world.rl_agent.roles[0].obs_dim,
+            act_dim=world.rl_agent.roles[0].act_dim,
+            n_rl_agents=1,
+            device=world.rl_agent.roles[0].device,
+        )
+
+        world.rl_agent.roles[0].buffer = buffer
 
         for i_episode in tqdm(
             range(world.rl_agent.roles[0].training_episodes),
-            desc=f"Training Episode {world.rl_agent.roles[0].episodes_done}",
+            desc=f"Training Episodes",
         ):
-            # container anlegen
-            # buffer an Rl agent übergeben
+            # change simulation id of output agent to include the episode number
+            world.output_agent.roles[
+                0
+            ].simulation_id = f"{world.output_agent.roles[0].simulation_id}_{i_episode}"
+
+            world.loop.run_until_complete(
+                world.run_async(start_ts=start_ts, end_ts=end_ts)
+            )
+            world.reset()
+
+            world.rl_agent.roles[0].episodes_done = +1
+
+            # in load_scenario_folder_async, we initiate new container and kill old if present
+            # as long as we do not skip setup contaier should be handeled correctly
             world.loop.run_until_complete(
                 load_scenario_folder_async(
                     world,
                     inputs_path,
                     scenario,
                     study_case,
-                    1,
                 )
             )
-            world.loop.run_until_complete(
-                world.run_async(start_ts=start_ts, end_ts=end_ts)
-            )
-            world.reset()
+            # give the newly created rl_agent the buffer that we stored from the beginning
+            world.rl_agent.roles[0].buffer = buffer
 
-            world.rl_agent.roles[0].episodes_done = i_episode
+            # container shutdown implicitly with new initialisation
 
-            # container abräumen
         world.logger.info("################")
         world.logger.info(f"Training finished, Start evaluation run")
 

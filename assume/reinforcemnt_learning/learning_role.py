@@ -25,6 +25,7 @@ class Learning(Role):
         self,
         learning_config,
     ):
+        self.buffer = None
         self.obs_dim = learning_config["observation_dimension"]
         self.act_dim = learning_config["action_dimension"]
         self.episodes_done = 0
