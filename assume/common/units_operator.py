@@ -130,7 +130,7 @@ class UnitsOperator(Role):
         self.set_unit_dispatch(orderbook, marketconfig)
         self.write_actual_dispatch()
 
-    def set_unit_dispatch(self, orderbook, marketconfig):
+    def set_unit_dispatch(self, orderbook, market_config):
         """
         feeds the current market result back to the units
         this does not respect bids from multiple markets
@@ -138,15 +138,10 @@ class UnitsOperator(Role):
         """
         orderbook.sort(key=itemgetter("unit_id"))
         for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
-            orders_l = list(orders)
-            total_power = sum(map(itemgetter("volume"), orders_l))
-            dispatch_plan = {"total_power": total_power}
+            orderbook = list(orders)
             self.units[unit_id].set_dispatch_plan(
-                dispatch_plan=dispatch_plan,
-                start=orderbook[0]["start_time"],
-                end=orderbook[0]["end_time"],
-                product_type=marketconfig.product_type,
-                clearing_price=orders_l[0]["price"],
+                orderbook=orderbook,
+                market_config=market_config,
             )
 
     def write_actual_dispatch(self):

@@ -149,7 +149,8 @@ class PowerPlant(SupportsMinMax):
         end: pd.Timestamp,
     ):
         end_excl = end - self.index.freq
-        if self.outputs["energy"][start:end_excl].min() < self.min_power:
+        # TODO ramp down and turn off only for relevant timesteps
+        if self.outputs["energy"][start:end_excl].mean() < self.min_power:
             self.outputs["energy"].loc[start:end_excl] = 0
             self.current_status = 0
             self.current_down_time += 1
