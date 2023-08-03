@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from assume.common.base import BaseStrategy, SupportsMinMaxCharge
-from assume.common.market_objects import MarketConfig, Product
+from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
 class flexableEOMStorage(BaseStrategy):
@@ -18,7 +18,7 @@ class flexableEOMStorage(BaseStrategy):
         product_tuples: list[Product],
         data_dict: dict,
         **kwargs,
-    ):
+    ) -> Orderbook:
         """
         Takes information from a unit that the unit operator manages and
         defines how it is dispatched to the market
@@ -110,7 +110,7 @@ class flexablePosCRMStorage(BaseStrategy):
         data_dict: dict,
         product_tuples: list[Product],
         **kwargs,
-    ):
+    ) -> Orderbook:
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
 
@@ -195,7 +195,7 @@ class flexableNegCRMStorage(BaseStrategy):
         product_tuples: list[Product],
         data_dict: dict,
         **kwargs,
-    ):
+    ) -> Orderbook:
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
 

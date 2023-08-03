@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from assume.common.base import BaseStrategy, BaseUnit, SupportsMinMax
-from assume.common.market_objects import MarketConfig, Product
+from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
 class PowerPlantStrategy(BaseStrategy):
@@ -11,7 +11,7 @@ class PowerPlantStrategy(BaseStrategy):
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,
-    ):
+    ) -> Orderbook:
         start = product_tuples[0][0]
         end_all = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
@@ -54,7 +54,7 @@ class NaivePosReserveStrategy(PowerPlantStrategy):
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,
-    ):
+    ) -> Orderbook:
         """
         Takes information from a unit that the unit operator manages and
         defines how it is dispatched to the market
@@ -99,7 +99,7 @@ class NaiveNegReserveStrategy(PowerPlantStrategy):
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,
-    ):
+    ) -> Orderbook:
         """
         Takes information from a unit that the unit operator manages and
         defines how it is dispatched to the market
