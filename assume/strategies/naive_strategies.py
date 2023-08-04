@@ -4,10 +4,10 @@ from assume.common.base import BaseStrategy, BaseUnit, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
-class PowerPlantStrategy(BaseStrategy):
+class NaiveStrategy(BaseStrategy):
     def calculate_bids(
         self,
-        unit: BaseUnit,
+        unit: SupportsMinMax,
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,
@@ -40,17 +40,13 @@ class PowerPlantStrategy(BaseStrategy):
         return bids
 
 
-class NaiveStrategy(PowerPlantStrategy):
-    pass
-
-
-class NaivePosReserveStrategy(PowerPlantStrategy):
+class NaivePosReserveStrategy(BaseStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def calculate_bids(
         self,
-        unit: BaseUnit,
+        unit: SupportsMinMax,
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,
@@ -89,13 +85,13 @@ class NaivePosReserveStrategy(PowerPlantStrategy):
         return bids
 
 
-class NaiveNegReserveStrategy(PowerPlantStrategy):
+class NaiveNegReserveStrategy(BaseStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def calculate_bids(
         self,
-        unit: BaseUnit,
+        unit: SupportsMinMax,
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,

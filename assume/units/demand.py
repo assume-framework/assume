@@ -1,3 +1,5 @@
+import numbers
+
 import pandas as pd
 
 from assume.common.base import SupportsMinMax
@@ -47,10 +49,10 @@ class Demand(SupportsMinMax):
             self.min_power = -max_power
         self.ramp_down = max(abs(min_power), abs(max_power))
         self.ramp_up = max(abs(min_power), abs(max_power))
-        if isinstance(volume, float):
+        if isinstance(volume, numbers.Real):
             volume = pd.Series(volume, index=self.index)
         self.volume = -abs(volume)  # demand is negative
-        if isinstance(price, float):
+        if isinstance(price, numbers.Real):
             price = pd.Series(price, index=self.index)
         self.price = price
         self.location = location
