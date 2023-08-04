@@ -358,17 +358,15 @@ class Storage(SupportsMinMaxCharge):
         duration = pd.Timedelta(self.index.freq).seconds / 3600
 
         base_load = self.outputs["energy"][start:end_excl]
+        capacity_pos = self.outputs["capacity_pos"][start:end_excl]
         capacity_neg = self.outputs["capacity_neg"][start:end_excl]
-
-        previous_output = self.get_output_before(start)
-        current_power_charge = min(previous_output, 0)
 
         min_power_charge = (
             self.min_power_charge[start:end_excl]
             if isinstance(self.min_power_charge, pd.Series)
             else self.min_power_charge
         )
-        min_power_charge -= base_load
+        min_power_charge -= base_load + capacity_pos
         min_power_charge = (min_power_charge).where(min_power_charge <= 0, 0)
 
         max_power_charge = (
@@ -382,7 +380,7 @@ class Storage(SupportsMinMaxCharge):
         )
 
         min_power_charge = min_power_charge.where(
-            min_power_charge > max_power_charge, 0
+            min_power_charge >= max_power_charge, 0
         )
 
         # restrict charging according to max_SOC
@@ -406,16 +404,14 @@ class Storage(SupportsMinMaxCharge):
 
         base_load = self.outputs["energy"][start:end_excl]
         capacity_pos = self.outputs["capacity_pos"][start:end_excl]
-
-        previous_output = self.get_output_before(start)
-        current_power_discharge = max(previous_output, 0)
+        capacity_neg = self.outputs["capacity_neg"][start:end_excl]
 
         min_power_discharge = (
             self.min_power_discharge[start:end_excl]
             if isinstance(self.min_power_discharge, pd.Series)
             else self.min_power_discharge
         )
-        min_power_discharge -= base_load
+        min_power_discharge -= base_load + capacity_neg
         min_power_discharge = (min_power_discharge).where(min_power_discharge >= 0, 0)
 
         max_power_discharge = (
