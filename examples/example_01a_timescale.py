@@ -17,7 +17,7 @@ DATABASE_URI = getenv(
 # %%
 if __name__ == "__main__":
     scenario = "example_01a"
-    study_case = "example_01a"
+    study_case = "day_ahead_market"
 
     world = World(database_uri=DATABASE_URI, export_csv_path=EXPORT_CSV_PATH)
     load_scenario_folder(

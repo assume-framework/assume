@@ -40,4 +40,4 @@ day_ahead_market:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: pay_as_clear
+      market_mechanism: pay_as_clear_opt
