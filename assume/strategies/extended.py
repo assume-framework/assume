@@ -27,12 +27,11 @@ class OTCStrategy(BaseStrategy):
 
             min_power, max_power = unit.calculate_min_max_power(start, end)
             current_power = unit.outputs["energy"].at[start]
-            max_price = unit.calculate_marginal_cost(start, current_power + max_power)
-
-            price = max_price
-            volume = max_power
+            volume = max_power[start]
             if "OTC" in market_config.name:
                 volume *= self.scale
+            price = unit.calculate_marginal_cost(start, current_power + volume)
+
             bids.append(
                 {
                     "start_time": start,

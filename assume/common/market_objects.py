@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Callable, NamedTuple, TypedDict, Union
+from typing import Callable, NamedTuple, TypedDict
 
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
@@ -22,8 +22,8 @@ class OnlyHours(NamedTuple):
 # describes an order which can be either generation (volume > 0) or demand (volume < 0)
 class Order(TypedDict):
     bid_id: str
-    start_time: Union[datetime, float]
-    end_time: Union[datetime, float]
+    start_time: datetime
+    end_time: datetime
     volume: int  # positive if generation
     price: int
     only_hours: OnlyHours | None = None
@@ -38,7 +38,7 @@ eligible_lambda = Callable[[Agent], bool]
 # describes the configuration of a market product which is available at a market
 @dataclass
 class MarketProduct:
-    duration: rd  # quarter-hourly, half-hourly, hourly, 4hourly, daily, weekly, monthly, quarter-yearly, yearly
+    duration: rd | rr.rrule  # quarter-hourly, half-hourly, hourly, 4hourly, daily, weekly, monthly, quarter-yearly, yearly
     count: int  # how many future durations can be traded, must be >= 1
     # count can also be given as a rrule with until
     first_delivery: rd = (
