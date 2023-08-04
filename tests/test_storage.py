@@ -57,3 +57,49 @@ def test_storage():
     )
     assert min_power_charge[0] == -40
     assert max_power_charge[0] == round(-50 / storage_unit.efficiency_charge, 3)
+
+    storage_unit.outputs["energy"][start] = 100
+    storage_unit.current_SOC = 500
+    dispatched_energy = storage_unit.execute_current_dispatch(start, end)
+    assert dispatched_energy[0] == 100
+    assert storage_unit.current_SOC == round(
+        500 - 100 / storage_unit.efficiency_discharge, 1
+    )
+    assert storage_unit.current_status == 1
+    assert storage_unit.current_down_time == 0
+    assert storage_unit.market_success_list == [1]
+
+    storage_unit.outputs["energy"][start] = -100
+    storage_unit.current_SOC = 500
+    dispatched_energy = storage_unit.execute_current_dispatch(start, end)
+    assert dispatched_energy[0] == -100
+    assert storage_unit.current_SOC == round(500 + 100 * storage_unit.efficiency_charge)
+    assert storage_unit.current_status == 1
+    assert storage_unit.current_down_time == 0
+    assert storage_unit.market_success_list == [2]
+
+    storage_unit.outputs["energy"][start] = 100
+    storage_unit.current_SOC = 50
+    dispatched_energy = storage_unit.execute_current_dispatch(start, end)
+    assert dispatched_energy[0] == round(50 * storage_unit.efficiency_discharge, 1)
+    assert storage_unit.current_SOC == 0
+    assert storage_unit.current_status == 1
+    assert storage_unit.current_down_time == 0
+    assert storage_unit.market_success_list == [3]
+
+    storage_unit.outputs["energy"][start] = -100
+    storage_unit.current_SOC = 950
+    dispatched_energy = storage_unit.execute_current_dispatch(start, end)
+    assert dispatched_energy[0] == round(-50 / storage_unit.efficiency_charge, 1)
+    assert storage_unit.current_SOC == 1000
+    assert storage_unit.current_status == 1
+    assert storage_unit.current_down_time == 0
+    assert storage_unit.market_success_list == [4]
+
+    storage_unit.outputs["energy"][start] = -100
+    dispatched_energy = storage_unit.execute_current_dispatch(start, end)
+    assert dispatched_energy[0] == 0
+    assert storage_unit.current_SOC == 1000
+    assert storage_unit.current_status == 0
+    assert storage_unit.current_down_time == 1
+    assert storage_unit.market_success_list == [4, 0]

@@ -242,21 +242,23 @@ class Storage(SupportsMinMaxCharge):
                     )
                     < self.min_SOC
                 ):
-                    self.outputs["energy"][t] = (
+                    self.outputs["energy"][t] = round(
                         (self.current_SOC - self.min_SOC)
                         * self.efficiency_discharge
                         * 3600
-                        / pd.Timedelta(self.index.freq).total_seconds()
+                        / pd.Timedelta(self.index.freq).total_seconds(),
+                        1,
                     )
                     logger.error(
                         f"The energy dispatched exceeds the minimum SOC, the dispatched amount is adjusted."
                     )
 
-                self.current_SOC -= (
+                self.current_SOC -= round(
                     self.outputs["energy"][t]
                     * pd.Timedelta(self.index.freq).total_seconds()
                     / 3600
-                    / self.efficiency_discharge
+                    / self.efficiency_discharge,
+                    1,
                 )
 
             # charging
@@ -271,21 +273,23 @@ class Storage(SupportsMinMaxCharge):
                     )
                     > self.max_SOC
                 ):
-                    self.outputs["energy"][t] = (
+                    self.outputs["energy"][t] = round(
                         (self.current_SOC - self.max_SOC)
                         / self.efficiency_charge
                         * 3600
-                        / pd.Timedelta(self.index.freq).total_seconds()
+                        / pd.Timedelta(self.index.freq).total_seconds(),
+                        1,
                     )
                     logger.error(
                         f"The energy dispatched exceeds the maximum SOC, the dispatched amount is adjusted."
                     )
 
-                self.current_SOC -= (
+                self.current_SOC -= round(
                     self.outputs["energy"][t]
                     * pd.Timedelta(self.index.freq).total_seconds()
                     / 3600
-                    * self.efficiency_charge
+                    * self.efficiency_charge,
+                    1,
                 )
 
             if self.outputs["energy"][t] == 0:
