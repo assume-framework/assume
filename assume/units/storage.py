@@ -314,14 +314,14 @@ class Storage(SupportsMinMaxCharge):
         self.current_down_time = 0
 
     @lru_cache(maxsize=256)
-    def calc_marginal_cost(
+    def calculate_marginal_cost(
         self,
-        timestep: pd.Timestamp,
-        discharge: bool = True,
+        start: pd.Timestamp,
+        power: float,
     ) -> float:
-        if discharge:
+        if power > 0:
             variable_cost = (
-                self.variable_cost_discharge.at[timestep]
+                self.variable_cost_discharge.at[start]
                 if isinstance(self.variable_cost_discharge, pd.Series)
                 else self.variable_cost_discharge
             )
@@ -329,7 +329,7 @@ class Storage(SupportsMinMaxCharge):
 
         else:
             variable_cost = (
-                self.variable_cost_charge.at[timestep]
+                self.variable_cost_charge.at[start]
                 if isinstance(self.variable_cost_charge, pd.Series)
                 else self.variable_cost_charge
             )
@@ -356,7 +356,7 @@ class Storage(SupportsMinMaxCharge):
         return unit_dict
 
     def calculate_min_max_charge(
-        self, start: pd.Timestamp, end: pd.Timestamp
+        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series]:
         end_excl = end - self.index.freq
         duration = pd.Timedelta(self.index.freq).seconds / 3600
@@ -401,7 +401,7 @@ class Storage(SupportsMinMaxCharge):
         return min_power_charge, max_power_charge
 
     def calculate_min_max_discharge(
-        self, start: pd.Timestamp, end: pd.Timestamp
+        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series]:
         end_excl = end - self.index.freq
         duration = pd.Timedelta(self.index.freq).seconds / 3600
