@@ -1,73 +1,45 @@
 from datetime import datetime
 
-import pandas as pd
-
-from assume.common.base import SupportsMinMax
 from assume.strategies import (
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
     NaiveStrategy,
 )
 
-
-class MockMarketConfig:
-    product_type = "energy"
-
-
-class MockUnit(SupportsMinMax):
-    def __init__(self, index):
-        super().__init__("", "", "", {}, index, None)
-        self.max_power = 1000
-        self.min_power = 0
-        self.ramp_down = 200
-        self.ramp_up = 400
-
-    def calculate_min_max_power(
-        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
-    ) -> tuple[pd.Series, pd.Series]:
-        min = pd.Series(100, self.index).loc[start:start]
-        max = pd.Series(400, self.index).loc[start:start]
-        return min, max
-
-    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
-        return 3
-
-
 start = datetime(2023, 7, 1)
 end = datetime(2023, 7, 2)
-index = pd.date_range(
-    start=datetime(2023, 7, 1),
-    end=datetime(2023, 7, 2),
-    freq="1h",
-)
-unit = MockUnit(index)
 
 
-def test_naive_strategy():
+def test_naive_strategy(mock_market_config, mock_supports_minmax):
     strategy = NaiveStrategy()
-    mc = MockMarketConfig()
+    mc = mock_market_config
     product_tuples = [(start, end, None)]
-    bids = strategy.calculate_bids(unit, mc, product_tuples=product_tuples)
+    bids = strategy.calculate_bids(
+        mock_supports_minmax, mc, product_tuples=product_tuples
+    )
     assert bids[0]["price"] == 3
     assert bids[0]["volume"] == 400
 
 
-def test_naive_pos_strategy():
+def test_naive_pos_strategy(mock_market_config, mock_supports_minmax):
     """
     calculates bids for
     """
     strategy = NaivePosReserveStrategy()
-    mc = MockMarketConfig()
+    mc = mock_market_config
     product_tuples = [(start, end, None)]
-    bids = strategy.calculate_bids(unit, mc, product_tuples=product_tuples)
+    bids = strategy.calculate_bids(
+        mock_supports_minmax, mc, product_tuples=product_tuples
+    )
     assert bids[0]["price"] == 0
     assert bids[0]["volume"] == 400
     assert len(bids) == 1
 
 
-def test_naive_neg_strategy():
+def test_naive_neg_strategy(mock_market_config, mock_supports_minmax):
     strategy = NaiveNegReserveStrategy()
-    mc = MockMarketConfig()
+    mc = mock_market_config
+    unit = mock_supports_minmax
     product_tuples = [(start, end, None)]
     bids = strategy.calculate_bids(unit, mc, product_tuples=product_tuples)
     assert bids[0]["price"] == 0

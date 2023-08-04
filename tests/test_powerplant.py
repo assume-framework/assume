@@ -7,10 +7,6 @@ from assume.strategies.naive_strategies import NaiveStrategy
 from assume.units import PowerPlant
 
 
-class MockMarketConfig:
-    product_type = "energy"
-
-
 @pytest.fixture
 def power_plant_1() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
@@ -156,7 +152,7 @@ def test_calculate_operational_window(power_plant_1):
     assert power_plant_1.outputs["energy"].at[start] == 0
 
 
-def test_powerplant_feedback(power_plant_1):
+def test_powerplant_feedback(power_plant_1, mock_market_config):
     power_plant_1.reset()
 
     product_tuple = (
@@ -191,7 +187,7 @@ def test_powerplant_feedback(power_plant_1):
     ]
 
     # min_power gets accepted
-    mc = MockMarketConfig()
+    mc = mock_market_config
     power_plant_1.set_dispatch_plan(mc, orderbook)
 
     # second market request for same interval
