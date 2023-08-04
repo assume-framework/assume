@@ -297,39 +297,6 @@ class PowerPlant(SupportsMinMax):
                 timestep=start,
             )
 
-    def calculate_min_max_price(self, start: pd.Timestamp, end: pd.Timestamp):
-        """
-        calculates prices, checks for ramping too
-        is only valid for single time frame orders
-        """
-        min_power, max_power = self.calculate_min_max_power(start, end)
-        previous_power = self.get_output_before(start)
-
-        # adjust for ramp down speed
-        min_power = max(previous_power - self.ramp_down, min_power)
-        # adjust for ramp up speed
-        max_power = min(previous_power + self.ramp_up, max_power)
-
-        if self.marginal_cost:
-            marginal_cost = (
-                self.marginal_cost[start]
-                if isinstance(self.marginal_cost, dict)
-                else self.marginal_cost
-            )
-
-            max_cost = marginal_cost
-            min_cost = marginal_cost
-        else:
-            min_cost = self.calc_marginal_cost_with_partial_eff(
-                power_output=previous_power + min_power,
-                timestep=start,
-            )
-            max_cost = self.calc_marginal_cost_with_partial_eff(
-                power_output=previous_power + max_power,
-                timestep=start,
-            )
-        return min_power, min_cost, max_power, max_cost
-
     def as_dict(self) -> dict:
         unit_dict = super().as_dict()
         unit_dict.update(

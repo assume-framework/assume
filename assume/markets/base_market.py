@@ -33,7 +33,7 @@ class MarketRole(Role):
         self.marketconfig.aid = self.context.aid
         self.all_orders: list[Order] = []
         self.market_result: Orderbook = []
-        self.registered_agents: list[str] = []
+        self.registered_agents: list[tuple[str, str]] = []
         self.open_slots = []
 
         def accept_orderbook(content: dict, meta):
