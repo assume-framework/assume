@@ -191,7 +191,7 @@ class HeatPump(SupportsMinMax):
 
         Parameters
         ----------
-        current_time : pd.Timestamp
+        timestep : pd.Timestamp
             The current time step.
 
         Returns
