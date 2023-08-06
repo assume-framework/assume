@@ -101,8 +101,6 @@ class flexablePosCRMStorage(BaseStrategy):
         # check if kwargs contains crm_foresight argument
         self.foresight = pd.Timedelta(kwargs.get("crm_foresight", "4h"))
 
-        self.current_time = None
-
     def calculate_bids(
         self,
         unit: SupportsMinMaxCharge,
@@ -138,7 +136,7 @@ class flexablePosCRMStorage(BaseStrategy):
             specific_revenue = get_specific_revenue(
                 unit=unit,
                 marginal_cost=marginal_cost,
-                current_time=self.current_time,
+                current_time=start,
                 foresight=self.foresight,
                 price_forecast=data_dict["price_forecast"],
             )
@@ -186,7 +184,6 @@ class flexableNegCRMStorage(BaseStrategy):
         super().__init__(*args, **kwargs)
 
         self.foresight = pd.Timedelta(kwargs.get("crm_foresight", "4h"))
-        self.current_time = None
 
     def calculate_bids(
         self,

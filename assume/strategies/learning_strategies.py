@@ -14,7 +14,6 @@ class RLStrategy(LearningStrategy):
         super().__init__(*args, **kwargs)
 
         self.foresight = kwargs.get("foresight", 24)
-        self.current_time = None
 
         # RL agent parameters
         self.obs_dim = kwargs.get("observation_dimension", 50)

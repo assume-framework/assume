@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 import pandas as pd
 
 from assume.common.base import BaseStrategy, SupportsMinMax
@@ -148,7 +150,7 @@ class flexableEOM(BaseStrategy):
         possible_revenue = get_specific_revenue(
             unit=unit,
             marginal_cost=marginal_cost_flex,
-            current_time=start,
+            t=start,
             foresight=self.foresight,
         )
         if possible_revenue >= 0 and unit.price_forecast[t] < marginal_cost_flex:
@@ -215,7 +217,7 @@ class flexablePosCRM(BaseStrategy):
             specific_revenue = get_specific_revenue(
                 unit=unit,
                 marginal_cost=marginal_cost,
-                current_time=start,
+                t=start,
                 foresight=self.foresight,
             )
 
@@ -291,7 +293,7 @@ class flexableNegCRM(BaseStrategy):
             specific_revenue = get_specific_revenue(
                 unit=unit,
                 marginal_cost=marginal_cost,
-                current_time=start,
+                t=start,
                 foresight=self.foresight,
             )
 
@@ -329,12 +331,11 @@ class flexableNegCRM(BaseStrategy):
 
 
 def get_specific_revenue(
-    unit,
-    marginal_cost,
-    current_time,
-    foresight,
+    unit: SupportsMinMax,
+    marginal_cost: float,
+    t: datetime,
+    foresight: timedelta,
 ):
-    t = current_time
     price_forecast = []
 
     if t + foresight > unit.price_forecast.index[-1]:

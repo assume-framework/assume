@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
 
@@ -61,7 +63,7 @@ class complexEOMStorage(BaseStrategy):
             if previous_power > 0:
                 # was discharging before
                 bid_price_mr = self.calculate_EOM_price_continue_discharging(
-                    unit, cost_mr_discharge, bid_quantity_mr_discharge
+                    start, unit, cost_mr_discharge, bid_quantity_mr_discharge
                 )
                 bid_quantity_mr = bid_quantity_mr_discharge
                 bid_price_flex = cost_flex_discharge
@@ -88,9 +90,7 @@ class complexEOMStorage(BaseStrategy):
                 bid_price_flex = 0
                 bid_quantity_flex = 0
 
-        elif (
-            price_forecast[unit.current_time] <= average_price * unit.efficiency_charge
-        ):
+        elif price_forecast[start] <= average_price * unit.efficiency_charge:
             # place bid to charge
             if previous_power > 0:
                 # was discharging before
@@ -141,8 +141,7 @@ class complexEOMStorage(BaseStrategy):
         ]
         return bids
 
-    def calculate_price_average(self, unit):
-        t = unit.current_time
+    def calculate_price_average(self, unit: SupportsMinMaxCharge, t: datetime):
         """if t - self.foresight < pd.Timedelta("0h"):
             average_price = np.mean(unit.price_forecast[t-self.foresight:]
                                     + unit.price_forecast[:t+self.foresight])
@@ -166,12 +165,12 @@ class complexEOMStorage(BaseStrategy):
         return bid_price_mr
 
     def calculate_EOM_price_continue_discharging(
-        self, unit, marginal_cost_flex, bid_quantity_mr
+        self, start, unit, marginal_cost_flex, bid_quantity_mr
     ):
         if bid_quantity_mr == 0:
             return 0
 
-        t = unit.current_time
+        t = start
         min_down_time = max(unit.min_down_time, 1)
 
         starting_cost = self.get_starting_costs(time=min_down_time, unit=unit)
@@ -181,6 +180,7 @@ class complexEOMStorage(BaseStrategy):
         possible_revenue = self.get_possible_revenues(
             marginal_cost=marginal_cost_flex,
             unit=unit,
+            t=start,
         )
         if possible_revenue >= 0 and unit.price_forecast[t] < marginal_cost_flex:
             marginal_cost_flex = 0
@@ -202,8 +202,7 @@ class complexEOMStorage(BaseStrategy):
         else:
             return unit.cold_start_cost
 
-    def get_possible_revenues(self, marginal_cost, unit):
-        t = unit.current_time
+    def get_possible_revenues(self, marginal_cost, unit, t):
         price_forecast = []
 
         if t + self.foresight > unit.price_forecast.index[-1]:
