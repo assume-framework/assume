@@ -85,7 +85,7 @@ class UnitsOperator(Role):
             message = {
                 "context": "write_results",
                 "type": "store_units",
-                "data": self.units[id],
+                "data": self.units[id].as_dict(),
             }
             await self.context.send_acl_message(
                 receiver_id=db_aid,

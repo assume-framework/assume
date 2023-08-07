@@ -1,4 +1,4 @@
-FROM python:3.10
+FROM python:3.11-bookworm
 
 RUN useradd -m -s /bin/bash admin
 
@@ -13,14 +13,12 @@ RUN touch assume/__init__.py
 RUN pip-compile --resolver=backtracking -o requirements.txt ./pyproject.toml
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN chown -R admin /src
-RUN chown -R admin /home/admin
-
-USER admin
 COPY README.md pyproject.toml /src
 COPY assume /src/assume
-RUN pip install -e .
-
 COPY examples /src/examples
-
-CMD ["python", "-u" ,"./examples/example_01.py"]
+ENV PATH /home/admin/.local/bin:$PATH
+RUN chown -R admin /src /home/admin
+USER admin
+RUN pip install -e .
+ENV PYTHONUNBUFFERED=1
+ENTRYPOINT ["assume"]

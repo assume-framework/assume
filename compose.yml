@@ -48,7 +48,7 @@ services:
 
   simulation:
     container_name: simulation
-    image: assume:latest
+    image: ghcr.io/assume-framework/assume:latest
     profiles: ["cli-only"]
     build: .
     environment:
@@ -58,3 +58,4 @@ services:
       - 5000:5000
     depends_on:
       - assume_db
+    command: -s example_01a -c base -db "sqlite:///"

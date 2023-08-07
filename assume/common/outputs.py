@@ -206,7 +206,7 @@ class WriteOutput(Role):
         df["market_id"] = market_id
         self.write_dfs["market_orders"].append(df)
 
-    def write_units_definition(self, unit: BaseUnit):
+    def write_units_definition(self, unit_info: dict):
         """
         Writes unit definitions to the corresponding data frame and directly store it in db and csv.
         Since that is only done once, no need for recurrent sheduling arises.
@@ -216,8 +216,6 @@ class WriteOutput(Role):
             unit_params: The parameters of the unit.
         """
 
-        unit_info = unit.as_dict()
-
         table_name = unit_info["unit_type"] + "_meta"
 
         if table_name is None:
@@ -225,7 +223,7 @@ class WriteOutput(Role):
             return False
         del unit_info["unit_type"]
         unit_info["simulation"] = self.simulation_id
-        u_info = {unit.id: unit_info}
+        u_info = {unit_info["id"]: unit_info}
 
         self.write_dfs[table_name].append(pd.DataFrame(u_info).T)
 
