@@ -151,7 +151,7 @@ class flexablePosCRMStorage(BaseStrategy):
             energy_price = capacity_price / unit.current_SOC
 
             if market_config.product_type == "capacity_pos":
-                bids.appen(
+                bids.append(
                     {
                         "start_time": start,
                         "end_time": end,
