@@ -10,7 +10,9 @@ log = logging.getLogger(__name__)
 SOLVERS = ["glpk", "cbc", "gurobi", "cplex"]
 
 
-def nodal_pricing_pyomo(market_agent: MarketRole, market_products: list[MarketProduct]):
+def nodal_pricing_example(
+    market_agent: MarketRole, market_products: list[MarketProduct]
+):
     assert "node_id" in market_agent.marketconfig.additional_fields
     import pandas as pd
     from pyomo.environ import (

@@ -1,0 +1,5 @@
+,efficiency,emission_factor,max_power,min_power,simulation,technology,unit_operator
+Unit 1,0.3,0.0,1000.0,200.0,example_01_clearing_example_01a_complex_clearing,nuclear,Operator 1
+Unit 2,0.5,0.4,1000.0,200.0,example_01_clearing_example_01a_complex_clearing,lignite,Operator 2
+Unit 3,0.4,0.3,1000.0,200.0,example_01_clearing_example_01a_complex_clearing,hard coal,Operator 3
+Unit 4,0.6,0.2,1000.0,200.0,example_01_clearing_example_01a_complex_clearing,combined cycle gas turbine,Operator 4

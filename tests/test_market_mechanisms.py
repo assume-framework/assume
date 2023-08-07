@@ -46,6 +46,7 @@ def test_market():
             "volume": 120,
             "price": 120,
             "agent_id": "gen1",
+            "bid_id": "bid1",
             "only_hours": None,
         },
         {
@@ -54,6 +55,7 @@ def test_market():
             "volume": 80,
             "price": 58,
             "agent_id": "gen1",
+            "bid_id": "bid2",
             "only_hours": None,
         },
         {
@@ -62,6 +64,7 @@ def test_market():
             "volume": 100,
             "price": 53,
             "agent_id": "gen1",
+            "bid_id": "bid3",
             "only_hours": None,
         },
         {
@@ -70,6 +73,7 @@ def test_market():
             "volume": -180,
             "price": 70,
             "agent_id": "dem1",
+            "bid_id": "bid4",
             "only_hours": None,
         },
     ]
@@ -97,6 +101,7 @@ def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
             "start_time": start,
             "end_time": end,
             "agent_id": "dem1",
+            "bid_id": "bid1",
             "volume": 0,
             "price": 0,
             "only_hours": None,
@@ -114,7 +119,7 @@ def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
         else:
             agent_id = f"dem_{i}"
         new_order["agent_id"] = agent_id
-
+        new_order["bid_id"] = f"bid_{i}"
         new_order["node_id"] = node_id
         orders.append(new_order)
     return orders

@@ -2,12 +2,13 @@ import logging
 from itertools import groupby
 from operator import itemgetter
 
-from assume.common.market_objects import MarketProduct, Order, Orderbook
+from assume.common.market_objects import MarketProduct, Orderbook
 from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)
 
 SOLVERS = ["glpk", "cbc", "gurobi", "cplex"]
+
 
 def pay_as_clear_opt(
     market_agent: MarketRole,
@@ -16,79 +17,70 @@ def pay_as_clear_opt(
     import pyomo.environ as pyo
     from pyomo.opt import SolverFactory, check_available_solvers
 
-    market_getter = itemgetter("start_time", "end_time", "only_hours")
     accepted_orders: Orderbook = []
     rejected_orders: Orderbook = []
-
     meta = []
 
+    market_getter = itemgetter("start_time", "end_time", "only_hours")
     market_agent.all_orders.sort(key=market_getter)
-    # find maximal length of market_agent.all_orders dicts
-    number_of_timesteps = len(market_products)
 
-    #find maximal number of bids per timestep
-    number_of_bids_per_timestep = max(len(list(x)) for _, x in groupby(market_agent.all_orders, market_getter))
+    if len(market_agent.all_orders) == 0:
+        return accepted_orders, meta
 
     model = pyo.ConcreteModel()
     model.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT_EXPORT)
 
-    model.T = pyo.RangeSet(0, number_of_timesteps-1)
-    model.K = pyo.RangeSet(0, number_of_bids_per_timestep-1)
+    model.T = pyo.Set(
+        initialize=[market_product[0] for market_product in market_products],
+        doc="timesteps",
+    )
+    model.K = pyo.Set(
+        initialize=[order["bid_id"] for order in market_agent.all_orders], doc="bids"
+    )
 
-    model.P = pyo.Var(model.T, model.K, domain=pyo.Reals, initialize=0)
+    model.P = pyo.Var(model.K, domain=pyo.Reals)
 
     model.energy_balance = pyo.ConstraintList()
-    model.max_power = pyo.ConstraintList()
-    model.min_power = pyo.ConstraintList()
+    model.min_max_power = pyo.ConstraintList()
 
-    for t, (product, product_orders) in enumerate(
-        groupby(market_agent.all_orders, market_getter)
-    ):
+    for product, product_orders in groupby(market_agent.all_orders, market_getter):
         if product not in market_products:
             rejected_orders.extend(product_orders)
             # log.debug(f'found unwanted bids for {product} should be {market_products}')
             continue
 
-
         product_orders = list(product_orders)
 
-        expr = sum(model.P[t, k] for k in range(len(product_orders))) == 0
+        expr = sum(model.P[order["bid_id"]] for order in product_orders) == 0
         model.energy_balance.add(expr)
 
-        for k, order in enumerate(
-            product_orders
-        ):
-            if order["volume"] > 0:
-                expr = model.P[t, k] <= order["volume"]
-            else:
-                expr = model.P[t, k] >= order["volume"]
-            model.max_power.add(expr)
-
-        if "acceptance_ratio" in market_agent.marketconfig.additional_fields:
-            for k, order in enumerate(
-                product_orders
-            ):
+        for order in product_orders:
+            if "acceptance_ratio" in market_agent.marketconfig.additional_fields:
                 if order["volume"] > 0:
-                    expr = model.P[t, k] >= order["acceptance_ratio"] * order["volume"]
+                    min_max_power_expr = (
+                        order["acceptance_ratio"] * order["volume"],
+                        model.P[order["bid_id"]],
+                        order["volume"],
+                    )
                 else:
-                    expr = model.P[t, k] <= order["acceptance_ratio"] * order["volume"]
-                model.min_power.add(expr)
-        else:
-            for k, order in enumerate(
-                product_orders
-            ):
-                expr = model.P[t, k] >= 0 if order["volume"] > 0 else model.P[t, k] <= 0
-                model.min_power.add(expr)
+                    min_max_power_expr = (
+                        order["volume"],
+                        model.P[order["bid_id"]],
+                        order["acceptance_ratio"] * order["volume"],
+                    )
+
+            else:
+                if order["volume"] > 0:
+                    min_max_power_expr = (0, model.P[order["bid_id"]], order["volume"])
+                else:
+                    min_max_power_expr = (order["volume"], model.P[order["bid_id"]], 0)
+
+            model.min_max_power.add(min_max_power_expr)
 
     def objective_rule(model):
         expr = sum(
-            model.P[t, k] * order["price"]
-            for t, (_, product_orders) in enumerate(
-                groupby(market_agent.all_orders, market_getter)
-            )
-            for k, order in enumerate(
-                product_orders
-            )
+            model.P[order["bid_id"]] * order["price"]
+            for order in market_agent.all_orders
         )
 
         return expr
@@ -102,10 +94,54 @@ def pay_as_clear_opt(
     solver = SolverFactory("glpk")
 
     # Solve the model
-    result = solver.solve(model)
+    instance = model.create_instance()
+    result = solver.solve(instance)
 
     if result["Solver"][0]["Status"] != "ok":
         raise Exception("infeasible")
 
     # Find the dual variable for the balance constraint
-    market_clearing_prices = [model.dual[model.energy_balance[i+1]] for i in range(len(model.energy_balance))]
+    market_clearing_prices = {
+        t: instance.dual[instance.energy_balance[i + 1]]
+        for i, t in enumerate(instance.T)
+    }
+
+    for product, product_orders in groupby(market_agent.all_orders, market_getter):
+        clear_price = market_clearing_prices[product[0]]
+
+        supply_volume = 0
+        demand_volume = 0
+
+        for order in product_orders:
+            opt_volume = instance.P[order["bid_id"]].value
+
+            if opt_volume > 0:
+                supply_volume += opt_volume
+            else:
+                demand_volume += opt_volume
+
+            order["volume"] = opt_volume
+            order["price"] = clear_price
+
+            if opt_volume != 0:
+                accepted_orders.append(order)
+
+        duration_hours = (product[1] - product[0]).total_seconds() / 60 / 60
+
+        meta.append(
+            {
+                "supply_volume": supply_volume,
+                "demand_volume": demand_volume,
+                "demand_volume_energy": demand_volume * duration_hours,
+                "supply_volume_energy": supply_volume * duration_hours,
+                "price": clear_price,
+                "max_price": clear_price,
+                "min_price": clear_price,
+                "node_id": None,
+                "product_start": product[0],
+                "product_end": product[1],
+                "only_hours": product[2],
+            }
+        )
+
+    return accepted_orders, meta
