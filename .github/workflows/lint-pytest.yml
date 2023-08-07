@@ -39,4 +39,21 @@ jobs:
         isort --check assume examples tests
     - name: Test with pytest
       run: |
-        pytest --cov
+        pytest --cov --cov-report=xml --junitxml="result.xml"
+
+    - name: Upload tests results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results
+        path: |
+          coverage.xml
+          result.xml
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      with:
+        flags: pytest
+        fail_ci_if_error: true
