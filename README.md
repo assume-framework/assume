@@ -1,4 +1,6 @@
 # ASSUME
+![pytest, black, isort](https://github.com/assume-framework/assume/actions/workflows/lint-pytest.yml/badge.svg)
+[![codecov](https://codecov.io/gh/assume-framework/assume/branch/main/graph/badge.svg?token=CZ4FO7P57H)](https://codecov.io/gh/assume-framework/assume)
 
 **ASSUME** is an open-source tool-box for an agent-based simulation
 of the European electricity and later on energy markets with a main
@@ -80,6 +82,12 @@ install pre-commit
 ```
 pip install pre-commit
 pre-commit install
+```
+
+to run pre-commit directly, you can use
+
+```
+pre-commit run --all-files
 ```
 
 Access to database and dashboards
