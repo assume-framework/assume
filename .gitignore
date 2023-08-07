@@ -134,5 +134,7 @@ dmypy.json
 .vscode
 examples/outputs
 examples/local_db/
+experimental/outputs
+experimental/local_db/
 validation_runs
 assume-db
