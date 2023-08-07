@@ -14,6 +14,7 @@ os.makedirs("./examples/local_db", exist_ok=True)
 
 availabe_examples = {
     "small": {"scenario": "example_01a", "study_case": "base"},
+    "small_with_opt_clearing": {"scenario": "example_01a", "study_case": "base_with_complex_clearing"},
     "small_with_vre": {"scenario": "example_01b", "study_case": "base"},
     "small_with_vre_and_storage": {
         "scenario": "example_01c",
@@ -29,10 +30,6 @@ availabe_examples = {
         "study_case": "eom_and_crm_case_2019",
     },
     "rl": {"scenario": "example_01_rl", "study_case": "rl_case"},
-    "small_with_opt_clearing": {
-        "scenario": "example_01_clearing",
-        "study_case": "example_01a_complex_clearing",
-    },
     "small_with_heatpumps": {
         "scenario": "example_01_heatpumps",
         "study_case": "with_heat_pumps",
