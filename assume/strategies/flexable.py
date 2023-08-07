@@ -1,7 +1,9 @@
+from datetime import datetime, timedelta
+
 import pandas as pd
 
 from assume.common.base import BaseStrategy, SupportsMinMax
-from assume.common.market_objects import MarketConfig, Product
+from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
 class flexableEOM(BaseStrategy):
@@ -10,7 +12,6 @@ class flexableEOM(BaseStrategy):
 
         # check if kwargs contains eom_foresight argument
         self.foresight = pd.Timedelta(kwargs.get("eom_foresight", "12h"))
-        start = None
 
     def calculate_bids(
         self,
@@ -18,7 +19,7 @@ class flexableEOM(BaseStrategy):
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,
-    ):
+    ) -> Orderbook:
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
 
@@ -51,7 +52,7 @@ class flexableEOM(BaseStrategy):
             # Calculating possible bid amount and cost
             # =============================================================================
 
-            marginal_cost_mr = unit.calculate_marginal_cost(
+            marginal_cost_inflex = unit.calculate_marginal_cost(
                 start, current_power + bid_quantity_inflex
             )
             marginal_cost_flex = unit.calculate_marginal_cost(
@@ -63,7 +64,7 @@ class flexableEOM(BaseStrategy):
             # =============================================================================
             if unit.current_status:
                 bid_price_inflex = self.calculate_EOM_price_if_on(
-                    unit, start, marginal_cost_mr, bid_quantity_inflex
+                    unit, start, marginal_cost_inflex, bid_quantity_inflex
                 )
             else:
                 bid_price_inflex = self.calculate_EOM_price_if_off(
@@ -105,7 +106,9 @@ class flexableEOM(BaseStrategy):
 
         return bids
 
-    def calculate_EOM_price_if_off(self, unit, marginal_cost_mr, bid_quantity_inflex):
+    def calculate_EOM_price_if_off(
+        self, unit, marginal_cost_inflex, bid_quantity_inflex
+    ):
         # The powerplant is currently off and calculates a startup markup as an extra
         # to the marginal cost
         # Calculating the average uninterrupted operating period
@@ -119,12 +122,12 @@ class flexableEOM(BaseStrategy):
         else:
             markup = starting_cost / av_operating_time / bid_quantity_inflex
 
-        bid_price_inflex = min(marginal_cost_mr + markup, 3000.0)
+        bid_price_inflex = min(marginal_cost_inflex + markup, 3000.0)
 
         return bid_price_inflex
 
     def calculate_EOM_price_if_on(
-        self, unit, start, marginal_cost_flex, bid_quantity_inflex
+        self, unit, start, marginal_cost_inflex, bid_quantity_inflex
     ):
         """
         Check the description provided by Thomas in last version, the average downtime is not available
@@ -148,15 +151,15 @@ class flexableEOM(BaseStrategy):
 
         possible_revenue = get_specific_revenue(
             unit=unit,
-            marginal_cost=marginal_cost_flex,
-            current_time=start,
+            marginal_cost=marginal_cost_inflex,
+            t=start,
             foresight=self.foresight,
         )
-        if possible_revenue >= 0 and unit.price_forecast[t] < marginal_cost_flex:
-            marginal_cost_flex = 0
+        if possible_revenue >= 0 and unit.price_forecast[t] < marginal_cost_inflex:
+            marginal_cost_inflex = 0
 
         bid_price_inflex = max(
-            -price_reduction_restart - heat_gen_cost + marginal_cost_flex,
+            -price_reduction_restart - heat_gen_cost + marginal_cost_inflex,
             -499.00,
         )
 
@@ -186,7 +189,7 @@ class flexablePosCRM(BaseStrategy):
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,
-    ):
+    ) -> Orderbook:
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
@@ -216,7 +219,7 @@ class flexablePosCRM(BaseStrategy):
             specific_revenue = get_specific_revenue(
                 unit=unit,
                 marginal_cost=marginal_cost,
-                current_time=start,
+                t=start,
                 foresight=self.foresight,
             )
 
@@ -264,7 +267,7 @@ class flexableNegCRM(BaseStrategy):
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,
-    ):
+    ) -> Orderbook:
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
@@ -292,7 +295,7 @@ class flexableNegCRM(BaseStrategy):
             specific_revenue = get_specific_revenue(
                 unit=unit,
                 marginal_cost=marginal_cost,
-                current_time=start,
+                t=start,
                 foresight=self.foresight,
             )
 
@@ -330,12 +333,11 @@ class flexableNegCRM(BaseStrategy):
 
 
 def get_specific_revenue(
-    unit,
-    marginal_cost,
-    current_time,
-    foresight,
+    unit: SupportsMinMax,
+    marginal_cost: float,
+    t: datetime,
+    foresight: timedelta,
 ):
-    t = current_time
     price_forecast = []
 
     if t + foresight > unit.price_forecast.index[-1]:

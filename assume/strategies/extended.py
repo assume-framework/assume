@@ -1,5 +1,5 @@
 from assume.common.base import BaseStrategy, SupportsMinMax
-from assume.common.market_objects import MarketConfig, Product
+from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
 class OTCStrategy(BaseStrategy):
@@ -13,7 +13,7 @@ class OTCStrategy(BaseStrategy):
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,
-    ):
+    ) -> Orderbook:
         """
         Takes information from a unit that the unit operator manages and
         defines how it is dispatched to the market
@@ -27,12 +27,11 @@ class OTCStrategy(BaseStrategy):
 
             min_power, max_power = unit.calculate_min_max_power(start, end)
             current_power = unit.outputs["energy"].at[start]
-            max_price = unit.calculate_marginal_cost(start, current_power + max_power)
-
-            price = max_price
-            volume = max_power
+            volume = max_power[start]
             if "OTC" in market_config.name:
                 volume *= self.scale
+            price = unit.calculate_marginal_cost(start, current_power + volume)
+
             bids.append(
                 {
                     "start_time": start,

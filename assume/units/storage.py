@@ -242,21 +242,23 @@ class Storage(SupportsMinMaxCharge):
                     )
                     < self.min_SOC
                 ):
-                    self.outputs["energy"][t] = (
+                    self.outputs["energy"][t] = round(
                         (self.current_SOC - self.min_SOC)
                         * self.efficiency_discharge
                         * 3600
-                        / pd.Timedelta(self.index.freq).total_seconds()
+                        / pd.Timedelta(self.index.freq).total_seconds(),
+                        1,
                     )
                     logger.error(
                         f"The energy dispatched exceeds the minimum SOC, the dispatched amount is adjusted."
                     )
 
-                self.current_SOC -= (
+                self.current_SOC -= round(
                     self.outputs["energy"][t]
                     * pd.Timedelta(self.index.freq).total_seconds()
                     / 3600
-                    / self.efficiency_discharge
+                    / self.efficiency_discharge,
+                    1,
                 )
 
             # charging
@@ -271,21 +273,23 @@ class Storage(SupportsMinMaxCharge):
                     )
                     > self.max_SOC
                 ):
-                    self.outputs["energy"][t] = (
+                    self.outputs["energy"][t] = round(
                         (self.current_SOC - self.max_SOC)
                         / self.efficiency_charge
                         * 3600
-                        / pd.Timedelta(self.index.freq).total_seconds()
+                        / pd.Timedelta(self.index.freq).total_seconds(),
+                        1,
                     )
                     logger.error(
                         f"The energy dispatched exceeds the maximum SOC, the dispatched amount is adjusted."
                     )
 
-                self.current_SOC -= (
+                self.current_SOC -= round(
                     self.outputs["energy"][t]
                     * pd.Timedelta(self.index.freq).total_seconds()
                     / 3600
-                    * self.efficiency_charge
+                    * self.efficiency_charge,
+                    1,
                 )
 
             if self.outputs["energy"][t] == 0:
@@ -310,14 +314,14 @@ class Storage(SupportsMinMaxCharge):
         self.current_down_time = 0
 
     @lru_cache(maxsize=256)
-    def calc_marginal_cost(
+    def calculate_marginal_cost(
         self,
-        timestep: pd.Timestamp,
-        discharge: bool = True,
+        start: pd.Timestamp,
+        power: float,
     ) -> float:
-        if discharge:
+        if power > 0:
             variable_cost = (
-                self.variable_cost_discharge.at[timestep]
+                self.variable_cost_discharge.at[start]
                 if isinstance(self.variable_cost_discharge, pd.Series)
                 else self.variable_cost_discharge
             )
@@ -325,7 +329,7 @@ class Storage(SupportsMinMaxCharge):
 
         else:
             variable_cost = (
-                self.variable_cost_charge.at[timestep]
+                self.variable_cost_charge.at[start]
                 if isinstance(self.variable_cost_charge, pd.Series)
                 else self.variable_cost_charge
             )
@@ -352,23 +356,21 @@ class Storage(SupportsMinMaxCharge):
         return unit_dict
 
     def calculate_min_max_charge(
-        self, start: pd.Timestamp, end: pd.Timestamp
+        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series]:
         end_excl = end - self.index.freq
         duration = pd.Timedelta(self.index.freq).seconds / 3600
 
         base_load = self.outputs["energy"][start:end_excl]
+        capacity_pos = self.outputs["capacity_pos"][start:end_excl]
         capacity_neg = self.outputs["capacity_neg"][start:end_excl]
-
-        previous_output = self.get_output_before(start)
-        current_power_charge = min(previous_output, 0)
 
         min_power_charge = (
             self.min_power_charge[start:end_excl]
             if isinstance(self.min_power_charge, pd.Series)
             else self.min_power_charge
         )
-        min_power_charge -= base_load
+        min_power_charge -= base_load + capacity_pos
         min_power_charge = (min_power_charge).where(min_power_charge <= 0, 0)
 
         max_power_charge = (
@@ -382,7 +384,7 @@ class Storage(SupportsMinMaxCharge):
         )
 
         min_power_charge = min_power_charge.where(
-            min_power_charge > max_power_charge, 0
+            min_power_charge >= max_power_charge, 0
         )
 
         # restrict charging according to max_SOC
@@ -399,23 +401,21 @@ class Storage(SupportsMinMaxCharge):
         return min_power_charge, max_power_charge
 
     def calculate_min_max_discharge(
-        self, start: pd.Timestamp, end: pd.Timestamp
+        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series]:
         end_excl = end - self.index.freq
         duration = pd.Timedelta(self.index.freq).seconds / 3600
 
         base_load = self.outputs["energy"][start:end_excl]
         capacity_pos = self.outputs["capacity_pos"][start:end_excl]
-
-        previous_output = self.get_output_before(start)
-        current_power_discharge = max(previous_output, 0)
+        capacity_neg = self.outputs["capacity_neg"][start:end_excl]
 
         min_power_discharge = (
             self.min_power_discharge[start:end_excl]
             if isinstance(self.min_power_discharge, pd.Series)
             else self.min_power_discharge
         )
-        min_power_discharge -= base_load
+        min_power_discharge -= base_load + capacity_neg
         min_power_discharge = (min_power_discharge).where(min_power_discharge >= 0, 0)
 
         max_power_discharge = (

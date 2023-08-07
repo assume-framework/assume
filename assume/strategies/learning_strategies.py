@@ -6,7 +6,7 @@ import torch as th
 
 from assume.common.base import BaseUnit, LearningStrategy
 from assume.common.learning_utils import Actor, NormalActionNoise
-from assume.common.market_objects import MarketConfig, Product
+from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
 class RLStrategy(LearningStrategy):
@@ -14,7 +14,6 @@ class RLStrategy(LearningStrategy):
         super().__init__(*args, **kwargs)
 
         self.foresight = kwargs.get("foresight", 24)
-        self.current_time = None
 
         # RL agent parameters
         self.obs_dim = kwargs.get("observation_dimension", 50)
@@ -78,7 +77,7 @@ class RLStrategy(LearningStrategy):
         product_tuples: list[Product],
         data_dict: dict,
         **kwargs,
-    ):
+    ) -> Orderbook:
         bid_quantity_inflex, bid_price_inflex = 0, 0
         bid_quantity_flex, bid_price_flex = 0, 0
 

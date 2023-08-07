@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from assume.common.base import BaseStrategy, SupportsMinMaxCharge
-from assume.common.market_objects import MarketConfig, Product
+from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
 class flexableEOMStorage(BaseStrategy):
@@ -18,7 +18,7 @@ class flexableEOMStorage(BaseStrategy):
         product_tuples: list[Product],
         data_dict: dict,
         **kwargs,
-    ):
+    ) -> Orderbook:
         """
         Takes information from a unit that the unit operator manages and
         defines how it is dispatched to the market
@@ -101,8 +101,6 @@ class flexablePosCRMStorage(BaseStrategy):
         # check if kwargs contains crm_foresight argument
         self.foresight = pd.Timedelta(kwargs.get("crm_foresight", "4h"))
 
-        self.current_time = None
-
     def calculate_bids(
         self,
         unit: SupportsMinMaxCharge,
@@ -110,7 +108,7 @@ class flexablePosCRMStorage(BaseStrategy):
         data_dict: dict,
         product_tuples: list[Product],
         **kwargs,
-    ):
+    ) -> Orderbook:
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
 
@@ -138,7 +136,7 @@ class flexablePosCRMStorage(BaseStrategy):
             specific_revenue = get_specific_revenue(
                 unit=unit,
                 marginal_cost=marginal_cost,
-                current_time=self.current_time,
+                current_time=start,
                 foresight=self.foresight,
                 price_forecast=data_dict["price_forecast"],
             )
@@ -153,7 +151,7 @@ class flexablePosCRMStorage(BaseStrategy):
             energy_price = capacity_price / unit.current_SOC
 
             if market_config.product_type == "capacity_pos":
-                bids.appen(
+                bids.append(
                     {
                         "start_time": start,
                         "end_time": end,
@@ -186,7 +184,6 @@ class flexableNegCRMStorage(BaseStrategy):
         super().__init__(*args, **kwargs)
 
         self.foresight = pd.Timedelta(kwargs.get("crm_foresight", "4h"))
-        self.current_time = None
 
     def calculate_bids(
         self,
@@ -195,7 +192,7 @@ class flexableNegCRMStorage(BaseStrategy):
         product_tuples: list[Product],
         data_dict: dict,
         **kwargs,
-    ):
+    ) -> Orderbook:
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
 
