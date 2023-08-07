@@ -202,10 +202,6 @@ class WriteOutput(Role):
         df = pd.DataFrame.from_records(market_orders, index="start_time")
         del df["only_hours"]
         del df["agent_id"]
-        if "product" in df.columns:
-            del df[
-                "product"
-            ]  # had to delete products since it was returning an error Does not support tuples. Couldn't fix it.
         df["simulation"] = self.simulation_id
         df["market_id"] = market_id
         self.write_dfs["market_orders"].append(df)
