@@ -20,7 +20,29 @@ base_case_2019:
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
 
-eom_and_crm_case_2019:
+dam_case_2019:
+  start_date: 2019-01-01 12:00
+  end_date: 2019-02-01 00:00
+  time_step: 1h
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-01-01 12:00
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+eom_crm_case_2019:
   start_date: 2019-01-01 00:00
   end_date: 2019-02-01 00:00
   time_step: 1h

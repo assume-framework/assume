@@ -97,7 +97,7 @@ def pay_as_clear_opt(
     if len(solvers) < 1:
         raise Exception(f"None of {SOLVERS} are available")
 
-    solver = SolverFactory("glpk")
+    solver = SolverFactory(solvers[0])
 
     # Solve the model
     instance = model.create_instance()

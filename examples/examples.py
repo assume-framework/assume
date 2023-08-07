@@ -30,7 +30,11 @@ availabe_examples = {
     "large_2019_eom": {"scenario": "example_02", "study_case": "base_case_2019"},
     "large_2019_eom_crm": {
         "scenario": "example_02",
-        "study_case": "eom_and_crm_case_2019",
+        "study_case": "eom_crm_case_2019",
+    },
+    "large_2019_day_ahead": {
+        "scenario": "example_02",
+        "study_case": "dam_case_2019",
     },
     "rl": {"scenario": "example_01_rl", "study_case": "rl_case"},
     "small_with_heatpumps": {
