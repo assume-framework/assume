@@ -39,6 +39,8 @@ def pay_as_clear_opt(
     )
 
     model.P = pyo.Var(model.K, domain=pyo.Reals)
+    if "acceptance_ratio" in market_agent.marketconfig.additional_fields:
+        model.bid_used = pyo.Var(model.K, domain=pyo.Binary)
 
     model.energy_balance = pyo.ConstraintList()
     model.min_max_power = pyo.ConstraintList()
@@ -58,15 +60,19 @@ def pay_as_clear_opt(
             if "acceptance_ratio" in market_agent.marketconfig.additional_fields:
                 if order["volume"] > 0:
                     min_max_power_expr = (
-                        order["acceptance_ratio"] * order["volume"],
+                        model.bid_used[order["bid_id"]]
+                        * order["acceptance_ratio"]
+                        * order["volume"],
                         model.P[order["bid_id"]],
-                        order["volume"],
+                        model.bid_used[order["bid_id"]] * order["volume"],
                     )
                 else:
                     min_max_power_expr = (
-                        order["volume"],
+                        model.bid_used[order["bid_id"]] * order["volume"],
                         model.P[order["bid_id"]],
-                        order["acceptance_ratio"] * order["volume"],
+                        model.bid_used[order["bid_id"]]
+                        * order["acceptance_ratio"]
+                        * order["volume"],
                     )
 
             else:
@@ -143,5 +149,7 @@ def pay_as_clear_opt(
                 "only_hours": product[2],
             }
         )
+
+    market_agent.all_orders = []
 
     return accepted_orders, meta

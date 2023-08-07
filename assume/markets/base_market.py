@@ -254,8 +254,6 @@ class MarketRole(Role):
 
         await self.store_market_results(market_meta)
 
-        self.all_orders = []
-
         return self.market_result, market_meta
 
     async def store_order_book(self, orderbook: Orderbook):

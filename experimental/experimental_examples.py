@@ -8,7 +8,7 @@ from assume import World, load_scenario_folder
 log = logging.getLogger(__name__)
 
 os.makedirs("./experimental/outputs", exist_ok=True)
-EXPORT_CSV_PATH = str(getenv("EXPORT_CSV_PATH", "./experimental/outputs"))
+csv_path = str(getenv("EXPORT_CSV_PATH", "./experimental/outputs"))
 
 os.makedirs("./experimental/local_db", exist_ok=True)
 
@@ -31,15 +31,15 @@ if __name__ == "__main__":
     data_format = "timescale"  # "local_db" or "timescale"
 
     if data_format == "local_db":
-        DATABASE_URI = getenv(
+        db_url = getenv(
             "DATABASE_URI", f"sqlite:///./experimental/local_db/assume_db_{example}.db"
         )
     elif data_format == "timescale":
-        DATABASE_URI = getenv(
+        db_url = getenv(
             "DATABASE_URI", "postgresql://assume:assume@localhost:5432/assume"
         )
 
-    world = World(database_uri=DATABASE_URI, export_csv_path=EXPORT_CSV_PATH)
+    world = World(database_uri=db_url, export_csv_path=csv_path)
     load_scenario_folder(
         world,
         inputs_path="experimental/inputs",
