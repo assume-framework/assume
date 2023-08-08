@@ -3,6 +3,7 @@ from datetime import datetime
 
 import pandas as pd
 
+from assume.common.forecasts import Forecaster
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
@@ -34,6 +35,7 @@ class BaseUnit:
         bidding_strategies: dict[str, BaseStrategy],
         index: pd.DatetimeIndex,
         node: str,
+        forecaster: Forecaster = None,
     ):
         self.id = id
         self.unit_operator = unit_operator
@@ -46,6 +48,10 @@ class BaseUnit:
         self.outputs["rl_actions"] = pd.Series(0.0, index=self.index, dtype=object)
         self.outputs["rl_observations"] = pd.Series(0.0, index=self.index, dtype=object)
         self.outputs["rl_rewards"] = pd.Series(0.0, index=self.index, dtype=object)
+        if forecaster:
+            self.forecaster = forecaster
+        else:
+            self.forecaster = defaultdict(lambda: pd.Series(0.0, index=self.index))
 
     def reset(self):
         """Reset the unit to its initial state."""
@@ -55,7 +61,6 @@ class BaseUnit:
         self,
         market_config: MarketConfig,
         product_tuples: list[tuple],
-        data_dict=None,
     ) -> Orderbook:
         """Calculate the bids for the next time step."""
 
@@ -66,7 +71,6 @@ class BaseUnit:
             unit=self,
             market_config=market_config,
             product_tuples=product_tuples,
-            data_dict=data_dict,
         )
 
     def set_dispatch_plan(

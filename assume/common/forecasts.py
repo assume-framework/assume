@@ -1,107 +1,84 @@
 import logging
 
+import numpy as np
 import pandas as pd
-from mango import Role
 
 
-class ForecastProvider(Role):
+class Forecaster:
+    """
+    A Forecaster can provide timeseries for forecasts which are derived either from existing files, random noise or actual forecast methods.
+    """
+
+    def __getitem__(self, column: str) -> pd.Series:
+        return pd.Series(0, self.index)
+
+
+class CsvForecaster(Forecaster):
     def __init__(
-        self,
-        market_id: str,
-        forecasts_df: pd.DataFrame = None,
-        powerplants: dict[str, pd.Series] = None,
-        fuel_prices_df: dict[str, pd.Series] = None,
-        demand_df: float | pd.Series = 0.0,
-        availability: dict[str, pd.Series] = None,
+        self, index: pd.Series, powerplants: dict[str, pd.Series] = {}, *args, **kwargs
     ):
-        if fuel_prices_df is None:
-            fuel_prices_df = {}
-        if availability is None:
-            availability = {}
-        if powerplants is None:
-            powerplants = {}
-
-        super().__init__()
-
+        super().__init__(*args, **kwargs)
         self.logger = logging.getLogger(__name__)
-
-        self.market_id = market_id
-        self.forecasts_df = forecasts_df
-        self.fuel_prices_df = fuel_prices_df
         self.powerplants = powerplants
-        self.demand_df = demand_df
-        self.availability = availability
+        self.forecasts = pd.DataFrame(index=index)
+        self.index = index
 
-        self.forecasts = {}
+    def __getitem__(self, column: str) -> pd.Series:
+        if column not in self.forecasts.columns:
+            return pd.Series(0, self.index)
+        return self.forecasts[column]
 
-        if (
-            self.forecasts_df is not None
-            and "price_forecast" in self.forecasts_df.columns
-        ):
-            self.forecasts["price_forecast"] = self.forecasts_df["price_forecast"]
+    def set_forecast(self, data: pd.DataFrame | pd.Series | None, prefix=""):
+        if data is None:
+            return
+        elif isinstance(data, pd.DataFrame):
+            for column in data.columns:
+                if len(data.index) == 1:
+                    values = data[column].item()
+                else:
+                    values = data[column]
+                self.forecasts[prefix + column] = values
         else:
-            self.forecasts["price_forecast"] = self.calculate_price_forecast(
-                market_id=self.market_id
-            )
+            self.forecasts[prefix + data.name] = data
 
-        if (
-            self.forecasts_df is not None
-            and "residual_load_forecast" in self.forecasts_df.columns
-        ):
-            self.forecasts["residual_load_forecast"] = self.forecasts_df[
-                "residual_load_forecast"
-            ]
-        else:
+    def calc_forecast_if_needed(self):
+        for pp in self.powerplants.index:
+            col = f"availability_{pp}"
+            if col not in self.forecasts.columns:
+                self.forecasts[col] = 1
+        if "price_EOM" not in self.forecasts.columns:
+            self.forecasts["price_EOM"] = self.calculate_EOM_price_forecast()
+        if "residual_load_EOM" not in self.forecasts.columns:
             self.forecasts[
-                "residual_load_forecast"
-            ] = self.calculate_residual_demand_forecast(market_id=self.market_id)
+                "residual_load_EOM"
+            ] = self.calculate_residual_demand_forecast()
 
     def get_registered_market_participants(self, market_id):
         """
-        get information about market aprticipants to make accurate price forecast
+        get information about market participants to make accurate price forecast
         """
-
-        raise NotImplementedError(
+        self.logger.warn(
             "Functionality of using the different markets and specified registration for the price forecast is not implemented yet"
         )
+        return self.powerplants
 
-        # calculate price forecast
-
-    def calculate_residual_demand_forecast(self, market_id):
-        if market_id == "EOM":
-            vre_powerplants = self.powerplants[
-                self.powerplants["technology"].isin(
-                    ["wind_onshore", "wind_offshore", "solar"]
-                )
-            ].copy()
-
-            if self.availability is None:
-                return self.demand_df
-
-            vre_feed_in_df = pd.DataFrame(
-                index=self.demand_df.index, columns=vre_powerplants.index, data=0.0
+    def calculate_residual_demand_forecast(self):
+        vre_powerplants = self.powerplants[
+            self.powerplants["technology"].isin(
+                ["wind_onshore", "wind_offshore", "solar"]
             )
+        ].copy()
 
-            for pp, max_power in vre_powerplants["max_power"].items():
-                vre_feed_in_df[pp] = self.availability[pp] * max_power
+        vre_feed_in_df = pd.DataFrame(
+            index=self.index, columns=vre_powerplants.index, data=0.0
+        )
 
-            res_demand_df = self.demand_df - vre_feed_in_df.sum(axis=1)
+        for pp, max_power in vre_powerplants["max_power"].items():
+            vre_feed_in_df[pp] = self.forecasts[f"availability_{pp}"] * max_power
 
-            return res_demand_df
+        res_demand_df = self.forecasts["demand_EOM"] - vre_feed_in_df.sum(axis=1)
 
-        else:
-            self.logger.warning(
-                f"No residual load forecast for {market_id} is implemented yet. Please provide an external price forecast."
-            )
-
-    def calculate_price_forecast(self, market_id):
-        if market_id == "EOM":
-            self.logger.info(f"Preparing price forecast for {market_id}")
-            return self.calculate_EOM_price_forecast()
-        else:
-            self.logger.warning(
-                f"No price forecast for {market_id} is implemented yet. Please provide an external price forecast."
-            )
+        return res_demand_df
 
     def calculate_EOM_price_forecast(self):
         """
@@ -113,44 +90,39 @@ class ForecastProvider(Role):
 
         # calculate infeed of renewables and residual demand_df
         # check if max_power is a series or a float
-        powerplants = self.powerplants
+        marginal_costs = self.powerplants.apply(self.calculate_marginal_cost, axis=1).T
+        sorted_columns = marginal_costs.loc[self.index[0]].sort_values().index
+        col_availabilities = self.forecasts.columns[
+            self.forecasts.columns.str.startswith("availability")
+        ]
+        availabilities = self.forecasts[col_availabilities]
+        availabilities.columns = col_availabilities.str.replace("availability_", "")
 
-        marginal_costs = powerplants.apply(
-            self.calculate_marginal_cost, axis=1, fuel_prices=self.fuel_prices_df
-        )
-        marginal_costs = marginal_costs.T
-        if len(marginal_costs) == 1:
-            marginal_costs = marginal_costs.iloc[0].to_dict()
+        power = self.powerplants.max_power * availabilities
+        cumsum_power = power[sorted_columns].cumsum(axis=1)
+        # initialize empty price_forecast
+        price_forecast = pd.Series(index=self.index, data=0.0)
 
-        price_forecast = pd.Series(index=self.demand_df.index, data=0.0)
-        for i in range(len(self.demand_df)):
-            pp_df = powerplants.copy()
-            pp_df["marginal_cost"] = (
-                marginal_costs.iloc[i]
-                if isinstance(marginal_costs, pd.DataFrame)
-                else marginal_costs
-            )
-
-            # change max_power of power plant to the value in the availability dict
-            for pp, cf in self.availability.items():
-                pp_df.at[pp, "max_power"] = cf.iloc[i] * pp_df.at[pp, "max_power"]
-
-            mcp = self.calc_market_clearing_price(
-                powerplants=pp_df,
-                demand=self.demand_df.iat[i],
-            )
-            price_forecast.iat[i] = mcp
+        # start with most expensive type (highest cumulative power)
+        for col in sorted_columns[::-1]:
+            # find times which can still be provided with this technology
+            # and cheaper once
+            cheaper = cumsum_power[col] > self.forecasts["demand_EOM"]
+            # set the price of this technology as the forecast price
+            # for these times
+            price_forecast.loc[cheaper] = marginal_costs[col].loc[cheaper]
+            # repeat with the next cheaper technology
 
         return price_forecast
 
-    def calculate_marginal_cost(self, pp_dict, fuel_prices):
+    def calculate_marginal_cost(self, pp_series: pd.Series):
         """
         Calculates the marginal cost of a power plant based on the fuel costs and efficiencies of the power plant.
 
         Parameters
         ----------
-        pp_dict : dict
-            Dictionary of power plant data.
+        pp_series : dict
+            Series with power plant data.
         fuel_prices : dict
             Dictionary of fuel data.
         emission_factors : dict
@@ -162,56 +134,22 @@ class ForecastProvider(Role):
             Marginal cost of the power plant.
 
         """
+        fp_column = f"fuel_price_{pp_series.fuel_type}"
+        if fp_column in self.forecasts.columns:
+            fuel_price = self.forecasts[fp_column]
+        else:
+            fuel_price = pd.Series(0, index=self.index)
 
-        fuel_price = fuel_prices.get(pp_dict["fuel_type"], 0.0)
-        emission_factor = pp_dict["emission_factor"]
-        co2_price = fuel_prices["co2"]
+        emission_factor = pp_series["emission_factor"]
+        co2_price = self.forecasts["fuel_price_co2"]
 
-        fuel_cost = fuel_price / pp_dict["efficiency"]
-        emissions_cost = co2_price * emission_factor / pp_dict["efficiency"]
-        variable_cost = pp_dict["var_cost"] if "var_cost" in pp_dict else 0.0
+        fuel_cost = fuel_price / pp_series["efficiency"]
+        emissions_cost = co2_price * emission_factor / pp_series["efficiency"]
+        variable_cost = pp_series["var_cost"] if "var_cost" in pp_series else 0.0
 
         marginal_cost = fuel_cost + emissions_cost + variable_cost
 
         return marginal_cost
-
-    def calc_market_clearing_price(
-        self,
-        powerplants,
-        demand,
-    ):
-        """
-        Calculates the market clearing price of the merit order model.
-
-        Parameters
-        ----------
-        powerplants : pandas.DataFrame
-            Dataframe containing the power plant data.
-        demand : float
-            Demand of the system.
-
-        Returns
-        -------
-        mcp : float
-            Market clearing price.
-
-        """
-
-        # Sort the power plants on marginal cost
-        powerplants.sort_values("marginal_cost", inplace=True)
-
-        # Calculate the cumulative capacity
-        powerplants["cum_cap"] = powerplants["max_power"].cumsum()
-
-        # Calculate the market clearing price
-        if powerplants["cum_cap"].iat[-1] < demand:
-            mcp = powerplants["marginal_cost"].iat[-1]
-        else:
-            mcp = powerplants.loc[
-                powerplants["cum_cap"] >= demand, "marginal_cost"
-            ].iat[0]
-
-        return mcp
 
     def save_forecasts(self, path):
         """
@@ -223,9 +161,27 @@ class ForecastProvider(Role):
 
         """
         try:
-            forecast_df = pd.DataFrame(self.forecasts)
-            forecast_df.to_csv(f"{path}/forecasts_df.csv", index=True)
+            self.forecasts.to_csv(f"{path}/forecasts_df.csv", index=True)
         except ValueError:
             self.logger.error(
                 f"No forecasts for {self.market_id} provided, so none saved."
             )
+
+
+class RandomForecaster(CsvForecaster):
+    def __init__(
+        self,
+        index: pd.Series,
+        powerplants: dict[str, pd.Series] = {},
+        sigma: float = 0.2,
+        *args,
+        **kwargs,
+    ):
+        self.sigma = sigma
+        super().__init__(index, powerplants, *args, **kwargs)
+
+    def __getitem__(self, column: str) -> pd.Series:
+        if column not in self.forecasts.columns:
+            return pd.Series(0, self.index)
+        noise = np.random.normal(0, self.sigma, len(self.index))
+        return self.forecasts[column] * noise

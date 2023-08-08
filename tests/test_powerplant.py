@@ -86,7 +86,7 @@ def test_init_function(power_plant_1, power_plant_2, power_plant_3):
     assert power_plant_1.ramp_down == 1000
 
     assert (
-        power_plant_1.marginal_cost
+        power_plant_1.marginal_cost.to_dict()
         == pd.Series(
             [40.0, 52.0, 64.0, 66.0],
             index=pd.date_range("2022-01-01", periods=4, freq="H"),
@@ -95,7 +95,7 @@ def test_init_function(power_plant_1, power_plant_2, power_plant_3):
 
     assert power_plant_2.marginal_cost == 40.0
 
-    assert power_plant_3.marginal_cost is None
+    assert power_plant_3.marginal_cost == 40
 
 
 def test_reset_function(power_plant_1):

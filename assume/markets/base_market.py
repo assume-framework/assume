@@ -32,7 +32,6 @@ class MarketRole(Role):
         self.marketconfig.addr = self.context.addr
         self.marketconfig.aid = self.context.aid
         self.all_orders: list[Order] = []
-        self.market_result: Orderbook = []
         self.registered_agents: list[tuple[str, str]] = []
         self.open_slots = []
 
@@ -217,14 +216,12 @@ class MarketRole(Role):
 
     async def clear_market(self, market_products: list[MarketProduct]):
         # print("clear market", len(self.all_orders))
-        self.market_result, market_meta = self.marketconfig.market_mechanism(
+        market_result, market_meta = self.marketconfig.market_mechanism(
             self, market_products
         )
 
-        self.market_result.sort(key=itemgetter("agent_id"))
-        for agent, accepted_orderbook in groupby(
-            self.market_result, itemgetter("agent_id")
-        ):
+        market_result.sort(key=itemgetter("agent_id"))
+        for agent, accepted_orderbook in groupby(market_result, itemgetter("agent_id")):
             addr, aid = agent
             meta = {"sender_addr": self.context.addr, "sender_id": self.context.aid}
             closing: ClearingMessage = {
@@ -239,11 +236,11 @@ class MarketRole(Role):
                 acl_metadata=meta,
             )
         # store order book in db agent
-        if not self.market_result:
+        if not market_result:
             logger.warning(
                 f"{self.context.current_timestamp} Market result {market_products} for market {self.marketconfig.name} are empty!"
             )
-        await self.store_order_book(self.market_result)
+        await self.store_order_book(market_result)
 
         for meta in market_meta:
             logger.debug(
@@ -254,7 +251,7 @@ class MarketRole(Role):
 
         await self.store_market_results(market_meta)
 
-        return self.market_result, market_meta
+        return market_result, market_meta
 
     async def store_order_book(self, orderbook: Orderbook):
         # Send a message to the OutputRole to update data in the database

@@ -18,7 +18,6 @@ class complexEOMStorage(BaseStrategy):
         unit: SupportsMinMaxCharge,
         market_config: MarketConfig,
         product_tuples: list[Product],
-        data_dict: dict,
         **kwargs,
     ) -> Orderbook:
         """
@@ -33,7 +32,7 @@ class complexEOMStorage(BaseStrategy):
         start = product[0]
         end = product[1]
 
-        price_forecast = data_dict["price_forecast"]
+        price_forecast = unit.forecaster["price_forecast"]
         self.price_forecast = price_forecast
 
         min_power_charge, max_power_charge = unit.calculate_min_max_charge(start, end)

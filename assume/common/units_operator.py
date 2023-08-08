@@ -66,17 +66,13 @@ class UnitsOperator(Role):
 
     async def add_unit(
         self,
-        id: str,
-        unit_class: type[BaseUnit],
-        unit_params: dict,
-        index: pd.DatetimeIndex,
+        unit: BaseUnit,
     ):
         """
         Create a unit.
         """
-
-        self.units[id] = unit_class(id=id, index=index, **unit_params)
-        self.units[id].reset()
+        unit.reset()
+        self.units[unit.id] = unit
 
         db_aid = self.context.data_dict.get("output_agent_id")
         db_addr = self.context.data_dict.get("output_agent_addr")
@@ -85,7 +81,7 @@ class UnitsOperator(Role):
             message = {
                 "context": "write_results",
                 "type": "store_units",
-                "data": self.units[id].as_dict(),
+                "data": self.units[unit.id].as_dict(),
             }
             await self.context.send_acl_message(
                 receiver_id=db_aid,
@@ -285,7 +281,6 @@ class UnitsOperator(Role):
             product_bids = unit.calculate_bids(
                 market,
                 product_tuples=products,
-                data_dict=self.context.data_dict,
             )
             product = products[0]
             for i, order in enumerate(product_bids):
