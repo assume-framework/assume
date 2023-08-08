@@ -10,7 +10,7 @@ import yaml
 from mango import RoleAgent
 from tqdm import tqdm
 
-from assume.common import ForecastProvider
+from assume.common.forecasts import CsvForecaster, Forecaster, RandomForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.world import World
 
@@ -152,6 +152,7 @@ async def add_units(
     unit_type: str,
     callback: Callable[[str, dict], dict],
     world: World,
+    forecaster: Forecaster,
 ):
     """
     This function adds units to the world from a given dataframe.
@@ -178,6 +179,7 @@ async def add_units(
             unit_type=unit_type,
             unit_operator_id=unit_params["unit_operator"],
             unit_params=unit_params,
+            forecaster=forecaster,
         )
 
 
@@ -247,55 +249,8 @@ async def load_scenario_folder_async(
         file_name="heatpump_units",
     )
 
-    fuel_prices_df = load_file(
-        path=path,
-        config=config,
-        file_name="fuel_prices_df",
-        index=index,
-    )
-
-    temperature_df = load_file(
-        path=path, config=config, file_name="temperature", index=index
-    )
-
-    electricity_prices_df = load_file(
-        path=path, config=config, file_name="electricity_prices", index=index
-    )
-
-    demand_df = load_file(
-        path=path,
-        config=config,
-        file_name="demand_df",
-        index=index,
-    )
-
-    availability = load_file(
-        path=path,
-        config=config,
-        file_name="availability_df",
-        index=index,
-    )
-
-    cross_border_flows_df = load_file(
-        path=path,
-        config=config,
-        file_name="cross_border_flows",
-        index=index,
-    )
-    cross_border_flows_df
-
-    forecasts_df = load_file(
-        path=path,
-        config=config,
-        file_name="forecasts_df",
-        index=index,
-    )
-
     if powerplant_units is None or demand_units is None:
         raise ValueError("No power plant or no demand units were provided!")
-
-    if demand_df is None:
-        raise ValueError("No demand time series was provided!")
 
     # Initialize world
 
@@ -339,28 +294,68 @@ async def load_scenario_folder_async(
         )
 
     # add forecast providers for each market
-    logger.info("Adding forecast providers")
-    for market_id, market_config in world.markets.items():
-        if forecasts_df is not None and market_id in forecasts_df.columns:
-            market_price_forecast = forecasts_df[market_id]
-        else:
-            market_price_forecast = None
+    logger.info("Adding forecast")
+    forecaster = RandomForecaster(
+        index=index,
+        powerplants=powerplant_units,
+    )
 
-        forecast_provider = ForecastProvider(
-            market_id=market_id,
-            forecasts_df=market_price_forecast,
-            fuel_prices_df=fuel_prices_df,
-            availability=availability,
-            powerplants=powerplant_units,
-            demand_df=demand_df[f"demand_{market_id}"],
-        )
-        forecast_agent = RoleAgent(
-            world.container, suggested_aid=f"forecast_agent_{market_id}"
-        )
-        forecast_agent.add_role(forecast_provider)
-        world.forecast_providers[market_id] = forecast_provider
+    forecasts_df = load_file(
+        path=path,
+        config=config,
+        file_name="forecasts_df",
+        index=index,
+    )
+    forecaster.set_forecast(forecasts_df)
 
-        forecast_provider.save_forecasts(path)
+    demand_df = load_file(
+        path=path,
+        config=config,
+        file_name="demand_df",
+        index=index,
+    )
+    if demand_df is None:
+        raise ValueError("No demand time series was provided!")
+    forecaster.set_forecast(demand_df)
+
+    cross_border_flows_df = load_file(
+        path=path,
+        config=config,
+        file_name="cross_border_flows",
+        index=index,
+    )
+    forecaster.set_forecast(cross_border_flows_df)
+
+    availability = load_file(
+        path=path,
+        config=config,
+        file_name="availability_df",
+        index=index,
+    )
+    forecaster.set_forecast(availability, prefix="availability_")
+    electricity_prices_df = load_file(
+        path=path, config=config, file_name="electricity_prices", index=index
+    )
+    forecaster.set_forecast(electricity_prices_df)
+
+    price_forecast_df = load_file(
+        path=path, config=config, file_name="price_forecasts", index=index
+    )
+    forecaster.set_forecast(price_forecast_df, "price_")
+    forecaster.set_forecast(
+        load_file(
+            path=path,
+            config=config,
+            file_name="fuel_prices_df",
+            index=index,
+        ),
+        prefix="fuel_price_",
+    )
+    forecaster.set_forecast(
+        load_file(path=path, config=config, file_name="temperature", index=index)
+    )
+    forecaster.calc_forecast_if_needed()
+    forecaster.save_forecasts(path)
 
     # add the unit operators using unique unit operator names in the powerplants csv
     logger.info("Adding unit operators")
@@ -381,33 +376,20 @@ async def load_scenario_folder_async(
             [all_operators, heatpump_units.unit_operator.unique()]
         )
 
-    def unit_operator_callback(unit_operator):
-        unit_operator.context.data_dict["price_forecast"] = world.forecast_providers[
-            "EOM"
-        ].forecasts["price_forecast"]
-        unit_operator.context.data_dict[
-            "residual_load_forecast"
-        ] = world.forecast_providers["EOM"].forecasts["residual_load_forecast"]
-
     for company_name in set(all_operators):
         world.add_unit_operator(id=str(company_name))
-        unit_operator_callback(world.unit_operators[company_name])
 
     # add the units to corresponsing unit operators
     # if fuel prices are provided, add them to the unit params
     # if vre generation is provided, add them to the vre units
     # if we have RL strategy, add price forecast to unit_params
     def powerplant_callback(unit_name, unit_params):
-        unit_params["price_forecast"] = world.forecast_providers["EOM"].forecasts[
-            "price_forecast"
-        ]
+        unit_params["price_forecast"] = forecaster["price_EOM"]
+        fuel_price = forecaster[f'fuel_price_{unit_params["fuel_type"]}']
 
-        if (
-            fuel_prices_df is not None
-            and unit_params["fuel_type"] in fuel_prices_df.columns
-        ):
-            unit_params["fuel_price"] = fuel_prices_df[unit_params["fuel_type"]]
-            unit_params["co2_price"] = fuel_prices_df["co2"]
+        if fuel_price is not None:
+            unit_params["fuel_price"] = fuel_price
+        unit_params["co2_price"] = forecaster["fuel_price_co2"]
 
         if availability is not None and unit_name in availability.columns:
             unit_params["capacity_factor"] = availability[unit_name]
@@ -419,6 +401,7 @@ async def load_scenario_folder_async(
         "power_plant",
         powerplant_callback,
         world,
+        forecaster,
     )
 
     def heatpump_callback(unit_name, unit_params):
@@ -437,10 +420,11 @@ async def load_scenario_folder_async(
         "heatpump",
         heatpump_callback,
         world,
+        forecaster,
     )
 
     def storage_callback(unit_name, unit_params):
-        unit_params["price_forecast"] = world.forecast_providers["EOM"].forecasts_df
+        unit_params["price_forecast"] = forecaster["price_EOM"]
 
         return unit_params
 
@@ -449,6 +433,7 @@ async def load_scenario_folder_async(
         "storage",
         storage_callback,
         world,
+        forecaster,
     )
 
     def demand_callback(unit_name, unit_params):
@@ -462,6 +447,7 @@ async def load_scenario_folder_async(
         "demand",
         demand_callback,
         world,
+        forecaster,
     )
 
 

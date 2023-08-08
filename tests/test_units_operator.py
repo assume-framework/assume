@@ -38,19 +38,16 @@ async def units_operator() -> UnitsOperator:
 
     units_role.context.data_dict = {}
 
-    await units_role.add_unit(
-        "testdemand",
-        Demand,
-        {
-            "bidding_strategies": {"energy": NaiveStrategy()},
-            "technology": "energy",
-            "unit_operator": "test_operator",
-            "max_power": 1000,
-            "min_power": 0,
-            "volume": 1000,
-        },
-        index,
-    )
+    params_dict = {
+        "bidding_strategies": {"energy": NaiveStrategy()},
+        "technology": "energy",
+        "unit_operator": "test_operator",
+        "max_power": 1000,
+        "min_power": 0,
+        "volume": 1000,
+    }
+    unit = Demand("testdemand", index=index, **params_dict)
+    await units_role.add_unit(unit)
 
     yield units_role
 

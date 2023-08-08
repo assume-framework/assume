@@ -18,4 +18,3 @@ def test_world():
     assert world.market_operators.keys()
     assert world.markets.keys()
     assert world.unit_operators.keys()
-    assert world.forecast_providers.keys()

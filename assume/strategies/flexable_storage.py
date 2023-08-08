@@ -16,7 +16,6 @@ class flexableEOMStorage(BaseStrategy):
         unit: SupportsMinMaxCharge,
         market_config: MarketConfig,
         product_tuples: list[Product],
-        data_dict: dict,
         **kwargs,
     ) -> Orderbook:
         """
@@ -64,7 +63,7 @@ class flexableEOMStorage(BaseStrategy):
                 previous_power, min_power_charge[start], current_power_charge
             )
 
-            price_forecast = data_dict["price_forecast"]
+            price_forecast = unit.forecaster["price_forecast"]
 
             average_price = calculate_price_average(
                 unit=unit,
@@ -105,7 +104,6 @@ class flexablePosCRMStorage(BaseStrategy):
         self,
         unit: SupportsMinMaxCharge,
         market_config: MarketConfig,
-        data_dict: dict,
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
@@ -138,7 +136,7 @@ class flexablePosCRMStorage(BaseStrategy):
                 marginal_cost=marginal_cost,
                 current_time=start,
                 foresight=self.foresight,
-                price_forecast=data_dict["price_forecast"],
+                price_forecast=unit.forecaster["price_forecast"],
             )
 
             if specific_revenue >= 0:
@@ -190,7 +188,6 @@ class flexableNegCRMStorage(BaseStrategy):
         unit: SupportsMinMaxCharge,
         market_config: MarketConfig,
         product_tuples: list[Product],
-        data_dict: dict,
         **kwargs,
     ) -> Orderbook:
         start = product_tuples[0][0]

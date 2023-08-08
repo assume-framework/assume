@@ -17,7 +17,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from tqdm import tqdm
 
 from assume.common import (
-    ForecastProvider,
+    Forecaster,
     MarketConfig,
     UnitsOperator,
     WriteOutput,
@@ -37,7 +37,7 @@ from assume.strategies import (
     flexablePosCRM,
     flexablePosCRMStorage,
 )
-from assume.units import Demand, HeatPump, PowerPlant, Storage
+from assume.units import BaseUnit, Demand, HeatPump, PowerPlant, Storage
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
 stdout_handler = logging.StreamHandler(stream=sys.stdout)
@@ -84,8 +84,6 @@ class World:
         self.market_operators: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}
         self.unit_operators: dict[str, UnitsOperator] = {}
-        self.forecast_providers: dict[str, ForecastProvider] = {}
-
         self.unit_types = {
             "power_plant": PowerPlant,
             "heatpump": HeatPump,
@@ -230,6 +228,7 @@ class World:
         unit_type: str,
         unit_operator_id: str,
         unit_params: dict,
+        forecaster: Forecaster,
     ) -> None:
         """
         Create and add a new unit to the world.
@@ -248,7 +247,7 @@ class World:
             raise ValueError(f"invalid unit operator {unit_operator_id}")
 
         # provided unit type does not exist yet
-        unit_class = self.unit_types.get(unit_type)
+        unit_class: type[BaseUnit] = self.unit_types.get(unit_type)
         if unit_class is None:
             raise ValueError(f"invalid unit type {unit_type}")
 
@@ -270,12 +269,8 @@ class World:
         unit_params["bidding_strategies"] = bidding_strategies
 
         # create unit within the unit operator its associated with
-        await self.unit_operators[unit_operator_id].add_unit(
-            id=id,
-            unit_class=unit_class,
-            unit_params=unit_params,
-            index=self.index,
-        )
+        unit = unit_class(id=id, index=self.index, forecaster=forecaster, **unit_params)
+        await self.unit_operators[unit_operator_id].add_unit(unit)
 
     def add_market_operator(
         self,

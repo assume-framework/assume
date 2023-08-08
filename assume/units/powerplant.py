@@ -61,19 +61,10 @@ class PowerPlant(SupportsMinMax):
         self.partial_load_eff = partial_load_eff
         self.fuel_type = fuel_type
         if isinstance(fuel_price, pd.Series) and len(fuel_price) == 1:
-            fuel_price = fuel_price.item()
-        self.fuel_price = fuel_price
-        if isinstance(co2_price, pd.Series) and len(co2_price) == 1:
-            co2_price = co2_price.item()
-        self.co2_price = co2_price
-        self.price_forecast = (
-            pd.Series(0.0, index=self.index) if price_forecast.empty else price_forecast
-        )
-        self.res_demand_forecast = (
-            pd.Series(0.0, index=self.index)
-            if res_demand_forecast.empty
-            else res_demand_forecast
-        )
+            fuel_price = pd.Series(fuel_price.item(), index)
+        self.forecaster[f"fuel_price_{self.fuel_type}"] = fuel_price
+        if co2_price is not None:
+            self.forecaster["fuel_price_co2"] = co2_price
         self.emission_factor = emission_factor
 
         # check ramping enabled
@@ -99,23 +90,7 @@ class PowerPlant(SupportsMinMax):
         self.init_marginal_cost()
 
     def init_marginal_cost(self):
-        if not self.partial_load_eff and not isinstance(self.fuel_price, pd.Series):
-            fuel_prices = {self.fuel_type: self.fuel_price, "co2": self.co2_price}
-            self.marginal_cost = self.calc_simple_marginal_cost(fuel_prices)
-        elif not self.partial_load_eff:
-            # calculate the marginal cost for the whole time series of fuel prices
-            fuel_prices = pd.concat([self.fuel_price, self.co2_price], axis=1)
-            # rename columns of fuel_prices to fule_type and co2
-            fuel_prices.columns = [self.fuel_type, "co2"]
-            self.marginal_cost = pd.DataFrame(
-                index=self.index, columns=["marginal_cost"], data=0.0
-            )
-            self.marginal_cost["marginal_cost"] = fuel_prices.apply(
-                self.calc_simple_marginal_cost, axis=1
-            )
-            self.marginal_cost = self.marginal_cost["marginal_cost"].to_dict()
-        else:
-            self.marginal_cost = None
+        self.marginal_cost = self.calc_simple_marginal_cost()
 
     def reset(self):
         """Reset the unit to its initial state."""
@@ -184,11 +159,11 @@ class PowerPlant(SupportsMinMax):
 
     def calc_simple_marginal_cost(
         self,
-        fuel_prices: dict,
     ):
+        fuel_price = self.forecaster[f"fuel_price_{self.fuel_type}"]
         marginal_cost = (
-            fuel_prices[self.fuel_type] / self.efficiency
-            + fuel_prices["co2"] * self.emission_factor / self.efficiency
+            fuel_price / self.efficiency
+            + self.forecaster["fuel_price_co2"] * self.emission_factor / self.efficiency
             + self.fixed_cost
         )
 
@@ -204,11 +179,6 @@ class PowerPlant(SupportsMinMax):
             self.fuel_price.at[timestep]
             if isinstance(self.fuel_price, pd.Series)
             else self.fuel_price
-        )
-        co2_price = (
-            self.co2_price.at[timestep]
-            if isinstance(self.co2_price, pd.Series)
-            else self.co2_price
         )
 
         capacity_ratio = power_output / self.max_power
@@ -244,6 +214,7 @@ class PowerPlant(SupportsMinMax):
             eta_loss = 0
 
         efficiency = self.efficiency - eta_loss
+        co2_price = self.forecaster["price_co2"].at[timestamp]
 
         marginal_cost = (
             fuel_price / efficiency
@@ -288,10 +259,7 @@ class PowerPlant(SupportsMinMax):
 
     def calculate_marginal_cost(self, start: datetime, power: float):
         if self.marginal_cost is not None:
-            if isinstance(self.marginal_cost, dict):
-                return self.marginal_cost[start]
-            else:
-                return self.marginal_cost
+            return self.marginal_cost[start]
         else:
             return self.calc_marginal_cost_with_partial_eff(
                 power_output=power,

@@ -69,7 +69,6 @@ class RLStrategy(LearningStrategy):
         unit: SupportsMinMax,
         market_config: MarketConfig,
         product_tuples: list[Product],
-        data_dict: dict,
         **kwargs,
     ) -> Orderbook:
         bid_quantity_inflex, bid_price_inflex = 0, 0
@@ -91,7 +90,6 @@ class RLStrategy(LearningStrategy):
             unit=unit,
             start=start,
             end=end,
-            data_dict=data_dict,
         )
 
         actions = self.get_actions(next_observation)
@@ -165,7 +163,6 @@ class RLStrategy(LearningStrategy):
         unit: SupportsMinMax,
         start: datetime,
         end: datetime,
-        data_dict: dict,
     ):
         end_excl = end - unit.index.freq
 
@@ -177,14 +174,15 @@ class RLStrategy(LearningStrategy):
             (self.foresight - 1) * unit.index.freq
         )  # in metric of market
 
-        if end_excl + forecast_len > data_dict["residual_load_forecast"].index[-1]:
+        if end_excl + forecast_len > unit.forecaster["residual_load_EOM"].index[-1]:
             scaled_res_load_forecast = (
-                data_dict["residual_load_forecast"].loc[start:].values / self.max_demand
+                unit.forecaster["residual_load_EOM"].loc[start:].values
+                / self.max_demand
             )
             scaled_res_load_forecast = np.concatenate(
                 [
                     scaled_res_load_forecast,
-                    data_dict["residual_load_forecast"].iloc[
+                    unit.forecaster["residual_load_EOM"].iloc[
                         : self.foresight - len(scaled_res_load_forecast)
                     ],
                 ]
@@ -192,20 +190,21 @@ class RLStrategy(LearningStrategy):
 
         else:
             scaled_res_load_forecast = (
-                data_dict["residual_load_forecast"]
+                unit.forecaster["residual_load_EOM"]
                 .loc[start : end_excl + forecast_len]
                 .values
                 / self.max_demand
             )
 
-        if end_excl + forecast_len > data_dict["price_forecast"].index[-1]:
+        if end_excl + forecast_len > unit.forecaster["price_forecast"].index[-1]:
             scaled_price_forecast = (
-                data_dict["price_forecast"].loc[start:].values / self.max_bid_price
+                unit.forecaster["price_forecast"].loc[start:].values
+                / self.max_bid_price
             )
             scaled_price_forecast = np.concatenate(
                 [
                     scaled_price_forecast,
-                    data_dict["price_forecast"].iloc[
+                    unit.forecaster["price_forecast"].iloc[
                         : self.foresight - len(scaled_price_forecast)
                     ],
                 ]
@@ -213,7 +212,9 @@ class RLStrategy(LearningStrategy):
 
         else:
             scaled_price_forecast = (
-                data_dict["price_forecast"].loc[start : end_excl + forecast_len].values
+                unit.forecaster["price_forecast"]
+                .loc[start : end_excl + forecast_len]
+                .values
                 / self.max_bid_price
             )
 
