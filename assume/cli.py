@@ -84,5 +84,5 @@ def cli(args=None):
 
 if __name__ == "__main__":
     # cli()
-    args = "-s example_01c -c crm_case -db postgresql://assume:assume@localhost:5432/assume"
+    args = "-s example_01_rl -db postgresql://assume:assume@localhost:5432/assume"
     cli(args.split(" "))

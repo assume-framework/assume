@@ -80,15 +80,13 @@ class BaseUnit:
             end_excl = end - self.index.freq
             self.outputs[product_type].loc[start:end_excl] += order["volume"]
 
-            self.calculate_cashflow(start=start, end=end, clearing_price=order["price"])
+        self.calculate_cashflow(orderbook)
 
-            self.bidding_strategies[product_type].calculate_reward(
-                start=start,
-                end=end,
-                product_type=product_type,
-                clearing_price=order["price"],
-                unit=self,
-            )
+        self.bidding_strategies[product_type].calculate_reward(
+            unit=self,
+            marketconfig=market_config,
+            orderbook=orderbook,
+        )
 
     def execute_current_dispatch(
         self,
@@ -119,12 +117,7 @@ class BaseUnit:
             "unit_type": "base_unit",
         }
 
-    def calculate_cashflow(
-        self,
-        start,
-        end,
-        clearing_price,
-    ):
+    def calculate_cashflow(self, orderbook: Orderbook):
         pass
 
 
@@ -254,11 +247,9 @@ class BaseStrategy:
 
     def calculate_reward(
         self,
-        start,
-        end,
-        product_type,
-        clearing_price,
         unit,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
     ):
         pass
 

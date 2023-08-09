@@ -3,7 +3,9 @@ from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
 
+import numpy as np
 import pandas as pd
+import torch as th
 from mango import Role
 from mango.messages.message import Performatives
 
@@ -128,6 +130,7 @@ class UnitsOperator(Role):
         self.valid_orders.extend(orderbook)
         marketconfig = self.registered_markets[content["market_id"]]
         self.set_unit_dispatch(orderbook, marketconfig)
+        self.write_learning_params(orderbook, marketconfig)
         self.write_actual_dispatch()
 
     def set_unit_dispatch(self, orderbook, market_config):
@@ -199,8 +202,6 @@ class UnitsOperator(Role):
         self.valid_orders = list(
             filter(lambda x: x["end_time"] >= now, self.valid_orders)
         )
-
-        self.write_learning_params(now)
 
     async def submit_bids(self, opening: OpeningMessage):
         """
@@ -290,15 +291,32 @@ class UnitsOperator(Role):
 
         return orderbook
 
-    def write_learning_params(self, start):
+    def write_learning_params(self, orderbook: Orderbook, marketconfig: MarketConfig):
         """
         sends the current rl_strategy update to the output agent
         """
-
+        start = orderbook[0]["start_time"]
+        learning_unit_count = 1
+        action_dimension = 2
         unit_rl_strategy_dfs = []
+
+        all_observations = []
+        all_rewards = []
+        learning_unit_count = 0
+        for unit in self.units.values():
+            bidding_strategy = unit.bidding_strategies.get(marketconfig.product_type)
+            if isinstance(bidding_strategy, LearningStrategy):
+                learning_unit_count += 1
+        all_actions = th.zeros(
+            size=(learning_unit_count, action_dimension), device="cpu"
+        )
+        i = 0
+
         for unit_id, unit in self.units.items():
             # rl only for energy market for now!
-            if isinstance(unit.bidding_strategies.get("energy"), LearningStrategy):
+            if isinstance(
+                unit.bidding_strategies.get(marketconfig.product_type), LearningStrategy
+            ):
                 data = pd.DataFrame(
                     {
                         "profit": unit.outputs["profit"].loc[start],
@@ -309,9 +327,28 @@ class UnitsOperator(Role):
                 )
                 data["unit"] = unit_id
                 unit_rl_strategy_dfs.append(data)
+                all_observations.append(
+                    unit.outputs["rl_samples_ObsActRew"][start]["observations"]
+                )
+                all_actions[i, :] = unit.outputs["rl_samples_ObsActRew"][start][
+                    "actions"
+                ]
+                all_rewards.append(
+                    unit.outputs["rl_samples_ObsActRew"][start]["reward"]
+                )
+
+                i += 1
+            # convert all_actions list of tensor to numpy 2D array
+
+        all_observations = np.array(all_observations)
+        all_actions = all_actions.squeeze().cpu().numpy()
+        all_rewards = np.array(all_rewards)
+
+        data = (all_observations, all_actions, all_rewards)
 
         if len(unit_rl_strategy_dfs):
             learning_data = pd.concat(unit_rl_strategy_dfs)
+            # TODO send observation and action also to output agent if neede din visualisation of grafana
 
             db_aid = self.context.data_dict.get("output_agent_id")
             db_addr = self.context.data_dict.get("output_agent_addr")
@@ -325,7 +362,7 @@ class UnitsOperator(Role):
                         "data": learning_data[["profit", "reward", "regret", "unit"]],
                     },
                 )
-            """
+
             learning_role_id = "learning_agent_1"
             learning_role_addr = ("localhost", 9099)
             if learning_role_id and learning_role_addr:
@@ -335,9 +372,7 @@ class UnitsOperator(Role):
                     content={
                         "context": "rl_training",
                         "type": "replay_buffer",
-                        "data": learning_data[
-                            ["reward", "current_observation", "action"]
-                        ],
+                        "start": start,
+                        "data": data,
                     },
                 )
-            """

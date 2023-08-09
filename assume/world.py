@@ -26,6 +26,7 @@ from assume.common import (
 )
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import (
+    LearningStrategy,
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
     NaiveStrategy,
@@ -61,6 +62,7 @@ class World:
         self.logger = logging.getLogger(__name__)
         self.addr = (ifac_addr, port)
         self.container = None
+        self.learning_agent_count = 0
 
         self.export_csv_path = export_csv_path
         # intialize db connection at beginning of simulation
@@ -103,15 +105,16 @@ class World:
             "naive_pos_reserve": NaivePosReserveStrategy,
             "otc_strategy": OTCStrategy,
         }
+
         try:
             from assume.strategies.learning_strategies import RLStrategy
 
             self.bidding_types["learning"] = RLStrategy
-        except ImportError:
+        except ImportError as e:
             self.logger.error(
-                "You are trying to use reinforcement learning strategies, but the their import failed. Check if you have all required packages installed"
+                "You are trying to use reinforcement learning strategies, but the their import failed. Check if you have all required packages installed: %s",
+                e,
             )
-            pass
         self.clearing_mechanisms = clearing_mechanisms
         self.clearing_mechanisms.update(additional_clearing_mechanisms)
         nest_asyncio.apply()
@@ -256,6 +259,8 @@ class World:
                 bidding_strategies[product_type] = self.bidding_types[strategy](
                     **self.learning_config
                 )
+                if isinstance(bidding_strategies[product_type], LearningStrategy):
+                    self.learning_agent_count += 1
             except KeyError as e:
                 self.logger.error(f"Invalid bidding strategy {strategy}")
                 raise e

@@ -106,8 +106,10 @@ class Learning(Role):
         """
 
         if content.get("type") == "replay_buffer":
+            start = content.get("start")
+            data = content.get("data")
             self.buffer.add(
-                obs=content.get("data").current_observation,
-                actions=content.get("data").action,
-                reward=content.get("data").current_observation,
+                obs=data[0],
+                actions=data[1],
+                reward=data[2],
             )

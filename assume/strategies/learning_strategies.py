@@ -4,10 +4,13 @@ import numpy as np
 import pandas as pd
 import torch as th
 
-from assume.common.market_objects import MarketConfig
-from assume.reinforcement_learning.learning_utils import Actor, NormalActionNoise
-from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
-from assume.units.base_unit import BaseUnit
+from assume.common.base import BaseUnit, LearningStrategy
+from assume.common.market_objects import MarketConfig, Orderbook, Product
+from assume.reinforcement_learning.learning_utils import (
+    Actor,
+    NormalActionNoise,
+    observation_dict,
+)
 
 
 class RLStrategy(LearningStrategy):
@@ -65,12 +68,7 @@ class RLStrategy(LearningStrategy):
     def reset(
         self,
     ):
-        self.curr_observation = None
-        self.next_observation = None
-
-        self.curr_action = None
         self.curr_reward = None
-        self.curr_experience = []
 
     def calculate_bids(
         self,
@@ -86,6 +84,10 @@ class RLStrategy(LearningStrategy):
         start = product_tuples[0][0]
         end = product_tuples[0][1]
         min_power, max_power = unit.calculate_min_max_power(start, end)
+        min_power = min_power[start]
+        max_power = max_power[start]
+
+        unit.outputs["rl_samples_ObsActRew"][start] = {}
 
         # =============================================================================
         # Calculate bid-prices from action output of RL strategies
@@ -93,16 +95,17 @@ class RLStrategy(LearningStrategy):
         # artificially force inflex_bid to be the smaller price
         # =============================================================================
 
-        self.next_observation = self.create_observation(
+        next_observation = self.create_observation(
             unit=unit,
             start=start,
             end=end,
             data_dict=data_dict,
         )
 
-        self.curr_action = self.get_actions()
+        actions = self.get_actions(next_observation)
+        unit.outputs["rl_samples_ObsActRew"][start]["actions"] = actions
 
-        bid_prices = self.curr_action * self.max_bid_price
+        bid_prices = actions * self.max_bid_price
 
         # =============================================================================
         # Powerplant is either on, or is able to turn on
@@ -133,11 +136,11 @@ class RLStrategy(LearningStrategy):
             },
         ]
 
-        self.curr_observation = self.next_observation
+        unit.outputs["rl_samples_ObsActRew"][start]["observations"] = next_observation
 
         return bids
 
-    def get_actions(self):
+    def get_actions(self, next_observation):
         if self.learning_mode:
             if self.collect_initial_experience:
                 curr_action = (
@@ -149,17 +152,17 @@ class RLStrategy(LearningStrategy):
                 )
 
                 curr_action += th.tensor(
-                    self.next_observation[-1],
+                    next_observation[-1],
                     device=self.device,
                     dtype=self.float_type,
                 )
             else:
-                curr_action = self.actor(self.next_observation).detach()
+                curr_action = self.actor(next_observation).detach()
                 curr_action += th.tensor(
                     self.action_noise.noise(), device=self.device, dtype=self.float_type
                 )
         else:
-            curr_action = self.actor(self.next_observation).detach()
+            curr_action = self.actor(next_observation).detach()
 
         curr_action = curr_action.clamp(-1, 1)
 
@@ -246,12 +249,17 @@ class RLStrategy(LearningStrategy):
 
     def calculate_reward(
         self,
-        start,
-        end,
-        product_type,
-        clearing_price,
         unit,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
     ):
+        start = orderbook[0]["start_time"]
+        end = orderbook[0]["end_time"]
+
+        # TODO does only work for single-market pay as clear
+
+        clearing_price = orderbook[0]["price"]
+        product_type = marketconfig.product_type
         # if not self.learning_mode:
         #    return
 
@@ -265,7 +273,7 @@ class RLStrategy(LearningStrategy):
         if unit.marginal_cost is not None:
             marginal_cost = (
                 unit.marginal_cost[start]
-                if isinstance(self.marginal_cost, dict)
+                if isinstance(unit.marginal_cost, dict)
                 else unit.marginal_cost
             )
         else:
@@ -307,18 +315,8 @@ class RLStrategy(LearningStrategy):
         regret_scale = 0.2
 
         reward = (profit - regret_scale * opportunity_cost) * scaling
-        unit.outputs["rewards"].loc[start:end_excl] = reward
         unit.outputs["profit"].loc[start:end_excl] = profit
+        unit.outputs["reward"].loc[start:end_excl] = reward
         unit.outputs["regret"].loc[start:end_excl] = opportunity_cost
-        # store tensor in unit
-        #
 
-        """
-        class ObsActRew(TypedDict):
-            observation: list[th.Tensor]
-            action: list[th.Tensor]
-            reward: list[th.Tensor]
-
-        unit.outputs["rl_samples_ObsActRew"] = dict[list[Marketproduct], ObsActRew]
-        """
-        self.curr_reward = reward
+        unit.outputs["rl_samples_ObsActRew"][start]["reward"] = reward

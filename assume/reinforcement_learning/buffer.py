@@ -105,15 +105,9 @@ class ReplayBuffer:
 
     def add(self, obs, actions, reward):
         # copying all to avoid modification
-        obs = obs.cpu().numpy()
-        actions = actions.cpu().numpy()
-
-        self.observations[self.pos] = np.array(obs[0], dtype=self.np_float_type).copy()
-        self.next_observations[self.pos] = np.array(
-            obs[1], dtype=self.np_float_type
-        ).copy()
-        self.actions[self.pos] = np.array(actions, dtype=self.np_float_type).copy()
-        self.rewards[self.pos] = np.array(reward, dtype=self.np_float_type).copy()
+        self.observations[self.pos] = obs[0].copy()
+        self.actions[self.pos] = actions.copy()
+        self.rewards[self.pos] = reward.copy()
 
         self.pos += 1
         if self.pos == self.buffer_size:
@@ -122,12 +116,12 @@ class ReplayBuffer:
 
     def sample(self, batch_size):
         upper_bound = self.buffer_size if self.full else self.pos
-        batch_inds = np.random.randint(0, upper_bound, size=batch_size)
+        batch_inds = np.random.randint(0, upper_bound - 1, size=batch_size)
 
         data = (
             self.observations[batch_inds, :, :],
             self.actions[batch_inds, :, :],
-            self.next_observations[batch_inds, :, :],
+            self.observations[batch_inds + 1, :, :],
             self.rewards[batch_inds],
         )
 
