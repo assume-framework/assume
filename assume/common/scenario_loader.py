@@ -494,7 +494,7 @@ def load_scenario_folder(
             buffer_size=1000000,
             obs_dim=world.rl_agent.roles[0].obs_dim,
             act_dim=world.rl_agent.roles[0].act_dim,
-            n_rl_agents=1,
+            n_rl_units=1,
             device=world.rl_agent.roles[0].device,
         )
 

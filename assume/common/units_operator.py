@@ -329,6 +329,10 @@ class UnitsOperator(Role):
                             "profit": unit.outputs["profit"].loc[start],
                             "reward": unit.outputs["reward"].loc[start],
                             "regret": unit.outputs["regret"].loc[start],
+                            "current_observation": unit.outputs[
+                                "current_observation"
+                            ].loc[start],
+                            "action": unit.outputs["action"].loc[start],
                         },
                         index=[start],
                     )
@@ -347,6 +351,22 @@ class UnitsOperator(Role):
                     content={
                         "context": "write_results",
                         "type": "rl_learning_params",
-                        "data": learning_data,
+                        "data": learning_data[["profit", "reward", "regret", "unit"]],
                     },
                 )
+            """
+            learning_role_id = "learning_agent_1"
+            learning_role_addr = ("localhost", 9099)
+            if learning_role_id and learning_role_addr:
+                self.context.schedule_instant_acl_message(
+                    receiver_id=learning_role_id,
+                    receiver_addr=learning_role_addr,
+                    content={
+                        "context": "rl_training",
+                        "type": "replay_buffer",
+                        "data": learning_data[
+                            ["reward", "current_observation", "action"]
+                        ],
+                    },
+                )
+            """

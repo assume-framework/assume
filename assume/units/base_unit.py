@@ -40,6 +40,8 @@ class BaseUnit:
         self.bidding_strategies: dict[str, "BaseStrategy"] = bidding_strategies
         self.index = index
         self.outputs = defaultdict(lambda: pd.Series(0.0, index=self.index))
+        self.outputs_current_observation = None
+        self.outputs_action = None
 
     def calculate_operational_window(
         self,

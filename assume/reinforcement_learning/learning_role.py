@@ -87,3 +87,27 @@ class Learning(Role):
         """
 
         # self.float_type = th.float16 if self.device.type == "cuda" else th.float
+
+    def setup(self):
+        # subscribe to messages for handling the training process
+        self.context.subscribe_message(
+            self,
+            self.handle_message,
+            lambda content, meta: content.get("context") == "rl_training",
+        )
+
+    def handle_message(self, content, meta):
+        """
+        Handles the incoming messages and performs corresponding actions.
+
+        Args:
+            content (dict): The content of the message.
+            meta: The metadata associated with the message. (not needed yet)
+        """
+
+        if content.get("type") == "replay_buffer":
+            self.buffer.add(
+                obs=content.get("data").current_observation,
+                actions=content.get("data").action,
+                reward=content.get("data").current_observation,
+            )

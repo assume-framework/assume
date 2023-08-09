@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import torch as th
 
-from assume.common.learning_utils import Actor, NormalActionNoise
 from assume.common.market_objects import MarketConfig
+from assume.reinforcement_learning.learning_utils import Actor, NormalActionNoise
 from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
 from assume.units.base_unit import BaseUnit
 
@@ -297,5 +297,15 @@ class RLStrategy(BaseStrategy):
         unit.outputs["rewards"].loc[start:end_excl] = reward
         unit.outputs["profit"].loc[start:end_excl] = profit
         unit.outputs["regret"].loc[start:end_excl] = opportunity_cost
+        # store tensor in unit
+        #
 
+        """
+        class ObsActRew(TypedDict):
+            observation: list[th.Tensor]
+            action: list[th.Tensor]
+            reward: list[th.Tensor]
+
+        unit.outputs["rl_samples_ObsActRew"] = dict[list[Marketproduct], ObsActRew]
+        """
         self.curr_reward = reward

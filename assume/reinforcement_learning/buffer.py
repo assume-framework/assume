@@ -28,7 +28,7 @@ class ReplayBufferSamples(NamedTuple):
 
 
 class ReplayBuffer:
-    def __init__(self, buffer_size, obs_dim, act_dim, n_rl_agents, device):
+    def __init__(self, buffer_size, obs_dim, act_dim, n_rl_units, device):
         self.buffer_size = buffer_size
         self.obs_dim = obs_dim
         self.act_dim = act_dim
@@ -42,20 +42,20 @@ class ReplayBuffer:
         self.np_float_type = np.float32
         self.th_float_type = th.float
 
-        self.n_rl_agents = n_rl_agents
+        self.n_rl_units = n_rl_units
 
         self.observations = np.zeros(
-            (self.buffer_size, self.n_rl_agents, self.obs_dim), dtype=self.np_float_type
+            (self.buffer_size, self.n_rl_units, self.obs_dim), dtype=self.np_float_type
         )
         self.next_observations = np.zeros(
-            (self.buffer_size, self.n_rl_agents, self.obs_dim), dtype=self.np_float_type
+            (self.buffer_size, self.n_rl_units, self.obs_dim), dtype=self.np_float_type
         )
 
         self.actions = np.zeros(
-            (self.buffer_size, self.n_rl_agents, self.act_dim), dtype=self.np_float_type
+            (self.buffer_size, self.n_rl_units, self.act_dim), dtype=self.np_float_type
         )
         self.rewards = np.zeros(
-            (self.buffer_size, self.n_rl_agents), dtype=self.np_float_type
+            (self.buffer_size, self.n_rl_units), dtype=self.np_float_type
         )
 
         # Check that the replay buffer can fit into the memory
