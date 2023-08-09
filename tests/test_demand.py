@@ -32,10 +32,12 @@ def test_demand():
         150,
         price=2000,
     )
-    op_window = dem.calculate_operational_window("energy", product_tuple)
+    start = product_tuple[0]
+    end = product_tuple[1]
+    min_power, max_power = dem.calculate_min_max_power(start, end)
 
-    assert op_window["states"]["max_power"]["volume"] == -150
-    assert op_window["states"]["max_power"]["cost"] == 2000
+    assert max_power.max() == -150
+    assert dem.calculate_marginal_cost(start, max_power.max()) == 2000
 
     mc = MarketConfig(
         "Test",
@@ -45,9 +47,11 @@ def test_demand():
         [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
     )
 
-    bids = dem.calculate_bids(mc, product_tuple)
+    bids = dem.calculate_bids(mc, [product_tuple])
 
     for bid in bids:
+        assert "start_time" in bid.keys()
+        assert "end_time" in bid.keys()
         assert "price" in bid.keys()
         assert "volume" in bid.keys()
     assert len(bids) == 1
@@ -82,13 +86,17 @@ def test_demand_series():
         demand,
         price=price,
     )
-    op_window = dem.calculate_operational_window("energy", product_tuple)
+    start = product_tuple[0]
+    end = product_tuple[1]
+    min_power, max_power = dem.calculate_min_max_power(start, end)
 
     # power should be the highest demand which is used throughout the period
     # in our case 80 MW
-    assert op_window["states"]["max_power"]["volume"] == -80
-    # price is (0 + 1000) / 2 for this period
-    assert op_window["states"]["max_power"]["cost"] == 500
+    max_power = max_power.max()
+    assert max_power == -80
+
+    assert dem.calculate_marginal_cost(start, max_power) == 0
+    assert dem.calculate_marginal_cost(end, max_power) == 1000
 
     mc = MarketConfig(
         "Test",
@@ -98,14 +106,14 @@ def test_demand_series():
         [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
     )
 
-    bids = dem.calculate_bids(mc, product_tuple)
+    bids = dem.calculate_bids(mc, [product_tuple])
 
     for bid in bids:
         assert "price" in bid.keys()
         assert "volume" in bid.keys()
     assert len(bids) == 1
-    assert bids[0]["volume"] == op_window["states"]["max_power"]["volume"]
-    assert bids[0]["price"] == op_window["states"]["max_power"]["cost"]
+    assert bids[0]["volume"] == max_power
+    assert bids[0]["price"] == price[1]
 
 
 if __name__ == "__main__":

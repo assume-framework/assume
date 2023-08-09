@@ -4,69 +4,51 @@ from assume.strategies import (
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
     NaiveStrategy,
-    OperationalWindow,
 )
 
 start = datetime(2023, 7, 1)
 end = datetime(2023, 7, 2)
-operational_window: OperationalWindow = {
-    "window": (start, end),
-    "states": {
-        "current_power": {
-            "volume": 100,
-            "cost": 1,
-        },
-        "min_power": {
-            "volume": 80,
-            "cost": 2,
-        },
-        "max_power": {
-            "volume": 400,
-            "cost": 3,
-        },
-        "neg_reserve": {
-            "volume": 10,
-            "cost": 4,
-        },
-        "pos_reserve": {
-            "volume": 20,
-            "cost": 5,
-        },
-    },
-}
 
 
-def test_naive_strategy():
+def test_naive_strategy(mock_market_config, mock_supports_minmax):
     strategy = NaiveStrategy()
-    bids = strategy.calculate_bids(None, operational_window, None)
-    mp = operational_window["states"]["max_power"]
-    assert bids[0]["price"] == mp["cost"]
-    assert bids[0]["volume"] == mp["volume"]
-    assert bids == [{"price": 3, "volume": 400}]
+    mc = mock_market_config
+    product_tuples = [(start, end, None)]
+    bids = strategy.calculate_bids(
+        mock_supports_minmax, mc, product_tuples=product_tuples
+    )
+    assert bids[0]["price"] == 3
+    assert bids[0]["volume"] == 400
 
 
-def test_naive_pos_strategy():
+def test_naive_pos_strategy(mock_market_config, mock_supports_minmax):
     """
     calculates bids for
     """
     strategy = NaivePosReserveStrategy()
-    bids = strategy.calculate_bids(None, operational_window, None)
-
+    mc = mock_market_config
+    product_tuples = [(start, end, None)]
+    bids = strategy.calculate_bids(
+        mock_supports_minmax, mc, product_tuples=product_tuples
+    )
     assert bids[0]["price"] == 0
-    assert bids[0]["volume"] == operational_window["states"]["pos_reserve"]["volume"]
-    assert bids == [{"price": 0, "volume": 20}]
+    assert bids[0]["volume"] == 400
+    assert len(bids) == 1
 
 
-def test_naive_neg_strategy():
+def test_naive_neg_strategy(mock_market_config, mock_supports_minmax):
     strategy = NaiveNegReserveStrategy()
-    bids = strategy.calculate_bids(None, operational_window, None)
-
+    mc = mock_market_config
+    unit = mock_supports_minmax
+    product_tuples = [(start, end, None)]
+    bids = strategy.calculate_bids(unit, mc, product_tuples=product_tuples)
     assert bids[0]["price"] == 0
-    assert bids[0]["volume"] == operational_window["states"]["neg_reserve"]["volume"]
-    assert bids == [{"price": 0, "volume": 10}]
+    assert bids[0]["volume"] == 100
+    assert len(bids) == 1
 
 
 if __name__ == "__main__":
-    test_naive_strategy()
-    test_naive_neg_strategy()
-    test_naive_pos_strategy()
+    # run pytest and enable prints
+    import pytest
+
+    pytest.main(["-s", __file__])

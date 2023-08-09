@@ -11,7 +11,7 @@ class ForecastProvider(Role):
         forecasts_df: pd.DataFrame = None,
         powerplants: dict[str, pd.Series] = None,
         fuel_prices_df: dict[str, pd.Series] = None,
-        demand_df: float or pd.Series = 0.0,
+        demand_df: float | pd.Series = 0.0,
         availability: dict[str, pd.Series] = None,
     ):
         if fuel_prices_df is None:
@@ -127,7 +127,7 @@ class ForecastProvider(Role):
             pp_df = powerplants.copy()
             pp_df["marginal_cost"] = (
                 marginal_costs.iloc[i]
-                if type(marginal_costs) == pd.DataFrame
+                if isinstance(marginal_costs, pd.DataFrame)
                 else marginal_costs
             )
 

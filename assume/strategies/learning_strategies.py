@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
 import torch as th
@@ -8,13 +10,11 @@ from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
 from assume.units.base_unit import BaseUnit
 
 
-class RLStrategy(BaseStrategy):
+class RLStrategy(LearningStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.is_learning_strategy = True
         self.foresight = kwargs.get("foresight", 24)
-        self.current_time = None
 
         # RL agent parameters
         self.obs_dim = kwargs.get("observation_dimension", 50)
@@ -75,12 +75,17 @@ class RLStrategy(BaseStrategy):
     def calculate_bids(
         self,
         unit: BaseUnit,
-        operational_window: OperationalWindow,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
         data_dict: dict,
         **kwargs,
-    ):
+    ) -> Orderbook:
         bid_quantity_inflex, bid_price_inflex = 0, 0
         bid_quantity_flex, bid_price_flex = 0, 0
+
+        start = product_tuples[0][0]
+        end = product_tuples[0][1]
+        min_power, max_power = unit.calculate_min_max_power(start, end)
 
         # =============================================================================
         # Calculate bid-prices from action output of RL strategies
@@ -90,7 +95,8 @@ class RLStrategy(BaseStrategy):
 
         self.next_observation = self.create_observation(
             unit=unit,
-            operational_window=operational_window,
+            start=start,
+            end=end,
             data_dict=data_dict,
         )
 
@@ -102,20 +108,29 @@ class RLStrategy(BaseStrategy):
         # Powerplant is either on, or is able to turn on
         # Calculating possible bid amount
         # =============================================================================
-        bid_quantity_inflex = operational_window["states"]["min_power"]["volume"]
+        bid_quantity_inflex = min_power
         bid_price_inflex = min(bid_prices)
 
         # Flex-bid price formulation
         if unit.current_status:
-            bid_quantity_flex = (
-                operational_window["states"]["max_power"]["volume"]
-                - bid_quantity_inflex
-            )
+            bid_quantity_flex = max_power - bid_quantity_inflex
             bid_price_flex = max(bid_prices)
 
         bids = [
-            {"price": bid_price_inflex, "volume": bid_quantity_inflex},
-            {"price": bid_price_flex, "volume": bid_quantity_flex},
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "price": bid_price_inflex,
+                "volume": bid_quantity_inflex,
+            },
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "price": bid_price_flex,
+                "volume": bid_quantity_flex,
+            },
         ]
 
         self.curr_observation = self.next_observation
@@ -153,11 +168,11 @@ class RLStrategy(BaseStrategy):
     def create_observation(
         self,
         unit,
-        operational_window,
-        data_dict,
+        start: datetime,
+        end: datetime,
+        data_dict: dict,
     ):
-        start = operational_window["window"][0]
-        end_excl = operational_window["window"][1] - unit.index.freq
+        end_excl = end - unit.index.freq
 
         # in rl_units operator in ASSUME
         # TODO consider that the last forecast_length time steps cant be used
@@ -207,13 +222,11 @@ class RLStrategy(BaseStrategy):
                 / self.max_bid_price
             )
 
+        current_volume = unit.get_output_before(start)
+        current_price = unit.calc_marginal_cost_with_partial_eff(current_volume, start)
         # scale unit outpus
-        scaled_total_capacity = (
-            operational_window["states"]["current_power"]["volume"] / unit.max_power
-        )
-        scaled_marginal_cost = (
-            operational_window["states"]["current_power"]["cost"] / self.max_bid_price
-        )
+        scaled_total_capacity = current_volume / unit.max_power
+        scaled_marginal_cost = current_price / self.max_bid_price
 
         observation = np.concatenate(
             [
@@ -239,10 +252,10 @@ class RLStrategy(BaseStrategy):
         clearing_price,
         unit,
     ):
-        if not self.is_learning_strategy:
-            return
+        # if not self.learning_mode:
+        #    return
 
-        # gets market feedback from set_dispacth
+        # gets market feedback from set_dispatch
         # based on calculated market success in dispatch we calculate the profit
 
         end_excl = end - unit.index.freq
@@ -252,7 +265,7 @@ class RLStrategy(BaseStrategy):
         if unit.marginal_cost is not None:
             marginal_cost = (
                 unit.marginal_cost[start]
-                if type(unit.marginal_cost) is dict
+                if isinstance(self.marginal_cost, dict)
                 else unit.marginal_cost
             )
         else:

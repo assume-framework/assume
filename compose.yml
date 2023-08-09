@@ -9,6 +9,8 @@ services:
       - POSTGRES_PASSWORD=assume
       - POSTGRES_DB=assume
       - TS_TUNE_MAX_CONNS=500
+    volumes:
+      - ./assume-db:/var/lib/postgresql
     ports:
       - 5432:5432
     deploy:

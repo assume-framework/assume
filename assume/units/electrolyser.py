@@ -1,7 +1,6 @@
 import pandas as pd
 
-from assume.strategies import OperationalWindow
-from assume.units.base_unit import BaseUnit
+from assume.common.base import BaseUnit
 
 
 class Electrolyser(BaseUnit):
@@ -10,11 +9,11 @@ class Electrolyser(BaseUnit):
         id: str,
         technology: str,
         bidding_strategies: dict,
-        max_hydrogen_output: float or pd.Series,
-        min_hydrogen_output: float or pd.Series,
-        efficiency: float or pd.Series,
-        volume: float or pd.Series = 1000,
-        electricity_price: float or pd.Series = 3000,
+        max_hydrogen_output: float | pd.Series,
+        min_hydrogen_output: float | pd.Series,
+        efficiency: float | pd.Series,
+        volume: float | pd.Series = 1000,
+        electricity_price: float | pd.Series = 3000,
         ramp_up: float = -1,
         ramp_down: float = 1,
         fixed_cost: float = 0,
@@ -59,11 +58,9 @@ class Electrolyser(BaseUnit):
         self.current_status = 1
         self.current_down_time = self.min_down_time
 
-    def calculate_operational_window(
-        self,
-        product_type: str,
-        product_tuple: tuple,
-    ) -> OperationalWindow:
+    def calculate_min_max_power(
+        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
+    ) -> tuple[float]:
         """Calculate the operational window for the next time step.
 
         Returns
@@ -71,10 +68,6 @@ class Electrolyser(BaseUnit):
         operational_window : dict
             Dictionary containing the operational window for the next time step.
         """
-        start, end, only_hours = product_tuple
-        start = pd.Timestamp(start)
-        end = pd.Timestamp(end)
-
         if self.current_status == 0 and self.current_down_time < self.min_down_time:
             return None
 
@@ -93,56 +86,43 @@ class Electrolyser(BaseUnit):
         min_power = min_power + self.neg_capacity_reserve.at[start]
 
         # Adjust for ramp up speed
-        if self.ramp_up != -1:
-            max_power = min(current_power_input + self.ramp_up, max_power)
-        else:
-            max_power = max_power
+        max_power = min(current_power_input + self.ramp_up, max_power)
 
         # Adjust max_power if sold positive reserve capacity on control reserve market
         max_power = max_power - self.outputs["pos_capacity"].at[start]
 
-        operational_window = {
-            "window": (start, end),
-            "states": {
-                "current_power": {
-                    "power": current_power_input,
-                    "marginal_cost": self.calc_marginal_cost(start),
-                },
-                "min_power": {
-                    "power": min_power,
-                    "marginal_cost": self.calc_marginal_cost(start),
-                },
-                "max_power": {
-                    "power": max_power,
-                    "marginal_cost": self.calc_marginal_cost(start),
-                },
-            },
-        }
+        return min_power, max_power
 
-        return operational_window
-
-    def set_dispatch_plan(
+    def execute_current_dispatch(
         self,
-        dispatch_plan: dict,
         start: pd.Timestamp,
         end: pd.Timestamp,
-        product_type: str,
     ):
-        # TODO checks should be at execute_current_dispatch - see powerplant
-        if dispatch_plan["total_capacity"] > self.min_power:
-            self.current_status = 1
-            self.current_down_time = 0
-            self.outputs["hydrogen"].at[current_time] = dispatch_plan["total_capacity"]
+        """
+        check if the total dispatch plan is feasible
+        This checks if the market feedback is feasible for the given unit.
+        And sets the closest dispatch if not.
+        The end param should be inclusive.
+        """
+        end_excl = end - self.index.freq
 
-        elif dispatch_plan["total_capacity"] < self.min_power:
+        if self.outputs["energy"][start:end_excl].min() < self.min_power:
+            self.outputs["energy"].loc[start:end_excl] = 0
+            self.outputs["hydrogen"].loc[start:end_excl] = 0
             self.current_status = 0
             self.current_down_time += 1
-            self.outputs["hydrogen"].at[current_time] = 0
+        else:
+            self.current_status = 1
+            self.current_down_time = 0
+            self.outputs["hydrogen"].loc[start:end_excl] = self.outputs["energy"][
+                start:end_excl
+            ]
+        return self.outputs["energy"][start:end_excl]
 
     def calc_marginal_cost(
         self,
         timestep: pd.Timestamp,
-    ) -> float or pd.Series:
+    ) -> float | pd.Series:
         """
         Calculate the marginal cost for the electrolyser at the given time step.
 
@@ -153,12 +133,12 @@ class Electrolyser(BaseUnit):
 
         Returns
         -------
-        bid_price : float or pd.Series
+        bid_price : float | pd.Series
             The calculated bid price.
         """
         efficiency_t = self.efficiency.loc[timestep]
 
-        if type(self.electricity_price) == pd.Series:
+        if isinstance(self.electricity_price, pd.Series):
             bid_price = self.electricity_price.at[timestep] / efficiency_t
         else:
             bid_price = self.electricity_price / efficiency_t

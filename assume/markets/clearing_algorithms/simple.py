@@ -2,11 +2,6 @@ import logging
 from itertools import groupby
 from operator import itemgetter
 
-try:
-    import torch as th
-except ImportError:
-    th = None
-
 from assume.common.market_objects import MarketProduct, Order, Orderbook
 from assume.markets.base_market import MarketRole
 
@@ -22,7 +17,7 @@ def pay_as_clear(
     rejected_orders: Orderbook = []
     clear_price = 0
     meta = []
-    market_agent.all_orders = sorted(market_agent.all_orders, key=market_getter)
+    market_agent.all_orders.sort(key=market_getter)
     for product, product_orders in groupby(market_agent.all_orders, market_getter):
         accepted_product_orders: Orderbook = []
         if product not in market_products:
@@ -31,23 +26,21 @@ def pay_as_clear(
             continue
 
         product_orders = list(product_orders)
-        demand_orders = filter(lambda x: x["volume"] < 0, product_orders)
-        supply_orders = filter(lambda x: x["volume"] > 0, product_orders)
+        demand_orders = list(filter(lambda x: x["volume"] < 0, product_orders))
+        supply_orders = list(filter(lambda x: x["volume"] > 0, product_orders))
         # volume 0 is ignored/invalid
 
         # generation
-        sorted_supply_orders = sorted(supply_orders, key=itemgetter("price"))
+        supply_orders.sort(key=itemgetter("price"))
         # demand
-        sorted_demand_orders = sorted(
-            demand_orders, key=itemgetter("price"), reverse=True
-        )
+        demand_orders.sort(key=itemgetter("price"), reverse=True)
         dem_vol, gen_vol = 0, 0
         # the following algorithm is inspired by one bar for generation and one for demand
         # add generation for currents demand price, until it matches demand
         # generation above it has to be sold for the lower price (or not at all)
-        for i in range(len(sorted_demand_orders)):
-            demand_order: Order = sorted_demand_orders[i]
-            if not sorted_supply_orders:
+        for i in range(len(demand_orders)):
+            demand_order: Order = demand_orders[i]
+            if not supply_orders:
                 # if no more generation - reject left over demand
                 rejected_orders.append(demand_order)
                 continue
@@ -58,8 +51,8 @@ def pay_as_clear(
             to_commit: Orderbook = []
 
             # and add supply until the demand order is matched
-            while sorted_supply_orders and gen_vol < dem_vol:
-                supply_order = sorted_supply_orders.pop(0)
+            while supply_orders and gen_vol < dem_vol:
+                supply_order = supply_orders.pop(0)
                 if supply_order["price"] <= demand_order["price"]:
                     to_commit.append(supply_order)
                     gen_vol += supply_order["volume"]
@@ -88,7 +81,7 @@ def pay_as_clear(
                 gen_vol -= diff
 
                 # add left over to supply_orders again
-                sorted_supply_orders.insert(0, split_supply_order)
+                supply_orders.insert(0, split_supply_order)
             # else: diff == 0 perfect match
 
             accepted_product_orders.append(demand_order)
@@ -100,8 +93,6 @@ def pay_as_clear(
         )
         if accepted_supply_orders:
             clear_price = max(map(itemgetter("price"), accepted_supply_orders))
-            if th is not None and isinstance(clear_price, th.Tensor):
-                clear_price = clear_price.item()
         else:
             clear_price = 0
         for order in accepted_product_orders:
@@ -157,24 +148,22 @@ def pay_as_bid(
             continue
 
         product_orders = list(product_orders)
-        demand_orders = filter(lambda x: x["volume"] < 0, product_orders)
-        supply_orders = filter(lambda x: x["volume"] > 0, product_orders)
+        demand_orders = list(filter(lambda x: x["volume"] < 0, product_orders))
+        supply_orders = list(filter(lambda x: x["volume"] > 0, product_orders))
         # volume 0 is ignored/invalid
 
         # generation
-        sorted_supply_orders = sorted(supply_orders, key=lambda i: i["price"])
+        supply_orders.sort(key=itemgetter("price"))
         # demand
-        sorted_demand_orders = sorted(
-            demand_orders, key=lambda i: i["price"], reverse=True
-        )
+        demand_orders.sort(key=itemgetter("price"), reverse=True)
 
         dem_vol, gen_vol = 0, 0
         # the following algorithm is inspired by one bar for generation and one for demand
         # add generation for currents demand price, until it matches demand
         # generation above it has to be sold for the lower price (or not at all)
-        for i in range(len(sorted_demand_orders)):
-            demand_order: Order = sorted_demand_orders[i]
-            if not sorted_supply_orders:
+        for i in range(len(demand_orders)):
+            demand_order: Order = demand_orders[i]
+            if not supply_orders:
                 # if no more generation - reject left over demand
                 rejected_orders.append(demand_order)
                 continue
@@ -182,8 +171,8 @@ def pay_as_bid(
             dem_vol += -demand_order["volume"]
             to_commit: Orderbook = []
 
-            while sorted_supply_orders and gen_vol < dem_vol:
-                supply_order = sorted_supply_orders.pop(0)
+            while supply_orders and gen_vol < dem_vol:
+                supply_order = supply_orders.pop(0)
                 if supply_order["price"] <= demand_order["price"]:
                     to_commit.append(supply_order)
                     gen_vol += supply_order["volume"]
@@ -211,7 +200,7 @@ def pay_as_bid(
                 # add left over to supply_orders again
                 gen_vol -= diff
 
-                sorted_supply_orders.insert(0, split_supply_order)
+                supply_orders.insert(0, split_supply_order)
             # else: diff == 0 perfect match
 
             accepted_orders.append(demand_order)

@@ -1,29 +1,42 @@
-from assume.common.market_objects import MarketConfig
-from assume.strategies.base_strategy import BaseStrategy, OperationalWindow
-from assume.units.base_unit import BaseUnit
+from datetime import datetime
+
+from assume.common.base import BaseStrategy, BaseUnit, SupportsMinMax
+from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
 class NaiveStrategy(BaseStrategy):
-    def __init__(self, *args, scale_firm_power_capacity=1.0, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.scale = scale_firm_power_capacity
-
     def calculate_bids(
         self,
-        unit: BaseUnit,
-        operational_window: OperationalWindow,
+        unit: SupportsMinMax,
         market_config: MarketConfig,
+        product_tuples: list[Product],
         **kwargs,
-    ):
-        """
-        Takes information from a unit that the unit operator manages and
-        defines how it is dispatched to the market
+    ) -> Orderbook:
+        start = product_tuples[0][0]
+        end_all = product_tuples[-1][1]
+        previous_power = unit.get_output_before(start)
+        min_power, max_power = unit.calculate_min_max_power(start, end_all)
 
-        Return: volume, price
-        """
-        price = operational_window["states"]["max_power"]["cost"]
-        volume = operational_window["states"]["max_power"]["volume"]
-        bids = [{"price": price, "volume": volume}]
+        bids = []
+        for product in product_tuples:
+            start = product[0]
+            current_power = unit.outputs["energy"].at[start]
+            marginal_cost = unit.calculate_marginal_cost(start, previous_power)
+            volume = unit.calculate_ramp(
+                previous_power, max_power[start], current_power
+            )
+            bids.append(
+                {
+                    "start_time": product[0],
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": marginal_cost,
+                    "volume": volume,
+                }
+            )
+
+            previous_power = volume + current_power
+
         return bids
 
 
@@ -33,20 +46,42 @@ class NaivePosReserveStrategy(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: BaseUnit,
-        operational_window: OperationalWindow,
+        unit: SupportsMinMax,
         market_config: MarketConfig,
+        product_tuples: list[Product],
         **kwargs,
-    ):
+    ) -> Orderbook:
         """
         Takes information from a unit that the unit operator manages and
         defines how it is dispatched to the market
 
         Return: volume, price
         """
-        price = 0
-        volume = operational_window["states"]["pos_reserve"]["volume"]
-        bids = [{"price": price, "volume": volume}]
+        start = product_tuples[0][0]
+        end_all = product_tuples[-1][1]
+        previous_power = unit.get_output_before(start)
+        min_power, max_power = unit.calculate_min_max_power(
+            start, end_all, market_config.product_type
+        )
+
+        bids = []
+        for product in product_tuples:
+            start = product[0]
+            current_power = unit.outputs["energy"].at[start]
+            volume = unit.calculate_ramp(
+                previous_power, max_power[start], current_power
+            )
+            price = 0
+            bids.append(
+                {
+                    "start_time": product[0],
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": price,
+                    "volume": volume,
+                }
+            )
+            previous_power = volume + current_power
         return bids
 
 
@@ -56,18 +91,41 @@ class NaiveNegReserveStrategy(BaseStrategy):
 
     def calculate_bids(
         self,
-        unit: BaseUnit,
-        operational_window: OperationalWindow,
+        unit: SupportsMinMax,
         market_config: MarketConfig,
+        product_tuples: list[Product],
         **kwargs,
-    ):
+    ) -> Orderbook:
         """
         Takes information from a unit that the unit operator manages and
         defines how it is dispatched to the market
 
         Return: volume, price
         """
-        price = 0
-        volume = operational_window["states"]["neg_reserve"]["volume"]
-        bids = [{"price": price, "volume": volume}]
+        start = product_tuples[0][0]
+        end_all = product_tuples[-1][1]
+        previous_power = unit.get_output_before(start)
+        min_power, max_power = unit.calculate_min_max_power(
+            start, end_all, market_config.product_type
+        )
+
+        bids = []
+        for product in product_tuples:
+            start = product[0]
+            previous_power = unit.get_output_before(start)
+            current_power = unit.outputs["energy"].at[start]
+            volume = unit.calculate_ramp(
+                previous_power, min_power[start], current_power
+            )
+            price = 0
+            bids.append(
+                {
+                    "start_time": product[0],
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": price,
+                    "volume": volume,
+                }
+            )
+            previous_power = volume + current_power
         return bids

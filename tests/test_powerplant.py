@@ -8,7 +8,7 @@ from assume.units import PowerPlant
 
 
 @pytest.fixture
-def power_plant_1():
+def power_plant_1() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
     return PowerPlant(
         id="test_pp",
@@ -32,7 +32,7 @@ def power_plant_1():
 
 
 @pytest.fixture
-def power_plant_2():
+def power_plant_2() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
     return PowerPlant(
         id="test_pp",
@@ -52,7 +52,7 @@ def power_plant_2():
 
 
 @pytest.fixture
-def power_plant_3():
+def power_plant_3() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
     return PowerPlant(
         id="test_pp",
@@ -134,20 +134,25 @@ def test_calculate_operational_window(power_plant_1):
         pd.Timestamp("2022-01-01 01:00:00"),
         None,
     )
-    operational_window = power_plant_1.calculate_operational_window(
-        product_tuple=product_tuple, product_type="energy"
+    start = product_tuple[0]
+    end = product_tuple[1]
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type="energy"
     )
 
-    assert operational_window["states"]["min_power"]["volume"] == 200
-    assert operational_window["states"]["min_power"]["cost"] == 40.0
+    min_cost = power_plant_1.calculate_marginal_cost(start, min_power[start])
+    max_cost = power_plant_1.calculate_marginal_cost(start, max_power[start])
 
-    assert operational_window["states"]["max_power"]["volume"] == 1000
-    assert operational_window["states"]["max_power"]["cost"] == 40
+    assert min_power[start] == 200
+    assert min_cost == 40.0
 
-    assert operational_window["states"]["current_power"]["volume"] == 0
+    assert max_power[start] == 1000
+    assert max_cost == 40
+
+    assert power_plant_1.outputs["energy"].at[start] == 0
 
 
-def test_powerplant_feedback(power_plant_1):
+def test_powerplant_feedback(power_plant_1, mock_market_config):
     power_plant_1.reset()
 
     product_tuple = (
@@ -156,110 +161,111 @@ def test_powerplant_feedback(power_plant_1):
         None,
     )
     product_type = "energy"
-
-    operational_window = power_plant_1.calculate_operational_window(
-        product_tuple=product_tuple, product_type=product_type
+    start = product_tuple[0]
+    end = product_tuple[1]
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type="energy"
     )
+    min_cost = power_plant_1.calculate_marginal_cost(start, min_power[start])
+    max_cost = power_plant_1.calculate_marginal_cost(start, max_power[start])
 
-    assert operational_window["states"]["min_power"]["volume"] == 200
-    assert operational_window["states"]["min_power"]["cost"] == 40
-    assert operational_window["states"]["max_power"]["volume"] == 1000
-    assert operational_window["states"]["max_power"]["cost"] == 40
-    assert operational_window["states"]["current_power"]["volume"] == 0
+    assert min_power[start] == 200
+    assert min_cost == 40.0
+
+    assert max_power[start] == 1000
+    assert max_cost == 40
+    assert power_plant_1.outputs["energy"].at[start] == 0
+
+    orderbook = [
+        {
+            "start_time": start,
+            "end_time": end,
+            "only_hours": None,
+            "price": min_cost,
+            "volume": min_power[start],
+        }
+    ]
 
     # min_power gets accepted
-    dispatch_plan = {"total_power": 200}
-    power_plant_1.set_dispatch_plan(
-        dispatch_plan, 20, product_tuple[0], product_tuple[1], product_type
-    )
+    mc = mock_market_config
+    power_plant_1.set_dispatch_plan(mc, orderbook)
 
     # second market request for same interval
-    operational_window = power_plant_1.calculate_operational_window(
-        product_tuple=product_tuple, product_type=product_type
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type="energy"
     )
 
     # we do not need additional min_power, as our runtime requirement is fulfilled
-    assert operational_window["states"]["min_power"]["volume"] == 0
-    assert operational_window["states"]["min_power"]["cost"] == 40
+    assert min_power[start] == 0
     # we can not bid the maximum anymore, because we already provide energy on the other market
-    assert operational_window["states"]["max_power"]["volume"] == 800
-    assert operational_window["states"]["max_power"]["cost"] == 40
+    assert max_power[start] == 800
 
-    # second market for other interval
-    product_tuple = (
-        pd.Timestamp("2022-01-01 01:00:00"),
-        pd.Timestamp("2022-01-01 02:00:00"),
-        None,
-    )
-    operational_window = power_plant_1.calculate_operational_window(
-        product_tuple=product_tuple, product_type=product_type
+    # second market request for next interval
+    start = pd.Timestamp("2022-01-01 01:00:00")
+    end = pd.Timestamp("2022-01-01 02:00:00")
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type="energy"
     )
 
     # now we can bid max_power and need min_power again
-    assert operational_window["states"]["min_power"]["volume"] == 200
-    assert operational_window["states"]["max_power"]["volume"] == 1000
+    assert min_power[start] == 200
+    assert max_power[start] == 1000
 
 
 def test_powerplant_ramping(power_plant_1):
     power_plant_1.ramp_down = 100
     power_plant_1.ramp_up = 200
     power_plant_1.reset()
-    product_tuple = (
-        datetime(2022, 1, 1, 0),
-        datetime(2022, 1, 1, 1),
-        None,
-    )
-    product_type = "energy"
 
-    operational_window = power_plant_1.calculate_operational_window(
-        product_tuple=product_tuple, product_type=product_type
+    start = datetime(2022, 1, 1, 0)
+    end = datetime(2022, 1, 1, 1)
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type="energy"
     )
 
-    assert operational_window["states"]["min_power"]["volume"] == 200
-    assert operational_window["states"]["min_power"]["cost"] == 40
-    assert operational_window["states"]["max_power"]["volume"] == 200
-    assert operational_window["states"]["max_power"]["cost"] == 40
-    assert operational_window["states"]["current_power"]["volume"] == 0
+    min_cost = power_plant_1.calculate_marginal_cost(start, min_power[start])
+    max_cost = power_plant_1.calculate_marginal_cost(start, max_power[start])
+    max_ramp = power_plant_1.calculate_ramp(0, max_power[start])
+
+    assert min_power[start] == 200
+    assert min_cost == 40.0
+
+    assert max_ramp == 200
+    assert max_cost == 40
 
     # min_power gets accepted
-    dispatch_plan = {"total_power": 200}
-    power_plant_1.set_dispatch_plan(
-        dispatch_plan, 20, product_tuple[0], product_tuple[1], product_type
-    )
+    end_excl = end - power_plant_1.index.freq
+    power_plant_1.outputs["energy"].loc[start:end_excl] += 200
 
     # next hour
-    product_tuple = (
-        datetime(2022, 1, 1, 1),
-        datetime(2022, 1, 1, 2),
-        None,
-    )
+    start = datetime(2022, 1, 1, 1)
+    end = datetime(2022, 1, 1, 2)
 
-    operational_window = power_plant_1.calculate_operational_window(
-        product_tuple=product_tuple, product_type=product_type
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type="energy"
     )
+    min_ramp = power_plant_1.calculate_ramp(200, min_power[start])
+    max_ramp = power_plant_1.calculate_ramp(200, max_power[start])
 
-    assert operational_window["states"]["min_power"]["volume"] == 200
-    assert operational_window["states"]["max_power"]["volume"] == 400
+    assert min_ramp == 200
+    assert max_ramp == 400
 
     # accept max_power
-    dispatch_plan = {"total_power": 400}
-    power_plant_1.set_dispatch_plan(
-        dispatch_plan, 20, product_tuple[0], product_tuple[1], product_type
-    )
+    power_plant_1.outputs["energy"].loc[start:end_excl] += 400
 
     # next hour
-    product_tuple = (
-        datetime(2022, 1, 1, 2),
-        datetime(2022, 1, 1, 3),
-        None,
+    start = datetime(2022, 1, 1, 2)
+    end = datetime(2022, 1, 1, 3)
+
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type="energy"
     )
 
-    operational_window = power_plant_1.calculate_operational_window(
-        product_tuple=product_tuple, product_type=product_type
-    )
+    min_ramp = power_plant_1.calculate_ramp(400, min_power[start])
+    max_ramp = power_plant_1.calculate_ramp(400, max_power[start])
 
-    assert operational_window["states"]["min_power"]["volume"] == 300
-    assert operational_window["states"]["max_power"]["volume"] == 600
+    assert min_ramp == 300
+    assert max_ramp == 600
 
 
 if __name__ == "__main__":

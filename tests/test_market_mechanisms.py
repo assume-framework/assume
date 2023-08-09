@@ -5,13 +5,9 @@ import numpy as np
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
 
-from assume import World
 from assume.common.market_objects import MarketConfig, MarketProduct, Order, Orderbook
 from assume.common.utils import get_available_products
-from assume.markets.base_market import MarketRole
-
-w = World()
-available_clearing_strategies = w.clearing_mechanisms
+from assume.markets import MarketRole, clearing_mechanisms
 
 simple_dayahead_auction_config = MarketConfig(
     "simple_dayahead_auction",
@@ -50,6 +46,7 @@ def test_market():
             "volume": 120,
             "price": 120,
             "agent_id": "gen1",
+            "bid_id": "bid1",
             "only_hours": None,
         },
         {
@@ -58,6 +55,7 @@ def test_market():
             "volume": 80,
             "price": 58,
             "agent_id": "gen1",
+            "bid_id": "bid2",
             "only_hours": None,
         },
         {
@@ -66,6 +64,7 @@ def test_market():
             "volume": 100,
             "price": 53,
             "agent_id": "gen1",
+            "bid_id": "bid3",
             "only_hours": None,
         },
         {
@@ -74,10 +73,11 @@ def test_market():
             "volume": -180,
             "price": 70,
             "agent_id": "dem1",
+            "bid_id": "bid4",
             "only_hours": None,
         },
     ]
-    simple_dayahead_auction_config.market_mechanism = available_clearing_strategies[
+    simple_dayahead_auction_config.market_mechanism = clearing_mechanisms[
         simple_dayahead_auction_config.market_mechanism
     ]
     mr.all_orders = orderbook
@@ -101,6 +101,7 @@ def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
             "start_time": start,
             "end_time": end,
             "agent_id": "dem1",
+            "bid_id": "bid1",
             "volume": 0,
             "price": 0,
             "only_hours": None,
@@ -118,7 +119,7 @@ def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
         else:
             agent_id = f"dem_{i}"
         new_order["agent_id"] = agent_id
-
+        new_order["bid_id"] = f"bid_{i}"
         new_order["node_id"] = node_id
         orders.append(new_order)
     return orders
@@ -127,7 +128,7 @@ def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
 def test_market_mechanism():
     import copy
 
-    for name, mechanism in available_clearing_strategies.items():
+    for name, mechanism in clearing_mechanisms.items():
         print(name)
         market_config = copy.copy(simple_dayahead_auction_config)
         market_config.market_mechanism = mechanism

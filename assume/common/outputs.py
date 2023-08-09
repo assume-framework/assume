@@ -9,7 +9,7 @@ from dateutil import rrule as rr
 from mango import Role
 from sqlalchemy import inspect, text
 
-from assume.units.base_unit import BaseUnit
+from assume.common.base import BaseUnit
 
 logger = logging.getLogger(__name__)
 
