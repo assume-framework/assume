@@ -1,17 +1,6 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Oct  7 15:43:00 2021
-
-@author: Nick_SimPC
-"""
-
-import os
-import pickle
-
 import torch as th
 from buffer import ReplayBuffer
 from misc import polyak_update
-from torch import nn
 from torch.nn import functional as F
 from torch.optim import Adam
 

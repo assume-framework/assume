@@ -5,7 +5,6 @@ from operator import itemgetter
 
 import numpy as np
 import pandas as pd
-import torch as th
 from mango import Role
 from mango.messages.message import Performatives
 
@@ -13,7 +12,6 @@ from assume.common.market_objects import (
     ClearingMessage,
     MarketConfig,
     OpeningMessage,
-    Order,
     Orderbook,
 )
 from assume.common.utils import aggregate_step_amount
@@ -95,11 +93,14 @@ class UnitsOperator(Role):
                 content=message,
             )
 
-    def participate(self, market):
-        # always participate at all markets
+    def participate(self, market: MarketConfig):
+        """
+        Method which decides if we want to participate on a given Market.
+        This always returns true for now
+        """
         return True
 
-    def register_market(self, market):
+    def register_market(self, market: MarketConfig):
         self.context.schedule_timestamp_task(
             self.context.send_acl_message(
                 {"context": "registration", "market": market.name},
@@ -115,12 +116,22 @@ class UnitsOperator(Role):
         logger.debug(f"{self.id} tried to register at market {market.name}")
 
     def handle_opening(self, opening: OpeningMessage, meta: dict[str, str]):
+        """
+        When we receive an opening from the market, we schedule sending back
+        our list of orders as a response
+        """
         logger.debug(
             f'{self.id} received opening from: {opening["market_id"]} {opening["start"]} until: {opening["stop"]}.'
         )
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
 
     def handle_market_feedback(self, content: ClearingMessage, meta: dict[str, str]):
+        """
+        handles the feedback which is received from a market we did bid at
+        stores accepted orders, sets the received power
+        writes result back for the learning
+        and executes the dispatch, including ramping for times in the past
+        """
         logger.debug(f"{self.id} got market result: {content}")
         orderbook: Orderbook = content["orderbook"]
         for order in orderbook:
@@ -133,18 +144,18 @@ class UnitsOperator(Role):
         self.write_learning_params(orderbook, marketconfig)
         self.write_actual_dispatch()
 
-    def set_unit_dispatch(self, orderbook, market_config):
+    def set_unit_dispatch(self, orderbook: Orderbook, marketconfig: MarketConfig):
         """
         feeds the current market result back to the units
         this does not respect bids from multiple markets
-        for the same time period
+        for the same time period, as we only have access to the current orderbook here
         """
         orderbook.sort(key=itemgetter("unit_id"))
         for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
             orderbook = list(orders)
             self.units[unit_id].set_dispatch_plan(
+                marketconfig=marketconfig,
                 orderbook=orderbook,
-                market_config=market_config,
             )
 
     def write_actual_dispatch(self):
@@ -173,7 +184,6 @@ class UnitsOperator(Role):
             data = pd.DataFrame(current_dispatch)
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
-        unit_dispatch = pd.concat(unit_dispatch_dfs)
 
         db_aid = self.context.data_dict.get("output_agent_id")
         db_addr = self.context.data_dict.get("output_agent_addr")
@@ -273,7 +283,7 @@ class UnitsOperator(Role):
 
         for unit_id, unit in self.units.items():
             product_bids = unit.calculate_bids(
-                market_config=market,
+                market,
                 product_tuples=products,
                 data_dict=self.context.data_dict,
             )
@@ -295,58 +305,61 @@ class UnitsOperator(Role):
         """
         sends the current rl_strategy update to the output agent
         """
-        start = orderbook[0]["start_time"]
-        learning_unit_count = 1
-        action_dimension = 2
-        unit_rl_strategy_dfs = []
-
-        all_observations = []
-        all_rewards = []
         learning_unit_count = 0
+        action_dimension = 0
         for unit in self.units.values():
             bidding_strategy = unit.bidding_strategies.get(marketconfig.product_type)
             if isinstance(bidding_strategy, LearningStrategy):
                 learning_unit_count += 1
-        all_actions = th.zeros(
-            size=(learning_unit_count, action_dimension), device="cpu"
-        )
-        i = 0
+                # should be the same across all strategies
+                action_dimension = bidding_strategy.act_dim
+        if learning_unit_count > 0:
+            start = orderbook[0]["start_time"]
+            unit_rl_strategy_dfs = []
 
-        for unit_id, unit in self.units.items():
-            # rl only for energy market for now!
-            if isinstance(
-                unit.bidding_strategies.get(marketconfig.product_type), LearningStrategy
-            ):
-                data = pd.DataFrame(
-                    {
-                        "profit": unit.outputs["profit"].loc[start],
-                        "reward": unit.outputs["reward"].loc[start],
-                        "regret": unit.outputs["regret"].loc[start],
-                    },
-                    index=[start],
-                )
-                data["unit"] = unit_id
-                unit_rl_strategy_dfs.append(data)
-                all_observations.append(
-                    unit.outputs["rl_samples_ObsActRew"][start]["observations"]
-                )
-                all_actions[i, :] = unit.outputs["rl_samples_ObsActRew"][start][
-                    "actions"
-                ]
-                all_rewards.append(
-                    unit.outputs["rl_samples_ObsActRew"][start]["reward"]
-                )
+            all_observations = []
+            all_rewards = []
+            try:
+                import torch as th
 
-                i += 1
+                all_actions = th.zeros(
+                    (learning_unit_count, action_dimension), device="cpu"
+                )
+            except ImportError:
+                logger.error(
+                    "tried writing learning_params, but torch is not installed"
+                )
+                all_actions = np.zeros((learning_unit_count, action_dimension))
+
+            i = 0
+
+            for unit_id, unit in self.units.items():
+                # rl only for energy market for now!
+                if isinstance(
+                    unit.bidding_strategies.get(marketconfig.product_type),
+                    LearningStrategy,
+                ):
+                    data = pd.DataFrame(
+                        {
+                            "profit": unit.outputs["profit"].loc[start],
+                            "reward": unit.outputs["reward"].loc[start],
+                            "regret": unit.outputs["regret"].loc[start],
+                        },
+                        index=[start],
+                    )
+                    data["unit"] = unit_id
+                    unit_rl_strategy_dfs.append(data)
+                    all_observations.append(unit.outputs["rl_observations"][start])
+                    all_actions[i, :] = unit.outputs["rl_actions"][start]
+                    all_rewards.append(unit.outputs["rl_rewards"][start])
+
+                    i += 1
+            all_observations = np.array(all_observations)
             # convert all_actions list of tensor to numpy 2D array
+            all_actions = all_actions.squeeze().cpu().numpy()
+            all_rewards = np.array(all_rewards)
 
-        all_observations = np.array(all_observations)
-        all_actions = all_actions.squeeze().cpu().numpy()
-        all_rewards = np.array(all_rewards)
-
-        data = (all_observations, all_actions, all_rewards)
-
-        if len(unit_rl_strategy_dfs):
+            data = (all_observations, all_actions, all_rewards)
             learning_data = pd.concat(unit_rl_strategy_dfs)
             # TODO send observation and action also to output agent if neede din visualisation of grafana
 
@@ -363,8 +376,8 @@ class UnitsOperator(Role):
                     },
                 )
 
-            learning_role_id = "learning_agent_1"
-            learning_role_addr = ("localhost", 9099)
+            learning_role_id = "learning_agent"
+            learning_role_addr = self.context.addr
             if learning_role_id and learning_role_addr:
                 self.context.schedule_instant_acl_message(
                     receiver_id=learning_role_id,

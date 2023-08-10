@@ -67,24 +67,24 @@ class BaseUnit:
 
     def set_dispatch_plan(
         self,
-        market_config: MarketConfig,
+        marketconfig: MarketConfig,
         orderbook: Orderbook,
     ) -> None:
         """
         adds dispatch plan from current market result to total dispatch plan
         """
-        product_type = market_config.product_type
+        product_type = marketconfig.product_type
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
             end_excl = end - self.index.freq
             self.outputs[product_type].loc[start:end_excl] += order["volume"]
 
-        self.calculate_cashflow(orderbook)
+        self.calculate_cashflow(product_type, orderbook)
 
         self.bidding_strategies[product_type].calculate_reward(
             unit=self,
-            marketconfig=market_config,
+            marketconfig=marketconfig,
             orderbook=orderbook,
         )
 
@@ -117,7 +117,7 @@ class BaseUnit:
             "unit_type": "base_unit",
         }
 
-    def calculate_cashflow(self, orderbook: Orderbook):
+    def calculate_cashflow(self, product_type: str, orderbook: Orderbook):
         pass
 
 
@@ -258,3 +258,11 @@ class LearningStrategy(BaseStrategy):
     """
     A strategy which provides learning functionality, has a method to calculate the reward.
     """
+
+    obs_dim: int
+    act_dim: int
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.obs_dim = kwargs.get("observation_dimension", 50)
+        self.act_dim = kwargs.get("action_dimension", 2)

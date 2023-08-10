@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Oct  7 11:03:55 2021
-
-@author: Nick_SimPC
-"""
-
 import os
 import pickle
 import warnings

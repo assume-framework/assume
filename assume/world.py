@@ -18,7 +18,6 @@ from tqdm import tqdm
 
 from assume.common import (
     ForecastProvider,
-    Learning,
     MarketConfig,
     UnitsOperator,
     WriteOutput,
@@ -126,15 +125,17 @@ class World:
         start: datetime,
         end: datetime,
         save_frequency_hours: int,
-        learning_config: None,
         simulation_id: str,
         index: pd.Series,
         same_process: bool = True,
+        bidding_params: dict = {},
+        learning_config: dict = {},
     ):
         self.clock = ExternalClock(0)
         self.start = start
         self.end = end
         self.learning_config = learning_config
+        self.bidding_params = bidding_params
         self.index = index
 
         # kill old container if exists
@@ -147,17 +148,19 @@ class World:
         )
 
         # initiate learning if the learning mode is one and hence we want to learn new strategies
-        if learning_config["learning_mode"] == True:
-            # if so we initate the rl leanring role with parameteres
+        if self.learning_config.get("learning_mode"):
+            # if so, we initate the rl learning role with parameters
+            from assume.reinforcement_learning.learning_role import Learning
 
             learning_role = Learning(
-                learning_config=learning_config,
+                learning_config=self.learning_config,
             )
+            self.bidding_params.update(self.learning_config)
 
             same_process = True
             if same_process:
                 self.rl_agent = RoleAgent(
-                    self.container, suggested_aid="learning_agent_1"
+                    self.container, suggested_aid="learning_agent"
                 )
                 self.rl_agent.add_role(learning_role)
             else:
@@ -165,7 +168,7 @@ class World:
                 # see https://gitlab.com/mango-agents/mango/-/issues/59
                 # but still improves performance
                 def creator(container):
-                    agent = RoleAgent(container, suggested_aid="learning_agent_1")
+                    agent = RoleAgent(container, suggested_aid="learning_agent")
                     agent.add_role(learning_role)
 
                 await self.container.as_agent_process(agent_creator=creator)
@@ -257,7 +260,7 @@ class World:
 
             try:
                 bidding_strategies[product_type] = self.bidding_types[strategy](
-                    **self.learning_config
+                    **self.bidding_params
                 )
                 if isinstance(bidding_strategies[product_type], LearningStrategy):
                     self.learning_agent_count += 1

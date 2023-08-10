@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Oct 18 10:43:43 2021
-
-@author: Nick_SimPC
-"""
-
 from datetime import datetime
 from typing import TypedDict
 

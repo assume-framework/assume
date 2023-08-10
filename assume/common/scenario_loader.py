@@ -10,7 +10,7 @@ import yaml
 from mango import RoleAgent
 from tqdm import tqdm
 
-from assume.common import ForecastProvider, ReplayBuffer
+from assume.common import ForecastProvider
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.world import World
 
@@ -303,6 +303,7 @@ async def load_scenario_folder_async(
     sim_id = f"{scenario}_{study_case}"
 
     learning_config = config.get("learning_config", {})
+    bidding_strategy_params = config.get("bidding_strategy_params", {})
     if "load_learned_path" not in learning_config.keys():
         learning_config[
             "load_learned_path"
@@ -314,6 +315,7 @@ async def load_scenario_folder_async(
         save_frequency_hours=save_frequency_hours,
         simulation_id=sim_id,
         learning_config=learning_config,
+        bidding_params=bidding_strategy_params,
         index=index,
     )
 
@@ -482,14 +484,14 @@ def load_scenario_folder(
         )
     )
 
-    start_ts = calendar.timegm(world.start.utctimetuple())
-    end_ts = calendar.timegm(world.end.utctimetuple())
-
-    if world.rl_agent is not None:
+    if world.learning_config.get("learning_mode"):
+        start_ts = calendar.timegm(world.start.utctimetuple())
+        end_ts = calendar.timegm(world.end.utctimetuple())
         # we are in learning mode
 
         # initiate buffer for rl agent
-        # please initiate an instance of the class Replaybuffer here
+        from assume.reinforcement_learning.buffer import ReplayBuffer
+
         buffer = ReplayBuffer(
             buffer_size=1000000,
             obs_dim=world.rl_agent.roles[0].obs_dim,
@@ -500,14 +502,14 @@ def load_scenario_folder(
 
         world.rl_agent.roles[0].buffer = buffer
 
-        for i_episode in tqdm(
+        for episode in tqdm(
             range(world.rl_agent.roles[0].training_episodes),
-            desc=f"Training Episodes",
+            desc="Training Episodes",
         ):
             # change simulation id of output agent to include the episode number
             world.output_agent.roles[
                 0
-            ].simulation_id = f"{world.output_agent.roles[0].simulation_id}_{i_episode}"
+            ].simulation_id = f"{world.output_agent.roles[0].simulation_id}_{episode}"
 
             world.loop.run_until_complete(
                 world.run_async(start_ts=start_ts, end_ts=end_ts)
@@ -517,7 +519,7 @@ def load_scenario_folder(
             world.rl_agent.roles[0].episodes_done = +1
 
             # in load_scenario_folder_async, we initiate new container and kill old if present
-            # as long as we do not skip setup contaier should be handeled correctly
+            # as long as we do not skip setup container should be handled correctly
             world.loop.run_until_complete(
                 load_scenario_folder_async(
                     world,

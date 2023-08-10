@@ -1,16 +1,12 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
 import torch as th
 
-from assume.common.base import BaseUnit, LearningStrategy
+from assume.common.base import LearningStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.reinforcement_learning.learning_utils import (
-    Actor,
-    NormalActionNoise,
-    observation_dict,
-)
+from assume.reinforcement_learning.learning_utils import Actor, NormalActionNoise
 
 
 class RLStrategy(LearningStrategy):
@@ -20,8 +16,7 @@ class RLStrategy(LearningStrategy):
         self.foresight = kwargs.get("foresight", 24)
 
         # RL agent parameters
-        self.obs_dim = kwargs.get("observation_dimension", 50)
-        self.act_dim = kwargs.get("action_dimension", 2)
+
         self.max_bid_price = kwargs.get("max_bid_price", 100)
         self.max_demand = kwargs.get("max_demand", 10e3)
 
@@ -31,8 +26,7 @@ class RLStrategy(LearningStrategy):
         float_type = kwargs.get("float_type", "float32")
         self.float_type = th.float if float_type == "float32" else th.float16
 
-        # self.learning_mode = kwargs.get("learning_mode", False)
-        self.learning_mode = False
+        self.learning_mode = kwargs.get("learning_mode", False)
 
         self.actor = Actor(self.obs_dim, self.act_dim, self.float_type).to(self.device)
 
@@ -72,7 +66,7 @@ class RLStrategy(LearningStrategy):
 
     def calculate_bids(
         self,
-        unit: BaseUnit,
+        unit: SupportsMinMax,
         market_config: MarketConfig,
         product_tuples: list[Product],
         data_dict: dict,
@@ -87,7 +81,10 @@ class RLStrategy(LearningStrategy):
         min_power = min_power[start]
         max_power = max_power[start]
 
-        unit.outputs["rl_samples_ObsActRew"][start] = {}
+        # needed so that type of series is object
+        unit.outputs["rl_actions"][start] = {}
+        unit.outputs["rl_observations"][start] = {}
+        unit.outputs["rl_rewards"][start] = {}
 
         # =============================================================================
         # Calculate bid-prices from action output of RL strategies
@@ -103,7 +100,7 @@ class RLStrategy(LearningStrategy):
         )
 
         actions = self.get_actions(next_observation)
-        unit.outputs["rl_samples_ObsActRew"][start]["actions"] = actions
+        unit.outputs["rl_actions"][start] = actions
 
         bid_prices = actions * self.max_bid_price
 
@@ -136,7 +133,7 @@ class RLStrategy(LearningStrategy):
             },
         ]
 
-        unit.outputs["rl_samples_ObsActRew"][start]["observations"] = next_observation
+        unit.outputs["rl_observations"][start] = next_observation
 
         return bids
 
@@ -170,7 +167,7 @@ class RLStrategy(LearningStrategy):
 
     def create_observation(
         self,
-        unit,
+        unit: SupportsMinMax,
         start: datetime,
         end: datetime,
         data_dict: dict,
@@ -253,50 +250,52 @@ class RLStrategy(LearningStrategy):
         marketconfig: MarketConfig,
         orderbook: Orderbook,
     ):
-        start = orderbook[0]["start_time"]
-        end = orderbook[0]["end_time"]
-
-        # TODO does only work for single-market pay as clear
-
-        clearing_price = orderbook[0]["price"]
         product_type = marketconfig.product_type
-        # if not self.learning_mode:
-        #    return
+        scaling = 0.1 / unit.max_power
+        regret_scale = 0.2
+        profit = 0
+        reward = 0
 
-        # gets market feedback from set_dispatch
-        # based on calculated market success in dispatch we calculate the profit
+        for order in orderbook:
+            start = order["start_time"]
+            end = order["end_time"]
+            end_excl = end - unit.index.freq
+            # gets market feedback from set_dispatch
+            # based on calculated market success in dispatch we calculate the profit
+            if unit.marginal_cost is not None:
+                marginal_cost = (
+                    unit.marginal_cost[start]
+                    if isinstance(unit.marginal_cost, dict)
+                    else unit.marginal_cost
+                )
+            else:
+                marginal_cost = unit.calc_marginal_cost_with_partial_eff(
+                    power_output=unit.outputs[product_type].loc[start:end_excl],
+                    timestep=start,
+                )
+            # calculate profit, now based on actual mc considering the power output
+            price_difference = order["price"] - marginal_cost
+            duration = (end - start) / timedelta(hours=1)
+            # calculate profit as income - running_cost from this event
+            order_profit = order["price"] * order["volume"] * duration
 
-        end_excl = end - unit.index.freq
-
-        # calculate profit, now based on actual mc considering the power output
-
-        if unit.marginal_cost is not None:
-            marginal_cost = (
-                unit.marginal_cost[start]
-                if isinstance(unit.marginal_cost, dict)
-                else unit.marginal_cost
+            # calculate opportunity cost as the loss of income we have because we are not running at full power
+            opportunity_cost = (
+                price_difference
+                * (
+                    unit.max_power - unit.outputs[product_type].loc[start:end_excl]
+                ).sum()
+                * duration
             )
-        else:
-            marginal_cost = unit.calc_marginal_cost_with_partial_eff(
-                power_output=unit.outputs[product_type].loc[start:end_excl],
-                timestep=start,
-            )
+            # opportunity cost must be positive
+            opportunity_cost = max(opportunity_cost, 0)
 
-        price_difference = clearing_price - marginal_cost
-
-        duration = (end - start).total_seconds() / 3600
-
-        profit = (
-            unit.outputs["cashflow"].loc[start:end_excl]
-            - marginal_cost * unit.outputs[product_type].loc[start:end_excl] * duration
-        ).sum()
-
-        opportunity_cost = (
-            price_difference
-            * (unit.max_power - unit.outputs[product_type].loc[start:end_excl]).sum()
-            * duration
-        )
-        opportunity_cost = max(opportunity_cost, 0)
+            profit += order_profit
+            # reward and opportunity cost does not work well for multiple biddings on the same timeframe
+            reward = (profit - regret_scale * opportunity_cost) * scaling
+            unit.outputs["profit"].loc[start:end_excl] += float(profit)
+            unit.outputs["reward"].loc[start:end_excl] = float(reward)
+            unit.outputs["regret"].loc[start:end_excl] = float(opportunity_cost)
 
         # consideration of start-up costs, which are evenly divided between the
         # upward and downward regulation events
@@ -311,12 +310,5 @@ class RLStrategy(LearningStrategy):
         ):
             profit = profit - unit.hot_start_cost / 2
 
-        scaling = 0.1 / unit.max_power
-        regret_scale = 0.2
-
         reward = (profit - regret_scale * opportunity_cost) * scaling
-        unit.outputs["profit"].loc[start:end_excl] = profit
-        unit.outputs["reward"].loc[start:end_excl] = reward
-        unit.outputs["regret"].loc[start:end_excl] = opportunity_cost
-
-        unit.outputs["rl_samples_ObsActRew"][start]["reward"] = reward
+        unit.outputs["rl_rewards"][start] = reward

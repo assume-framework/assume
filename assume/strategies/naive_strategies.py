@@ -1,6 +1,4 @@
-from datetime import datetime
-
-from assume.common.base import BaseStrategy, BaseUnit, SupportsMinMax
+from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 

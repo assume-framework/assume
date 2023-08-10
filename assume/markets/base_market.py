@@ -247,7 +247,7 @@ class MarketRole(Role):
 
         for meta in market_meta:
             logger.debug(
-                f'clearing price for {self.marketconfig.name} is {round(meta["price"],2)}, volume: {meta["demand_volume"]}'
+                f'clearing price for {self.marketconfig.name} is {meta["price"]:.2f}, volume: {meta["demand_volume"]}'
             )
             meta["market_id"] = self.marketconfig.name
             meta["time"] = meta["product_start"]

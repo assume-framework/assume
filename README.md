@@ -90,18 +90,11 @@ to run pre-commit directly, you can use
 pre-commit run --all-files
 ```
 
-to run pre-commit directly, you can use
-
-```
-pre-commit run --all-files
-
-```
-
 Use Learning Capabilities
 ---------------------------------
 If you want to use the reinforcement learning strategies of Assume please make sure to install torch on top of the requirements listed in the requirements.txt. If you Ressources do not have a GPU available use the CPU only version of torch, which can be installed like this:
 
-pip install torch==2.0.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+pip install "torch>=2.0.1+cpu" -f https://download.pytorch.org/whl/torch_stable.html
 
 Access to database and dashboards
 ---------------------------------
