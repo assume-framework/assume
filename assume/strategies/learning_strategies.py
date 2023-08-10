@@ -81,11 +81,6 @@ class RLStrategy(LearningStrategy):
         min_power = min_power[start]
         max_power = max_power[start]
 
-        # needed so that type of series is object
-        unit.outputs["rl_actions"][start] = {}
-        unit.outputs["rl_observations"][start] = {}
-        unit.outputs["rl_rewards"][start] = {}
-
         # =============================================================================
         # Calculate bid-prices from action output of RL strategies
         # Calculating possible bid amount
@@ -307,8 +302,8 @@ class RLStrategy(LearningStrategy):
         ):
             profit = profit - unit.hot_start_cost / 2
 
-        reward = (profit - regret_scale * opportunity_cost) * scaling
+        reward = float(profit - regret_scale * opportunity_cost) * scaling
         unit.outputs["rl_rewards"][start] = reward
         unit.outputs["profit"].loc[start:end_excl] += float(profit)
-        unit.outputs["reward"].loc[start:end_excl] += float(reward)
+        unit.outputs["reward"].loc[start:end_excl] += reward
         unit.outputs["regret"].loc[start:end_excl] = float(opportunity_cost)

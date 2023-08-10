@@ -42,6 +42,10 @@ class BaseUnit:
         self.bidding_strategies: dict[str, BaseStrategy] = bidding_strategies
         self.index = index
         self.outputs = defaultdict(lambda: pd.Series(0.0, index=self.index))
+        # series does not like to convert from tensor to float otherwise
+        self.outputs["rl_actions"] = pd.Series(0.0, index=self.index, dtype=object)
+        self.outputs["rl_observations"] = pd.Series(0.0, index=self.index, dtype=object)
+        self.outputs["rl_rewards"] = pd.Series(0.0, index=self.index, dtype=object)
 
     def reset(self):
         """Reset the unit to its initial state."""
