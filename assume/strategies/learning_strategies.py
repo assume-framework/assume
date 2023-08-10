@@ -288,14 +288,11 @@ class RLStrategy(LearningStrategy):
                 * duration
             )
             # opportunity cost must be positive
-            opportunity_cost = max(opportunity_cost, 0)
+            order_opportunity_cost = max(opportunity_cost, 0)
+            opportunity_cost += order_opportunity_cost
 
+            # sum up order profit
             profit += order_profit
-            # reward and opportunity cost does not work well for multiple biddings on the same timeframe
-            reward = (profit - regret_scale * opportunity_cost) * scaling
-            unit.outputs["profit"].loc[start:end_excl] += float(profit)
-            unit.outputs["reward"].loc[start:end_excl] = float(reward)
-            unit.outputs["regret"].loc[start:end_excl] = float(opportunity_cost)
 
         # consideration of start-up costs, which are evenly divided between the
         # upward and downward regulation events
@@ -312,3 +309,6 @@ class RLStrategy(LearningStrategy):
 
         reward = (profit - regret_scale * opportunity_cost) * scaling
         unit.outputs["rl_rewards"][start] = reward
+        unit.outputs["profit"].loc[start:end_excl] += float(profit)
+        unit.outputs["reward"].loc[start:end_excl] += float(reward)
+        unit.outputs["regret"].loc[start:end_excl] = float(opportunity_cost)
