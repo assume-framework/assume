@@ -1,5 +1,6 @@
 import calendar
 import logging
+import math
 from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
@@ -22,11 +23,26 @@ logger = logging.getLogger(__name__)
 class MarketRole(Role):
     longitude: float
     latitude: float
-    markets: list = []
+    marketconfig: MarketConfig
 
     def __init__(self, marketconfig: MarketConfig):
         super().__init__()
         self.marketconfig: MarketConfig = marketconfig
+        if self.marketconfig.price_tick:
+            if marketconfig.maximum_bid_price % self.marketconfig.price_tick != 0:
+                logger.warning(
+                    f"{marketconfig.name} - max price not a multiple of tick size"
+                )
+            if marketconfig.minimum_bid_price % self.marketconfig.price_tick != 0:
+                logger.warning(
+                    f"{marketconfig.name} - min price not a multiple of tick size"
+                )
+
+        if self.marketconfig.volume_tick:
+            if marketconfig.maximum_bid_volume % self.marketconfig.volume_tick != 0:
+                logger.warning(
+                    f"{marketconfig.name} - max volume not a multiple of tick size"
+                )
 
     def setup(self):
         self.marketconfig.addr = self.context.addr
@@ -137,6 +153,7 @@ class MarketRole(Role):
         # TODO check if agent is allowed to bid
         agent_addr = meta["sender_addr"]
         agent_id = meta["sender_id"]
+        # TODO check if products are part of currently open Market Openings
         try:
             max_price = self.marketconfig.maximum_bid_price
             min_price = self.marketconfig.minimum_bid_price
@@ -144,10 +161,10 @@ class MarketRole(Role):
 
             if self.marketconfig.price_tick:
                 # max and min should be in units
-                max_price = round(max_price / self.marketconfig.price_tick)
-                min_price = round(min_price / self.marketconfig.price_tick)
+                max_price = math.floor(max_price / self.marketconfig.price_tick)
+                min_price = math.ceil(min_price / self.marketconfig.price_tick)
             if self.marketconfig.volume_tick:
-                max_volume = round(max_volume / self.marketconfig.volume_tick)
+                max_volume = math.floor(max_volume / self.marketconfig.volume_tick)
 
             for order in orderbook:
                 order["agent_id"] = (agent_addr, agent_id)
@@ -215,19 +232,30 @@ class MarketRole(Role):
         )
 
     async def clear_market(self, market_products: list[MarketProduct]):
-        # print("clear market", len(self.all_orders))
-        market_result, market_meta = self.marketconfig.market_mechanism(
-            self, market_products
-        )
+        (
+            accepted_orderbook,
+            rejected_orderbook,
+            market_meta,
+        ) = self.marketconfig.market_mechanism(self, market_products)
 
-        market_result.sort(key=itemgetter("agent_id"))
-        for agent, accepted_orderbook in groupby(market_result, itemgetter("agent_id")):
+        accepted_orderbook.sort(key=itemgetter("agent_id"))
+        rejected_orderbook.sort(key=itemgetter("agent_id"))
+        accepted_bids = {
+            agent: list(bids)
+            for agent, bids in groupby(accepted_orderbook, itemgetter("agent_id"))
+        }
+        rejected_bids = {
+            agent: list(bids)
+            for agent, bids in groupby(rejected_orderbook, itemgetter("agent_id"))
+        }
+        for agent in self.registered_agents:
             addr, aid = agent
             meta = {"sender_addr": self.context.addr, "sender_id": self.context.aid}
             closing: ClearingMessage = {
                 "context": "clearing",
                 "market_id": self.marketconfig.name,
-                "orderbook": list(accepted_orderbook),
+                "orderbook": accepted_bids.get(agent, []),
+                "rejected": rejected_bids.get(agent, []),
             }
             await self.context.send_acl_message(
                 closing,
@@ -236,11 +264,11 @@ class MarketRole(Role):
                 acl_metadata=meta,
             )
         # store order book in db agent
-        if not market_result:
+        if not accepted_orderbook:
             logger.warning(
                 f"{self.context.current_timestamp} Market result {market_products} for market {self.marketconfig.name} are empty!"
             )
-        await self.store_order_book(market_result)
+        await self.store_order_book(accepted_orderbook)
 
         for meta in market_meta:
             logger.debug(
@@ -251,7 +279,7 @@ class MarketRole(Role):
 
         await self.store_market_results(market_meta)
 
-        return market_result, market_meta
+        return accepted_orderbook, market_meta
 
     async def store_order_book(self, orderbook: Orderbook):
         # Send a message to the OutputRole to update data in the database

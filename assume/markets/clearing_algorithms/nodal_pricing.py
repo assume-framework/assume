@@ -44,7 +44,7 @@ def nodal_pricing_pyomo(market_agent: MarketRole, market_products: list[MarketPr
     accepted_orders: Orderbook = []
     rejected_orders: Orderbook = []
     meta = []
-    market_agent.all_orders = sorted(market_agent.all_orders, key=market_getter)
+    market_agent.all_orders.sort(key=market_getter)
     for product, product_orders in groupby(market_agent.all_orders, market_getter):
         product_orders = list(product_orders)
         if product[0:3] not in market_products:
@@ -52,8 +52,8 @@ def nodal_pricing_pyomo(market_agent: MarketRole, market_products: list[MarketPr
             # log.debug(f'found unwanted bids for {product} should be {market_products}')
             continue
 
-        demand_orders = list(filter(lambda x: x["volume"] < 0, product_orders))
-        supply_orders = list(filter(lambda x: x["volume"] > 0, product_orders))
+        supply_orders = [x for x in product_orders if x["volume"] > 0]
+        demand_orders = [x for x in product_orders if x["volume"] < 0]
         # volume 0 is ignored/invalid
 
         if "acceptance_ratio" in market_agent.marketconfig.additional_fields:
@@ -238,4 +238,4 @@ def nodal_pricing_pyomo(market_agent: MarketRole, market_products: list[MarketPr
                     "only_hours": product[2],
                 }
             )
-    return accepted_orders, meta
+    return accepted_orders, [], meta

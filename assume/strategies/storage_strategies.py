@@ -26,7 +26,6 @@ class complexEOMStorage(BaseStrategy):
 
         Return: volume, price
         Strategy analogue to flexABLE
-
         """
         product = product_tuples[0]
         start = product[0]
