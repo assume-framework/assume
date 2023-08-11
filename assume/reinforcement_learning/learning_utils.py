@@ -1,14 +1,19 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Oct 18 10:43:43 2021
-
-@author: Nick_SimPC
-"""
+from datetime import datetime
+from typing import TypedDict
 
 import numpy as np
 import torch as th
 from torch import nn
 from torch.nn import functional as F
+
+
+class ObsActRew(TypedDict):
+    observation: list[th.Tensor]
+    action: list[th.Tensor]
+    reward: list[th.Tensor]
+
+
+observation_dict = dict[list[datetime], ObsActRew]
 
 
 class CriticTD3(nn.Module):

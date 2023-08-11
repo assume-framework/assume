@@ -1,10 +1,11 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import lru_cache
 
 import pandas as pd
 
 from assume.common.base import SupportsMinMax
+from assume.common.market_objects import Orderbook
 
 logger = logging.getLogger(__name__)
 
@@ -170,16 +171,16 @@ class PowerPlant(SupportsMinMax):
         #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")
         return self.outputs["energy"].loc[start:end_excl]
 
-    def calculate_cashflow(self, start, end, clearing_price):
-        start = start
-        end_excl = end - self.index.freq
-
-        self.outputs["cashflow"].loc[start:end_excl] = (
-            clearing_price
-            * self.outputs["energy"].loc[start:end_excl]
-            * (end - start).total_seconds()
-            / 3600
-        )
+    def calculate_cashflow(self, product_type: str, orderbook: Orderbook):
+        for order in orderbook:
+            start = order["start_time"]
+            end = order["end_time"]
+            end_excl = end - self.index.freq
+            cashflow = float(order["price"] * order["volume"])
+            hours = (end - start) / timedelta(hours=1)
+            self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
+                cashflow * hours
+            )
 
     def calc_simple_marginal_cost(
         self,

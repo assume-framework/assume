@@ -40,7 +40,7 @@ availabe_examples = {
         "scenario": "example_02",
         "study_case": "dam_case_2019",
     },
-    "rl": {"scenario": "example_01_rl", "study_case": "rl_case"},
+    "rl": {"scenario": "example_01_rl", "study_case": "base"},
 }
 
 # %%

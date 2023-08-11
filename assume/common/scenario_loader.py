@@ -1,3 +1,4 @@
+import calendar
 import logging
 from datetime import datetime
 from typing import Callable
@@ -7,6 +8,7 @@ import numpy as np
 import pandas as pd
 import yaml
 from mango import RoleAgent
+from tqdm import tqdm
 
 from assume.common import ForecastProvider
 from assume.common.market_objects import MarketConfig, MarketProduct
@@ -205,6 +207,8 @@ async def load_scenario_folder_async(
         config = config[study_case]
     logger.info(f"Starting Scenario {scenario}/{study_case} from {inputs_path}")
 
+    world.reset()
+
     start = pd.Timestamp(config["start_date"])
     end = pd.Timestamp(config["end_date"])
 
@@ -298,14 +302,21 @@ async def load_scenario_folder_async(
     save_frequency_hours = config.get("save_frequency_hours", None)
     sim_id = f"{scenario}_{study_case}"
 
+    learning_config = config.get("learning_config", {})
     bidding_strategy_params = config.get("bidding_strategy_params", {})
-    if "load_learned_path" not in bidding_strategy_params.keys():
-        bidding_strategy_params[
+    if "load_learned_path" not in learning_config.keys():
+        learning_config[
             "load_learned_path"
         ] = f"{inputs_path}/learned_strategies/{sim_id}/"
 
     await world.setup(
-        start, end, save_frequency_hours, sim_id, bidding_strategy_params, index
+        start=start,
+        end=end,
+        save_frequency_hours=save_frequency_hours,
+        simulation_id=sim_id,
+        learning_config=learning_config,
+        bidding_params=bidding_strategy_params,
+        index=index,
     )
 
     # get the market config from the config file and add the markets
@@ -463,7 +474,8 @@ def load_scenario_folder(
     """
     Load a scenario from a given path.
     """
-    return world.loop.run_until_complete(
+
+    world.loop.run_until_complete(
         load_scenario_folder_async(
             world,
             inputs_path,
@@ -471,3 +483,57 @@ def load_scenario_folder(
             study_case,
         )
     )
+
+    if world.learning_config.get("learning_mode"):
+        start_ts = calendar.timegm(world.start.utctimetuple())
+        end_ts = calendar.timegm(world.end.utctimetuple())
+        # we are in learning mode
+
+        # initiate buffer for rl agent
+        from assume.reinforcement_learning.buffer import ReplayBuffer
+
+        buffer = ReplayBuffer(
+            buffer_size=1000000,
+            obs_dim=world.rl_agent.roles[0].obs_dim,
+            act_dim=world.rl_agent.roles[0].act_dim,
+            n_rl_units=world.learning_agent_count,
+            device=world.rl_agent.roles[0].device,
+        )
+
+        world.rl_agent.roles[0].buffer = buffer
+
+        for episode in tqdm(
+            range(world.rl_agent.roles[0].training_episodes),
+            desc="Training Episodes",
+        ):
+            # change simulation id of output agent to include the episode number
+            world.output_agent.roles[
+                0
+            ].simulation_id = f"{world.output_agent.roles[0].simulation_id}_{episode}"
+
+            world.loop.run_until_complete(
+                world.run_async(start_ts=start_ts, end_ts=end_ts)
+            )
+            world.reset()
+
+            world.rl_agent.roles[0].episodes_done = +1
+
+            # in load_scenario_folder_async, we initiate new container and kill old if present
+            # as long as we do not skip setup container should be handled correctly
+            world.loop.run_until_complete(
+                load_scenario_folder_async(
+                    world,
+                    inputs_path,
+                    scenario,
+                    study_case,
+                )
+            )
+            # give the newly created rl_agent the buffer that we stored from the beginning
+            world.rl_agent.roles[0].buffer = buffer
+
+            # container shutdown implicitly with new initialisation
+
+        world.logger.info("################")
+        world.logger.info(f"Training finished, Start evaluation run")
+
+        world.rl_agent.roles[0].learning_mode = False

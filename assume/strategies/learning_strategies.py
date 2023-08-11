@@ -1,12 +1,12 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
 import torch as th
 
-from assume.common.base import BaseUnit, LearningStrategy
-from assume.common.learning_utils import Actor, NormalActionNoise
+from assume.common.base import LearningStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
+from assume.reinforcement_learning.learning_utils import Actor, NormalActionNoise
 
 
 class RLStrategy(LearningStrategy):
@@ -16,8 +16,7 @@ class RLStrategy(LearningStrategy):
         self.foresight = kwargs.get("foresight", 24)
 
         # RL agent parameters
-        self.obs_dim = kwargs.get("observation_dimension", 50)
-        self.act_dim = kwargs.get("action_dimension", 2)
+
         self.max_bid_price = kwargs.get("max_bid_price", 100)
         self.max_demand = kwargs.get("max_demand", 10e3)
 
@@ -63,16 +62,11 @@ class RLStrategy(LearningStrategy):
     def reset(
         self,
     ):
-        self.curr_observation = None
-        self.next_observation = None
-
-        self.curr_action = None
         self.curr_reward = None
-        self.curr_experience = []
 
     def calculate_bids(
         self,
-        unit: BaseUnit,
+        unit: SupportsMinMax,
         market_config: MarketConfig,
         product_tuples: list[Product],
         data_dict: dict,
@@ -84,6 +78,8 @@ class RLStrategy(LearningStrategy):
         start = product_tuples[0][0]
         end = product_tuples[0][1]
         min_power, max_power = unit.calculate_min_max_power(start, end)
+        min_power = min_power[start]
+        max_power = max_power[start]
 
         # =============================================================================
         # Calculate bid-prices from action output of RL strategies
@@ -91,16 +87,17 @@ class RLStrategy(LearningStrategy):
         # artificially force inflex_bid to be the smaller price
         # =============================================================================
 
-        self.next_observation = self.create_observation(
+        next_observation = self.create_observation(
             unit=unit,
             start=start,
             end=end,
             data_dict=data_dict,
         )
 
-        self.curr_action = self.get_actions()
+        actions = self.get_actions(next_observation)
+        unit.outputs["rl_actions"][start] = actions
 
-        bid_prices = self.curr_action * self.max_bid_price
+        bid_prices = actions * self.max_bid_price
 
         # =============================================================================
         # Powerplant is either on, or is able to turn on
@@ -131,11 +128,11 @@ class RLStrategy(LearningStrategy):
             },
         ]
 
-        self.curr_observation = self.next_observation
+        unit.outputs["rl_observations"][start] = next_observation
 
         return bids
 
-    def get_actions(self):
+    def get_actions(self, next_observation):
         if self.learning_mode:
             if self.collect_initial_experience:
                 curr_action = (
@@ -146,19 +143,18 @@ class RLStrategy(LearningStrategy):
                     .squeeze()
                 )
 
-                # trick that makes the bidding close to marginal cost for exploration purposes
                 curr_action += th.tensor(
-                    self.next_observation[-1],
+                    next_observation[-1],
                     device=self.device,
                     dtype=self.float_type,
                 )
             else:
-                curr_action = self.actor(self.next_observation).detach()
+                curr_action = self.actor(next_observation).detach()
                 curr_action += th.tensor(
                     self.action_noise.noise(), device=self.device, dtype=self.float_type
                 )
         else:
-            curr_action = self.actor(self.next_observation).detach()
+            curr_action = self.actor(next_observation).detach()
 
         curr_action = curr_action.clamp(-1, 1)
 
@@ -166,7 +162,7 @@ class RLStrategy(LearningStrategy):
 
     def create_observation(
         self,
-        unit,
+        unit: SupportsMinMax,
         start: datetime,
         end: datetime,
         data_dict: dict,
@@ -245,49 +241,53 @@ class RLStrategy(LearningStrategy):
 
     def calculate_reward(
         self,
-        start,
-        end,
-        product_type,
-        clearing_price,
         unit,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
     ):
-        # if not self.learning_mode:
-        #    return
+        product_type = marketconfig.product_type
+        scaling = 0.1 / unit.max_power
+        regret_scale = 0.2
+        profit = 0
+        reward = 0
 
-        # gets market feedback from set_dispatch
-        # based on calculated market success in dispatch we calculate the profit
+        for order in orderbook:
+            start = order["start_time"]
+            end = order["end_time"]
+            end_excl = end - unit.index.freq
+            # gets market feedback from set_dispatch
+            # based on calculated market success in dispatch we calculate the profit
+            if unit.marginal_cost is not None:
+                marginal_cost = (
+                    unit.marginal_cost[start]
+                    if isinstance(unit.marginal_cost, dict)
+                    else unit.marginal_cost
+                )
+            else:
+                marginal_cost = unit.calc_marginal_cost_with_partial_eff(
+                    power_output=unit.outputs[product_type].loc[start:end_excl],
+                    timestep=start,
+                )
+            # calculate profit, now based on actual mc considering the power output
+            price_difference = order["price"] - marginal_cost
+            duration = (end - start) / timedelta(hours=1)
+            # calculate profit as income - running_cost from this event
+            order_profit = order["price"] * order["volume"] * duration
 
-        end_excl = end - unit.index.freq
-
-        # calculate profit, now based on actual mc considering the power output
-
-        if unit.marginal_cost is not None:
-            marginal_cost = (
-                unit.marginal_cost[start]
-                if isinstance(self.marginal_cost, dict)
-                else unit.marginal_cost
+            # calculate opportunity cost as the loss of income we have because we are not running at full power
+            opportunity_cost = (
+                price_difference
+                * (
+                    unit.max_power - unit.outputs[product_type].loc[start:end_excl]
+                ).sum()
+                * duration
             )
-        else:
-            marginal_cost = unit.calc_marginal_cost_with_partial_eff(
-                power_output=unit.outputs[product_type].loc[start:end_excl],
-                timestep=start,
-            )
+            # opportunity cost must be positive
+            order_opportunity_cost = max(opportunity_cost, 0)
+            opportunity_cost += order_opportunity_cost
 
-        price_difference = clearing_price - marginal_cost
-
-        duration = (end - start).total_seconds() / 3600
-
-        profit = (
-            unit.outputs["cashflow"].loc[start:end_excl]
-            - marginal_cost * unit.outputs[product_type].loc[start:end_excl] * duration
-        ).sum()
-
-        opportunity_cost = (
-            price_difference
-            * (unit.max_power - unit.outputs[product_type].loc[start:end_excl]).sum()
-            * duration
-        )
-        opportunity_cost = max(opportunity_cost, 0)
+            # sum up order profit
+            profit += order_profit
 
         # consideration of start-up costs, which are evenly divided between the
         # upward and downward regulation events
@@ -302,12 +302,8 @@ class RLStrategy(LearningStrategy):
         ):
             profit = profit - unit.hot_start_cost / 2
 
-        scaling = 0.1 / unit.max_power
-        regret_scale = 0.2
-
-        reward = (profit - regret_scale * opportunity_cost) * scaling
-        unit.outputs["rewards"].loc[start:end_excl] = reward
-        unit.outputs["profit"].loc[start:end_excl] = profit
-        unit.outputs["regret"].loc[start:end_excl] = opportunity_cost
-
-        self.curr_reward = reward
+        reward = float(profit - regret_scale * opportunity_cost) * scaling
+        unit.outputs["rl_rewards"][start] = reward
+        unit.outputs["profit"].loc[start:end_excl] += float(profit)
+        unit.outputs["reward"].loc[start:end_excl] += reward
+        unit.outputs["regret"].loc[start:end_excl] = float(opportunity_cost)

@@ -25,6 +25,7 @@ from assume.common import (
 )
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import (
+    LearningStrategy,
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
     NaiveStrategy,
@@ -60,6 +61,7 @@ class World:
         self.logger = logging.getLogger(__name__)
         self.addr = (ifac_addr, port)
         self.container = None
+        self.learning_agent_count = 0
 
         self.export_csv_path = export_csv_path
         # intialize db connection at beginning of simulation
@@ -102,12 +104,16 @@ class World:
             "naive_pos_reserve": NaivePosReserveStrategy,
             "otc_strategy": OTCStrategy,
         }
+
         try:
             from assume.strategies.learning_strategies import RLStrategy
 
             self.bidding_types["learning"] = RLStrategy
-        except ImportError:
-            pass
+        except ImportError as e:
+            self.logger.error(
+                "You are trying to use reinforcement learning strategies, but the their import failed. Check if you have all required packages installed: %s",
+                e,
+            )
         self.clearing_mechanisms = clearing_mechanisms
         self.clearing_mechanisms.update(additional_clearing_mechanisms)
         nest_asyncio.apply()
@@ -120,13 +126,15 @@ class World:
         end: datetime,
         save_frequency_hours: int,
         simulation_id: str,
-        bidding_params: dict,
         index: pd.Series,
         same_process: bool = True,
+        bidding_params: dict = {},
+        learning_config: dict = {},
     ):
         self.clock = ExternalClock(0)
         self.start = start
         self.end = end
+        self.learning_config = learning_config
         self.bidding_params = bidding_params
         self.index = index
 
@@ -138,6 +146,32 @@ class World:
         self.container = await create_container(
             addr=self.addr, clock=self.clock, codec=mango_codec_factory()
         )
+
+        # initiate learning if the learning mode is one and hence we want to learn new strategies
+        if self.learning_config.get("learning_mode"):
+            # if so, we initate the rl learning role with parameters
+            from assume.reinforcement_learning.learning_role import Learning
+
+            learning_role = Learning(
+                learning_config=self.learning_config,
+            )
+            self.bidding_params.update(self.learning_config)
+
+            same_process = True
+            if same_process:
+                self.rl_agent = RoleAgent(
+                    self.container, suggested_aid="learning_agent"
+                )
+                self.rl_agent.add_role(learning_role)
+            else:
+                # this does not set the clock in output_agent correctly yet
+                # see https://gitlab.com/mango-agents/mango/-/issues/59
+                # but still improves performance
+                def creator(container):
+                    agent = RoleAgent(container, suggested_aid="learning_agent")
+                    agent.add_role(learning_role)
+
+                await self.container.as_agent_process(agent_creator=creator)
 
         self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to world
@@ -227,6 +261,8 @@ class World:
                 bidding_strategies[product_type] = self.bidding_types[strategy](
                     **self.bidding_params
                 )
+                if isinstance(bidding_strategies[product_type], LearningStrategy):
+                    self.learning_agent_count += 1
             except KeyError as e:
                 self.logger.error(f"Invalid bidding strategy {strategy}")
                 raise e
@@ -306,15 +342,14 @@ class World:
         self.clock.set_time(next_activity)
         return delta
 
-    async def run_async(self):
+    async def run_async(self, start_ts, end_ts):
         """
         Run the simulation.
+        either in learning mode where we run multiple times or in normal mode
         """
 
         # agent is implicit added to self.container._agents
 
-        start_ts = calendar.timegm(self.start.utctimetuple())
-        end_ts = calendar.timegm(self.end.utctimetuple())
         pbar = tqdm(total=end_ts - start_ts)
 
         # allow registration before first opening
@@ -334,7 +369,16 @@ class World:
         pbar.close()
         await self.container.shutdown()
 
-        logging.info("Simulation finished")
-
     def run(self):
-        return self.loop.run_until_complete(self.run_async())
+        start_ts = calendar.timegm(self.start.utctimetuple())
+        end_ts = calendar.timegm(self.end.utctimetuple())
+
+        return self.loop.run_until_complete(
+            self.run_async(start_ts=start_ts, end_ts=end_ts)
+        )
+
+    def reset(self):
+        self.market_operators = {}
+        self.markets = {}
+        self.unit_operators = {}
+        self.forecast_providers = {}

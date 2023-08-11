@@ -42,6 +42,10 @@ class BaseUnit:
         self.bidding_strategies: dict[str, BaseStrategy] = bidding_strategies
         self.index = index
         self.outputs = defaultdict(lambda: pd.Series(0.0, index=self.index))
+        # series does not like to convert from tensor to float otherwise
+        self.outputs["rl_actions"] = pd.Series(0.0, index=self.index, dtype=object)
+        self.outputs["rl_observations"] = pd.Series(0.0, index=self.index, dtype=object)
+        self.outputs["rl_rewards"] = pd.Series(0.0, index=self.index, dtype=object)
 
     def reset(self):
         """Reset the unit to its initial state."""
@@ -67,28 +71,26 @@ class BaseUnit:
 
     def set_dispatch_plan(
         self,
-        market_config: MarketConfig,
+        marketconfig: MarketConfig,
         orderbook: Orderbook,
     ) -> None:
         """
         adds dispatch plan from current market result to total dispatch plan
         """
-        product_type = market_config.product_type
+        product_type = marketconfig.product_type
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
             end_excl = end - self.index.freq
             self.outputs[product_type].loc[start:end_excl] += order["volume"]
 
-            self.calculate_cashflow(start=start, end=end, clearing_price=order["price"])
+        self.calculate_cashflow(product_type, orderbook)
 
-            self.bidding_strategies[product_type].calculate_reward(
-                start=start,
-                end=end,
-                product_type=product_type,
-                clearing_price=order["price"],
-                unit=self,
-            )
+        self.bidding_strategies[product_type].calculate_reward(
+            unit=self,
+            marketconfig=marketconfig,
+            orderbook=orderbook,
+        )
 
     def execute_current_dispatch(
         self,
@@ -120,12 +122,7 @@ class BaseUnit:
             "unit_type": "base_unit",
         }
 
-    def calculate_cashflow(
-        self,
-        start,
-        end,
-        clearing_price,
-    ):
+    def calculate_cashflow(self, product_type: str, orderbook: Orderbook):
         pass
 
 
@@ -255,11 +252,9 @@ class BaseStrategy:
 
     def calculate_reward(
         self,
-        start,
-        end,
-        product_type,
-        clearing_price,
         unit,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
     ):
         pass
 
@@ -268,3 +263,11 @@ class LearningStrategy(BaseStrategy):
     """
     A strategy which provides learning functionality, has a method to calculate the reward.
     """
+
+    obs_dim: int
+    act_dim: int
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.obs_dim = kwargs.get("observation_dimension", 50)
+        self.act_dim = kwargs.get("action_dimension", 2)
