@@ -9,6 +9,7 @@ from mango import RoleAgent, create_container
 from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 
+from assume.common.forecasts import NaiveForecast
 from assume.common.units_operator import UnitsOperator
 from assume.markets.base_market import MarketConfig, MarketProduct
 from assume.strategies.naive_strategies import NaiveStrategy
@@ -44,7 +45,7 @@ async def units_operator() -> UnitsOperator:
         "unit_operator": "test_operator",
         "max_power": 1000,
         "min_power": 0,
-        "volume": 1000,
+        "forecaster": NaiveForecast(index, demand=1000),
     }
     unit = Demand("testdemand", index=index, **params_dict)
     await units_role.add_unit(unit)

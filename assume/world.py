@@ -108,8 +108,8 @@ class World:
 
             self.bidding_types["learning"] = RLStrategy
         except ImportError as e:
-            self.logger.error(
-                "You are trying to use reinforcement learning strategies, but the their import failed. Check if you have all required packages installed: %s",
+            self.logger.info(
+                "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",
                 e,
             )
         self.clearing_mechanisms = clearing_mechanisms
@@ -146,7 +146,7 @@ class World:
         )
 
         # initiate learning if the learning mode is one and hence we want to learn new strategies
-        if self.learning_config.get("learning_mode"):
+        if False:  # self.learning_config.get("learning_mode"):
             # if so, we initate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
 
@@ -257,15 +257,16 @@ class World:
                 continue
 
             try:
+                if issubclass(self.bidding_types[strategy], LearningStrategy):
+                    self.learning_agent_count += 1
                 bidding_strategies[product_type] = self.bidding_types[strategy](
                     **self.bidding_params
                 )
-                if isinstance(bidding_strategies[product_type], LearningStrategy):
-                    self.learning_agent_count += 1
             except KeyError as e:
-                self.logger.error(f"Invalid bidding strategy {strategy}")
-                raise e
-
+                self.logger.error(
+                    f"Bidding strategy {strategy} not registered, could not add {id}"
+                )
+                return
         unit_params["bidding_strategies"] = bidding_strategies
 
         # create unit within the unit operator its associated with

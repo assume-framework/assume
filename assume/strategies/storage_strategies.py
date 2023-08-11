@@ -32,9 +32,6 @@ class complexEOMStorage(BaseStrategy):
         start = product[0]
         end = product[1]
 
-        price_forecast = unit.forecaster["price_forecast"]
-        self.price_forecast = price_forecast
-
         min_power_charge, max_power_charge = unit.calculate_min_max_charge(start, end)
         min_power_discharge, max_power_discharge = unit.calculate_min_max_discharge(
             start, end
@@ -56,6 +53,8 @@ class complexEOMStorage(BaseStrategy):
         average_price = self.calculate_price_average(unit)
 
         previous_power = unit.get_output_before(start)
+
+        price_forecast = unit.forecaster["price_EOM"][t : t + self.foresight]
 
         if price_forecast[start] >= average_price / unit.efficiency_discharge:
             # place bid to discharge
@@ -141,12 +140,8 @@ class complexEOMStorage(BaseStrategy):
         return bids
 
     def calculate_price_average(self, unit: SupportsMinMaxCharge, t: datetime):
-        """if t - self.foresight < pd.Timedelta("0h"):
-            average_price = np.mean(unit.price_forecast[t-self.foresight:]
-                                    + unit.price_forecast[:t+self.foresight])
-        else:"""
         average_price = np.mean(
-            unit.price_forecast[t - self.foresight : t + self.foresight]
+            unit.forecaster["price_EOM"][t - self.foresight : t + self.foresight]
         )
 
         return average_price
@@ -181,7 +176,10 @@ class complexEOMStorage(BaseStrategy):
             unit=unit,
             t=start,
         )
-        if possible_revenue >= 0 and unit.price_forecast[t] < marginal_cost_flex:
+        if (
+            possible_revenue >= 0
+            and unit.forecaster["price_EOM"][t] < marginal_cost_flex
+        ):
             marginal_cost_flex = 0
 
         bid_price_mr = max(
@@ -202,12 +200,7 @@ class complexEOMStorage(BaseStrategy):
             return unit.cold_start_cost
 
     def get_possible_revenues(self, marginal_cost, unit, t):
-        price_forecast = []
-
-        if t + self.foresight > unit.price_forecast.index[-1]:
-            price_forecast = unit.price_forecast.loc[t:]
-        else:
-            price_forecast = unit.price_forecast.loc[t : t + self.foresight]
+        price_forecast = unit.forecaster["price_EOM"][t : t + self.foresight]
 
         possible_revenue = sum(
             marketPrice - marginal_cost for marketPrice in price_forecast

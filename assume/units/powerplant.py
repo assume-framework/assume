@@ -20,15 +20,10 @@ class PowerPlant(SupportsMinMax):
         index: pd.DatetimeIndex,
         max_power: float,
         min_power: float = 0.0,
-        availability: pd.Series = None,
         efficiency: float = 1.0,
         fixed_cost: float = 0.0,
         partial_load_eff: bool = False,
         fuel_type: str = "others",
-        fuel_price: float | pd.Series = 0.0,
-        co2_price: float | pd.Series = 0.0,
-        price_forecast: pd.Series = pd.Series(),
-        res_demand_forecast: pd.Series = pd.Series(),
         emission_factor: float = 0.0,
         ramp_up: float = -1,
         ramp_down: float = -1,
@@ -52,19 +47,14 @@ class PowerPlant(SupportsMinMax):
             bidding_strategies=bidding_strategies,
             index=index,
             node=node,
+            **kwargs,
         )
 
         self.max_power = max_power
         self.min_power = min_power
-        self.availability = availability or pd.Series(1, index=self.index)
         self.efficiency = efficiency
         self.partial_load_eff = partial_load_eff
         self.fuel_type = fuel_type
-        if isinstance(fuel_price, pd.Series) and len(fuel_price) == 1:
-            fuel_price = pd.Series(fuel_price.item(), index)
-        self.forecaster[f"fuel_price_{self.fuel_type}"] = fuel_price
-        if co2_price is not None:
-            self.forecaster["fuel_price_co2"] = co2_price
         self.emission_factor = emission_factor
 
         # check ramping enabled
@@ -160,10 +150,10 @@ class PowerPlant(SupportsMinMax):
     def calc_simple_marginal_cost(
         self,
     ):
-        fuel_price = self.forecaster[f"fuel_price_{self.fuel_type}"]
+        fuel_price = self.forecaster.get_price(self.fuel_type)
         marginal_cost = (
             fuel_price / self.efficiency
-            + self.forecaster["fuel_price_co2"] * self.emission_factor / self.efficiency
+            + self.forecaster.get_price("co2") * self.emission_factor / self.efficiency
             + self.fixed_cost
         )
 
@@ -175,11 +165,7 @@ class PowerPlant(SupportsMinMax):
         power_output: float,
         timestep: pd.Timestamp = None,
     ) -> float | pd.Series:
-        fuel_price = (
-            self.fuel_price.at[timestep]
-            if isinstance(self.fuel_price, pd.Series)
-            else self.fuel_price
-        )
+        fuel_price = self.forecaster.get_price(self.fuel_type).at[timestamp]
 
         capacity_ratio = power_output / self.max_power
 
@@ -214,7 +200,7 @@ class PowerPlant(SupportsMinMax):
             eta_loss = 0
 
         efficiency = self.efficiency - eta_loss
-        co2_price = self.forecaster["price_co2"].at[timestamp]
+        co2_price = self.forecaster.get_price("co2").at[timestamp]
 
         marginal_cost = (
             fuel_price / efficiency
@@ -247,7 +233,9 @@ class PowerPlant(SupportsMinMax):
         # min_power should be at least the heat demand at that time
         min_power = min_power.where(min_power >= heat_demand, heat_demand)
 
-        max_power = self.availability[start:end_excl] * self.max_power
+        max_power = (
+            self.forecaster.get_availability(self.id)[start:end_excl] * self.max_power
+        )
         # provide reserve for capacity_pos
         max_power = max_power - self.outputs["capacity_pos"][start:end_excl]
         # remove what has already been bid

@@ -13,7 +13,6 @@ class Electrolyser(BaseUnit):
         min_hydrogen_output: float | pd.Series,
         efficiency: float | pd.Series,
         volume: float | pd.Series = 1000,
-        electricity_price: float | pd.Series = 3000,
         ramp_up: float = -1,
         ramp_down: float = 1,
         fixed_cost: float = 0,
@@ -39,11 +38,7 @@ class Electrolyser(BaseUnit):
         self.min_hydrogen_output = min_hydrogen_output
         self.efficiency = efficiency
         self.volume = volume
-        self.electricity_price = (
-            electricity_price
-            if electricity_price is not None
-            else pd.Series(0, index=index)
-        )
+        self.electricity_price = self.forecaster["electricity_price"]
         self.fixed_cost = fixed_cost
         self.ramp_up = ramp_up
         self.ramp_down = ramp_down

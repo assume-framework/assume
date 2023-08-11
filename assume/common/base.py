@@ -36,6 +36,7 @@ class BaseUnit:
         index: pd.DatetimeIndex,
         node: str,
         forecaster: Forecaster = None,
+        **kwargs,
     ):
         self.id = id
         self.unit_operator = unit_operator

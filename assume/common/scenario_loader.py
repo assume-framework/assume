@@ -43,7 +43,7 @@ def load_file(
             index_col=0,
             encoding="utf-8",
             na_values=["n.a.", "None", "-", "none", "nan"],
-            parse_dates=True,
+            parse_dates=index is not None,
         )
 
         for col in df:
@@ -85,7 +85,7 @@ def load_file(
         return df
 
     except FileNotFoundError:
-        logger.warning(f"{file_name} not found. Returning None")
+        logger.info(f"{file_name} not found. Returning None")
         return None
 
 
@@ -150,7 +150,6 @@ def make_market_config(
 async def add_units(
     units_df: pd.DataFrame,
     unit_type: str,
-    callback: Callable[[str, dict], dict],
     world: World,
     forecaster: Forecaster,
 ):
@@ -171,8 +170,6 @@ async def add_units(
             if key.startswith("bidding_")
         }
         unit_params["bidding_strategies"] = bidding_strategies
-
-        unit_params = callback(unit_name, unit_params)
 
         await world.add_unit(
             id=unit_name,
@@ -295,7 +292,7 @@ async def load_scenario_folder_async(
 
     # add forecast providers for each market
     logger.info("Adding forecast")
-    forecaster = RandomForecaster(
+    forecaster = CsvForecaster(
         index=index,
         powerplants=powerplant_units,
     )
@@ -383,55 +380,26 @@ async def load_scenario_folder_async(
     # if fuel prices are provided, add them to the unit params
     # if vre generation is provided, add them to the vre units
     # if we have RL strategy, add price forecast to unit_params
-    def powerplant_callback(unit_name, unit_params):
-        unit_params["price_forecast"] = forecaster["price_EOM"]
-        fuel_price = forecaster[f'fuel_price_{unit_params["fuel_type"]}']
-
-        if fuel_price is not None:
-            unit_params["fuel_price"] = fuel_price
-        unit_params["co2_price"] = forecaster["fuel_price_co2"]
-
-        if availability is not None and unit_name in availability.columns:
-            unit_params["capacity_factor"] = availability[unit_name]
-
+    def empty_callback(unit_name, unit_params):
         return unit_params
 
     await add_units(
         powerplant_units,
         "power_plant",
-        powerplant_callback,
         world,
         forecaster,
     )
-
-    def heatpump_callback(unit_name, unit_params):
-        if electricity_prices_df is not None:
-            unit_params["electricity_price"] = electricity_prices_df[
-                "electricity_price"
-            ]
-
-        if temperature_df is not None:
-            unit_params["source_temp"] = temperature_df["source_temperature"]
-            unit_params["sink_temp"] = temperature_df["sink_temperature"]
-        return unit_params
 
     await add_units(
         heatpump_units,
         "heatpump",
-        heatpump_callback,
         world,
         forecaster,
     )
 
-    def storage_callback(unit_name, unit_params):
-        unit_params["price_forecast"] = forecaster["price_EOM"]
-
-        return unit_params
-
     await add_units(
         storage_units,
         "storage",
-        storage_callback,
         world,
         forecaster,
     )
@@ -445,7 +413,6 @@ async def load_scenario_folder_async(
     await add_units(
         demand_units,
         "demand",
-        demand_callback,
         world,
         forecaster,
     )

@@ -3,6 +3,7 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
+from assume.common.forecasts import NaiveForecast
 from assume.strategies.naive_strategies import NaiveStrategy
 from assume.units import PowerPlant
 
@@ -10,64 +11,65 @@ from assume.units import PowerPlant
 @pytest.fixture
 def power_plant_1() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
+    index = pd.date_range("2022-01-01", periods=4, freq="H")
+    ff = NaiveForecast(
+        index, availability=1, fuel_price=[10, 11, 12, 13], co2_price=[10, 20, 30, 30]
+    )
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
         technology="coal",
         bidding_strategies={"energy": NaiveStrategy()},
-        index=pd.date_range("2022-01-01", periods=4, freq="H"),
+        index=index,
         max_power=1000,
         min_power=200,
         efficiency=0.5,
         fixed_cost=10,
         fuel_type="lignite",
         emission_factor=0.5,
-        fuel_price=pd.Series(
-            [10, 11, 12, 13], index=pd.date_range("2022-01-01", periods=4, freq="H")
-        ),
-        co2_price=pd.Series(
-            [10, 20, 30, 30], index=pd.date_range("2022-01-01", periods=4, freq="H")
-        ),
+        forecaster=ff,
     )
 
 
 @pytest.fixture
 def power_plant_2() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
+    index = pd.date_range("2022-01-01", periods=4, freq="H")
+    ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
         technology="coal",
         bidding_strategies={"energy": NaiveStrategy()},
-        index=pd.date_range("2022-01-01", periods=4, freq="H"),
+        index=index,
         max_power=1000,
         min_power=0,
         efficiency=0.5,
         fixed_cost=10,
         fuel_type="lignite",
+        forecaster=ff,
         emission_factor=0.5,
-        fuel_price=10,
-        co2_price=10,
     )
 
 
 @pytest.fixture
 def power_plant_3() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
+    index = pd.date_range("2022-01-01", periods=4, freq="H")
+    ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
         technology="coal",
         bidding_strategies={"energy": NaiveStrategy()},
-        index=pd.date_range("2022-01-01", periods=4, freq="H"),
+        index=index,
         max_power=1000,
         min_power=0,
         efficiency=0.5,
         fixed_cost=10,
         fuel_type="lignite",
         emission_factor=0.5,
-        fuel_price=10,
-        co2_price=10,
+        forecaster=ff,
         partial_load_eff=True,
     )
 
@@ -84,18 +86,17 @@ def test_init_function(power_plant_1, power_plant_2, power_plant_3):
     assert power_plant_1.emission_factor == 0.5
     assert power_plant_1.ramp_up == 1000
     assert power_plant_1.ramp_down == 1000
-
+    index = pd.date_range("2022-01-01", periods=4, freq="H")
     assert (
         power_plant_1.marginal_cost.to_dict()
         == pd.Series(
             [40.0, 52.0, 64.0, 66.0],
-            index=pd.date_range("2022-01-01", periods=4, freq="H"),
+            index,
         ).to_dict()
     )
 
-    assert power_plant_2.marginal_cost == 40.0
-
-    assert power_plant_3.marginal_cost == 40
+    assert power_plant_2.marginal_cost.to_dict() == pd.Series(40, index).to_dict()
+    assert power_plant_3.marginal_cost.to_dict() == pd.Series(40, index).to_dict()
 
 
 def test_reset_function(power_plant_1):
