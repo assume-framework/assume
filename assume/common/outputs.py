@@ -224,6 +224,7 @@ class WriteOutput(Role):
         del unit_info["unit_type"]
         unit_info["simulation"] = self.simulation_id
         u_info = {unit_info["id"]: unit_info}
+        del unit_info["id"]
 
         self.write_dfs[table_name].append(pd.DataFrame(u_info).T)
 

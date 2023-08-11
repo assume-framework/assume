@@ -28,7 +28,6 @@ class Demand(SupportsMinMax):
         index: pd.DatetimeIndex,
         max_power: float,
         min_power: float,
-        volume: float | pd.Series,
         node: str = "bus0",
         price: float | pd.Series = 3000.0,
         location: tuple[float, float] = (0.0, 0.0),
@@ -41,6 +40,7 @@ class Demand(SupportsMinMax):
             bidding_strategies=bidding_strategies,
             index=index,
             node=node,
+            **kwargs,
         )
         self.max_power = max_power
         self.min_power = min_power
@@ -49,8 +49,7 @@ class Demand(SupportsMinMax):
             self.min_power = -max_power
         self.ramp_down = max(abs(min_power), abs(max_power))
         self.ramp_up = max(abs(min_power), abs(max_power))
-        if isinstance(volume, numbers.Real):
-            volume = pd.Series(volume, index=self.index)
+        volume = self.forecaster[self.id]
         self.volume = -abs(volume)  # demand is negative
         if isinstance(price, numbers.Real):
             price = pd.Series(price, index=self.index)

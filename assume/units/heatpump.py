@@ -14,7 +14,6 @@ class HeatPump(SupportsMinMax):
         max_power: float | pd.Series,
         min_power: float | pd.Series,
         volume: float | pd.Series = 1000,
-        electricity_price: pd.Series = pd.Series(),
         ramp_up: float = -1,
         ramp_down: float = 1,
         fixed_cost: float = 0,
@@ -23,8 +22,6 @@ class HeatPump(SupportsMinMax):
         downtime_hot_start: int = 0.001,  # hours
         downtime_warm_start: int = 0.005,  # hours
         source: str = None,
-        source_temp: float | pd.Series = 15,
-        sink_temp: float | pd.Series = 35,
         index: pd.DatetimeIndex = None,
         location: tuple[float, float] = None,
         node: str = None,
@@ -39,8 +36,6 @@ class HeatPump(SupportsMinMax):
             index=index,
         )
 
-        self.source_temp = source_temp
-        self.sink_temp = sink_temp
         self.max_power = max_power
         self.min_power = min_power
         self.source = source
@@ -48,17 +43,7 @@ class HeatPump(SupportsMinMax):
         # self.min_thermal_output = min_thermal_output
 
         self.volume = volume
-        self.electricity_price = (
-            electricity_price
-            if electricity_price is not None
-            else pd.Series(0, index=index)
-        )
-        self.sink_temp = (
-            sink_temp if sink_temp is not None else pd.Series(0, index=index)
-        )
-        self.source_temp = (
-            source_temp if source_temp is not None else pd.Series(0, index=index)
-        )
+        self.electricity_price = self.forecaster["electricity_price"]
         self.fixed_cost = fixed_cost
 
         # check ramping enabled
@@ -96,7 +81,9 @@ class HeatPump(SupportsMinMax):
         Returns:
         float: the calculated COP
         """
-        delta_t = self.sink_temp - self.source_temp
+        delta_t = (
+            self.forecaster["sink_temperature"] - self.forecaster["source_temperature"]
+        )
         if self.source == "air":
             cop = 6.81 + 0.121 * delta_t + 0.000630 * delta_t**2
         elif self.source == "soil":

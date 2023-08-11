@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -9,22 +10,40 @@ class Forecaster:
     A Forecaster can provide timeseries for forecasts which are derived either from existing files, random noise or actual forecast methods.
     """
 
+    def __init__(self, index: pd.Series):
+        self.index = index
+
     def __getitem__(self, column: str) -> pd.Series:
         return pd.Series(0, self.index)
+
+    def get_availability(self, unit: str):
+        """
+        returns the price for a given fuel_type
+        or zeros if type does not exist
+        """
+        return self[f"availability_{unit}"]
+
+    def get_price(self, fuel_type: str):
+        """
+        returns the price for a given fuel_type
+        or zeros if type does not exist
+        """
+        return self[f"fuel_price_{fuel_type}"]
 
 
 class CsvForecaster(Forecaster):
     def __init__(
         self, index: pd.Series, powerplants: dict[str, pd.Series] = {}, *args, **kwargs
     ):
-        super().__init__(*args, **kwargs)
+        super().__init__(index, *args, **kwargs)
         self.logger = logging.getLogger(__name__)
         self.powerplants = powerplants
         self.forecasts = pd.DataFrame(index=index)
-        self.index = index
 
     def __getitem__(self, column: str) -> pd.Series:
         if column not in self.forecasts.columns:
+            if "availability" in column:
+                return pd.Series(1, self.index)
             return pd.Series(0, self.index)
         return self.forecasts[column]
 
@@ -32,12 +51,17 @@ class CsvForecaster(Forecaster):
         if data is None:
             return
         elif isinstance(data, pd.DataFrame):
-            for column in data.columns:
-                if len(data.index) == 1:
-                    values = data[column].item()
-                else:
-                    values = data[column]
-                self.forecasts[prefix + column] = values
+            if prefix:
+                columns = [prefix + column for column in data.columns]
+                data.columns = columns
+            if len(data.index) == 1:
+                for column in data.columns:
+                    self.forecasts[column] = data[column].item()
+            else:
+                new_columns = set(data.columns) - set(self.forecasts.columns)
+                self.forecasts = pd.concat(
+                    [self.forecasts, data[list(new_columns)]], axis=1
+                )
         else:
             self.forecasts[prefix + data.name] = data
 
@@ -173,7 +197,7 @@ class RandomForecaster(CsvForecaster):
         self,
         index: pd.Series,
         powerplants: dict[str, pd.Series] = {},
-        sigma: float = 0.2,
+        sigma: float = 0.02,
         *args,
         **kwargs,
     ):
@@ -185,3 +209,34 @@ class RandomForecaster(CsvForecaster):
             return pd.Series(0, self.index)
         noise = np.random.normal(0, self.sigma, len(self.index))
         return self.forecasts[column] * noise
+
+
+class NaiveForecast(Forecaster):
+    def __init__(
+        self,
+        index: pd.Series,
+        availability: float | list = 1,
+        fuel_price: float | list = 10,
+        co2_price: float | list = 10,
+        demand: float | list = 100,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(index)
+        self.fuel_price = fuel_price
+        self.availability = availability
+        self.co2_price = co2_price
+        self.demand = demand
+
+    def __getitem__(self, column: str) -> pd.Series:
+        if "availability" in column:
+            value = self.availability
+        elif column == "fuel_price_co2":
+            value = self.co2_price
+        elif "fuel_price" in column:
+            value = self.fuel_price
+        elif "demand" in column:
+            value = self.demand
+        else:
+            value = 0
+        return pd.Series(value, self.index)

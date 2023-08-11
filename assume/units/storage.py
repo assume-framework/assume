@@ -67,8 +67,6 @@ class Storage(SupportsMinMaxCharge):
         The minimum down time of the storage unit in hours.
     min_down_time : float, optional
         The minimum down time of the storage unit in hours.
-    availability : dict, optional
-        The availability of the storage unit in MW for each time step.
     is_active: bool
         Defines whether or not the unit bids itself or is portfolio optimized.
     bidding_startegy: str
@@ -96,12 +94,10 @@ class Storage(SupportsMinMaxCharge):
         min_power_charge: float | pd.Series = 0.0,
         min_power_discharge: float | pd.Series = 0.0,
         min_SOC: float = 0.0,
-        availability: pd.Series = None,
         efficiency_charge: float = 1,
         efficiency_discharge: float = 1,
         variable_cost_charge: float | pd.Series = 0.0,
         variable_cost_discharge: float | pd.Series = 0.0,
-        price_forecast: pd.Series = None,
         emission_factor: float = 0.0,
         ramp_up_charge: float = 0.0,
         ramp_down_charge: float = 0.0,
@@ -141,8 +137,6 @@ class Storage(SupportsMinMaxCharge):
         self.max_SOC = max_SOC
         self.min_SOC = min_SOC
 
-        self.availability = availability or pd.Series(1, index=self.index)
-
         self.efficiency_charge = efficiency_charge if 0 < efficiency_charge < 1 else 1
         self.efficiency_discharge = (
             efficiency_discharge if 0 < efficiency_discharge < 1 else 1
@@ -150,10 +144,6 @@ class Storage(SupportsMinMaxCharge):
 
         self.variable_cost_charge = variable_cost_charge
         self.variable_cost_discharge = variable_cost_discharge
-
-        self.price_forecast = (
-            price_forecast if price_forecast is not None else pd.Series(0, index=index)
-        )
 
         self.emission_factor = emission_factor
 

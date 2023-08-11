@@ -144,7 +144,8 @@ class flexableEOM(BaseStrategy):
 
         if unit.outputs["heat"][t] > 0:
             heat_gen_cost = (
-                unit.outputs["heat"][t] * (unit.fuel_price["natural gas"][t] / 0.9)
+                unit.outputs["heat"][t]
+                * (unit.forecaster.get_price("natural gas")[t] / 0.9)
             ) / bid_quantity_inflex
         else:
             heat_gen_cost = 0.0

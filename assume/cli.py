@@ -58,7 +58,6 @@ def cli(args=None):
     )
 
     args = parser.parse_args(args)
-    print(args)
     name = args.scenario
     if args.db_uri:
         db_uri = args.db_uri

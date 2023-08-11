@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 from dateutil import rrule as rr
 
+from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.strategies import NaiveStrategy
 from assume.units.demand import Demand
@@ -21,15 +22,16 @@ def test_demand():
         datetime(2023, 7, 1, hour=2),
         None,
     )
+    ff = NaiveForecast(index, demand=150)
     dem = Demand(
-        "test01",
+        "demand_test01",
         "UO1",
         "energy",
         strategies,
         index,
         150,
         0,
-        150,
+        forecaster=ff,
         price=2000,
     )
     start = product_tuple[0]
@@ -75,15 +77,17 @@ def test_demand_series():
     demand[1] = 80
     price = pd.Series(1000, index=index)
     price[1] = 0
+
+    ff = NaiveForecast(index, demand=demand)
     dem = Demand(
-        "test01",
+        "demand_test02",
         "UO1",
         "energy",
         strategies,
         index,
         150,
         0,
-        demand,
+        forecaster=ff,
         price=price,
     )
     start = product_tuple[0]

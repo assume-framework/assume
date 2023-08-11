@@ -11,8 +11,8 @@ class MockMarketConfig:
 
 
 class MockMinMaxUnit(SupportsMinMax):
-    def __init__(self, index):
-        super().__init__("", "", "", {}, index, None)
+    def __init__(self, index, **kwargs):
+        super().__init__("", "", "", {}, index, None, **kwargs)
         self.max_power = 1000
         self.min_power = 0
         self.ramp_down = 200
