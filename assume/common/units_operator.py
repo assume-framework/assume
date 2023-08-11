@@ -85,7 +85,7 @@ class UnitsOperator(Role):
             message = {
                 "context": "write_results",
                 "type": "store_units",
-                "data": self.units[id],
+                "data": self.units[id].as_dict(),
             }
             await self.context.send_acl_message(
                 receiver_id=db_aid,
@@ -349,7 +349,9 @@ class UnitsOperator(Role):
                     )
                     data["unit"] = unit_id
                     unit_rl_strategy_dfs.append(data)
-                    all_observations.append(unit.outputs["rl_observations"][start])
+                    all_observations.append(
+                        np.array(unit.outputs["rl_observations"][start])
+                    )
                     all_actions[i, :] = unit.outputs["rl_actions"][start]
                     all_rewards.append(unit.outputs["rl_rewards"][start])
 

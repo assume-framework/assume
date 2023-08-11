@@ -116,6 +116,7 @@ class BaseUnit:
 
     def as_dict(self) -> dict:
         return {
+            "id": self.id,
             "technology": self.technology,
             "unit_operator": self.unit_operator,
             "unit_type": "base_unit",
