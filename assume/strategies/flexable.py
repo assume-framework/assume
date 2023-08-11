@@ -155,7 +155,10 @@ class flexableEOM(BaseStrategy):
             t=start,
             foresight=self.foresight,
         )
-        if possible_revenue >= 0 and unit.price_forecast[t] < marginal_cost_inflex:
+        if (
+            possible_revenue >= 0
+            and unit.forecaster["price_forecast"][t] < marginal_cost_inflex
+        ):
             marginal_cost_inflex = 0
 
         bid_price_inflex = max(
@@ -340,10 +343,10 @@ def get_specific_revenue(
 ):
     price_forecast = []
 
-    if t + foresight > unit.price_forecast.index[-1]:
-        price_forecast = unit.price_forecast.loc[t:]
+    if t + foresight > unit.forecaster["price_forecast"].index[-1]:
+        price_forecast = unit.forecaster["price_forecast"][t:]
     else:
-        price_forecast = unit.price_forecast.loc[t : t + foresight]
+        price_forecast = unit.forecaster["price_forecast"][t : t + foresight]
 
     possible_revenue = (price_forecast - marginal_cost).sum()
 
