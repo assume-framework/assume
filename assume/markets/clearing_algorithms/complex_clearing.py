@@ -25,7 +25,7 @@ def pay_as_clear_opt(
     market_agent.all_orders.sort(key=market_getter)
 
     if len(market_agent.all_orders) == 0:
-        return accepted_orders, meta
+        return accepted_orders, [], meta
 
     model = pyo.ConcreteModel()
     model.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT_EXPORT)
@@ -152,4 +152,4 @@ def pay_as_clear_opt(
 
     market_agent.all_orders = []
 
-    return accepted_orders, meta
+    return accepted_orders, [], meta

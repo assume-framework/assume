@@ -20,14 +20,14 @@ def pay_as_clear(
     market_agent.all_orders.sort(key=market_getter)
     for product, product_orders in groupby(market_agent.all_orders, market_getter):
         accepted_product_orders: Orderbook = []
+        product_orders = list(product_orders)
         if product not in market_products:
             rejected_orders.extend(product_orders)
             # log.debug(f'found unwanted bids for {product} should be {market_products}')
             continue
 
-        product_orders = list(product_orders)
-        demand_orders = list(filter(lambda x: x["volume"] < 0, product_orders))
-        supply_orders = list(filter(lambda x: x["volume"] > 0, product_orders))
+        supply_orders = [x for x in product_orders if x["volume"] > 0]
+        demand_orders = [x for x in product_orders if x["volume"] < 0]
         # volume 0 is ignored/invalid
 
         # generation
@@ -38,8 +38,7 @@ def pay_as_clear(
         # the following algorithm is inspired by one bar for generation and one for demand
         # add generation for currents demand price, until it matches demand
         # generation above it has to be sold for the lower price (or not at all)
-        for i in range(len(demand_orders)):
-            demand_order: Order = demand_orders[i]
+        for demand_order in demand_orders:
             if not supply_orders:
                 # if no more generation - reject left over demand
                 rejected_orders.append(demand_order)
@@ -88,9 +87,7 @@ def pay_as_clear(
             accepted_product_orders.extend(to_commit)
 
         # set clearing price - merit order - uniform pricing
-        accepted_supply_orders = list(
-            filter(lambda x: x["volume"] > 0, accepted_product_orders)
-        )
+        accepted_supply_orders = [x for x in accepted_product_orders if x["volume"] > 0]
         if accepted_supply_orders:
             clear_price = max(map(itemgetter("price"), accepted_supply_orders))
         else:
@@ -100,14 +97,10 @@ def pay_as_clear(
             order["price"] = clear_price
         accepted_orders.extend(accepted_product_orders)
 
-        accepted_supply_orders = list(
-            filter(lambda x: x["volume"] > 0, accepted_product_orders)
-        )
-        accepted_demand_orders = list(
-            filter(lambda x: x["volume"] > 0, accepted_product_orders)
-        )
+        accepted_supply_orders = [x for x in accepted_product_orders if x["volume"] > 0]
+        accepted_demand_orders = [x for x in accepted_product_orders if x["volume"] < 0]
         supply_volume = sum(map(itemgetter("volume"), accepted_supply_orders))
-        demand_volume = sum(map(itemgetter("volume"), accepted_demand_orders))
+        demand_volume = -sum(map(itemgetter("volume"), accepted_demand_orders))
         duration_hours = (product[1] - product[0]).total_seconds() / 60 / 60
         meta.append(
             {
@@ -128,7 +121,7 @@ def pay_as_clear(
     market_agent.all_orders = rejected_orders
     # accepted orders can not be used in future
 
-    return accepted_orders, meta
+    return accepted_orders, [], meta
 
 
 def pay_as_bid(
@@ -139,7 +132,7 @@ def pay_as_bid(
     accepted_orders: Orderbook = []
     rejected_orders: Orderbook = []
     meta = []
-    market_agent.all_orders = sorted(market_agent.all_orders, key=market_getter)
+    market_agent.all_orders.sort(key=market_getter)
     for product, product_orders in groupby(market_agent.all_orders, market_getter):
         accepted_product_orders: Orderbook = []
         if product not in market_products:
@@ -148,8 +141,8 @@ def pay_as_bid(
             continue
 
         product_orders = list(product_orders)
-        demand_orders = list(filter(lambda x: x["volume"] < 0, product_orders))
-        supply_orders = list(filter(lambda x: x["volume"] > 0, product_orders))
+        supply_orders = [x for x in product_orders if x["volume"] > 0]
+        demand_orders = [x for x in product_orders if x["volume"] < 0]
         # volume 0 is ignored/invalid
 
         # generation
@@ -161,8 +154,7 @@ def pay_as_bid(
         # the following algorithm is inspired by one bar for generation and one for demand
         # add generation for currents demand price, until it matches demand
         # generation above it has to be sold for the lower price (or not at all)
-        for i in range(len(demand_orders)):
-            demand_order: Order = demand_orders[i]
+        for demand_order in demand_orders:
             if not supply_orders:
                 # if no more generation - reject left over demand
                 rejected_orders.append(demand_order)
@@ -211,14 +203,15 @@ def pay_as_bid(
                 demand_order["price"] = supply_order["price"]
             accepted_product_orders.extend(to_commit)
 
-        accepted_supply_orders = list(
-            filter(lambda x: x["volume"] > 0, accepted_product_orders)
-        )
-        accepted_demand_orders = list(
-            filter(lambda x: x["volume"] > 0, accepted_product_orders)
-        )
+        accepted_supply_orders = [x for x in accepted_product_orders if x["volume"] > 0]
+        accepted_demand_orders = [x for x in accepted_product_orders if x["volume"] < 0]
         supply_volume = sum(map(itemgetter("volume"), accepted_supply_orders))
-        demand_volume = sum(map(itemgetter("volume"), accepted_demand_orders))
+        demand_volume = -sum(map(itemgetter("volume"), accepted_demand_orders))
+
+        avg_price = 0
+        if supply_volume:
+            weighted_price = [o["volume"] * o["price"] for o in accepted_supply_orders]
+            avg_price = sum(weighted_price) / supply_volume
         accepted_orders.extend(accepted_product_orders)
         prices = list(map(itemgetter("price"), accepted_supply_orders))
         if not prices:
@@ -230,7 +223,7 @@ def pay_as_bid(
                 "demand_volume": demand_volume,
                 "demand_volume_energy": demand_volume * duration_hours,
                 "supply_volume_energy": supply_volume * duration_hours,
-                "price": sum(prices) / len(prices),
+                "price": avg_price,
                 "max_price": max(prices),
                 "min_price": min(prices),
                 "node_id": None,
@@ -242,4 +235,4 @@ def pay_as_bid(
     market_agent.all_orders = rejected_orders
     # accepted orders can not be used in future
 
-    return accepted_orders, meta
+    return accepted_orders, [], meta

@@ -81,7 +81,7 @@ def test_market():
         simple_dayahead_auction_config.market_mechanism
     ]
     mr.all_orders = orderbook
-    clearing_result, meta = simple_dayahead_auction_config.market_mechanism(
+    accepted, rejected, meta = simple_dayahead_auction_config.market_mechanism(
         mr, products
     )
     assert meta[0]["demand_volume"] > 0
@@ -89,7 +89,7 @@ def test_market():
     import pandas as pd
 
     print(pd.DataFrame(mr.all_orders))
-    print(pd.DataFrame(clearing_result))
+    print(pd.DataFrame(accepted))
     print(meta)
 
 
@@ -144,7 +144,7 @@ def test_market_mechanism():
 
         orderbook = create_orderbook(order, node_ids=[0, 1, 2])
         mr.all_orders = orderbook
-        clearing_result, meta = market_config.market_mechanism(mr, products)
+        accepted, rejected, meta = market_config.market_mechanism(mr, products)
         assert meta[0]["supply_volume"] > 0
         assert meta[0]["price"] > 0
         # import pandas as pd
