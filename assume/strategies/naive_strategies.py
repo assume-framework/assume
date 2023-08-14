@@ -33,7 +33,42 @@ class NaiveStrategy(BaseStrategy):
                 }
             )
 
+            if "bid_type" in market_config.additional_fields:
+                bids[-1]["bid_type"] = "SB"
+
             previous_power = volume + current_power
+
+        return bids
+    
+class NaiveDAStrategy(BaseStrategy):
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        
+        start = product_tuples[0][0]
+        end_all = product_tuples[-1][1]
+        previous_power = unit.get_output_before(start)
+        min_power, max_power = unit.calculate_min_max_power(start, end_all)
+
+        bids = []
+        current_power = unit.outputs["energy"].at[start]
+        marginal_cost = unit.calculate_marginal_cost(start, previous_power)
+        volume = unit.calculate_ramp(
+            previous_power, max_power[start], current_power
+        )
+        bids.append(
+            {
+                "start_time": start,
+                "end_time": product_tuples[0][1],
+                "only_hours": product_tuples[0][2],
+                "price": marginal_cost,
+                "volume": {product[0]: volume for product in product_tuples},
+            }
+        )
 
         return bids
 

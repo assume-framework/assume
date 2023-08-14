@@ -24,6 +24,8 @@ def pay_as_clear_opt(
     market_getter = itemgetter("start_time", "end_time", "only_hours")
     market_agent.all_orders.sort(key=market_getter)
 
+    orders = market_agent.all_orders
+
     if len(market_agent.all_orders) == 0:
         return accepted_orders, [], meta
 
@@ -34,64 +36,34 @@ def pay_as_clear_opt(
         initialize=[market_product[0] for market_product in market_products],
         doc="timesteps",
     )
-    model.K = pyo.Set(
-        initialize=[order["bid_id"] for order in market_agent.all_orders], doc="bids"
-    )
+    model.sBids = pyo.Set(initialize=[order["bid_id"] for order in orders if order["bid_type"] == "SB"], doc="simple_bids")
+    model.bBids = pyo.Set(initialize=[order["bid_id"] for order in orders if order["bid_type"] == "BB"], doc="block_bids")
 
-    model.P = pyo.Var(model.K, domain=pyo.Reals)
-    if "acceptance_ratio" in market_agent.marketconfig.additional_fields:
-        model.bid_used = pyo.Var(model.K, domain=pyo.Binary)
+    model.xs = pyo.Var(model.sBids, domain=pyo.NonNegativeReals, bounds=(0,1), doc="simple_bid_acceptance")
+    model.xb = pyo.Var(model.bBids, domain=pyo.NonNegativeReals, bounds=(0,1),doc="block_bid_acceptance")
 
-    model.energy_balance = pyo.ConstraintList()
-    model.min_max_power = pyo.ConstraintList()
+    balanceExpr = {t: 0.0 for t in model.T}
+    for order in orders:
+        if order["bid_type"] == "SB":
+            balanceExpr[order["start_time"]] += order["volume"] * model.xs[order["bid_id"]]
+        elif order["bid_type"] == "BB":
+            for start_time, volume in order["volume"].items():
+                balanceExpr[start_time] += volume * model.xb[order["bid_id"]]
 
-    for product, product_orders in groupby(market_agent.all_orders, market_getter):
-        if product not in market_products:
-            rejected_orders.extend(product_orders)
-            # log.debug(f'found unwanted bids for {product} should be {market_products}')
-            continue
+    def energy_balance_rule(m, t):
+        return balanceExpr[t] == 0
 
-        product_orders = list(product_orders)
+    model.energy_balance = pyo.Constraint(model.T, rule=energy_balance_rule)            
 
-        expr = sum(model.P[order["bid_id"]] for order in product_orders) == 0
-        model.energy_balance.add(expr)
+    obj_exp = 0
+    for order in orders:
+        if order["bid_type"] == "SB":
+            obj_exp += order["price"] * order["volume"] * model.xs[order["bid_id"]]
+        elif order["bid_type"] == "BB":
+            for start_time, volume in order["volume"].items():
+                obj_exp += order["price"] * volume * model.xb[order["bid_id"]]
 
-        for order in product_orders:
-            if "acceptance_ratio" in market_agent.marketconfig.additional_fields:
-                if order["volume"] > 0:
-                    min_max_power_expr = (
-                        model.bid_used[order["bid_id"]]
-                        * order["acceptance_ratio"]
-                        * order["volume"],
-                        model.P[order["bid_id"]],
-                        model.bid_used[order["bid_id"]] * order["volume"],
-                    )
-                else:
-                    min_max_power_expr = (
-                        model.bid_used[order["bid_id"]] * order["volume"],
-                        model.P[order["bid_id"]],
-                        model.bid_used[order["bid_id"]]
-                        * order["acceptance_ratio"]
-                        * order["volume"],
-                    )
-
-            else:
-                if order["volume"] > 0:
-                    min_max_power_expr = (0, model.P[order["bid_id"]], order["volume"])
-                else:
-                    min_max_power_expr = (order["volume"], model.P[order["bid_id"]], 0)
-
-            model.min_max_power.add(min_max_power_expr)
-
-    def objective_rule(model):
-        expr = sum(
-            model.P[order["bid_id"]] * order["price"]
-            for order in market_agent.all_orders
-        )
-
-        return expr
-
-    model.objective = pyo.Objective(rule=objective_rule, sense=pyo.minimize)
+    model.objective = pyo.Objective(expr=obj_exp, sense=pyo.minimize)
 
     solvers = check_available_solvers(*SOLVERS)
     if len(solvers) < 1:
@@ -100,16 +72,15 @@ def pay_as_clear_opt(
     solver = SolverFactory(solvers[0])
 
     # Solve the model
-    instance = model.create_instance()
-    result = solver.solve(instance)
+    result = solver.solve(model)
 
     if result["Solver"][0]["Status"] != "ok":
         raise Exception("infeasible")
 
     # Find the dual variable for the balance constraint
     market_clearing_prices = {
-        t: instance.dual[instance.energy_balance[i + 1]]
-        for i, t in enumerate(instance.T)
+        t: model.dual[model.energy_balance[t]]
+        for t in model.T
     }
 
     for product, product_orders in groupby(market_agent.all_orders, market_getter):
@@ -118,15 +89,22 @@ def pay_as_clear_opt(
         supply_volume = 0
         demand_volume = 0
 
-        for order in product_orders:
-            opt_volume = instance.P[order["bid_id"]].value
+        product_orders = list(product_orders)
+        for order in list(product_orders):
+            if order["bid_type"] == "SB":
+                order["volume"] = model.xs[order["bid_id"]].value * order["volume"]
+                opt_volume = order["volume"]
+            elif order["bid_type"] == "BB":
+                opt_volume = 0
+                for start_time, volume in order["volume"].items():
+                    order['profile'][start_time] = model.xb[order["bid_id"]].value * volume
+                    opt_volume += order['profile'][start_time]
 
             if opt_volume > 0:
                 supply_volume += opt_volume
             else:
                 demand_volume += opt_volume
 
-            order["volume"] = opt_volume
             order["price"] = clear_price
 
             if opt_volume != 0:

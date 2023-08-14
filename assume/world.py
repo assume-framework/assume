@@ -24,19 +24,7 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.markets import MarketRole, clearing_mechanisms
-from assume.strategies import (
-    LearningStrategy,
-    NaiveNegReserveStrategy,
-    NaivePosReserveStrategy,
-    NaiveStrategy,
-    OTCStrategy,
-    flexableEOM,
-    flexableEOMStorage,
-    flexableNegCRM,
-    flexableNegCRMStorage,
-    flexablePosCRM,
-    flexablePosCRMStorage,
-)
+from assume.strategies import bidding_strategies, LearningStrategy
 from assume.units import BaseUnit, Demand, HeatPump, PowerPlant, Storage
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
@@ -90,18 +78,7 @@ class World:
             "demand": Demand,
             "storage": Storage,
         }
-        self.bidding_types = {
-            "flexable_eom": flexableEOM,
-            "flexable_pos_crm": flexablePosCRM,
-            "flexable_neg_crm": flexableNegCRM,
-            "flexable_eom_storage": flexableEOMStorage,
-            "flexable_pos_crm_storage": flexablePosCRMStorage,
-            "flexable_neg_crm_storage": flexableNegCRMStorage,
-            "naive": NaiveStrategy,
-            "naive_neg_reserve": NaiveNegReserveStrategy,
-            "naive_pos_reserve": NaivePosReserveStrategy,
-            "otc_strategy": OTCStrategy,
-        }
+        self.bidding_types = bidding_strategies
 
         try:
             from assume.strategies.learning_strategies import RLStrategy
