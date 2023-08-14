@@ -90,6 +90,24 @@ to run pre-commit directly, you can use
 pre-commit run --all-files
 ```
 
+
+Create Documentation
+--------------------
+
+First, create an environment which includes the docs dependencies:
+
+```
+conda env create -f environment_docs.yml
+```
+
+To create the documentation or update the automatically created docs in `docs/source/assume*` run `sphinx-apidoc -o docs/source -Fa assume`
+
+To create and serve the documentation locally, run
+
+```bash
+make -C docs html && python -m http.server --directory docs/build/html
+```
+
 Use Learning Capabilities
 ---------------------------------
 If you want to use the reinforcement learning strategies of Assume please make sure to install torch on top of the requirements listed in the requirements.txt. If you Ressources do not have a GPU available use the CPU only version of torch, which can be installed like this:

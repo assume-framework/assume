@@ -9,30 +9,81 @@ A full list of configurations and explanation is given here.
   market config item            description
  ============================= =====================================================
   name                          string name
-  product type                  energy or capacity or heat
-  market products               list of available products to be traded
-  opening hours                 recurrence rule of openings
-  opening duration              time delta
+  product_type                  energy or capacity or heat
+  market_products               list of available products to be traded
+  opening_hours                 recurrence rule of openings
+  opening_duration              time delta
   market mechanism              name of method used for clearing
-  maximum bid                   max allowed bidding price
-  minimum bid                   min allowed bidding price
-  maximum volume                the largest valid volume for a single bid
-  additional fields             list of additional fields to base bid
-  volume tick size              step increments of volume
-  price tick size               step increments of price
-  volume unit                   string for visualization
-  price unit                    string for visualization
-  supports get unmatched        boolean
-  maximum gradient              max allowed change between bids
-  eligible obligations lambda   function checking if agent is allowed to trade here
+  maximum_bid_price             max allowed bidding price
+  minimum_bid_price             min allowed bidding price
+  maximum_bid_volume            the largest valid volume for a single bid
+  additional_fields             list of additional fields to base bid
+  volume_tick                   step increments of volume
+  price_tick                    step increments of price
+  volume_unit                   string for visualization of volume
+  price_unit                    string for visualization of price
+  supports_get_unmatched        boolean
+  maximum_gradient              max allowed change between bids
+  eligible_obligations_lambda   function checking if agent is allowed to trade here
  ============================= =====================================================
 
 
-Here, a description of all options and the usage will be given.
+Here, a description of all options and the usage is given.
+
+The `opening_hours` is a recurrence rule which defines when the market is open.
+The `opening_duration` is a timedelta which defines how long the market is open. This can be used to leave time for negotiation in the agents.
+The `market_mechanism` is the name of the clearing method used for this market, and is mapped to the actual clearing_function in the initialization.
+The `minimum_bid_price`, `maximum_bid_price` and `maximum_bid_volume` are constraints for bids. All Bids of the sent orderbook are rejected and not considered for clearing if one or more are not in these bounds.
+An agent receives a "Rejected" message if this is the case.
+The `additional_fields` is a list of additional fields which are used to base the bid on.
+The `price_tick` and `volume_tick` is the step increment of volume, which ensures that only integers are used for calculation.
+The `price_unit` and `volume_unit` are strings for visualization of price.
+The `supports_get_unmatched` is a boolean which defines if the market supports the handle_get_unmatched method, which allows agents to look into the current market orderbook, as it is the case, mostly on continuous markets.
+The `maximum_gradient` is the maximum allowed change between bids from one hour to the next one - only relevant if the count of market products is greater than 1.
+
+Most important, the `market_products` are a list of MarketProduct objects.
+
+MarketProduct
+-------------
+
+Each MarketProduct contains the three informations:
+
+- duration (a relative timedelta or recurrency rule)
+- count (how many consecutive products are available for trading)
+- first_delivery (a relative timedelta of the first delivery in relation to market start)
+- only_hours (tuple of hours from which this product is available, on multi day products)
+
+For example, if the duration is 1 hour, the count is 4 and first_delivery is 2 hours, then a market which opens at 12:00 will have the following products:
+
+- 14:00 - 15:00
+- 15:00 - 16:00
+- 16:00 - 17:00
+- 17:00 - 18:00
+
+It then makes sense to reschedule the market clearing all 4 hours, but it would also be possible to schedule the same clearing interval an hour later too, which would look like this:
+
+.. mermaid::
+
+   gantt
+      title Market Schedule Simple count 4
+      dateFormat  YYY-MM-DD HH:mm
+      axisFormat %H:%M
+      section First
+      Bidding00 EOM          :a1, 2019-01-01 12:00, 1h
+      Delivery01 EOM         :2019-01-01 14:00, 1h
+      Delivery02 EOM         :2019-01-01 15:00, 1h
+      Delivery03 EOM         :2019-01-01 16:00, 1h
+      Delivery04 EOM         :2019-01-01 17:00, 1h
+      section Second
+      Bidding10 EOM          :a2, 2019-01-01 13:00, 1h
+      Delivery11 EOM         :2019-01-01 15:00, 1h
+      Delivery12 EOM         :2019-01-01 16:00, 1h
+      Delivery13 EOM         :2019-01-01 17:00, 1h
+      Delivery14 EOM         :2019-01-01 18:00, 1h
 
 
 Example Configuration - CRM Market
-==================================
+----------------------------------
 
 An example of a EOM and CRM market is shown here.
 It is possible to trade at the EOM and sell positive capacity on the CRM too::
