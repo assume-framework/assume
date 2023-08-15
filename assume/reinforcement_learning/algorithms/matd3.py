@@ -56,7 +56,7 @@ class TD3(RLAlgorithm):
 
     async def update_policy(self):
         logger.info(f"Updating Policy")
-        # double check if we should update already, because for some reason the recurrencyrule does not behave as I have expected
+        # TODO double check if we should update already, because for some reason the recurrencyrule does not behave as I have expected
         if self.learning_role.start_update:
             for _ in range(self.gradient_steps):
                 # loop over all agents based on number of agents in sel.n_rl_agents

@@ -27,7 +27,9 @@ class Learning(Role):
         self.simulation_start = start
         self.simulation_end = end
 
+        # how many learning roles do exist and how are they named
         self.n_rl_units = 0
+        self.rl_units = []
 
         self.buffer = None
         self.obs_dim = learning_config["observation_dimension"]
