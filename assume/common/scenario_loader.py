@@ -172,14 +172,6 @@ async def add_units(
         }
         unit_params["bidding_strategies"] = bidding_strategies
 
-        #        if isinstance(bidding_strategies['energy'], LearningStrategy):
-        # TODO schön
-        if bidding_strategies["energy"] == "learning":
-            world.rl_agent.roles[0].n_rl_units += 1
-            world.rl_agent.roles[0].rl_units = world.rl_agent.roles[0].rl_units.append(
-                unit_name
-            )
-
         await world.add_unit(
             id=unit_name,
             unit_type=unit_type,

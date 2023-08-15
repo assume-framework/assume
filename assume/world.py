@@ -61,7 +61,6 @@ class World:
         self.logger = logging.getLogger(__name__)
         self.addr = (ifac_addr, port)
         self.container = None
-        self.learning_unit_count = 0
 
         self.export_csv_path = export_csv_path
         # intialize db connection at beginning of simulation
@@ -146,7 +145,7 @@ class World:
         )
 
         # initiate learning if the learning mode is one and hence we want to learn new strategies
-        if False:  # self.learning_config.get("learning_mode"):
+        if self.learning_config.get("learning_mode"):
             # if so, we initate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
 
@@ -260,10 +259,13 @@ class World:
 
             try:
                 if issubclass(self.bidding_types[strategy], LearningStrategy):
-                    self.learning_agent_count += 1
+                    self.rl_agent.roles[0].n_rl_units += 1
+                    self.rl_agent.roles[0].rl_units.append(id)
+
                 bidding_strategies[product_type] = self.bidding_types[strategy](
                     **self.bidding_params
                 )
+
             except KeyError as e:
                 self.logger.error(
                     f"Bidding strategy {strategy} not registered, could not add {id}"
