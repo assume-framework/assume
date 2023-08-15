@@ -165,7 +165,7 @@ class PowerPlant(SupportsMinMax):
         power_output: float,
         timestep: pd.Timestamp = None,
     ) -> float | pd.Series:
-        fuel_price = self.forecaster.get_price(self.fuel_type).at[timestamp]
+        fuel_price = self.forecaster.get_price(self.fuel_type).at[timestep]
 
         capacity_ratio = power_output / self.max_power
 
@@ -200,7 +200,7 @@ class PowerPlant(SupportsMinMax):
             eta_loss = 0
 
         efficiency = self.efficiency - eta_loss
-        co2_price = self.forecaster.get_price("co2").at[timestamp]
+        co2_price = self.forecaster.get_price("co2").at[timestep]
 
         marginal_cost = (
             fuel_price / efficiency
