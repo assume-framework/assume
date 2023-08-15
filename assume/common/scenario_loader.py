@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 from assume.common.forecasts import CsvForecaster, Forecaster, RandomForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
+from assume.strategies.learning_strategies import LearningStrategy
 from assume.world import World
 
 logger = logging.getLogger(__name__)
@@ -170,6 +171,10 @@ async def add_units(
             if key.startswith("bidding_")
         }
         unit_params["bidding_strategies"] = bidding_strategies
+
+        #        if isinstance(bidding_strategies['energy'], LearningStrategy):
+        if bidding_strategies["energy"] == "learning":
+            world.rl_agent.roles[0].n_rl_units = world.rl_agent.roles[0].n_rl_units + 1
 
         await world.add_unit(
             id=unit_name,
@@ -449,19 +454,12 @@ def load_scenario_folder(
             buffer_size=int(5e5),
             obs_dim=world.rl_agent.roles[0].obs_dim,
             act_dim=world.rl_agent.roles[0].act_dim,
-            n_rl_units=world.learning_unit_count,
+            n_rl_units=world.rl_agent.roles[0].n_rl_units,
             device=world.rl_agent.roles[0].device,
         )
 
         world.rl_agent.roles[0].buffer = buffer
-
-        # store number of learning agents in learning role
-        for unit in self.units.values():
-            bidding_strategy = unit.bidding_strategies.get(marketconfig.product_type)
-            if isinstance(bidding_strategy, LearningStrategy):
-                learning_unit_count += 1
-                # should be the same across all strategies
-                action_dimension = bidding_strategy.act_dim
+        world.rl_agent.roles[0].init_learning()
 
         for episode in tqdm(
             range(world.rl_agent.roles[0].training_episodes),

@@ -1,6 +1,8 @@
 import logging
 import os
+from datetime import datetime, timedelta
 
+import pandas as pd
 import torch as th
 from dateutil import rrule as rr
 from mango import Role
@@ -19,7 +21,14 @@ class Learning(Role):
     def __init__(
         self,
         learning_config,
+        start: datetime,
+        end: datetime,
     ):
+        self.simulation_start = start
+        self.simulation_end = end
+
+        self.n_rl_units = 0
+
         self.buffer = None
         self.obs_dim = learning_config["observation_dimension"]
         self.act_dim = learning_config["action_dimension"]
@@ -63,30 +72,41 @@ class Learning(Role):
             self.max_eval_regret = 1e9
             self.max_eval_profit = -1e9
 
-            # create learning algorithm
-            self.create_learning_algorithm(self.rl_algorithm)
-
-            # store evaluation values
-            self.rl_eval_rewards = []
-            self.rl_eval_profits = []
-            self.rl_eval_regrets = []
-
-            # shedule policy updates
-            # TODO define frequency and stuff
-
-            recurrency_task = rr.rrule(
-                freq=rr.HOURLY,
-                interval=self.train_freq,
-                dtstart=self.learning_starts,
-                until=self.training_episodes,
-                cache=True,
-            )
-
-            self.context.schedule_recurrent_task(
-                self.rl_algorithm.update_policy, recurrency_task
-            )
+            # temp for testing reccurency role
+            self.start_update = False
 
         # self.float_type = th.float16 if self.device.type == "cuda" else th.float
+
+    def init_learning(self):
+        # function that initializes learning, needs to be an extra function so that it can be called after buffer is given to Role
+        self.create_learning_algorithm(self.rl_algorithm)
+
+        # store evaluation values
+        self.rl_eval_rewards = []
+        self.rl_eval_profits = []
+        self.rl_eval_regrets = []
+
+        # shedule policy updates
+        # TODO define frequency and stuff
+
+        recurrency_task = rr.rrule(
+            freq=rr.HOURLY,
+            interval=self.train_freq,
+            dtstart=self.simulation_start + timedelta(hours=self.learning_starts),
+            until=self.simulation_start
+            + timedelta(
+                hours=(
+                    (self.simulation_end - self.simulation_start).total_seconds()
+                    / 3600
+                    * self.training_episodes
+                )
+            ),
+            cache=True,
+        )
+
+        self.context.schedule_recurrent_task(
+            self.rl_algorithm.update_policy, recurrency_task
+        )
 
     def setup(self):
         # subscribe to messages for handling the training process
@@ -114,11 +134,12 @@ class Learning(Role):
                 reward=data[2],
             )
 
+        self.start_update = True
+
     def create_learning_algorithm(self, algorithm):
         if algorithm == "matd3":
             self.rl_algorithm = TD3(
                 learning_role=self,
-                buffer_size=self.buffer.buffer_size,
                 learning_starts=self.learning_starts,
                 train_freq=self.train_freq,
                 gradient_steps=self.gradient_steps,

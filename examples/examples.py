@@ -45,7 +45,7 @@ availabe_examples = {
 
 # %%
 if __name__ == "__main__":
-    example = "small"
+    example = "rl"
     data_format = "timescale"  # "local_db" or "timescale"
 
     if data_format == "local_db":
@@ -54,6 +54,7 @@ if __name__ == "__main__":
         db_url = "postgresql://assume:assume@localhost:5432/assume"
 
     world = World(database_uri=db_url, export_csv_path=csv_path)
+
     load_scenario_folder(
         world,
         inputs_path="examples/inputs",

@@ -151,6 +151,8 @@ class World:
             from assume.reinforcement_learning.learning_role import Learning
 
             learning_role = Learning(
+                start=start,
+                end=end,
                 learning_config=self.learning_config,
             )
             self.bidding_params.update(self.learning_config)

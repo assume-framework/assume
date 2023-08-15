@@ -10,7 +10,8 @@ logger = logging.getLogger(__name__)
 class RLAlgorithm:
     def __init__(
         self,
-        learning_role=None,
+        # init learning_role as object of Learning class
+        learning_role,
         learning_rate=1e-4,
         learning_starts=100,
         batch_size=1024,
@@ -40,13 +41,13 @@ class RLAlgorithm:
         self.target_noise_clip = target_noise_clip
         self.target_policy_noise = target_policy_noise
 
-        self.n_rl_agents = self.learning_role.buffer.n_rl_agents
+        self.n_rl_agents = self.learning_role.roles[0].buffer.n_rl_agents
 
-        self.obs_dim = self.learning_role.obs_dim
-        self.act_dim = self.learning_role.act_dim
+        self.obs_dim = self.learning_role.roles[0].obs_dim
+        self.act_dim = self.learning_role.roles[0].act_dim
 
-        self.device = self.learning_role.device
-        self.float_type = self.learning_role.float_type
+        self.device = self.learning_role.roles[0].device
+        self.float_type = self.learning_role.roles[0].float_type
 
         self.unique_obs_len = 8
 
