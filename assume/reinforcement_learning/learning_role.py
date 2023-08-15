@@ -1,7 +1,14 @@
+import logging
 import os
 
 import torch as th
+from dateutil import rrule as rr
 from mango import Role
+
+from assume.reinforcement_learning.algorithms.matd3 import TD3
+
+logger = logging.getLogger(__name__)
+
 
 # need
 # self.world.dt
@@ -56,6 +63,9 @@ class Learning(Role):
             self.max_eval_regret = 1e9
             self.max_eval_profit = -1e9
 
+            # create learning algorithm
+            self.create_learning_algorithm(self.rl_algorithm)
+
             # store evaluation values
             self.rl_eval_rewards = []
             self.rl_eval_profits = []
@@ -63,7 +73,7 @@ class Learning(Role):
 
             # shedule policy updates
             # TODO define frequency and stuff
-            """
+
             recurrency_task = rr.rrule(
                 freq=rr.HOURLY,
                 interval=self.train_freq,
@@ -71,8 +81,10 @@ class Learning(Role):
                 until=self.training_episodes,
                 cache=True,
             )
-        self.context.schedule_recurrent_task(self.store_dfs, recurrency_task)
-        """
+
+            self.context.schedule_recurrent_task(
+                self.rl_algorithm.update_policy, recurrency_task
+            )
 
         # self.float_type = th.float16 if self.device.type == "cuda" else th.float
 
@@ -101,3 +113,53 @@ class Learning(Role):
                 actions=data[1],
                 reward=data[2],
             )
+
+    def create_learning_algorithm(self, algorithm):
+        if algorithm == "matd3":
+            self.rl_algorithm = TD3(
+                learning_role=self,
+                buffer_size=self.buffer.buffer_size,
+                learning_starts=self.learning_starts,
+                train_freq=self.train_freq,
+                gradient_steps=self.gradient_steps,
+                batch_size=self.batch_size,
+                gamma=self.gamma,
+            )
+
+        else:
+            self.logger.error(
+                f"you specified an reinforcement learning algorithm {algorithm}, for which no files where provided"
+            )
+
+    # in assume self
+    def compare_and_save_policies(self):
+        modes = ["reward", "profit", "regret"]
+        for mode in modes:
+            value = None
+
+            if mode == "reward" and self.rl_eval_rewards[-1] > self.max_eval_reward:
+                self.max_eval_reward = self.rl_eval_rewards[-1]
+                dir_name = "highest_reward"
+                value = self.max_eval_reward
+            elif mode == "profit" and self.rl_eval_profits[-1] > self.max_eval_profit:
+                self.max_eval_profit = self.rl_eval_profits[-1]
+                dir_name = "highest_profit"
+                value = self.max_eval_profit
+            elif (
+                mode == "regret"
+                and self.rl_eval_regrets[-1] < self.max_eval_regret
+                and self.rl_eval_regrets[-1] != 0
+            ):
+                self.max_eval_regret = self.rl_eval_regrets[-1]
+                dir_name = "lowest_regret"
+                value = self.max_eval_regret
+
+            if value is not None:
+                self.rl_algorithm.save_params(dir_name=dir_name)
+                for unit in self.rl_powerplants + self.rl_storages:
+                    if unit.learning:
+                        unit.save_params(dir_name=dir_name)
+
+                self.logger.info(
+                    f"Policies saved, episode: {self.eval_episodes_done + 1}, mode: {mode}, value: {value:.2f}"
+                )

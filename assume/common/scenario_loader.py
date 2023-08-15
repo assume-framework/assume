@@ -446,14 +446,22 @@ def load_scenario_folder(
         from assume.reinforcement_learning.buffer import ReplayBuffer
 
         buffer = ReplayBuffer(
-            buffer_size=1000000,
+            buffer_size=int(5e5),
             obs_dim=world.rl_agent.roles[0].obs_dim,
             act_dim=world.rl_agent.roles[0].act_dim,
-            n_rl_units=world.learning_agent_count,
+            n_rl_units=world.learning_unit_count,
             device=world.rl_agent.roles[0].device,
         )
 
         world.rl_agent.roles[0].buffer = buffer
+
+        # store number of learning agents in learning role
+        for unit in self.units.values():
+            bidding_strategy = unit.bidding_strategies.get(marketconfig.product_type)
+            if isinstance(bidding_strategy, LearningStrategy):
+                learning_unit_count += 1
+                # should be the same across all strategies
+                action_dimension = bidding_strategy.act_dim
 
         for episode in tqdm(
             range(world.rl_agent.roles[0].training_episodes),

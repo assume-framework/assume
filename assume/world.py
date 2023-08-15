@@ -61,7 +61,7 @@ class World:
         self.logger = logging.getLogger(__name__)
         self.addr = (ifac_addr, port)
         self.container = None
-        self.learning_agent_count = 0
+        self.learning_unit_count = 0
 
         self.export_csv_path = export_csv_path
         # intialize db connection at beginning of simulation

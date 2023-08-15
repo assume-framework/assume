@@ -1,16 +1,17 @@
+import logging
 import os
 
 import torch as th
-from buffer import ReplayBuffer
 from torch.optim import Adam
+
+logger = logging.getLogger(__name__)
 
 
 class RLAlgorithm:
     def __init__(
         self,
-        env=None,
+        learning_role=None,
         learning_rate=1e-4,
-        buffer_size=1e6,
         learning_starts=100,
         batch_size=1024,
         tau=0.005,
@@ -21,75 +22,35 @@ class RLAlgorithm:
         target_policy_noise=0.2,
         target_noise_clip=0.5,
     ):
-        self.env = env
+        super().__init__()
+
+        self.learning_role = learning_role
         self.learning_rate = learning_rate
         self.learning_starts = learning_starts
         self.batch_size = batch_size
         self.gamma = gamma
         self.tau = tau
 
-        # get train frequency from learning role
-        self.train_freq = len(env.snapshots) if train_freq == -1 else train_freq
+        self.train_freq = train_freq
         self.gradient_steps = (
             self.train_freq if gradient_steps == -1 else gradient_steps
         )
+
         self.policy_delay = policy_delay
         self.target_noise_clip = target_noise_clip
         self.target_policy_noise = target_policy_noise
 
-        self.rl_agents = [
-            agent for agent in env.rl_powerplants + env.rl_storages if agent.learning
-        ]
-        self.n_rl_agents = len(self.rl_agents)
+        self.n_rl_agents = self.learning_role.buffer.n_rl_agents
 
-        self.obs_dim = env.obs_dim
-        self.act_dim = env.act_dim
+        self.obs_dim = self.learning_role.obs_dim
+        self.act_dim = self.learning_role.act_dim
 
-        self.device = env.device
-        self.float_type = env.float_type
-
-        self.buffer = ReplayBuffer(
-            buffer_size=int(buffer_size),
-            obs_dim=self.obs_dim,
-            act_dim=self.act_dim,
-            n_rl_units=self.n_rl_agents,
-            device=self.device,
-        )
+        self.device = self.learning_role.device
+        self.float_type = self.learning_role.float_type
 
         self.unique_obs_len = 8
 
-        for agent in self.rl_agents:
-            agent.critic = Critic(
-                self.n_rl_agents,
-                self.obs_dim,
-                self.act_dim,
-                self.float_type,
-                self.unique_obs_len,
-            )
-
-            agent.critic_target = Critic(
-                self.n_rl_agents,
-                self.obs_dim,
-                self.act_dim,
-                self.float_type,
-                self.unique_obs_len,
-            )
-
-            agent.critic.optimizer = Adam(
-                agent.critic.parameters(), lr=self.learning_rate
-            )
-
-            agent.critic_target.load_state_dict(agent.critic.state_dict())
-            agent.critic_target.train(mode=False)
-
-            agent.critic = agent.critic.to(self.device)
-            agent.critic_target = agent.critic_target.to(self.device)
-
-        if self.env.load_params:
-            self.load_params(self.env.load_params)
-
-        self.steps_done = 0
-        self.n_updates = 0
+        # define critic and target critic per agent
 
     def update_policy(self):
         self.logger.error(
@@ -103,14 +64,17 @@ class RLAlgorithm:
         This affects certain modules, such as batch normalisation and dropout.
 
         :param mode: if true, set to training mode, else set to evaluation mode
-        """
+
         for agent in self.rl_agents:
             agent.critic = agent.critic.train(mode)
             agent.actor = agent.actor.train(mode)
 
         self.training = mode
+        """
+        pass
 
     def save_params(self, dir_name="best_policy"):
+        """
         save_dir = self.env.save_params["save_dir"]
 
         def save_obj(obj, directory, agent):
@@ -130,8 +94,11 @@ class RLAlgorithm:
             }
 
             save_obj(obj, directory, agent.name)
+        """
+        pass
 
     def load_params(self, load_params):
+        """
         if not load_params["load_critics"]:
             return None
 
@@ -161,3 +128,5 @@ class RLAlgorithm:
                 self.world.logger.info(
                     "No critic values loaded for agent {}".format(agent.name)
                 )
+        """
+        pass
