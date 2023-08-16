@@ -185,7 +185,7 @@ class MarketRole(Role):
                 if self.marketconfig.volume_tick:
                     assert isinstance(order["volume"], int)
                 for field in self.marketconfig.additional_fields:
-                    assert order[field], f"missing field: {field}"
+                    assert field in order.keys(), f"missing field: {field}"
                 self.all_orders.append(order)
         except Exception as e:
             logger.error(f"error handling message from {agent_id} - {e}")
