@@ -10,20 +10,8 @@ from assume.markets.clearing_algorithms.complex_clearing_dmas import (
     complex_clearing_dmas,
 )
 
-from .utils import get_test_prices
-
 start = datetime(2020, 1, 1)
 end = datetime(2020, 12, 2)
-
-
-def test_dmas_market_init():
-    mr = MarketRole(simple_dayahead_auction_config)
-    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
-    products = get_available_products(
-        simple_dayahead_auction_config.market_products, next_opening
-    )
-    assert len(products) == 24
-
 
 simple_dayahead_auction_config = MarketConfig(
     "simple_dayahead_auction",
@@ -39,6 +27,15 @@ simple_dayahead_auction_config = MarketConfig(
     price_unit="€/MW",
     market_mechanism="pay_as_clear",
 )
+
+
+def test_dmas_market_init():
+    mr = MarketRole(simple_dayahead_auction_config)
+    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
+    products = get_available_products(
+        simple_dayahead_auction_config.market_products, next_opening
+    )
+    assert len(products) == 24
 
 
 def test_market():

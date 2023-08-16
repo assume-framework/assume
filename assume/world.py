@@ -25,6 +25,8 @@ from assume.common import (
 )
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import (
+    DmasPowerplantStrategy,
+    DmasStorageStrategy,
     LearningStrategy,
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
@@ -100,6 +102,8 @@ class World:
             "naive_neg_reserve": NaiveNegReserveStrategy,
             "naive_pos_reserve": NaivePosReserveStrategy,
             "otc_strategy": OTCStrategy,
+            "dmas": DmasPowerplantStrategy,
+            "dmas_storage": DmasStorageStrategy,
         }
 
         try:

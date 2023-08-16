@@ -36,11 +36,11 @@ async def init():
     marketdesign = [
         MarketConfig(
             "EOM",
-            rr.rrule(rr.HOURLY, dtstart=start, until=end),
+            rr.rrule(rr.HOURLY, interval=24, dtstart=start, until=end),
             timedelta(hours=1),
             "pay_as_clear",
-            [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
-            additional_fields=[],
+            [MarketProduct(timedelta(hours=1), 24, timedelta(hours=1))],
+            additional_fields=["block_id", "link", "exclusive_id"],
         )
     ]
 

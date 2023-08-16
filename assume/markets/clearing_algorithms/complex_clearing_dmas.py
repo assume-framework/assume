@@ -1,7 +1,7 @@
 import logging
 import time
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import numpy as np
 import pandas as pd
@@ -56,6 +56,8 @@ def complex_clearing_dmas(
     assert "block_id" in market_agent.marketconfig.additional_fields
     assert "exclusive_id" in market_agent.marketconfig.additional_fields
 
+    bid_ids = {}
+
     for order in market_agent.all_orders:
         order_type = None
         if order["exclusive_id"] is not None:
@@ -80,12 +82,14 @@ def complex_clearing_dmas(
         if order_type is not None:
             tt = (order["start_time"] - start) / timedelta(hours=1)
             # block_id, hour, name
+            name = order["agent_id"]
+            bid_ids[name] = order["bid_id"]
             if "exclusive" in order_type:
-                idx = (order["exclusive_id"], tt, order["agent_id"])
+                idx = (order["exclusive_id"], tt, name)
             elif "linked" in order_type:
-                idx = (order["block_id"], tt, order["agent_id"])
+                idx = (order["block_id"], tt, name)
             else:
-                idx = (order["bid_id"], tt, order["agent_id"])
+                idx = (order["bid_id"], tt, name)
 
             index_orders[order_type][tt].append((idx[0], idx[2]))
 
@@ -167,10 +171,12 @@ def complex_clearing_dmas(
                     f"Agent {agent} send invalid linked orders "
                     f"- block {block} has no parent_id {parent_id}"
                 )
-                print("Block, Hour, Agent, Price, Volume, Link")
+                log.warning("Block, Hour, Agent, Price, Volume, Link")
                 for key, data in orders["linked_ask"].items():
                     if key[2] == agent:
-                        print(key[0], key[1], key[2], data[0], data[1], data[2])
+                        log.warning(
+                            f"{key[0], key[1], key[2], data[0], data[1], data[2]}"
+                        )
         else:
             # mother bid must exist with at least one entry
             # either the whole mother bid can be used | None
@@ -269,7 +275,7 @@ def complex_clearing_dmas(
         else:
             options = {}
         r = opt.solve(model, options=options)
-        print(r)
+        log.info(r)
     except Exception as e:
         log.exception("error solving optimization problem")
         log.error(f"Model: {model}")
@@ -342,15 +348,16 @@ def complex_clearing_dmas(
                             p = (prc, vol)
                         used_orders[type_][(block, t, name)] = p
                         o: Order = {
-                            "start": bstart,
-                            "end": end,
+                            "start_time": bstart,
+                            "end_time": end,
+                            "only_hours": None,
                             "price": prc,
                             "volume": vol,
-                            "link": link,
-                            "agent_id": name,
-                            "bid_id": block,
                             "block_id": block,
+                            "link": link,
                             "exclusive_id": None,
+                            "agent_id": name,
+                            "bid_id": bid_ids[name],
                         }
                         orderbook.append(o)
 
@@ -359,14 +366,16 @@ def complex_clearing_dmas(
                         prc, vol = orders[type_][block, t, name]
                         used_orders[type_][(block, t, name)] = (prc, vol)
                         o: Order = {
-                            "start": bstart,
-                            "end": end,
+                            "start_time": bstart,
+                            "end_time": end,
+                            "only_hours": None,
                             "price": prc,
                             "volume": vol,
-                            "link": None,
-                            "agent_id": name,
                             "block_id": None,
+                            "link": None,
                             "exclusive_id": block,
+                            "agent_id": name,
+                            "bid_id": bid_ids[name],
                         }
                         orderbook.append(o)
 
@@ -377,15 +386,16 @@ def complex_clearing_dmas(
         end = start + timedelta(hours=hour + 1)
         orderbook.append(
             {
-                "start": bstart,
-                "end": end,
+                "start_time": bstart,
+                "end_time": end,
+                "only_hours": None,
                 "price": prc,
                 "volume": vol,
-                "link": None,
-                "agent_id": name,
                 "block_id": None,
+                "link": None,
                 "exclusive_id": None,
-                "bid_id": block,
+                "agent_id": name,
+                "bid_id": bid_ids[name],
             }
         )
 
@@ -426,10 +436,11 @@ def complex_clearing_dmas(
     # -> build merit order
     merit_order = {hour: dict(price=[], volume=[], type=[]) for hour in t_range}
 
-    def add_to_merit_order(hour, price, volume, type):
-        merit_order[hour]["price"].append(price)
-        merit_order[hour]["volume"].append(volume)
-        merit_order[hour]["type"].append(type)
+    def add_to_merit_order(hour, price, volume, type_):
+        pass
+        # merit_order[hour]["price"].append(price)
+        # merit_order[hour]["volume"].append(volume)
+        # merit_order[hour]["type"].append(type_)
 
     for index, values in orders["linked_ask"].items():
         price, volume, _ = values

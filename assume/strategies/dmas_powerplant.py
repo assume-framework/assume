@@ -231,7 +231,8 @@ class DmasPowerplantStrategy(BaseStrategy):
     def optimize(
         self,
         unit: SupportsMinMax,
-        start: datetime = None,
+        start: datetime,
+        hour_count: int,
         prices: pd.DataFrame = None,
         steps: tuple = None,
     ) -> np.array:
@@ -239,7 +240,6 @@ class DmasPowerplantStrategy(BaseStrategy):
         self.prevented_start = dict(
             prevent=False, hours=np.zeros(self.T, float), delta=0
         )
-        hour_count = len(unit.index) // 2
         hour_count2 = 2 * hour_count
         steps = steps or self.steps
         prices_24h = prices.iloc[:hour_count].copy()
@@ -442,7 +442,7 @@ class DmasPowerplantStrategy(BaseStrategy):
         fuel_price = unit.forecaster.get_price(unit.fuel_type)[
             start : start + timedelta(hours=hour_count2 - 1)
         ]
-        self.optimize(unit, start, base_price)
+        self.optimize(unit, start, hour_count, base_price)
 
         def get_cost(p: float, t: int):
             f = fuel_price[t]
@@ -745,4 +745,5 @@ class DmasPowerplantStrategy(BaseStrategy):
                 lambda o: start + timedelta(hours=o["hour"]) + unit.index.freq, axis=1
             )
             del df["hour"]
+            df["exclusive_id"] = None
         return df.to_dict("records")
