@@ -182,10 +182,10 @@ class World:
             save_frequency_hours=save_frequency_hours,
         )
         if same_process:
-            self.output_agent = RoleAgent(
+            output_agent = RoleAgent(
                 self.container, suggested_aid=self.output_agent_addr[1]
             )
-            self.output_agent.add_role(output_role)
+            output_agent.add_role(output_role)
         else:
             # this does not set the clock in output_agent correctly yet
             # see https://gitlab.com/mango-agents/mango/-/issues/59

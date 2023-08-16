@@ -94,6 +94,7 @@ class Storage(SupportsMinMaxCharge):
         min_power_charge: float | pd.Series = 0.0,
         min_power_discharge: float | pd.Series = 0.0,
         min_SOC: float = 0.0,
+        initial_soc: float = 0.5,
         efficiency_charge: float = 1,
         efficiency_discharge: float = 1,
         variable_cost_charge: float | pd.Series = 0.0,
@@ -123,6 +124,7 @@ class Storage(SupportsMinMaxCharge):
             bidding_strategies=bidding_strategies,
             index=index,
             unit_operator=unit_operator,
+            **kwargs,
         )
 
         self.max_power_charge = (
@@ -133,6 +135,7 @@ class Storage(SupportsMinMaxCharge):
         )
         self.max_power_discharge = max_power_discharge
         self.min_power_discharge = min_power_discharge
+        self.initial_soc = initial_soc
 
         self.max_SOC = max_SOC
         self.min_SOC = min_SOC
