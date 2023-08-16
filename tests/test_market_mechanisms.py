@@ -2,6 +2,7 @@ import itertools
 from datetime import datetime, timedelta
 
 import numpy as np
+import pandas as pd
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
 
@@ -125,6 +126,56 @@ def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
     return orders
 
 
+def create_definite_orderbook(start, end):
+    orders = []
+    i = 0
+    for t in pd.date_range(start=start, end=end, freq="1H"):
+        order: Order = {
+            "start_time": t,
+            "end_time": t + timedelta(hours=1),
+            "agent_id": "dem1",
+            "bid_id": f"bid_{i*2}",
+            "volume": -1000,
+            "price": 3000,
+            "only_hours": None,
+            "node_id": 0,
+            "bid_type": "SB",
+        }
+        orders.append(order)
+        order: Order = {
+            "start_time": t,
+            "end_time": t + timedelta(hours=1),
+            "agent_id": "gen1",
+            "bid_id": f"bid_{i*2+1}",
+            "volume": 1000,
+            "price": 100,
+            "only_hours": None,
+            "node_id": 0,
+            "bid_type": "SB",
+        }
+        orders.append(order)
+        i += 1
+    i = 2 * i
+    for t in pd.date_range(
+        start=start + timedelta(hours=5), end=start + timedelta(hours=10), freq="1H"
+    ):
+        order: Order = {
+            "start_time": t,
+            "end_time": t + timedelta(hours=1),
+            "agent_id": "gen2",
+            "bid_id": f"bid_{i}",
+            "volume": 900,
+            "price": 50,
+            "only_hours": None,
+            "node_id": 0,
+            "bid_type": "SB",
+        }
+        orders.append(order)
+        i += 1
+
+    return orders
+
+
 def test_market_mechanism():
     import copy
 
@@ -153,6 +204,27 @@ def test_market_mechanism():
         # print(meta)
 
     # return mr.all_orders, meta
+
+
+def test_complex_clearing():
+    import copy
+
+    market_config = copy.copy(simple_dayahead_auction_config)
+    market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex"]
+    market_config.market_products = [MarketProduct(rd(hours=+1), 24, rd(hours=1))]
+    mr = MarketRole(market_config)
+    next_opening = market_config.opening_hours.after(datetime.now())
+    products = get_available_products(market_config.market_products, next_opening)
+    assert len(products) == 24
+    orderbook = create_definite_orderbook(products[0][0], products[-1][0])
+
+    mr.all_orders = orderbook
+    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
+        mr, products
+    )
+
+    assert meta[0]["supply_volume"] > 0
+    assert meta[0]["price"] > 0
 
 
 if __name__ == "__main__":
