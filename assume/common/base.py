@@ -211,7 +211,7 @@ class SupportsMinMaxCharge(BaseUnit):
     ramp_down_discharge: float
     ramp_up_charge: float
     ramp_down_charge: float
-    max_SOC: float
+    max_volume: float
     efficiency_charge: float
     efficiency_discharge: float
 
