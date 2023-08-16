@@ -40,6 +40,12 @@ jobs:
     - name: Test with pytest
       run: |
         pytest --cov --cov-report=xml --junitxml="result.xml"
+    - name: Install torch dependencies
+      run: |
+        python -m pip install -e .[learning]
+    - name: Run Learning with assume cli in in-memory db
+      run: |
+        assume -s example_01_rl -db "sqlite:///"
 
     - name: Upload tests results
       uses: actions/upload-artifact@v3

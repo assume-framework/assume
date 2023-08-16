@@ -442,27 +442,27 @@ def load_scenario_folder(
 
         buffer = ReplayBuffer(
             buffer_size=1000000,
-            obs_dim=world.rl_agent.roles[0].obs_dim,
-            act_dim=world.rl_agent.roles[0].act_dim,
-            n_rl_units=world.learning_agent_count,
-            device=world.rl_agent.roles[0].device,
+            obs_dim=world.learning_role.obs_dim,
+            act_dim=world.learning_role.act_dim,
+            n_rl_units=world.learning_role.n_rl_units,
+            device=world.learning_role.device,
         )
 
-        world.rl_agent.roles[0].buffer = buffer
+        world.learning_role.buffer = buffer
 
         for episode in tqdm(
-            range(world.rl_agent.roles[0].training_episodes),
+            range(world.learning_role.training_episodes),
             desc="Training Episodes",
         ):
             # change simulation id of output agent to include the episode number
-            world.output_agent.roles[
-                0
-            ].simulation_id = f"{world.output_agent.roles[0].simulation_id}_{episode}"
+            world.output_role.simulation_id = (
+                f"{world.output_role.simulation_id}_{episode}"
+            )
 
             world.run()
             world.reset()
 
-            world.rl_agent.roles[0].episodes_done = +1
+            world.learning_role.episodes_done = +1
 
             # in load_scenario_folder_async, we initiate new container and kill old if present
             # as long as we do not skip setup container should be handled correctly
@@ -475,11 +475,11 @@ def load_scenario_folder(
                 )
             )
             # give the newly created rl_agent the buffer that we stored from the beginning
-            world.rl_agent.roles[0].buffer = buffer
+            world.learning_role.buffer = buffer
 
             # container shutdown implicitly with new initialisation
 
         world.logger.info("################")
         world.logger.info(f"Training finished, Start evaluation run")
 
-        world.rl_agent.roles[0].learning_mode = False
+        world.learning_role.learning_mode = False

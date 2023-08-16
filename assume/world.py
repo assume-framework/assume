@@ -149,30 +149,28 @@ class World:
             # if so, we initate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
 
-            learning_role = Learning(
+            self.learning_role = Learning(
                 learning_config=self.learning_config,
             )
             self.bidding_params.update(self.learning_config)
 
             same_process = True
             if same_process:
-                self.rl_agent = RoleAgent(
-                    self.container, suggested_aid="learning_agent"
-                )
-                self.rl_agent.add_role(learning_role)
+                rl_agent = RoleAgent(self.container, suggested_aid="learning_agent")
+                rl_agent.add_role(self.learning_role)
             else:
                 # this does not set the clock in output_agent correctly yet
                 # see https://gitlab.com/mango-agents/mango/-/issues/59
                 # but still improves performance
                 def creator(container):
                     agent = RoleAgent(container, suggested_aid="learning_agent")
-                    agent.add_role(learning_role)
+                    agent.add_role(self.learning_role)
 
                 await self.container.as_agent_process(agent_creator=creator)
 
         self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to world
-        output_role = WriteOutput(
+        self.output_role = WriteOutput(
             simulation_id=simulation_id,
             start=start,
             end=end,
@@ -184,14 +182,14 @@ class World:
             output_agent = RoleAgent(
                 self.container, suggested_aid=self.output_agent_addr[1]
             )
-            output_agent.add_role(output_role)
+            output_agent.add_role(self.output_role)
         else:
             # this does not set the clock in output_agent correctly yet
             # see https://gitlab.com/mango-agents/mango/-/issues/59
             # but still improves performance
             def creator(container):
                 agent = RoleAgent(container, suggested_aid=self.output_agent_addr[1])
-                agent.add_role(output_role)
+                agent.add_role(self.output_role)
 
             await self.container.as_agent_process(agent_creator=creator)
 
@@ -259,8 +257,8 @@ class World:
 
             try:
                 if issubclass(self.bidding_types[strategy], LearningStrategy):
-                    self.rl_agent.roles[0].n_rl_units += 1
-                    self.rl_agent.roles[0].rl_units.append(id)
+                    self.learning_role.n_rl_units += 1
+                    self.learning_role.rl_units.append(id)
 
                 bidding_strategies[product_type] = self.bidding_types[strategy](
                     **self.bidding_params
