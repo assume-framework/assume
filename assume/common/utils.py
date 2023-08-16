@@ -7,6 +7,8 @@ from itertools import groupby
 from operator import itemgetter
 
 import dateutil.rrule as rr
+import numpy as np
+import pandas as pd
 
 from assume.common.market_objects import MarketProduct, Orderbook
 
@@ -172,6 +174,38 @@ def plot_orderbook(orderbook: Orderbook, results: list[dict]):
     return fig, ax
 
 
+def visualize_orderbook(order_book: Orderbook):
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import ListedColormap
+
+    tab20_cmap = plt.get_cmap("tab20c")
+    max_block_count = max([o.get("block_id", 1) for o in order_book])
+
+    order_book.sort(key=itemgetter("block_id", "link"))
+    start_times = sorted(set(o["start_time"] for o in order_book))
+    y_past = pd.Series(0, index=start_times)
+    for i, bids_grouped in groupby(order_book, itemgetter("block_id")):
+        my_cmap_raw = np.array(tab20_cmap.colors) * i / max_block_count
+        my_cmap = ListedColormap(my_cmap_raw)
+
+        for j, o in groupby(bids_grouped, itemgetter("link")):
+            s = pd.Series(0, index=start_times)
+            ys = np.zeros(24)
+            o = list(o)
+            for order in o:
+                s[order["start_time"]] += order["volume"]
+            if (s > 0).any():
+                plt.bar(
+                    s.index, s.values, bottom=y_past, color=my_cmap.colors[(j + 1) % 20]
+                )
+                y_past += s
+    plt.title("Orderbook")
+    plt.xlabel("hour")
+    plt.xticks(rotation=80)
+    plt.ylabel("MW")
+    plt.show()
+
+
 def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=None):
     """
     step function with bought volume
@@ -236,3 +270,14 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=No
                 aggregation[groupdata_str].append(d_list)
 
     return [j for sub in list(aggregation.values()) for j in sub]
+
+
+def get_test_demand_orders(power: np.array):
+    order_book = {}
+    for t in range(len(power)):
+        order_book[t] = dict(
+            type="demand", hour=t, block_id=t, name="DEM", price=3, volume=-power[t]
+        )
+    demand_order = pd.DataFrame.from_dict(order_book, orient="index")
+    demand_order = demand_order.set_index(["block_id", "hour", "name"])
+    return demand_order

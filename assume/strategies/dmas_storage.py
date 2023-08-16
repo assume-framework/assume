@@ -63,7 +63,7 @@ class DmasStorageStrategy(BaseStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.model = ConcreteModel()
+        self.model = ConcreteModel("storage")
         self.opt = get_solver_factory()
 
     def build_model(self, unit: SupportsMinMaxCharge, start: datetime, hour_count: int):

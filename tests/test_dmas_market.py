@@ -16,22 +16,13 @@ start = datetime(2020, 1, 1)
 end = datetime(2020, 12, 2)
 
 
-def test_dmas_market_init(storage_unit):
-    strategy = DmasStorageStrategy()
-    hour_count = len(storage_unit.index)
-
-    prices = get_test_prices()
-
-    strategy.build_model(
-        storage_unit,
-        datetime(2022, 1, 1),
-        hour_count,
-        prices["co2"],
-        prices[storage_unit.fuel_type],
-        prices["power"],
-        runtime=1,
-        p0=300,
+def test_dmas_market_init():
+    mr = MarketRole(simple_dayahead_auction_config)
+    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
+    products = get_available_products(
+        simple_dayahead_auction_config.market_products, next_opening
     )
+    assert len(products) == 24
 
 
 simple_dayahead_auction_config = MarketConfig(
@@ -51,6 +42,13 @@ simple_dayahead_auction_config = MarketConfig(
 
 
 def test_market():
+    """
+    For debugging, the following might help:
+    from pyomo.environ import value
+    sinks = [value(model.sink[key]) for key in model.sink]
+    sources = [value(model.source[key]) for key in model.source]
+    [model.use_hourly_ask[(block, hour, agent)].value for block, hour, agent in orders["single_ask"].keys()]
+    """
     mr = MarketRole(simple_dayahead_auction_config)
     next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
     products = get_available_products(
@@ -72,6 +70,9 @@ def test_market():
             "agent_id": "gen1",
             "bid_id": "bid1",
             "only_hours": None,
+            "exclusive_id": None,
+            "block_id": None,
+            "link": None,
         },
         {
             "start_time": start,
@@ -81,6 +82,9 @@ def test_market():
             "agent_id": "gen1",
             "bid_id": "bid2",
             "only_hours": None,
+            "exclusive_id": None,
+            "block_id": None,
+            "link": None,
         },
         {
             "start_time": start,
@@ -90,6 +94,9 @@ def test_market():
             "agent_id": "gen1",
             "bid_id": "bid3",
             "only_hours": None,
+            "exclusive_id": None,
+            "block_id": None,
+            "link": None,
         },
         {
             "start_time": start,
@@ -99,6 +106,9 @@ def test_market():
             "agent_id": "dem1",
             "bid_id": "bid4",
             "only_hours": None,
+            "exclusive_id": None,
+            "block_id": None,
+            "link": None,
         },
     ]
     simple_dayahead_auction_config.market_mechanism = complex_clearing_dmas

@@ -39,7 +39,7 @@ def get_solver_factory(solvers_str=["cbc", "glpk", "cbc", "gurobi", "cplex"]):
 class DmasPowerplantStrategy(BaseStrategy):
     def __init__(self, steps=[-10, -1, 0, 1, 10], *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.model = ConcreteModel()
+        self.model = ConcreteModel("powerplant")
         self.opt = get_solver_factory()
         self.steps = steps
         self.T = 24

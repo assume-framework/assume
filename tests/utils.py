@@ -39,6 +39,37 @@ def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
     return orders
 
 
+def create_link_orderbook(hour_count=24, seed=30):
+    start = datetime.today()
+    end = datetime.today() + timedelta(hours=1)
+    order: Order = {
+        "start_time": start,
+        "end_time": end,
+        "agent_id": "dem1",
+        "bid_id": "bid1",
+        "volume": 0,
+        "price": 0,
+        "only_hours": None,
+        "node_id": 0,
+    }
+    orders = []
+    np.random.seed(seed)
+
+    for node_id, i in product(node_ids, range(count)):
+        new_order = order.copy()
+        new_order["price"] = np.random.randint(100)
+        new_order["volume"] = np.random.randint(-10, 10)
+        if new_order["volume"] > 0:
+            agent_id = f"gen_{i}"
+        else:
+            agent_id = f"dem_{i}"
+        new_order["agent_id"] = agent_id
+        new_order["bid_id"] = f"bid_{i}"
+        new_order["node_id"] = node_id
+        orders.append(new_order)
+    return orders
+
+
 def get_test_prices(num: int = 24):
     power_price = 50 * np.ones(num)
     # power_price[18:24] = 0

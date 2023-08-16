@@ -1,6 +1,7 @@
 import logging
 import time
 from collections import defaultdict
+from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
@@ -19,7 +20,7 @@ from pyomo.environ import (
 from pyomo.environ import value as get_real_number
 from pyomo.opt import SolverFactory, check_available_solvers
 
-from assume.common.market_objects import MarketProduct
+from assume.common.market_objects import MarketProduct, Order
 from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)
@@ -38,13 +39,13 @@ def complex_clearing_dmas(
     T = len(market_products)
     t_range = np.arange(T)
     # Orders have (block, hour, name) as key and (price, volume, link) as values
-    orders = defaultdict(lambda: defaultdict(list))
+    orders = {type_: {} for type_ in order_types}
     # Index Orders have t as key and (block, name) as value
-    index_orders = defaultdict(lambda: defaultdict(list))
+    index_orders = {type_: defaultdict(list) for type_ in order_types}
     model_vars = {}
     parent_blocks = {}
     start_block = []
-    model = ConcreteModel()
+    model = ConcreteModel("dmas_market")
     # Create a solver
     solvers = check_available_solvers(*SOLVERS)
     if len(solvers) < 1:
@@ -78,27 +79,24 @@ def complex_clearing_dmas(
                 order_type = None
         if order_type is not None:
             tt = (order["start_time"] - start) / timedelta(hours=1)
-
+            # block_id, hour, name
             if "exclusive" in order_type:
                 idx = (order["exclusive_id"], tt, order["agent_id"])
             elif "linked" in order_type:
                 idx = (order["block_id"], tt, order["agent_id"])
             else:
                 idx = (order["bid_id"], tt, order["agent_id"])
+
             index_orders[order_type][tt].append((idx[0], idx[2]))
 
             if "linked" in order_type:
-                val = order["volume"], order["price"], order["link"]
+                val = order["price"], order["volume"], order["link"]
             else:
-                val = order["volume"], order["price"]
+                val = order["price"], order["volume"]
 
-            orders[order_type][idx].append(val)
+            orders[order_type][idx] = val
 
-    # set parameter
-    for order_type in order_types:
-        for key_tuple in orders[order_type].keys():
-            block, hour, name = key_tuple
-            index_orders[order_type][hour] += [(block, name)]
+    ################ set parameter ################
 
     for key_tuple, val in orders["linked_ask"].items():
         block, _, agent = key_tuple
@@ -193,45 +191,43 @@ def complex_clearing_dmas(
         )
 
     def get_volume(type_: str, hour: int):
-        if type_ != "single_bid":
-            if type_ != "exclusive_ask":
-                return quicksum(
-                    orders[type_][block, hour, name][1]
-                    * model_vars[type_][block, hour, name]
-                    for block, name in index_orders[type_][hour]
-                )
-            else:
-                return quicksum(
-                    orders[type_][block, hour, name][1] * model_vars[type_][block, name]
-                    for block, name in index_orders[type_][hour]
-                )
-        else:
+        if type_ == "single_bid":
             return quicksum(
                 orders[type_][block, hour, name][1]
                 for block, name in index_orders[type_][hour]
             )
+        elif type_ == "exclusive_ask":
+            return quicksum(
+                orders[type_][block, hour, name][1] * model_vars[type_][block, name]
+                for block, name in index_orders[type_][hour]
+            )
+        else:
+            return quicksum(
+                orders[type_][block, hour, name][1]
+                * model_vars[type_][block, hour, name]
+                for block, name in index_orders[type_][hour]
+            )
 
     def get_cost(type_: str, hour: int):
-        if type_ != "single_bid":
-            if type_ != "exclusive_ask":
-                return quicksum(
-                    orders[type_][block, hour, name][0]
-                    * orders[type_][block, hour, name][1]
-                    * model_vars[type_][block, hour, name]
-                    for block, name in index_orders[type_][hour]
-                )
-            else:
-                return quicksum(
-                    orders[type_][block, hour, name][0]
-                    * orders[type_][block, hour, name][1]
-                    * model_vars[type_][block, name]
-                    for block, name in index_orders[type_][hour]
-                    if orders[type_][block, hour, name][1] > 0
-                )
+        if type_ == "single_bid":
+            return quicksum(
+                orders[type_][block, hour, name][0]
+                * orders[type_][block, hour, name][1]
+                for block, name in index_orders[type_][hour]
+            )
+        elif type_ == "exclusive_ask":
+            return quicksum(
+                orders[type_][block, hour, name][0]
+                * orders[type_][block, hour, name][1]
+                * model_vars[type_][block, name]
+                for block, name in index_orders[type_][hour]
+                if orders[type_][block, hour, name][1] > 0
+            )
         else:
             return quicksum(
                 orders[type_][block, hour, name][0]
                 * orders[type_][block, hour, name][1]
+                * model_vars[type_][block, hour, name]
                 for block, name in index_orders[type_][hour]
             )
 
@@ -268,13 +264,19 @@ def complex_clearing_dmas(
     log.info("start optimization/market clearing")
     t1 = time.time()
     try:
-        r = opt.solve(model, options={"MIPGap": 0.1, "TimeLimit": 60})
+        if opt.name == "gurobi":
+            options = {"MIPGap": 0.1, "TimeLimit": 60}
+        else:
+            options = {}
+        r = opt.solve(model, options=options)
         print(r)
     except Exception as e:
         log.exception("error solving optimization problem")
         log.error(f"Model: {model}")
         log.error(f"{repr(e)}")
     log.info(f"cleared market in {time.time() - t1:.2f} seconds")
+
+    ################ convert internal bids to orderbook ################
 
     # -> determine price at each hour
     prices = []
@@ -316,13 +318,20 @@ def complex_clearing_dmas(
         volumes.append(volume)
     log.info(f"Got {sum_magic_source:.2f} kWh from Magic source")
     # -> determine used ask orders
+
     used_orders = {type_: {} for type_ in model_vars.keys()}
-    for type_ in model_vars.keys():
-        for t in t_range:
-            for block, name in orders[f"{type_}_index"][t]:
+
+    orderbook = []
+    for t in t_range:
+        t = int(t)
+        bstart = start + timedelta(hours=t)
+        end = start + timedelta(hours=t + 1)
+        for type_ in model_vars.keys():
+            for block, name in index_orders[type_][t]:
                 if type_ in ["single_ask", "linked_ask"]:
                     if model_vars[type_][block, t, name].value:
                         f = model_vars[type_][block, t, name].value
+                        link = None
                         if "linked" in type_:
                             prc, vol, link = orders[type_][block, t, name]
                             vol *= f
@@ -332,31 +341,74 @@ def complex_clearing_dmas(
                             vol *= f
                             p = (prc, vol)
                         used_orders[type_][(block, t, name)] = p
+                        o: Order = {
+                            "start": bstart,
+                            "end": end,
+                            "price": prc,
+                            "volume": vol,
+                            "link": link,
+                            "agent_id": name,
+                            "bid_id": block,
+                            "block_id": block,
+                            "exclusive_id": None,
+                        }
+                        orderbook.append(o)
+
                 elif type_ == "exclusive_ask":
                     if model_vars[type_][block, name].value:
                         prc, vol = orders[type_][block, t, name]
                         used_orders[type_][(block, t, name)] = (prc, vol)
+                        o: Order = {
+                            "start": bstart,
+                            "end": end,
+                            "price": prc,
+                            "volume": vol,
+                            "link": None,
+                            "agent_id": name,
+                            "block_id": None,
+                            "exclusive_id": block,
+                        }
+                        orderbook.append(o)
+
+    for key, val in orders["single_bid"].items():
+        block, hour, name = key
+        prc, vol = val
+        bstart = start + timedelta(hours=hour)
+        end = start + timedelta(hours=hour + 1)
+        orderbook.append(
+            {
+                "start": bstart,
+                "end": end,
+                "price": prc,
+                "volume": vol,
+                "link": None,
+                "agent_id": name,
+                "block_id": None,
+                "exclusive_id": None,
+                "bid_id": block,
+            }
+        )
 
     # -> build dataframe
     for type_ in model_vars.keys():
-        orders = pd.DataFrame.from_dict(used_orders[type_], orient="index")
-        orders.index = pd.MultiIndex.from_tuples(
-            orders.index, names=["block_id", "hour", "name"]
+        orders_df = pd.DataFrame.from_dict(used_orders[type_], orient="index")
+        orders_df.index = pd.MultiIndex.from_tuples(
+            orders_df.index, names=["block_id", "hour", "name"]
         )
 
-        if "linked" in type_ and orders.empty:
-            orders["price"] = []
-            orders["volume"] = []
-            orders["link"] = []
-        elif orders.empty:
-            orders["price"] = []
-            orders["volume"] = []
+        if "linked" in type_ and orders_df.empty:
+            orders_df["price"] = []
+            orders_df["volume"] = []
+            orders_df["link"] = []
+        elif orders_df.empty:
+            orders_df["price"] = []
+            orders_df["volume"] = []
         elif "linked" in type_:
-            orders.columns = ["price", "volume", "link"]
+            orders_df.columns = ["price", "volume", "link"]
         else:
-            orders.columns = ["price", "volume"]
+            orders_df.columns = ["price", "volume"]
 
-        used_orders[type_] = orders.copy()
+        used_orders[type_] = orders_df.copy()
     # -> return all bid orders
     used_bid_orders = pd.DataFrame.from_dict(orders["single_bid"], orient="index")
     used_bid_orders.index = pd.MultiIndex.from_tuples(
@@ -398,16 +450,26 @@ def complex_clearing_dmas(
         price, volume = values
         _, hour, _ = index
         add_to_merit_order(hour, price, -volume, "bid")
-
-    meta = merit_order
     rejected = []
-    accepted = ...
-    (
-        prices,
-        used_orders["single_ask"],
-        used_orders["linked_ask"],
-        used_orders["exclusive_ask"],
-        used_bid_orders,
-        merit_order,
-    )
-    return accepted, rejected, meta
+    meta = []
+    for t in t_range:
+        t = int(t)
+        bstart = start + timedelta(hours=t)
+        end = start + timedelta(hours=t + 1)
+        prc = prices["price"][t]
+        meta.append(
+            {
+                "supply_volume": volumes[t],
+                "demand_volume": volumes[t],
+                "demand_volume_energy": volumes[t],
+                "supply_volume_energy": volumes[t],
+                "price": prc,
+                "max_price": prc,
+                "min_price": prc,
+                "node_id": None,
+                "product_start": bstart,
+                "product_end": end,
+                "only_hours": None,
+            }
+        )
+    return orderbook, rejected, meta
