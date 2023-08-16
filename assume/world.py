@@ -24,7 +24,7 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.markets import MarketRole, clearing_mechanisms
-from assume.strategies import bidding_strategies, LearningStrategy
+from assume.strategies import LearningStrategy, bidding_strategies
 from assume.units import BaseUnit, Demand, HeatPump, PowerPlant, Storage
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
@@ -49,7 +49,6 @@ class World:
         self.logger = logging.getLogger(__name__)
         self.addr = (ifac_addr, port)
         self.container = None
-        self.learning_agent_count = 0
 
         self.export_csv_path = export_csv_path
         # intialize db connection at beginning of simulation
@@ -123,7 +122,7 @@ class World:
         )
 
         # initiate learning if the learning mode is one and hence we want to learn new strategies
-        if False:  # self.learning_config.get("learning_mode"):
+        if self.learning_config.get("learning_mode"):
             # if so, we initate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
 
@@ -159,10 +158,10 @@ class World:
             save_frequency_hours=save_frequency_hours,
         )
         if same_process:
-            self.output_agent = RoleAgent(
+            output_agent = RoleAgent(
                 self.container, suggested_aid=self.output_agent_addr[1]
             )
-            self.output_agent.add_role(output_role)
+            output_agent.add_role(output_role)
         else:
             # this does not set the clock in output_agent correctly yet
             # see https://gitlab.com/mango-agents/mango/-/issues/59
@@ -235,10 +234,13 @@ class World:
 
             try:
                 if issubclass(self.bidding_types[strategy], LearningStrategy):
-                    self.learning_agent_count += 1
+                    self.rl_agent.roles[0].n_rl_units += 1
+                    self.rl_agent.roles[0].rl_units.append(id)
+
                 bidding_strategies[product_type] = self.bidding_types[strategy](
                     **self.bidding_params
                 )
+
             except KeyError as e:
                 self.logger.error(
                     f"Bidding strategy {strategy} not registered, could not add {id}"

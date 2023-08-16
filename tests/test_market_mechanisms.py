@@ -1,4 +1,3 @@
-import itertools
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -9,6 +8,8 @@ from dateutil.relativedelta import relativedelta as rd
 from assume.common.market_objects import MarketConfig, MarketProduct, Order, Orderbook
 from assume.common.utils import get_available_products
 from assume.markets import MarketRole, clearing_mechanisms
+
+from .utils import create_orderbook
 
 simple_dayahead_auction_config = MarketConfig(
     "simple_dayahead_auction",
@@ -92,38 +93,6 @@ def test_market():
     print(pd.DataFrame(mr.all_orders))
     print(pd.DataFrame(accepted))
     print(meta)
-
-
-def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
-    if not order:
-        start = datetime.today()
-        end = datetime.today() + timedelta(hours=1)
-        order: Order = {
-            "start_time": start,
-            "end_time": end,
-            "agent_id": "dem1",
-            "bid_id": "bid1",
-            "volume": 0,
-            "price": 0,
-            "only_hours": None,
-            "node_id": 0,
-        }
-    orders = []
-    np.random.seed(seed)
-
-    for node_id, i in itertools.product(node_ids, range(count)):
-        new_order = order.copy()
-        new_order["price"] = np.random.randint(100)
-        new_order["volume"] = np.random.randint(-10, 10)
-        if new_order["volume"] > 0:
-            agent_id = f"gen_{i}"
-        else:
-            agent_id = f"dem_{i}"
-        new_order["agent_id"] = agent_id
-        new_order["bid_id"] = f"bid_{i}"
-        new_order["node_id"] = node_id
-        orders.append(new_order)
-    return orders
 
 
 def create_definite_orderbook(start, end):
@@ -225,6 +194,11 @@ def test_complex_clearing():
 
     assert meta[0]["supply_volume"] > 0
     assert meta[0]["price"] > 0
+    assert rejected_orders == []
+    assert accepted_orders[11]["agent_id"] == "gen1"
+    assert accepted_orders[11]["volume"] == 100
+    assert accepted_orders[12]["agent_id"] == "gen2"
+    assert accepted_orders[12]["volume"] == 900
 
 
 if __name__ == "__main__":

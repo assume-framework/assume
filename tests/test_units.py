@@ -1,3 +1,7 @@
+from datetime import datetime
+
+import pandas as pd
+
 from assume.common.base import SupportsMinMax, SupportsMinMaxCharge
 
 
@@ -63,3 +67,25 @@ def test_minmaxcharge():
         )
         == 0
     )
+
+
+def test_minmax_operationtime():
+    mm = SupportsMinMax("Test", "TestOperator", "TestTechnology", {}, None, "empty")
+    mm.index = pd.date_range(
+        start=datetime(2023, 7, 1),
+        end=datetime(2023, 7, 2),
+        freq="1h",
+    )
+    mm.outputs["energy"] += 500
+    mm.min_down_time = 4
+    mm.min_operating_time = 4
+    runtime = mm.get_operation_time(datetime(2023, 7, 2))
+    assert runtime > 0
+
+    mm.outputs["energy"][-4:] = 0
+    runtime = mm.get_operation_time(datetime(2023, 7, 2))
+    assert runtime < 0
+
+    mm.outputs["energy"][-1:] = 1000
+    runtime = mm.get_operation_time(datetime(2023, 7, 2))
+    assert runtime == 1
