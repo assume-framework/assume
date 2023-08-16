@@ -47,7 +47,7 @@ def pay_as_clear_opt(
         if order["bid_type"] == "SB":
             balanceExpr[order["start_time"]] += order["volume"] * model.xs[order["bid_id"]]
         elif order["bid_type"] == "BB":
-            for start_time, volume in order["volume"].items():
+            for start_time, volume in order["profile"].items():
                 balanceExpr[start_time] += volume * model.xb[order["bid_id"]]
 
     def energy_balance_rule(m, t):
@@ -60,7 +60,7 @@ def pay_as_clear_opt(
         if order["bid_type"] == "SB":
             obj_exp += order["price"] * order["volume"] * model.xs[order["bid_id"]]
         elif order["bid_type"] == "BB":
-            for start_time, volume in order["volume"].items():
+            for start_time, volume in order["profile"].items():
                 obj_exp += order["price"] * volume * model.xb[order["bid_id"]]
 
     model.objective = pyo.Objective(expr=obj_exp, sense=pyo.minimize)
@@ -96,7 +96,7 @@ def pay_as_clear_opt(
                 opt_volume = order["volume"]
             elif order["bid_type"] == "BB":
                 opt_volume = 0
-                for start_time, volume in order["volume"].items():
+                for start_time, volume in order["profile"].items():
                     order['profile'][start_time] = model.xb[order["bid_id"]].value * volume
                     opt_volume += order['profile'][start_time]
 

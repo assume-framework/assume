@@ -66,7 +66,7 @@ class NaiveDAStrategy(BaseStrategy):
                 "end_time": product_tuples[0][1],
                 "only_hours": product_tuples[0][2],
                 "price": marginal_cost,
-                "volume": {product[0]: volume for product in product_tuples},
+                "profile": {product[0]: volume for product in product_tuples},
             }
         )
 
