@@ -146,7 +146,7 @@ class flexablePosCRMStorage(BaseStrategy):
                     abs(specific_revenue) * unit.min_power_discharge / bid_quantity
                 )
 
-            energy_price = capacity_price / unit.current_SOC
+            energy_price = capacity_price / (unit.current_SOC * unit.max_volume)
 
             if market_config.product_type == "capacity_pos":
                 bids.append(
@@ -258,12 +258,15 @@ def get_specific_revenue(unit, marginal_cost, current_time, foresight, price_for
     theoretic_SOC = unit.current_SOC
     for market_price in price_forecast:
         theoretic_power_discharge = min(
-            max(theoretic_SOC - unit.min_SOC, 0), unit.max_power_discharge
+            max(theoretic_SOC * unit.max_volume - unit.min_volume, 0),
+            unit.max_power_discharge,
         )
         possible_revenue += (market_price - marginal_cost) * theoretic_power_discharge
-        theoretic_SOC -= theoretic_power_discharge
+        theoretic_SOC -= theoretic_power_discharge / unit.max_volume
 
     if unit.current_SOC - theoretic_SOC != 0:
-        possible_revenue = possible_revenue / (unit.current_SOC - theoretic_SOC)
+        possible_revenue = (
+            possible_revenue / (unit.current_SOC - theoretic_SOC) / unit.max_volume
+        )
 
     return possible_revenue
