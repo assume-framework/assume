@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 import pytest
@@ -107,7 +107,7 @@ def test_reset_function(power_plant_1):
     assert power_plant_1.current_status == 1
 
     # check if total_power_output is reset
-    assert power_plant_1.outputs["power"].equals(
+    assert power_plant_1.outputs["energy"].equals(
         pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
     )
     # the same for pos and neg capacity reserve
@@ -267,6 +267,52 @@ def test_powerplant_ramping(power_plant_1):
 
     assert min_ramp == 300
     assert max_ramp == 600
+
+
+def test_powerplant_availability(power_plant_1):
+    index = pd.date_range("2022-01-01", periods=4, freq="H")
+    ff = NaiveForecast(
+        index,
+        availability=[0.5, 0.01, 1, 1],
+        fuel_price=[10, 11, 12, 13],
+        co2_price=[10, 20, 30, 30],
+    )
+    # set availability
+    power_plant_1.forecaster = ff
+    power_plant_1.max_power = 1000
+    power_plant_1.min_power = 200
+    power_plant_1.ramp_down = 1000
+    power_plant_1.ramp_up = 1000
+    power_plant_1.reset()
+
+    start = datetime(2022, 1, 1, 0)
+    end = datetime(2022, 1, 1, 1)
+    ### HOUR 0
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type="energy"
+    )
+
+    max_ramp = power_plant_1.calculate_ramp(0, max_power[start])
+    assert max_ramp == power_plant_1.max_power / 2
+
+    ### HOUR 1
+    start += timedelta(hours=1)
+    end += timedelta(hours=1)
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type="energy"
+    )
+    # run min_power if 0 < power <= min_power is needed
+    max_ramp = power_plant_1.calculate_ramp(0, max_power[start])
+    assert max_ramp == power_plant_1.min_power
+
+    ### HOUR 2
+    start += timedelta(hours=1)
+    end += timedelta(hours=1)
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type="energy"
+    )
+    max_ramp = power_plant_1.calculate_ramp(0, max_power[start])
+    assert max_ramp == power_plant_1.max_power
 
 
 if __name__ == "__main__":

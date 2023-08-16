@@ -49,11 +49,11 @@ if __name__ == "__main__":
     data_format = "timescale"  # "local_db" or "timescale"
 
     if data_format == "local_db":
-        db_url = f"sqlite:///./examples/local_db/assume_db_{example}.db"
+        db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
     elif data_format == "timescale":
-        db_url = "postgresql://assume:assume@localhost:5432/assume"
+        db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
-    world = World(database_uri=db_url, export_csv_path=csv_path)
+    world = World(database_uri=db_uri, export_csv_path=csv_path)
     load_scenario_folder(
         world,
         inputs_path="examples/inputs",

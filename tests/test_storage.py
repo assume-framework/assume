@@ -50,7 +50,7 @@ def test_reset_function(storage_unit):
     assert storage_unit.current_status == 1
 
     # check if total_power_output is reset
-    assert storage_unit.outputs["power"].equals(
+    assert storage_unit.outputs["energy"].equals(
         pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
     )
     # the same for pos and neg capacity reserve

@@ -20,7 +20,7 @@ class WriteOutput(Role):
         end: datetime,
         db_engine=None,
         export_csv_path: str = "",
-        save_frequency_hours: int | None = None,
+        save_frequency_hours: int = 24,
     ):
         """
         Initializes an instance of the WriteOutput class.
@@ -31,14 +31,14 @@ class WriteOutput(Role):
             end (datetime): The end datetime of the simulation run.
             db_engine (optional): The database engine. Defaults to None.
             export_csv_path (str, optional): The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
-            save_frequency_hours (int | None, optional): The frequency in hours for storeing data in the db and/or csv files. Defaults to None.
+            save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to None.
         """
 
         super().__init__()
 
         # store needed date
         self.simulation_id = simulation_id
-        self.save_frequency_hours: int = save_frequency_hours or 1
+        self.save_frequency_hours = save_frequency_hours
 
         # make directory if not already present
         self.export_csv_path = export_csv_path
@@ -257,6 +257,8 @@ class WriteOutput(Role):
 
         # insert left records into db
         await self.store_dfs()
+        if self.db is None:
+            return
         queries = [
             f"select market_id as name, avg(price) as avg_price from market_meta where simulation = '{self.simulation_id}' group by market_id",
             f"select market_id as name, sum(price*demand_volume_energy) as total_cost from market_meta where simulation = '{self.simulation_id}' group by market_id",

@@ -121,9 +121,9 @@ class World:
         self,
         start: datetime,
         end: datetime,
-        save_frequency_hours: int,
         simulation_id: str,
         index: pd.Series,
+        save_frequency_hours: int = 24,
         same_process: bool = True,
         bidding_params: dict = {},
         learning_config: dict = {},
@@ -207,6 +207,8 @@ class World:
         id: str or int
 
         """
+        if self.unit_operators.get(id):
+            raise ValueError(f"UnitOperator {id} already exists")
         units_operator = UnitsOperator(available_markets=list(self.markets.values()))
         # creating a new role agent and apply the role of a unitsoperator
         unit_operator_agent = RoleAgent(self.container, suggested_aid=f"{id}")
@@ -221,7 +223,7 @@ class World:
             "output_agent_id": self.output_agent_addr[1],
         }
 
-    async def add_unit(
+    async def async_add_unit(
         self,
         id: str,
         unit_type: str,
@@ -242,7 +244,7 @@ class World:
         """
 
         # check if unit operator exists
-        if unit_operator_id not in self.unit_operators:
+        if unit_operator_id not in self.unit_operators.keys():
             raise ValueError(f"invalid unit operator {unit_operator_id}")
 
         # provided unit type does not exist yet
@@ -272,7 +274,13 @@ class World:
         unit_params["bidding_strategies"] = bidding_strategies
 
         # create unit within the unit operator its associated with
-        unit = unit_class(id=id, index=self.index, forecaster=forecaster, **unit_params)
+        unit = unit_class(
+            id=id,
+            unit_operator=unit_operator_id,
+            index=self.index,
+            forecaster=forecaster,
+            **unit_params,
+        )
         await self.unit_operators[unit_operator_id].add_unit(unit)
 
     def add_market_operator(
@@ -287,6 +295,8 @@ class World:
         id = int
              market operator id is associated with the market its participating
         """
+        if self.market_operators.get(id):
+            raise ValueError(f"MarketOperator {id} already exists")
         market_operator_agent = RoleAgent(
             self.container,
             suggested_aid=id,
@@ -331,7 +341,7 @@ class World:
         market_operator.markets.append(market_config)
         self.markets[f"{market_config.name}"] = market_config
 
-    async def step(self):
+    async def _step(self):
         next_activity = self.clock.get_next_activity()
         if not next_activity:
             self.logger.info("simulation finished - no schedules left")
@@ -340,7 +350,7 @@ class World:
         self.clock.set_time(next_activity)
         return delta
 
-    async def run_async(self, start_ts, end_ts):
+    async def async_run(self, start_ts, end_ts):
         """
         Run the simulation.
         either in learning mode where we run multiple times or in normal mode
@@ -354,7 +364,7 @@ class World:
         self.clock.set_time(start_ts - 1)
         while self.clock.time < end_ts:
             await asyncio.sleep(0)
-            delta = await self.step()
+            delta = await self._step()
             if delta:
                 pbar.update(delta)
                 pbar.set_description(
@@ -371,12 +381,33 @@ class World:
         start_ts = calendar.timegm(self.start.utctimetuple())
         end_ts = calendar.timegm(self.end.utctimetuple())
 
-        return self.loop.run_until_complete(
-            self.run_async(start_ts=start_ts, end_ts=end_ts)
-        )
+        try:
+            return self.loop.run_until_complete(
+                self.async_run(start_ts=start_ts, end_ts=end_ts)
+            )
+        except KeyboardInterrupt:
+            pass
 
     def reset(self):
         self.market_operators = {}
         self.markets = {}
         self.unit_operators = {}
         self.forecast_providers = {}
+
+    def add_unit(
+        self,
+        id: str,
+        unit_type: str,
+        unit_operator_id: str,
+        unit_params: dict,
+        forecaster: Forecaster,
+    ) -> None:
+        return self.loop.run_until_complete(
+            self.async_add_unit(
+                id=id,
+                unit_type=unit_type,
+                unit_operator_id=unit_operator_id,
+                unit_params=unit_params,
+                forecaster=forecaster,
+            )
+        )
