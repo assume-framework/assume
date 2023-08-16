@@ -1,16 +1,14 @@
 import calendar
 import logging
 from datetime import datetime
-from typing import Callable
 
 import dateutil.rrule as rr
 import numpy as np
 import pandas as pd
 import yaml
-from mango import RoleAgent
 from tqdm import tqdm
 
-from assume.common.forecasts import CsvForecaster, Forecaster, RandomForecaster
+from assume.common.forecasts import CsvForecaster, Forecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.world import World
 
