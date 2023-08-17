@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
+import pytest
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
 
@@ -121,6 +122,7 @@ def test_complex_clearing():
     # including block order in the money
 
 
+# @pytest.mark.require_gurobi
 def test_complex_clearing_BB():
     import copy
 
