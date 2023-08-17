@@ -12,10 +12,10 @@ try:
 except ImportError:
     pass
 from assume.strategies.naive_strategies import (
+    NaiveDAStrategy,
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
     NaiveStrategy,
-    NaiveDAStrategy,
 )
 
 bidding_strategies: dict[str, BaseStrategy] = {
