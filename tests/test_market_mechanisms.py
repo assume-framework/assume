@@ -122,7 +122,7 @@ def test_complex_clearing():
     # including block order in the money
 
 
-# @pytest.mark.require_gurobi
+@pytest.mark.require_gurobi
 def test_complex_clearing_BB():
     import copy
 
