@@ -115,8 +115,6 @@ def test_complex_clearing():
     assert accepted_orders[2]["agent_id"] == "gen2"
     assert accepted_orders[2]["volume"] == 900
 
-    # including block order in the money
-
 
 def test_complex_clearing_BB():
     import copy
@@ -124,18 +122,33 @@ def test_complex_clearing_BB():
     market_config = copy.copy(simple_dayahead_auction_config)
 
     market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex"]
-    market_config.market_products = [MarketProduct(rd(hours=+1), 2, rd(hours=1))]
+    market_config.market_products = [MarketProduct(rd(hours=+1), 24, rd(hours=1))]
     mr = MarketRole(market_config)
     next_opening = market_config.opening_hours.after(datetime.now())
     products = get_available_products(market_config.market_products, next_opening)
-    assert len(products) == 2
+    assert len(products) == 24
     orderbook = create_definite_orderbook(products[0][0], products[-1][0])
+
+    # insert simple order with lower price in between
+    cheap_order: Order = {
+        "start_time": products[1][0],
+        "end_time": products[1][1],
+        "agent_id": "gen3",
+        "bid_id": f"bid_{len(orderbook)+1}",
+        "volume": 1000,
+        "price": 5,
+        "only_hours": None,
+        "node_id": 0,
+        "bid_type": "SB",
+    }
+
+    orderbook.append(cheap_order)
 
     # insert block order in-the-money
     block_order: Order = {
         "start_time": products[0][0],
         "end_time": products[0][1],
-        "agent_id": "gen3_block",
+        "agent_id": "gen4_block",
         "bid_id": f"bid_{len(orderbook)+1}",
         "profile": {product[0]: 50 for product in products},
         "price": 25,
@@ -170,17 +183,19 @@ def test_complex_clearing_BB():
     assert meta[0]["demand_volume"] == -1000
     assert meta[0]["price"] == 100
 
+    assert meta[1]["price"] == 5  # because thats the cost for one additional MW
+
     assert accepted_orders[0]["agent_id"] == "dem1"
     assert accepted_orders[0]["volume"] == -1000
     assert accepted_orders[1]["agent_id"] == "gen1"
     assert accepted_orders[1]["volume"] == 50
     assert accepted_orders[2]["agent_id"] == "gen2"
     assert accepted_orders[2]["volume"] == 900
-    assert accepted_orders[-1]["agent_id"] == "gen3_block"
+    assert accepted_orders[-1]["agent_id"] == "gen4_block"
     assert accepted_orders[-1]["profile"][products[0][0]] == 50
-
-    assert rejected_orders[0]["agent_id"] == "gen4_block"
-    assert rejected_orders[0]["profile"][products[0][0]] == 0
+    assert len(rejected_orders) == 3
+    assert rejected_orders[-1]["agent_id"] == "gen4_block"
+    assert rejected_orders[-1]["profile"][products[0][0]] == 0
 
 
 if __name__ == "__main__":

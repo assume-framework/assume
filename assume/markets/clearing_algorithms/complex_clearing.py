@@ -10,7 +10,7 @@ log = logging.getLogger(__name__)
 SOLVERS = ["glpk", "cbc", "gurobi", "cplex"]
 
 
-# TODO: clearing for BB not as expected - debugging necessary
+# TODO: remove paradoxically accepted orders from solution
 def pay_as_clear_opt(
     market_agent: MarketRole,
     market_products: list[MarketProduct],
