@@ -102,7 +102,8 @@ class MarketRole(Role):
         products = get_available_products(
             self.marketconfig.market_products, market_open
         )
-        if market_closing > self.marketconfig.opening_hours._until:
+        until = self.marketconfig.opening_hours._until
+        if until and market_closing > until:
             # this market should not open, as the clearing is after the markets end time
             return
 
@@ -184,7 +185,7 @@ class MarketRole(Role):
                 if self.marketconfig.volume_tick:
                     assert isinstance(order["volume"], int)
                 for field in self.marketconfig.additional_fields:
-                    assert order[field], f"missing field: {field}"
+                    assert field in order.keys(), f"missing field: {field}"
                 self.all_orders.append(order)
         except Exception as e:
             logger.error(f"error handling message from {agent_id} - {e}")

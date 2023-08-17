@@ -2,7 +2,7 @@ import logging
 from itertools import groupby
 from operator import itemgetter
 
-from assume.common.market_objects import MarketProduct, Order, Orderbook
+from assume.common.market_objects import MarketProduct, Orderbook
 from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)

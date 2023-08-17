@@ -4,10 +4,12 @@ import pandas as pd
 import pytest
 
 from assume.common.base import SupportsMinMax
+from assume.common.market_objects import MarketConfig
 
 
 class MockMarketConfig:
     product_type = "energy"
+    additional_fields = []
 
 
 class MockMinMaxUnit(SupportsMinMax):

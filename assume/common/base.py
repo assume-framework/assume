@@ -157,6 +157,8 @@ class SupportsMinMax(BaseUnit):
         self, previous_power: float, power: float, current_power: float = 0
     ) -> float:
         if power == 0:
+            # if less than min_power is required, we run min_power
+            # we could also split at self.min_power/2
             return power
         # ramp up constraint
         # max_power + current_power < previous_power + unit.ramp_up
