@@ -114,16 +114,6 @@ If you want to use the reinforcement learning strategies of Assume please make s
 
 pip install "torch>=2.0.1+cpu" -f https://download.pytorch.org/whl/torch_stable.html
 
-Access to database and dashboards
----------------------------------
-To save the simulation results to a database and be able to analyze them using Grafan dashboards, install the docker container:
-
-```
-docker compose up
-```
-
-This will start a container for timescaledb and grafana with preconfigured grafana dashboard.
-
 Quick Start
 -----------
 
@@ -137,6 +127,7 @@ If you have docker installed, you can run the following two commands:
     docker compose up -d
     python examples/example_01a_timescale.py
 ```
+This will start a container for timescaledb and grafana with preconfigured grafana dashboard.
 
 Afterwards you can access the Dashboard on `http://localhost:3000`
 

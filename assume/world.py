@@ -25,6 +25,7 @@ from assume.common import (
 )
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import LearningStrategy, bidding_strategies
+
 from assume.units import BaseUnit, Demand, HeatPump, PowerPlant, Storage
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
@@ -77,8 +78,9 @@ class World:
             "demand": Demand,
             "storage": Storage,
         }
+        
         self.bidding_types = bidding_strategies
-
+  
         try:
             from assume.strategies.learning_strategies import RLStrategy
 

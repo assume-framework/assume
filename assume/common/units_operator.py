@@ -87,6 +87,10 @@ class UnitsOperator(Role):
                 receiver_id=db_aid,
                 receiver_addr=db_addr,
                 content=message,
+                acl_metadata={
+                    "sender_addr": self.context.addr,
+                    "sender_id": self.context.aid,
+                },
             )
 
     def participate(self, market: MarketConfig):
