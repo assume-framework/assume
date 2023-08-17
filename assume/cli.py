@@ -75,13 +75,10 @@ def cli(args=None):
         scenario=args.scenario,
         study_case=args.case_study,
     )
-    try:
-        world.run()
-    except KeyboardInterrupt:
-        pass
+    world.run()
 
 
 if __name__ == "__main__":
     # cli()
-    args = "-s example_01_rl -db postgresql://assume:assume@localhost:5432/assume"
+    args = "-s example_01a -db postgresql://assume:assume@localhost:5432/assume"
     cli(args.split(" "))

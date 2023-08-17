@@ -1,16 +1,13 @@
-import calendar
 import logging
 from datetime import datetime
-from typing import Callable
 
 import dateutil.rrule as rr
 import numpy as np
 import pandas as pd
 import yaml
-from mango import RoleAgent
 from tqdm import tqdm
 
-from assume.common.forecasts import CsvForecaster, Forecaster, RandomForecaster
+from assume.common.forecasts import CsvForecaster, Forecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.world import World
 
@@ -147,7 +144,7 @@ def make_market_config(
     return market_config
 
 
-async def add_units(
+def add_units(
     units_df: pd.DataFrame,
     unit_type: str,
     world: World,
@@ -170,11 +167,12 @@ async def add_units(
             if key.startswith("bidding_")
         }
         unit_params["bidding_strategies"] = bidding_strategies
-
-        await world.add_unit(
+        operator_id = unit_params["unit_operator"]
+        del unit_params["unit_operator"]
+        world.add_unit(
             id=unit_name,
             unit_type=unit_type,
-            unit_operator_id=unit_params["unit_operator"],
+            unit_operator_id=operator_id,
             unit_params=unit_params,
             forecaster=forecaster,
         )
@@ -383,21 +381,21 @@ async def load_scenario_folder_async(
     def empty_callback(unit_name, unit_params):
         return unit_params
 
-    await add_units(
+    add_units(
         powerplant_units,
         "power_plant",
         world,
         forecaster,
     )
 
-    await add_units(
+    add_units(
         heatpump_units,
         "heatpump",
         world,
         forecaster,
     )
 
-    await add_units(
+    add_units(
         storage_units,
         "storage",
         world,
@@ -410,7 +408,7 @@ async def load_scenario_folder_async(
 
         return unit_params
 
-    await add_units(
+    add_units(
         demand_units,
         "demand",
         world,
@@ -437,39 +435,34 @@ def load_scenario_folder(
         )
     )
 
+    # check if learning mode
     if world.learning_config.get("learning_mode"):
-        start_ts = calendar.timegm(world.start.utctimetuple())
-        end_ts = calendar.timegm(world.end.utctimetuple())
-        # we are in learning mode
-
         # initiate buffer for rl agent
         from assume.reinforcement_learning.buffer import ReplayBuffer
 
         buffer = ReplayBuffer(
             buffer_size=1000000,
-            obs_dim=world.rl_agent.roles[0].obs_dim,
-            act_dim=world.rl_agent.roles[0].act_dim,
-            n_rl_units=world.learning_agent_count,
-            device=world.rl_agent.roles[0].device,
+            obs_dim=world.learning_role.obs_dim,
+            act_dim=world.learning_role.act_dim,
+            n_rl_units=world.learning_role.n_rl_units,
+            device=world.learning_role.device,
         )
 
-        world.rl_agent.roles[0].buffer = buffer
+        world.learning_role.buffer = buffer
 
         for episode in tqdm(
-            range(world.rl_agent.roles[0].training_episodes),
+            range(world.learning_role.training_episodes),
             desc="Training Episodes",
         ):
             # change simulation id of output agent to include the episode number
-            world.output_agent.roles[
-                0
-            ].simulation_id = f"{world.output_agent.roles[0].simulation_id}_{episode}"
-
-            world.loop.run_until_complete(
-                world.run_async(start_ts=start_ts, end_ts=end_ts)
+            world.output_role.simulation_id = (
+                f"{world.output_role.simulation_id}_{episode}"
             )
+
+            world.run()
             world.reset()
 
-            world.rl_agent.roles[0].episodes_done = +1
+            world.learning_role.episodes_done = +1
 
             # in load_scenario_folder_async, we initiate new container and kill old if present
             # as long as we do not skip setup container should be handled correctly
@@ -482,11 +475,11 @@ def load_scenario_folder(
                 )
             )
             # give the newly created rl_agent the buffer that we stored from the beginning
-            world.rl_agent.roles[0].buffer = buffer
+            world.learning_role.buffer = buffer
 
             # container shutdown implicitly with new initialisation
 
         world.logger.info("################")
         world.logger.info(f"Training finished, Start evaluation run")
 
-        world.rl_agent.roles[0].learning_mode = False
+        world.learning_role.learning_mode = False
