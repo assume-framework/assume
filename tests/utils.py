@@ -39,6 +39,59 @@ def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
     return orders
 
 
+"""
+Create Orderbook with constant order volumes and prices:
+    - dem1: volume = -1000, price = 3000
+    - gen1: volume = 1000, price = 100
+    - gen2: volume = 900, price = 50
+"""
+
+
+def create_definite_orderbook(start, end):
+    orders = []
+    i = 0
+    for t in pd.date_range(start=start, end=end, freq="1H"):
+        order: Order = {
+            "start_time": t,
+            "end_time": t + timedelta(hours=1),
+            "agent_id": "dem1",
+            "bid_id": f"bid_{i*3}",
+            "volume": -1000,
+            "price": 3000,
+            "only_hours": None,
+            "node_id": 0,
+            "bid_type": "SB",
+        }
+        orders.append(order)
+        order: Order = {
+            "start_time": t,
+            "end_time": t + timedelta(hours=1),
+            "agent_id": "gen1",
+            "bid_id": f"bid_{i*3+1}",
+            "volume": 1000,
+            "price": 100,
+            "only_hours": None,
+            "node_id": 0,
+            "bid_type": "SB",
+        }
+        orders.append(order)
+        order: Order = {
+            "start_time": t,
+            "end_time": t + timedelta(hours=1),
+            "agent_id": "gen2",
+            "bid_id": f"bid_{i*3+2}",
+            "volume": 900,
+            "price": 50,
+            "only_hours": None,
+            "node_id": 0,
+            "bid_type": "SB",
+        }
+        orders.append(order)
+        i += 1
+
+    return orders
+
+
 def get_test_prices(num: int = 24):
     power_price = 50 * np.ones(num)
     # power_price[18:24] = 0

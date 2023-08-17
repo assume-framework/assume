@@ -10,6 +10,7 @@ log = logging.getLogger(__name__)
 SOLVERS = ["glpk", "cbc", "gurobi", "cplex"]
 
 
+# TODO: clearing for BB not as expected - debugging necessary
 def pay_as_clear_opt(
     market_agent: MarketRole,
     market_products: list[MarketProduct],
@@ -36,16 +37,34 @@ def pay_as_clear_opt(
         initialize=[market_product[0] for market_product in market_products],
         doc="timesteps",
     )
-    model.sBids = pyo.Set(initialize=[order["bid_id"] for order in orders if order["bid_type"] == "SB"], doc="simple_bids")
-    model.bBids = pyo.Set(initialize=[order["bid_id"] for order in orders if order["bid_type"] == "BB"], doc="block_bids")
+    model.sBids = pyo.Set(
+        initialize=[order["bid_id"] for order in orders if order["bid_type"] == "SB"],
+        doc="simple_bids",
+    )
+    model.bBids = pyo.Set(
+        initialize=[order["bid_id"] for order in orders if order["bid_type"] == "BB"],
+        doc="block_bids",
+    )
 
-    model.xs = pyo.Var(model.sBids, domain=pyo.NonNegativeReals, bounds=(0,1), doc="simple_bid_acceptance")
-    model.xb = pyo.Var(model.bBids, domain=pyo.NonNegativeReals, bounds=(0,1),doc="block_bid_acceptance")
+    model.xs = pyo.Var(
+        model.sBids,
+        domain=pyo.NonNegativeReals,
+        bounds=(0, 1),
+        doc="simple_bid_acceptance",
+    )
+    model.xb = pyo.Var(
+        model.bBids,
+        domain=pyo.NonNegativeReals,
+        bounds=(0, 1),
+        doc="block_bid_acceptance",
+    )
 
     balanceExpr = {t: 0.0 for t in model.T}
     for order in orders:
         if order["bid_type"] == "SB":
-            balanceExpr[order["start_time"]] += order["volume"] * model.xs[order["bid_id"]]
+            balanceExpr[order["start_time"]] += (
+                order["volume"] * model.xs[order["bid_id"]]
+            )
         elif order["bid_type"] == "BB":
             for start_time, volume in order["profile"].items():
                 balanceExpr[start_time] += volume * model.xb[order["bid_id"]]
@@ -53,7 +72,7 @@ def pay_as_clear_opt(
     def energy_balance_rule(m, t):
         return balanceExpr[t] == 0
 
-    model.energy_balance = pyo.Constraint(model.T, rule=energy_balance_rule)            
+    model.energy_balance = pyo.Constraint(model.T, rule=energy_balance_rule)
 
     obj_exp = 0
     for order in orders:
@@ -78,27 +97,20 @@ def pay_as_clear_opt(
         raise Exception("infeasible")
 
     # Find the dual variable for the balance constraint
-    market_clearing_prices = {
-        t: model.dual[model.energy_balance[t]]
-        for t in model.T
-    }
+    market_clearing_prices = {t: model.dual[model.energy_balance[t]] for t in model.T}
 
-    for product, product_orders in groupby(market_agent.all_orders, market_getter):
+    block_orders = [order for order in orders if order["bid_type"] == "BB"]
+    simple_orders = [order for order in orders if order["bid_type"] == "SB"]
+
+    for product, product_orders in groupby(simple_orders, market_getter):
         clear_price = market_clearing_prices[product[0]]
 
         supply_volume = 0
         demand_volume = 0
 
-        product_orders = list(product_orders)
         for order in list(product_orders):
-            if order["bid_type"] == "SB":
-                order["volume"] = model.xs[order["bid_id"]].value * order["volume"]
-                opt_volume = order["volume"]
-            elif order["bid_type"] == "BB":
-                opt_volume = 0
-                for start_time, volume in order["profile"].items():
-                    order['profile'][start_time] = model.xb[order["bid_id"]].value * volume
-                    opt_volume += order['profile'][start_time]
+            order["volume"] = model.xs[order["bid_id"]].value * order["volume"]
+            opt_volume = order["volume"]
 
             if opt_volume > 0:
                 supply_volume += opt_volume
@@ -109,6 +121,21 @@ def pay_as_clear_opt(
 
             if opt_volume != 0:
                 accepted_orders.append(order)
+            else:
+                rejected_orders.append(order)
+
+        for order in block_orders:
+            start_time = product[0]
+            if start_time in order["profile"]:
+                order["profile"][start_time] = (
+                    model.xb[order["bid_id"]].value * order["profile"][start_time]
+                )
+                opt_volume = order["profile"][start_time]
+
+                if opt_volume > 0:
+                    supply_volume += opt_volume
+                else:
+                    demand_volume += opt_volume
 
         duration_hours = (product[1] - product[0]).total_seconds() / 60 / 60
 
@@ -128,6 +155,14 @@ def pay_as_clear_opt(
             }
         )
 
+    for order in block_orders:
+        order["price"] = clear_price
+
+        if model.xb[order["bid_id"]].value != 0:
+            accepted_orders.append(order)
+        else:
+            rejected_orders.append(order)
+
     market_agent.all_orders = []
 
-    return accepted_orders, [], meta
+    return accepted_orders, rejected_orders, meta

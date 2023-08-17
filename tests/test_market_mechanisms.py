@@ -9,7 +9,7 @@ from assume.common.market_objects import MarketConfig, MarketProduct, Order, Ord
 from assume.common.utils import get_available_products
 from assume.markets import MarketRole, clearing_mechanisms
 
-from .utils import create_orderbook
+from .utils import create_definite_orderbook, create_orderbook
 
 simple_dayahead_auction_config = MarketConfig(
     "simple_dayahead_auction",
@@ -37,48 +37,9 @@ def test_market():
     assert len(products) == 1
 
     print(products)
-    start = products[0][0]
-    end = products[0][1]
-    only_hours = products[0][2]
 
-    orderbook: Orderbook = [
-        {
-            "start_time": start,
-            "end_time": end,
-            "volume": 120,
-            "price": 120,
-            "agent_id": "gen1",
-            "bid_id": "bid1",
-            "only_hours": None,
-        },
-        {
-            "start_time": start,
-            "end_time": end,
-            "volume": 80,
-            "price": 58,
-            "agent_id": "gen1",
-            "bid_id": "bid2",
-            "only_hours": None,
-        },
-        {
-            "start_time": start,
-            "end_time": end,
-            "volume": 100,
-            "price": 53,
-            "agent_id": "gen1",
-            "bid_id": "bid3",
-            "only_hours": None,
-        },
-        {
-            "start_time": start,
-            "end_time": end,
-            "volume": -180,
-            "price": 70,
-            "agent_id": "dem1",
-            "bid_id": "bid4",
-            "only_hours": None,
-        },
-    ]
+    orderbook = create_definite_orderbook(products[0][0], products[-1][0])
+
     simple_dayahead_auction_config.market_mechanism = clearing_mechanisms[
         simple_dayahead_auction_config.market_mechanism
     ]
@@ -93,56 +54,6 @@ def test_market():
     print(pd.DataFrame(mr.all_orders))
     print(pd.DataFrame(accepted))
     print(meta)
-
-
-def create_definite_orderbook(start, end):
-    orders = []
-    i = 0
-    for t in pd.date_range(start=start, end=end, freq="1H"):
-        order: Order = {
-            "start_time": t,
-            "end_time": t + timedelta(hours=1),
-            "agent_id": "dem1",
-            "bid_id": f"bid_{i*2}",
-            "volume": -1000,
-            "price": 3000,
-            "only_hours": None,
-            "node_id": 0,
-            "bid_type": "SB",
-        }
-        orders.append(order)
-        order: Order = {
-            "start_time": t,
-            "end_time": t + timedelta(hours=1),
-            "agent_id": "gen1",
-            "bid_id": f"bid_{i*2+1}",
-            "volume": 1000,
-            "price": 100,
-            "only_hours": None,
-            "node_id": 0,
-            "bid_type": "SB",
-        }
-        orders.append(order)
-        i += 1
-    i = 2 * i
-    for t in pd.date_range(
-        start=start + timedelta(hours=5), end=start + timedelta(hours=10), freq="1H"
-    ):
-        order: Order = {
-            "start_time": t,
-            "end_time": t + timedelta(hours=1),
-            "agent_id": "gen2",
-            "bid_id": f"bid_{i}",
-            "volume": 900,
-            "price": 50,
-            "only_hours": None,
-            "node_id": 0,
-            "bid_type": "SB",
-        }
-        orders.append(order)
-        i += 1
-
-    return orders
 
 
 def test_market_mechanism():
@@ -179,6 +90,7 @@ def test_complex_clearing():
     import copy
 
     market_config = copy.copy(simple_dayahead_auction_config)
+
     market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex"]
     market_config.market_products = [MarketProduct(rd(hours=+1), 24, rd(hours=1))]
     mr = MarketRole(market_config)
@@ -192,13 +104,83 @@ def test_complex_clearing():
         mr, products
     )
 
-    assert meta[0]["supply_volume"] > 0
-    assert meta[0]["price"] > 0
+    assert meta[0]["supply_volume"] == 1000
+    assert meta[0]["demand_volume"] == -1000
+    assert meta[0]["price"] == 100
     assert rejected_orders == []
-    assert accepted_orders[11]["agent_id"] == "gen1"
-    assert accepted_orders[11]["volume"] == 100
-    assert accepted_orders[12]["agent_id"] == "gen2"
-    assert accepted_orders[12]["volume"] == 900
+    assert accepted_orders[0]["agent_id"] == "dem1"
+    assert accepted_orders[0]["volume"] == -1000
+    assert accepted_orders[1]["agent_id"] == "gen1"
+    assert accepted_orders[1]["volume"] == 100
+    assert accepted_orders[2]["agent_id"] == "gen2"
+    assert accepted_orders[2]["volume"] == 900
+
+    # including block order in the money
+
+
+def test_complex_clearing_BB():
+    import copy
+
+    market_config = copy.copy(simple_dayahead_auction_config)
+
+    market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex"]
+    market_config.market_products = [MarketProduct(rd(hours=+1), 2, rd(hours=1))]
+    mr = MarketRole(market_config)
+    next_opening = market_config.opening_hours.after(datetime.now())
+    products = get_available_products(market_config.market_products, next_opening)
+    assert len(products) == 2
+    orderbook = create_definite_orderbook(products[0][0], products[-1][0])
+
+    # insert block order in-the-money
+    block_order: Order = {
+        "start_time": products[0][0],
+        "end_time": products[0][1],
+        "agent_id": "gen3_block",
+        "bid_id": f"bid_{len(orderbook)+1}",
+        "profile": {product[0]: 50 for product in products},
+        "price": 25,
+        "only_hours": None,
+        "node_id": 0,
+        "bid_type": "BB",
+    }
+
+    orderbook.append(block_order)
+
+    # insert block order out-of-the-money
+    block_order: Order = {
+        "start_time": products[0][0],
+        "end_time": products[0][1],
+        "agent_id": "gen4_block",
+        "bid_id": f"bid_{len(orderbook)+1}",
+        "profile": {product[0]: 50 for product in products},
+        "price": 150,
+        "only_hours": None,
+        "node_id": 0,
+        "bid_type": "BB",
+    }
+
+    orderbook.append(block_order)
+
+    mr.all_orders = orderbook
+    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
+        mr, products
+    )
+
+    assert meta[0]["supply_volume"] == 1000
+    assert meta[0]["demand_volume"] == -1000
+    assert meta[0]["price"] == 100
+
+    assert accepted_orders[0]["agent_id"] == "dem1"
+    assert accepted_orders[0]["volume"] == -1000
+    assert accepted_orders[1]["agent_id"] == "gen1"
+    assert accepted_orders[1]["volume"] == 50
+    assert accepted_orders[2]["agent_id"] == "gen2"
+    assert accepted_orders[2]["volume"] == 900
+    assert accepted_orders[-1]["agent_id"] == "gen3_block"
+    assert accepted_orders[-1]["profile"][products[0][0]] == 50
+
+    assert rejected_orders[0]["agent_id"] == "gen4_block"
+    assert rejected_orders[0]["profile"][products[0][0]] == 0
 
 
 if __name__ == "__main__":
