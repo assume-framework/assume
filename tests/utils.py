@@ -58,8 +58,8 @@ def create_definite_orderbook(start, end):
             "bid_id": f"bid_{i*3}",
             "volume": -1000,
             "price": 3000,
+            "accepted_price": None,
             "only_hours": None,
-            "node_id": 0,
             "bid_type": "SB",
         }
         orders.append(order)
@@ -70,8 +70,8 @@ def create_definite_orderbook(start, end):
             "bid_id": f"bid_{i*3+1}",
             "volume": 1000,
             "price": 100,
+            "accepted_price": None,
             "only_hours": None,
-            "node_id": 0,
             "bid_type": "SB",
         }
         orders.append(order)
@@ -82,8 +82,8 @@ def create_definite_orderbook(start, end):
             "bid_id": f"bid_{i*3+2}",
             "volume": 900,
             "price": 50,
+            "accepted_price": None,
             "only_hours": None,
-            "node_id": 0,
             "bid_type": "SB",
         }
         orders.append(order)

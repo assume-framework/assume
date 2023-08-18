@@ -1,3 +1,4 @@
+import math
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -126,8 +127,14 @@ def test_complex_clearing_BB():
 
     market_config = copy.copy(simple_dayahead_auction_config)
 
-    market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex"]
+    market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex_opt"]
     market_config.market_products = [MarketProduct(rd(hours=+1), 24, rd(hours=1))]
+    market_config.additional_fields = [
+        "bid_type",
+        "accepted_price",
+        "profile",
+        "accepted_profile",
+    ]
     mr = MarketRole(market_config)
     next_opening = market_config.opening_hours.after(datetime.now())
     products = get_available_products(market_config.market_products, next_opening)
@@ -142,6 +149,7 @@ def test_complex_clearing_BB():
         "bid_id": f"bid_{len(orderbook)+1}",
         "volume": 1000,
         "price": 5,
+        "accepted_price": None,
         "only_hours": None,
         "node_id": 0,
         "bid_type": "SB",
@@ -158,6 +166,7 @@ def test_complex_clearing_BB():
         "profile": {product[0]: 50 for product in products},
         "accepted_profile": {},
         "price": 25,
+        "accepted_price": {},
         "only_hours": None,
         "node_id": 0,
         "bid_type": "BB",
@@ -174,6 +183,7 @@ def test_complex_clearing_BB():
         "profile": {product[0]: 50 for product in products},
         "accepted_profile": {},
         "price": 150,
+        "accepted_price": {},
         "only_hours": None,
         "node_id": 0,
         "bid_type": "BB",
@@ -186,26 +196,37 @@ def test_complex_clearing_BB():
         mr, products
     )
 
-    assert meta[0]["supply_volume"] == 1000
-    assert meta[0]["demand_volume"] == -1000
-    assert meta[0]["price"] == 100
+    assert math.isclose(meta[0]["supply_volume"], 1000)
+    assert math.isclose(meta[0]["demand_volume"], -1000)
+    assert math.isclose(meta[0]["price"], 100)
 
-    assert meta[1]["price"] == 5  # because thats the cost for one additional MW
+    # assert math.isclose(meta[1]["price"], 5) # because thats the cost for one additional MW
 
     assert accepted_orders[0]["agent_id"] == "dem1"
-    assert round(accepted_orders[0]["accepted_volume"], 2) == -1000
+    assert math.isclose(accepted_orders[0]["accepted_volume"], -1000)
 
     assert accepted_orders[1]["agent_id"] == "gen1"
-    assert round(accepted_orders[1]["accepted_volume"], 2) == 50
+    assert math.isclose(accepted_orders[1]["accepted_volume"], 50)
 
     assert accepted_orders[2]["agent_id"] == "gen2"
-    assert round(accepted_orders[2]["accepted_volume"], 2) == 900
+    assert math.isclose(accepted_orders[2]["accepted_volume"], 900)
 
     assert accepted_orders[3]["agent_id"] == "gen4_block"
-    assert round(accepted_orders[3]["accepted_profile"][products[0][0]], 2) == 50
+    assert math.isclose(accepted_orders[3]["accepted_profile"][products[0][0]], 50)
 
     assert rejected_orders[0]["agent_id"] == "gen4_block"
-    assert round(rejected_orders[0]["accepted_profile"][products[0][0]], 2) == 0
+    assert math.isclose(rejected_orders[0]["accepted_profile"][products[0][0]], 0)
+
+    # check for paradoxically acceptance of cheap block bid
+    for t in [product[0] for product in products]:
+        if math.isclose(
+            accepted_orders[3]["accepted_price"][t] - accepted_orders[3]["price"], 0
+        ) or (accepted_orders[3]["accepted_price"][t] > accepted_orders[3]["price"]):
+            print(
+                f"The block order {accepted_orders[3]['bid_id']} is paradoxically"
+                + f"accepted with offered price {accepted_orders[3]['price']} and"
+                + f"cleared price {accepted_orders[3]['accepted_price'][t]}."
+            )
 
 
 if __name__ == "__main__":

@@ -28,9 +28,6 @@ class Order(TypedDict):
     price: float
     accepted_volume: float
     agent_id: str
-    profile: Optional[dict[datetime, float]]  # for block orders
-    accepted_profile: Optional[dict[datetime, float]]  # for block orders
-    bid_type: Optional[str]  # SB, BB, LB
     only_hours: Optional[OnlyHours]
 
 

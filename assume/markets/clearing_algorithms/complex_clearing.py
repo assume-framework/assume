@@ -121,6 +121,11 @@ def pay_as_clear_complex_opt(
     rejected_orders: Orderbook = []
     meta = []
 
+    assert "accepted_price" in market_agent.marketconfig.additional_fields
+    assert "bid_type" in market_agent.marketconfig.additional_fields
+    assert "profile" in market_agent.marketconfig.additional_fields
+    assert "accepted_profile" in market_agent.marketconfig.additional_fields
+
     price_cap = (
         market_agent.marketconfig.minimum_bid_price,
         market_agent.marketconfig.maximum_bid_price,
@@ -269,7 +274,7 @@ def extract_results(
             acceptance = model.xs[order["bid_id"]].value
             acceptance = 0 if acceptance < eps else acceptance
             order["accepted_volume"] = acceptance * order["volume"]
-            order["price"] = market_clearing_prices[order["start_time"]]
+            order["accepted_price"] = market_clearing_prices[order["start_time"]]
 
             if order["accepted_volume"] > 0:
                 supply_volume_dict[order["start_time"]] += order["accepted_volume"]
@@ -282,7 +287,7 @@ def extract_results(
 
             for start_time, volume in order["profile"].items():
                 order["accepted_profile"][start_time] = acceptance * volume
-                order["price"] = market_clearing_prices[start_time]
+                order["accepted_price"][start_time] = market_clearing_prices[start_time]
 
                 if order["accepted_profile"][start_time] > 0:
                     supply_volume_dict[start_time] += order["accepted_profile"][
