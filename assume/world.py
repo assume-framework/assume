@@ -60,10 +60,11 @@ class World:
                     self.db.connection()
                     connected = True
                     self.logger.info("connected to db")
-                except OperationalError:
+                except OperationalError as e:
                     self.logger.error(
                         f"could not connect to {database_uri}, trying again"
                     )
+                    self.logger.error(f"{e}")
                     time.sleep(2)
         else:
             self.db = None
