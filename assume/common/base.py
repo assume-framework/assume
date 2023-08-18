@@ -87,7 +87,7 @@ class BaseUnit:
             start = order["start_time"]
             end = order["end_time"]
             end_excl = end - self.index.freq
-            self.outputs[product_type].loc[start:end_excl] += order["volume"]
+            self.outputs[product_type].loc[start:end_excl] += order["accepted_volume"]
 
         self.calculate_cashflow(product_type, orderbook)
 

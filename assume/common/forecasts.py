@@ -218,6 +218,7 @@ class NaiveForecast(Forecaster):
         fuel_price: float | list = 10,
         co2_price: float | list = 10,
         demand: float | list = 100,
+        price_forecast: float | list = 50,
         *args,
         **kwargs,
     ):
@@ -226,6 +227,7 @@ class NaiveForecast(Forecaster):
         self.availability = availability
         self.co2_price = co2_price
         self.demand = demand
+        self.price_forecast = price_forecast
 
     def __getitem__(self, column: str) -> pd.Series:
         if "availability" in column:
@@ -236,6 +238,10 @@ class NaiveForecast(Forecaster):
             value = self.fuel_price
         elif "demand" in column:
             value = self.demand
+        elif column == "price_forecast":
+            value = self.price_forecast
         else:
             value = 0
+        if isinstance(value, pd.Series):
+            value.index = self.index
         return pd.Series(value, self.index)

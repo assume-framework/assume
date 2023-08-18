@@ -77,6 +77,7 @@ class World:
             "demand": Demand,
             "storage": Storage,
         }
+
         self.bidding_types = bidding_strategies
 
         try:

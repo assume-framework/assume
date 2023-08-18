@@ -54,9 +54,12 @@ class MarketRole(Role):
         def accept_orderbook(content: dict, meta):
             if not isinstance(content, dict):
                 return False
-            name_match = content.get("market") == self.marketconfig.name
-            orderbook_exists = content.get("orderbook") is not None
-            return name_match and orderbook_exists
+
+            return (
+                content.get("market") == self.marketconfig.name
+                and content.get("orderbook") is not None
+                and (meta["sender_addr"], meta["sender_id"]) in self.registered_agents
+            )
 
         def accept_registration(content: dict, meta):
             if not isinstance(content, dict):
@@ -76,18 +79,12 @@ class MarketRole(Role):
 
         self.context.subscribe_message(self, self.handle_orderbook, accept_orderbook)
         self.context.subscribe_message(
-            self,
-            self.handle_registration,
-            accept_registration
-            # TODO safer type check? dataclass?
+            self, self.handle_registration, accept_registration
         )
 
         if self.marketconfig.supports_get_unmatched:
             self.context.subscribe_message(
-                self,
-                self.handle_get_unmatched,
-                accept_get_unmatched
-                # TODO safer type check? dataclass?
+                self, self.handle_get_unmatched, accept_get_unmatched
             )
 
         current = datetime.utcfromtimestamp(self.context.current_timestamp)
@@ -151,7 +148,6 @@ class MarketRole(Role):
 
     def handle_orderbook(self, content: dict, meta: dict):
         orderbook: Orderbook = content["orderbook"]
-        # TODO check if agent is allowed to bid
         agent_addr = meta["sender_addr"]
         agent_id = meta["sender_id"]
         # TODO check if products are part of currently open Market Openings
@@ -177,9 +173,25 @@ class MarketRole(Role):
                 assert (
                     order["price"] >= min_price
                 ), f"minimum_bid_price {order['price']}"
-                assert (
-                    abs(order["volume"]) <= max_volume
-                ), f"max_volume {order['volume']}"
+
+                if "bid_type" in order.keys():
+                    assert order["bid_type"] in [
+                        "SB",
+                        "BB",
+                    ], f"bid_type {order['bid_type']} not in ['SB', 'BB']"
+
+                if (
+                    "bid_type" in order.keys() and order["bid_type"] == "SB"
+                ) or "bid_type" not in order.keys():
+                    assert (
+                        abs(order["volume"]) <= max_volume
+                    ), f"max_volume {order['volume']}"
+
+                if "bid_type" in order.keys() and order["bid_type"] == "BB":
+                    assert (
+                        abs(order["profile"].values()) <= max_volume
+                    ).all(), f"max_volume {order['volume']}"
+
                 if self.marketconfig.price_tick:
                     assert isinstance(order["price"], int)
                 if self.marketconfig.volume_tick:

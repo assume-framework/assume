@@ -12,7 +12,10 @@ from assume.common.utils import (
     get_available_products,
     initializer,
     plot_orderbook,
+    visualize_orderbook,
 )
+
+from .utils import create_orderbook
 
 
 def test_convert_rrule():
@@ -150,9 +153,21 @@ def test_plot_function(mock_pyplot):
     plot_orderbook([], [])
 
 
+@patch("matplotlib.pyplot.show")
+def test_plot_function(mock_pyplot):
+    orderbook = create_orderbook()
+    i = -1
+    for o in orderbook:
+        o["link"] = i
+        o["block_id"] = i + 1
+        i += 1
+    visualize_orderbook(orderbook)
+
+
 if __name__ == "__main__":
     test_convert_rrule()
     test_available_products()
     test_plot_function()
     test_make_market_config()
     test_initializer()
+    test_plot_function()

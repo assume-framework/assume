@@ -1,5 +1,5 @@
 from assume.common.base import BaseStrategy, SupportsMinMax
-from assume.common.market_objects import MarketConfig, Orderbook, Product
+from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 
 
 class NaiveStrategy(BaseStrategy):
@@ -30,16 +30,17 @@ class NaiveStrategy(BaseStrategy):
                 "price": marginal_cost,
                 "volume": volume,
             }
+            if "bid_type" in market_config.additional_fields:
+                order.update({"bid_type": "SB"})
+
             order.update({field: None for field in market_config.additional_fields})
             bids.append(order)
-
-            if "bid_type" in market_config.additional_fields:
-                bids[-1]["bid_type"] = "SB"
 
             previous_power = volume + current_power
 
         return bids
-    
+
+
 class NaiveDAStrategy(BaseStrategy):
     def calculate_bids(
         self,
@@ -48,28 +49,27 @@ class NaiveDAStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        
         start = product_tuples[0][0]
         end_all = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
         min_power, max_power = unit.calculate_min_max_power(start, end_all)
 
-        bids = []
         current_power = unit.outputs["energy"].at[start]
         marginal_cost = unit.calculate_marginal_cost(start, previous_power)
-        volume = unit.calculate_ramp(
-            previous_power, max_power[start], current_power
-        )
-        bids.append(
-            {
-                "start_time": start,
-                "end_time": product_tuples[0][1],
-                "only_hours": product_tuples[0][2],
-                "price": marginal_cost,
-                "profile": {product[0]: volume for product in product_tuples},
-            }
-        )
+        volume = unit.calculate_ramp(previous_power, max_power[start], current_power)
 
+        profile = {product[0]: volume for product in product_tuples}
+        order: Order = {
+            "start_time": start,
+            "end_time": product_tuples[0][1],
+            "only_hours": product_tuples[0][2],
+            "price": marginal_cost,
+            "profile": profile,
+            "accepted_profile": {},
+            "bid_type": "BB",
+        }
+
+        bids = [order]
         return bids
 
 
