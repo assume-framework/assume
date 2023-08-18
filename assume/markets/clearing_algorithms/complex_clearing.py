@@ -2,6 +2,9 @@ import logging
 from itertools import groupby
 from operator import itemgetter
 
+import pyomo.environ as pyo
+from pyomo.opt import SolverFactory, TerminationCondition, check_available_solvers
+
 from assume.common.market_objects import MarketProduct, Orderbook
 from assume.markets.base_market import MarketRole
 
@@ -15,14 +18,7 @@ def pay_as_clear_opt(
     market_agent: MarketRole,
     market_products: list[MarketProduct],
 ):
-    import pyomo.environ as pyo
-    from pyomo.opt import SolverFactory, check_available_solvers
-
     eps = 1e-4
-
-    accepted_orders: Orderbook = []
-    rejected_orders: Orderbook = []
-    meta = []
 
     market_getter = itemgetter("start_time", "end_time", "only_hours")
     market_agent.all_orders.sort(key=market_getter)
@@ -30,7 +26,7 @@ def pay_as_clear_opt(
     orders = market_agent.all_orders
 
     if len(market_agent.all_orders) == 0:
-        return accepted_orders, [], meta
+        return [], [], []
 
     model = pyo.ConcreteModel()
     model.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT_EXPORT)
@@ -68,7 +64,7 @@ def pay_as_clear_opt(
                 order["volume"] * model.xs[order["bid_id"]]
             )
         elif order["bid_type"] == "BB":
-            for start_time, volume in order["profile"].items():
+            for start_time, volume in order["volume"].items():
                 balanceExpr[start_time] += volume * model.xb[order["bid_id"]]
 
     def energy_balance_rule(m, t):
@@ -81,7 +77,7 @@ def pay_as_clear_opt(
         if order["bid_type"] == "SB":
             obj_exp += order["price"] * order["volume"] * model.xs[order["bid_id"]]
         elif order["bid_type"] == "BB":
-            for start_time, volume in order["profile"].items():
+            for start_time, volume in order["volume"].items():
                 obj_exp += order["price"] * volume * model.xb[order["bid_id"]]
 
     model.objective = pyo.Objective(expr=obj_exp, sense=pyo.minimize)
@@ -95,7 +91,7 @@ def pay_as_clear_opt(
     # Solve the model
     result = solver.solve(model)
 
-    if result["Solver"][0]["Status"] != "ok":
+    if result.solver.termination_condition == TerminationCondition.infeasible:
         raise Exception("infeasible")
 
     # Find the dual variable for the balance constraint
@@ -114,17 +110,12 @@ def pay_as_clear_complex_opt(
     market_agent: MarketRole,
     market_products: list[MarketProduct],
 ):
-    import pyomo.environ as pyo
-    from pyomo.opt import SolverFactory, check_available_solvers
-
-    accepted_orders: Orderbook = []
-    rejected_orders: Orderbook = []
-    meta = []
+    if len(market_agent.all_orders) == 0:
+        return [], [], []
 
     assert "accepted_price" in market_agent.marketconfig.additional_fields
     assert "bid_type" in market_agent.marketconfig.additional_fields
     assert "profile" in market_agent.marketconfig.additional_fields
-    assert "accepted_profile" in market_agent.marketconfig.additional_fields
 
     price_cap = (
         market_agent.marketconfig.minimum_bid_price,
@@ -136,9 +127,6 @@ def pay_as_clear_complex_opt(
     market_agent.all_orders.sort(key=market_getter)
 
     orders = market_agent.all_orders
-
-    if len(market_agent.all_orders) == 0:
-        return accepted_orders, [], meta
 
     model = pyo.ConcreteModel()
 
@@ -176,7 +164,7 @@ def pay_as_clear_complex_opt(
                 order["volume"] * model.xs[order["bid_id"]]
             )
         elif order["bid_type"] == "BB":
-            for start_time, volume in order["profile"].items():
+            for start_time, volume in order["volume"].items():
                 balance_expr[start_time] += volume * model.xb[order["bid_id"]]
 
     def energy_balance_rule(m, t):
@@ -192,10 +180,10 @@ def pay_as_clear_complex_opt(
             ) * order["volume"]
 
         elif order["bid_type"] == "BB":
-            bid_volume = sum(order["profile"].values())
+            bid_volume = sum(order["volume"].values())
             big_M = (price_cap[1] - price_cap[0]) * bid_volume
             surplus_expr[order["bid_id"]] = (
-                sum(model.prices[t] * v for t, v in order["profile"].items())
+                sum(model.prices[t] * v for t, v in order["volume"].items())
                 - order["price"] * bid_volume
             ) - big_M * (1 - model.xb[order["bid_id"]])
 
@@ -211,7 +199,7 @@ def pay_as_clear_complex_opt(
                 order["price"] * order["volume"] * model.xs[order["bid_id"]]
             )
         elif order["bid_type"] == "BB":
-            for start_time, volume in order["profile"].items():
+            for start_time, volume in order["volume"].items():
                 primal_obj_expr += order["price"] * volume * model.xb[order["bid_id"]]
 
     primal_obj_expr *= -1
@@ -240,7 +228,7 @@ def pay_as_clear_complex_opt(
     # Solve the model
     result = solver.solve(model)
 
-    if result["Solver"][0]["Status"] != "ok":
+    if result.solver.termination_condition == TerminationCondition.infeasible:
         raise Exception("infeasible")
 
     # Find the dual variable for the balance constraint
@@ -285,16 +273,16 @@ def extract_results(
             acceptance = model.xb[order["bid_id"]].value
             acceptance = 0 if acceptance < eps else acceptance
 
-            for start_time, volume in order["profile"].items():
-                order["accepted_profile"][start_time] = acceptance * volume
+            for start_time, volume in order["volume"].items():
+                order["accepted_volume"][start_time] = acceptance * volume
                 order["accepted_price"][start_time] = market_clearing_prices[start_time]
 
-                if order["accepted_profile"][start_time] > 0:
-                    supply_volume_dict[start_time] += order["accepted_profile"][
+                if order["accepted_volume"][start_time] > 0:
+                    supply_volume_dict[start_time] += order["accepted_volume"][
                         start_time
                     ]
                 else:
-                    demand_volume_dict[start_time] += order["accepted_profile"][
+                    demand_volume_dict[start_time] += order["accepted_volume"][
                         start_time
                     ]
 

@@ -91,4 +91,3 @@ dam_with_complex_opt_clearing:
         - bid_type
         - accepted_price
         - profile
-        - accepted_profile

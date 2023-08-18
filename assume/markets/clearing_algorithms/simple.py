@@ -98,9 +98,11 @@ def pay_as_clear(
             clear_price = max(map(itemgetter("price"), accepted_supply_orders))
         else:
             clear_price = 0
+
         for order in accepted_product_orders:
             order["original_price"] = order["price"]
-            order["price"] = clear_price
+            order["accepted_price"] = clear_price
+
         accepted_orders.extend(accepted_product_orders)
 
         accepted_supply_orders = [
@@ -212,8 +214,10 @@ def pay_as_bid(
             # pay as bid
             for supply_order in to_commit:
                 supply_order["original_price"] = supply_order["price"]
+                supply_order["accepted_price"] = supply_order["price"]
+
                 demand_order["original_price"] = demand_order["price"]
-                demand_order["price"] = supply_order["price"]
+                demand_order["accepted_price"] = supply_order["price"]
             accepted_product_orders.extend(to_commit)
 
         accepted_supply_orders = [
@@ -228,12 +232,12 @@ def pay_as_bid(
         avg_price = 0
         if supply_volume:
             weighted_price = [
-                order["accepted_volume"] * order["price"]
+                order["accepted_volume"] * order["accepted_price"]
                 for order in accepted_supply_orders
             ]
             avg_price = sum(weighted_price) / supply_volume
         accepted_orders.extend(accepted_product_orders)
-        prices = list(map(itemgetter("price"), accepted_supply_orders)) or [0]
+        prices = list(map(itemgetter("accepted_price"), accepted_supply_orders)) or [0]
         duration_hours = (product[1] - product[0]).total_seconds() / 60 / 60
         meta.append(
             {

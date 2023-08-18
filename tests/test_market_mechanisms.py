@@ -133,7 +133,6 @@ def test_complex_clearing_BB():
         "bid_type",
         "accepted_price",
         "profile",
-        "accepted_profile",
     ]
     mr = MarketRole(market_config)
     next_opening = market_config.opening_hours.after(datetime.now())
@@ -148,6 +147,7 @@ def test_complex_clearing_BB():
         "agent_id": "gen3",
         "bid_id": f"bid_{len(orderbook)+1}",
         "volume": 1000,
+        "accepted_volume": None,
         "price": 5,
         "accepted_price": None,
         "only_hours": None,
@@ -163,8 +163,8 @@ def test_complex_clearing_BB():
         "end_time": products[0][1],
         "agent_id": "gen4_block",
         "bid_id": f"bid_{len(orderbook)+1}",
-        "profile": {product[0]: 50 for product in products},
-        "accepted_profile": {},
+        "volume": {product[0]: 50 for product in products},
+        "accepted_volume": {},
         "price": 25,
         "accepted_price": {},
         "only_hours": None,
@@ -180,8 +180,8 @@ def test_complex_clearing_BB():
         "end_time": products[0][1],
         "agent_id": "gen4_block",
         "bid_id": f"bid_{len(orderbook)+1}",
-        "profile": {product[0]: 50 for product in products},
-        "accepted_profile": {},
+        "volume": {product[0]: 50 for product in products},
+        "accepted_volume": {},
         "price": 150,
         "accepted_price": {},
         "only_hours": None,
@@ -200,7 +200,9 @@ def test_complex_clearing_BB():
     assert math.isclose(meta[0]["demand_volume"], -1000)
     assert math.isclose(meta[0]["price"], 100)
 
-    # assert math.isclose(meta[1]["price"], 5) # because thats the cost for one additional MW
+    assert math.isclose(
+        meta[1]["price"], 5
+    )  # because thats the cost for one additional MW
 
     assert accepted_orders[0]["agent_id"] == "dem1"
     assert math.isclose(accepted_orders[0]["accepted_volume"], -1000)
@@ -212,10 +214,10 @@ def test_complex_clearing_BB():
     assert math.isclose(accepted_orders[2]["accepted_volume"], 900)
 
     assert accepted_orders[3]["agent_id"] == "gen4_block"
-    assert math.isclose(accepted_orders[3]["accepted_profile"][products[0][0]], 50)
+    assert math.isclose(accepted_orders[3]["accepted_volume"][products[0][0]], 50)
 
     assert rejected_orders[0]["agent_id"] == "gen4_block"
-    assert math.isclose(rejected_orders[0]["accepted_profile"][products[0][0]], 0)
+    assert math.isclose(rejected_orders[0]["accepted_volume"][products[0][0]], 0)
 
     # check for paradoxically acceptance of cheap block bid
     for t in [product[0] for product in products]:

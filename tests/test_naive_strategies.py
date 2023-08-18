@@ -65,7 +65,7 @@ def test_naive_da_strategy(mock_market_config, mock_supports_minmax):
     product_tuples = [(start, end, None)]
     bids = strategy.calculate_bids(unit, mc, product_tuples=product_tuples)
     assert bids[0]["price"] == 3
-    assert bids[0]["profile"] == {start: 400}
+    assert bids[0]["volume"] == {start: 400}
 
     # test with dam
     mc.market_products = [MarketProduct(rd(hours=+1), 24, rd(hours=24))]
@@ -81,9 +81,9 @@ def test_naive_da_strategy(mock_market_config, mock_supports_minmax):
 
     bids = strategy.calculate_bids(unit, mc, product_tuples=products)
     assert bids[0]["price"] == 3
-    assert len(bids[0]["profile"]) == 24
-    assert bids[0]["profile"][products[0][0]] == 400
-    assert bids[0]["profile"][products[-1][0]] == 400
+    assert len(bids[0]["volume"]) == 24
+    assert bids[0]["volume"][products[0][0]] == 400
+    assert bids[0]["volume"][products[-1][0]] == 400
 
 
 if __name__ == "__main__":
