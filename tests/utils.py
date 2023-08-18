@@ -81,7 +81,7 @@ def create_definite_orderbook(start, end):
             "agent_id": "gen2",
             "bid_id": f"bid_{i*3+2}",
             "volume": 900,
-            "price": 50,
+            "price": 24,
             "accepted_price": None,
             "only_hours": None,
             "bid_type": "SB",

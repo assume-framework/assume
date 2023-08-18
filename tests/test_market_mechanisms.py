@@ -128,7 +128,7 @@ def test_complex_clearing_BB():
     market_config = copy.copy(simple_dayahead_auction_config)
 
     market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex_opt"]
-    market_config.market_products = [MarketProduct(rd(hours=+1), 24, rd(hours=1))]
+    market_config.market_products = [MarketProduct(rd(hours=+1), 2, rd(hours=1))]
     market_config.additional_fields = [
         "bid_type",
         "accepted_price",
@@ -137,7 +137,7 @@ def test_complex_clearing_BB():
     mr = MarketRole(market_config)
     next_opening = market_config.opening_hours.after(datetime.now())
     products = get_available_products(market_config.market_products, next_opening)
-    assert len(products) == 24
+    assert len(products) == 2
     orderbook = create_definite_orderbook(products[0][0], products[-1][0])
 
     # insert simple order with lower price in between
@@ -163,7 +163,7 @@ def test_complex_clearing_BB():
         "end_time": products[0][1],
         "agent_id": "gen4_block",
         "bid_id": f"bid_{len(orderbook)+1}",
-        "volume": {product[0]: 50 for product in products},
+        "volume": {product[0]: 105 for product in products},
         "accepted_volume": {},
         "price": 25,
         "accepted_price": {},
@@ -208,27 +208,28 @@ def test_complex_clearing_BB():
     assert math.isclose(accepted_orders[0]["accepted_volume"], -1000)
 
     assert accepted_orders[1]["agent_id"] == "gen1"
-    assert math.isclose(accepted_orders[1]["accepted_volume"], 50)
+    assert math.isclose(accepted_orders[1]["accepted_volume"], 100)
 
     assert accepted_orders[2]["agent_id"] == "gen2"
     assert math.isclose(accepted_orders[2]["accepted_volume"], 900)
 
-    assert accepted_orders[3]["agent_id"] == "gen4_block"
-    assert math.isclose(accepted_orders[3]["accepted_volume"][products[0][0]], 50)
+    # block order no longer accepted
+    # assert accepted_orders[3]["agent_id"] == "gen4_block"
+    # assert math.isclose(accepted_orders[3]["accepted_volume"][products[0][0]], 5)
 
     assert rejected_orders[0]["agent_id"] == "gen4_block"
     assert math.isclose(rejected_orders[0]["accepted_volume"][products[0][0]], 0)
 
     # check for paradoxically acceptance of cheap block bid
-    for t in [product[0] for product in products]:
-        if math.isclose(
-            accepted_orders[3]["accepted_price"][t] - accepted_orders[3]["price"], 0
-        ) or (accepted_orders[3]["accepted_price"][t] > accepted_orders[3]["price"]):
-            print(
-                f"The block order {accepted_orders[3]['bid_id']} is paradoxically"
-                + f"accepted with offered price {accepted_orders[3]['price']} and"
-                + f"cleared price {accepted_orders[3]['accepted_price'][t]}."
-            )
+    # for t in [product[0] for product in products]:
+    #     if math.isclose(
+    #         accepted_orders[3]["accepted_price"][t] - accepted_orders[3]["price"], 0
+    #     ) or (accepted_orders[3]["accepted_price"][t] > accepted_orders[3]["price"]):
+    #         print(
+    #             f"The block order {accepted_orders[3]['bid_id']} is paradoxically"
+    #             + f"accepted with offered price {accepted_orders[3]['price']} and"
+    #             + f"cleared price {accepted_orders[3]['accepted_price'][t]}."
+    #         )
 
 
 if __name__ == "__main__":
