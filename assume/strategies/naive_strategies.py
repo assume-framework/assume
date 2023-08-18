@@ -64,8 +64,8 @@ class NaiveDAStrategy(BaseStrategy):
             "end_time": product_tuples[0][1],
             "only_hours": product_tuples[0][2],
             "price": marginal_cost,
-            "profile": profile,
-            "accepted_profile": {},
+            "volume": profile,
+            "accepted_volume": {product[0]: 0 for product in product_tuples},
             "bid_type": "BB",
         }
 

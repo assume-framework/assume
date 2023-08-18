@@ -142,8 +142,8 @@ def test_complex_clearing_BB():
         "end_time": products[0][1],
         "agent_id": "gen3_block",
         "bid_id": f"bid_{len(orderbook)+1}",
-        "profile": {product[0]: 50 for product in products},
-        "accepted_profile": {},
+        "volume": {product[0]: 50 for product in products},
+        "accepted_volume": {},
         "price": 25,
         "only_hours": None,
         "node_id": 0,
@@ -158,8 +158,8 @@ def test_complex_clearing_BB():
         "end_time": products[0][1],
         "agent_id": "gen4_block",
         "bid_id": f"bid_{len(orderbook)+1}",
-        "profile": {product[0]: 50 for product in products},
-        "accepted_profile": {},
+        "volume": {product[0]: 50 for product in products},
+        "accepted_volume": {},
         "price": 150,
         "only_hours": None,
         "node_id": 0,
@@ -187,10 +187,10 @@ def test_complex_clearing_BB():
     assert round(accepted_orders[2]["accepted_volume"], 2) == 900
 
     assert accepted_orders[3]["agent_id"] == "gen3_block"
-    assert round(accepted_orders[3]["accepted_profile"][products[0][0]], 2) == 50
+    assert round(accepted_orders[3]["accepted_volume"][products[0][0]], 2) == 50
 
     assert rejected_orders[0]["agent_id"] == "gen4_block"
-    assert round(rejected_orders[0]["accepted_profile"][products[0][0]], 2) == 0
+    assert round(rejected_orders[0]["accepted_volume"][products[0][0]], 2) == 0
 
 
 if __name__ == "__main__":

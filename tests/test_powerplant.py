@@ -183,6 +183,7 @@ def test_powerplant_feedback(power_plant_1, mock_market_config):
             "end_time": end,
             "only_hours": None,
             "price": min_cost,
+            "accepted_price": min_cost,
             "accepted_volume": min_power[start],
         }
     ]

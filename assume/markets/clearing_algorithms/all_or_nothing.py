@@ -75,7 +75,7 @@ def pay_as_clear_aon(market_agent: MarketRole, market_products: list[MarketProdu
             rejected_orders.extend(supply_orders[i:])
 
         for order in accepted_product_orders:
-            order["price"] = clear_price
+            order["accepted_price"] = clear_price
 
         accepted_supply_orders = [
             x for x in accepted_product_orders if x["accepted_volume"] > 0
@@ -140,7 +140,8 @@ def pay_as_bid_aon(market_agent: MarketRole, market_products: list[MarketProduct
                     demand_orders[i]["accepted_volume"] = demand_orders[i]["volume"]
 
                     # pay as bid - so the generator gets payed more than he needed to operate
-                    supply_orders[i]["price"] = demand_orders[i]["price"]
+                    supply_orders[i]["accepted_price"] = demand_orders[i]["price"]
+                    demand_orders[i]["accepted_price"] = demand_orders[i]["price"]
 
                 else:
                     # as we have sorted before, the other bids/supply_orders can't be matched either
@@ -167,7 +168,7 @@ def pay_as_bid_aon(market_agent: MarketRole, market_products: list[MarketProduct
         supply_volume = sum(map(itemgetter("accepted_volume"), accepted_supply_orders))
         demand_volume = -sum(map(itemgetter("accepted_volume"), accepted_demand_orders))
         accepted_orders.extend(accepted_product_orders)
-        prices = list(map(itemgetter("price"), accepted_supply_orders))
+        prices = list(map(itemgetter("accepted_price"), accepted_supply_orders))
         if not prices:
             prices = [market_agent.marketconfig.maximum_bid]
 

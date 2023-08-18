@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from numbers import Number
 from typing import Callable, NamedTuple, Optional, TypedDict
 
 from dateutil import rrule as rr
@@ -24,13 +25,11 @@ class Order(TypedDict):
     bid_id: str
     start_time: datetime
     end_time: datetime
-    volume: float  # positive if generation
-    price: float
-    accepted_volume: float
+    volume: Number | dict[datetime, Number]  # positive if generation
+    accepted_volume: Number | dict[datetime, Number]
+    price: Number
+    accepted_price: Number | dict[datetime, Number]
     agent_id: str
-    profile: Optional[dict[datetime, float]]  # for block orders
-    accepted_profile: Optional[dict[datetime, float]]  # for block orders
-    bid_type: Optional[str]  # SB, BB, LB
     only_hours: Optional[OnlyHours]
 
 

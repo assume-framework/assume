@@ -189,7 +189,7 @@ class MarketRole(Role):
 
                 if "bid_type" in order.keys() and order["bid_type"] == "BB":
                     assert (
-                        abs(order["profile"].values()) <= max_volume
+                        abs(order["volume"].values()) <= max_volume
                     ).all(), f"max_volume {order['volume']}"
 
                 if self.marketconfig.price_tick:
