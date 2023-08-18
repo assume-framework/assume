@@ -39,57 +39,63 @@ def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
     return orders
 
 
-"""
-Create Orderbook with constant order volumes and prices:
-    - dem1: volume = -1000, price = 3000
-    - gen1: volume = 1000, price = 100
-    - gen2: volume = 900, price = 50
-"""
+def extend_orderbook(
+    products,
+    volume,
+    price,
+    orderbook=[],
+    bid_type="SB",
+):
+    """
+    Creates constant bids over the time span of all products
+    with specified values for price and volume
+    and appends the orderbook
+    """
+    if volume == 0:
+        return orderbook
 
+    if bid_type == "BB":
+        if volume < 0:
+            agent_id = f"block_dem{len(orderbook)+1}"
+        else:
+            agent_id = f"block_gen{len(orderbook)+1}"
 
-def create_definite_orderbook(start, end):
-    orders = []
-    i = 0
-    for t in pd.date_range(start=start, end=end, freq="1H"):
         order: Order = {
-            "start_time": t,
-            "end_time": t + timedelta(hours=1),
-            "agent_id": "dem1",
-            "bid_id": f"bid_{i*3}",
-            "volume": -1000,
-            "price": 3000,
-            "accepted_price": None,
+            "start_time": products[0][0],
+            "end_time": products[0][1],
+            "agent_id": agent_id,
+            "bid_id": f"bid_{len(orderbook)+1}",
+            "volume": {product[0]: volume for product in products},
+            "accepted_volume": {},
+            "price": price,
+            "accepted_price": {},
             "only_hours": None,
-            "bid_type": "SB",
+            "bid_type": bid_type,
         }
-        orders.append(order)
-        order: Order = {
-            "start_time": t,
-            "end_time": t + timedelta(hours=1),
-            "agent_id": "gen1",
-            "bid_id": f"bid_{i*3+1}",
-            "volume": 1000,
-            "price": 100,
-            "accepted_price": None,
-            "only_hours": None,
-            "bid_type": "SB",
-        }
-        orders.append(order)
-        order: Order = {
-            "start_time": t,
-            "end_time": t + timedelta(hours=1),
-            "agent_id": "gen2",
-            "bid_id": f"bid_{i*3+2}",
-            "volume": 900,
-            "price": 24,
-            "accepted_price": None,
-            "only_hours": None,
-            "bid_type": "SB",
-        }
-        orders.append(order)
-        i += 1
+        orderbook.append(order)
 
-    return orders
+    else:
+        if volume < 0:
+            agent_id = f"dem{len(orderbook)+1}"
+        else:
+            agent_id = f"gen{len(orderbook)+1}"
+
+        for product in products:
+            order: Order = {
+                "start_time": product[0],
+                "end_time": product[1],
+                "agent_id": agent_id,
+                "bid_id": f"bid_{len(orderbook)+1}",
+                "volume": volume,
+                "accepted_volume": None,
+                "price": price,
+                "accepted_price": None,
+                "only_hours": None,
+                "bid_type": bid_type,
+            }
+            orderbook.append(order)
+
+    return orderbook
 
 
 def get_test_prices(num: int = 24):

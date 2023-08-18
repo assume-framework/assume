@@ -11,7 +11,7 @@ from assume.common.market_objects import MarketConfig, MarketProduct, Order, Ord
 from assume.common.utils import get_available_products
 from assume.markets import MarketRole, clearing_mechanisms
 
-from .utils import create_definite_orderbook, create_orderbook
+from .utils import create_orderbook, extend_orderbook
 
 simple_dayahead_auction_config = MarketConfig(
     "simple_dayahead_auction",
@@ -40,7 +40,15 @@ def test_market():
 
     print(products)
 
-    orderbook = create_definite_orderbook(products[0][0], products[-1][0])
+    """
+    Create Orderbook with constant order volumes and prices:
+        - dem1: volume = -1000, price = 3000
+        - gen1: volume = 1000, price = 100
+        - gen2: volume = 900, price = 50
+    """
+    orderbook = extend_orderbook(products, -1000, 3000)
+    orderbook = extend_orderbook(products, 1000, 100, orderbook)
+    orderbook = extend_orderbook(products, 900, 50, orderbook)
 
     simple_dayahead_auction_config.market_mechanism = clearing_mechanisms[
         simple_dayahead_auction_config.market_mechanism
@@ -97,12 +105,23 @@ def test_complex_clearing():
     market_config = copy.copy(simple_dayahead_auction_config)
 
     market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex"]
-    market_config.market_products = [MarketProduct(rd(hours=+1), 24, rd(hours=1))]
+    h = 24
+    market_config.market_products = [MarketProduct(rd(hours=+1), h, rd(hours=1))]
     mr = MarketRole(market_config)
     next_opening = market_config.opening_hours.after(datetime.now())
     products = get_available_products(market_config.market_products, next_opening)
-    assert len(products) == 24
-    orderbook = create_definite_orderbook(products[0][0], products[-1][0])
+    assert len(products) == h
+
+    """
+    Create Orderbook with constant order volumes and prices:
+        - dem1: volume = -1000, price = 3000
+        - gen1: volume = 1000, price = 100
+        - gen2: volume = 900, price = 50
+    """
+    orderbook = []
+    orderbook = extend_orderbook(products, -1000, 3000, orderbook)
+    orderbook = extend_orderbook(products, 1000, 100, orderbook)
+    orderbook = extend_orderbook(products, 900, 50, orderbook)
 
     mr.all_orders = orderbook
     accepted_orders, rejected_orders, meta = market_config.market_mechanism(
@@ -113,11 +132,11 @@ def test_complex_clearing():
     assert meta[0]["demand_volume"] == -1000
     assert meta[0]["price"] == 100
     assert rejected_orders == []
-    assert accepted_orders[0]["agent_id"] == "dem1"
+    assert accepted_orders[0]["agent_id"] == f"dem1"
     assert accepted_orders[0]["accepted_volume"] == -1000
-    assert accepted_orders[1]["agent_id"] == "gen1"
+    assert accepted_orders[1]["agent_id"] == f"gen{h+1}"
     assert accepted_orders[1]["accepted_volume"] == 100
-    assert accepted_orders[2]["agent_id"] == "gen2"
+    assert accepted_orders[2]["agent_id"] == f"gen{2*h+1}"
     assert accepted_orders[2]["volume"] == 900
 
 
@@ -138,98 +157,111 @@ def test_complex_clearing_BB():
     next_opening = market_config.opening_hours.after(datetime.now())
     products = get_available_products(market_config.market_products, next_opening)
     assert len(products) == 2
-    orderbook = create_definite_orderbook(products[0][0], products[-1][0])
 
-    # insert simple order with lower price in between
-    cheap_order: Order = {
-        "start_time": products[1][0],
-        "end_time": products[1][1],
-        "agent_id": "gen3",
-        "bid_id": f"bid_{len(orderbook)+1}",
-        "volume": 1000,
-        "accepted_volume": None,
-        "price": 5,
-        "accepted_price": None,
-        "only_hours": None,
-        "node_id": 0,
-        "bid_type": "SB",
-    }
-
-    orderbook.append(cheap_order)
-
-    # insert block order in-the-money
-    block_order: Order = {
-        "start_time": products[0][0],
-        "end_time": products[0][1],
-        "agent_id": "gen4_block",
-        "bid_id": f"bid_{len(orderbook)+1}",
-        "volume": {product[0]: 105 for product in products},
-        "accepted_volume": {},
-        "price": 25,
-        "accepted_price": {},
-        "only_hours": None,
-        "node_id": 0,
-        "bid_type": "BB",
-    }
-
-    orderbook.append(block_order)
-
-    # insert block order out-of-the-money
-    block_order: Order = {
-        "start_time": products[0][0],
-        "end_time": products[0][1],
-        "agent_id": "gen4_block",
-        "bid_id": f"bid_{len(orderbook)+1}",
-        "volume": {product[0]: 50 for product in products},
-        "accepted_volume": {},
-        "price": 150,
-        "accepted_price": {},
-        "only_hours": None,
-        "node_id": 0,
-        "bid_type": "BB",
-    }
-
-    orderbook.append(block_order)
+    """
+    Create Orderbook with constant order volumes and prices:
+        - dem1: volume = -1000, price = 3000
+        - gen1: volume = 1000, price = 100
+        - gen2: volume = 1000, price = 50
+        - block_gen3: volume = 100, price = 75
+    """
+    orderbook = []
+    orderbook = extend_orderbook(
+        products, volume=-1000, price=3000, orderbook=orderbook
+    )
+    orderbook = extend_orderbook(products, 1000, 100, orderbook)
+    orderbook = extend_orderbook(products, 1000, 50, orderbook)
+    orderbook = extend_orderbook(products, 100, 75, orderbook, "BB")
 
     mr.all_orders = orderbook
     accepted_orders, rejected_orders, meta = market_config.market_mechanism(
         mr, products
     )
 
-    assert math.isclose(meta[0]["supply_volume"], 1000)
-    assert math.isclose(meta[0]["demand_volume"], -1000)
-    assert math.isclose(meta[0]["price"], 100)
+    assert math.isclose(meta[0]["price"], 50)
+    assert rejected_orders[1]["agent_id"] == "block_gen7"
+    assert math.isclose(rejected_orders[1]["accepted_volume"][products[0][0]], 0)
 
-    assert math.isclose(
-        meta[1]["price"], 5
-    )  # because thats the cost for one additional MW
+    # change the price of the block order to be in-the-money
+    orderbook[3]["price"] = 45
 
-    assert accepted_orders[0]["agent_id"] == "dem1"
-    assert math.isclose(accepted_orders[0]["accepted_volume"], -1000)
+    mr.all_orders = orderbook
+    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
+        mr, products
+    )
 
-    assert accepted_orders[1]["agent_id"] == "gen1"
-    assert math.isclose(accepted_orders[1]["accepted_volume"], 100)
+    assert math.isclose(meta[0]["price"], 50)
+    assert accepted_orders[2]["agent_id"] == "block_gen7"
+    assert math.isclose(accepted_orders[2]["accepted_volume"][products[0][0]], 100)
 
-    assert accepted_orders[2]["agent_id"] == "gen2"
-    assert math.isclose(accepted_orders[2]["accepted_volume"], 900)
+    # change price of simple bid to lower the mcp for one hour
+    orderbook[2]["price"] = 41
 
-    # block order no longer accepted
-    # assert accepted_orders[3]["agent_id"] == "gen4_block"
-    # assert math.isclose(accepted_orders[3]["accepted_volume"][products[0][0]], 5)
+    mr.all_orders = orderbook
+    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
+        mr, products
+    )
 
-    assert rejected_orders[0]["agent_id"] == "gen4_block"
-    assert math.isclose(rejected_orders[0]["accepted_volume"][products[0][0]], 0)
+    assert math.isclose(meta[0]["price"], 41)
+    assert math.isclose(meta[1]["price"], 50)
+    # block bid should be accepted, because surplus is 91-90=1
+    assert accepted_orders[2]["agent_id"] == "block_gen7"
+    assert math.isclose(accepted_orders[2]["accepted_volume"][products[0][0]], 100)
+    assert math.isclose(accepted_orders[2]["accepted_price"][products[0][0]], 41)
 
-    # check for paradoxically acceptance of cheap block bid
-    # for t in [product[0] for product in products]:
-    #     if math.isclose(
-    #         accepted_orders[3]["accepted_price"][t] - accepted_orders[3]["price"], 0
-    #     ) or (accepted_orders[3]["accepted_price"][t] > accepted_orders[3]["price"]):
-    #         print(
-    #             f"The block order {accepted_orders[3]['bid_id']} is paradoxically"
-    #             + f"accepted with offered price {accepted_orders[3]['price']} and"
-    #             + f"cleared price {accepted_orders[3]['accepted_price'][t]}."
-    #         )
+    # change price of simple bid to lower the mcp for one hour even more
+    orderbook[2]["price"] = 39
+
+    mr.all_orders = orderbook
+    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
+        mr, products
+    )
+
+    assert math.isclose(meta[0]["price"], 39)
+    assert math.isclose(meta[1]["price"], 50)
+    # block bid should be rejected, because surplus is 89-90=-1
+    assert rejected_orders[1]["agent_id"] == "block_gen7"
+    assert math.isclose(rejected_orders[1]["accepted_volume"][products[0][0]], 0)
+
+    # change price of simple bid to see equilibrium case
+    orderbook[2]["price"] = 40
+
+    mr.all_orders = orderbook
+    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
+        mr, products
+    )
+
+    assert math.isclose(meta[0]["price"], 40)
+    assert math.isclose(meta[1]["price"], 50)
+    # block bid should be rejected, because surplus for block is 90-90=0
+    # and general surplus through introduction of block is also 0
+    assert rejected_orders[1]["agent_id"] == "block_gen7"
+    assert math.isclose(rejected_orders[1]["accepted_volume"][products[0][0]], 0)
+
+    # introducing profile block order by increasing the volume for the hour with a higher mcp
+    orderbook[3]["volume"][products[1][0]] = 900
+
+    mr.all_orders = orderbook
+    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
+        mr, products
+    )
+    assert math.isclose(meta[0]["price"], 40)
+    assert math.isclose(meta[1]["price"], 50)
+    # block bid should be accepted, because surplus is (40-45)*100+(50-45)*900=4000
+    assert accepted_orders[2]["agent_id"] == "block_gen7"
+    assert math.isclose(accepted_orders[2]["accepted_volume"][products[0][0]], 100)
+    assert math.isclose(accepted_orders[2]["accepted_price"][products[0][0]], 40)
+    assert math.isclose(accepted_orders[2]["accepted_volume"][products[1][0]], 900)
+    assert math.isclose(accepted_orders[2]["accepted_price"][products[1][0]], 50)
+
+    # what happens, if the block bid volume is higher than total demand?
+    # -> opimization fails!
+    # orderbook[3]["volume"][products[1][0]] = 1100
+
+    # mr.all_orders = orderbook
+    # accepted_orders, rejected_orders, meta = market_config.market_mechanism(
+    #     mr, products
+    # )
 
 
 if __name__ == "__main__":
