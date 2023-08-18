@@ -140,7 +140,6 @@ def test_complex_clearing():
     assert accepted_orders[2]["volume"] == 900
 
 
-@pytest.mark.require_gurobi
 def test_complex_clearing_BB():
     import copy
 

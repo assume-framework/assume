@@ -88,7 +88,6 @@ filterwarnings = [
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "require_learning",
-    "require_gurobi",
 ]
 
 [tool.coverage.run]

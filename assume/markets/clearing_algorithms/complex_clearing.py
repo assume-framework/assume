@@ -121,7 +121,6 @@ def pay_as_clear_complex_opt(
         market_agent.marketconfig.minimum_bid_price,
         market_agent.marketconfig.maximum_bid_price,
     )
-    eps = 1e-4
 
     market_getter = itemgetter("start_time", "end_time", "only_hours")
     market_agent.all_orders.sort(key=market_getter)
@@ -214,19 +213,17 @@ def pay_as_clear_complex_opt(
         return primal_obj_expr >= dual_obj_rule(m)
 
     model.primal_eql_dual = pyo.Constraint(rule=primal_eql_dual)
-
+    eps = 1e-4
     solvers = check_available_solvers(*SOLVERS)
-    if "gurobi" not in solvers:
-        raise Exception(
-            "Gurobi solver is not available. You cannot use this clearing algorithm."
-        )
 
-    solver = SolverFactory("gurobi")
-    solver.options["cutoff"] = -1.0
-    solver.options["eps"] = eps
+    solver = SolverFactory(solvers[0])
+    if solver.name == "gurobi":
+        options = {"cutoff": -1.0, "eps": eps}
+    else:
+        options = {}
 
     # Solve the model
-    result = solver.solve(model)
+    result = solver.solve(model, options=options)
 
     if result.solver.termination_condition == TerminationCondition.infeasible:
         raise Exception("infeasible")
