@@ -1,13 +1,10 @@
 from datetime import datetime, timedelta
 
-import numpy as np
 import pandas as pd
-from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
 
-from assume.common.market_objects import MarketConfig, MarketProduct, Order, Orderbook
+from assume.common.market_objects import MarketProduct
 from assume.common.utils import get_available_products
-from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import (
     NaiveDAStrategy,
     NaiveNegReserveStrategy,

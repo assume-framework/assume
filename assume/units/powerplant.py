@@ -142,7 +142,7 @@ class PowerPlant(SupportsMinMax):
             end = order["end_time"]
             end_excl = end - self.index.freq
 
-            if type(order["accepted_volume"]) == dict:
+            if isinstance(order["accepted_volume"], dict):
                 cashflow = float(
                     order["accepted_price"][i] * order["accepted_volume"][i]
                     for i in order["accepted_volume"].keys()
