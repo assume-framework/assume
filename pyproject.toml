@@ -85,6 +85,10 @@ filterwarnings = [
     "ignore:Call to deprecated create function EnumValueDescriptor",
     "ignore:Call to deprecated create function EnumDescriptor",
 ]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "require_learning",
+]
 
 [tool.coverage.run]
 omit = ["tests/*"]

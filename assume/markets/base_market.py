@@ -173,9 +173,25 @@ class MarketRole(Role):
                 assert (
                     order["price"] >= min_price
                 ), f"minimum_bid_price {order['price']}"
-                assert (
-                    abs(order["volume"]) <= max_volume
-                ), f"max_volume {order['volume']}"
+
+                if "bid_type" in order.keys():
+                    assert order["bid_type"] in [
+                        "SB",
+                        "BB",
+                    ], f"bid_type {order['bid_type']} not in ['SB', 'BB']"
+
+                if (
+                    "bid_type" in order.keys() and order["bid_type"] == "SB"
+                ) or "bid_type" not in order.keys():
+                    assert (
+                        abs(order["volume"]) <= max_volume
+                    ), f"max_volume {order['volume']}"
+
+                if "bid_type" in order.keys() and order["bid_type"] == "BB":
+                    assert (
+                        abs(order["volume"].values()) <= max_volume
+                    ).all(), f"max_volume {order['volume']}"
+
                 if self.marketconfig.price_tick:
                     assert isinstance(order["price"], int)
                 if self.marketconfig.volume_tick:

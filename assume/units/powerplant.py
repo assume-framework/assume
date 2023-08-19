@@ -141,7 +141,15 @@ class PowerPlant(SupportsMinMax):
             start = order["start_time"]
             end = order["end_time"]
             end_excl = end - self.index.freq
-            cashflow = float(order["price"] * order["volume"])
+
+            if isinstance(order["accepted_volume"], dict):
+                cashflow = float(
+                    order["accepted_price"][i] * order["accepted_volume"][i]
+                    for i in order["accepted_volume"].keys()
+                )
+            else:
+                cashflow = float(order["accepted_price"] * order["accepted_volume"])
+
             hours = (end - start) / timedelta(hours=1)
             self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
                 cashflow * hours
