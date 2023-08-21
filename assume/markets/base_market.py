@@ -175,6 +175,9 @@ class MarketRole(Role):
                 ), f"minimum_bid_price {order['price']}"
 
                 if "bid_type" in order.keys():
+                    order["bid_type"] = (
+                        "SB" if order["bid_type"] == None else order["bid_type"]
+                    )
                     assert order["bid_type"] in [
                         "SB",
                         "BB",
@@ -245,6 +248,11 @@ class MarketRole(Role):
         )
 
     async def clear_market(self, market_products: list[MarketProduct]):
+        # Check if order is in time slots for current opening
+        # for order in self.all_orders:
+        #     assert (
+        #         order["start_time"] in index
+        #     ), f"order start time not in {self.marketconfig.market_products}"
         (
             accepted_orderbook,
             rejected_orderbook,
