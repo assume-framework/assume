@@ -13,7 +13,6 @@ log = logging.getLogger(__name__)
 SOLVERS = ["glpk", "cbc", "gurobi", "cplex"]
 
 
-# TODO: remove paradoxically accepted orders from solution
 def pay_as_clear_opt(
     market_agent: MarketRole,
     market_products: list[MarketProduct],
@@ -103,6 +102,7 @@ def pay_as_clear_opt(
         orders=orders,
         market_products=market_products,
         market_clearing_prices=market_clearing_prices,
+        market_agent=market_agent,
     )
 
 
@@ -237,6 +237,7 @@ def pay_as_clear_complex_opt(
         orders=orders,
         market_products=market_products,
         market_clearing_prices=market_clearing_prices,
+        market_agent=market_agent,
     )
 
 
@@ -246,6 +247,7 @@ def extract_results(
     orders,
     market_products,
     market_clearing_prices,
+    market_agent,
 ):
     accepted_orders: Orderbook = []
     rejected_orders: Orderbook = []
@@ -312,5 +314,7 @@ def extract_results(
                 "only_hours": product[2],
             }
         )
+
+    market_agent.all_orders = []
 
     return accepted_orders, rejected_orders, meta
