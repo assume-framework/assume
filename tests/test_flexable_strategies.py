@@ -1,24 +1,12 @@
 import math
-from datetime import datetime, timedelta
+from datetime import datetime
 
-import numpy as np
 import pandas as pd
 import pytest
-from dateutil.relativedelta import relativedelta as rd
 
 from assume.common.forecasts import NaiveForecast
-from assume.common.market_objects import MarketProduct
-from assume.common.utils import get_available_products
-from assume.strategies import (
-    flexableEOM,
-    flexableEOMStorage,
-    flexableNegCRM,
-    flexableNegCRMStorage,
-    flexablePosCRM,
-    flexablePosCRMStorage,
-)
-from assume.units import Demand, PowerPlant, Storage
-from tests.conftest import MockMinMaxUnit
+from assume.strategies import flexableEOM, flexableNegCRM, flexablePosCRM
+from assume.units import PowerPlant
 
 start = datetime(2023, 7, 1)
 end = datetime(2023, 7, 2)
