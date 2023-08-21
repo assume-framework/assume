@@ -112,12 +112,18 @@ class BaseUnit:
         return self.outputs["energy"][start:end_excl]
 
     def get_output_before(self, dt: datetime, product_type: str = "energy") -> float:
+        """
+        return output before the given datetime.
+        """
         if dt - self.index.freq < self.index[0]:
             return 0
         else:
             return self.outputs["energy"].at[dt - self.index.freq]
 
     def as_dict(self) -> dict:
+        """
+        Returns a dictionary representation of the unit.
+        """
         return {
             "id": self.id,
             "technology": self.technology,
@@ -126,6 +132,9 @@ class BaseUnit:
         }
 
     def calculate_cashflow(self, product_type: str, orderbook: Orderbook):
+        """
+        calculates the cashflow for the given product_type
+        """
         pass
 
 
@@ -133,29 +142,43 @@ class SupportsMinMax(BaseUnit):
     """
     Base Class used for Powerplant derived classes
     """
-
+    # minimum power output 
     min_power: float
-    max_power: float
-    ramp_down: float
-    ramp_up: float
+    # maximum power output
+    max_power: float 
+     # how much power can be reduced in one time step
+    ramp_down: float 
+    # how much power can be increased in one time step
+    ramp_up: float  
     # percentage of how much output power is provided
-    efficiency: float
+    efficiency: float 
     # how much kg/kWh of CO2 emissions is needed
     emission_factor: float
-    min_operating_time: int
-    min_down_time: int
+    # minimum time the unit has to be on
+    min_operating_time: int  
+    # minimum time the unit has to be off
+    min_down_time: int  
 
     def calculate_min_max_power(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series, pd.Series]:
+        """
+        calculates the min and max power for the given time period  
+        """
         pass
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
+        """
+        calculates the marginal cost for the given power
+        """
         pass
 
     def calculate_ramp(
         self, previous_power: float, power: float, current_power: float = 0
     ) -> float:
+        """
+        calculates the ramp for the given power
+        """
         if power == 0:
             # if less than min_power is required, we run min_power
             # we could also split at self.min_power/2
@@ -177,6 +200,9 @@ class SupportsMinMax(BaseUnit):
         return power
 
     def get_clean_spread(self, prices: pd.DataFrame):
+        """
+        returns the clean spread for the given prices  
+        """
         emission_cost = self.emission_factor * prices["co"].mean()
         fuel_cost = prices[self.technology.replace("_combined", "")].mean()
         return (fuel_cost + emission_cost) / self.efficiency
@@ -203,31 +229,51 @@ class SupportsMinMaxCharge(BaseUnit):
     """
     Base Class used for Storage derived classes
     """
-
+    # initial state of charge
     initial_soc: float
+    # how much power must be charged at least in one time step
     min_power_charge: float
+    # how much power can be charged at most in one time step
     max_power_charge: float
+    # how much power must be discharged at least in one time step
     min_power_discharge: float
+    # how much power can be discharged at most in one time step
     max_power_discharge: float
+    # how much power can be increased in discharging in one time step
     ramp_up_discharge: float
+    # how much power can be decreased in discharging in one time step
     ramp_down_discharge: float
+    # how much power can be increased in charging in one time step
     ramp_up_charge: float
+    # how much power can be decreased in charging in one time step
     ramp_down_charge: float
+    # maximum volume of the storage
     max_volume: float
+    # efficiency of charging
     efficiency_charge: float
+    # efficiency of discharging 
     efficiency_discharge: float
 
     def calculate_min_max_charge(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series, pd.Series]:
+        """
+        calculates the min and max charging power for the given time period 
+        """
         pass
 
     def calculate_min_max_discharge(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series, pd.Series]:
+        """
+        calculates the min and max discharging power for the given time period
+        """
         pass
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
+        """
+        calculates the marginal cost for the given power
+        """
         pass
 
     def get_soc_before(self, dt: datetime) -> float:
@@ -242,6 +288,9 @@ class SupportsMinMaxCharge(BaseUnit):
             return self.outputs["soc"].at[dt - self.index.freq]
 
     def get_clean_spread(self, prices: pd.DataFrame):
+        """
+        returns the clean spread for the given prices
+        """
         emission_cost = self.emission_factor * prices["co"].mean()
         fuel_cost = prices[self.technology.replace("_combined", "")].mean()
         return (fuel_cost + emission_cost) / self.efficiency_charge
@@ -252,6 +301,9 @@ class SupportsMinMaxCharge(BaseUnit):
         power_discharge: float,
         current_power: float = 0,
     ) -> float:
+        """
+        calculates the ramp for the given discharging power
+        """
         if power_discharge == 0:
             return power_discharge
         power_discharge = min(
@@ -268,6 +320,9 @@ class SupportsMinMaxCharge(BaseUnit):
     def calculate_ramp_charge(
         self, previous_power: float, power_charge: float, current_power: float = 0
     ) -> float:
+        """
+        calculates the ramp for the given charging power
+        """
         if power_charge == 0:
             return power_charge
         power_charge = max(

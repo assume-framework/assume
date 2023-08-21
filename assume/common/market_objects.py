@@ -90,6 +90,10 @@ class MarketConfig:
 
 
 class OpeningMessage(TypedDict):
+    """
+    Message which is sent to the market to open a market
+
+    """
     context: str
     market_id: str
     start: float
@@ -98,6 +102,10 @@ class OpeningMessage(TypedDict):
 
 
 class ClearingMessage(TypedDict):
+    """
+    Message which is sent to the market to clear a market
+    
+    """
     context: str
     market_id: str
     orderbook: Orderbook
