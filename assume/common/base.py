@@ -254,15 +254,28 @@ class SupportsMinMaxCharge(BaseUnit):
     ) -> float:
         if power_discharge == 0:
             return power_discharge
-        power_discharge = min(
-            power_discharge,
-            previous_power + self.ramp_up_discharge - current_power,
-        )
 
-        power_discharge = max(
-            power_discharge,
-            previous_power - self.ramp_down_discharge - current_power,
-        )
+        # if storage was charging before and ramping for charging is defined
+        if previous_power < 0 and self.ramp_down_charge != None:
+            power_discharge = max(
+                previous_power - self.ramp_down_charge - current_power, 0
+            )
+        else:
+            # Assuming the storage is not restricted by ramping charging down
+            if previous_power < 0:
+                previous_power = 0
+
+            power_discharge = min(
+                power_discharge,
+                max(0, previous_power + self.ramp_up_discharge - current_power),
+            )
+            # restrict only if ramping defined
+            if self.ramp_down_discharge != None:
+                power_discharge = max(
+                    power_discharge,
+                    previous_power - self.ramp_down_discharge - current_power,
+                    0,
+                )
         return power_discharge
 
     def calculate_ramp_charge(
@@ -270,12 +283,29 @@ class SupportsMinMaxCharge(BaseUnit):
     ) -> float:
         if power_charge == 0:
             return power_charge
-        power_charge = max(
-            power_charge, previous_power + self.ramp_up_charge - current_power
-        )
-        power_charge = min(
-            power_charge, previous_power - self.ramp_down_charge - current_power
-        )
+
+        # assuming ramping down discharge restricts ramp up of charge
+        # if storage was discharging before and ramp_down_discharge is defined
+        if previous_power > 0 and self.ramp_down_discharge != 0:
+            power_charge = min(
+                previous_power - self.ramp_down_discharge - current_power, 0
+            )
+        else:
+            if previous_power > 0:
+                previous_power = 0
+
+            power_charge = max(
+                power_charge,
+                min(previous_power + self.ramp_up_charge - current_power, 0),
+            )
+            # restrict only if ramping defined
+            if self.ramp_down_charge != 0:
+                power_charge = min(
+                    power_charge,
+                    previous_power - self.ramp_down_charge - current_power,
+                    0,
+                )
+
         return power_charge
 
 
