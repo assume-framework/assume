@@ -96,13 +96,14 @@ def pay_as_clear_opt(
     # Find the dual variable for the balance constraint
     market_clearing_prices = {t: model.dual[model.energy_balance[t]] for t in model.T}
 
+    market_agent.all_orders = []
+
     return extract_results(
         model=model,
         eps=eps,
         orders=orders,
         market_products=market_products,
         market_clearing_prices=market_clearing_prices,
-        market_agent=market_agent,
     )
 
 
@@ -231,13 +232,14 @@ def pay_as_clear_complex_opt(
     # Find the dual variable for the balance constraint
     market_clearing_prices = {t: model.prices[t].value for t in model.T}
 
+    market_agent.all_orders = []
+
     return extract_results(
         model=model,
         eps=eps,
         orders=orders,
         market_products=market_products,
         market_clearing_prices=market_clearing_prices,
-        market_agent=market_agent,
     )
 
 
@@ -247,7 +249,6 @@ def extract_results(
     orders,
     market_products,
     market_clearing_prices,
-    market_agent,
 ):
     accepted_orders: Orderbook = []
     rejected_orders: Orderbook = []
@@ -314,7 +315,5 @@ def extract_results(
                 "only_hours": product[2],
             }
         )
-
-    market_agent.all_orders = []
 
     return accepted_orders, rejected_orders, meta
