@@ -316,4 +316,6 @@ def extract_results(
             }
         )
 
+    model.clear()
+
     return accepted_orders, rejected_orders, meta
