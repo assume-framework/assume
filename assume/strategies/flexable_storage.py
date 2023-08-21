@@ -33,6 +33,15 @@ class flexableEOMStorage(BaseStrategy):
         end_all = product_tuples[-1][1]
 
         previous_power = unit.get_output_before(start)
+
+        # get the dispatched power from last day
+        dispatch = np.where(
+            unit.outputs["energy"] > 0,
+            (unit.outputs["energy"] / unit.efficiency_discharge),
+            (unit.outputs["energy"] * unit.efficiency_charge),
+        )
+        theoretic_SOC = unit.initial_soc - ((dispatch / unit.max_volume)).sum()
+
         min_power_charge, max_power_charge = unit.calculate_min_max_charge(
             start, end_all
         )
@@ -51,16 +60,32 @@ class flexableEOMStorage(BaseStrategy):
             current_power_charge = min(current_power, 0)
 
             max_power_discharge[start] = unit.calculate_ramp_discharge(
-                previous_power, max_power_discharge[start], current_power_discharge
+                previous_power,
+                max_power_discharge[start],
+                current_power_discharge,
+                min_power_discharge[0],
+                theoretic_SOC,
             )
             min_power_discharge[start] = unit.calculate_ramp_discharge(
-                previous_power, min_power_discharge[start], current_power_discharge
+                previous_power,
+                min_power_discharge[start],
+                current_power_discharge,
+                min_power_discharge[start],
+                theoretic_SOC,
             )
             max_power_charge[start] = unit.calculate_ramp_charge(
-                previous_power, max_power_charge[start], current_power_charge
+                previous_power,
+                max_power_charge[start],
+                current_power_charge,
+                min_power_charge[start],
+                theoretic_SOC,
             )
             min_power_charge[start] = unit.calculate_ramp_charge(
-                previous_power, min_power_charge[start], current_power_charge
+                previous_power,
+                min_power_charge[start],
+                current_power_charge,
+                min_power_charge[start],
+                theoretic_SOC,
             )
 
             price_forecast = unit.forecaster["price_forecast"]
@@ -89,6 +114,13 @@ class flexableEOMStorage(BaseStrategy):
                 }
             )
             previous_power = bid_quantity + current_power
+
+            if previous_power > 0:
+                theoretic_SOC -= (
+                    bid_quantity + current_power
+                ) / unit.efficiency_discharge
+            elif previous_power < 0:
+                theoretic_SOC -= (bid_quantity + current_power) * unit.efficiency_charge
 
         return bids
 

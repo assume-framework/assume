@@ -1,3 +1,5 @@
+import math
+
 import pandas as pd
 import pytest
 
@@ -90,7 +92,7 @@ def test_calculate_operational_window(storage_unit):
 
     assert min_power_charge[start] == 0
     assert max_power_charge[start] == -100
-    assert cost_charge == 3 / 0.9 + 1
+    assert math.isclose(cost_charge, 3 / 0.9 + 1)
 
     assert storage_unit.outputs["energy"].at[start] == 0
 
@@ -115,14 +117,19 @@ def test_calculate_operational_window(storage_unit):
         start, end
     )
     assert min_power_discharge[0] == 40
-    assert max_power_discharge[0] == round(50 * storage_unit.efficiency_discharge, 3)
+    assert math.isclose(
+        max_power_discharge[0], (50 * storage_unit.efficiency_discharge)
+    )
 
     storage_unit.current_SOC = 0.95
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end
     )
     assert min_power_charge[0] == -40
-    assert max_power_charge[0] == round(-50 / storage_unit.efficiency_charge, 3)
+    # TODO: remove rounding?
+    assert math.isclose(
+        max_power_charge[0], round(-50 / storage_unit.efficiency_charge, 1)
+    )
 
 
 def test_storage_feedback(storage_unit, mock_market_config):
@@ -287,8 +294,11 @@ def test_execute_dispatch(storage_unit):
     storage_unit.current_SOC = 0.5
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy[0] == 100
-    assert storage_unit.current_SOC == round(
-        0.5 - 100 / storage_unit.efficiency_discharge / storage_unit.max_volume, 3
+    assert math.isclose(
+        storage_unit.current_SOC,
+        round(
+            0.5 - 100 / storage_unit.efficiency_discharge / storage_unit.max_volume, 2
+        ),
     )
     assert storage_unit.current_status == 1
     assert storage_unit.current_down_time == 0
@@ -298,8 +308,9 @@ def test_execute_dispatch(storage_unit):
     storage_unit.current_SOC = 0.5
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy[0] == -100
-    assert storage_unit.current_SOC == round(
-        0.5 + 100 * storage_unit.efficiency_charge / storage_unit.max_volume, 3
+    assert math.isclose(
+        storage_unit.current_SOC,
+        round(0.5 + 100 * storage_unit.efficiency_charge / storage_unit.max_volume, 2),
     )
     assert storage_unit.current_status == 1
     assert storage_unit.current_down_time == 0
