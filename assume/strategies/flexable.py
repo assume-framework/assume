@@ -213,7 +213,7 @@ class flexablePosCRM(BaseStrategy):
             )
 
             if bid_quantity == 0:
-                return []
+                continue
 
             marginal_cost = unit.calculate_marginal_cost(
                 start,
@@ -288,7 +288,7 @@ class flexableNegCRM(BaseStrategy):
             )
             bid_quantity = min_power[start] - previous_power
             if bid_quantity >= 0:
-                return []
+                continue
 
             # bid_quantity < 0
             marginal_cost = unit.calculate_marginal_cost(

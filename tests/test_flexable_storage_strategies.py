@@ -85,10 +85,42 @@ def test_flexable_pos_crm_storage(mock_market_config, storage):
     product_tuples = [(start, end, None)]
     storage.reset()
 
-    #
+    # constant price of 50
+    specific_revenue = (50 - (4 / 0.95 + 1)) * 360 / (0.36 * 1000)
+
+    storage.forecaster = NaiveForecast(index, availability=1, price_forecast=50)
+    bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
+    assert len(bids) == 1
+    assert math.isclose(bids[0]["price"], specific_revenue / (0.5 * 1000))
+    assert bids[0]["volume"] == 60
+
+    # assert capacity_pos
+    mc.product_type = "capacity_pos"
+    bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
+    assert len(bids) == 1
+    assert math.isclose(bids[0]["price"], specific_revenue)
+    assert bids[0]["volume"] == 60
+
+    # specific revenue < 0
+    storage.forecaster = NaiveForecast(
+        index, availability=1, price_forecast=[5, 5, 5, 5]
+    )
+    bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
+    assert len(bids) == 1
+    assert bids[0]["price"] == 0
+    assert bids[0]["volume"] == 60
+
+    # was charging before
+    storage.outputs["energy"][start] = -60
+    product_tuples = [
+        (start + pd.Timedelta(hours=1), end + pd.Timedelta(hours=1), None)
+    ]
+    bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
+    assert bids == []
 
 
 def test_flexable_neg_crm_storage(mock_market_config, storage):
+    index = pd.date_range("2023-07-01", periods=4, freq="H")
     end = datetime(2023, 7, 1, 4, 0, 0)
     strategy = flexableNegCRMStorage()
     mc = mock_market_config
@@ -96,6 +128,28 @@ def test_flexable_neg_crm_storage(mock_market_config, storage):
     mc.product_type = "energy_neg"
     product_tuples = [(start, end, None)]
     storage.reset()
+
+    # constant price of 50
+    storage.forecaster = NaiveForecast(index, availability=1, price_forecast=50)
+    bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
+    assert len(bids) == 1
+    assert math.isclose(bids[0]["price"], 0)
+    assert bids[0]["volume"] == -60
+
+    # assert capacity_pos
+    mc.product_type = "capacity_neg"
+    bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
+    assert len(bids) == 1
+    assert math.isclose(bids[0]["price"], 0)
+    assert bids[0]["volume"] == -60
+
+    # was charging before
+    storage.outputs["energy"][start] = 60
+    product_tuples = [
+        (start + pd.Timedelta(hours=1), end + pd.Timedelta(hours=1), None)
+    ]
+    bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
+    assert bids == []
 
 
 if __name__ == "__main__":
