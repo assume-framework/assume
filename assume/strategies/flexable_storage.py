@@ -102,7 +102,7 @@ class flexableEOMStorage(BaseStrategy):
             elif price_forecast[start] <= average_price * unit.efficiency_charge:
                 bid_quantity = max_power_charge[start]
             else:
-                return []
+                continue
 
             bids.append(
                 {
@@ -159,9 +159,11 @@ class flexablePosCRMStorage(BaseStrategy):
             )
 
             if bid_quantity == 0:
-                return []
+                continue
 
-            marginal_cost = unit.calc_marginal_cost(timestep=start, discharge=True)
+            marginal_cost = unit.calculate_marginal_cost(
+                start=start, power=bid_quantity
+            )
 
             specific_revenue = get_specific_revenue(
                 unit=unit,
@@ -240,6 +242,8 @@ class flexableNegCRMStorage(BaseStrategy):
             )
 
             # if bid_quantity >= min_bid_volume  --> not checked here
+            if bid_quantity == 0:
+                continue
 
             if market_config.product_type == "capacity_neg":
                 bids.append(
@@ -252,7 +256,7 @@ class flexableNegCRMStorage(BaseStrategy):
                     }
                 )
             elif market_config.product_type == "energy_neg":
-                bids.appen(
+                bids.append(
                     {
                         "start_time": start,
                         "end_time": end,
@@ -283,22 +287,33 @@ def get_specific_revenue(unit, marginal_cost, current_time, foresight, price_for
 
     if t + foresight > price_forecast.index[-1]:
         price_forecast = price_forecast.loc[t:]
+        _, max_power_discharge = unit.calculate_min_max_discharge(
+            start=t, end=price_forecast.index[-1] + unit.index.freq
+        )
     else:
         price_forecast = price_forecast.loc[t : t + foresight]
+        _, max_power_discharge = unit.calculate_min_max_discharge(
+            start=t, end=t + foresight + unit.index.freq
+        )
 
     possible_revenue = 0
     theoretic_SOC = unit.current_SOC
-    for market_price in price_forecast:
-        theoretic_power_discharge = min(
-            max(theoretic_SOC * unit.max_volume - unit.min_volume, 0),
-            unit.max_power_discharge,
+
+    previous_power = unit.get_output_before(t)
+    for i, market_price in enumerate(price_forecast):
+        theoretic_power_discharge = unit.calculate_ramp_discharge(
+            previous_power=previous_power,
+            power_discharge=max_power_discharge[i],
         )
         possible_revenue += (market_price - marginal_cost) * theoretic_power_discharge
         theoretic_SOC -= theoretic_power_discharge / unit.max_volume
+        previous_power = theoretic_power_discharge
 
     if unit.current_SOC - theoretic_SOC != 0:
         possible_revenue = (
             possible_revenue / (unit.current_SOC - theoretic_SOC) / unit.max_volume
         )
+    else:
+        possible_revenue = possible_revenue / unit.max_volume
 
     return possible_revenue
