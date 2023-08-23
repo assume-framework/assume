@@ -184,6 +184,7 @@ async def load_scenario_folder_async(
     inputs_path: str,
     scenario: str,
     study_case: str,
+    disable_learning: bool = False,
 ):
     """Load a scenario from a given path.
 
@@ -259,6 +260,9 @@ async def load_scenario_folder_async(
         learning_config[
             "load_learned_path"
         ] = f"{inputs_path}/learned_strategies/{sim_id}/"
+
+    if disable_learning:
+        learning_config = {}
 
     await world.setup(
         start=start,
@@ -426,7 +430,6 @@ def load_scenario_folder(
     """
     Load a scenario from a given path.
     """
-
     world.loop.run_until_complete(
         load_scenario_folder_async(
             world,
@@ -435,7 +438,6 @@ def load_scenario_folder(
             study_case,
         )
     )
-
     # check if learning mode
     if world.learning_config.get("learning_mode"):
         # initiate buffer for rl agent
@@ -445,16 +447,17 @@ def load_scenario_folder(
             buffer_size=int(5e5),
             obs_dim=world.learning_role.obs_dim,
             act_dim=world.learning_role.act_dim,
-            n_rl_units=world.learning_role.n_rl_units,
+            n_rl_units=len(world.learning_role.rl_units),
             device=world.learning_role.device,
         )
-
-        world.learning_role.buffer = buffer
 
         for episode in tqdm(
             range(world.learning_role.training_episodes),
             desc="Training Episodes",
         ):
+            # give the newly created rl_agent the buffer that we stored from the beginning
+            world.learning_role.set_buffer(buffer)
+
             # change simulation id of output agent to include the episode number
             world.output_role.simulation_id = (
                 f"{world.output_role.simulation_id}_{episode}"
@@ -463,7 +466,9 @@ def load_scenario_folder(
             world.run()
             world.reset()
 
-            world.learning_role.episodes_done = +1
+            world.learning_role.episodes_done = episode + 1
+
+            disable_learning = episode == world.learning_role.training_episodes - 1
 
             # in load_scenario_folder_async, we initiate new container and kill old if present
             # as long as we do not skip setup container should be handled correctly
@@ -473,14 +478,11 @@ def load_scenario_folder(
                     inputs_path,
                     scenario,
                     study_case,
+                    disable_learning=disable_learning,
                 )
             )
-            # give the newly created rl_agent the buffer that we stored from the beginning
-            world.learning_role.buffer = buffer
 
             # container shutdown implicitly with new initialisation
 
-        world.logger.info("################")
-        world.logger.info(f"Training finished, Start evaluation run")
-
-        world.learning_role.learning_mode = False
+        logger.info("################")
+        logger.info(f"Training finished, Start evaluation run")

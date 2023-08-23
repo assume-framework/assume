@@ -116,20 +116,22 @@ class World:
 
         # kill old container if exists
         if isinstance(self.container, Container) and self.container.running:
-            self.container.shutdown()
+            await self.container.shutdown()
 
         # create new container
         self.container = await create_container(
             addr=self.addr, clock=self.clock, codec=mango_codec_factory()
         )
 
-        # initiate learning if the learning mode is one and hence we want to learn new strategies
-        if self.learning_config.get("learning_mode"):
+        # initiate learning if the learning mode is on and hence we want to learn new strategies
+        if self.learning_config:
             # if so, we initate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
 
             self.learning_role = Learning(
                 learning_config=self.learning_config,
+                start=self.start,
+                end=self.end,
             )
             self.bidding_params.update(self.learning_config)
 
@@ -138,9 +140,7 @@ class World:
                 rl_agent = RoleAgent(self.container, suggested_aid="learning_agent")
                 rl_agent.add_role(self.learning_role)
             else:
-                # this does not set the clock in output_agent correctly yet
-                # see https://gitlab.com/mango-agents/mango/-/issues/59
-                # but still improves performance
+
                 def creator(container):
                     agent = RoleAgent(container, suggested_aid="learning_agent")
                     agent.add_role(self.learning_role)
@@ -235,8 +235,8 @@ class World:
                 continue
 
             try:
+                # TODO find better way to count learning agents
                 if issubclass(self.bidding_types[strategy], LearningStrategy):
-                    self.learning_role.n_rl_units += 1
                     self.learning_role.rl_units.append(id)
 
                 bidding_strategies[product_type] = self.bidding_types[strategy](

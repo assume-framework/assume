@@ -8,13 +8,9 @@ from dateutil import rrule as rr
 from mango import Role
 
 from assume.reinforcement_learning.algorithms.matd3 import TD3
+from assume.reinforcement_learning.buffer import ReplayBuffer
 
 logger = logging.getLogger(__name__)
-
-
-# need
-# self.world.dt
-# self.world.snapshots
 
 
 class Learning(Role):
@@ -28,14 +24,10 @@ class Learning(Role):
         self.simulation_end = end
 
         # how many learning roles do exist and how are they named
-        self.n_rl_units = 0
-        self.rl_units = []
-
-        self.buffer = None
+        self.buffer: ReplayBuffer = None
         self.obs_dim = learning_config["observation_dimension"]
         self.act_dim = learning_config["action_dimension"]
         self.episodes_done = 0
-        self.n_rl_units = 0
         self.rl_units = []
         self.rl_algorithm = learning_config["algorithm"]
 
@@ -76,9 +68,6 @@ class Learning(Role):
             self.max_eval_regret = 1e9
             self.max_eval_profit = -1e9
 
-            # temp for testing reccurency role
-            self.start_update = False
-
         # self.float_type = th.float16 if self.device.type == "cuda" else th.float
 
     def init_learning(self):
@@ -90,21 +79,11 @@ class Learning(Role):
         self.rl_eval_profits = []
         self.rl_eval_regrets = []
 
-        # shedule policy updates
-        # TODO define frequency and stuff
-
         recurrency_task = rr.rrule(
             freq=rr.HOURLY,
             interval=self.train_freq,
             dtstart=self.simulation_start + timedelta(hours=self.learning_starts),
-            until=self.simulation_start
-            + timedelta(
-                hours=(
-                    (self.simulation_end - self.simulation_start).total_seconds()
-                    / 3600
-                    * self.training_episodes
-                )
-            ),
+            until=self.simulation_end,
             cache=True,
         )
 
@@ -138,8 +117,6 @@ class Learning(Role):
                 reward=data[2],
             )
 
-        self.start_update = True
-
     def create_learning_algorithm(self, algorithm):
         if algorithm == "matd3":
             self.rl_algorithm = TD3(
@@ -150,7 +127,6 @@ class Learning(Role):
                 batch_size=self.batch_size,
                 gamma=self.gamma,
             )
-
         else:
             self.logger.error(
                 f"you specified an reinforcement learning algorithm {algorithm}, for which no files where provided"
@@ -188,3 +164,7 @@ class Learning(Role):
                 self.logger.info(
                     f"Policies saved, episode: {self.eval_episodes_done + 1}, mode: {mode}, value: {value:.2f}"
                 )
+
+    def set_buffer(self, buffer: ReplayBuffer):
+        self.buffer = buffer
+        self.init_learning()
