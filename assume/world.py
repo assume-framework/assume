@@ -135,8 +135,7 @@ class World:
             )
             self.bidding_params.update(self.learning_config)
 
-            same_process = True
-            if same_process:
+            if True:  # separate process does not support buffer and learning
                 rl_agent = RoleAgent(self.container, suggested_aid="learning_agent")
                 rl_agent.add_role(self.learning_role)
             else:
@@ -235,13 +234,12 @@ class World:
                 continue
 
             try:
-                # TODO find better way to count learning agents
-                if issubclass(self.bidding_types[strategy], LearningStrategy):
-                    self.learning_role.rl_units.append(id)
-
                 bidding_strategies[product_type] = self.bidding_types[strategy](
                     **self.bidding_params
                 )
+                # TODO find better way to count learning agents
+                if issubclass(self.bidding_types[strategy], LearningStrategy):
+                    self.learning_role.rl_units[id] = bidding_strategies[product_type]
 
             except KeyError as e:
                 self.logger.error(

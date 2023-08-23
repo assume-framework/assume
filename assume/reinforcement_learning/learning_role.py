@@ -2,13 +2,15 @@ import logging
 import os
 from datetime import datetime, timedelta
 
-import pandas as pd
 import torch as th
 from dateutil import rrule as rr
 from mango import Role
+from torch.optim import Adam
 
+from assume.common.base import LearningStrategy
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
+from assume.reinforcement_learning.learning_utils import CriticTD3
 
 logger = logging.getLogger(__name__)
 
@@ -28,10 +30,12 @@ class Learning(Role):
         self.obs_dim = learning_config["observation_dimension"]
         self.act_dim = learning_config["action_dimension"]
         self.episodes_done = 0
-        self.rl_units = []
+        self.rl_units: dict[int, LearningStrategy] = {}
         self.rl_algorithm = learning_config["algorithm"]
+        self.critics = {}
+        self.target_critics = {}
 
-        # define wheter we train model or evaluate it
+        # define whether we train model or evaluate it
         self.training_episodes = learning_config["training_episodes"]
         self.learning_mode = learning_config["learning_mode"]
         self.cuda_device = learning_config["device"]
@@ -49,7 +53,6 @@ class Learning(Role):
                 self.logger.error(
                     "Reinforcement Learning training is deactivated and no pretrained model were provided, activate learning or specify model to use in config"
                 )
-
             # TODO implement loading models! check Nick
 
         else:
@@ -68,7 +71,7 @@ class Learning(Role):
             self.max_eval_regret = 1e9
             self.max_eval_profit = -1e9
 
-        # self.float_type = th.float16 if self.device.type == "cuda" else th.float
+        self.float_type = th.float16 if self.cuda_device == "cuda" else th.float
 
     def init_learning(self):
         # function that initializes learning, needs to be an extra function so that it can be called after buffer is given to Role
@@ -79,17 +82,25 @@ class Learning(Role):
         self.rl_eval_profits = []
         self.rl_eval_regrets = []
 
-        recurrency_task = rr.rrule(
-            freq=rr.HOURLY,
-            interval=self.train_freq,
-            dtstart=self.simulation_start + timedelta(hours=self.learning_starts),
-            until=self.simulation_end,
-            cache=True,
-        )
+        n_agents = len(self.rl_units)
+        strategy: LearningStrategy
+        for u_id, strategy in self.rl_units.items():
+            self.critics[u_id] = CriticTD3(
+                n_agents, strategy.obs_dim, strategy.act_dim, self.float_type
+            )
+            self.target_critics[u_id] = CriticTD3(
+                n_agents, strategy.obs_dim, strategy.act_dim, self.float_type
+            )
 
-        self.context.schedule_recurrent_task(
-            self.rl_algorithm.update_policy, recurrency_task
-        )
+            self.critics[u_id].optimizer = Adam(
+                self.critics[u_id].parameters(), lr=self.learning_rate
+            )
+
+            self.target_critics[u_id].load_state_dict(self.critics[u_id].state_dict())
+            self.target_critics[u_id].train(mode=False)
+
+            self.critics[u_id] = self.critics[u_id].to(self.device)
+            self.target_critics[u_id] = self.target_critics[u_id].to(self.device)
 
     def setup(self):
         # subscribe to messages for handling the training process
@@ -98,6 +109,16 @@ class Learning(Role):
             self.handle_message,
             lambda content, meta: content.get("context") == "rl_training",
         )
+
+        recurrency_task = rr.rrule(
+            freq=rr.HOURLY,
+            interval=self.train_freq,
+            dtstart=self.simulation_start + timedelta(hours=self.learning_starts),
+            until=self.simulation_end,
+            cache=True,
+        )
+
+        self.context.schedule_recurrent_task(self.update_policy, recurrency_task)
 
     def handle_message(self, content, meta):
         """
@@ -110,7 +131,7 @@ class Learning(Role):
 
         if content.get("type") == "replay_buffer":
             start = content.get("start")
-            data = content.get("data")
+            data = content["data"]
             self.buffer.add(
                 obs=data[0],
                 actions=data[1],
@@ -131,6 +152,9 @@ class Learning(Role):
             self.logger.error(
                 f"you specified an reinforcement learning algorithm {algorithm}, for which no files where provided"
             )
+
+    async def update_policy(self):
+        self.rl_algorithm.update_policy()
 
     # in assume self
     def compare_and_save_policies(self):
@@ -168,3 +192,50 @@ class Learning(Role):
     def set_buffer(self, buffer: ReplayBuffer):
         self.buffer = buffer
         self.init_learning()
+
+    def save_params(self, dir_name: str = "best_policy"):
+        def save_obj(obj, directory, agent):
+            path = f"{directory}critic_{str(agent)}"
+            th.save(obj, path)
+
+        directory = f"output/{simulation_id}/{dir_name}/"
+        os.makedirs(directory, exist_ok=True)
+
+        for u_id in self.rl_units.keys():
+            obj = {
+                "critic": self.critics[u_id].state_dict(),
+                "critic_target": self.target_critics[u_id].state_dict(),
+                "critic_optimizer": self.critics[u_id].optimizer.state_dict(),
+            }
+            save_obj(obj, directory, u_id)
+
+    def load_params(self, load_params: dict):
+        if not load_params["load_critics"]:
+            return None
+
+        sim_id = load_params["id"]
+        load_dir = load_params["dir"]
+
+        self.env.logger.info("Loading critic parameters...")
+
+        def load_obj(directory, agent):
+            path = f"{directory}critic_{str(agent)}"
+            return th.load(path, map_location=self.device)
+
+        directory = load_params["policy_dir"] + sim_id + "/" + load_dir + "/"
+
+        if not os.path.exists(directory):
+            raise FileNotFoundError(
+                "Specified directory for loading the critics does not exist!"
+            )
+
+        for u_id in self.rl_units.keys():
+            try:
+                params = load_obj(directory, agent.name)
+                self.critics[u_id].load_state_dict(params["critic"])
+                self.target_critics[u_id].load_state_dict(params["critic_target"])
+                self.critics[u_id].optimizer.load_state_dict(params["critic_optimizer"])
+            except Exception:
+                self.world.logger.info(
+                    "No critic values loaded for agent {}".format(u_id)
+                )

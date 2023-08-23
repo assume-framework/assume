@@ -9,7 +9,6 @@ from tqdm import tqdm
 
 from assume.common.forecasts import CsvForecaster, Forecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
-from assume.strategies.learning_strategies import LearningStrategy
 from assume.world import World
 
 logger = logging.getLogger(__name__)
