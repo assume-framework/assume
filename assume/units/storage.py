@@ -186,24 +186,15 @@ class Storage(SupportsMinMaxCharge):
     def reset(self):
         """Reset the unit to its initial state."""
 
-        # current_status = 0 means the unit is not dispatched
-        self.current_status = 1
-        self.current_down_time = self.min_down_time
-
         # outputs["energy"] > 0 discharging, outputs["energy"] < 0 charging
         self.outputs["energy"] = pd.Series(0.0, index=self.index)
 
         # always starting with discharging?
         # self.outputs["energy"].iat[0] = self.min_power_discharge
-
-        # starting half way charged
-        self.current_SOC = self.initial_soc
-
         self.outputs["pos_capacity"] = pd.Series(0.0, index=self.index)
         self.outputs["neg_capacity"] = pd.Series(0.0, index=self.index)
 
         self.mean_market_success = 0
-        self.market_success_list = [0]
 
     def execute_current_dispatch(self, start: pd.Timestamp, end: pd.Timestamp):
         end_excl = end - self.index.freq
@@ -231,7 +222,9 @@ class Storage(SupportsMinMaxCharge):
 
             # discharging
             if self.outputs["energy"][t] > 0:
-                max_soc_discharge = self.calculate_soc_max_discharge(self.current_SOC)
+                max_soc_discharge = self.calculate_soc_max_discharge(
+                    self.get_soc_before(t)
+                )
 
                 if self.outputs["energy"][t] > max_soc_discharge:
                     if not math.isclose(self.outputs["energy"][t], max_soc_discharge):
@@ -250,7 +243,7 @@ class Storage(SupportsMinMaxCharge):
 
             # charging
             elif self.outputs["energy"][t] < 0:
-                max_soc_charge = self.calculate_soc_max_charge(self.current_SOC)
+                max_soc_charge = self.calculate_soc_max_charge(self.get_soc_before(t))
 
                 if self.outputs["energy"][t] < max_soc_charge:
                     if not math.isclose(self.outputs["energy"][t], max_soc_charge):
@@ -275,19 +268,10 @@ class Storage(SupportsMinMaxCharge):
         return self.outputs["energy"].loc[start:end_excl]
 
     def set_market_failure(self):
-        self.current_status = 0
-        self.current_down_time += 1
-        if self.market_success_list[-1] != 0:
-            self.mean_market_success = sum(self.market_success_list) / len(
-                self.market_success_list
-            )
-            self.market_success_list.append(0)
+        pass
 
     def set_market_sucess(self, delta_soc):
-        self.current_SOC -= round(delta_soc / self.soc_tick) * self.soc_tick
-        self.market_success_list[-1] += 1
-        self.current_status = 1  # discharging or charging
-        self.current_down_time = 0
+        pass
 
     @lru_cache(maxsize=256)
     def calculate_marginal_cost(
@@ -391,7 +375,7 @@ class Storage(SupportsMinMaxCharge):
         )
 
         # restrict charging according to max_volume
-        max_soc_charge = self.calculate_soc_max_charge(self.current_SOC)
+        max_soc_charge = self.calculate_soc_max_charge(self.get_soc_before(start))
         max_power_charge = max_power_charge.where(
             max_power_charge > max_soc_charge, max_soc_charge
         )
@@ -431,7 +415,7 @@ class Storage(SupportsMinMaxCharge):
         )
 
         # restrict according to min_volume
-        max_soc_discharge = self.calculate_soc_max_discharge(self.current_SOC)
+        max_soc_discharge = self.calculate_soc_max_discharge(self.get_soc_before(start))
         max_power_discharge = max_power_discharge.where(
             max_power_discharge < max_soc_discharge, max_soc_discharge
         )
@@ -440,16 +424,14 @@ class Storage(SupportsMinMaxCharge):
 
     def calculate_ramp_discharge(
         self,
+        previous_soc: float,
         previous_power: float,
         power_discharge: float,
         current_power: float = 0,
         min_power_discharge: float = 0,
-        SOC: float | None = None,
     ) -> float:
         if power_discharge == 0:
             return power_discharge
-        if SOC is None:
-            SOC = self.current_SOC
 
         # assuming ramping down discharge restricts ramp up of charging if storage was discharging before and ramp_down_discharge is defined
         if previous_power < 0 and self.ramp_down_charge != None:
@@ -474,7 +456,7 @@ class Storage(SupportsMinMaxCharge):
 
         # restrict according to min_SOC
 
-        max_soc_discharge = self.calculate_soc_max_discharge(SOC)
+        max_soc_discharge = self.calculate_soc_max_discharge(previous_soc)
         if power_discharge > max_soc_discharge:
             power_discharge = max_soc_discharge
         if power_discharge < min_power_discharge:
@@ -484,16 +466,14 @@ class Storage(SupportsMinMaxCharge):
 
     def calculate_ramp_charge(
         self,
+        previous_soc: float,
         previous_power: float,
         power_charge: float,
         current_power: float = 0,
         min_power_charge: float = 0,
-        SOC: float | None = None,
     ) -> float:
         if power_charge == 0:
             return power_charge
-        if SOC is None:
-            SOC = self.current_SOC
 
         # assuming ramping down discharge restricts ramp up of charge if storage was discharging before and ramp_down_discharge is defined
         if previous_power > 0 and self.ramp_down_discharge != None:
@@ -517,7 +497,7 @@ class Storage(SupportsMinMaxCharge):
                 )
 
         # restrict charging according to max_SOC
-        max_soc_charge = self.calculate_soc_max_charge(SOC)
+        max_soc_charge = self.calculate_soc_max_charge(previous_soc)
 
         if power_charge < max_soc_charge:
             power_charge = max_soc_charge
@@ -525,3 +505,17 @@ class Storage(SupportsMinMaxCharge):
             power_charge = 0
 
         return power_charge
+
+    def get_starting_costs(self, op_time):
+        """
+        op_time is hours running
+        """
+        if op_time > 0:
+            # unit is running
+            return 0
+        if -op_time < self.downtime_hot_start:
+            return self.hot_start_cost
+        elif -op_time < self.downtime_warm_start:
+            return self.warm_start_cost
+        else:
+            return self.cold_start_cost

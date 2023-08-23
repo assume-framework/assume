@@ -150,7 +150,8 @@ class complexEOMStorage(BaseStrategy):
             unit.mean_market_success, unit.min_operating_time, 1
         )  # 1 prevents division by 0
 
-        starting_cost = self.get_starting_costs(time=unit.current_down_time, unit=unit)
+        op_time = unit.get_operation_time(start)
+        starting_cost = unit.get_starting_costs(op_time)
         markup = starting_cost / av_operating_time / bid_quantity_mr
 
         bid_price_mr = min(marginal_cost_mr + markup, 3000.0)
@@ -164,9 +165,8 @@ class complexEOMStorage(BaseStrategy):
             return 0
 
         t = start
-        min_down_time = max(unit.min_down_time, 1)
-
-        starting_cost = self.get_starting_costs(time=min_down_time, unit=unit)
+        op_time = unit.get_operation_time(start)
+        starting_cost = unit.get_starting_costs(op_time)
 
         price_reduction_restart = starting_cost / min_down_time / bid_quantity_mr
 

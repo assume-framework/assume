@@ -62,7 +62,7 @@ class flexableEOM(BaseStrategy):
             # =============================================================================
             # Calculating possible price
             # =============================================================================
-            if unit.current_status:
+            if unit.get_operation_time(start) > 0:
                 bid_price_inflex = self.calculate_EOM_price_if_on(
                     unit, start, marginal_cost_inflex, bid_quantity_inflex
                 )
@@ -79,7 +79,7 @@ class flexableEOM(BaseStrategy):
                 power_loss_ratio = 0.0
 
             # Flex-bid price formulation
-            if unit.current_status or (unit.min_down_time == 1):
+            if unit.get_operation_time(start) > unit.min_down_time:
                 bid_quantity_flex = max_power[start] - bid_quantity_inflex
                 bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
 
@@ -116,7 +116,8 @@ class flexableEOM(BaseStrategy):
             unit.mean_market_success, unit.min_operating_time, 1
         )  # 1 prevents division by 0
 
-        starting_cost = self.get_starting_costs(time=unit.current_down_time, unit=unit)
+        op_time = unit.get_operation_time(start)
+        starting_cost = unit.get_starting_costs(op_time)
         if bid_quantity_inflex == 0:
             markup = starting_cost / av_operating_time
         else:
@@ -136,9 +137,8 @@ class flexableEOM(BaseStrategy):
             return 0
 
         t = start
-        min_down_time = max(unit.min_down_time, 1)
-
-        starting_cost = self.get_starting_costs(time=min_down_time, unit=unit)
+        op_time = unit.get_operation_time(start)
+        starting_cost = unit.get_starting_costs(op_time)
 
         price_reduction_restart = starting_cost / min_down_time / bid_quantity_inflex
 
@@ -168,16 +168,6 @@ class flexableEOM(BaseStrategy):
         )
 
         return bid_price_inflex
-
-    def get_starting_costs(self, time, unit):
-        if time < unit.downtime_hot_start:
-            return unit.hot_start_cost
-
-        elif time < unit.downtime_warm_start:
-            return unit.warm_start_cost
-
-        else:
-            return unit.cold_start_cost
 
 
 class flexablePosCRM(BaseStrategy):

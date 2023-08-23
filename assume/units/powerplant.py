@@ -85,9 +85,6 @@ class PowerPlant(SupportsMinMax):
     def reset(self):
         """Reset the unit to its initial state."""
 
-        self.current_status = 1
-        self.current_down_time = self.min_down_time
-
         self.outputs["energy"] = pd.Series(0.0, index=self.index)
         # workaround if market schedules do not match
         # for example neg_reserve is required but market did not bid yet
@@ -107,7 +104,6 @@ class PowerPlant(SupportsMinMax):
         self.outputs["regrets"] = pd.Series(0.0, index=self.index)
 
         self.mean_market_success = 0
-        self.market_success_list = [0]
 
     def execute_current_dispatch(
         self,
@@ -118,17 +114,6 @@ class PowerPlant(SupportsMinMax):
         # TODO ramp down and turn off only for relevant timesteps
         if self.outputs["energy"][start:end_excl].mean() < self.min_power:
             self.outputs["energy"].loc[start:end_excl] = 0
-            self.current_status = 0
-            self.current_down_time += 1
-            if self.market_success_list[-1] != 0:
-                self.mean_market_success = sum(self.market_success_list) / len(
-                    self.market_success_list
-                )
-                self.market_success_list.append(0)
-        else:
-            self.market_success_list[-1] += 1
-            self.current_status = 1
-            self.current_down_time = 0
 
         # TODO check if resulting power is < max_power
         # if self.outputs["energy"][start:end_excl].max() > self.max_power:
@@ -227,10 +212,6 @@ class PowerPlant(SupportsMinMax):
         """
         end_excl = end - self.index.freq
 
-        # check if unit is currently off and cannot be turned on yet
-        # if unit.current_status == 0 and unit.current_down_time < unit.min_down_time:
-        #    return 0, 0
-
         base_load = self.outputs["energy"][start:end_excl]
         heat_demand = self.outputs["heat"][start:end_excl]
         assert heat_demand.min() >= 0
@@ -275,3 +256,17 @@ class PowerPlant(SupportsMinMax):
         )
 
         return unit_dict
+
+    def get_starting_costs(self, op_time):
+        """
+        op_time is hours running
+        """
+        if op_time > 0:
+            # unit is running
+            return 0
+        if -op_time < self.downtime_hot_start:
+            return self.hot_start_cost
+        elif -op_time < self.downtime_warm_start:
+            return self.warm_start_cost
+        else:
+            return self.cold_start_cost
