@@ -24,19 +24,7 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.markets import MarketRole, clearing_mechanisms
-from assume.strategies import (
-    LearningStrategy,
-    NaiveNegReserveStrategy,
-    NaivePosReserveStrategy,
-    NaiveStrategy,
-    OTCStrategy,
-    flexableEOM,
-    flexableEOMStorage,
-    flexableNegCRM,
-    flexableNegCRMStorage,
-    flexablePosCRM,
-    flexablePosCRMStorage,
-)
+from assume.strategies import LearningStrategy, bidding_strategies
 from assume.units import BaseUnit, Demand, HeatPump, PowerPlant, Storage
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
@@ -72,10 +60,11 @@ class World:
                     self.db.connection()
                     connected = True
                     self.logger.info("connected to db")
-                except OperationalError:
+                except OperationalError as e:
                     self.logger.error(
                         f"could not connect to {database_uri}, trying again"
                     )
+                    self.logger.error(f"{e}")
                     time.sleep(2)
         else:
             self.db = None
@@ -89,18 +78,8 @@ class World:
             "demand": Demand,
             "storage": Storage,
         }
-        self.bidding_types = {
-            "flexable_eom": flexableEOM,
-            "flexable_pos_crm": flexablePosCRM,
-            "flexable_neg_crm": flexableNegCRM,
-            "flexable_eom_storage": flexableEOMStorage,
-            "flexable_pos_crm_storage": flexablePosCRMStorage,
-            "flexable_neg_crm_storage": flexableNegCRMStorage,
-            "naive": NaiveStrategy,
-            "naive_neg_reserve": NaiveNegReserveStrategy,
-            "naive_pos_reserve": NaivePosReserveStrategy,
-            "otc_strategy": OTCStrategy,
-        }
+
+        self.bidding_types = bidding_strategies
 
         try:
             from assume.strategies.learning_strategies import RLStrategy
@@ -121,9 +100,9 @@ class World:
         self,
         start: datetime,
         end: datetime,
-        save_frequency_hours: int,
         simulation_id: str,
         index: pd.Series,
+        save_frequency_hours: int = 24,
         same_process: bool = True,
         bidding_params: dict = {},
         learning_config: dict = {},
@@ -149,32 +128,28 @@ class World:
             # if so, we initate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
 
-            learning_role = Learning(
-                start=start,
-                end=end,
+            self.learning_role = Learning(
                 learning_config=self.learning_config,
             )
             self.bidding_params.update(self.learning_config)
 
             same_process = True
             if same_process:
-                self.rl_agent = RoleAgent(
-                    self.container, suggested_aid="learning_agent"
-                )
-                self.rl_agent.add_role(learning_role)
+                rl_agent = RoleAgent(self.container, suggested_aid="learning_agent")
+                rl_agent.add_role(self.learning_role)
             else:
                 # this does not set the clock in output_agent correctly yet
                 # see https://gitlab.com/mango-agents/mango/-/issues/59
                 # but still improves performance
                 def creator(container):
                     agent = RoleAgent(container, suggested_aid="learning_agent")
-                    agent.add_role(learning_role)
+                    agent.add_role(self.learning_role)
 
                 await self.container.as_agent_process(agent_creator=creator)
 
         self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to world
-        output_role = WriteOutput(
+        self.output_role = WriteOutput(
             simulation_id=simulation_id,
             start=start,
             end=end,
@@ -183,17 +158,17 @@ class World:
             save_frequency_hours=save_frequency_hours,
         )
         if same_process:
-            self.output_agent = RoleAgent(
+            output_agent = RoleAgent(
                 self.container, suggested_aid=self.output_agent_addr[1]
             )
-            self.output_agent.add_role(output_role)
+            output_agent.add_role(self.output_role)
         else:
             # this does not set the clock in output_agent correctly yet
             # see https://gitlab.com/mango-agents/mango/-/issues/59
             # but still improves performance
             def creator(container):
                 agent = RoleAgent(container, suggested_aid=self.output_agent_addr[1])
-                agent.add_role(output_role)
+                agent.add_role(self.output_role)
 
             await self.container.as_agent_process(agent_creator=creator)
 
@@ -209,6 +184,8 @@ class World:
         id: str or int
 
         """
+        if self.unit_operators.get(id):
+            raise ValueError(f"UnitOperator {id} already exists")
         units_operator = UnitsOperator(available_markets=list(self.markets.values()))
         # creating a new role agent and apply the role of a unitsoperator
         unit_operator_agent = RoleAgent(self.container, suggested_aid=f"{id}")
@@ -223,7 +200,7 @@ class World:
             "output_agent_id": self.output_agent_addr[1],
         }
 
-    async def add_unit(
+    async def async_add_unit(
         self,
         id: str,
         unit_type: str,
@@ -244,7 +221,7 @@ class World:
         """
 
         # check if unit operator exists
-        if unit_operator_id not in self.unit_operators:
+        if unit_operator_id not in self.unit_operators.keys():
             raise ValueError(f"invalid unit operator {unit_operator_id}")
 
         # provided unit type does not exist yet
@@ -259,8 +236,8 @@ class World:
 
             try:
                 if issubclass(self.bidding_types[strategy], LearningStrategy):
-                    self.rl_agent.roles[0].n_rl_units += 1
-                    self.rl_agent.roles[0].rl_units.append(id)
+                    self.learning_role.n_rl_units += 1
+                    self.learning_role.rl_units.append(id)
 
                 bidding_strategies[product_type] = self.bidding_types[strategy](
                     **self.bidding_params
@@ -274,7 +251,13 @@ class World:
         unit_params["bidding_strategies"] = bidding_strategies
 
         # create unit within the unit operator its associated with
-        unit = unit_class(id=id, index=self.index, forecaster=forecaster, **unit_params)
+        unit = unit_class(
+            id=id,
+            unit_operator=unit_operator_id,
+            index=self.index,
+            forecaster=forecaster,
+            **unit_params,
+        )
         await self.unit_operators[unit_operator_id].add_unit(unit)
 
     def add_market_operator(
@@ -289,6 +272,8 @@ class World:
         id = int
              market operator id is associated with the market its participating
         """
+        if self.market_operators.get(id):
+            raise ValueError(f"MarketOperator {id} already exists")
         market_operator_agent = RoleAgent(
             self.container,
             suggested_aid=id,
@@ -333,7 +318,7 @@ class World:
         market_operator.markets.append(market_config)
         self.markets[f"{market_config.name}"] = market_config
 
-    async def step(self):
+    async def _step(self):
         next_activity = self.clock.get_next_activity()
         if not next_activity:
             self.logger.info("simulation finished - no schedules left")
@@ -342,7 +327,7 @@ class World:
         self.clock.set_time(next_activity)
         return delta
 
-    async def run_async(self, start_ts, end_ts):
+    async def async_run(self, start_ts, end_ts):
         """
         Run the simulation.
         either in learning mode where we run multiple times or in normal mode
@@ -356,7 +341,7 @@ class World:
         self.clock.set_time(start_ts - 1)
         while self.clock.time < end_ts:
             await asyncio.sleep(0)
-            delta = await self.step()
+            delta = await self._step()
             if delta:
                 pbar.update(delta)
                 pbar.set_description(
@@ -373,12 +358,33 @@ class World:
         start_ts = calendar.timegm(self.start.utctimetuple())
         end_ts = calendar.timegm(self.end.utctimetuple())
 
-        return self.loop.run_until_complete(
-            self.run_async(start_ts=start_ts, end_ts=end_ts)
-        )
+        try:
+            return self.loop.run_until_complete(
+                self.async_run(start_ts=start_ts, end_ts=end_ts)
+            )
+        except KeyboardInterrupt:
+            pass
 
     def reset(self):
         self.market_operators = {}
         self.markets = {}
         self.unit_operators = {}
         self.forecast_providers = {}
+
+    def add_unit(
+        self,
+        id: str,
+        unit_type: str,
+        unit_operator_id: str,
+        unit_params: dict,
+        forecaster: Forecaster,
+    ) -> None:
+        return self.loop.run_until_complete(
+            self.async_add_unit(
+                id=id,
+                unit_type=unit_type,
+                unit_operator_id=unit_operator_id,
+                unit_params=unit_params,
+                forecaster=forecaster,
+            )
+        )

@@ -64,18 +64,18 @@ def cli(args=None):
     else:
         db_uri = f"sqlite:///./examples/local_db/{name}.db"
 
-    world = World(
-        database_uri=db_uri,
-        export_csv_path=args.csv_export_path,
-        log_level=args.loglevel,
-    )
-    load_scenario_folder(
-        world,
-        inputs_path=args.input_path,
-        scenario=args.scenario,
-        study_case=args.case_study,
-    )
     try:
+        world = World(
+            database_uri=db_uri,
+            export_csv_path=args.csv_export_path,
+            log_level=args.loglevel,
+        )
+        load_scenario_folder(
+            world,
+            inputs_path=args.input_path,
+            scenario=args.scenario,
+            study_case=args.case_study,
+        )
         world.run()
     except KeyboardInterrupt:
         pass
@@ -83,5 +83,5 @@ def cli(args=None):
 
 if __name__ == "__main__":
     # cli()
-    args = "-s example_01_rl -db postgresql://assume:assume@localhost:5432/assume"
+    args = "-s example_01a -db postgresql://assume:assume@localhost:5432/assume"
     cli(args.split(" "))

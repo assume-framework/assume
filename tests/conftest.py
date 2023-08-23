@@ -8,6 +8,7 @@ from assume.common.base import SupportsMinMax
 
 class MockMarketConfig:
     product_type = "energy"
+    additional_fields = []
 
 
 class MockMinMaxUnit(SupportsMinMax):

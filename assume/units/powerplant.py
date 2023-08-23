@@ -25,8 +25,8 @@ class PowerPlant(SupportsMinMax):
         partial_load_eff: bool = False,
         fuel_type: str = "others",
         emission_factor: float = 0.0,
-        ramp_up: float = -1,
-        ramp_down: float = -1,
+        ramp_up: float = None,
+        ramp_down: float = None,
         hot_start_cost: float = 0,
         warm_start_cost: float = 0,
         cold_start_cost: float = 0,
@@ -58,8 +58,8 @@ class PowerPlant(SupportsMinMax):
         self.emission_factor = emission_factor
 
         # check ramping enabled
-        self.ramp_down = max_power if ramp_down == -1 else ramp_down
-        self.ramp_up = max_power if ramp_up == -1 else ramp_up
+        self.ramp_down = max_power if ramp_down is None else ramp_down
+        self.ramp_up = max_power if ramp_up is None else ramp_up
         self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
         self.min_down_time = min_down_time if min_down_time > 0 else 1
         self.downtime_hot_start = (
@@ -141,7 +141,15 @@ class PowerPlant(SupportsMinMax):
             start = order["start_time"]
             end = order["end_time"]
             end_excl = end - self.index.freq
-            cashflow = float(order["price"] * order["volume"])
+
+            if isinstance(order["accepted_volume"], dict):
+                cashflow = float(
+                    order["accepted_price"][i] * order["accepted_volume"][i]
+                    for i in order["accepted_volume"].keys()
+                )
+            else:
+                cashflow = float(order["accepted_price"] * order["accepted_volume"])
+
             hours = (end - start) / timedelta(hours=1)
             self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
                 cashflow * hours

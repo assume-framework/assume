@@ -79,7 +79,7 @@ class flexableEOM(BaseStrategy):
                 power_loss_ratio = 0.0
 
             # Flex-bid price formulation
-            if unit.current_status:
+            if unit.current_status or (unit.min_down_time == 1):
                 bid_quantity_flex = max_power[start] - bid_quantity_inflex
                 bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
 
@@ -213,7 +213,7 @@ class flexablePosCRM(BaseStrategy):
             )
 
             if bid_quantity == 0:
-                return []
+                continue
 
             marginal_cost = unit.calculate_marginal_cost(
                 start,
@@ -288,7 +288,7 @@ class flexableNegCRM(BaseStrategy):
             )
             bid_quantity = min_power[start] - previous_power
             if bid_quantity >= 0:
-                return []
+                continue
 
             # bid_quantity < 0
             marginal_cost = unit.calculate_marginal_cost(

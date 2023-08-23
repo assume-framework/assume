@@ -34,7 +34,7 @@ class BaseUnit:
         technology: str,
         bidding_strategies: dict[str, BaseStrategy],
         index: pd.DatetimeIndex,
-        node: str,
+        node: str = "",
         forecaster: Forecaster = None,
         **kwargs,
     ):
@@ -87,7 +87,7 @@ class BaseUnit:
             start = order["start_time"]
             end = order["end_time"]
             end_excl = end - self.index.freq
-            self.outputs[product_type].loc[start:end_excl] += order["volume"]
+            self.outputs[product_type].loc[start:end_excl] += order["accepted_volume"]
 
         self.calculate_cashflow(product_type, orderbook)
 
@@ -111,13 +111,11 @@ class BaseUnit:
         end_excl = end - self.index.freq
         return self.outputs["energy"][start:end_excl]
 
-    def get_output_before(
-        self, datetime: datetime, product_type: str = "energy"
-    ) -> float:
-        if datetime - self.index.freq < self.index[0]:
+    def get_output_before(self, dt: datetime, product_type: str = "energy") -> float:
+        if dt - self.index.freq < self.index[0]:
             return 0
         else:
-            return self.outputs["energy"].at[datetime - self.index.freq]
+            return self.outputs["energy"].at[dt - self.index.freq]
 
     def as_dict(self) -> dict:
         return {
@@ -140,6 +138,12 @@ class SupportsMinMax(BaseUnit):
     max_power: float
     ramp_down: float
     ramp_up: float
+    # percentage of how much output power is provided
+    efficiency: float
+    # how much kg/kWh of CO2 emissions is needed
+    emission_factor: float
+    min_operating_time: int
+    min_down_time: int
 
     def calculate_min_max_power(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
@@ -153,6 +157,8 @@ class SupportsMinMax(BaseUnit):
         self, previous_power: float, power: float, current_power: float = 0
     ) -> float:
         if power == 0:
+            # if less than min_power is required, we run min_power
+            # we could also split at self.min_power/2
             return power
         # ramp up constraint
         # max_power + current_power < previous_power + unit.ramp_up
@@ -170,12 +176,35 @@ class SupportsMinMax(BaseUnit):
         )
         return power
 
+    def get_clean_spread(self, prices: pd.DataFrame):
+        emission_cost = self.emission_factor * prices["co"].mean()
+        fuel_cost = prices[self.technology.replace("_combined", "")].mean()
+        return (fuel_cost + emission_cost) / self.efficiency
+
+    def get_operation_time(self, start: datetime):
+        """returns the operation time
+        if unit is on since 4 hours, it returns 4
+        if the unit is off since 4 hours, it returns -4
+        """
+        max_time = max(self.min_operating_time, self.min_down_time)
+        begin = start - self.index.freq * max_time
+        end = start
+        arr = self.outputs["energy"][begin:end][::-1] > 0
+        is_off = not arr[0]
+        runn = 0
+        for val in arr:
+            if val == is_off:
+                break
+            runn += 1
+        return (-1) ** is_off * runn
+
 
 class SupportsMinMaxCharge(BaseUnit):
     """
     Base Class used for Storage derived classes
     """
 
+    initial_soc: float
     min_power_charge: float
     max_power_charge: float
     min_power_discharge: float
@@ -184,6 +213,9 @@ class SupportsMinMaxCharge(BaseUnit):
     ramp_down_discharge: float
     ramp_up_charge: float
     ramp_down_charge: float
+    max_volume: float
+    efficiency_charge: float
+    efficiency_discharge: float
 
     def calculate_min_max_charge(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
@@ -198,6 +230,22 @@ class SupportsMinMaxCharge(BaseUnit):
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         pass
 
+    def get_soc_before(self, dt: datetime) -> float:
+        """
+        return SoC before the given datetime.
+        If datetime is before the start of the index, the initial SoC is returned.
+        The SoC is a float between 0 and 1.
+        """
+        if dt - self.index.freq < self.index[0]:
+            return self.initial_soc
+        else:
+            return self.outputs["soc"].at[dt - self.index.freq]
+
+    def get_clean_spread(self, prices: pd.DataFrame):
+        emission_cost = self.emission_factor * prices["co"].mean()
+        fuel_cost = prices[self.technology.replace("_combined", "")].mean()
+        return (fuel_cost + emission_cost) / self.efficiency_charge
+
     def calculate_ramp_discharge(
         self,
         previous_power: float,
@@ -206,15 +254,28 @@ class SupportsMinMaxCharge(BaseUnit):
     ) -> float:
         if power_discharge == 0:
             return power_discharge
-        power_discharge = min(
-            power_discharge,
-            previous_power + self.ramp_up_discharge - current_power,
-        )
 
-        power_discharge = max(
-            power_discharge,
-            previous_power - self.ramp_down_discharge - current_power,
-        )
+        # if storage was charging before and ramping for charging is defined
+        if previous_power < 0 and self.ramp_down_charge != None:
+            power_discharge = max(
+                previous_power - self.ramp_down_charge - current_power, 0
+            )
+        else:
+            # Assuming the storage is not restricted by ramping charging down
+            if previous_power < 0:
+                previous_power = 0
+
+            power_discharge = min(
+                power_discharge,
+                max(0, previous_power + self.ramp_up_discharge - current_power),
+            )
+            # restrict only if ramping defined
+            if self.ramp_down_discharge != None:
+                power_discharge = max(
+                    power_discharge,
+                    previous_power - self.ramp_down_discharge - current_power,
+                    0,
+                )
         return power_discharge
 
     def calculate_ramp_charge(
@@ -222,12 +283,29 @@ class SupportsMinMaxCharge(BaseUnit):
     ) -> float:
         if power_charge == 0:
             return power_charge
-        power_charge = max(
-            power_charge, previous_power + self.ramp_up_charge - current_power
-        )
-        power_charge = min(
-            power_charge, previous_power - self.ramp_down_charge - current_power
-        )
+
+        # assuming ramping down discharge restricts ramp up of charge
+        # if storage was discharging before and ramp_down_discharge is defined
+        if previous_power > 0 and self.ramp_down_discharge != 0:
+            power_charge = min(
+                previous_power - self.ramp_down_discharge - current_power, 0
+            )
+        else:
+            if previous_power > 0:
+                previous_power = 0
+
+            power_charge = max(
+                power_charge,
+                min(previous_power + self.ramp_up_charge - current_power, 0),
+            )
+            # restrict only if ramping defined
+            if self.ramp_down_charge != 0:
+                power_charge = min(
+                    power_charge,
+                    previous_power - self.ramp_down_charge - current_power,
+                    0,
+                )
+
         return power_charge
 
 

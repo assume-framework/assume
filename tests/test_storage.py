@@ -1,4 +1,4 @@
-from datetime import datetime
+import math
 
 import pandas as pd
 import pytest
@@ -16,7 +16,7 @@ def storage_unit() -> Storage:
         bidding_strategies={"energy": NaiveStrategy()},
         max_power_charge=-100,
         max_power_discharge=100,
-        max_SOC=1000,
+        max_volume=1000,
         efficiency_charge=0.9,
         efficiency_discharge=0.95,
         index=pd.date_range("2022-01-01", periods=4, freq="H"),
@@ -52,7 +52,7 @@ def test_reset_function(storage_unit):
     assert storage_unit.current_status == 1
 
     # check if total_power_output is reset
-    assert storage_unit.outputs["power"].equals(
+    assert storage_unit.outputs["energy"].equals(
         pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
     )
     # the same for pos and neg capacity reserve
@@ -92,7 +92,7 @@ def test_calculate_operational_window(storage_unit):
 
     assert min_power_charge[start] == 0
     assert max_power_charge[start] == -100
-    assert cost_charge == 3 / 0.9 + 1
+    assert math.isclose(cost_charge, 3 / 0.9 + 1)
 
     assert storage_unit.outputs["energy"].at[start] == 0
 
@@ -112,19 +112,24 @@ def test_calculate_operational_window(storage_unit):
     assert min_power_discharge[0] == 40
     assert max_power_discharge[0] == 60
 
-    storage_unit.current_SOC = 50
+    storage_unit.current_SOC = 0.05
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
     )
     assert min_power_discharge[0] == 40
-    assert max_power_discharge[0] == round(50 * storage_unit.efficiency_discharge, 3)
+    assert math.isclose(
+        max_power_discharge[0], (50 * storage_unit.efficiency_discharge)
+    )
 
-    storage_unit.current_SOC = 950
+    storage_unit.current_SOC = 0.95
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end
     )
     assert min_power_charge[0] == -40
-    assert max_power_charge[0] == round(-50 / storage_unit.efficiency_charge, 3)
+    # TODO: remove rounding?
+    assert math.isclose(
+        max_power_charge[0], round(-50 / storage_unit.efficiency_charge, 1)
+    )
 
 
 def test_storage_feedback(storage_unit, mock_market_config):
@@ -164,7 +169,7 @@ def test_storage_feedback(storage_unit, mock_market_config):
             "end_time": end,
             "only_hours": None,
             "price": cost_discharge,
-            "volume": max_power_discharge[start] / 2,
+            "accepted_volume": max_power_discharge[start] / 2,
         }
     ]
     # max_power_charge gets accepted
@@ -286,27 +291,33 @@ def test_execute_dispatch(storage_unit):
     end = product_tuple[1]
 
     storage_unit.outputs["energy"][start] = 100
-    storage_unit.current_SOC = 500
+    storage_unit.current_SOC = 0.5
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy[0] == 100
-    assert storage_unit.current_SOC == round(
-        500 - 100 / storage_unit.efficiency_discharge, 1
+    assert math.isclose(
+        storage_unit.current_SOC,
+        round(
+            0.5 - 100 / storage_unit.efficiency_discharge / storage_unit.max_volume, 2
+        ),
     )
     assert storage_unit.current_status == 1
     assert storage_unit.current_down_time == 0
     assert storage_unit.market_success_list == [1]
 
     storage_unit.outputs["energy"][start] = -100
-    storage_unit.current_SOC = 500
+    storage_unit.current_SOC = 0.5
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy[0] == -100
-    assert storage_unit.current_SOC == round(500 + 100 * storage_unit.efficiency_charge)
+    assert math.isclose(
+        storage_unit.current_SOC,
+        round(0.5 + 100 * storage_unit.efficiency_charge / storage_unit.max_volume, 2),
+    )
     assert storage_unit.current_status == 1
     assert storage_unit.current_down_time == 0
     assert storage_unit.market_success_list == [2]
 
     storage_unit.outputs["energy"][start] = 100
-    storage_unit.current_SOC = 50
+    storage_unit.current_SOC = 0.05
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy[0] == round(50 * storage_unit.efficiency_discharge, 1)
     assert storage_unit.current_SOC == 0
@@ -315,10 +326,10 @@ def test_execute_dispatch(storage_unit):
     assert storage_unit.market_success_list == [3]
 
     storage_unit.outputs["energy"][start] = -100
-    storage_unit.current_SOC = 950
+    storage_unit.current_SOC = 0.95
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy[0] == round(-50 / storage_unit.efficiency_charge, 1)
-    assert storage_unit.current_SOC == 1000
+    assert storage_unit.current_SOC == 1
     assert storage_unit.current_status == 1
     assert storage_unit.current_down_time == 0
     assert storage_unit.market_success_list == [4]
@@ -326,7 +337,7 @@ def test_execute_dispatch(storage_unit):
     storage_unit.outputs["energy"][start] = -100
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy[0] == 0
-    assert storage_unit.current_SOC == 1000
+    assert storage_unit.current_SOC == 1
     assert storage_unit.current_status == 0
     assert storage_unit.current_down_time == 1
     assert storage_unit.market_success_list == [4, 0]

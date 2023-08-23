@@ -1,13 +1,13 @@
-import itertools
 from datetime import datetime, timedelta
 
-import numpy as np
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
 
-from assume.common.market_objects import MarketConfig, MarketProduct, Order, Orderbook
+from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
 from assume.markets import MarketRole, clearing_mechanisms
+
+from .utils import create_orderbook, extend_orderbook
 
 simple_dayahead_auction_config = MarketConfig(
     "simple_dayahead_auction",
@@ -35,48 +35,17 @@ def test_market():
     assert len(products) == 1
 
     print(products)
-    start = products[0][0]
-    end = products[0][1]
-    only_hours = products[0][2]
 
-    orderbook: Orderbook = [
-        {
-            "start_time": start,
-            "end_time": end,
-            "volume": 120,
-            "price": 120,
-            "agent_id": "gen1",
-            "bid_id": "bid1",
-            "only_hours": None,
-        },
-        {
-            "start_time": start,
-            "end_time": end,
-            "volume": 80,
-            "price": 58,
-            "agent_id": "gen1",
-            "bid_id": "bid2",
-            "only_hours": None,
-        },
-        {
-            "start_time": start,
-            "end_time": end,
-            "volume": 100,
-            "price": 53,
-            "agent_id": "gen1",
-            "bid_id": "bid3",
-            "only_hours": None,
-        },
-        {
-            "start_time": start,
-            "end_time": end,
-            "volume": -180,
-            "price": 70,
-            "agent_id": "dem1",
-            "bid_id": "bid4",
-            "only_hours": None,
-        },
-    ]
+    """
+    Create Orderbook with constant order volumes and prices:
+        - dem1: volume = -1000, price = 3000
+        - gen1: volume = 1000, price = 100
+        - gen2: volume = 900, price = 50
+    """
+    orderbook = extend_orderbook(products, -1000, 3000)
+    orderbook = extend_orderbook(products, 1000, 100, orderbook)
+    orderbook = extend_orderbook(products, 900, 50, orderbook)
+
     simple_dayahead_auction_config.market_mechanism = clearing_mechanisms[
         simple_dayahead_auction_config.market_mechanism
     ]
@@ -93,42 +62,13 @@ def test_market():
     print(meta)
 
 
-def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
-    if not order:
-        start = datetime.today()
-        end = datetime.today() + timedelta(hours=1)
-        order: Order = {
-            "start_time": start,
-            "end_time": end,
-            "agent_id": "dem1",
-            "bid_id": "bid1",
-            "volume": 0,
-            "price": 0,
-            "only_hours": None,
-            "node_id": 0,
-        }
-    orders = []
-    np.random.seed(seed)
-
-    for node_id, i in itertools.product(node_ids, range(count)):
-        new_order = order.copy()
-        new_order["price"] = np.random.randint(100)
-        new_order["volume"] = np.random.randint(-10, 10)
-        if new_order["volume"] > 0:
-            agent_id = f"gen_{i}"
-        else:
-            agent_id = f"dem_{i}"
-        new_order["agent_id"] = agent_id
-        new_order["bid_id"] = f"bid_{i}"
-        new_order["node_id"] = node_id
-        orders.append(new_order)
-    return orders
-
-
-def test_market_mechanism():
+def test_simple_market_mechanism():
     import copy
 
     for name, mechanism in clearing_mechanisms.items():
+        if "complex" in name:
+            continue
+
         print(name)
         market_config = copy.copy(simple_dayahead_auction_config)
         market_config.market_mechanism = mechanism
@@ -153,12 +93,3 @@ def test_market_mechanism():
         # print(meta)
 
     # return mr.all_orders, meta
-
-
-if __name__ == "__main__":
-    pass
-    # from assume.common.utils import plot_orderbook
-    # clearing_result, meta = test_market_mechanism()
-    # only works with per node clearing
-    # fig, ax = plot_orderbook(clearing_result, meta)
-    # fig.show()

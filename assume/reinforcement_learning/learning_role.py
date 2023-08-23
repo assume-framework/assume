@@ -35,6 +35,8 @@ class Learning(Role):
         self.obs_dim = learning_config["observation_dimension"]
         self.act_dim = learning_config["action_dimension"]
         self.episodes_done = 0
+        self.n_rl_units = 0
+        self.rl_units = []
         self.rl_algorithm = learning_config["algorithm"]
 
         # define wheter we train model or evaluate it
