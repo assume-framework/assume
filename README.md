@@ -58,9 +58,9 @@ conda activate assume-framework
 
 Quick Start
 -----------
-There are 3 ways to run an exemplar.
-1.) local (without database and grafana)
-2.) with docker (with database and grafana)
+There are 3 ways to run an exemplar. <br>
+1.) local (without database and grafana) <br>
+2.) with docker (with database and grafana) <br>
 3.) use CLI to run simulations
 
 1. To run an exemplar simulation without database and grafana, run the following command:
