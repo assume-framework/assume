@@ -14,77 +14,57 @@ class PowerPlant(SupportsMinMax):
     """
     A class for a powerplant unit
 
-    Attirbutes
-    ----------
-    id : str
-        The ID of the storage unit.
-    technology : str
-        The technology of the storage unit.
-    node : str
-        The node of the storage unit.
-    max_power: float
-        The maximum power output capacity of the power plant in MW.
-    min_power: float = 0.0
-        The minimum power output capacity of the power plant in MW. (Defaults to 0.0 MW)
-    efficiency: float = 1.0
-        The efficiency of the poewr plant in converting fuel to electricity (Defaults to 1.0)
-    fixed_cost: float = 0.0
-        The fixed operating cost of the power plant, independent of the power output (Defaults to 0.0 monetary units)
-    partial_load_eff: bool = False
-        Does the efficiency varies at part loads? (Defaults to False)
-    fuel_type: str = "others"
-        The type of fuel used by the power plant for power generation (Defaults to "others")
-    emission_factor: float = 0.0
-        The emission factor associated with the power plants fuel type -> CO2 emissions per unit of energy produced (Defaults to 0.0.)
-    ramp_up: float = -1
-        The ramp-up rate of the power plant, indicating how quickly it can increase power output (Defaults to -1)
-    ramp_down: float = -1
-        The ramp-down rate of the power plant, indicating how quickly it can decrease power output. (Defaults to -1)
-    hot_start_cost: float = 0
-        The cost of a hot start, where the power plant is restarted after a recent shutdown.(Defaults to 0 monetary units.)
-    warm_start_cost: float = 0
-        The cost of a warm start, where the power plant is restarted after a moderate downtime.(Defaults to 0 monetary units.)
-    cold_start_cost: float = 0
-        The cost of a cold start, where the power plant is restarted after a prolonged downtime.(Defaults to 0 monetary units.)
-    min_operating_time: float = 0
-        The minimum duration that the power plant must operate once started, in hours.(Defaults to 0 hours.)
-    min_down_time: float = 0
-        The minimum downtime required after a shutdown before the power plant can be restarted, in hours.(Defaults to 0 hours.)
-    downtime_hot_start: int = 8
-        The downtime required after a hot start before the power plant can be restarted, in hours.(Defaults to 8 hours.)
-    downtime_warm_start: int = 48
-        The downtime required after a warm start before the power plant can be restarted, in hours.( Defaults to 48 hours.)
-    heat_extraction: bool = False
-        A boolean indicating whether the power plant can extract heat for external purposes.(Defaults to False.)        
-    max_heat_extraction: float = 0
-        The maximum amount of heat that the power plant can extract for external use, in some suitable unit.(Defaults to 0.)
-    location: tuple[float, float] = (0.0, 0.0)
-        The geographical coordinates (latitude and longitude) of the power plant's location.(Defaults to (0.0, 0.0).)
-    node: str = "bus0"
-        The identifier of the electrical bus or network node to which the power plant is connected.(Defaults to "bus0".)
+    :param id: The ID of the storage unit.
+    :type id: str
+    :param technology: The technology of the storage unit.
+    :type technology: str
+    :param bidding_strategies: The bidding strategies of the storage unit.
+    :type bidding_strategies: dict
+    :param index: The index of the storage unit.
+    :type index: pd.DatetimeIndex
+    :param max_power: The maximum power output capacity of the power plant in MW.
+    :type max_power: float
+    :param min_power: The minimum power output capacity of the power plant in MW. (Defaults to 0.0 MW)
+    :type min_power: float, optional
+    :param efficiency: The efficiency of the poewr plant in converting fuel to electricity (Defaults to 1.0)
+    :type efficiency: float, optional
+    :param fixed_cost: The fixed operating cost of the power plant, independent of the power output (Defaults to 0.0 monetary units)
+    :type fixed_cost: float, optional
+    :param partial_load_eff: Does the efficiency varies at part loads? (Defaults to False)
+    :type partial_load_eff: bool, optional
+    :param fuel_type: The type of fuel used by the power plant for power generation (Defaults to "others")
+    :type fuel_type: str, optional
+    :param emission_factor: The emission factor associated with the power plants fuel type -> CO2 emissions per unit of energy produced (Defaults to 0.0.)
+    :type emission_factor: float, optional
+    :param ramp_up: The ramp-up rate of the power plant, indicating how quickly it can increase power output (Defaults to -1)
+    :type ramp_up: float, optional
+    :param ramp_down: The ramp-down rate of the power plant, indicating how quickly it can decrease power output. (Defaults to -1)
+    :type ramp_down: float, optional
+    :param hot_start_cost: The cost of a hot start, where the power plant is restarted after a recent shutdown.(Defaults to 0 monetary units.)
+    :type hot_start_cost: float, optional
+    :param warm_start_cost: The cost of a warm start, where the power plant is restarted after a moderate downtime.(Defaults to 0 monetary units.)
+    :type warm_start_cost: float, optional
+    :param cold_start_cost: The cost of a cold start, where the power plant is restarted after a prolonged downtime.(Defaults to 0 monetary units.)
+    :type cold_start_cost: float, optional
+    :param min_operating_time: The minimum duration that the power plant must operate once started, in hours.(Defaults to 0 hours.)
+    :type min_operating_time: float, optional
+    :param min_down_time: The minimum downtime required after a shutdown before the power plant can be restarted, in hours.(Defaults to 0 hours.)
+    :type min_down_time: float, optional
+    :param downtime_hot_start: The downtime required after a hot start before the power plant can be restarted, in hours.(Defaults to 8 hours.)
+    :type downtime_hot_start: int, optional
+    :param downtime_warm_start: The downtime required after a warm start before the power plant can be restarted, in hours.( Defaults to 48 hours.)
+    :type downtime_warm_start: int, optional
+    :param heat_extraction: A boolean indicating whether the power plant can extract heat for external purposes.(Defaults to False.)
+    :type heat_extraction: bool, optional
+    :param max_heat_extraction: The maximum amount of heat that the power plant can extract for external use, in some suitable unit.(Defaults to 0.)
+    :type max_heat_extraction: float, optional
+    :param location: The geographical coordinates (latitude and longitude) of the power plant's location.(Defaults to (0.0, 0.0).)
+    :type location: tuple[float, float], optional
+    :param node: The identifier of the electrical bus or network node to which the power plant is connected.(Defaults to "bus0".)
+    :type node: str, optional
+    :param **kwargs: Additional keyword arguments to be passed to the base class.
+    :type **kwargs: dict, optional
 
-   Methods
-    -------
-    reset()
-        Reset the unit to its initial state.
-    init_marginal_cost()
-        Initialize the marginal cost of the unit using the calc_simple_marginal_cost()-Method
-    execute_current_dispatch()
-        Executes the current dispatch of the unit based on the provided timestamps.
-    calc_marginal_cost(power_output, partial_load_eff)
-        Calculate the marginal cost of the storage unit.
-    calculate_cashflow()
-        Calculates the cashflow of the unit based on the provided product type and orderbook.
-    calc_simple_marginal_cost():
-        Calculates the marginal cost of the unit
-    calc_marginal_cost_with_partial_eff():
-        Calculates the marginal cost of the unit based on power output and timestamp, considering partial efficiency.
-    calculate_min_max_power()
-        Calculate the minimum and maximum power levels of the unit
-    calculate_marginal_cost()
-        Calculates the marginal cost of the unit at a specific time and power level
-    as_dict() -> dict
-        Returns the attributes of the unit as a dictionary, including specific attributes.
         
     """
     def __init__(
