@@ -29,7 +29,7 @@ class CriticTD3(nn.Module):
     def __init__(self, n_agents, obs_dim, act_dim, float_type, unique_obs_len=16):
         super(CriticTD3, self).__init__()
 
-        self.obs_dim = obs_dim + unique_obs_len * (n_agents - 1)
+        self.obs_dim = obs_dim  # + unique_obs_len * (n_agents - 1)
         self.act_dim = act_dim * n_agents
 
         # Q1 architecture

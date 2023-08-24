@@ -49,19 +49,22 @@ class TD3(RLAlgorithm):
 
         self.unique_obs_len = 8
 
+        self.n_updates = 0
+
     def update_policy(self):
         logger.info(f"Updating Policy")
         n_rl_agents = len(self.learning_role.rl_units)
         for _ in range(self.gradient_steps):
+            self.n_updates += 1
             i = 0
             strategy: LearningStrategy
+
             for u_id, strategy in self.learning_role.rl_units.items():
                 critic_target = self.learning_role.target_critics[u_id]
                 critic = self.learning_role.critics[u_id]
                 actor = self.learning_role.rl_units[u_id].actor
                 actor_target = self.learning_role.rl_units[u_id].actor_target
-                transitions = None
-                next_actions = None
+
                 if i % 100 == 0:
                     transitions = self.learning_role.buffer.sample(self.batch_size)
                     states = transitions.observations
@@ -71,31 +74,48 @@ class TD3(RLAlgorithm):
 
                     with th.no_grad():
                         # Select action according to policy and add clipped noise
-                        noise = actions.clone().data.normal_(0, self.target_policy_noise)
-                        noise = noise.clamp(-self.target_noise_clip, self.target_noise_clip)
-                        next_actions = [(actor_target(next_states[:, i, :]) + noise[:, i, :]).clamp(-1, 1) for i, agent in enumerate(self.learning_role.rl_units.values())]
+                        noise = actions.clone().data.normal_(
+                            0, self.target_policy_noise
+                        )
+                        noise = noise.clamp(
+                            -self.target_noise_clip, self.target_noise_clip
+                        )
+                        next_actions = [
+                            (actor_target(next_states[:, i, :]) + noise[:, i, :]).clamp(
+                                -1, 1
+                            )
+                            for i, agent in enumerate(
+                                self.learning_role.rl_units.values()
+                            )
+                        ]
                         next_actions = th.stack(next_actions)
 
-                        next_actions = (next_actions.transpose(0,1).contiguous())
+                        next_actions = next_actions.transpose(0, 1).contiguous()
                         next_actions = next_actions.view(-1, n_rl_agents * self.act_dim)
-                i+=1
 
                 all_actions = actions.view(self.batch_size, -1)
 
-                temp = th.cat((states[:, :i, self.obs_dim-self.unique_obs_len:].reshape(self.batch_size, -1),
-                                states[:, i+1:, self.obs_dim-self.unique_obs_len:].reshape(self.batch_size, -1)), axis=1)
+                # temp = th.cat((states[:, :i, self.obs_dim-self.unique_obs_len:].reshape(self.batch_size, -1),
+                #                 states[:, i+1:, self.obs_dim-self.unique_obs_len:].reshape(self.batch_size, -1)), axis=1)
 
-                all_states = th.cat((states[:, i, :].reshape(self.batch_size, -1), temp), axis = 1).view(self.batch_size, -1)
+                # all_states = th.cat((states[:, i, :].reshape(self.batch_size, -1), temp), axis = 1).view(self.batch_size, -1)
+                all_states = states[:, i, :].reshape(self.batch_size, -1)
 
-                temp = th.cat((next_states[:, :i, self.obs_dim-self.unique_obs_len:].reshape(self.batch_size, -1),
-                                next_states[:, i+1:, self.obs_dim-self.unique_obs_len:].reshape(self.batch_size, -1)), axis=1)
+                # temp = th.cat((next_states[:, :i, self.obs_dim-self.unique_obs_len:].reshape(self.batch_size, -1),
+                #                 next_states[:, i+1:, self.obs_dim-self.unique_obs_len:].reshape(self.batch_size, -1)), axis=1)
 
-                all_next_states = th.cat((next_states[:, i, :].reshape(self.batch_size, -1), temp), axis = 1).view(self.batch_size, -1)
+                # all_next_states = th.cat((next_states[:, i, :].reshape(self.batch_size, -1), temp), axis = 1).view(self.batch_size, -1)
+                all_next_states = next_states[:, i, :].reshape(self.batch_size, -1)
+
                 with th.no_grad():
                     # Compute the next Q-values: min over all critics targets
-                    next_q_values = th.cat(critic_target(all_next_states, next_actions), dim = 1)
-                    next_q_values, _ = th.min(next_q_values, dim = 1, keepdim=True)
-                    target_Q_values = rewards[:, i].unsqueeze(1) + self.gamma * next_q_values
+                    next_q_values = th.cat(
+                        critic_target(all_next_states, next_actions), dim=1
+                    )
+                    next_q_values, _ = th.min(next_q_values, dim=1, keepdim=True)
+                    target_Q_values = (
+                        rewards[:, i].unsqueeze(1) + self.gamma * next_q_values
+                    )
 
                 # Get current Q-values estimates for each critic network
                 current_Q_values = critic(all_states, all_actions)
@@ -121,15 +141,23 @@ class TD3(RLAlgorithm):
                     all_actions_clone[:, i, :] = action_i
                     all_actions_clone = all_actions_clone.view(self.batch_size, -1)
 
-                    actor_loss = -critic.q1_forward(all_states,all_actions_clone).mean()
+                    actor_loss = -critic.q1_forward(
+                        all_states, all_actions_clone
+                    ).mean()
 
                     # TODO Optimize the actor
-                    #actor.optimizer.zero_grad()
+                    # actor.optimizer.zero_grad()
                     actor_loss.backward()
-                    #actor.optimizer.step()
+                    # actor.optimizer.step()
 
-                    polyak_update(critic.parameters(), critic_target.parameters(), self.tau)
-                    polyak_update(actor.parameters(), actor_target.parameters(), self.tau)
+                    polyak_update(
+                        critic.parameters(), critic_target.parameters(), self.tau
+                    )
+                    polyak_update(
+                        actor.parameters(), actor_target.parameters(), self.tau
+                    )
 
                 # TODO return a transition back to the strategy
                 strategy.update_transition(transitions)
+
+                i += 1
