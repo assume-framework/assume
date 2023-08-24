@@ -12,7 +12,7 @@ base:
     learning_mode: True
     algorithm: matd3
     collect_inital_experience: 10
-    train_freq: 100
+    train_freq: 2
     learning_rate: 0.01
     gradient_steps: -1
     batch_size: 256

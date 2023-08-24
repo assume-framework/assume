@@ -30,10 +30,8 @@ class ReplayBuffer:
         self.full = False
 
         self.device = device
-        # self.np_float_type = np.float16 if self.device.type == "cuda" else np.float32
-        # self.th_float_type = th.half if self.device.type == "cuda" else th.float
-        self.np_float_type = np.float32
-        self.th_float_type = th.float
+        self.np_float_type = np.float16 if self.device.type == "cuda" else np.float32
+        self.th_float_type = th.half if self.device.type == "cuda" else th.float
 
         self.n_rl_units = n_rl_units
 

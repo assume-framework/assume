@@ -207,7 +207,7 @@ class WriteOutput(Role):
     def write_units_definition(self, unit_info: dict):
         """
         Writes unit definitions to the corresponding data frame and directly store it in db and csv.
-        Since that is only done once, no need for recurrent sheduling arises.
+        Since that is only done once, no need for recurrent scheduling arises.
 
         Args:
             unit_type (str): The type of the unit.
