@@ -64,7 +64,6 @@ class PowerPlant(SupportsMinMax):
     :type node: str, optional
     :param **kwargs: Additional keyword arguments to be passed to the base class.
     :type **kwargs: dict, optional
-
         
     """
     def __init__(
@@ -136,11 +135,15 @@ class PowerPlant(SupportsMinMax):
         self.init_marginal_cost()
 
     def init_marginal_cost(self):
-        """Initialize the marginal cost of the unit."""
+        """
+        Initialize the marginal cost of the unit.
+        """
         self.marginal_cost = self.calc_simple_marginal_cost()
 
     def reset(self):
-        """Reset the unit to its initial state."""
+        """
+        Reset the unit to its initial state.
+        """
         self.current_status = 1
         self.current_down_time = self.min_down_time
 
@@ -170,7 +173,9 @@ class PowerPlant(SupportsMinMax):
         start: pd.Timestamp,
         end: pd.Timestamp,
     ):
-        """Execute the current dispatch of the unit."""
+        """
+        Executes the current dispatch of the unit based on the provided timestamps.
+        """
         end_excl = end - self.index.freq
         # TODO ramp down and turn off only for relevant timesteps
         if self.outputs["energy"][start:end_excl].mean() < self.min_power:
@@ -194,7 +199,9 @@ class PowerPlant(SupportsMinMax):
         return self.outputs["energy"].loc[start:end_excl]
 
     def calculate_cashflow(self, product_type: str, orderbook: Orderbook):
-        """Calculate the cashflow of the unit."""
+        """
+        Calculates the cashflow of the unit based on the provided product type and orderbook.
+        """
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
@@ -208,7 +215,9 @@ class PowerPlant(SupportsMinMax):
     def calc_simple_marginal_cost(
         self,
     ):
-        """Calculate the marginal cost of the unit (simple method)"""
+        """
+        Calculate the marginal cost of the unit (simple method)
+        """
         fuel_price = self.forecaster.get_price(self.fuel_type)
         marginal_cost = (
             fuel_price / self.efficiency
@@ -224,6 +233,9 @@ class PowerPlant(SupportsMinMax):
         power_output: float,
         timestep: pd.Timestamp = None,
     ) -> float | pd.Series:
+        """
+        Calculates the marginal cost of the unit based on power output and timestamp, considering partial efficiency.
+        """
         fuel_price = self.forecaster.get_price(self.fuel_type).at[timestep]
 
         capacity_ratio = power_output / self.max_power
@@ -305,6 +317,9 @@ class PowerPlant(SupportsMinMax):
         return min_power, max_power
 
     def calculate_marginal_cost(self, start: datetime, power: float):
+        """
+        Calculates the marginal cost of the unit based on the provided start time and power output.
+        """
         #if marginal costs already exists, return it
         if self.marginal_cost is not None:
             return self.marginal_cost[start]
@@ -316,7 +331,9 @@ class PowerPlant(SupportsMinMax):
             )
 
     def as_dict(self) -> dict:
-        """Return the unit as a dictionary."""
+        """
+        Returns the attributes of the unit as a dictionary, including specific attributes.
+        """
         unit_dict = super().as_dict()
         unit_dict.update(
             {
