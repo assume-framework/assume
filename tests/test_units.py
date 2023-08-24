@@ -56,14 +56,16 @@ def test_minmaxcharge():
 
     # stay turned off
     assert (
-        mmc.calculate_ramp_charge(previous_power=0, power_charge=0, current_power=0)
+        mmc.calculate_ramp_charge(
+            0.5, previous_power=0, power_charge=0, current_power=0
+        )
         == 0
     )
 
     # stay turned off
     assert (
         mmc.calculate_ramp_discharge(
-            previous_power=0, power_discharge=0, current_power=0
+            0.5, previous_power=0, power_discharge=0, current_power=0
         )
         == 0
     )
@@ -84,8 +86,13 @@ def test_minmax_operationtime():
 
     mm.outputs["energy"][-4:] = 0
     runtime = mm.get_operation_time(datetime(2023, 7, 2))
-    assert runtime < 0
+    assert runtime == -3
 
-    mm.outputs["energy"][-1:] = 1000
+    mm.outputs["energy"][-2:] = 1000
     runtime = mm.get_operation_time(datetime(2023, 7, 2))
     assert runtime == 1
+
+    mm.outputs["energy"][:] = 400
+    mm.outputs["energy"][-1:] = 0
+    runtime = mm.get_operation_time(datetime(2023, 7, 2))
+    assert runtime == 5

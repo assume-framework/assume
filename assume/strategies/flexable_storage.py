@@ -40,7 +40,8 @@ class flexableEOMStorage(BaseStrategy):
             (unit.outputs["energy"] / unit.efficiency_discharge),
             (unit.outputs["energy"] * unit.efficiency_charge),
         )
-        theoretic_SOC = unit.initial_soc - ((dispatch / unit.max_volume)).sum()
+        soc = unit.get_soc_before(start)
+        theoretic_SOC = soc - ((dispatch / unit.max_volume)).sum()
 
         min_power_charge, max_power_charge = unit.calculate_min_max_charge(
             start, end_all
@@ -60,32 +61,32 @@ class flexableEOMStorage(BaseStrategy):
             current_power_charge = min(current_power, 0)
 
             max_power_discharge[start] = unit.calculate_ramp_discharge(
+                theoretic_SOC,
                 previous_power,
                 max_power_discharge[start],
                 current_power_discharge,
                 min_power_discharge[0],
-                theoretic_SOC,
             )
             min_power_discharge[start] = unit.calculate_ramp_discharge(
+                theoretic_SOC,
                 previous_power,
                 min_power_discharge[start],
                 current_power_discharge,
                 min_power_discharge[start],
-                theoretic_SOC,
             )
             max_power_charge[start] = unit.calculate_ramp_charge(
+                theoretic_SOC,
                 previous_power,
                 max_power_charge[start],
                 current_power_charge,
                 min_power_charge[start],
-                theoretic_SOC,
             )
             min_power_charge[start] = unit.calculate_ramp_charge(
+                theoretic_SOC,
                 previous_power,
                 min_power_charge[start],
                 current_power_charge,
                 min_power_charge[start],
-                theoretic_SOC,
             )
 
             price_forecast = unit.forecaster["price_forecast"]
@@ -151,8 +152,10 @@ class flexablePosCRMStorage(BaseStrategy):
         for product in product_tuples:
             start = product[0]
             current_power = unit.outputs["energy"].at[start]
+            soc = unit.get_soc_before(start)
 
             bid_quantity = unit.calculate_ramp_discharge(
+                soc,
                 previous_power,
                 max_power_discharge[start],
                 current_power,
@@ -179,8 +182,8 @@ class flexablePosCRMStorage(BaseStrategy):
                 capacity_price = (
                     abs(specific_revenue) * unit.min_power_discharge / bid_quantity
                 )
-
-            energy_price = capacity_price / (unit.current_SOC * unit.max_volume)
+            soc = unit.get_soc_before(start)
+            energy_price = capacity_price / (soc * unit.max_volume)
 
             if market_config.product_type == "capacity_pos":
                 bids.append(
@@ -228,6 +231,7 @@ class flexableNegCRMStorage(BaseStrategy):
         end = product_tuples[-1][1]
 
         previous_power = unit.get_output_before(start)
+        soc = unit.get_soc_before(start)
 
         min_power_charge, max_power_charge = unit.calculate_min_max_charge(start, end)
 
@@ -236,6 +240,7 @@ class flexableNegCRMStorage(BaseStrategy):
             start = product[0]
             current_power = unit.outputs["energy"].at[start]
             bid_quantity = unit.calculate_ramp_charge(
+                soc,
                 previous_power,
                 max_power_charge[start],
                 current_power,
@@ -297,11 +302,13 @@ def get_specific_revenue(unit, marginal_cost, current_time, foresight, price_for
         )
 
     possible_revenue = 0
-    theoretic_SOC = unit.current_SOC
+    soc = unit.get_soc_before(current_time)
+    theoretic_SOC = soc
 
     previous_power = unit.get_output_before(t)
     for i, market_price in enumerate(price_forecast):
         theoretic_power_discharge = unit.calculate_ramp_discharge(
+            soc,
             previous_power=previous_power,
             power_discharge=max_power_discharge[i],
         )
@@ -309,10 +316,8 @@ def get_specific_revenue(unit, marginal_cost, current_time, foresight, price_for
         theoretic_SOC -= theoretic_power_discharge / unit.max_volume
         previous_power = theoretic_power_discharge
 
-    if unit.current_SOC - theoretic_SOC != 0:
-        possible_revenue = (
-            possible_revenue / (unit.current_SOC - theoretic_SOC) / unit.max_volume
-        )
+    if soc != theoretic_SOC:
+        possible_revenue = possible_revenue / (soc - theoretic_SOC) / unit.max_volume
     else:
         possible_revenue = possible_revenue / unit.max_volume
 
