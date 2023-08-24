@@ -3,6 +3,9 @@ from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
 class OTCStrategy(BaseStrategy):
+    """
+    Strategy for OTC (over the counter trading) markets
+    """
     def __init__(self, *args, scale_firm_power_capacity=1.0, **kwargs):
         super().__init__(*args, **kwargs)
         self.scale = scale_firm_power_capacity
@@ -35,8 +38,8 @@ class OTCStrategy(BaseStrategy):
             start = product[0]
             end = product[1]
 
-            min_power, max_power = unit.calculate_min_max_power(start, end)
-            current_power = unit.outputs["energy"].at[start]
+            min_power, max_power = unit.calculate_min_max_power(start, end) #max_power describes the maximum power output of the unit
+            current_power = unit.outputs["energy"].at[start] #current power output describes the power output at the start of the product
             volume = max_power[start]
             if "OTC" in market_config.name:
                 volume *= self.scale

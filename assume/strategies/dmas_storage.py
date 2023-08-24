@@ -23,16 +23,16 @@ def shift(prc, type_: str = "first"):
     
     :param prc: price curve
     :type prc: np.array
-    :param type_: type of shift
+    :param type_: type of shift. default is 'first'
     :type type_: str
     :return: shifted price curve
     :rtype: np.array
     """
-    new_prices, num_prices = [], len(prc)
+    new_prices, num_prices = [], len(prc) #new_prices is the list of prices after the shift
 
     for p, index in zip(prc, range(num_prices)):
         if type_ == "first":
-            new_prices += [p * (0.9 + index * 0.2 / num_prices)]
+            new_prices += [p * (0.9 + index * 0.2 / num_prices)] #calculate the new price by multiplying the old price with a factor
         else:
             new_prices += [p * (1.1 - index * 0.2 / num_prices)]
 
@@ -45,18 +45,18 @@ def shaping(prc, type_: str = "peak"):
     
     :param prc: price curve
     :type prc: np.array
-    :param type_: type of shift
+    :param type_: type of shift. default is 'peak'. other options are 'pv' and 'demand'.
     :type type_: str
     :return: shifted price curve
     :rtype: np.array
     """
     if type_ == "peak":
-        prc[8:20] *= 1.1
+        prc[8:20] *= 1.1 #between 8 and 20 hours, the price is multiplied by 1.1 (general production is high)
     elif type_ == "pv":
-        prc[10:14] *= 0.9
+        prc[10:14] *= 0.9 #between 10 and 14 hours, the price is multiplied by 0.9 (Pv production is high)
     elif type_ == "demand":
-        prc[6:9] *= 1.1
-        prc[17:20] *= 1.1
+        prc[6:9] *= 1.1 #between 6 and 9 hours, the price is multiplied by 1.1 (demand is high)
+        prc[17:20] *= 1.1 #between 17 and 20 hours, the price is multiplied by 1.1
     return prc
 
 
@@ -90,9 +90,6 @@ def get_solver_factory(solvers_str=["glpk", "cbc", "gurobi", "cplex"]):
 class DmasStorageStrategy(BaseStrategy):
     """
     Strategy for a storage unit that uses DMAS to optimize its operation
-    
-    :param BaseStrategy: base strategy
-    :type BaseStrategy: BaseStrategy
     """
     def __init__(self, *args, **kwargs):
         """
