@@ -255,6 +255,7 @@ async def load_scenario_folder_async(
 
     learning_config = config.get("learning_config", {})
     bidding_strategy_params = config.get("bidding_strategy_params", {})
+
     if "load_learned_path" not in learning_config.keys():
         learning_config[
             "load_learned_path"

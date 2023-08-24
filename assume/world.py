@@ -124,7 +124,7 @@ class World:
         )
 
         # initiate learning if the learning mode is on and hence we want to learn new strategies
-        if self.learning_config:
+        if self.learning_config.get("learning_mode", False):
             # if so, we initate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
 
