@@ -8,7 +8,14 @@ from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
 class complexEOMStorage(BaseStrategy):
+    """
+    complexEOMStorage is a strategy for storage units that are able to charge and discharge (Energy Only Market)
+    """
     def __init__(self):
+        """
+        :param foresight: [description], defaults to pd.Timedelta("12h")
+        :type foresight: [type], optional
+        """
         super().__init__()
 
         self.foresight = pd.Timedelta("12h")
@@ -24,7 +31,15 @@ class complexEOMStorage(BaseStrategy):
         Takes information from a unit that the unit operator manages and
         defines how it is dispatched to the market
 
-        Return: volume, price
+        :param unit: the unit to be dispatched
+        :type unit: SupportsMinMax
+        :param market_config: the market configuration
+        :type market_config: MarketConfig
+        :param product_tuples: list of all products the unit can offer
+        :type product_tuples: list[Product]
+        :return: the bids consisting of the start time, end time, only hours, price and volume.
+        :rtype: Orderbook
+
         Strategy analogue to flexABLE
         """
         product = product_tuples[0]
@@ -139,6 +154,17 @@ class complexEOMStorage(BaseStrategy):
         return bids
 
     def calculate_price_average(self, unit: SupportsMinMaxCharge, t: datetime):
+        """
+        Calculates the average price for the next 12 hours
+        Returns the average price
+
+        :param unit: the unit to be dispatched
+        :type unit: SupportsMinMax
+        :param t: the current time
+        :type t: datetime
+        :return: the average price
+        :rtype: float
+        """
         average_price = np.mean(
             unit.forecaster["price_EOM"][t - self.foresight : t + self.foresight]
         )
@@ -146,6 +172,19 @@ class complexEOMStorage(BaseStrategy):
         return average_price
 
     def calculate_EOM_price_if_off(self, unit, marginal_cost_mr, bid_quantity_mr):
+        """
+        Calculates the bid price if the unit is off
+        Returns the bid price
+
+        :param unit: the unit to be dispatched
+        :type unit: SupportsMinMax
+        :param marginal_cost_mr: the marginal cost of the unit
+        :type marginal_cost_mr: float
+        :param bid_quantity_mr: the bid quantity of the unit
+        :type bid_quantity_mr: float
+        :return: the bid price
+        :rtype: float
+        """
         av_operating_time = max(
             unit.mean_market_success, unit.min_operating_time, 1
         )  # 1 prevents division by 0
@@ -160,6 +199,21 @@ class complexEOMStorage(BaseStrategy):
     def calculate_EOM_price_continue_discharging(
         self, start, unit, marginal_cost_flex, bid_quantity_mr
     ):
+        """
+        Calculates the bid price if the unit is discharging
+        Returns the bid price
+
+        :param start: the start time of the product
+        :type start: datetime
+        :param unit: the unit to be dispatched
+        :type unit: SupportsMinMax
+        :param marginal_cost_flex: the marginal cost of the unit
+        :type marginal_cost_flex: float
+        :param bid_quantity_mr: the bid quantity of the unit
+        :type bid_quantity_mr: float
+        :return: the bid price
+        :rtype: float
+        """
         if bid_quantity_mr == 0:
             return 0
 
@@ -189,6 +243,17 @@ class complexEOMStorage(BaseStrategy):
         return bid_price_mr
 
     def get_starting_costs(self, time, unit):
+        """
+        get the starting costs of the unit
+        Returns the starting costs
+
+        :param time: the time the unit is off
+        :type time: float
+        :param unit: the unit to be dispatched
+        :type unit: SupportsMinMax
+        :return: the starting costs
+        :rtype: float
+        """
         if time < unit.downtime_hot_start:
             return unit.hot_start_cost
 
@@ -199,6 +264,19 @@ class complexEOMStorage(BaseStrategy):
             return unit.cold_start_cost
 
     def get_possible_revenues(self, marginal_cost, unit, t):
+        """
+        get the possible revenues of the unit
+        Returns the possible revenues
+
+        :param marginal_cost: the marginal cost of the unit
+        :type marginal_cost: float
+        :param unit: the unit to be dispatched
+        :type unit: SupportsMinMax
+        :param t: the current time
+        :type t: datetime
+        :return: the possible revenues
+        :rtype: float
+        """
         price_forecast = unit.forecaster["price_EOM"][t : t + self.foresight]
 
         possible_revenue = sum(
