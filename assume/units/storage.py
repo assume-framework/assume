@@ -1,5 +1,6 @@
 import logging
 import math
+from datetime import timedelta
 from functools import lru_cache
 
 import pandas as pd
@@ -194,12 +195,12 @@ class Storage(SupportsMinMaxCharge):
         self.outputs["pos_capacity"] = pd.Series(0.0, index=self.index)
         self.outputs["neg_capacity"] = pd.Series(0.0, index=self.index)
 
-        self.mean_market_success = 0
-
     def execute_current_dispatch(self, start: pd.Timestamp, end: pd.Timestamp):
         end_excl = end - self.index.freq
 
         for t in self.outputs["energy"][start:end_excl].index:
+            delta_soc = 0
+            soc = self.get_soc_before(t)
             if self.outputs["energy"][t] > self.max_power_discharge:
                 self.outputs["energy"][t] = self.max_power_discharge
                 logger.error(
@@ -222,9 +223,7 @@ class Storage(SupportsMinMaxCharge):
 
             # discharging
             if self.outputs["energy"][t] > 0:
-                max_soc_discharge = self.calculate_soc_max_discharge(
-                    self.get_soc_before(t)
-                )
+                max_soc_discharge = self.calculate_soc_max_discharge(soc)
 
                 if self.outputs["energy"][t] > max_soc_discharge:
                     if not math.isclose(self.outputs["energy"][t], max_soc_discharge):
@@ -234,16 +233,16 @@ class Storage(SupportsMinMaxCharge):
                     self.outputs["energy"][t] = max_soc_discharge
 
                 delta_soc = (
-                    self.outputs["energy"][t]
-                    * pd.Timedelta(self.index.freq).total_seconds()
-                    / 3600
+                    -self.outputs["energy"][t]
+                    * self.index.freq
+                    / timedelta(hours=1)
                     / self.efficiency_discharge
                     / self.max_volume
                 )
 
             # charging
             elif self.outputs["energy"][t] < 0:
-                max_soc_charge = self.calculate_soc_max_charge(self.get_soc_before(t))
+                max_soc_charge = self.calculate_soc_max_charge(soc)
 
                 if self.outputs["energy"][t] < max_soc_charge:
                     if not math.isclose(self.outputs["energy"][t], max_soc_charge):
@@ -253,25 +252,16 @@ class Storage(SupportsMinMaxCharge):
                     self.outputs["energy"][t] = max_soc_charge
 
                 delta_soc = (
-                    self.outputs["energy"][t]
-                    * pd.Timedelta(self.index.freq).total_seconds()
-                    / 3600
+                    -self.outputs["energy"][t]
+                    * self.index.freq
+                    / timedelta(hours=1)
                     * self.efficiency_charge
                     / self.max_volume
                 )
 
-            if self.outputs["energy"][t] == 0:
-                self.set_market_failure()
-            else:
-                self.set_market_sucess(delta_soc)
+            self.outputs["soc"][t] = soc + delta_soc
 
         return self.outputs["energy"].loc[start:end_excl]
-
-    def set_market_failure(self):
-        pass
-
-    def set_market_sucess(self, delta_soc):
-        pass
 
     @lru_cache(maxsize=256)
     def calculate_marginal_cost(
@@ -316,7 +306,7 @@ class Storage(SupportsMinMaxCharge):
         return unit_dict
 
     def calculate_soc_max_discharge(self, soc) -> float:
-        duration = pd.Timedelta(self.index.freq).total_seconds() / 3600
+        duration = self.index.freq / timedelta(hours=1)
         power = max(
             0,
             (
@@ -325,13 +315,13 @@ class Storage(SupportsMinMaxCharge):
                 / duration
             ),
         )
-        return round(power, 1)
+        return round(power, 3)
 
     def calculate_soc_max_charge(
         self,
         soc,
     ) -> float:
-        duration = pd.Timedelta(self.index.freq).seconds / 3600
+        duration = self.index.freq / timedelta(hours=1)
         power = min(
             0,
             (
@@ -340,13 +330,12 @@ class Storage(SupportsMinMaxCharge):
                 / duration
             ),
         )
-        return round(power, 1)
+        return round(power, 3)
 
     def calculate_min_max_charge(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series]:
         end_excl = end - self.index.freq
-        duration = pd.Timedelta(self.index.freq).seconds / 3600
 
         base_load = self.outputs["energy"][start:end_excl]
         capacity_pos = self.outputs["capacity_pos"][start:end_excl]
@@ -386,7 +375,6 @@ class Storage(SupportsMinMaxCharge):
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series]:
         end_excl = end - self.index.freq
-        duration = pd.Timedelta(self.index.freq).seconds / 3600
 
         base_load = self.outputs["energy"][start:end_excl]
         capacity_pos = self.outputs["capacity_pos"][start:end_excl]
@@ -430,30 +418,13 @@ class Storage(SupportsMinMaxCharge):
         current_power: float = 0,
         min_power_discharge: float = 0,
     ) -> float:
-        if power_discharge == 0:
-            return power_discharge
-
-        # assuming ramping down discharge restricts ramp up of charging if storage was discharging before and ramp_down_discharge is defined
-        if previous_power < 0 and self.ramp_down_charge != None:
-            power_discharge = max(
-                previous_power - self.ramp_down_charge - current_power, 0
-            )
-        else:
-            if previous_power < 0:
-                previous_power = 0
-
-            power_discharge = min(
-                power_discharge,
-                max(0, previous_power + self.ramp_up_discharge - current_power),
-            )
-            # restrict only if ramping defined
-            if self.ramp_down_discharge != None:
-                power_discharge = max(
-                    power_discharge,
-                    previous_power - self.ramp_down_discharge - current_power,
-                    0,
-                )
-
+        power_discharge = super().calculate_ramp_discharge(
+            previous_soc,
+            previous_power,
+            power_discharge,
+            current_power,
+            min_power_discharge,
+        )
         # restrict according to min_SOC
 
         max_soc_discharge = self.calculate_soc_max_discharge(previous_soc)
@@ -472,29 +443,12 @@ class Storage(SupportsMinMaxCharge):
         current_power: float = 0,
         min_power_charge: float = 0,
     ) -> float:
-        if power_charge == 0:
-            return power_charge
-
-        # assuming ramping down discharge restricts ramp up of charge if storage was discharging before and ramp_down_discharge is defined
-        if previous_power > 0 and self.ramp_down_discharge != None:
-            power_charge = min(
-                previous_power - self.ramp_down_discharge - current_power, 0
-            )
-        else:
-            if previous_power > 0:
-                previous_power = 0
-
-            power_charge = max(
-                power_charge,
-                min(previous_power + self.ramp_up_charge - current_power, 0),
-            )
-            # restrict only if ramping defined
-            if self.ramp_down_charge != None:
-                power_charge = min(
-                    power_charge,
-                    previous_power - self.ramp_down_charge - current_power,
-                    0,
-                )
+        power_charge = super().calculate_ramp_charge(
+            previous_soc,
+            previous_power,
+            power_charge,
+            current_power,
+        )
 
         # restrict charging according to max_SOC
         max_soc_charge = self.calculate_soc_max_charge(previous_soc)

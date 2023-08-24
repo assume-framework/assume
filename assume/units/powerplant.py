@@ -103,8 +103,6 @@ class PowerPlant(SupportsMinMax):
         self.outputs["rewards"] = pd.Series(0.0, index=self.index)
         self.outputs["regrets"] = pd.Series(0.0, index=self.index)
 
-        self.mean_market_success = 0
-
     def execute_current_dispatch(
         self,
         start: pd.Timestamp,

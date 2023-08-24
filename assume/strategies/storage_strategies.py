@@ -146,9 +146,8 @@ class complexEOMStorage(BaseStrategy):
         return average_price
 
     def calculate_EOM_price_if_off(self, unit, marginal_cost_mr, bid_quantity_mr):
-        av_operating_time = max(
-            unit.mean_market_success, unit.min_operating_time, 1
-        )  # 1 prevents division by 0
+        av_operating_time = max((unit.outputs[:start] > 0).mean(), 1)
+        # 1 prevents division by 0
 
         op_time = unit.get_operation_time(start)
         starting_cost = unit.get_starting_costs(op_time)
@@ -168,7 +167,7 @@ class complexEOMStorage(BaseStrategy):
         op_time = unit.get_operation_time(start)
         starting_cost = unit.get_starting_costs(op_time)
 
-        price_reduction_restart = starting_cost / min_down_time / bid_quantity_mr
+        price_reduction_restart = starting_cost / unit.min_down_time / bid_quantity_mr
 
         possible_revenue = self.get_possible_revenues(
             marginal_cost=marginal_cost_flex,
