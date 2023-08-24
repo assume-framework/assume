@@ -22,6 +22,15 @@ logger = logging.getLogger(__name__)
 
 
 class UnitsOperator(Role):
+    """
+    The UnitsOperator is the agent that manages the units.
+    It receives the opening hours of the market and sends back the bids for the market.
+    
+    :param available_markets: the available markets
+    :type available_markets: list[MarketConfig]
+    :param opt_portfolio: optimized portfolio strategy
+    :type opt_portfolio: tuple[bool, BaseStrategy] | None
+    """
     def __init__(
         self,
         available_markets: list[MarketConfig],
@@ -70,6 +79,9 @@ class UnitsOperator(Role):
     ):
         """
         Create a unit.
+
+        :param unit: the unit to be added
+        :type unit: BaseUnit
         """
         unit.reset()
         self.units[unit.id] = unit
@@ -97,10 +109,19 @@ class UnitsOperator(Role):
         """
         Method which decides if we want to participate on a given Market.
         This always returns true for now
+
+        :param market: the market to participate in
+        :type market: MarketConfig
         """
         return True
 
     def register_market(self, market: MarketConfig):
+        """
+        Register a market.
+
+        :param market: the market to register
+        :type market: MarketConfig
+        """
         self.context.schedule_timestamp_task(
             self.context.send_acl_message(
                 {"context": "registration", "market": market.name},
@@ -119,6 +140,11 @@ class UnitsOperator(Role):
         """
         When we receive an opening from the market, we schedule sending back
         our list of orders as a response
+
+        :param opening: the opening message
+        :type opening: OpeningMessage
+        :param meta: the meta data of the market
+        :type meta: dict[str, str]
         """
         logger.debug(
             f'{self.id} received opening from: {opening["market_id"]} {opening["start"]} until: {opening["stop"]}.'
@@ -131,6 +157,11 @@ class UnitsOperator(Role):
         stores accepted orders, sets the received power
         writes result back for the learning
         and executes the dispatch, including ramping for times in the past
+
+        :param content: the content of the clearing message
+        :type content: ClearingMessage
+        :param meta: the meta data of the market
+        :type meta: dict[str, str]
         """
         logger.debug(f"{self.id} got market result: {content}")
         orderbook: Orderbook = content["orderbook"]
@@ -149,6 +180,11 @@ class UnitsOperator(Role):
         feeds the current market result back to the units
         this does not respect bids from multiple markets
         for the same time period, as we only have access to the current orderbook here
+
+        :param orderbook: the orderbook of the market
+        :type orderbook: Orderbook
+        :param marketconfig: the market configuration
+        :type marketconfig: MarketConfig
         """
         orderbook.sort(key=itemgetter("unit_id"))
         for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
@@ -218,7 +254,8 @@ class UnitsOperator(Role):
         formulates an orderbook and sends it to the market.
         This will handle optional portfolio processing
 
-        Return:
+        :param opening: the opening message
+        :type opening: OpeningMessage
         """
 
         products = opening["products"]
@@ -260,6 +297,20 @@ class UnitsOperator(Role):
     async def formulate_bids_portfolio(
         self, market: MarketConfig, products: list[tuple]
     ) -> Orderbook:
+        """
+        Takes information from all units that the unit operator manages and
+        formulates the bid to the market from that according to the bidding strategy of the unit operator.
+        
+        This is the portfolio optimization version
+
+        :param market: the market to formulate bids for
+        :type market: MarketConfig
+        :param products: the products to formulate bids for
+        :type products: list[tuple]
+
+        :return: OrderBook that is submitted as a bid to the market
+        :rtype: OrderBook
+        """
         orderbook: Orderbook = []
         # TODO sort units by priority
         # execute operator bidding strategy..?
@@ -274,9 +325,15 @@ class UnitsOperator(Role):
     ) -> Orderbook:
         """
         Takes information from all units that the unit operator manages and
-        formulates the bid to the market from that according to the bidding strategy.
+        formulates the bid to the market from that according to the bidding strategy of the unit itself.
 
-        Return: OrderBook that is submitted as a bid to the market
+        :param market: the market to formulate bids for
+        :type market: MarketConfig
+        :param products: the products to formulate bids for
+        :type products: list[tuple]
+
+        :return OrderBook that is submitted as a bid to the market
+        :rtype OrderBook
         """
 
         orderbook: Orderbook = []
@@ -303,6 +360,11 @@ class UnitsOperator(Role):
     def write_learning_params(self, orderbook: Orderbook, marketconfig: MarketConfig):
         """
         sends the current rl_strategy update to the output agent
+
+        :param orderbook: the orderbook of the market
+        :type orderbook: Orderbook
+        :param marketconfig: the market configuration
+        :type marketconfig: MarketConfig
         """
         learning_unit_count = 0
         action_dimension = 0

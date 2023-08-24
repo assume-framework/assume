@@ -43,6 +43,16 @@ def initializer(func):
 
 
 def get_available_products(market_products: list[MarketProduct], startdate: datetime):
+    """
+    Get all available products for a given startdate
+
+    :param market_products: list of market products
+    :type market_products: list[MarketProduct]
+    :param startdate: the startdate
+    :type startdate: datetime
+    :return: list of available products
+    :rtype: list[MarketProduct]
+    """
     options = []
     for product in market_products:
         start = startdate + product.first_delivery
@@ -63,6 +73,13 @@ def get_available_products(market_products: list[MarketProduct], startdate: date
 def plot_orderbook(orderbook: Orderbook, results: list[dict]):
     """
     Plot the merit order of bids for each node in a separate subplot
+
+    :param orderbook: the orderbook
+    :type orderbook: Orderbook
+    :param results: the results of the clearing
+    :type results: list[dict]
+    :return: the figure and axes of the plot
+    :rtype: tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
     """
     import matplotlib.pyplot as plt
     from matplotlib.lines import Line2D
@@ -175,6 +192,12 @@ def plot_orderbook(orderbook: Orderbook, results: list[dict]):
 
 
 def visualize_orderbook(order_book: Orderbook):
+    """
+    Visualize the orderbook
+
+    :param order_book: the orderbook
+    :type order_book: Orderbook
+    """
     import matplotlib.pyplot as plt
     from matplotlib.colors import ListedColormap
 
@@ -217,6 +240,17 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=No
     order from 01.01-31.12 must also be given, to be considered.
 
     If called without groupby, this returns the aggregated orderbook timeseries
+
+    :param orderbook: the orderbook
+    :type orderbook: Orderbook
+    :param begin: the begin time
+    :type begin: datetime | None
+    :param end: the end time
+    :type end: datetime | None
+    :param groupby: the columns to group by
+    :type groupby: list[str] | None
+    :return: the aggregated orderbook timeseries
+    :rtype: list[tuple[datetime, float, str, str]]
     """
     if groupby is None:
         groupby = []
