@@ -30,6 +30,14 @@ log = logging.getLogger(__name__)
 
 
 def get_solver_factory(solvers_str=["cbc", "glpk", "cbc", "gurobi", "cplex"]):
+    """
+    select the first available solver from the list
+
+    :param solvers_str: list of solvers
+    :type solvers_str: list
+    :return: solver factory
+    :rtype: SolverFactory
+    """
     solvers = check_available_solvers(*solvers_str)
     if len(solvers) < 1:
         raise Exception(f"None of {solvers_str} are available")
@@ -38,6 +46,16 @@ def get_solver_factory(solvers_str=["cbc", "glpk", "cbc", "gurobi", "cplex"]):
 
 class DmasPowerplantStrategy(BaseStrategy):
     def __init__(self, steps=[-10, -1, 0, 1, 10], *args, **kwargs):
+        """
+        Initializes the strategy
+
+        :param steps: list of steps to optimize
+        :type steps: list
+        :param args: additional arguments
+        :type args: list
+        :param kwargs: additional keyword arguments
+        :type kwargs: dict
+        """
         super().__init__(*args, **kwargs)
         self.model = ConcreteModel("powerplant")
         self.opt = get_solver_factory()
@@ -71,6 +89,29 @@ class DmasPowerplantStrategy(BaseStrategy):
         runtime: int = None,
         p0: float = None,
     ) -> None:
+        """
+        builds the optimization model
+        returns the cashflow
+
+        :param unit: unit to optimize
+        :type unit: SupportsMinMax
+        :param start: start time
+        :type start: datetime
+        :param hour_count: number of hours to optimize
+        :type hour_count: int
+        :param emission_prices: emission prices
+        :type emission_prices: np.array
+        :param fuel_prices: fuel prices
+        :type fuel_prices: np.array
+        :param power_prices: power prices
+        :type power_prices: np.array
+        :param runtime: runtime of the unit
+        :type runtime: int
+        :param p0: initial power
+        :type p0: float
+        :return: cashflow
+        :rtype: np.array
+        """
         runtime = runtime or unit.get_operation_time(start)
         p0 = p0 or unit.get_output_before(start)
         self.model.clear()
@@ -102,7 +143,7 @@ class DmasPowerplantStrategy(BaseStrategy):
         self.model.initial_on = ConstraintList()
         self.model.initial_off = ConstraintList()
 
-        for t in tr:
+        for t in tr: #iterate over hours to optimize
             # output power of the plant
             self.model.real_power.add(
                 self.model.p_out[t]
@@ -194,6 +235,26 @@ class DmasPowerplantStrategy(BaseStrategy):
         step: int,
         hour_count: int,
     ) -> None:
+        """
+        sets the results of the optimization
+        
+        :param unit: unit to optimize
+        :type unit: SupportsMinMax
+        :param emission_prices: emission prices
+        :type emission_prices: np.array
+        :param fuel_prices: fuel prices
+        :type fuel_prices: np.array
+        :param power_prices: power prices
+        :type power_prices: np.array
+        :param start: start time
+        :type start: datetime
+        :param step: step
+        :type step: int
+        :param hour_count: number of hours to optimize
+        :type hour_count: int
+        :return: None
+        :rtype: None
+        """
         # -> output power
         tr = np.arange(hour_count)
         power = np.asarray([self.model.p_out[t].value for t in tr])
@@ -236,6 +297,22 @@ class DmasPowerplantStrategy(BaseStrategy):
         prices: pd.DataFrame = None,
         steps: tuple = None,
     ) -> np.array:
+        """
+        optimizes the unit
+        
+        :param unit: unit to optimize
+        :type unit: SupportsMinMax
+        :param start: start time
+        :type start: datetime
+        :param hour_count: number of hours to optimize
+        :type hour_count: int
+        :param prices: prices
+        :type prices: pd.DataFrame 
+        :param steps: steps to optimize
+        :type steps: tuple
+        :return: generation
+        :rtype: np.array
+        """
         base_price = prices.copy()
         self.prevented_start = dict(
             prevent=False, hours=np.zeros(self.T, float), delta=0
@@ -361,6 +438,19 @@ class DmasPowerplantStrategy(BaseStrategy):
         """
         calculates the result with prices *2
         to optimize according to the result in the best way possible
+
+        :param unit: unit to optimize
+        :type unit: SupportsMinMax
+        :param start: start time
+        :type start: datetime
+        :param committed_power: committed power
+        :type committed_power: np.array
+        :param hour_count: number of hours to optimize
+        :type hour_count: int
+        :param power_prices: power prices
+        :type power_prices: np.array
+        :return: generation
+        :rtype: np.array
         """
         cashflow = self.build_model(unit, start, 24)
         tr = np.arange(hour_count)
@@ -425,6 +515,22 @@ class DmasPowerplantStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
+        """
+        Takes information from a unit that the unit operator manages and
+        defines how it is dispatched to the market
+        Returns a list of bids that the unit operator will submit to the market
+
+        :param unit: unit to dispatch
+        :type unit: SupportsMinMax
+        :param market_config: market configuration
+        :type market_config: MarketConfig
+        :param product_tuples: list of products to dispatch
+        :type product_tuples: list[Product]
+        :param kwargs: additional arguments
+        :type kwargs: dict
+        :return: orderbook
+        :rtype: Orderbook
+        """
         if not "block_id" in market_config.additional_fields:
             raise Exception("Block Id missing from Marketconfig")
         if not "link" in market_config.additional_fields:
