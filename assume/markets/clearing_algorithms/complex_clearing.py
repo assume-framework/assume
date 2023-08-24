@@ -217,11 +217,16 @@ def pay_as_clear_complex_opt(
     eps = 1e-4
     solvers = check_available_solvers(*SOLVERS)
 
-    solver = SolverFactory(solvers[0])
+    solver = (
+        SolverFactory("gurobi") if "gurobi" in solvers else SolverFactory(solvers[0])
+    )
     if solver.name == "gurobi":
         options = {"cutoff": -1.0, "eps": eps}
     else:
         options = {}
+        raise ValueError(
+            f"Solver {solver} does not support cutoff, might not find solution."
+        )
 
     # Solve the model
     result = solver.solve(model, options=options)
@@ -260,6 +265,8 @@ def extract_results(
     for order in orders:
         if order["bid_type"] == "SB":
             acceptance = model.xs[order["bid_id"]].value
+            if acceptance is None:
+                acceptance = 0
             acceptance = 0 if acceptance < eps else acceptance
             order["accepted_volume"] = acceptance * order["volume"]
             order["accepted_price"] = market_clearing_prices[order["start_time"]]
@@ -315,7 +322,5 @@ def extract_results(
                 "only_hours": product[2],
             }
         )
-
-    model.clear()
 
     return accepted_orders, rejected_orders, meta

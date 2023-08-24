@@ -108,6 +108,7 @@ def test_complex_clearing_BB():
     assert math.isclose(meta[0]["price"], 50)
     assert rejected_orders[1]["agent_id"] == "block_gen7"
     assert math.isclose(rejected_orders[1]["accepted_volume"][products[0][0]], 0)
+    assert mr.all_orders == []
 
     # change the price of the block order to be in-the-money
     orderbook[3]["price"] = 45
@@ -120,6 +121,7 @@ def test_complex_clearing_BB():
     assert math.isclose(meta[0]["price"], 50)
     assert accepted_orders[2]["agent_id"] == "block_gen7"
     assert math.isclose(accepted_orders[2]["accepted_volume"][products[0][0]], 100)
+    assert mr.all_orders == []
 
     # change price of simple bid to lower the mcp for one hour
     orderbook[2]["price"] = 41
@@ -135,6 +137,7 @@ def test_complex_clearing_BB():
     assert accepted_orders[2]["agent_id"] == "block_gen7"
     assert math.isclose(accepted_orders[2]["accepted_volume"][products[0][0]], 100)
     assert math.isclose(accepted_orders[2]["accepted_price"][products[0][0]], 41)
+    assert mr.all_orders == []
 
     # change price of simple bid to lower the mcp for one hour even more
     orderbook[2]["price"] = 39
@@ -149,6 +152,7 @@ def test_complex_clearing_BB():
     # block bid should be rejected, because surplus is 89-90=-1
     assert rejected_orders[1]["agent_id"] == "block_gen7"
     assert math.isclose(rejected_orders[1]["accepted_volume"][products[0][0]], 0)
+    assert mr.all_orders == []
 
     # change price of simple bid to see equilibrium case
     orderbook[2]["price"] = 40
@@ -164,6 +168,7 @@ def test_complex_clearing_BB():
     # and general surplus through introduction of block is also 0
     assert rejected_orders[1]["agent_id"] == "block_gen7"
     assert math.isclose(rejected_orders[1]["accepted_volume"][products[0][0]], 0)
+    assert mr.all_orders == []
 
     # introducing profile block order by increasing the volume for the hour with a higher mcp
     orderbook[3]["volume"][products[1][0]] = 900
@@ -180,6 +185,7 @@ def test_complex_clearing_BB():
     assert math.isclose(accepted_orders[2]["accepted_price"][products[0][0]], 40)
     assert math.isclose(accepted_orders[2]["accepted_volume"][products[1][0]], 900)
     assert math.isclose(accepted_orders[2]["accepted_price"][products[1][0]], 50)
+    assert mr.all_orders == []
 
     # what happens, if the block bid volume is higher than total demand?
     # -> opimization fails!
