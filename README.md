@@ -65,6 +65,7 @@ python examples/examples.py
 ```
 
 If you have docker installed, you can run the following two commands
+
 Note: you have to select 'timescale' in examples.py
 ```
     docker compose up -d
@@ -72,7 +73,7 @@ Note: you have to select 'timescale' in examples.py
 ```
 This will start a container for timescaledb and grafana with preconfigured grafana dashboard.
 Afterwards you can access the Dashboard on `http://localhost:3000`
-
+<br>
 
 You can also use the cli to run simulations:
 
