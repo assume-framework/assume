@@ -65,6 +65,7 @@ class CsvForecaster(Forecaster):
     Methods
     -------
     """
+
     def __init__(
         self, index: pd.Series, powerplants: dict[str, pd.Series] = {}, *args, **kwargs
     ):
@@ -201,7 +202,7 @@ class CsvForecaster(Forecaster):
         """
         Calculates the marginal cost of a power plant based on the fuel costs and efficiencies of the power plant.
 
-        :param pp_series: Series with power plant data 
+        :param pp_series: Series with power plant data
         :type pp_series: pd.Series
         :return: the marginal cost of the power plant
         :rtype: float
@@ -241,7 +242,7 @@ class CsvForecaster(Forecaster):
 class RandomForecaster(CsvForecaster):
     """
     A forecaster that generates forecasts using random noise.
-    
+
     :param index: the index of the forecasts
     :type index: pd.Series
     :param powerplants: the powerplants
@@ -249,9 +250,10 @@ class RandomForecaster(CsvForecaster):
     :param sigma: the standard deviation of the noise
     :type sigma: float
 
-    Methods 
+    Methods
     -------
     """
+
     def __init__(
         self,
         index: pd.Series,
@@ -278,9 +280,9 @@ class NaiveForecast(Forecaster):
     :type index: pd.Series
     :param availability: the availability of the power plants
     :type availability: float | list
-    :param fuel_price: the fuel price 
+    :param fuel_price: the fuel price
     :type fuel_price: float | list
-    :param co2_price: the co2 price 
+    :param co2_price: the co2 price
     :type co2_price: float | list
     :param demand: the demand
     :type demand: float | list
@@ -290,6 +292,7 @@ class NaiveForecast(Forecaster):
     Methods
     -------
     """
+
     def __init__(
         self,
         index: pd.Series,

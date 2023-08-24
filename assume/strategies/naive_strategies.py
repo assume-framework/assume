@@ -11,6 +11,7 @@ class NaiveStrategy(BaseStrategy):
     Methods
     -------
     """
+
     def calculate_bids(
         self,
         unit: SupportsMinMax,
@@ -18,7 +19,6 @@ class NaiveStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        
         """
         Takes information from a unit that the unit operator manages and
         defines how it is dispatched to the market
@@ -32,10 +32,14 @@ class NaiveStrategy(BaseStrategy):
         :return: the bids
         :rtype: Orderbook
         """
-        start = product_tuples[0][0] # start time of the first product
-        end_all = product_tuples[-1][1] # end time of the last product
-        previous_power = unit.get_output_before(start) # power output of the unit before the start time of the first product
-        min_power, max_power = unit.calculate_min_max_power(start, end_all) # minimum and maximum power output of the unit between the start time of the first product and the end time of the last product
+        start = product_tuples[0][0]  # start time of the first product
+        end_all = product_tuples[-1][1]  # end time of the last product
+        previous_power = unit.get_output_before(
+            start
+        )  # power output of the unit before the start time of the first product
+        min_power, max_power = unit.calculate_min_max_power(
+            start, end_all
+        )  # minimum and maximum power output of the unit between the start time of the first product and the end time of the last product
 
         bids = []
         for product in product_tuples:
@@ -44,19 +48,22 @@ class NaiveStrategy(BaseStrategy):
             and the volume of the product. Dispatch the order to the market.
             """
             start = product[0]
-            current_power = unit.outputs["energy"].at[start] # power output of the unit at the start time of the current product
-            marginal_cost = unit.calculate_marginal_cost(start, previous_power) # calculation of the marginal costs
+            current_power = unit.outputs["energy"].at[
+                start
+            ]  # power output of the unit at the start time of the current product
+            marginal_cost = unit.calculate_marginal_cost(
+                start, previous_power
+            )  # calculation of the marginal costs
             volume = unit.calculate_ramp(
                 previous_power, max_power[start], current_power
-            ) # calculation of the volume of the product
+            )  # calculation of the volume of the product
             order: Order = {
                 "start_time": product[0],
                 "end_time": product[1],
                 "only_hours": product[2],
                 "price": marginal_cost,
                 "volume": volume,
-
-            }# order to be dispatched to the market
+            }  # order to be dispatched to the market
             if "bid_type" in market_config.additional_fields:
                 order.update({"bid_type": "SB"})
 
@@ -104,6 +111,7 @@ class NaivePosReserveStrategy(BaseStrategy):
     """
     A naive strategy that bids the ramp up volume on the positive reserve market (price = 0).
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -127,7 +135,7 @@ class NaivePosReserveStrategy(BaseStrategy):
         :return: the bids consisting of the start time, end time, only hours, price and volume.
         :rtype: Orderbook
         """
-  
+
         start = product_tuples[0][0]
         end_all = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
@@ -142,7 +150,7 @@ class NaivePosReserveStrategy(BaseStrategy):
             volume = unit.calculate_ramp(
                 previous_power, max_power[start], current_power
             )
-            price = 0  
+            price = 0
             bids.append(
                 {
                     "start_time": product[0],
@@ -160,6 +168,7 @@ class NaiveNegReserveStrategy(BaseStrategy):
     """
     A naive strategy that bids the ramp down volume on the negative reserve market (price = 0).
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

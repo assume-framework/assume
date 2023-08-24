@@ -20,7 +20,7 @@ from assume.common.market_objects import MarketConfig, Orderbook, Product
 def shift(prc, type_: str = "first"):
     """
     Shifts the price curve up or down
-    
+
     :param prc: price curve
     :type prc: np.array
     :param type_: type of shift. default is 'first'
@@ -28,11 +28,15 @@ def shift(prc, type_: str = "first"):
     :return: shifted price curve
     :rtype: np.array
     """
-    new_prices, num_prices = [], len(prc) #new_prices is the list of prices after the shift
+    new_prices, num_prices = [], len(
+        prc
+    )  # new_prices is the list of prices after the shift
 
     for p, index in zip(prc, range(num_prices)):
         if type_ == "first":
-            new_prices += [p * (0.9 + index * 0.2 / num_prices)] #calculate the new price by multiplying the old price with a factor
+            new_prices += [
+                p * (0.9 + index * 0.2 / num_prices)
+            ]  # calculate the new price by multiplying the old price with a factor
         else:
             new_prices += [p * (1.1 - index * 0.2 / num_prices)]
 
@@ -42,7 +46,7 @@ def shift(prc, type_: str = "first"):
 def shaping(prc, type_: str = "peak"):
     """
     Shifts the price curve up or down
-    
+
     :param prc: price curve
     :type prc: np.array
     :param type_: type of shift. default is 'peak'. other options are 'pv' and 'demand'.
@@ -51,12 +55,18 @@ def shaping(prc, type_: str = "peak"):
     :rtype: np.array
     """
     if type_ == "peak":
-        prc[8:20] *= 1.1 #between 8 and 20 hours, the price is multiplied by 1.1 (general production is high)
+        prc[
+            8:20
+        ] *= 1.1  # between 8 and 20 hours, the price is multiplied by 1.1 (general production is high)
     elif type_ == "pv":
-        prc[10:14] *= 0.9 #between 10 and 14 hours, the price is multiplied by 0.9 (Pv production is high)
+        prc[
+            10:14
+        ] *= 0.9  # between 10 and 14 hours, the price is multiplied by 0.9 (Pv production is high)
     elif type_ == "demand":
-        prc[6:9] *= 1.1 #between 6 and 9 hours, the price is multiplied by 1.1 (demand is high)
-        prc[17:20] *= 1.1 #between 17 and 20 hours, the price is multiplied by 1.1
+        prc[
+            6:9
+        ] *= 1.1  # between 6 and 9 hours, the price is multiplied by 1.1 (demand is high)
+        prc[17:20] *= 1.1  # between 17 and 20 hours, the price is multiplied by 1.1
     return prc
 
 
@@ -75,7 +85,7 @@ PRICE_FUNCS = {
 def get_solver_factory(solvers_str=["glpk", "cbc", "gurobi", "cplex"]):
     """
     Returns the first available solver from the list of solvers
-    
+
     :param solvers_str: list of solvers
     :type solvers_str: list
     :return: solver factory
@@ -91,10 +101,11 @@ class DmasStorageStrategy(BaseStrategy):
     """
     Strategy for a storage unit that uses DMAS to optimize its operation
     """
+
     def __init__(self, *args, **kwargs):
         """
         Initializes the strategy
-        
+
         :param args: arguments
         :type args: list
         :param kwargs: keyword arguments
@@ -107,7 +118,7 @@ class DmasStorageStrategy(BaseStrategy):
     def build_model(self, unit: SupportsMinMaxCharge, start: datetime, hour_count: int):
         """
         Builds the optimization model
-        
+
         :param unit: unit to dispatch
         :type unit: SupportsMinMaxCharge
         :param start: start time
@@ -152,7 +163,7 @@ class DmasStorageStrategy(BaseStrategy):
     def optimize_result(self, unit: SupportsMinMaxCharge, committed_power: np.array):
         """
         Optimizes the result
-        
+
         :param unit: unit to dispatch
         :type unit: SupportsMinMaxCharge
         :param committed_power: committed power
@@ -199,7 +210,7 @@ class DmasStorageStrategy(BaseStrategy):
     ):
         """
         Optimizes the unit operation
-        
+
         :param unit: unit to dispatch
         :type unit: SupportsMinMaxCharge
         :param start: start time
@@ -265,8 +276,8 @@ class DmasStorageStrategy(BaseStrategy):
         :type product_tuples: list[Product]
         :param kwargs: additional arguments
         :type kwargs: dict
-        :return: bids 
-        :rtype: Orderbook   
+        :return: bids
+        :rtype: Orderbook
         """
         assert "exclusive_id" in market_config.additional_fields
         start = product_tuples[0][0]

@@ -143,7 +143,7 @@ class DmasPowerplantStrategy(BaseStrategy):
         self.model.initial_on = ConstraintList()
         self.model.initial_off = ConstraintList()
 
-        for t in tr: #iterate over hours to optimize
+        for t in tr:  # iterate over hours to optimize
             # output power of the plant
             self.model.real_power.add(
                 self.model.p_out[t]
@@ -237,7 +237,7 @@ class DmasPowerplantStrategy(BaseStrategy):
     ) -> None:
         """
         sets the results of the optimization
-        
+
         :param unit: unit to optimize
         :type unit: SupportsMinMax
         :param emission_prices: emission prices
@@ -299,7 +299,7 @@ class DmasPowerplantStrategy(BaseStrategy):
     ) -> np.array:
         """
         optimizes the unit
-        
+
         :param unit: unit to optimize
         :type unit: SupportsMinMax
         :param start: start time
@@ -307,7 +307,7 @@ class DmasPowerplantStrategy(BaseStrategy):
         :param hour_count: number of hours to optimize
         :type hour_count: int
         :param prices: prices
-        :type prices: pd.DataFrame 
+        :type prices: pd.DataFrame
         :param steps: steps to optimize
         :type steps: tuple
         :return: generation

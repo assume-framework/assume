@@ -10,6 +10,7 @@ class flexableEOM(BaseStrategy):
     """
     A strategy that bids on the EOM-market.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -236,11 +237,11 @@ class flexableEOM(BaseStrategy):
             return unit.cold_start_cost
 
 
-
 class flexablePosCRM(BaseStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the CRM (reserve market).
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -275,7 +276,7 @@ class flexablePosCRM(BaseStrategy):
         previous_power = unit.get_output_before(start)
         min_power, max_power = unit.calculate_min_max_power(
             start, end, market_config.product_type
-        )# get max_power for the product type
+        )  # get max_power for the product type
 
         bids = []
         for product in product_tuples:
@@ -336,6 +337,7 @@ class flexableNegCRM(BaseStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -355,7 +357,7 @@ class flexableNegCRM(BaseStrategy):
         Takes information from a unit that the unit operator manages and
         defines how it is dispatched to the market
         Returns a list of bids consisting of the start time, end time, only hours, price and volume.
-        
+
         :param unit: A unit that the unit operator manages
         :type unit: SupportsMinMax
         :param market_config: A market configuration

@@ -11,6 +11,7 @@ class complexEOMStorage(BaseStrategy):
     """
     complexEOMStorage is a strategy for storage units that are able to charge and discharge (Energy Only Market)
     """
+
     def __init__(self):
         """
         :param foresight: [description], defaults to pd.Timedelta("12h")
@@ -187,7 +188,6 @@ class complexEOMStorage(BaseStrategy):
         """
         av_operating_time = max((unit.outputs[:start] > 0).mean(), 1)
         # 1 prevents division by 0
-
 
         op_time = unit.get_operation_time(start)
         starting_cost = unit.get_starting_costs(op_time)

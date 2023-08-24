@@ -29,7 +29,7 @@ def load_file(
 ) -> pd.DataFrame:
     """
     This function loads a csv file from a given path and returns a dataframe.
-    
+
     :param path: the path to the csv file
     :type path: str
     :param config: the config file
@@ -123,7 +123,7 @@ def make_market_config(
 ):
     """
     This function creates a market config from a given dictionary.
-    
+
     :param id: the id of the market
     :type id: str
     :param market_params: the market parameters

@@ -14,21 +14,22 @@ logger = logging.getLogger(__name__)
 
 class WriteOutput(Role):
     """
-        Initializes an instance of the WriteOutput class.
+    Initializes an instance of the WriteOutput class.
 
-        :param simulation_id: The ID of the simulation as a unique calssifier.
-        :type simulation_id: str
-        :param start: The start datetime of the simulation run.
-        :type start: datetime
-        :param end: The end datetime of the simulation run.
-        :type end: datetime
-        :param db_engine: The database engine. Defaults to None.
-        :type db_engine: optional
-        :param export_csv_path: The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
-        :type export_csv_path: str, optional
-        :param save_frequency_hours: The frequency in hours for storing data in the db and/or csv files. Defaults to None.
-        :type save_frequency_hours: int
+    :param simulation_id: The ID of the simulation as a unique calssifier.
+    :type simulation_id: str
+    :param start: The start datetime of the simulation run.
+    :type start: datetime
+    :param end: The end datetime of the simulation run.
+    :type end: datetime
+    :param db_engine: The database engine. Defaults to None.
+    :type db_engine: optional
+    :param export_csv_path: The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
+    :type export_csv_path: str, optional
+    :param save_frequency_hours: The frequency in hours for storing data in the db and/or csv files. Defaults to None.
+    :type save_frequency_hours: int
     """
+
     def __init__(
         self,
         simulation_id: str,
@@ -38,7 +39,6 @@ class WriteOutput(Role):
         export_csv_path: str = "",
         save_frequency_hours: int = 24,
     ):
-        
         super().__init__()
 
         # store needed date
@@ -108,7 +108,7 @@ class WriteOutput(Role):
         """
         Handles the incoming messages and performs corresponding actions.
 
-        
+
         :param content: The content of the message.
         :type content: dict
         :param meta: The metadata associated with the message. (not needed yet)
@@ -150,7 +150,7 @@ class WriteOutput(Role):
     def write_market_results(self, market_meta):
         """
         Writes market results to the corresponding data frame.
-        
+
         :param market_meta: The market metadata, which includes the clearing price and volume.
         :type market_meta: any
         """
@@ -188,7 +188,7 @@ class WriteOutput(Role):
     def check_for_tensors(self, data):
         """
         Checks if the data contains tensors and converts them to floats.
-        
+
         :param data: The data to be checked.
         :type data: any
         """
@@ -208,7 +208,7 @@ class WriteOutput(Role):
         """
         Writes market orders to the corresponding data frame.
         Append new data until it is written to db and csv with store_df function.
-        
+
         :param market_orders: The market orders.
         :type market_orders: any
         :param market_id: The id of the market.

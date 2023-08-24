@@ -16,7 +16,7 @@ class HeatPump(SupportsMinMax):
     :type max_power: float | pd.Series
     :param min_power: the minimum power output of the unit (kW)
     :type min_power: float | pd.Series
-    :param volume: the volume of the heat pump 
+    :param volume: the volume of the heat pump
     :type volume: float | pd.Series
     :param ramp_up: the ramp up speed of the unit (MW/15Minutes)
     :type ramp_up: float
@@ -34,17 +34,17 @@ class HeatPump(SupportsMinMax):
     :type downtime_warm_start: int
     :param source: the source of the heat pump
     :type source: str
-    :param index: the index of the unit 
+    :param index: the index of the unit
     :type index: pd.DatetimeIndex
     :param location: the location of the unit (latitude, longitude)
     :type location: tuple[float, float]
     :param node: the node of the unit
     :type node: str
-    :param dr_factor: the demand response factor of the unit 
+    :param dr_factor: the demand response factor of the unit
     :type dr_factor: float
-    :param kwargs: additional keyword arguments 
-    :type kwargs: dict
-"""
+    :param kwargs: additional keyword arguments
+    :type kwargs: dict"""
+
     def __init__(
         self,
         id: str,
@@ -100,7 +100,6 @@ class HeatPump(SupportsMinMax):
 
     def reset(self):
         """Reset the unit to its initial state."""
-
 
         self.outputs["heat"] = pd.Series(0.0, index=self.index)
         min_thermal_output = self.outputs["heat"].loc[

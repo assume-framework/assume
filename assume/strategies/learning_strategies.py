@@ -28,6 +28,7 @@ class RLStrategy(LearningStrategy):
     :param actor: Actor network
     :type actor: torch.nn.Module
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -91,7 +92,7 @@ class RLStrategy(LearningStrategy):
     ) -> Orderbook:
         """
         Calculate bids for a unit
-        
+
         :param unit: Unit to calculate bids for
         :type unit: SupportsMinMax
         :param market_config: Market configuration
@@ -203,7 +204,7 @@ class RLStrategy(LearningStrategy):
     ):
         """
         Create observation
-        
+
         :param unit: Unit to create observation for
         :type unit: SupportsMinMax
         :param start: Start time
@@ -296,7 +297,7 @@ class RLStrategy(LearningStrategy):
     ):
         """
         Calculate reward
-        
+
         :param unit: Unit to calculate reward for
         :type unit: SupportsMinMax
         :param marketconfig: Market configuration

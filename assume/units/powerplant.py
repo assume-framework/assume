@@ -64,8 +64,9 @@ class PowerPlant(SupportsMinMax):
     :type node: str, optional
     :param **kwargs: Additional keyword arguments to be passed to the base class.
     :type **kwargs: dict, optional
-        
+
     """
+
     def __init__(
         self,
         id: str,
@@ -354,10 +355,10 @@ class PowerPlant(SupportsMinMax):
         :return: the marginal cost of the unit
         :rtype: float
         """
-        #if marginal costs already exists, return it
+        # if marginal costs already exists, return it
         if self.marginal_cost is not None:
             return self.marginal_cost[start]
-        #if not, calculate it
+        # if not, calculate it
         else:
             return self.calc_marginal_cost_with_partial_eff(
                 power_output=power,
@@ -367,7 +368,7 @@ class PowerPlant(SupportsMinMax):
     def as_dict(self) -> dict:
         """
         Returns the attributes of the unit as a dictionary, including specific attributes.
-        
+
         :return: the attributes of the unit as a dictionary
         :rtype: dict
         """

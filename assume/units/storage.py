@@ -123,7 +123,6 @@ class Storage(SupportsMinMaxCharge):
             unit_operator=unit_operator,
             **kwargs,
         )
-    
 
         self.max_power_charge = (
             max_power_charge if max_power_charge <= 0 else -max_power_charge
@@ -140,22 +139,22 @@ class Storage(SupportsMinMaxCharge):
         self.max_volume = max_volume
         self.min_volume = min_volume
 
-        #The efficiency of the storage unit while charging.
+        # The efficiency of the storage unit while charging.
         self.efficiency_charge = efficiency_charge if 0 < efficiency_charge < 1 else 1
         self.efficiency_discharge = (
             efficiency_discharge if 0 < efficiency_discharge < 1 else 1
         )
-        
-        #The variable costs to charge/discharge the storage unit.
+
+        # The variable costs to charge/discharge the storage unit.
         self.variable_cost_charge = variable_cost_charge
         self.variable_cost_discharge = variable_cost_discharge
 
-        #The emission factor of the storage unit.
+        # The emission factor of the storage unit.
         self.emission_factor = emission_factor
 
-        #The ramp up/down rate of charging/discharging the storage unit.
-        #if ramp_up_charge == 0, the ramp_up_charge is set to the max_power_charge
-        #else the ramp_up_charge is set to the negative value of the ramp_up_charge
+        # The ramp up/down rate of charging/discharging the storage unit.
+        # if ramp_up_charge == 0, the ramp_up_charge is set to the max_power_charge
+        # else the ramp_up_charge is set to the negative value of the ramp_up_charge
         self.ramp_up_charge = (
             self.max_power_charge if ramp_up_charge is None else -abs(ramp_up_charge)
         )
@@ -173,13 +172,13 @@ class Storage(SupportsMinMaxCharge):
             else ramp_down_discharge
         )
 
-        #How long the storage unit has to be in operation before it can be shut down.
+        # How long the storage unit has to be in operation before it can be shut down.
         self.min_operating_time = min_operating_time
-        #How long the storage unit has to be shut down before it can be started.
+        # How long the storage unit has to be shut down before it can be started.
         self.min_down_time = min_down_time
-        #The downtime before hot start of the storage unit.
+        # The downtime before hot start of the storage unit.
         self.downtime_hot_start = downtime_hot_start
-        #The downtime before warm start of the storage unit.
+        # The downtime before warm start of the storage unit.
         self.warm_start_cost = downtime_warm_start
 
         self.fixed_cost = fixed_cost
@@ -280,14 +279,12 @@ class Storage(SupportsMinMaxCharge):
 
         return self.outputs["energy"].loc[start:end_excl]
 
-
     @lru_cache(maxsize=256)
     def calculate_marginal_cost(
         self,
         start: pd.Timestamp,
         power: float,
     ) -> float:
-
         if power > 0:
             variable_cost = (
                 self.variable_cost_discharge.at[start]
@@ -311,7 +308,7 @@ class Storage(SupportsMinMaxCharge):
     def as_dict(self) -> dict:
         """
         Return the storage unit's attributes as a dictionary, including specific attributes.
-        
+
         :return: the storage unit's attributes as a dictionary
         :rtype: dict
         """
@@ -363,7 +360,7 @@ class Storage(SupportsMinMaxCharge):
         """
         Calculate the minimum and maximum charge power levels of the storage unit.
         Returns the minimum and maximum charge power levels of the storage unit in MW.
-        
+
         :param start: The start of the current dispatch.
         :param end: The end of the current dispatch.
         :param product_type: The product type of the storage unit.

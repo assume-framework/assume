@@ -24,7 +24,7 @@ class OnlyHours(NamedTuple):
 class Order(TypedDict):
     """
     Describes an order which can be either generation (volume > 0) or demand (volume < 0)
-    
+
     :param bid_id: the id of the bid
     :type bid_id: str
     :param start_time: the start time of the order
@@ -40,6 +40,7 @@ class Order(TypedDict):
     :param agent_id: the id of the agent
     :type agent_id: str
     """
+
     bid_id: str
     start_time: datetime
     end_time: datetime
@@ -73,6 +74,7 @@ class MarketProduct:
     :param eligible_lambda_function: lambda function which determines if an agent is eligible to trade this product
     :type eligible_lambda_function: eligible_lambda | None
     """
+
     duration: rd | rr.rrule  # quarter-hourly, half-hourly, hourly, 4hourly, daily, weekly, monthly, quarter-yearly, yearly
     count: int  # how many future durations can be traded, must be >= 1
     # count can also be given as a rrule with until
@@ -91,7 +93,7 @@ market_mechanism = Callable[[Role, list[MarketProduct]], tuple[Orderbook, dict]]
 class Product(NamedTuple):
     """
     an actual product with start and end
-    
+
     :param start: the start time of the product
     :type start: datetime
     :param end: the end time of the product
@@ -109,7 +111,7 @@ class Product(NamedTuple):
 class MarketConfig:
     """
     Describes the configuration of a market.
-    
+
     :param name: the name of the market
     :type name: str
     :param addr: the address of the market
@@ -149,6 +151,7 @@ class MarketConfig:
     :param eligible_obligations_lambda: lambda function which determines if an agent is eligible to trade this product
     :type eligible_obligations_lambda: eligible_lambda | None
     """
+
     name: str
     addr = None
     aid = None
@@ -190,6 +193,7 @@ class OpeningMessage(TypedDict):
     :param products: list of products which are available at the market to be traded
     :type products: list[Product]
     """
+
     context: str
     market_id: str
     start: float
@@ -208,6 +212,7 @@ class ClearingMessage(TypedDict):
     :param orderbook: the orderbook of the market
     :type orderbook: Orderbook
     """
+
     context: str
     market_id: str
     orderbook: Orderbook

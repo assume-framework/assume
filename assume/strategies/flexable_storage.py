@@ -137,7 +137,6 @@ class flexableEOMStorage(BaseStrategy):
 
 
 class flexablePosCRMStorage(BaseStrategy):
-    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -155,7 +154,7 @@ class flexablePosCRMStorage(BaseStrategy):
         Takes information from a unit that the unit operator manages and
         defines how it is dispatched to the market
         Returns bids containing start_time, end_time, only_hours, price, volume
-        
+
         :param unit: Unit that is dispatched
         :type unit: SupportsMinMaxCharge
         :param market_config: Market configuration
@@ -257,7 +256,7 @@ class flexableNegCRMStorage(BaseStrategy):
         """
         Takes information from a unit that the unit operator manages and
         defines how it is dispatched to the market
-        
+
         :param unit: Unit that is dispatched
         :type unit: SupportsMinMaxCharge
         :param market_config: Market configuration
@@ -325,7 +324,7 @@ def calculate_price_average(unit, current_time, foresight, price_forecast):
     """
     Calculates the average price for a given time period
     Returns the average price
-    
+
     :param unit: Unit that is dispatched
     :type unit: SupportsMinMaxCharge
     :param current_time: Current time
@@ -348,7 +347,7 @@ def get_specific_revenue(unit, marginal_cost, current_time, foresight, price_for
     """
     Calculates the specific revenue for a given time period
     Returns the specific revenue
-    
+
     :param unit: Unit that is dispatched
     :type unit: SupportsMinMaxCharge
     :param marginal_cost: Marginal cost

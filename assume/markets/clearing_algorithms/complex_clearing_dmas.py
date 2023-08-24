@@ -36,7 +36,7 @@ def complex_clearing_dmas(
 ):
     """
     This performs the process of "market clearing" for a given market agent and its orders.
-    During this process, incoming orders are matched against each other and allocations are determined to adhere to market rules. 
+    During this process, incoming orders are matched against each other and allocations are determined to adhere to market rules.
     The result are an orderbook, the rejected orders and market metadata.
     """
     # INIT

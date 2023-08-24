@@ -25,12 +25,13 @@ class UnitsOperator(Role):
     """
     The UnitsOperator is the agent that manages the units.
     It receives the opening hours of the market and sends back the bids for the market.
-    
+
     :param available_markets: the available markets
     :type available_markets: list[MarketConfig]
     :param opt_portfolio: optimized portfolio strategy
     :type opt_portfolio: tuple[bool, BaseStrategy] | None
     """
+
     def __init__(
         self,
         available_markets: list[MarketConfig],
@@ -300,7 +301,7 @@ class UnitsOperator(Role):
         """
         Takes information from all units that the unit operator manages and
         formulates the bid to the market from that according to the bidding strategy of the unit operator.
-        
+
         This is the portfolio optimization version
 
         :param market: the market to formulate bids for

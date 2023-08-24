@@ -10,6 +10,7 @@ from assume.common.market_objects import MarketConfig, Orderbook, Product
 class BaseStrategy:
     pass
 
+
 class BaseUnit:
     """
     A base class for a unit.
@@ -71,7 +72,7 @@ class BaseUnit:
     ) -> Orderbook:
         """
         Calculate the bids for the next time step.
-        
+
         :param market_config: The market configuration.
         :type market_config: MarketConfig
         :param product_tuples: The product tuples.
@@ -205,21 +206,21 @@ class SupportsMinMax(BaseUnit):
     Methods
     -------
     """
-    
+
     min_power: float
-    max_power: float 
-    ramp_down: float 
-    ramp_up: float  
-    efficiency: float 
+    max_power: float
+    ramp_down: float
+    ramp_up: float
+    efficiency: float
     emission_factor: float
-    min_operating_time: int  
-    min_down_time: int  
+    min_operating_time: int
+    min_down_time: int
 
     def calculate_min_max_power(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series, pd.Series]:
         """
-        Calculates the min and max power for the given time period 
+        Calculates the min and max power for the given time period
 
         :param start: the start time of the dispatch
         :type start: pd.Timestamp
@@ -227,7 +228,7 @@ class SupportsMinMax(BaseUnit):
         :type end: pd.Timestamp
         :param product_type: the product type of the unit
         :type product_type: str
-        :return: the min and max power for the given time period 
+        :return: the min and max power for the given time period
         :rtype: tuple[pd.Series, pd.Series]
         """
         pass
@@ -299,7 +300,7 @@ class SupportsMinMax(BaseUnit):
         if unit is on since 4 hours, it returns 4
         if the unit is off since 4 hours, it returns -4
         The value at start is not considered
-        
+
         :param start: the start time
         :type start: datetime
         :return: the operation time
@@ -353,7 +354,7 @@ class SupportsMinMaxCharge(BaseUnit):
     :param efficiency_discharge: The efficiency of discharging.
     :type efficiency_discharge: float
 
-    Methods 
+    Methods
     -------
     """
 
@@ -367,14 +368,14 @@ class SupportsMinMaxCharge(BaseUnit):
     ramp_up_charge: float
     ramp_down_charge: float
     max_volume: float
-    efficiency_charge: float 
+    efficiency_charge: float
     efficiency_discharge: float
 
     def calculate_min_max_charge(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series, pd.Series]:
         """
-        calculates the min and max charging power for the given time period 
+        calculates the min and max charging power for the given time period
 
         :param start: the start time of the dispatch
         :type start: pd.Timestamp
@@ -392,7 +393,7 @@ class SupportsMinMaxCharge(BaseUnit):
     ) -> tuple[pd.Series, pd.Series]:
         """
         calculates the min and max discharging power for the given time period
-        
+
         :param start: the start time of the dispatch
         :type start: pd.Timestamp
         :param end: the end time of the dispatch
@@ -581,7 +582,8 @@ class BaseStrategy:
         unit,
         marketconfig: MarketConfig,
         orderbook: Orderbook,
-    ):  """
+    ):
+        """
         Calculates the reward for the given unit
 
         :param unit: the unit
@@ -591,6 +593,7 @@ class BaseStrategy:
         :param orderbook: The orderbook.
         :type orderbook: Orderbook
         """
+
     pass
 
 

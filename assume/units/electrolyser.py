@@ -1,10 +1,12 @@
 import pandas as pd
 
 from assume.common.base import BaseUnit
+
+
 class Electrolyser(BaseUnit):
     """
     An electrolyser unit.
-    
+
     :param id: unique identifier for the unit
     :type id: str
     :param technology: the technology of the unit
@@ -44,6 +46,7 @@ class Electrolyser(BaseUnit):
     :param kwargs: additional keyword arguments
     :type kwargs: dict
     """
+
     def __init__(
         self,
         id: str,
@@ -93,7 +96,6 @@ class Electrolyser(BaseUnit):
         Reset the unit to its initial state.
         """
         pass
-
 
     def calculate_min_max_power(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
@@ -170,7 +172,7 @@ class Electrolyser(BaseUnit):
         """
         Calculate the marginal cost for the electrolyser at the given time step.
         Returns the calculated bid price.
-        
+
         :param timestep: the current time step
         :type timestep: pd.Timestamp
         :return: The calculated bid price.

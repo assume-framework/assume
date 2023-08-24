@@ -105,7 +105,7 @@ class Demand(SupportsMinMax):
         """
         Calculate the minimum and maximum power output of the unit.
         Returns the bid volume as both the minimum and maximum power output of the unit.
-        
+
         :param start: the start time of the dispatch
         :type start: pd.Timestamp
         :param end: the end time of the dispatch
@@ -135,7 +135,7 @@ class Demand(SupportsMinMax):
     def as_dict(self) -> dict:
         """
         Return the unit as a dictionary.
-        
+
         :return: the unit as a dictionary
         :rtype: dict
         """
