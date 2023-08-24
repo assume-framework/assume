@@ -56,11 +56,23 @@ Afterwards, activate the environment:
 conda activate assume-framework
 ```
 
-After these steps you can also run the example simulation:
+Quick Start
+-----------
+To run an exemplar simulation without database and grafana, run the following command:
 
 ```
-python examples/example_01a_sqlite.py
+python examples/examples.py
 ```
+
+If you have docker installed, you can run the following two commands
+Note: you have to select 'timescale' in examples.py
+```
+    docker compose up -d
+    python examples/examples.py
+```
+This will start a container for timescaledb and grafana with preconfigured grafana dashboard.
+Afterwards you can access the Dashboard on `http://localhost:3000`
+
 
 You can also use the cli to run simulations:
 
@@ -114,22 +126,6 @@ If you want to use the reinforcement learning strategies of Assume please make s
 
 pip install "torch>=2.0.1+cpu" -f https://download.pytorch.org/whl/torch_stable.html
 
-Quick Start
------------
-
-To run an exemplar simulation without database and grafana, run the following command:
-```
-    python examples/example_01a_sqlite.py
-```
-
-If you have docker installed, you can run the following two commands:
-```
-    docker compose up -d
-    python examples/example_01a_timescale.py
-```
-This will start a container for timescaledb and grafana with preconfigured grafana dashboard.
-
-Afterwards you can access the Dashboard on `http://localhost:3000`
 
 Licence
 =======
