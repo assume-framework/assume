@@ -175,7 +175,16 @@ class PowerPlant(SupportsMinMax):
     ):
         """
         Executes the current dispatch of the unit based on the provided timestamps.
+        Returns the volume of the unit within the given time range.
+
+        :param start: the start time of the dispatch
+        :type start: pd.Timestamp
+        :param end: the end time of the dispatch
+        :type end: pd.Timestamp
+        :return: the volume of the unit within the given time range
+        :rtype: float
         """
+
         end_excl = end - self.index.freq
         # TODO ramp down and turn off only for relevant timesteps
         if self.outputs["energy"][start:end_excl].mean() < self.min_power:
@@ -201,6 +210,14 @@ class PowerPlant(SupportsMinMax):
     def calculate_cashflow(self, product_type: str, orderbook: Orderbook):
         """
         Calculates the cashflow of the unit based on the provided product type and orderbook.
+        Returns the cashflow of the unit.
+
+        :param product_type: the product type of the unit
+        :type product_type: str
+        :param orderbook: the orderbook of the unit
+        :type orderbook: Orderbook
+        :return: the cashflow of the unit
+        :rtype: float
         """
         for order in orderbook:
             start = order["start_time"]
@@ -217,6 +234,10 @@ class PowerPlant(SupportsMinMax):
     ):
         """
         Calculate the marginal cost of the unit (simple method)
+        Returns the marginal cost of the unit.
+
+        :return: the marginal cost of the unit
+        :rtype: float
         """
         fuel_price = self.forecaster.get_price(self.fuel_type)
         marginal_cost = (
@@ -235,6 +256,14 @@ class PowerPlant(SupportsMinMax):
     ) -> float | pd.Series:
         """
         Calculates the marginal cost of the unit based on power output and timestamp, considering partial efficiency.
+        Returns the marginal cost of the unit.
+
+        :param power_output: the power output of the unit
+        :type power_output: float
+        :param timestep: the timestamp of the unit
+        :type timestep: pd.Timestamp, optional
+        :return: the marginal cost of the unit
+        :rtype: float | pd.Series
         """
         fuel_price = self.forecaster.get_price(self.fuel_type).at[timestep]
 
@@ -285,8 +314,19 @@ class PowerPlant(SupportsMinMax):
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series, pd.Series]:
         """
+        Calculate the minimum and maximum power output of the unit.
+        Returns the minimum and maximum power output of the unit.
         does not include ramping
         can be used for arbitrary start times in the future
+
+        :param start: the start time of the dispatch
+        :type start: pd.Timestamp
+        :param end: the end time of the dispatch
+        :type end: pd.Timestamp
+        :param product_type: the product type of the unit
+        :type product_type: str
+        :return: the minimum and maximum power output of the unit
+        :rtype: tuple[pd.Series, pd.Series]
         """
         end_excl = end - self.index.freq
 
@@ -319,6 +359,14 @@ class PowerPlant(SupportsMinMax):
     def calculate_marginal_cost(self, start: datetime, power: float):
         """
         Calculates the marginal cost of the unit based on the provided start time and power output.
+        Returns the marginal cost of the unit.
+
+        :param start: the start time of the dispatch
+        :type start: datetime
+        :param power: the power output of the unit
+        :type power: float
+        :return: the marginal cost of the unit
+        :rtype: float
         """
         #if marginal costs already exists, return it
         if self.marginal_cost is not None:
@@ -333,6 +381,9 @@ class PowerPlant(SupportsMinMax):
     def as_dict(self) -> dict:
         """
         Returns the attributes of the unit as a dictionary, including specific attributes.
+        
+        :return: the attributes of the unit as a dictionary
+        :rtype: dict
         """
         unit_dict = super().as_dict()
         unit_dict.update(
