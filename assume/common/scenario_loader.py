@@ -184,6 +184,7 @@ async def load_scenario_folder_async(
     scenario: str,
     study_case: str,
     disable_learning: bool = False,
+    episode: int = 0,
 ):
     """Load a scenario from a given path.
 
@@ -269,6 +270,7 @@ async def load_scenario_folder_async(
         end=end,
         save_frequency_hours=save_frequency_hours,
         simulation_id=sim_id,
+        episode=episode,
         learning_config=learning_config,
         bidding_params=bidding_strategy_params,
         index=index,
@@ -458,11 +460,6 @@ def load_scenario_folder(
             # give the newly created rl_agent the buffer that we stored from the beginning
             world.learning_role.set_buffer(buffer)
 
-            # change simulation id of output agent to include the episode number
-            world.output_role.simulation_id = (
-                f"{world.output_role.simulation_id}_{episode}"
-            )
-
             world.run()
             world.reset()
 
@@ -478,6 +475,7 @@ def load_scenario_folder(
                     inputs_path,
                     scenario,
                     study_case,
+                    episode=world.learning_role.episodes_done,
                     disable_learning=disable_learning,
                 )
             )

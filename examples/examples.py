@@ -45,7 +45,7 @@ availabe_examples = {
 
 # %%
 if __name__ == "__main__":
-    example = "small_with_opt_clearing"
+    example = "rl"
     data_format = "timescale"  # "local_db" or "timescale"
 
     if data_format == "local_db":
