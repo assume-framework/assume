@@ -232,6 +232,7 @@ def pay_as_clear_complex_opt(
     result = solver.solve(model, options=options)
 
     if result.solver.termination_condition == TerminationCondition.infeasible:
+        market_agent.all_orders = []
         raise Exception("infeasible")
 
     # Find the dual variable for the balance constraint
