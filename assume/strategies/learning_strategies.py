@@ -10,6 +10,25 @@ from assume.reinforcement_learning.learning_utils import Actor, NormalActionNois
 
 
 class RLStrategy(LearningStrategy):
+    """
+    Reinforcement Learning Strategy
+
+    :param foresight: Number of time steps to look ahead. Default 24.
+    :type foresight: int
+    :param max_bid_price: Maximum bid price
+    :type max_bid_price: float
+    :param max_demand: Maximum demand
+    :type max_demand: float
+    :param device: Device to run on
+    :type device: str
+    :param float_type: Float type to use
+    :type float_type: str
+    :param learning_mode: Whether to use learning mode
+    :type learning_mode: bool
+    :param actor: Actor network
+    :type actor: torch.nn.Module
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -71,6 +90,18 @@ class RLStrategy(LearningStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
+        """
+        Calculate bids for a unit
+
+        :param unit: Unit to calculate bids for
+        :type unit: SupportsMinMax
+        :param market_config: Market configuration
+        :type market_config: MarketConfig
+        :param product_tuples: Product tuples
+        :type product_tuples: list[Product]
+        :return: Bids containing start time, end time, price and volume
+        :rtype: Orderbook
+        """
         bid_quantity_inflex, bid_price_inflex = 0, 0
         bid_quantity_flex, bid_price_flex = 0, 0
 
@@ -130,6 +161,14 @@ class RLStrategy(LearningStrategy):
         return bids
 
     def get_actions(self, next_observation):
+        """
+        Get actions
+
+        :param next_observation: Next observation
+        :type next_observation: torch.Tensor
+        :return: Actions
+        :rtype: torch.Tensor
+        """
         if self.learning_mode:
             if self.collect_initial_experience:
                 curr_action = (
@@ -163,6 +202,17 @@ class RLStrategy(LearningStrategy):
         start: datetime,
         end: datetime,
     ):
+        """
+        Create observation
+
+        :param unit: Unit to create observation for
+        :type unit: SupportsMinMax
+        :param start: Start time
+        :type start: datetime
+        :param end: End time
+        :type end: datetime
+        :return: Observation
+        :rtype: torch.Tensor"""
         end_excl = end - unit.index.freq
 
         # in rl_units operator in ASSUME
@@ -245,6 +295,16 @@ class RLStrategy(LearningStrategy):
         marketconfig: MarketConfig,
         orderbook: Orderbook,
     ):
+        """
+        Calculate reward
+
+        :param unit: Unit to calculate reward for
+        :type unit: SupportsMinMax
+        :param marketconfig: Market configuration
+        :type marketconfig: MarketConfig
+        :param orderbook: Orderbook
+        :type orderbook: Orderbook
+        """
         product_type = marketconfig.product_type
         scaling = 0.1 / unit.max_power
         regret_scale = 0.2
