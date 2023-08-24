@@ -190,36 +190,6 @@ class PowerPlant(SupportsMinMax):
         #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")
         return self.outputs["energy"].loc[start:end_excl]
 
-    def calculate_cashflow(self, product_type: str, orderbook: Orderbook):
-        """
-        Calculates the cashflow of the unit based on the provided product type and orderbook.
-        Returns the cashflow of the unit.
-
-        :param product_type: the product type of the unit
-        :type product_type: str
-        :param orderbook: the orderbook of the unit
-        :type orderbook: Orderbook
-        :return: the cashflow of the unit
-        :rtype: float
-        """
-        for order in orderbook:
-            start = order["start_time"]
-            end = order["end_time"]
-            end_excl = end - self.index.freq
-
-            if isinstance(order["accepted_volume"], dict):
-                cashflow = float(
-                    order["accepted_price"][i] * order["accepted_volume"][i]
-                    for i in order["accepted_volume"].keys()
-                )
-            else:
-                cashflow = float(order["accepted_price"] * order["accepted_volume"])
-
-            hours = (end - start) / timedelta(hours=1)
-            self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
-                cashflow * hours
-            )
-
     def calc_simple_marginal_cost(
         self,
     ):

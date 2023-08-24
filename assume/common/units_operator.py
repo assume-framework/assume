@@ -217,8 +217,13 @@ class UnitsOperator(Role):
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
             current_dispatch = unit.execute_current_dispatch(start, now)
+            end = now - unit.index.freq
             current_dispatch.name = "power"
             data = pd.DataFrame(current_dispatch)
+            data["soc"] = unit.outputs["soc"][start:end]
+            for key in unit.outputs.keys():
+                if "cashflow" in key:
+                    data[key] = unit.outputs[key][start:end]
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
 

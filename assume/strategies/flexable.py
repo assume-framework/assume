@@ -147,7 +147,7 @@ class flexableEOM(BaseStrategy):
         :return: The bid price of the unit
         :rtype: float
         """
-        av_operating_time = max((unit.outputs[:start] > 0).mean(), 1)
+        av_operating_time = max((unit.outputs["energy"][:start] > 0).mean(), 1)
         # 1 prevents division by 0
         op_time = unit.get_operation_time(start)
         starting_cost = unit.get_starting_costs(op_time)

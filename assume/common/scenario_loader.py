@@ -298,7 +298,7 @@ async def load_scenario_folder_async(
 
     # Initialize world
 
-    save_frequency_hours = config.get("save_frequency_hours", None)
+    save_frequency_hours = config.get("save_frequency_hours", 48)
     sim_id = f"{scenario}_{study_case}"
 
     learning_config = config.get("learning_config", {})

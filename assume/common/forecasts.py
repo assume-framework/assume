@@ -111,10 +111,15 @@ class CsvForecaster(Forecaster):
         """
         Calculates the forecasts if they are not already calculated.
         """
+        cols = []
         for pp in self.powerplants.index:
             col = f"availability_{pp}"
             if col not in self.forecasts.columns:
-                self.forecasts[col] = 1
+                s = pd.Series(1, index=self.forecasts.index)
+                s.name = col
+                cols.append(s)
+        cols.append(self.forecasts)
+        self.forecasts = pd.concat(cols, axis=1).copy()
         if "price_EOM" not in self.forecasts.columns:
             self.forecasts["price_EOM"] = self.calculate_EOM_price_forecast()
         if "residual_load_EOM" not in self.forecasts.columns:
