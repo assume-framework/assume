@@ -157,7 +157,7 @@ class World:
             export_csv_path=self.export_csv_path,
             save_frequency_hours=save_frequency_hours,
         )
-        if True:
+        if same_process:
             output_agent = RoleAgent(
                 self.container, suggested_aid=self.output_agent_addr[1]
             )

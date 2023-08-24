@@ -460,8 +460,6 @@ def load_scenario_folder(
             # give the newly created rl_agent the buffer that we stored from the beginning
             world.learning_role.set_buffer(buffer)
 
-            # change simulation id of output agent to include the episode number
-
             world.run()
             world.reset()
 
