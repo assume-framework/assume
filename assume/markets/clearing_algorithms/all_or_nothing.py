@@ -52,6 +52,9 @@ def pay_as_clear_aon(market_agent: MarketRole, market_products: list[MarketProdu
             i = 0
             for i in range(min_len):
                 if supply_orders[i]["price"] <= demand_orders[i]["price"]:
+                    supply_orders[i]["accepted_volume"] = supply_orders[i]["volume"]
+                    demand_orders[i]["accepted_volume"] = demand_orders[i]["volume"]
+
                     # pay as clear - all accepted receive the highest needed/cleared price
                     if clear_price < supply_orders[i]["price"]:
                         clear_price = supply_orders[i]["price"]
@@ -62,18 +65,28 @@ def pay_as_clear_aon(market_agent: MarketRole, market_products: list[MarketProdu
             # resulting i is the cut point
             accepted_product_orders.extend(demand_orders[:i])
             accepted_product_orders.extend(supply_orders[:i])
+
+            for order in supply_orders[i:]:
+                order["accepted_volume"] = 0
+            for order in demand_orders[i:]:
+                order["accepted_volume"] = 0
+
             rejected_orders.extend(demand_orders[i:])
             rejected_orders.extend(supply_orders[i:])
 
         for order in accepted_product_orders:
-            order["price"] = clear_price
+            order["accepted_price"] = clear_price
 
-        accepted_supply_orders = [x for x in accepted_product_orders if x["volume"] > 0]
-        accepted_demand_orders = [x for x in accepted_product_orders if x["volume"] < 0]
-        supply_volume = sum(map(itemgetter("volume"), accepted_supply_orders))
-        demand_volume = -sum(map(itemgetter("volume"), accepted_demand_orders))
+        accepted_supply_orders = [
+            x for x in accepted_product_orders if x["accepted_volume"] > 0
+        ]
+        accepted_demand_orders = [
+            x for x in accepted_product_orders if x["accepted_volume"] < 0
+        ]
+        supply_volume = sum(map(itemgetter("accepted_volume"), accepted_supply_orders))
+        demand_volume = -sum(map(itemgetter("accepted_volume"), accepted_demand_orders))
         accepted_orders.extend(accepted_product_orders)
-        prices = list(map(itemgetter("price"), accepted_supply_orders))
+        prices = list(map(itemgetter("accepted_price"), accepted_supply_orders))
         if not prices:
             prices = [market_agent.marketconfig.maximum_bid]
 
@@ -123,8 +136,12 @@ def pay_as_bid_aon(market_agent: MarketRole, market_products: list[MarketProduct
             i = 0
             for i in range(min_len):
                 if supply_orders[i]["price"] <= demand_orders[i]["price"]:
+                    supply_orders[i]["accepted_volume"] = supply_orders[i]["volume"]
+                    demand_orders[i]["accepted_volume"] = demand_orders[i]["volume"]
+
                     # pay as bid - so the generator gets payed more than he needed to operate
-                    supply_orders[i]["price"] = demand_orders[i]["price"]
+                    supply_orders[i]["accepted_price"] = demand_orders[i]["price"]
+                    demand_orders[i]["accepted_price"] = demand_orders[i]["price"]
 
                 else:
                     # as we have sorted before, the other bids/supply_orders can't be matched either
@@ -133,15 +150,25 @@ def pay_as_bid_aon(market_agent: MarketRole, market_products: list[MarketProduct
 
             accepted_product_orders.extend(demand_orders[:i])
             accepted_product_orders.extend(supply_orders[:i])
+
+            for order in supply_orders[i:]:
+                order["accepted_volume"] = 0
+            for order in demand_orders[i:]:
+                order["accepted_volume"] = 0
+
             rejected_orders.extend(demand_orders[i:])
             rejected_orders.extend(supply_orders[i:])
 
-        accepted_supply_orders = [x for x in accepted_product_orders if x["volume"] > 0]
-        accepted_demand_orders = [x for x in accepted_product_orders if x["volume"] < 0]
-        supply_volume = sum(map(itemgetter("volume"), accepted_supply_orders))
-        demand_volume = -sum(map(itemgetter("volume"), accepted_demand_orders))
+        accepted_supply_orders = [
+            x for x in accepted_product_orders if x["accepted_volume"] > 0
+        ]
+        accepted_demand_orders = [
+            x for x in accepted_product_orders if x["accepted_volume"] < 0
+        ]
+        supply_volume = sum(map(itemgetter("accepted_volume"), accepted_supply_orders))
+        demand_volume = -sum(map(itemgetter("accepted_volume"), accepted_demand_orders))
         accepted_orders.extend(accepted_product_orders)
-        prices = list(map(itemgetter("price"), accepted_supply_orders))
+        prices = list(map(itemgetter("accepted_price"), accepted_supply_orders))
         if not prices:
             prices = [market_agent.marketconfig.maximum_bid]
 

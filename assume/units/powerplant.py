@@ -80,8 +80,8 @@ class PowerPlant(SupportsMinMax):
         partial_load_eff: bool = False,
         fuel_type: str = "others",
         emission_factor: float = 0.0,
-        ramp_up: float = -1,
-        ramp_down: float = -1,
+        ramp_up: float = None,
+        ramp_down: float = None,
         hot_start_cost: float = 0,
         warm_start_cost: float = 0,
         cold_start_cost: float = 0,
@@ -113,9 +113,9 @@ class PowerPlant(SupportsMinMax):
         self.emission_factor = emission_factor
 
         # check ramping enabled
-        self.ramp_down = max_power if ramp_down == -1 else ramp_down
-        self.ramp_up = max_power if ramp_up == -1 else ramp_up
-        self.min_operating_time = min_operating_time if min_operating_time > 0 else 1 
+        self.ramp_down = max_power if ramp_down is None else ramp_down
+        self.ramp_up = max_power if ramp_up is None else ramp_up
+        self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
         self.min_down_time = min_down_time if min_down_time > 0 else 1
         self.downtime_hot_start = (
             downtime_hot_start / self.index.freq.delta.total_seconds() / 3600
@@ -141,11 +141,7 @@ class PowerPlant(SupportsMinMax):
         self.marginal_cost = self.calc_simple_marginal_cost()
 
     def reset(self):
-        """
-        Reset the unit to its initial state.
-        """
-        self.current_status = 1
-        self.current_down_time = self.min_down_time
+        """Reset the unit to its initial state."""
 
         self.outputs["energy"] = pd.Series(0.0, index=self.index)
         # workaround if market schedules do not match
@@ -164,9 +160,6 @@ class PowerPlant(SupportsMinMax):
         self.outputs["profits"] = pd.Series(0.0, index=self.index)
         self.outputs["rewards"] = pd.Series(0.0, index=self.index)
         self.outputs["regrets"] = pd.Series(0.0, index=self.index)
-
-        self.mean_market_success = 0
-        self.market_success_list = [0]
 
     def execute_current_dispatch(
         self,
@@ -189,17 +182,6 @@ class PowerPlant(SupportsMinMax):
         # TODO ramp down and turn off only for relevant timesteps
         if self.outputs["energy"][start:end_excl].mean() < self.min_power:
             self.outputs["energy"].loc[start:end_excl] = 0
-            self.current_status = 0
-            self.current_down_time += 1
-            if self.market_success_list[-1] != 0:
-                self.mean_market_success = sum(self.market_success_list) / len(
-                    self.market_success_list
-                )
-                self.market_success_list.append(0)
-        else:
-            self.market_success_list[-1] += 1
-            self.current_status = 1
-            self.current_down_time = 0
 
         # TODO check if resulting power is < max_power
         # if self.outputs["energy"][start:end_excl].max() > self.max_power:
@@ -223,7 +205,15 @@ class PowerPlant(SupportsMinMax):
             start = order["start_time"]
             end = order["end_time"]
             end_excl = end - self.index.freq
-            cashflow = float(order["price"] * order["volume"])
+
+            if isinstance(order["accepted_volume"], dict):
+                cashflow = float(
+                    order["accepted_price"][i] * order["accepted_volume"][i]
+                    for i in order["accepted_volume"].keys()
+                )
+            else:
+                cashflow = float(order["accepted_price"] * order["accepted_volume"])
+
             hours = (end - start) / timedelta(hours=1)
             self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
                 cashflow * hours
@@ -330,10 +320,6 @@ class PowerPlant(SupportsMinMax):
         """
         end_excl = end - self.index.freq
 
-        # check if unit is currently off and cannot be turned on yet
-        # if unit.current_status == 0 and unit.current_down_time < unit.min_down_time:
-        #    return 0, 0
-
         base_load = self.outputs["energy"][start:end_excl]
         heat_demand = self.outputs["heat"][start:end_excl]
         assert heat_demand.min() >= 0
@@ -397,3 +383,17 @@ class PowerPlant(SupportsMinMax):
         )
 
         return unit_dict
+
+    def get_starting_costs(self, op_time):
+        """
+        op_time is hours running
+        """
+        if op_time > 0:
+            # unit is running
+            return 0
+        if -op_time < self.downtime_hot_start:
+            return self.hot_start_cost
+        elif -op_time < self.downtime_warm_start:
+            return self.warm_start_cost
+        else:
+            return self.cold_start_cost

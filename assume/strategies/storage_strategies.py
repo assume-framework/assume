@@ -185,11 +185,12 @@ class complexEOMStorage(BaseStrategy):
         :return: the bid price
         :rtype: float
         """
-        av_operating_time = max(
-            unit.mean_market_success, unit.min_operating_time, 1
-        )  # 1 prevents division by 0
+        av_operating_time = max((unit.outputs[:start] > 0).mean(), 1)
+        # 1 prevents division by 0
 
-        starting_cost = self.get_starting_costs(time=unit.current_down_time, unit=unit)
+
+        op_time = unit.get_operation_time(start)
+        starting_cost = unit.get_starting_costs(op_time)
         markup = starting_cost / av_operating_time / bid_quantity_mr
 
         bid_price_mr = min(marginal_cost_mr + markup, 3000.0)
@@ -218,11 +219,10 @@ class complexEOMStorage(BaseStrategy):
             return 0
 
         t = start
-        min_down_time = max(unit.min_down_time, 1)
+        op_time = unit.get_operation_time(start)
+        starting_cost = unit.get_starting_costs(op_time)
 
-        starting_cost = self.get_starting_costs(time=min_down_time, unit=unit)
-
-        price_reduction_restart = starting_cost / min_down_time / bid_quantity_mr
+        price_reduction_restart = starting_cost / unit.min_down_time / bid_quantity_mr
 
         possible_revenue = self.get_possible_revenues(
             marginal_cost=marginal_cost_flex,

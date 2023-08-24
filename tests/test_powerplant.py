@@ -100,12 +100,7 @@ def test_init_function(power_plant_1, power_plant_2, power_plant_3):
 
 
 def test_reset_function(power_plant_1):
-    power_plant_1.current_status = 0
-    assert power_plant_1.current_status == 0
-
     power_plant_1.reset()
-    assert power_plant_1.current_status == 1
-
     # check if total_power_output is reset
     assert power_plant_1.outputs["energy"].equals(
         pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
@@ -183,7 +178,8 @@ def test_powerplant_feedback(power_plant_1, mock_market_config):
             "end_time": end,
             "only_hours": None,
             "price": min_cost,
-            "volume": min_power[start],
+            "accepted_price": min_cost,
+            "accepted_volume": min_power[start],
         }
     ]
 

@@ -24,21 +24,7 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.markets import MarketRole, clearing_mechanisms
-from assume.strategies import (
-    DmasPowerplantStrategy,
-    DmasStorageStrategy,
-    LearningStrategy,
-    NaiveNegReserveStrategy,
-    NaivePosReserveStrategy,
-    NaiveStrategy,
-    OTCStrategy,
-    flexableEOM,
-    flexableEOMStorage,
-    flexableNegCRM,
-    flexableNegCRMStorage,
-    flexablePosCRM,
-    flexablePosCRMStorage,
-)
+from assume.strategies import LearningStrategy, bidding_strategies
 from assume.units import BaseUnit, Demand, HeatPump, PowerPlant, Storage
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
@@ -74,10 +60,11 @@ class World:
                     self.db.connection()
                     connected = True
                     self.logger.info("connected to db")
-                except OperationalError:
+                except OperationalError as e:
                     self.logger.error(
                         f"could not connect to {database_uri}, trying again"
                     )
+                    self.logger.error(f"{e}")
                     time.sleep(2)
         else:
             self.db = None
@@ -91,20 +78,8 @@ class World:
             "demand": Demand,
             "storage": Storage,
         }
-        self.bidding_types = {
-            "flexable_eom": flexableEOM,
-            "flexable_pos_crm": flexablePosCRM,
-            "flexable_neg_crm": flexableNegCRM,
-            "flexable_eom_storage": flexableEOMStorage,
-            "flexable_pos_crm_storage": flexablePosCRMStorage,
-            "flexable_neg_crm_storage": flexableNegCRMStorage,
-            "naive": NaiveStrategy,
-            "naive_neg_reserve": NaiveNegReserveStrategy,
-            "naive_pos_reserve": NaivePosReserveStrategy,
-            "otc_strategy": OTCStrategy,
-            "dmas": DmasPowerplantStrategy,
-            "dmas_storage": DmasStorageStrategy,
-        }
+
+        self.bidding_types = bidding_strategies
 
         try:
             from assume.strategies.learning_strategies import RLStrategy
@@ -141,31 +116,30 @@ class World:
 
         # kill old container if exists
         if isinstance(self.container, Container) and self.container.running:
-            self.container.shutdown()
+            await self.container.shutdown()
 
         # create new container
         self.container = await create_container(
             addr=self.addr, clock=self.clock, codec=mango_codec_factory()
         )
 
-        # initiate learning if the learning mode is one and hence we want to learn new strategies
-        if self.learning_config.get("learning_mode"):
+        # initiate learning if the learning mode is on and hence we want to learn new strategies
+        if self.learning_config.get("learning_mode", False):
             # if so, we initate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
 
             self.learning_role = Learning(
                 learning_config=self.learning_config,
+                start=self.start,
+                end=self.end,
             )
             self.bidding_params.update(self.learning_config)
 
-            same_process = True
-            if same_process:
+            if True:  # separate process does not support buffer and learning
                 rl_agent = RoleAgent(self.container, suggested_aid="learning_agent")
                 rl_agent.add_role(self.learning_role)
             else:
-                # this does not set the clock in output_agent correctly yet
-                # see https://gitlab.com/mango-agents/mango/-/issues/59
-                # but still improves performance
+
                 def creator(container):
                     agent = RoleAgent(container, suggested_aid="learning_agent")
                     agent.add_role(self.learning_role)
@@ -260,13 +234,12 @@ class World:
                 continue
 
             try:
-                if issubclass(self.bidding_types[strategy], LearningStrategy):
-                    self.learning_role.n_rl_units += 1
-                    self.learning_role.rl_units.append(id)
-
                 bidding_strategies[product_type] = self.bidding_types[strategy](
                     **self.bidding_params
                 )
+                # TODO find better way to count learning agents
+                if issubclass(self.bidding_types[strategy], LearningStrategy):
+                    self.learning_role.rl_units[id] = bidding_strategies[product_type]
 
             except KeyError as e:
                 self.logger.error(

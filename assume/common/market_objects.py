@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Callable, NamedTuple, TypedDict
+from numbers import Number
+from typing import Callable, NamedTuple, Optional, TypedDict
 
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
@@ -42,10 +43,12 @@ class Order(TypedDict):
     bid_id: str
     start_time: datetime
     end_time: datetime
-    volume: int  # positive if generation
-    price: int
-    only_hours: OnlyHours | None = None
+    volume: Number | dict[datetime, Number]  # positive if generation
+    accepted_volume: Number | dict[datetime, Number]
+    price: Number
+    accepted_price: Number | dict[datetime, Number]
     agent_id: str
+    only_hours: Optional[OnlyHours]
 
 
 Orderbook = list[Order]

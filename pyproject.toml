@@ -29,7 +29,7 @@ packages = [
 [tool.poetry.dependencies]
 python = "^3.10"
 paho-mqtt = "^1.5.1"
-mango-agents = "^1.1.0"
+mango-agents = {git = "https://gitlab.com/maurerle/mango"}
 tqdm = "^4.64.1"
 python-dateutil = "^2.8.2"
 sqlalchemy = "^2.0.9"
@@ -84,6 +84,10 @@ filterwarnings = [
     "ignore:Call to deprecated create function FileDescriptor",
     "ignore:Call to deprecated create function EnumValueDescriptor",
     "ignore:Call to deprecated create function EnumDescriptor",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "require_learning",
 ]
 
 [tool.coverage.run]

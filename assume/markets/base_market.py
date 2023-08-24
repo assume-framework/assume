@@ -173,9 +173,28 @@ class MarketRole(Role):
                 assert (
                     order["price"] >= min_price
                 ), f"minimum_bid_price {order['price']}"
-                assert (
-                    abs(order["volume"]) <= max_volume
-                ), f"max_volume {order['volume']}"
+
+                if "bid_type" in order.keys():
+                    order["bid_type"] = (
+                        "SB" if order["bid_type"] == None else order["bid_type"]
+                    )
+                    assert order["bid_type"] in [
+                        "SB",
+                        "BB",
+                    ], f"bid_type {order['bid_type']} not in ['SB', 'BB']"
+
+                if (
+                    "bid_type" in order.keys() and order["bid_type"] == "SB"
+                ) or "bid_type" not in order.keys():
+                    assert (
+                        abs(order["volume"]) <= max_volume
+                    ), f"max_volume {order['volume']}"
+
+                if "bid_type" in order.keys() and order["bid_type"] == "BB":
+                    assert (
+                        abs(order["volume"].values()) <= max_volume
+                    ).all(), f"max_volume {order['volume']}"
+
                 if self.marketconfig.price_tick:
                     assert isinstance(order["price"], int)
                 if self.marketconfig.volume_tick:
@@ -229,6 +248,11 @@ class MarketRole(Role):
         )
 
     async def clear_market(self, market_products: list[MarketProduct]):
+        # Check if order is in time slots for current opening
+        # for order in self.all_orders:
+        #     assert (
+        #         order["start_time"] in index
+        #     ), f"order start time not in {self.marketconfig.market_products}"
         (
             accepted_orderbook,
             rejected_orderbook,

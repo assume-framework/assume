@@ -107,7 +107,7 @@ class BaseUnit:
             start = order["start_time"]
             end = order["end_time"]
             end_excl = end - self.index.freq
-            self.outputs[product_type].loc[start:end_excl] += order["volume"]
+            self.outputs[product_type].loc[start:end_excl] += order["accepted_volume"]
 
         self.calculate_cashflow(product_type, orderbook)
 
@@ -298,16 +298,23 @@ class SupportsMinMax(BaseUnit):
         returns the operation time
         if unit is on since 4 hours, it returns 4
         if the unit is off since 4 hours, it returns -4
-
+        The value at start is not considered
+        
         :param start: the start time
         :type start: datetime
         :return: the operation time
         :rtype: int
+
         """
+        before = start - self.index.freq
+        # before = start
         max_time = max(self.min_operating_time, self.min_down_time)
-        begin = start - self.index.freq * max_time
-        end = start
+        begin = before - self.index.freq * max_time
+        end = before
         arr = self.outputs["energy"][begin:end][::-1] > 0
+        if len(arr) < 1:
+            # before start of index
+            return max_time
         is_off = not arr[0]
         runn = 0
         for val in arr:
@@ -441,9 +448,11 @@ class SupportsMinMaxCharge(BaseUnit):
 
     def calculate_ramp_discharge(
         self,
+        previous_soc: float,
         previous_power: float,
         power_discharge: float,
         current_power: float = 0,
+        min_power_discharge: float = 0,
     ) -> float:
         """
         calculates the ramp for the given discharging power
@@ -459,19 +468,36 @@ class SupportsMinMaxCharge(BaseUnit):
         """
         if power_discharge == 0:
             return power_discharge
-        power_discharge = min(
-            power_discharge,
-            previous_power + self.ramp_up_discharge - current_power,
-        )
 
-        power_discharge = max(
-            power_discharge,
-            previous_power - self.ramp_down_discharge - current_power,
-        )
+        # if storage was charging before and ramping for charging is defined
+        if previous_power < 0 and self.ramp_down_charge != None:
+            power_discharge = max(
+                previous_power - self.ramp_down_charge - current_power, 0
+            )
+        else:
+            # Assuming the storage is not restricted by ramping charging down
+            if previous_power < 0:
+                previous_power = 0
+
+            power_discharge = min(
+                power_discharge,
+                max(0, previous_power + self.ramp_up_discharge - current_power),
+            )
+            # restrict only if ramping defined
+            if self.ramp_down_discharge != None:
+                power_discharge = max(
+                    power_discharge,
+                    previous_power - self.ramp_down_discharge - current_power,
+                    0,
+                )
         return power_discharge
 
     def calculate_ramp_charge(
-        self, previous_power: float, power_charge: float, current_power: float = 0
+        self,
+        previous_soc: float,
+        previous_power: float,
+        power_charge: float,
+        current_power: float = 0,
     ) -> float:
         """
         calculates the ramp for the given charging power
@@ -487,12 +513,29 @@ class SupportsMinMaxCharge(BaseUnit):
         """
         if power_charge == 0:
             return power_charge
-        power_charge = max(
-            power_charge, previous_power + self.ramp_up_charge - current_power
-        )
-        power_charge = min(
-            power_charge, previous_power - self.ramp_down_charge - current_power
-        )
+
+        # assuming ramping down discharge restricts ramp up of charge
+        # if storage was discharging before and ramp_down_discharge is defined
+        if previous_power > 0 and self.ramp_down_discharge != 0:
+            power_charge = min(
+                previous_power - self.ramp_down_discharge - current_power, 0
+            )
+        else:
+            if previous_power > 0:
+                previous_power = 0
+
+            power_charge = max(
+                power_charge,
+                min(previous_power + self.ramp_up_charge - current_power, 0),
+            )
+            # restrict only if ramping defined
+            if self.ramp_down_charge != 0:
+                power_charge = min(
+                    power_charge,
+                    previous_power - self.ramp_down_charge - current_power,
+                    0,
+                )
+
         return power_charge
 
 
@@ -571,3 +614,6 @@ class LearningStrategy(BaseStrategy):
         super().__init__(*args, **kwargs)
         self.obs_dim = kwargs.get("observation_dimension", 50)
         self.act_dim = kwargs.get("action_dimension", 2)
+
+    def update_transition(self, transitions):
+        pass

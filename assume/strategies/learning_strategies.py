@@ -135,9 +135,8 @@ class RLStrategy(LearningStrategy):
         bid_price_inflex = min(bid_prices)
 
         # Flex-bid price formulation
-        if unit.current_status:
-            bid_quantity_flex = max_power - bid_quantity_inflex
-            bid_price_flex = max(bid_prices)
+        bid_quantity_flex = max_power - bid_quantity_inflex
+        bid_price_flex = max(bid_prices)
 
         bids = [
             {
@@ -367,3 +366,12 @@ class RLStrategy(LearningStrategy):
         unit.outputs["profit"].loc[start:end_excl] += float(profit)
         unit.outputs["reward"].loc[start:end_excl] += reward
         unit.outputs["regret"].loc[start:end_excl] = float(opportunity_cost)
+
+    def update_transition(self, transitions):
+        if not self.learning_mode:
+            raise Exception("got transition while not in learningmode")
+        super().update_transition(transitions)
+        states = transitions.observations
+        actions = transitions.actions
+        next_states = transitions.next_observations
+        rewards = transitions.rewards

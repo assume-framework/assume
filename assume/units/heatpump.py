@@ -99,11 +99,8 @@ class HeatPump(SupportsMinMax):
         self.dr_factor = dr_factor
 
     def reset(self):
-        """
-        Reset the unit to its initial state.
-        """
-        self.current_status = 1
-        self.current_down_time = self.min_down_time
+        """Reset the unit to its initial state."""
+
 
         self.outputs["heat"] = pd.Series(0.0, index=self.index)
         min_thermal_output = self.outputs["heat"].loc[
@@ -156,9 +153,6 @@ class HeatPump(SupportsMinMax):
         assert heat_demand.min() >= 0
 
         cop = self.calculate_cop()
-
-        if self.current_status == 0 and self.current_down_time < self.min_down_time:
-            return None
 
         # check if min_power is a series or a float
         min_power = (
@@ -217,11 +211,7 @@ class HeatPump(SupportsMinMax):
         if self.outputs["energy"][start:end_excl].min() < self.min_power:
             self.outputs["energy"].loc[start:end_excl] = 0
             self.outputs["heat"].loc[start:end_excl] = 0
-            self.current_status = 0
-            self.current_down_time += 1
         else:
-            self.current_status = 1
-            self.current_down_time = 0
             self.outputs["heat"].loc[start:end_excl] = self.outputs["energy"][
                 start:end_excl
             ]
