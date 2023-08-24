@@ -58,13 +58,18 @@ conda activate assume-framework
 
 Quick Start
 -----------
-To run an exemplar simulation without database and grafana, run the following command:
+There are 3 ways to run an exemplar.
+1. local (without database and grafana)
+2. with docker (with database and grafana)
+3. use CLI to run simulations
+
+1. To run an exemplar simulation without database and grafana, run the following command:
 
 ```
 python examples/examples.py
 ```
 
-If you have docker installed, you can run the following two commands
+2. If you have docker installed, you can run the following two commands
 
 Note: you have to select 'timescale' in examples.py
 ```
@@ -73,9 +78,8 @@ Note: you have to select 'timescale' in examples.py
 ```
 This will start a container for timescaledb and grafana with preconfigured grafana dashboard.
 Afterwards you can access the Dashboard on `http://localhost:3000`
-<br>
 
-You can also use the cli to run simulations:
+3. You can also use the cli to run simulations:
 
 ```
 assume -s example_01b -db "postgresql://assume:assume@localhost:5432/assume"
