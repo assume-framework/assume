@@ -354,3 +354,6 @@ class LearningStrategy(BaseStrategy):
         super().__init__(*args, **kwargs)
         self.obs_dim = kwargs.get("observation_dimension", 50)
         self.act_dim = kwargs.get("action_dimension", 2)
+
+    def update_transition(self, transitions):
+        pass
