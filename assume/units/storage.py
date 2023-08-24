@@ -73,29 +73,6 @@ class Storage(SupportsMinMaxCharge):
         In case the unit is active it has to be defined which bidding strategy should be used
     **kwargs
         Additional keyword arguments.
-
-    Methods
-    -------
-    reset()
-        Reset the storage unit to its initial state
-    execute_current_dispatch()
-        Executes the current dispatch of the storage unit based on the provided timestamps
-    set_market_failure()
-        Set the storage unit's status to failure in the market.
-    set_market_success()
-        Set the storage unit's status to success in the market
-
-    calculate_marginal_cost() -> float
-        Calculates the marginal cost of the storage unit based on provided time and power levels.
-
-    as_dict() -> dict
-        Returns the storage unit's attributes as a dictionary, including specific attributes.
-
-    calculate_min_max_charge() -> tuple[pd.Series]
-        Calculate the minimum and maximum charge power levels of the storage unit.
-
-    calculate_min_max_discharge() -> tuple[pd.Series]
-        Calculate the minimum and maximum discharge power levels of the storage unit.
     """
 
     def __init__(
@@ -207,7 +184,9 @@ class Storage(SupportsMinMaxCharge):
         self.location = location
 
     def reset(self):
-        """Reset the unit to its initial state."""
+        """
+        Reset the unit to its initial state.
+        """
 
         # current_status = 0 means the unit is not dispatched
         self.current_status = 1
@@ -229,7 +208,15 @@ class Storage(SupportsMinMaxCharge):
         self.market_success_list = [0]
 
     def execute_current_dispatch(self, start: pd.Timestamp, end: pd.Timestamp):
-        """Execute the current dispatch of the storage unit."""
+        """
+        Execute the current dispatch of the storage unit.
+        Returns the dispatched energy in MWh.
+
+        :param start: The start of the current dispatch.
+        :param end: The end of the current dispatch.
+        :return: The dispatched energy in MWh.
+        :rtype: pd.Series
+        """
         end_excl = end - self.index.freq
 
         for t in self.outputs["energy"][start:end_excl].index:
@@ -326,6 +313,9 @@ class Storage(SupportsMinMaxCharge):
         return self.outputs["energy"].loc[start:end_excl]
 
     def set_market_failure(self):
+        """
+        Set the storage unit's status to failure in the market. 
+        """
         self.current_status = 0
         self.current_down_time += 1
         if self.market_success_list[-1] != 0:
@@ -335,6 +325,9 @@ class Storage(SupportsMinMaxCharge):
             self.market_success_list.append(0)
 
     def set_market_sucess(self):
+        """
+        Set the storage unit's status to success in the market.
+        """
         self.market_success_list[-1] += 1
         self.current_status = 1  # discharging or charging
         self.current_down_time = 0
@@ -345,6 +338,7 @@ class Storage(SupportsMinMaxCharge):
         start: pd.Timestamp,
         power: float,
     ) -> float:
+
         if power > 0:
             variable_cost = (
                 self.variable_cost_discharge.at[start]
@@ -366,6 +360,12 @@ class Storage(SupportsMinMaxCharge):
         return marginal_cost
 
     def as_dict(self) -> dict:
+        """
+        Return the storage unit's attributes as a dictionary, including specific attributes.
+        
+        :return: the storage unit's attributes as a dictionary
+        :rtype: dict
+        """
         unit_dict = super().as_dict()
         unit_dict.update(
             {
@@ -384,6 +384,16 @@ class Storage(SupportsMinMaxCharge):
     def calculate_min_max_charge(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series]:
+        """
+        Calculate the minimum and maximum charge power levels of the storage unit.
+        Returns the minimum and maximum charge power levels of the storage unit in MW.
+        
+        :param start: The start of the current dispatch.
+        :param end: The end of the current dispatch.
+        :param product_type: The product type of the storage unit.
+        :return: The minimum and maximum charge power levels of the storage unit in MW.
+        :rtype: tuple[pd.Series]
+        """
         end_excl = end - self.index.freq
         duration = pd.Timedelta(self.index.freq).seconds / 3600
 
@@ -433,6 +443,16 @@ class Storage(SupportsMinMaxCharge):
     def calculate_min_max_discharge(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series]:
+        """
+        Calculate the minimum and maximum discharge power levels of the storage unit.
+        Returns the minimum and maximum discharge power levels of the storage unit in MW.
+
+        :param start: The start of the current dispatch.
+        :param end: The end of the current dispatch.
+        :param product_type: The product type of the storage unit.
+        :return: The minimum and maximum discharge power levels of the storage unit in MW.
+        :rtype: tuple[pd.Series]
+        """
         end_excl = end - self.index.freq
         duration = pd.Timedelta(self.index.freq).seconds / 3600
 

@@ -3,8 +3,8 @@ import pandas as pd
 from assume.common.base import SupportsMinMax
 
 
-
-"""A class for a heatpump unit.
+class HeatPump(SupportsMinMax):
+    """A class for a heatpump unit.
 
     :param id: unique identifier for the unit
     :type id: str
@@ -44,26 +44,7 @@ from assume.common.base import SupportsMinMax
     :type dr_factor: float
     :param kwargs: additional keyword arguments 
     :type kwargs: dict
-
-
-    Methods
-    ----------
-    def reset()
-    Reset the heat pump to its initial state
-
-    calculate_cop()
-        Calculates the Coefficient of Performance (efficiency) of the heat pump based on source and sink temperatures.
-    
-    calculate_min_max_power() -> tuple[float]
-        Calculates and returns the minimum and maximum power output of the heat pump for a given time step.
-
-    execute_current_dispatch():
-        Executes the current dispatch of the heat pump and returns its energy dispatch.
-
-    calc_marginal_cost() -> float | pd.Series
-        Calculate the marginal cost for the heat pump at the given time step.
 """
-class HeatPump(SupportsMinMax):
     def __init__(
         self,
         id: str,
@@ -135,12 +116,12 @@ class HeatPump(SupportsMinMax):
     def calculate_cop(self):
         """
         Calculates the COP of a heat pump given the temperature difference between the source and sink temperatures.
+        Returns the calculated COP as a float.
 
-        Parameters:
-        heat_pump_type (str): type of heat pump, either 'air' for air-sourced heat pumps or 'soil' for ground-sourced heat pumps
-
-        Returns:
-        float: the calculated COP
+        :param heat_pump_type: the type of heat pump, either 'air' for air-sourced heat pumps or 'soil' for ground-sourced heat pumps
+        :type heat_pump_type: str
+        :return: the calculated COP
+        :rtype: float
         """
         delta_t = (
             self.forecaster["sink_temperature"] - self.forecaster["source_temperature"]
@@ -158,11 +139,17 @@ class HeatPump(SupportsMinMax):
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[float]:
         """Calculate the min and max power for the given time step.
+        Returns None if the unit is not available for dispatch.
+        Returns the min and max power if the unit is available for dispatch.
 
-        Returns
-        -------
-        min_power : float
-        max_power : float
+        :param start: the start time of the dispatch
+        :type start: pd.Timestamp
+        :param end: the end time of the dispatch
+        :type end: pd.Timestamp
+        :param product_type: the product type of the unit
+        :type product_type: str
+        :return: the min and max power of the unit
+        :rtype: tuple[float]
         """
         end_excl = end - self.index.freq
         heat_demand = self.outputs["heat"][start:end_excl]
@@ -217,6 +204,13 @@ class HeatPump(SupportsMinMax):
         This checks if the market feedback is feasible for the given unit.
         And sets the closest dispatch if not.
         The end param should be inclusive.
+
+        :param start: the start time of the dispatch
+        :type start: pd.Timestamp
+        :param end: the end time of the dispatch
+        :type end: pd.Timestamp
+        :return: the volume of the unit within the given time range
+        :rtype: pd.Series
         """
         end_excl = end - self.index.freq
 
@@ -236,17 +230,14 @@ class HeatPump(SupportsMinMax):
     def calc_marginal_cost(self, timestep: pd.Timestamp) -> float | pd.Series:
         """
         Calculate the marginal cost for the heat pump at the given time step.
+        Returns the calculated bid price as a float or pd.Series.
 
-        Parameters
-        ----------
-        timestep : pd.Timestamp
-            The current time step.
-
-        Returns
-        -------
-        bid_price : float
-            The calculated bid_price.
+        :param timestep: the current time step
+        :type timestep: pd.Timestamp
+        :return: the calculated bid price
+        :rtype: float | pd.Series
         """
+
         cop = self.calculate_cop()
         cop_t = cop.loc[timestep]
 
