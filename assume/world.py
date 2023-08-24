@@ -106,6 +106,7 @@ class World:
         same_process: bool = True,
         bidding_params: dict = {},
         learning_config: dict = {},
+        episode: int = 0,
     ):
         self.clock = ExternalClock(0)
         self.start = start
@@ -149,14 +150,14 @@ class World:
         self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to world
         self.output_role = WriteOutput(
-            simulation_id=simulation_id,
+            simulation_id=f"{simulation_id}_{episode}",
             start=start,
             end=end,
             db_engine=self.db,
             export_csv_path=self.export_csv_path,
             save_frequency_hours=save_frequency_hours,
         )
-        if same_process:
+        if True:
             output_agent = RoleAgent(
                 self.container, suggested_aid=self.output_agent_addr[1]
             )
