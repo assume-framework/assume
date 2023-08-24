@@ -3,6 +3,29 @@ import pandas as pd
 from assume.common.base import SupportsMinMax
 
 
+
+"""A class for a heatpump unit.
+
+    Attributes
+    ----------
+
+    Methods
+    ----------
+    def reset()
+    Reset the heat pump to its initial state
+
+    calculate_cop()
+        Calculates the Coefficient of Performance (efficiency) of the heat pump based on source and sink temperatures.
+    
+    calculate_min_max_power() -> tuple[float]
+        Calculates and returns the minimum and maximum power output of the heat pump for a given time step.
+
+    execute_current_dispatch():
+        Executes the current dispatch of the heat pump and returns its energy dispatch.
+
+    calc_marginal_cost() -> float | pd.Series
+        Calculate the marginal cost for the heat pump at the given time step.
+"""
 class HeatPump(SupportsMinMax):
     def __init__(
         self,

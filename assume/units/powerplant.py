@@ -11,6 +11,82 @@ logger = logging.getLogger(__name__)
 
 
 class PowerPlant(SupportsMinMax):
+    """
+    A class for a powerplant unit
+
+    Attirbutes
+    ----------
+    id : str
+        The ID of the storage unit.
+    technology : str
+        The technology of the storage unit.
+    node : str
+        The node of the storage unit.
+    max_power: float
+        The maximum power output capacity of the power plant in MW.
+    min_power: float = 0.0
+        The minimum power output capacity of the power plant in MW. (Defaults to 0.0 MW)
+    efficiency: float = 1.0
+        The efficiency of the poewr plant in converting fuel to electricity (Defaults to 1.0)
+    fixed_cost: float = 0.0
+        The fixed operating cost of the power plant, independent of the power output (Defaults to 0.0 monetary units)
+    partial_load_eff: bool = False
+        Does the efficiency varies at part loads? (Defaults to False)
+    fuel_type: str = "others"
+        The type of fuel used by the power plant for power generation (Defaults to "others")
+    emission_factor: float = 0.0
+        The emission factor associated with the power plants fuel type -> CO2 emissions per unit of energy produced (Defaults to 0.0.)
+    ramp_up: float = -1
+        The ramp-up rate of the power plant, indicating how quickly it can increase power output (Defaults to -1)
+    ramp_down: float = -1
+        The ramp-down rate of the power plant, indicating how quickly it can decrease power output. (Defaults to -1)
+    hot_start_cost: float = 0
+        The cost of a hot start, where the power plant is restarted after a recent shutdown.(Defaults to 0 monetary units.)
+    warm_start_cost: float = 0
+        The cost of a warm start, where the power plant is restarted after a moderate downtime.(Defaults to 0 monetary units.)
+    cold_start_cost: float = 0
+        The cost of a cold start, where the power plant is restarted after a prolonged downtime.(Defaults to 0 monetary units.)
+    min_operating_time: float = 0
+        The minimum duration that the power plant must operate once started, in hours.(Defaults to 0 hours.)
+    min_down_time: float = 0
+        The minimum downtime required after a shutdown before the power plant can be restarted, in hours.(Defaults to 0 hours.)
+    downtime_hot_start: int = 8
+        The downtime required after a hot start before the power plant can be restarted, in hours.(Defaults to 8 hours.)
+    downtime_warm_start: int = 48
+        The downtime required after a warm start before the power plant can be restarted, in hours.( Defaults to 48 hours.)
+    heat_extraction: bool = False
+        A boolean indicating whether the power plant can extract heat for external purposes.(Defaults to False.)        
+    max_heat_extraction: float = 0
+        The maximum amount of heat that the power plant can extract for external use, in some suitable unit.(Defaults to 0.)
+    location: tuple[float, float] = (0.0, 0.0)
+        The geographical coordinates (latitude and longitude) of the power plant's location.(Defaults to (0.0, 0.0).)
+    node: str = "bus0"
+        The identifier of the electrical bus or network node to which the power plant is connected.(Defaults to "bus0".)
+
+   Methods
+    -------
+    reset()
+        Reset the unit to its initial state.
+    init_marginal_cost()
+        Initialize the marginal cost of the unit using the calc_simple_marginal_cost()-Method
+    execute_current_dispatch()
+        Executes the current dispatch of the unit based on the provided timestamps.
+    calc_marginal_cost(power_output, partial_load_eff)
+        Calculate the marginal cost of the storage unit.
+    calculate_cashflow()
+        Calculates the cashflow of the unit based on the provided product type and orderbook.
+    calc_simple_marginal_cost():
+        Calculates the marginal cost of the unit
+    calc_marginal_cost_with_partial_eff():
+        Calculates the marginal cost of the unit based on power output and timestamp, considering partial efficiency.
+    calculate_min_max_power()
+        Calculate the minimum and maximum power levels of the unit
+    calculate_marginal_cost()
+        Calculates the marginal cost of the unit at a specific time and power level
+    as_dict() -> dict
+        Returns the attributes of the unit as a dictionary, including specific attributes.
+        
+    """
     def __init__(
         self,
         id: str,
@@ -60,7 +136,7 @@ class PowerPlant(SupportsMinMax):
         # check ramping enabled
         self.ramp_down = max_power if ramp_down == -1 else ramp_down
         self.ramp_up = max_power if ramp_up == -1 else ramp_up
-        self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
+        self.min_operating_time = min_operating_time if min_operating_time > 0 else 1 
         self.min_down_time = min_down_time if min_down_time > 0 else 1
         self.downtime_hot_start = (
             downtime_hot_start / self.index.freq.delta.total_seconds() / 3600
@@ -80,11 +156,11 @@ class PowerPlant(SupportsMinMax):
         self.init_marginal_cost()
 
     def init_marginal_cost(self):
+        """Initialize the marginal cost of the unit."""
         self.marginal_cost = self.calc_simple_marginal_cost()
 
     def reset(self):
         """Reset the unit to its initial state."""
-
         self.current_status = 1
         self.current_down_time = self.min_down_time
 
@@ -114,6 +190,7 @@ class PowerPlant(SupportsMinMax):
         start: pd.Timestamp,
         end: pd.Timestamp,
     ):
+        """Execute the current dispatch of the unit."""
         end_excl = end - self.index.freq
         # TODO ramp down and turn off only for relevant timesteps
         if self.outputs["energy"][start:end_excl].mean() < self.min_power:
@@ -137,6 +214,7 @@ class PowerPlant(SupportsMinMax):
         return self.outputs["energy"].loc[start:end_excl]
 
     def calculate_cashflow(self, product_type: str, orderbook: Orderbook):
+        """Calculate the cashflow of the unit."""
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
@@ -150,6 +228,7 @@ class PowerPlant(SupportsMinMax):
     def calc_simple_marginal_cost(
         self,
     ):
+        """Calculate the marginal cost of the unit (simple method)"""
         fuel_price = self.forecaster.get_price(self.fuel_type)
         marginal_cost = (
             fuel_price / self.efficiency
@@ -246,8 +325,10 @@ class PowerPlant(SupportsMinMax):
         return min_power, max_power
 
     def calculate_marginal_cost(self, start: datetime, power: float):
+        #if marginal costs already exists, return it
         if self.marginal_cost is not None:
             return self.marginal_cost[start]
+        #if not, calculate it
         else:
             return self.calc_marginal_cost_with_partial_eff(
                 power_output=power,
@@ -255,6 +336,7 @@ class PowerPlant(SupportsMinMax):
             )
 
     def as_dict(self) -> dict:
+        """Return the unit as a dictionary."""
         unit_dict = super().as_dict()
         unit_dict.update(
             {
