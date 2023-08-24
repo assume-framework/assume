@@ -5,6 +5,7 @@ from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
 
+import pandas as pd
 from mango import Role
 
 from assume.common.market_objects import (
@@ -199,7 +200,16 @@ class MarketRole(Role):
         orderbook: Orderbook = content["orderbook"]
         agent_addr = meta["sender_addr"]
         agent_id = meta["sender_id"]
-        # TODO check if products are part of currently open Market Openings
+
+        delivery_start = (
+            datetime.utcfromtimestamp(self.context.current_timestamp)
+            + self.marketconfig.market_products[0].first_delivery
+        )
+        delivery_end = (
+            delivery_start
+            + self.marketconfig.market_products[0].count
+            * self.marketconfig.market_products[0].duration
+        )
         try:
             max_price = self.marketconfig.maximum_bid_price
             min_price = self.marketconfig.minimum_bid_price
@@ -213,6 +223,16 @@ class MarketRole(Role):
                 max_volume = math.floor(max_volume / self.marketconfig.volume_tick)
 
             for order in orderbook:
+                assert order["start_time"] in pd.date_range(
+                    start=delivery_start,
+                    end=delivery_end,
+                    freq=self.marketconfig.market_products[0].duration,
+                ), f"order start time out of market delivery range"
+                assert order["end_time"] in pd.date_range(
+                    start=delivery_start,
+                    end=delivery_end,
+                    freq=self.marketconfig.market_products[0].duration,
+                ), f"order end time out of market delivery range"
                 order["agent_id"] = (agent_addr, agent_id)
                 if not order.get("only_hours"):
                     order["only_hours"] = None

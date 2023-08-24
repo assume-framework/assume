@@ -16,12 +16,16 @@ availabe_examples = {
     "small_dam": {"scenario": "example_01a", "study_case": "dam"},
     "small_with_opt_clearing": {
         "scenario": "example_01a",
-        "study_case": "dam_with_complex_clearing",
+        "study_case": "dam_with_complex_opt_clearing",
     },
     "small_with_vre": {"scenario": "example_01b", "study_case": "base"},
     "small_with_vre_and_storage": {
         "scenario": "example_01c",
         "study_case": "eom_only",
+    },
+    "small_with_vre_and_storage_and_complex_clearing": {
+        "scenario": "example_01c",
+        "study_case": "dam_with_complex_opt_clearing",
     },
     "small_with_crm": {
         "scenario": "example_01c",
