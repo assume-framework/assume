@@ -442,6 +442,7 @@ class UnitsOperator(Role):
 
             learning_role_id = "learning_agent"
             learning_role_addr = self.context.addr
+
             if learning_role_id and learning_role_addr:
                 self.context.schedule_instant_acl_message(
                     receiver_id=learning_role_id,
