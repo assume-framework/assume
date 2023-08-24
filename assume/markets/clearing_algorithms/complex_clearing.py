@@ -249,6 +249,173 @@ def pay_as_clear_complex_opt(
     )
 
 
+def pay_as_clear_complex_opt_mar(
+    market_agent: MarketRole,
+    market_products: list[MarketProduct],
+):
+    if len(market_agent.all_orders) == 0:
+        return [], [], []
+
+    assert "accepted_price" in market_agent.marketconfig.additional_fields
+    assert "bid_type" in market_agent.marketconfig.additional_fields
+    assert "profile" in market_agent.marketconfig.additional_fields
+    assert "minimum_acceptance_ratio" in market_agent.marketconfig.additional_fields
+
+    price_cap = (
+        market_agent.marketconfig.minimum_bid_price,
+        market_agent.marketconfig.maximum_bid_price,
+    )
+
+    market_getter = itemgetter("start_time", "end_time", "only_hours")
+    market_agent.all_orders.sort(key=market_getter)
+
+    orders = market_agent.all_orders
+
+    model = pyo.ConcreteModel()
+
+    model.T = pyo.Set(
+        initialize=[market_product[0] for market_product in market_products],
+        doc="timesteps",
+    )
+    model.Bids = pyo.Set(
+        initialize=[order["bid_id"] for order in orders], doc="all_bids"
+    )
+    # model.sBids = pyo.Set(
+    #     initialize=[order["bid_id"] for order in orders if order["bid_type"] == "SB"],
+    #     doc="simple_bids",
+    # )
+    # model.bBids = pyo.Set(
+    #     initialize=[order["bid_id"] for order in orders if order["bid_type"] == "BB"],
+    #     doc="block_bids",
+    # )
+
+    model.x = pyo.Var(
+        model.Bids,
+        domain=pyo.NonNegativeReals,
+        bounds=(0, 1),
+        doc="bid_acceptance_ratio",
+    )
+    model.u = pyo.Var(
+        model.Bids,
+        domain=pyo.Binary,
+        doc="bid_acceptance_binary",
+    )
+
+    model.prices = pyo.Var(model.T, domain=pyo.Reals, doc="prices", bounds=price_cap)
+    model.surplus = pyo.Var(model.Bids, domain=pyo.NonNegativeReals, doc="surplus")
+
+    balance_expr = {t: 0.0 for t in model.T}
+    for order in orders:
+        if order["bid_type"] == "SB":
+            balance_expr[order["start_time"]] += (
+                order["volume"] * model.x[order["bid_id"]]
+            )
+        elif order["bid_type"] == "BB":
+            for start_time, volume in order["volume"].items():
+                balance_expr[start_time] += volume * model.x[order["bid_id"]]
+
+    def energy_balance_rule(m, t):
+        return balance_expr[t] == 0
+
+    model.energy_balance = pyo.Constraint(model.T, rule=energy_balance_rule)
+
+    mar_expr = {bid_id: 0.0 for bid_id in model.Bids}
+    for order in orders:
+        mar_expr[order["start_time"]] = (
+            order["minimum_acceptance_ratio"] * model.u[order["bid_id"]]
+        )
+
+    def mar_min_rule(m, bid_id):
+        return m.x[bid_id] >= mar_expr[bid_id]
+
+    def mar_max_rule(m, bid_id):
+        return m.x[bid_id] <= m.u[bid_id]
+
+    model.mar_min = pyo.Constraint(model.Bids, rule=mar_min_rule)
+    model.mar_max = pyo.Constraint(model.Bids, rule=mar_max_rule)
+
+    surplus_expr = {bid_id: 0.0 for bid_id in model.Bids}
+    for order in orders:
+        if order["bid_type"] == "SB":
+            surplus_expr[order["bid_id"]] = (
+                (model.prices[order["start_time"]] - order["price"])
+                * order["volume"]
+                * model.x[order["bid_id"]]
+            )
+
+        elif order["bid_type"] == "BB":
+            bid_volume = sum(order["volume"].values())
+            big_M = (
+                (price_cap[1] - price_cap[0]) * bid_volume * model.x[order["bid_id"]]
+            )
+            surplus_expr[order["bid_id"]] = (
+                sum(model.prices[t] * v for t, v in order["volume"].items())
+                * model.x[order["bid_id"]]
+                - order["price"] * bid_volume
+            ) - big_M * (1 - model.u[order["bid_id"]])
+
+    def surplus_rule(m, bid_id):
+        return m.surplus[bid_id] >= surplus_expr[bid_id]
+
+    model.surplus_rule = pyo.Constraint(model.Bids, rule=surplus_rule)
+
+    primal_obj_expr = 0
+    for order in orders:
+        if order["bid_type"] == "SB":
+            primal_obj_expr += (
+                order["price"] * order["volume"] * model.x[order["bid_id"]]
+            )
+        elif order["bid_type"] == "BB":
+            for start_time, volume in order["volume"].items():
+                primal_obj_expr += order["price"] * volume * model.x[order["bid_id"]]
+
+    primal_obj_expr *= -1
+    model.objective = pyo.Objective(expr=primal_obj_expr, sense=pyo.maximize)
+
+    def dual_obj_rule(m):
+        return sum(m.surplus[bid_id] for bid_id in m.Bids)
+
+    # model.objective_dual = pyo.Objective(rule=dual_obj_rule, sense=pyo.minimize)
+
+    def primal_eql_dual(m):
+        return primal_obj_expr >= dual_obj_rule(m)
+
+    model.primal_eql_dual = pyo.Constraint(rule=primal_eql_dual)
+    eps = 1e-4
+    solvers = check_available_solvers(*SOLVERS)
+
+    solver = (
+        SolverFactory("gurobi") if "gurobi" in solvers else SolverFactory(solvers[0])
+    )
+    if solver.name == "gurobi":
+        options = {"cutoff": -1.0, "eps": eps}
+    else:
+        options = {}
+        raise ValueError(
+            f"Solver {solver} does not support cutoff, might not find solution."
+        )
+
+    # Solve the model
+    result = solver.solve(model, options=options)
+
+    if result.solver.termination_condition == TerminationCondition.infeasible:
+        market_agent.all_orders = []
+        raise Exception("infeasible")
+
+    # Find the dual variable for the balance constraint
+    market_clearing_prices = {t: model.prices[t].value for t in model.T}
+
+    market_agent.all_orders = []
+
+    return extract_results(
+        model=model,
+        eps=eps,
+        orders=orders,
+        market_products=market_products,
+        market_clearing_prices=market_clearing_prices,
+    )
+
+
 def extract_results(
     model,
     eps,
@@ -265,7 +432,7 @@ def extract_results(
 
     for order in orders:
         if order["bid_type"] == "SB":
-            acceptance = model.xs[order["bid_id"]].value
+            acceptance = model.x[order["bid_id"]].value
             acceptance = 0 if acceptance < eps else acceptance
             order["accepted_volume"] = acceptance * order["volume"]
             order["accepted_price"] = market_clearing_prices[order["start_time"]]
@@ -276,7 +443,7 @@ def extract_results(
                 demand_volume_dict[order["start_time"]] += order["accepted_volume"]
 
         elif order["bid_type"] == "BB":
-            acceptance = model.xb[order["bid_id"]].value
+            acceptance = model.x[order["bid_id"]].value
             acceptance = 0 if acceptance < eps else acceptance
 
             for start_time, volume in order["volume"].items():

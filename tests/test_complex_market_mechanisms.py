@@ -197,6 +197,55 @@ def test_complex_clearing_BB():
     # )
 
 
+def test_complex_clearing_MAR():
+    """
+    Example taken from Whitepaper electricity spot market design 2030-2050
+    Bichler et al.
+    2021
+    """
+
+    import copy
+
+    market_config = copy.copy(simple_dayahead_auction_config)
+
+    market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex_opt_mar"]
+    market_config.market_products = [MarketProduct(rd(hours=+1), 1, rd(hours=1))]
+    market_config.additional_fields = [
+        "bid_type",
+        "accepted_price",
+        "profile",
+        "minimum_acceptance_ratio",
+    ]
+    mr = MarketRole(market_config)
+    next_opening = market_config.opening_hours.after(datetime.now())
+    products = get_available_products(market_config.market_products, next_opening)
+    assert len(products) == 1
+
+    """
+    Create Orderbook with constant (for only one hour) order volumes and prices:
+        - dem1: volume = -10, price = 300
+        - dem2: volume = -14, price = 10
+        - block_gen4: volume = 12, price = 40, mar=11/12
+        - gen5: volume = 13, price = 100
+
+    """
+    orderbook = []
+    orderbook = extend_orderbook(
+        products, volume=-10, price=300, orderbook=orderbook, bid_type="SB", mar=0
+    )
+    orderbook = extend_orderbook(products, -14, 10, orderbook, "SB", 0)
+    orderbook = extend_orderbook(products, 12, 40, orderbook, "BB", 11 / 12)
+    orderbook = extend_orderbook(products, 13, 100, orderbook, "SB", 0)
+
+    assert len(orderbook) == 4
+
+    mr.all_orders = orderbook
+    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
+        mr, products
+    )
+    assert meta[0]["supply_volume"] == 10
+
+
 def test_complex_clearing_Bichler_et_al():
     """
     Example taken from Whitepaper electricity spot market design 2030-2050
