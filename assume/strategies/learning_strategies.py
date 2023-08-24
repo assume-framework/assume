@@ -105,9 +105,8 @@ class RLStrategy(LearningStrategy):
         bid_price_inflex = min(bid_prices)
 
         # Flex-bid price formulation
-        if unit.current_status:
-            bid_quantity_flex = max_power - bid_quantity_inflex
-            bid_price_flex = max(bid_prices)
+        bid_quantity_flex = max_power - bid_quantity_inflex
+        bid_price_flex = max(bid_prices)
 
         bids = [
             {

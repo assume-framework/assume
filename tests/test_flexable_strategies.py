@@ -47,7 +47,6 @@ def test_flexable_eom(mock_market_config, power_plant):
     assert bids[1]["volume"] == 800
 
     # start-up situation with ramping restriction
-    power_plant.current_status = 0
     power_plant.ramp_up = 400
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
     assert len(bids) == 2

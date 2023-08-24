@@ -186,14 +186,21 @@ class SupportsMinMax(BaseUnit):
         return (fuel_cost + emission_cost) / self.efficiency
 
     def get_operation_time(self, start: datetime):
-        """returns the operation time
-        if unit is on since 4 hours, it returns 4
-        if the unit is off since 4 hours, it returns -4
+        """returns the operation time at time start
+        if unit is on the previous 4 hours, it returns 4
+        if the unit was off the previous 4 hours, it returns -4
+
+        The value at start is not considered
         """
+        before = start - self.index.freq
+        # before = start
         max_time = max(self.min_operating_time, self.min_down_time)
-        begin = start - self.index.freq * max_time
-        end = start
+        begin = before - self.index.freq * max_time
+        end = before
         arr = self.outputs["energy"][begin:end][::-1] > 0
+        if len(arr) < 1:
+            # before start of index
+            return max_time
         is_off = not arr[0]
         runn = 0
         for val in arr:
@@ -252,9 +259,11 @@ class SupportsMinMaxCharge(BaseUnit):
 
     def calculate_ramp_discharge(
         self,
+        previous_soc: float,
         previous_power: float,
         power_discharge: float,
         current_power: float = 0,
+        min_power_discharge: float = 0,
     ) -> float:
         if power_discharge == 0:
             return power_discharge
@@ -283,7 +292,11 @@ class SupportsMinMaxCharge(BaseUnit):
         return power_discharge
 
     def calculate_ramp_charge(
-        self, previous_power: float, power_charge: float, current_power: float = 0
+        self,
+        previous_soc: float,
+        previous_power: float,
+        power_charge: float,
+        current_power: float = 0,
     ) -> float:
         if power_charge == 0:
             return power_charge
