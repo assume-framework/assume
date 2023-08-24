@@ -27,6 +27,20 @@ def load_file(
     file_name: str,
     index: pd.DatetimeIndex = None,
 ) -> pd.DataFrame:
+    """
+    This function loads a csv file from a given path and returns a dataframe.
+    
+    :param path: the path to the csv file
+    :type path: str
+    :param config: the config file
+    :type config: dict
+    :param file_name: the name of the csv file
+    :type file_name: str
+    :param index: the index of the dataframe
+    :type index: pd.DatetimeIndex
+    :return: the dataframe
+    :rtype: pd.DataFrame
+    """
     df = None
 
     if file_name in config:
@@ -87,6 +101,15 @@ def load_file(
 
 
 def convert_to_rrule_freq(string):
+    """
+    This function converts a string to a rrule frequency and interval.
+    The string should be in the format of "1h" or "1d" or "1w".
+
+    :param string: the string to be converted
+    :type string: str
+    :return: the rrule frequency and interval
+    :rtype: tuple[int, int]
+    """
     freq = freq_map[string[-1]]
     interval = int(string[:-1])
     return freq, interval
@@ -98,6 +121,20 @@ def make_market_config(
     world_start: datetime,
     world_end: datetime,
 ):
+    """
+    This function creates a market config from a given dictionary.
+    
+    :param id: the id of the market
+    :type id: str
+    :param market_params: the market parameters
+    :type market_params: dict
+    :param world_start: the start time of the world
+    :type world_start: datetime
+    :param world_end: the end time of the world
+    :type world_end: datetime
+    :return: the market config
+    :rtype: MarketConfig
+    """
     freq, interval = convert_to_rrule_freq(market_params["opening_frequency"])
     start = market_params.get("start_date")
     end = market_params.get("end_date")
@@ -153,6 +190,15 @@ def add_units(
     """
     This function adds units to the world from a given dataframe.
     The callback is used to adjust unit_params depending on the unit_type, before adding the unit to the world.
+
+    :param units_df: the dataframe containing the units
+    :type units_df: pd.DataFrame
+    :param unit_type: the type of the unit
+    :type unit_type: str
+    :param world: the world
+    :type world: World
+    :param forecaster: the forecaster
+    :type forecaster: Forecaster
     """
     if units_df is None:
         return
@@ -184,15 +230,16 @@ async def load_scenario_folder_async(
     scenario: str,
     study_case: str,
 ):
-    """Load a scenario from a given path.
+    """Load a scenario from a given path. Raises: ValueError: If the scenario or study case is not found.
 
-    Args:
-        inputs_path (str): Path to the inputs folder.
-        scenario (str): Name of the scenario.
-        study_case (str): Name of the study case.
-
-    Raises:
-        ValueError: If the scenario or study case is not found.
+    :param world: The world.
+    :type world: World
+    :param inputs_path: Path to the inputs folder.
+    :type inputs_path: str
+    :param scenario: Name of the scenario.
+    :type scenario: str
+    :param study_case: Name of the study case.
+    :type study_case: str
     """
 
     # load the config file
@@ -424,6 +471,15 @@ def load_scenario_folder(
 ):
     """
     Load a scenario from a given path.
+
+    :param world: The world.
+    :type world: World
+    :param inputs_path: Path to the inputs folder.
+    :type inputs_path: str
+    :param scenario: Name of the scenario.
+    :type scenario: str
+    :param study_case: Name of the study case.
+    :type study_case: str
     """
 
     world.loop.run_until_complete(

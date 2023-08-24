@@ -32,6 +32,8 @@ class Demand(SupportsMinMax):
     :param kwargs: additional keyword arguments
     :type kwargs: dict
 
+    Methods
+    -------
     """
 
     def __init__(

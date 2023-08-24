@@ -7,30 +7,64 @@ import pandas as pd
 class Forecaster:
     """
     A Forecaster can provide timeseries for forecasts which are derived either from existing files, random noise or actual forecast methods.
+
+    :param index: the index of the forecasts
+    :type index: pd.Series
+
+    Methods
+    -------
     """
 
     def __init__(self, index: pd.Series):
         self.index = index
 
     def __getitem__(self, column: str) -> pd.Series:
+        """
+        Returns the forecast for a given column.
+
+        :param column: the column of the forecast
+        :type column: str
+        :return: the forecast
+        :rtype: pd.Series
+        """
         return pd.Series(0, self.index)
 
     def get_availability(self, unit: str):
         """
-        returns the price for a given fuel_type
-        or zeros if type does not exist
+        Returns the availability of a given unit.
+
+        :param unit: the unit
+        :type unit: str
+        :return: the availability of the unit
+        :rtype: pd.Series
         """
         return self[f"availability_{unit}"]
 
     def get_price(self, fuel_type: str):
         """
-        returns the price for a given fuel_type
+        Returns the price for a given fuel_type
         or zeros if type does not exist
+
+        :param fuel_type: the fuel type
+        :type fuel_type: str
+        :return: the price of the fuel
+        :rtype: pd.Series
         """
         return self[f"fuel_price_{fuel_type}"]
 
 
 class CsvForecaster(Forecaster):
+    """
+    A Forecaster that reads forecasts from csv files.
+
+    :param index: the index of the forecasts
+    :type index: pd.Series
+    :param powerplants: the powerplants
+    :type powerplants: dict[str, pd.Series]
+
+    Methods
+    -------
+    """
     def __init__(
         self, index: pd.Series, powerplants: dict[str, pd.Series] = {}, *args, **kwargs
     ):
@@ -47,6 +81,14 @@ class CsvForecaster(Forecaster):
         return self.forecasts[column]
 
     def set_forecast(self, data: pd.DataFrame | pd.Series | None, prefix=""):
+        """
+        Sets the forecast for a given column.
+
+        :param data: the forecast
+        :type data: pd.DataFrame | pd.Series | None
+        :param prefix: the prefix of the column
+        :type prefix: str
+        """
         if data is None:
             return
         elif isinstance(data, pd.DataFrame):
@@ -65,6 +107,9 @@ class CsvForecaster(Forecaster):
             self.forecasts[prefix + data.name] = data
 
     def calc_forecast_if_needed(self):
+        """
+        Calculates the forecasts if they are not already calculated.
+        """
         for pp in self.powerplants.index:
             col = f"availability_{pp}"
             if col not in self.forecasts.columns:
@@ -79,6 +124,11 @@ class CsvForecaster(Forecaster):
     def get_registered_market_participants(self, market_id):
         """
         get information about market participants to make accurate price forecast
+
+        :param market_id: the market id
+        :type market_id: str
+        :return: the registered market participants
+        :rtype: pd.DataFrame
         """
         self.logger.warn(
             "Functionality of using the different markets and specified registration for the price forecast is not implemented yet"
@@ -86,6 +136,12 @@ class CsvForecaster(Forecaster):
         return self.powerplants
 
     def calculate_residual_demand_forecast(self):
+        """
+        Calculates the residual demand forecast.
+
+        :return: the residual demand forecast
+        :rtype: pd.Series
+        """
         vre_powerplants = self.powerplants[
             self.powerplants["technology"].isin(
                 ["wind_onshore", "wind_offshore", "solar"]
@@ -109,6 +165,9 @@ class CsvForecaster(Forecaster):
         Here for the entire time horizon at once
         TODO make price forecasts for all markets, not just specified for the DAM like here
         TODO consider storages?
+
+        :return: the merit order price forecast
+        :rtype: pd.Series
         """
 
         # calculate infeed of renewables and residual demand_df
@@ -142,20 +201,10 @@ class CsvForecaster(Forecaster):
         """
         Calculates the marginal cost of a power plant based on the fuel costs and efficiencies of the power plant.
 
-        Parameters
-        ----------
-        pp_series : dict
-            Series with power plant data.
-        fuel_prices : dict
-            Dictionary of fuel data.
-        emission_factors : dict
-            Dictionary of emission factors.
-
-        Returns
-        -------
-        marginal_cost : float
-            Marginal cost of the power plant.
-
+        :param pp_series: Series with power plant data 
+        :type pp_series: pd.Series
+        :return: the marginal cost of the power plant
+        :rtype: float
         """
         fp_column = f"fuel_price_{pp_series.fuel_type}"
         if fp_column in self.forecasts.columns:
@@ -178,10 +227,8 @@ class CsvForecaster(Forecaster):
         """
         Saves the forecasts to a csv file.
 
-        Parameters
-        ----------
-        path : str
-
+        :param path: the path to save the forecasts to
+        :type path: str
         """
         try:
             self.forecasts.to_csv(f"{path}/forecasts_df.csv", index=True)
@@ -192,6 +239,19 @@ class CsvForecaster(Forecaster):
 
 
 class RandomForecaster(CsvForecaster):
+    """
+    A forecaster that generates forecasts using random noise.
+    
+    :param index: the index of the forecasts
+    :type index: pd.Series
+    :param powerplants: the powerplants
+    :type powerplants: dict[str, pd.Series]
+    :param sigma: the standard deviation of the noise
+    :type sigma: float
+
+    Methods 
+    -------
+    """
     def __init__(
         self,
         index: pd.Series,
@@ -211,6 +271,25 @@ class RandomForecaster(CsvForecaster):
 
 
 class NaiveForecast(Forecaster):
+    """
+    A forecaster that generates forecasts using naive methods.
+
+    :param index: the index of the forecasts
+    :type index: pd.Series
+    :param availability: the availability of the power plants
+    :type availability: float | list
+    :param fuel_price: the fuel price 
+    :type fuel_price: float | list
+    :param co2_price: the co2 price 
+    :type co2_price: float | list
+    :param demand: the demand
+    :type demand: float | list
+    :param price_forecast: the price forecast
+    :type price_forecast: float | list
+
+    Methods
+    -------
+    """
     def __init__(
         self,
         index: pd.Series,
