@@ -6,8 +6,45 @@ from assume.common.base import SupportsMinMax
 
 """A class for a heatpump unit.
 
-    Attributes
-    ----------
+    :param id: unique identifier for the unit
+    :type id: str
+    :param technology: the technology of the unit
+    :type technology: str
+    :param bidding_strategies: the bidding strategies of the unit
+    :type bidding_strategies: dict
+    :param max_power: the maximum power output of the unit (kW)
+    :type max_power: float | pd.Series
+    :param min_power: the minimum power output of the unit (kW)
+    :type min_power: float | pd.Series
+    :param volume: the volume of the heat pump 
+    :type volume: float | pd.Series
+    :param ramp_up: the ramp up speed of the unit (MW/15Minutes)
+    :type ramp_up: float
+    :param ramp_down: the ramp down speed of the unit (MW/15Minutes)
+    :type ramp_down: float
+    :param fixed_cost: the fixed cost of the unit (€/MW)
+    :type fixed_cost: float
+    :param min_operating_time: the minimum operating time of the unit
+    :type min_operating_time: float
+    :param min_down_time: the minimum down time of the unit
+    :type min_down_time: float
+    :param downtime_hot_start: the downtime hot start of the unit (hours)
+    :type downtime_hot_start: int
+    :param downtime_warm_start: the downtime warm start of the unit (hours)
+    :type downtime_warm_start: int
+    :param source: the source of the heat pump
+    :type source: str
+    :param index: the index of the unit 
+    :type index: pd.DatetimeIndex
+    :param location: the location of the unit (latitude, longitude)
+    :type location: tuple[float, float]
+    :param node: the node of the unit
+    :type node: str
+    :param dr_factor: the demand response factor of the unit 
+    :type dr_factor: float
+    :param kwargs: additional keyword arguments 
+    :type kwargs: dict
+
 
     Methods
     ----------
@@ -81,8 +118,9 @@ class HeatPump(SupportsMinMax):
         self.dr_factor = dr_factor
 
     def reset(self):
-        """Reset the unit to its initial state."""
-
+        """
+        Reset the unit to its initial state.
+        """
         self.current_status = 1
         self.current_down_time = self.min_down_time
 
