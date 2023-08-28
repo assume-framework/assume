@@ -303,6 +303,63 @@ def test_complex_clearing_Bichler_et_al():
     assert accepted_orders[2]["accepted_volume"] == 9
 
 
+def test_complex_clearing_Bichler_et_al():
+    """
+    Example taken from Whitepaper electricity spot market design 2030-2050
+    Bichler et al.
+    2021
+    """
+
+    import copy
+
+    market_config = copy.copy(simple_dayahead_auction_config)
+
+    market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex_opt"]
+    market_config.market_products = [MarketProduct(rd(hours=+1), 1, rd(hours=1))]
+    market_config.additional_fields = [
+        "bid_type",
+        "accepted_price",
+        "profile",
+    ]
+    mr = MarketRole(market_config)
+    next_opening = market_config.opening_hours.after(datetime.now())
+    products = get_available_products(market_config.market_products, next_opening)
+    assert len(products) == 1
+
+    """
+    Create Orderbook with constant (for only one hour) order volumes and prices:
+        - dem1: volume = -10, price = 300
+        - dem2: volume = -14, price = 10
+        - gen3: volume = 1, price = 40
+        - block_gen4: volume = 11, price = 40
+        - gen5: volume = 13, price = 100
+
+    """
+    orderbook = []
+    orderbook = extend_orderbook(products, volume=-10, price=300, orderbook=orderbook)
+    orderbook = extend_orderbook(products, -14, 10, orderbook)
+    orderbook = extend_orderbook(products, 1, 40, orderbook)
+    orderbook = extend_orderbook(products, 11, 40, orderbook, "BB")
+    orderbook = extend_orderbook(products, 13, 100, orderbook)
+
+    # bid gen1 and block_gen3 are from one unit
+    orderbook[3]["agent_id"] = orderbook[2]["agent_id"]
+    assert len(orderbook) == 5
+
+    mr.all_orders = orderbook
+    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
+        mr, products
+    )
+    assert meta[0]["supply_volume"] == 10
+    assert math.isclose(meta[0]["price"], 100)
+    assert accepted_orders[0]["agent_id"] == "dem1"
+    assert accepted_orders[0]["accepted_volume"] == -10
+    assert accepted_orders[1]["agent_id"] == "gen3"
+    assert accepted_orders[1]["accepted_volume"] == 1
+    assert accepted_orders[2]["agent_id"] == "gen5"
+    assert accepted_orders[2]["accepted_volume"] == 9
+
+
 if __name__ == "__main__":
     pass
     # from assume.common.utils import plot_orderbook
