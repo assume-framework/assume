@@ -10,7 +10,7 @@ from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)
 
-SOLVERS = ["glpk", "cbc", "gurobi", "cplex"]
+SOLVERS = ["gurobi", "cplex", "glpk", "cbc"]
 
 
 def pay_as_clear_opt(
@@ -220,6 +220,12 @@ def pay_as_clear_complex_opt(
     solver = SolverFactory(solvers[0])
     if solver.name == "gurobi":
         options = {"cutoff": -1.0, "eps": eps}
+    elif solver.name == "cplex":
+        options = {"mip.tolerances.lowercutoff": -1.0, "mip.tolerances.absmipgap": eps}
+    elif solver.name == "cbc":
+        options = {"sec": 60, "ratio": 0.1}
+    elif solver.name == "glpk":
+        options = {"tmlim": 60, "mipgap": 0.1}
     else:
         options = {}
 
@@ -227,6 +233,7 @@ def pay_as_clear_complex_opt(
     result = solver.solve(model, options=options)
 
     if result.solver.termination_condition == TerminationCondition.infeasible:
+        market_agent.all_orders = []
         raise Exception("infeasible")
 
     # Find the dual variable for the balance constraint
@@ -315,7 +322,5 @@ def extract_results(
                 "only_hours": product[2],
             }
         )
-
-    model.clear()
 
     return accepted_orders, rejected_orders, meta

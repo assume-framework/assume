@@ -84,11 +84,15 @@ class BaseUnit:
         if market_config.product_type not in self.bidding_strategies:
             return []
 
-        return self.bidding_strategies[market_config.product_type].calculate_bids(
+        bids = self.bidding_strategies[market_config.product_type].calculate_bids(
             unit=self,
             market_config=market_config,
             product_tuples=product_tuples,
         )
+        for i, _ in enumerate(bids):
+            bids[i].update({field: None for field in market_config.additional_fields})
+
+        return bids
 
     def set_dispatch_plan(
         self,

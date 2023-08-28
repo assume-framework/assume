@@ -45,7 +45,6 @@ availabe_examples = {
 
 # %%
 if __name__ == "__main__":
-
     """
     Available examples:
     - local_db: without database and grafana

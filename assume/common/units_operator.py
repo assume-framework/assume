@@ -344,8 +344,12 @@ class UnitsOperator(Role):
                 market,
                 product_tuples=products,
             )
-            product = products[0]
             for i, order in enumerate(product_bids):
+                if order["volume"] == 0:
+                    continue
+                if "profile" in order.keys():
+                    if all(volume == 0 for volume in order["profile"].values()):
+                        continue
                 order["agent_id"] = (self.context.addr, self.context.aid)
                 if market.volume_tick:
                     order["volume"] = round(order["volume"] / market.volume_tick)

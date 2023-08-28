@@ -56,19 +56,16 @@ class NaiveStrategy(BaseStrategy):
             )  # calculation of the marginal costs
             volume = unit.calculate_ramp(
                 previous_power, max_power[start], current_power
-            )  # calculation of the volume of the product
-            order: Order = {
-                "start_time": product[0],
-                "end_time": product[1],
-                "only_hours": product[2],
-                "price": marginal_cost,
-                "volume": volume,
-            }  # order to be dispatched to the market
-            if "bid_type" in market_config.additional_fields:
-                order.update({"bid_type": "SB"})
-
-            order.update({field: None for field in market_config.additional_fields})
-            bids.append(order)
+            )
+            bids.append(
+                {
+                    "start_time": product[0],
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": marginal_cost,
+                    "volume": volume,
+                }
+            )
 
             previous_power = volume + current_power
 
