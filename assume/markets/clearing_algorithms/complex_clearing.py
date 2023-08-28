@@ -140,12 +140,15 @@ def pay_as_clear_complex(
         return [], [], []
 
     assert "bid_type" in market_agent.marketconfig.additional_fields
-    assert "profile" in market_agent.marketconfig.additional_fields
 
     market_getter = itemgetter("start_time", "end_time", "only_hours")
     market_agent.all_orders.sort(key=market_getter)
 
     orders = market_agent.all_orders
+    for order in orders:
+        order["accepted_price"] = {}
+        order["accepted_volume"] = {}
+
     rejected_orders: Orderbook = []
 
     mode = "default"
