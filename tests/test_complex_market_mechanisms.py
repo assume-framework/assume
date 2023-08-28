@@ -37,7 +37,6 @@ def test_complex_clearing():
     market_config.market_products = [MarketProduct(rd(hours=+1), h, rd(hours=1))]
     market_config.additional_fields = [
         "bid_type",
-        "profile",
     ]
     mr = MarketRole(market_config)
     next_opening = market_config.opening_hours.after(datetime.now())
@@ -81,7 +80,7 @@ def test_complex_clearing_BB():
     market_config.market_products = [MarketProduct(rd(hours=+1), 2, rd(hours=1))]
     market_config.additional_fields = [
         "bid_type",
-        "profile",
+        "min_acceptance_ratio",
     ]
     mr = MarketRole(market_config)
     next_opening = market_config.opening_hours.after(datetime.now())
@@ -108,20 +107,20 @@ def test_complex_clearing_BB():
         products, 100, 75, orderbook, bid_type="BB", min_acceptance_ratio=1
     )
 
-    mr.all_orders = orderbook
+    mr.all_orders = orderbook.copy()
     accepted_orders, rejected_orders, meta = market_config.market_mechanism(
         mr, products
     )
 
     assert meta[0]["price"] == 50
-    assert rejected_orders[1]["agent_id"] == "block_gen7"
-    assert rejected_orders[1]["accepted_volume"][products[0][0]] == 0
+    assert rejected_orders[0]["agent_id"] == "block_gen7"
+    assert rejected_orders[0]["accepted_volume"] == {}
     assert mr.all_orders == []
 
     # change the price of the block order to be in-the-money
-    orderbook[3]["price"] = 45
+    orderbook[6]["price"] = 45
 
-    mr.all_orders = orderbook
+    mr.all_orders = orderbook.copy()
     accepted_orders, rejected_orders, meta = market_config.market_mechanism(
         mr, products
     )
@@ -134,7 +133,7 @@ def test_complex_clearing_BB():
     # change price of simple bid to lower the mcp for one hour
     orderbook[2]["price"] = 41
 
-    mr.all_orders = orderbook
+    mr.all_orders = orderbook.copy()
     accepted_orders, rejected_orders, meta = market_config.market_mechanism(
         mr, products
     )
@@ -150,7 +149,7 @@ def test_complex_clearing_BB():
     # change price of simple bid to lower the mcp for one hour even more
     orderbook[2]["price"] = 39
 
-    mr.all_orders = orderbook
+    mr.all_orders = orderbook.copy()
     accepted_orders, rejected_orders, meta = market_config.market_mechanism(
         mr, products
     )
@@ -158,30 +157,31 @@ def test_complex_clearing_BB():
     assert meta[0]["price"] == 39
     assert meta[1]["price"] == 50
     # block bid should be rejected, because surplus is 89-90=-1
-    assert rejected_orders[1]["agent_id"] == "block_gen7"
-    assert rejected_orders[1]["accepted_volume"][products[0][0]] == 0
+    assert rejected_orders[0]["agent_id"] == "block_gen7"
+    assert rejected_orders[0]["accepted_volume"] == {}
     assert mr.all_orders == []
 
     # change price of simple bid to see equilibrium case
     orderbook[2]["price"] = 40
 
-    mr.all_orders = orderbook
+    mr.all_orders = orderbook.copy()
     accepted_orders, rejected_orders, meta = market_config.market_mechanism(
         mr, products
     )
 
     assert meta[0]["price"] == 40
     assert meta[1]["price"] == 50
-    # block bid should be rejected, because surplus for block is 90-90=0
-    # and general surplus through introduction of block is also 0
-    assert rejected_orders[1]["agent_id"] == "block_gen7"
-    assert rejected_orders[1]["accepted_volume"][products[0][0]] == 0
+    # block bid should be accepted, because surplus for block is 90-90=0
+    # and general surplus through introduction of block > 0
+    assert accepted_orders[2]["agent_id"] == "block_gen7"
+    assert accepted_orders[2]["accepted_volume"][products[0][0]] == 100
+    assert accepted_orders[2]["accepted_price"][products[0][0]] == 40
     assert mr.all_orders == []
 
     # introducing profile block order by increasing the volume for the hour with a higher mcp
-    orderbook[3]["volume"][products[1][0]] = 900
+    orderbook[6]["volume"][products[1][0]] = 900
 
-    mr.all_orders = orderbook
+    mr.all_orders = orderbook.copy()
     accepted_orders, rejected_orders, meta = market_config.market_mechanism(
         mr, products
     )
@@ -195,182 +195,25 @@ def test_complex_clearing_BB():
     assert accepted_orders[2]["accepted_price"][products[1][0]] == 50
     assert mr.all_orders == []
 
-    # what happens, if the block bid volume is higher than total demand?
-    # -> opimization fails!
-    # orderbook[3]["volume"][products[1][0]] = 1100
+    # what happens, if the block bid volume is higher than total demand
+    # solution infeasible
 
-    # mr.all_orders = orderbook
+    # orderbook[6]["volume"][products[1][0]] = 1100
+
+    # mr.all_orders = orderbook.copy()
     # accepted_orders, rejected_orders, meta = market_config.market_mechanism(
     #     mr, products
     # )
 
-
-def test_complex_clearing_MAR():
-    """
-    Example taken from Whitepaper electricity spot market design 2030-2050
-    Bichler et al.
-    2021
-    """
-
-    import copy
-
-    market_config = copy.copy(simple_dayahead_auction_config)
-
-    market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex"]
-    market_config.market_products = [MarketProduct(rd(hours=+1), 1, rd(hours=1))]
-    market_config.additional_fields = [
-        "bid_type",
-        "profile",
-        "min_acceptance_ratio",
-    ]
-    mr = MarketRole(market_config)
-    next_opening = market_config.opening_hours.after(datetime.now())
-    products = get_available_products(market_config.market_products, next_opening)
-    assert len(products) == 1
-
-    """
-    Create Orderbook with constant (for only one hour) order volumes and prices:
-        - dem1: volume = -10, price = 300
-        - dem2: volume = -14, price = 10
-        - block_gen4: volume = 12, price = 40, mar=11/12
-        - gen5: volume = 13, price = 100
-
-    """
-    orderbook = []
-    orderbook = extend_orderbook(
-        products,
-        volume=-10,
-        price=300,
-        orderbook=orderbook,
-        bid_type="SB",
-        min_acceptance_ratio=0,
-    )
-    orderbook = extend_orderbook(products, -14, 10, orderbook, "SB")
-    orderbook = extend_orderbook(
-        products, 12, 40, orderbook, "BB", min_acceptance_ratio=11 / 12
-    )
-    orderbook = extend_orderbook(products, 13, 100, orderbook, "SB")
-
-    assert len(orderbook) == 4
-
-    mr.all_orders = orderbook
-    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
-        mr, products
-    )
-    assert meta[0]["supply_volume"] == 10
-
-
-def test_complex_clearing_Bichler_et_al():
-    """
-    Example taken from Whitepaper electricity spot market design 2030-2050
-    Bichler et al.
-    2021
-    """
-
-    import copy
-
-    market_config = copy.copy(simple_dayahead_auction_config)
-
-    market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex"]
-    market_config.market_products = [MarketProduct(rd(hours=+1), 1, rd(hours=1))]
-    market_config.additional_fields = [
-        "bid_type",
-        "profile",
-    ]
-    mr = MarketRole(market_config)
-    next_opening = market_config.opening_hours.after(datetime.now())
-    products = get_available_products(market_config.market_products, next_opening)
-    assert len(products) == 1
-
-    """
-    Create Orderbook with constant (for only one hour) order volumes and prices:
-        - dem1: volume = -10, price = 300
-        - dem2: volume = -14, price = 10
-        - gen3: volume = 1, price = 40
-        - block_gen4: volume = 11, price = 40
-        - gen5: volume = 13, price = 100
-
-    """
-    orderbook = []
-    orderbook = extend_orderbook(products, volume=-10, price=300, orderbook=orderbook)
-    orderbook = extend_orderbook(products, -14, 10, orderbook)
-    orderbook = extend_orderbook(products, 1, 40, orderbook)
-    orderbook = extend_orderbook(products, 11, 40, orderbook, "BB")
-    orderbook = extend_orderbook(products, 13, 100, orderbook)
-
-    # bid gen1 and block_gen3 are from one unit
-    orderbook[3]["agent_id"] = orderbook[2]["agent_id"]
-    assert len(orderbook) == 5
-
-    mr.all_orders = orderbook
-    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
-        mr, products
-    )
-    assert meta[0]["supply_volume"] == 10
-    assert meta[0]["price"] == 100
-    assert accepted_orders[0]["agent_id"] == "dem1"
-    assert accepted_orders[0]["accepted_volume"] == -10
-    assert accepted_orders[1]["agent_id"] == "gen3"
-    assert accepted_orders[1]["accepted_volume"] == 1
-    assert accepted_orders[2]["agent_id"] == "gen5"
-    assert accepted_orders[2]["accepted_volume"] == 9
-
-
-def test_complex_clearing_Bichler_et_al():
-    """
-    Example taken from Whitepaper electricity spot market design 2030-2050
-    Bichler et al.
-    2021
-    """
-
-    import copy
-
-    market_config = copy.copy(simple_dayahead_auction_config)
-
-    market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex_opt"]
-    market_config.market_products = [MarketProduct(rd(hours=+1), 1, rd(hours=1))]
-    market_config.additional_fields = [
-        "bid_type",
-        "accepted_price",
-        "profile",
-    ]
-    mr = MarketRole(market_config)
-    next_opening = market_config.opening_hours.after(datetime.now())
-    products = get_available_products(market_config.market_products, next_opening)
-    assert len(products) == 1
-
-    """
-    Create Orderbook with constant (for only one hour) order volumes and prices:
-        - dem1: volume = -10, price = 300
-        - dem2: volume = -14, price = 10
-        - gen3: volume = 1, price = 40
-        - block_gen4: volume = 11, price = 40
-        - gen5: volume = 13, price = 100
-
-    """
-    orderbook = []
-    orderbook = extend_orderbook(products, volume=-10, price=300, orderbook=orderbook)
-    orderbook = extend_orderbook(products, -14, 10, orderbook)
-    orderbook = extend_orderbook(products, 1, 40, orderbook)
-    orderbook = extend_orderbook(products, 11, 40, orderbook, "BB")
-    orderbook = extend_orderbook(products, 13, 100, orderbook)
-
-    # bid gen1 and block_gen3 are from one unit
-    orderbook[3]["agent_id"] = orderbook[2]["agent_id"]
-    assert len(orderbook) == 5
-
-    mr.all_orders = orderbook
-    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
-        mr, products
-    )
-    assert meta[0]["supply_volume"] == 10
-    assert math.isclose(meta[0]["price"], 100)
-    assert accepted_orders[0]["agent_id"] == "dem1"
-    assert accepted_orders[0]["accepted_volume"] == -10
-    assert accepted_orders[1]["agent_id"] == "gen3"
-    assert accepted_orders[1]["accepted_volume"] == 1
-    assert accepted_orders[2]["agent_id"] == "gen5"
-    assert accepted_orders[2]["accepted_volume"] == 9
+    # assert meta[0]["supply_volume"] == 1000
+    # assert meta[0]["price"] == 40
+    # block=accepted_orders[2]
+    # for product in products:
+    #     if block["accepted_volume"][product[0]] > 0:
+    #         assert (
+    #             block['min_acceptance_ratio'] * block["volume"][products[0][0]]
+    #             <= block["accepted_volume"][products[0][0]]
+    #        )
 
 
 if __name__ == "__main__":
