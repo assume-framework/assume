@@ -214,7 +214,7 @@ def test_complex_clearing_MAR():
         "bid_type",
         "accepted_price",
         "profile",
-        "minimum_acceptance_ratio",
+        "mar",
     ]
     mr = MarketRole(market_config)
     next_opening = market_config.opening_hours.after(datetime.now())

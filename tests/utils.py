@@ -94,7 +94,7 @@ def extend_orderbook(
                 "bid_type": bid_type,
             }
     if mar is not None:
-        order.update({"minimum_acceptance_ratio": mar})
+        order.update({"mar": mar})
 
     orderbook.append(order)
 
