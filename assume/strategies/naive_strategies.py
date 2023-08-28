@@ -3,6 +3,15 @@ from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 
 
 class NaiveStrategy(BaseStrategy):
+    """
+    A naive strategy that bids the marginal cost of the unit on the market.
+    """
+
+    """
+    Methods
+    -------
+    """
+
     def calculate_bids(
         self,
         unit: SupportsMinMax,
@@ -10,16 +19,41 @@ class NaiveStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        start = product_tuples[0][0]
-        end_all = product_tuples[-1][1]
-        previous_power = unit.get_output_before(start)
-        min_power, max_power = unit.calculate_min_max_power(start, end_all)
+        """
+        Takes information from a unit that the unit operator manages and
+        defines how it is dispatched to the market
+
+        :param unit: the unit to be dispatched
+        :type unit: SupportsMinMax
+        :param market_config: the market configuration
+        :type market_config: MarketConfig
+        :param product_tuples: list of all products the unit can offer
+        :type product_tuples: list[Product]
+        :return: the bids
+        :rtype: Orderbook
+        """
+        start = product_tuples[0][0]  # start time of the first product
+        end_all = product_tuples[-1][1]  # end time of the last product
+        previous_power = unit.get_output_before(
+            start
+        )  # power output of the unit before the start time of the first product
+        min_power, max_power = unit.calculate_min_max_power(
+            start, end_all
+        )  # minimum and maximum power output of the unit between the start time of the first product and the end time of the last product
 
         bids = []
         for product in product_tuples:
+            """
+            for each product, calculate the marginal cost of the unit at the start time of the product
+            and the volume of the product. Dispatch the order to the market.
+            """
             start = product[0]
-            current_power = unit.outputs["energy"].at[start]
-            marginal_cost = unit.calculate_marginal_cost(start, previous_power)
+            current_power = unit.outputs["energy"].at[
+                start
+            ]  # power output of the unit at the start time of the current product
+            marginal_cost = unit.calculate_marginal_cost(
+                start, previous_power
+            )  # calculation of the marginal costs
             volume = unit.calculate_ramp(
                 previous_power, max_power[start], current_power
             )
@@ -71,6 +105,10 @@ class NaiveDAStrategy(BaseStrategy):
 
 
 class NaivePosReserveStrategy(BaseStrategy):
+    """
+    A naive strategy that bids the ramp up volume on the positive reserve market (price = 0).
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -85,8 +123,16 @@ class NaivePosReserveStrategy(BaseStrategy):
         Takes information from a unit that the unit operator manages and
         defines how it is dispatched to the market
 
-        Return: volume, price
+        :param unit: the unit to be dispatched
+        :type unit: SupportsMinMax
+        :param market_config: the market configuration
+        :type market_config: MarketConfig
+        :param product_tuples: list of all products the unit can offer
+        :type product_tuples: list[Product]
+        :return: the bids consisting of the start time, end time, only hours, price and volume.
+        :rtype: Orderbook
         """
+
         start = product_tuples[0][0]
         end_all = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
@@ -116,6 +162,10 @@ class NaivePosReserveStrategy(BaseStrategy):
 
 
 class NaiveNegReserveStrategy(BaseStrategy):
+    """
+    A naive strategy that bids the ramp down volume on the negative reserve market (price = 0).
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -130,7 +180,14 @@ class NaiveNegReserveStrategy(BaseStrategy):
         Takes information from a unit that the unit operator manages and
         defines how it is dispatched to the market
 
-        Return: volume, price
+        :param unit: the unit to be dispatched
+        :type unit: SupportsMinMax
+        :param market_config: the market configuration
+        :type market_config: MarketConfig
+        :param product_tuples: list of all products the unit can offer
+        :type product_tuples: list[Product]
+        :return: the bids consisting of the start time, end time, only hours, price and volume.
+        :rtype: Orderbook
         """
         start = product_tuples[0][0]
         end_all = product_tuples[-1][1]

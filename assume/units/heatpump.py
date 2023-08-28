@@ -4,6 +4,47 @@ from assume.common.base import SupportsMinMax
 
 
 class HeatPump(SupportsMinMax):
+    """A class for a heatpump unit.
+
+    :param id: unique identifier for the unit
+    :type id: str
+    :param technology: the technology of the unit
+    :type technology: str
+    :param bidding_strategies: the bidding strategies of the unit
+    :type bidding_strategies: dict
+    :param max_power: the maximum power output of the unit (kW)
+    :type max_power: float | pd.Series
+    :param min_power: the minimum power output of the unit (kW)
+    :type min_power: float | pd.Series
+    :param volume: the volume of the heat pump
+    :type volume: float | pd.Series
+    :param ramp_up: the ramp up speed of the unit (MW/15Minutes)
+    :type ramp_up: float
+    :param ramp_down: the ramp down speed of the unit (MW/15Minutes)
+    :type ramp_down: float
+    :param fixed_cost: the fixed cost of the unit (€/MW)
+    :type fixed_cost: float
+    :param min_operating_time: the minimum operating time of the unit
+    :type min_operating_time: float
+    :param min_down_time: the minimum down time of the unit
+    :type min_down_time: float
+    :param downtime_hot_start: the downtime hot start of the unit (hours)
+    :type downtime_hot_start: int
+    :param downtime_warm_start: the downtime warm start of the unit (hours)
+    :type downtime_warm_start: int
+    :param source: the source of the heat pump
+    :type source: str
+    :param index: the index of the unit
+    :type index: pd.DatetimeIndex
+    :param location: the location of the unit (latitude, longitude)
+    :type location: tuple[float, float]
+    :param node: the node of the unit
+    :type node: str
+    :param dr_factor: the demand response factor of the unit
+    :type dr_factor: float
+    :param kwargs: additional keyword arguments
+    :type kwargs: dict"""
+
     def __init__(
         self,
         id: str,
@@ -71,12 +112,12 @@ class HeatPump(SupportsMinMax):
     def calculate_cop(self):
         """
         Calculates the COP of a heat pump given the temperature difference between the source and sink temperatures.
+        Returns the calculated COP as a float.
 
-        Parameters:
-        heat_pump_type (str): type of heat pump, either 'air' for air-sourced heat pumps or 'soil' for ground-sourced heat pumps
-
-        Returns:
-        float: the calculated COP
+        :param heat_pump_type: the type of heat pump, either 'air' for air-sourced heat pumps or 'soil' for ground-sourced heat pumps
+        :type heat_pump_type: str
+        :return: the calculated COP
+        :rtype: float
         """
         delta_t = (
             self.forecaster["sink_temperature"] - self.forecaster["source_temperature"]
@@ -94,11 +135,17 @@ class HeatPump(SupportsMinMax):
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[float]:
         """Calculate the min and max power for the given time step.
+        Returns None if the unit is not available for dispatch.
+        Returns the min and max power if the unit is available for dispatch.
 
-        Returns
-        -------
-        min_power : float
-        max_power : float
+        :param start: the start time of the dispatch
+        :type start: pd.Timestamp
+        :param end: the end time of the dispatch
+        :type end: pd.Timestamp
+        :param product_type: the product type of the unit
+        :type product_type: str
+        :return: the min and max power of the unit
+        :rtype: tuple[float]
         """
         end_excl = end - self.index.freq
         heat_demand = self.outputs["heat"][start:end_excl]
@@ -150,6 +197,13 @@ class HeatPump(SupportsMinMax):
         This checks if the market feedback is feasible for the given unit.
         And sets the closest dispatch if not.
         The end param should be inclusive.
+
+        :param start: the start time of the dispatch
+        :type start: pd.Timestamp
+        :param end: the end time of the dispatch
+        :type end: pd.Timestamp
+        :return: the volume of the unit within the given time range
+        :rtype: pd.Series
         """
         end_excl = end - self.index.freq
 
@@ -165,17 +219,14 @@ class HeatPump(SupportsMinMax):
     def calc_marginal_cost(self, timestep: pd.Timestamp) -> float | pd.Series:
         """
         Calculate the marginal cost for the heat pump at the given time step.
+        Returns the calculated bid price as a float or pd.Series.
 
-        Parameters
-        ----------
-        timestep : pd.Timestamp
-            The current time step.
-
-        Returns
-        -------
-        bid_price : float
-            The calculated bid_price.
+        :param timestep: the current time step
+        :type timestep: pd.Timestamp
+        :return: the calculated bid price
+        :rtype: float | pd.Series
         """
+
         cop = self.calculate_cop()
         cop_t = cop.loc[timestep]
 

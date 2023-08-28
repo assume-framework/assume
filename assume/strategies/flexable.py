@@ -7,6 +7,10 @@ from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
 class flexableEOM(BaseStrategy):
+    """
+    A strategy that bids on the EOM-market.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -20,6 +24,22 @@ class flexableEOM(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
+        """
+        Takes information from a unit that the unit operator manages and
+        defines how it is dispatched to the market
+        Returns a list of bids consisting of the start time, end time, only hours, price and volume.
+
+        :param unit: A unit that the unit operator manages
+        :type unit: SupportsMinMax
+        :param market_config: A market configuration
+        :type market_config: MarketConfig
+        :param product_tuples: A list of tuples containing the start and end time of each product
+        :type product_tuples: list[Product]
+        :param kwargs: Additional arguments
+        :type kwargs: dict
+        :return: A list of bids
+        :rtype: Orderbook
+        """
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
 
@@ -113,15 +133,27 @@ class flexableEOM(BaseStrategy):
         bid_quantity_inflex,
         start: datetime,
     ):
-        # The powerplant is currently off and calculates a startup markup as an extra
-        # to the marginal cost
-        # Calculating the average uninterrupted operating period
+        """
+        The powerplant is currently off and calculates a startup markup as an extra
+        to the marginal cost
+        Calculating the average uninterrupted operating period
+
+        :param unit: A unit that the unit operator manages
+        :type unit: SupportsMinMax
+        :param marginal_cost_inflex: The marginal cost of the unit
+        :type marginal_cost_inflex: float
+        :param bid_quantity_inflex: The bid quantity of the unit
+        :type bid_quantity_inflex: float
+        :return: The bid price of the unit
+        :rtype: float
+        """
         av_operating_time = max((unit.outputs[:start] > 0).mean(), 1)
         # 1 prevents division by 0
         op_time = unit.get_operation_time(start)
         starting_cost = unit.get_starting_costs(op_time)
         # if we split starting_cost across av_operating_time
         # we are never adding the other parts of the cost to the following hours
+
         if bid_quantity_inflex == 0:
             markup = starting_cost / av_operating_time
         else:
@@ -136,6 +168,18 @@ class flexableEOM(BaseStrategy):
     ):
         """
         Check the description provided by Thomas in last version, the average downtime is not available
+        The powerplant is currently on
+
+        :param unit: A unit that the unit operator manages
+        :type unit: SupportsMinMax
+        :param start: The start time of the product
+        :type start: datetime
+        :param marginal_cost_inflex: The marginal cost of the unit
+        :type marginal_cost_inflex: float
+        :param bid_quantity_inflex: The bid quantity of the unit
+        :type bid_quantity_inflex: float
+        :return: The bid price of the unit
+        :rtype: float
         """
         if bid_quantity_inflex == 0:
             return 0
@@ -176,8 +220,28 @@ class flexableEOM(BaseStrategy):
 
         return bid_price_inflex
 
+    def get_starting_costs(self, time, unit):
+        """
+        Calculates the starting costs of a unit
+
+        :return: The starting costs of the unit
+        :rtype: float
+        """
+        if time < unit.downtime_hot_start:
+            return unit.hot_start_cost
+
+        elif time < unit.downtime_warm_start:
+            return unit.warm_start_cost
+
+        else:
+            return unit.cold_start_cost
+
 
 class flexablePosCRM(BaseStrategy):
+    """
+    A strategy that bids the energy_price or the capacity_price of the unit on the CRM (reserve market).
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -191,12 +255,28 @@ class flexablePosCRM(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
+        """
+        Takes information from a unit that the unit operator manages and
+        defines how it is dispatched to the market
+        Returns a list of bids consisting of the start time, end time, only hours, price and volume.
+
+        :param unit: A unit that the unit operator manages
+        :type unit: SupportsMinMax
+        :param market_config: A market configuration
+        :type market_config: MarketConfig
+        :param product_tuples: A list of tuples containing the start and end time of each product
+        :type product_tuples: list[Product]
+        :param kwargs: Additional arguments
+        :type kwargs: dict
+        :return: A list of bids
+        :rtype: Orderbook
+        """
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
         min_power, max_power = unit.calculate_min_max_power(
             start, end, market_config.product_type
-        )
+        )  # get max_power for the product type
 
         bids = []
         for product in product_tuples:
@@ -254,6 +334,10 @@ class flexablePosCRM(BaseStrategy):
 
 
 class flexableNegCRM(BaseStrategy):
+    """
+    A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -269,6 +353,22 @@ class flexableNegCRM(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
+        """
+        Takes information from a unit that the unit operator manages and
+        defines how it is dispatched to the market
+        Returns a list of bids consisting of the start time, end time, only hours, price and volume.
+
+        :param unit: A unit that the unit operator manages
+        :type unit: SupportsMinMax
+        :param market_config: A market configuration
+        :type market_config: MarketConfig
+        :param product_tuples: A list of tuples containing the start and end time of each product
+        :type product_tuples: list[Product]
+        :param kwargs: Additional arguments
+        :type kwargs: dict
+        :return: A list of bids
+        :rtype: Orderbook
+        """
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
@@ -339,6 +439,20 @@ def get_specific_revenue(
     t: datetime,
     foresight: timedelta,
 ):
+    """
+    get the specific revenue of a unit
+
+    :param unit: A unit that the unit operator manages
+    :type unit: SupportsMinMax
+    :param marginal_cost: The marginal cost of the unit
+    :type marginal_cost: float
+    :param t: The start time of the product
+    :type t: datetime
+    :param foresight: The foresight of the unit
+    :type foresight: timedelta
+    :return: The specific revenue of the unit
+    :rtype: float
+    """
     price_forecast = []
 
     if t + foresight > unit.forecaster["price_forecast"].index[-1]:

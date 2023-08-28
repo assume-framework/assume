@@ -10,7 +10,7 @@ from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)
 
-SOLVERS = ["glpk", "cbc", "gurobi", "cplex"]
+SOLVERS = ["gurobi", "cplex", "glpk", "cbc"]
 
 
 def pay_as_clear_opt(
@@ -217,16 +217,17 @@ def pay_as_clear_complex_opt(
     eps = 1e-4
     solvers = check_available_solvers(*SOLVERS)
 
-    solver = (
-        SolverFactory("gurobi") if "gurobi" in solvers else SolverFactory(solvers[0])
-    )
+    solver = SolverFactory(solvers[0])
     if solver.name == "gurobi":
         options = {"cutoff": -1.0, "eps": eps}
+    elif solver.name == "cplex":
+        options = {"mip.tolerances.lowercutoff": -1.0, "mip.tolerances.absmipgap": eps}
+    elif solver.name == "cbc":
+        options = {"sec": 60, "ratio": 0.1}
+    elif solver.name == "glpk":
+        options = {"tmlim": 60, "mipgap": 0.1}
     else:
         options = {}
-        raise ValueError(
-            f"Solver {solver} does not support cutoff, might not find solution."
-        )
 
     # Solve the model
     result = solver.solve(model, options=options)

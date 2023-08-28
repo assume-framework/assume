@@ -106,6 +106,7 @@ class World:
         same_process: bool = True,
         bidding_params: dict = {},
         learning_config: dict = {},
+        episode: int = 0,
     ):
         self.clock = ExternalClock(0)
         self.start = start
@@ -149,7 +150,7 @@ class World:
         self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to world
         self.output_role = WriteOutput(
-            simulation_id=simulation_id,
+            simulation_id=f"{simulation_id}_{episode}",
             start=start,
             end=end,
             db_engine=self.db,
