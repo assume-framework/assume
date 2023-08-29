@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 
@@ -141,7 +141,8 @@ class BaseUnit:
         :rtype: pd.Series
         """
         end_excl = end - self.index.freq
-        return self.outputs["energy"][start:end_excl]
+        energy = self.outputs["energy"][start:end_excl]
+        return energy
 
     def get_output_before(self, dt: datetime, product_type: str = "energy") -> float:
         """
@@ -183,7 +184,23 @@ class BaseUnit:
         :param orderbook: The orderbook.
         :type orderbook: Orderbook
         """
-        pass
+        for order in orderbook:
+            start = order["start_time"]
+            end = order["end_time"]
+            end_excl = end - self.index.freq
+
+            if isinstance(order["accepted_volume"], dict):
+                cashflow = float(
+                    order["accepted_price"][i] * order["accepted_volume"][i]
+                    for i in order["accepted_volume"].keys()
+                )
+            else:
+                cashflow = float(order["accepted_price"] * order["accepted_volume"])
+
+            hours = (end - start) / timedelta(hours=1)
+            self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
+                cashflow * hours
+            )
 
 
 class SupportsMinMax(BaseUnit):

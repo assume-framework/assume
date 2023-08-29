@@ -217,8 +217,13 @@ class UnitsOperator(Role):
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
             current_dispatch = unit.execute_current_dispatch(start, now)
+            end = now - unit.index.freq
             current_dispatch.name = "power"
             data = pd.DataFrame(current_dispatch)
+            data["soc"] = unit.outputs["soc"][start:end]
+            for key in unit.outputs.keys():
+                if "cashflow" in key:
+                    data[key] = unit.outputs[key][start:end]
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
 
@@ -371,17 +376,19 @@ class UnitsOperator(Role):
         :param marketconfig: the market configuration
         :type marketconfig: MarketConfig
         """
-        learning_unit_count = 0
+        learning_strategies = []
         action_dimension = 0
         for unit in self.units.values():
             bidding_strategy = unit.bidding_strategies.get(marketconfig.product_type)
             if isinstance(bidding_strategy, LearningStrategy):
-                learning_unit_count += 1
+                learning_strategies.append(bidding_strategy)
                 # should be the same across all strategies
                 action_dimension = bidding_strategy.act_dim
-        if learning_unit_count > 0:
+        if len(learning_strategies) > 0:
             start = orderbook[0]["start_time"]
             unit_rl_strategy_dfs = []
+            learning_unit_count = len(learning_strategies)
+            learning_mode = learning_strategies[0].learning_mode
 
             all_observations = []
             all_rewards = []
@@ -429,7 +436,6 @@ class UnitsOperator(Role):
 
             data = (all_observations, all_actions, all_rewards)
             learning_data = pd.concat(unit_rl_strategy_dfs)
-            # TODO send observation and action also to output agent if neede din visualisation of grafana
 
             db_aid = self.context.data_dict.get("output_agent_id")
             db_addr = self.context.data_dict.get("output_agent_addr")
@@ -447,7 +453,7 @@ class UnitsOperator(Role):
             learning_role_id = "learning_agent"
             learning_role_addr = self.context.addr
 
-            if learning_role_id and learning_role_addr:
+            if learning_mode:
                 self.context.schedule_instant_acl_message(
                     receiver_id=learning_role_id,
                     receiver_addr=learning_role_addr,
