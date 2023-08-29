@@ -74,6 +74,11 @@ def extend_orderbook(
             "bid_type": bid_type,
         }
 
+        if min_acceptance_ratio is not None:
+            order.update({"min_acceptance_ratio": min_acceptance_ratio})
+        else:
+            order.update({"min_acceptance_ratio": 0})
+
         orderbook.append(order)
 
     else:
@@ -96,10 +101,12 @@ def extend_orderbook(
                 "bid_type": bid_type,
             }
 
-            orderbook.append(order)
+            if min_acceptance_ratio is not None:
+                order.update({"min_acceptance_ratio": min_acceptance_ratio})
+            else:
+                order.update({"min_acceptance_ratio": 0})
 
-    if min_acceptance_ratio is not None:
-        order.update({"min_acceptance_ratio": min_acceptance_ratio})
+            orderbook.append(order)
 
     return orderbook
 

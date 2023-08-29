@@ -48,6 +48,36 @@ def market_clearing_opt(
         doc="block_bid_acceptance",
     )
 
+    if mode == "with_min_acceptance_ratio":
+        model.Bids = pyo.Set(
+            initialize=[order["bid_id"] for order in orders], doc="all_bids"
+        )
+        model.x = pyo.Var(
+            model.Bids,
+            domain=pyo.Binary,
+            doc="bid_accepted",
+        )
+
+        model.mar_constr = pyo.ConstraintList()
+        for order in orders:
+            if order["bid_type"] == "SB":
+                model.mar_constr.add(
+                    model.xs[order["bid_id"]]
+                    >= order["min_acceptance_ratio"] * model.x[order["bid_id"]]
+                )
+                model.mar_constr.add(
+                    model.xs[order["bid_id"]] <= model.x[order["bid_id"]]
+                )
+
+            elif order["bid_type"] == "BB":
+                model.mar_constr.add(
+                    model.xb[order["bid_id"]]
+                    >= order["min_acceptance_ratio"] * model.x[order["bid_id"]]
+                )
+                model.mar_constr.add(
+                    model.xb[order["bid_id"]] <= model.x[order["bid_id"]]
+                )
+
     balance_expr = {t: 0.0 for t in model.T}
     for order in orders:
         if order["bid_type"] == "SB":
@@ -62,13 +92,6 @@ def market_clearing_opt(
         return balance_expr[t] == 0
 
     model.energy_balance = pyo.Constraint(model.T, rule=energy_balance_rule)
-
-    if mode == "with_min_acceptance_ratio":
-        model.mar_constr = pyo.ConstraintList()
-        for order in orders:
-            if order["bid_type"] == "BB":
-                mar_expr = model.xb[order["bid_id"]] >= order["min_acceptance_ratio"]
-                model.mar_constr.add(mar_expr)
 
     obj_expr = 0
     for order in orders:
@@ -85,17 +108,19 @@ def market_clearing_opt(
     solver = (
         SolverFactory("gurobi") if "gurobi" in solvers else SolverFactory(solvers[0])
     )
-    if solver.name == "gurobi":
-        options = {"cutoff": -1.0, "eps": EPS}
-    else:
-        options = {}
-        raise ValueError(
-            f"Solver {solver} does not support cutoff, might not find solution."
-        )
+    options = {"eps": EPS}
 
     # Solve the model
     instance = model.create_instance()
     results = solver.solve(instance, options=options)
+
+    # fix all model.x to the values in the solution
+    if mode == "with_min_acceptance_ratio":
+        for bid_id in instance.Bids:
+            instance.x[bid_id].fix(instance.x[bid_id].value)
+
+        # resolve the model
+        results = solver.solve(instance, options=options)
 
     return instance, results
 
