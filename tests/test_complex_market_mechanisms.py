@@ -113,8 +113,11 @@ def test_complex_clearing_BB():
     )
 
     assert meta[0]["price"] == 50
-    assert rejected_orders[0]["agent_id"] == "block_gen7"
-    assert rejected_orders[0]["accepted_volume"] == {}
+    assert rejected_orders[1]["agent_id"] == "block_gen7"
+    assert rejected_orders[1]["accepted_volume"] == {
+        products[0][0]: 0,
+        products[1][0]: 0,
+    }
     assert mr.all_orders == []
 
     # change the price of the block order to be in-the-money
@@ -157,8 +160,11 @@ def test_complex_clearing_BB():
     assert meta[0]["price"] == 39
     assert meta[1]["price"] == 50
     # block bid should be rejected, because surplus is 89-90=-1
-    assert rejected_orders[0]["agent_id"] == "block_gen7"
-    assert rejected_orders[0]["accepted_volume"] == {}
+    assert rejected_orders[1]["agent_id"] == "block_gen7"
+    assert rejected_orders[1]["accepted_volume"] == {
+        products[0][0]: 0,
+        products[1][0]: 0,
+    }
     assert mr.all_orders == []
 
     # change price of simple bid to see equilibrium case
@@ -194,26 +200,6 @@ def test_complex_clearing_BB():
     assert accepted_orders[2]["accepted_volume"][products[1][0]] == 900
     assert accepted_orders[2]["accepted_price"][products[1][0]] == 50
     assert mr.all_orders == []
-
-    # what happens, if the block bid volume is higher than total demand
-    # solution infeasible
-
-    # orderbook[6]["volume"][products[1][0]] = 1100
-
-    # mr.all_orders = orderbook.copy()
-    # accepted_orders, rejected_orders, meta = market_config.market_mechanism(
-    #     mr, products
-    # )
-
-    # assert meta[0]["supply_volume"] == 1000
-    # assert meta[0]["price"] == 40
-    # block=accepted_orders[2]
-    # for product in products:
-    #     if block["accepted_volume"][product[0]] > 0:
-    #         assert (
-    #             block['min_acceptance_ratio'] * block["volume"][products[0][0]]
-    #             <= block["accepted_volume"][products[0][0]]
-    #        )
 
 
 if __name__ == "__main__":

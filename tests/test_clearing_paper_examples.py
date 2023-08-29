@@ -60,10 +60,12 @@ def test_complex_clearing_whitepaper_a():
     """
     orderbook = []
     orderbook = extend_orderbook(products, volume=-10, price=300, orderbook=orderbook)
-    orderbook = extend_orderbook(products, -14, 10, orderbook)
-    orderbook = extend_orderbook(products, 1, 40, orderbook)
-    orderbook = extend_orderbook(products, 11, 40, orderbook, "BB")
-    orderbook = extend_orderbook(products, 13, 100, orderbook)
+    orderbook = extend_orderbook(products, volume=-14, price=10, orderbook=orderbook)
+    orderbook = extend_orderbook(products, volume=1, price=40, orderbook=orderbook)
+    orderbook = extend_orderbook(
+        products, volume=11, price=40, orderbook=orderbook, bid_type="BB"
+    )
+    orderbook = extend_orderbook(products, volume=13, price=100, orderbook=orderbook)
 
     # bid gen1 and block_gen3 are from one unit
     orderbook[3]["agent_id"] = orderbook[2]["agent_id"]
@@ -158,7 +160,6 @@ def test_clearing_non_convex_1():
     market_config.market_products = [MarketProduct(rd(hours=+1), 3, rd(hours=1))]
     market_config.additional_fields = [
         "bid_type",
-        "minimum_acceptance_ratio",
     ]
     mr = MarketRole(market_config)
     next_opening = market_config.opening_hours.after(datetime.now())
@@ -170,47 +171,20 @@ def test_clearing_non_convex_1():
 
     """
     orderbook_demand = []
+
     order: Order = {
         "start_time": products[0][0],
         "end_time": products[0][1],
         "agent_id": "B1",
-        "bid_id": "B1_1",
-        "volume": -4,
-        "accepted_volume": {},
+        "bid_id": "B1",
+        "volume": {
+            products[0][0]: -4,
+            products[1][0]: -6,
+            products[2][0]: -10,
+        },
         "price": 100,
-        "accepted_price": {},
         "only_hours": None,
-        "bid_type": "SB",
-    }
-
-    orderbook_demand.append(order)
-
-    order: Order = {
-        "start_time": products[1][0],
-        "end_time": products[1][1],
-        "agent_id": "B1",
-        "bid_id": "B1_2",
-        "volume": -6,
-        "accepted_volume": {},
-        "price": 100,
-        "accepted_price": {},
-        "only_hours": None,
-        "bid_type": "SB",
-    }
-
-    orderbook_demand.append(order)
-
-    order: Order = {
-        "start_time": products[2][0],
-        "end_time": products[2][1],
-        "agent_id": "B1",
-        "bid_id": "B1_3",
-        "volume": -10,
-        "accepted_volume": {},
-        "price": 100,
-        "accepted_price": {},
-        "only_hours": None,
-        "bid_type": "SB",
+        "bid_type": "BB",
     }
     orderbook_demand.append(order)
 
@@ -218,41 +192,15 @@ def test_clearing_non_convex_1():
         "start_time": products[0][0],
         "end_time": products[0][1],
         "agent_id": "B2",
-        "bid_id": "B2_1",
-        "volume": -3,
-        "accepted_volume": {},
+        "bid_id": "B2",
+        "volume": {
+            products[0][0]: -3,
+            products[1][0]: -6,
+            products[2][0]: -12,
+        },
         "price": 100,
-        "accepted_price": {},
         "only_hours": None,
-        "bid_type": "SB",
-    }
-    orderbook_demand.append(order)
-
-    order: Order = {
-        "start_time": products[1][0],
-        "end_time": products[1][1],
-        "agent_id": "B2",
-        "bid_id": "B2_2",
-        "volume": -6,
-        "accepted_volume": {},
-        "price": 100,
-        "accepted_price": {},
-        "only_hours": None,
-        "bid_type": "SB",
-    }
-    orderbook_demand.append(order)
-
-    order: Order = {
-        "start_time": products[2][0],
-        "end_time": products[2][1],
-        "agent_id": "B2",
-        "bid_id": "B2_3",
-        "volume": -12,
-        "accepted_volume": {},
-        "price": 100,
-        "accepted_price": {},
-        "only_hours": None,
-        "bid_type": "SB",
+        "bid_type": "BB",
     }
     orderbook_demand.append(order)
 
@@ -260,10 +208,10 @@ def test_clearing_non_convex_1():
     orderbook = extend_orderbook(
         products=products, volume=15, price=5, orderbook=orderbook
     )
-    orderbook = extend_orderbook(products, 20, 3, orderbook)
+    orderbook = extend_orderbook(products, volume=20, price=3, orderbook=orderbook)
 
-    assert len(orderbook) == 12
-    assert len(orderbook_demand) == 6
+    assert len(orderbook) == 8
+    assert len(orderbook_demand) == 2
 
     mr.all_orders = orderbook
     accepted_orders, rejected_orders, meta = market_config.market_mechanism(
@@ -275,40 +223,102 @@ def test_clearing_non_convex_1():
     assert meta[1]["price"] == 3
     assert meta[2]["supply_volume"] == 22
     assert meta[2]["price"] == 5
-    assert accepted_orders[0]["agent_id"] == "B1"
-    assert accepted_orders[0]["accepted_volume"] == -4
-    assert accepted_orders[1]["agent_id"] == "B2"
-    assert accepted_orders[1]["accepted_volume"] == -3
-    assert accepted_orders[2]["agent_id"] == "gen10"
-    assert accepted_orders[2]["accepted_volume"] == 7
-    assert accepted_orders[3]["agent_id"] == "B1"
-    assert accepted_orders[3]["accepted_volume"] == -6
-    assert accepted_orders[4]["agent_id"] == "B2"
-    assert accepted_orders[4]["accepted_volume"] == -6
-    assert accepted_orders[5]["agent_id"] == "gen10"
-    assert accepted_orders[5]["accepted_volume"] == 12
-    assert accepted_orders[6]["agent_id"] == "B1"
-    assert accepted_orders[6]["accepted_volume"] == -10
-    assert accepted_orders[7]["agent_id"] == "B2"
-    assert accepted_orders[7]["accepted_volume"] == -12
-    assert accepted_orders[8]["agent_id"] == "gen7"
-    assert accepted_orders[8]["accepted_volume"] == 2
-    assert accepted_orders[9]["agent_id"] == "gen10"
-    assert accepted_orders[9]["accepted_volume"] == 20
 
+    assert accepted_orders[0]["agent_id"] == "B1"
+    assert accepted_orders[0]["accepted_volume"] == {
+        products[0][0]: -4,
+        products[1][0]: -6,
+        products[2][0]: -10,
+    }
+
+    assert accepted_orders[1]["agent_id"] == "B2"
+    assert accepted_orders[1]["accepted_volume"] == {
+        products[0][0]: -3,
+        products[1][0]: -6,
+        products[2][0]: -12,
+    }
+
+    assert accepted_orders[2]["agent_id"] == "gen6"
+    assert accepted_orders[2]["accepted_volume"] == 7
+
+    assert accepted_orders[3]["agent_id"] == "gen6"
+    assert accepted_orders[3]["accepted_volume"] == 12
+
+    assert accepted_orders[4]["agent_id"] == "gen3"
+    assert accepted_orders[4]["accepted_volume"] == 2
+
+    assert accepted_orders[5]["agent_id"] == "gen6"
+    assert accepted_orders[5]["accepted_volume"] == 20
+
+
+def test_clearing_non_convex_2():
     """
     Introduce non-convexities
     5.1.2
     including mar, BB for gen7
     no load costs cannot be integrated here, so the results differ
     """
-    orderbook = orderbook_demand.copy()
+    import copy
+
+    market_config = copy.copy(simple_dayahead_auction_config)
+
+    market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex"]
+    market_config.market_products = [MarketProduct(rd(hours=+1), 3, rd(hours=1))]
+    market_config.additional_fields = [
+        "bid_type",
+        "min_acceptance_ratio",
+    ]
+    mr = MarketRole(market_config)
+    next_opening = market_config.opening_hours.after(datetime.now())
+    products = get_available_products(market_config.market_products, next_opening)
+    assert len(products) == 3
+
+    """
+    Create Orderbook
+
+    """
+    orderbook = []
+
+    order: Order = {
+        "start_time": products[0][0],
+        "end_time": products[0][1],
+        "agent_id": "B1",
+        "bid_id": "B1",
+        "volume": {
+            products[0][0]: -4,
+            products[1][0]: -6,
+            products[2][0]: -11,
+        },
+        "price": 100,
+        "only_hours": None,
+        "bid_type": "BB",
+        "min_acceptance_ratio": 0,
+    }
+    orderbook.append(order)
+
+    order: Order = {
+        "start_time": products[0][0],
+        "end_time": products[0][1],
+        "agent_id": "B2",
+        "bid_id": "B2",
+        "volume": {
+            products[0][0]: -3,
+            products[1][0]: -6,
+            products[2][0]: -12,
+        },
+        "price": 100,
+        "only_hours": None,
+        "bid_type": "BB",
+        "min_acceptance_ratio": 0,
+    }
+    orderbook.append(order)
+
     orderbook = extend_orderbook(
         products=products,
         volume=15,
         price=5,
         orderbook=orderbook,
-        bid_type="BB",
+        bid_type="SB",
         min_acceptance_ratio=2 / 15,
     )
     orderbook = extend_orderbook(
@@ -320,63 +330,152 @@ def test_clearing_non_convex_1():
         min_acceptance_ratio=10 / 20,
     )
 
-    assert len(orderbook) == 10
-
     mr.all_orders = orderbook
     accepted_orders, rejected_orders, meta = market_config.market_mechanism(
         mr, products
     )
     assert meta[0]["supply_volume"] == 7
-    assert meta[0]["price"] == 3
+    assert meta[0]["price"] == 5
     assert meta[1]["supply_volume"] == 12
     assert meta[1]["price"] == 3
-    assert meta[2]["supply_volume"] == 22
-    # the price is a trade-off for the block bid: since 2MWh were accepted for 3€ in 2 hours
-    # 3+3+9 = 5*3
-    assert meta[2]["price"] == 9
-    assert accepted_orders[0]["agent_id"] == "B1"
-    assert accepted_orders[0]["accepted_volume"] == -4
-    assert accepted_orders[1]["agent_id"] == "B2"
-    assert accepted_orders[1]["accepted_volume"] == -3
-    assert accepted_orders[2]["agent_id"] == "block_gen7"
-    assert accepted_orders[2]["accepted_volume"] == {
-        product[0]: 2 for product in products
-    }
-    assert accepted_orders[3]["agent_id"] == "gen8"
-    assert accepted_orders[3]["accepted_volume"] == 5
-    assert accepted_orders[4]["agent_id"] == "B1"
-    assert accepted_orders[4]["accepted_volume"] == -6
-    assert accepted_orders[5]["agent_id"] == "B2"
-    assert accepted_orders[5]["accepted_volume"] == -6
-    assert accepted_orders[6]["agent_id"] == "gen8"
-    assert accepted_orders[6]["accepted_volume"] == 10
-    assert accepted_orders[7]["agent_id"] == "B1"
-    assert accepted_orders[7]["accepted_volume"] == -10
-    assert accepted_orders[8]["agent_id"] == "B2"
-    assert accepted_orders[8]["accepted_volume"] == -12
-    assert accepted_orders[9]["agent_id"] == "gen8"
-    assert accepted_orders[9]["accepted_volume"] == 20
+    assert meta[2]["supply_volume"] == 23
+    assert meta[2]["price"] == 5
 
+    assert accepted_orders[0]["agent_id"] == "B1"
+    assert accepted_orders[0]["accepted_volume"] == {
+        products[0][0]: -4,
+        products[1][0]: -6,
+        products[2][0]: -11,
+    }
+
+    assert accepted_orders[1]["agent_id"] == "B2"
+    assert accepted_orders[1]["accepted_volume"] == {
+        products[0][0]: -3,
+        products[1][0]: -6,
+        products[2][0]: -12,
+    }
+
+    assert accepted_orders[2]["agent_id"] == "gen3"
+    assert accepted_orders[2]["accepted_volume"] == 7
+    assert accepted_orders[3]["agent_id"] == "gen6"
+    assert accepted_orders[3]["accepted_volume"] == 12
+    assert accepted_orders[4]["agent_id"] == "gen3"
+    assert accepted_orders[4]["accepted_volume"] == 3
+    assert accepted_orders[5]["agent_id"] == "gen6"
+    assert accepted_orders[5]["accepted_volume"] == 20
+
+
+def test_clearing_non_convex_3():
     """
     5.1.3 price sensitive demand
 
     half of the demand bids are elastic
     """
-    orderbook = [
-        order
-        for order in orderbook
-        if (order["agent_id"] != "B1" and order["agent_id"] != "B2")
+    import copy
+
+    market_config = copy.copy(simple_dayahead_auction_config)
+
+    market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex"]
+    market_config.market_products = [MarketProduct(rd(hours=+1), 3, rd(hours=1))]
+    market_config.additional_fields = [
+        "bid_type",
+        "min_acceptance_ratio",
     ]
-    for order in orderbook_demand.copy():
-        order["volume"] = order["volume"] / 2
-        orderbook.append(order)
-        order_2 = order.copy()
-        if order_2["agent_id"] == "B1":
-            order_2["price"] = 10
-        elif order_2["agent_id"] == "B2":
-            order_2["price"] = 2
-        order_2["bid_id"] = f"{order['bid_id']}_2"
-        orderbook.append(order_2)
+    mr = MarketRole(market_config)
+    next_opening = market_config.opening_hours.after(datetime.now())
+    products = get_available_products(market_config.market_products, next_opening)
+    assert len(products) == 3
+
+    """
+    Create Orderbook
+
+    """
+    orderbook = []
+
+    order: Order = {
+        "start_time": products[0][0],
+        "end_time": products[0][1],
+        "agent_id": "B1",
+        "bid_id": "B1_1",
+        "volume": {
+            products[0][0]: -2,
+            products[1][0]: -3,
+            products[2][0]: -5.5,
+        },
+        "price": 100,
+        "only_hours": None,
+        "bid_type": "BB",
+        "min_acceptance_ratio": 0,
+    }
+    orderbook.append(order)
+
+    order: Order = {
+        "start_time": products[0][0],
+        "end_time": products[0][1],
+        "agent_id": "B2",
+        "bid_id": "B2_1",
+        "volume": {
+            products[0][0]: -1.5,
+            products[1][0]: -3,
+            products[2][0]: -6,
+        },
+        "price": 100,
+        "only_hours": None,
+        "bid_type": "BB",
+        "min_acceptance_ratio": 0,
+    }
+    orderbook.append(order)
+
+    order: Order = {
+        "start_time": products[0][0],
+        "end_time": products[0][1],
+        "agent_id": "B1",
+        "bid_id": "B1_2",
+        "volume": {
+            products[0][0]: -2,
+            products[1][0]: -3,
+            products[2][0]: -5.5,
+        },
+        "price": 10,
+        "only_hours": None,
+        "bid_type": "BB",
+        "min_acceptance_ratio": 0,
+    }
+    orderbook.append(order)
+
+    order: Order = {
+        "start_time": products[0][0],
+        "end_time": products[0][1],
+        "agent_id": "B2",
+        "bid_id": "B2_2",
+        "volume": {
+            products[0][0]: -1.5,
+            products[1][0]: -3,
+            products[2][0]: -6,
+        },
+        "price": 2,
+        "only_hours": None,
+        "bid_type": "BB",
+        "min_acceptance_ratio": 0,
+    }
+    orderbook.append(order)
+
+    orderbook = extend_orderbook(
+        products=products,
+        volume=15,
+        price=5,
+        orderbook=orderbook,
+        bid_type="SB",
+        min_acceptance_ratio=2 / 15,
+    )
+    orderbook = extend_orderbook(
+        products=products,
+        volume=20,
+        price=3,
+        orderbook=orderbook,
+        bid_type="SB",
+        min_acceptance_ratio=10 / 20,
+    )
 
     mr.all_orders = orderbook
     accepted_orders, rejected_orders, meta = market_config.market_mechanism(
@@ -384,36 +483,39 @@ def test_clearing_non_convex_1():
     )
 
     assert meta[0]["supply_volume"] == 5.5
-    assert meta[0]["price"] == 3
+    assert meta[0]["price"] == 5
     assert meta[1]["supply_volume"] == 9
-    assert meta[1]["price"] == 3
-    assert meta[2]["supply_volume"] == 16
+    assert meta[1]["price"] == 5
+    assert meta[2]["supply_volume"] == 17
     assert meta[2]["price"] == 3
 
-    assert accepted_orders[0]["agent_id"] == "gen8"
-    assert accepted_orders[0]["accepted_volume"] == 5.5
-    assert accepted_orders[1]["bid_id"] == "B1_1"
-    assert accepted_orders[1]["accepted_volume"] == -2
-    assert accepted_orders[2]["bid_id"] == "B1_1_2"
-    assert accepted_orders[2]["accepted_volume"] == -2
-    assert accepted_orders[3]["bid_id"] == "B2_1"
-    assert accepted_orders[3]["accepted_volume"] == -1.5
-    assert accepted_orders[4]["agent_id"] == "gen8"
+    assert accepted_orders[0]["bid_id"] == "B1_1"
+    assert accepted_orders[0]["accepted_volume"] == {
+        products[0][0]: -2,
+        products[1][0]: -3,
+        products[2][0]: -5.5,
+    }
+
+    assert accepted_orders[1]["bid_id"] == "B2_1"
+    assert accepted_orders[1]["accepted_volume"] == {
+        products[0][0]: -1.5,
+        products[1][0]: -3,
+        products[2][0]: -6,
+    }
+
+    assert accepted_orders[2]["bid_id"] == "B1_2"
+    assert accepted_orders[2]["accepted_volume"] == {
+        products[0][0]: -2,
+        products[1][0]: -3,
+        products[2][0]: -5.5,
+    }
+
+    assert accepted_orders[3]["agent_id"] == "gen5"
+    assert accepted_orders[3]["accepted_volume"] == 5.5
+    assert accepted_orders[4]["agent_id"] == "gen5"
     assert accepted_orders[4]["accepted_volume"] == 9
-    assert accepted_orders[5]["bid_id"] == "B1_2"
-    assert accepted_orders[5]["accepted_volume"] == -3
-    assert accepted_orders[6]["bid_id"] == "B1_2_2"
-    assert accepted_orders[6]["accepted_volume"] == -3
-    assert accepted_orders[7]["bid_id"] == "B2_2"
-    assert accepted_orders[7]["accepted_volume"] == -3
-    assert accepted_orders[8]["agent_id"] == "gen8"
-    assert accepted_orders[8]["accepted_volume"] == 16
-    assert accepted_orders[9]["bid_id"] == "B1_3"
-    assert accepted_orders[9]["accepted_volume"] == -5
-    assert accepted_orders[10]["bid_id"] == "B1_3_2"
-    assert accepted_orders[10]["accepted_volume"] == -5
-    assert accepted_orders[11]["bid_id"] == "B2_3"
-    assert accepted_orders[11]["accepted_volume"] == -6
+    assert accepted_orders[5]["agent_id"] == "gen8"
+    assert accepted_orders[5]["accepted_volume"] == 17
 
     """
     5.1.4 Flexible demand
