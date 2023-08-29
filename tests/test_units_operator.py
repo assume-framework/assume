@@ -66,6 +66,7 @@ async def test_set_unit_dispatch(units_operator: UnitsOperator):
             "volume": 500,
             "accepted_volume": 500,
             "price": 1000,
+            "accepted_price": 1000,
             "agent_id": "gen1",
             "unit_id": "testdemand",
             "only_hours": None,

@@ -181,6 +181,7 @@ def test_storage_feedback(storage_unit, mock_market_config):
             "end_time": end,
             "only_hours": None,
             "price": cost_discharge,
+            "accepted_price": cost_discharge,
             "accepted_volume": max_power_discharge[start] / 2,
         }
     ]

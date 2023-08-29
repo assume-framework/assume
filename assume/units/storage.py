@@ -379,7 +379,7 @@ class Storage(SupportsMinMaxCharge):
             else self.min_power_charge
         )
         min_power_charge -= base_load + capacity_pos
-        min_power_charge = (min_power_charge).where(min_power_charge <= 0, 0)
+        min_power_charge = min_power_charge.clip(upper=0)
 
         max_power_charge = (
             self.max_power_charge[start:end_excl]
@@ -397,9 +397,7 @@ class Storage(SupportsMinMaxCharge):
 
         # restrict charging according to max_volume
         max_soc_charge = self.calculate_soc_max_charge(self.get_soc_before(start))
-        max_power_charge = max_power_charge.where(
-            max_power_charge > max_soc_charge, max_soc_charge
-        )
+        max_power_charge = max_power_charge.clip(lower=max_soc_charge)
 
         return min_power_charge, max_power_charge
 
@@ -428,7 +426,7 @@ class Storage(SupportsMinMaxCharge):
             else self.min_power_discharge
         )
         min_power_discharge -= base_load + capacity_neg
-        min_power_discharge = (min_power_discharge).where(min_power_discharge >= 0, 0)
+        min_power_discharge = min_power_discharge.clip(lower=0)
 
         max_power_discharge = (
             self.max_power_discharge[start:end_excl]
@@ -446,9 +444,7 @@ class Storage(SupportsMinMaxCharge):
 
         # restrict according to min_volume
         max_soc_discharge = self.calculate_soc_max_discharge(self.get_soc_before(start))
-        max_power_discharge = max_power_discharge.where(
-            max_power_discharge < max_soc_discharge, max_soc_discharge
-        )
+        max_power_discharge = max_power_discharge.clip(upper=max_soc_discharge)
 
         return min_power_discharge, max_power_discharge
 
