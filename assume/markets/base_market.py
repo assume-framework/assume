@@ -10,6 +10,7 @@ from mango import Role
 from assume.common.market_objects import (
     ClearingMessage,
     MarketConfig,
+    MarketMechanism,
     MarketProduct,
     OpeningMessage,
     Order,
@@ -20,7 +21,7 @@ from assume.common.utils import get_available_products
 logger = logging.getLogger(__name__)
 
 
-class MarketRole(Role):
+class MarketRole(MarketMechanism, Role):
     """
     This is the base class for all market roles. It implements the basic functionality of a market role, such as
     registering agents, clearing the market and sending the results to the database agent.
@@ -37,7 +38,7 @@ class MarketRole(Role):
     marketconfig: MarketConfig
 
     def __init__(self, marketconfig: MarketConfig):
-        super().__init__()
+        super().__init__(marketconfig)
         self.marketconfig: MarketConfig = marketconfig
         if self.marketconfig.price_tick:
             if marketconfig.maximum_bid_price % self.marketconfig.price_tick != 0:
@@ -72,9 +73,7 @@ class MarketRole(Role):
         """
         self.marketconfig.addr = self.context.addr
         self.marketconfig.aid = self.context.aid
-        self.all_orders: list[Order] = []
         self.registered_agents: list[tuple[str, str]] = []
-        self.open_slots = []
 
         def accept_orderbook(content: dict, meta):
             if not isinstance(content, dict):
@@ -141,6 +140,8 @@ class MarketRole(Role):
             "products": products,
         }
 
+        self.open_auctions.put(opening_message)
+
         for agent in self.registered_agents:
             agent_addr, agent_id = agent
             await self.context.send_acl_message(
@@ -180,8 +181,7 @@ class MarketRole(Role):
         """
         agent = meta["sender_id"]
         agent_addr = meta["sender_addr"]
-        # TODO allow accessing agents properties?
-        if self.marketconfig.eligible_obligations_lambda(agent):
+        if self.validate_registration(meta):
             self.registered_agents.append((agent_addr, agent))
 
     def handle_orderbook(self, content: dict, meta: dict):
@@ -200,56 +200,7 @@ class MarketRole(Role):
         agent_addr = meta["sender_addr"]
         agent_id = meta["sender_id"]
         try:
-            max_price = self.marketconfig.maximum_bid_price
-            min_price = self.marketconfig.minimum_bid_price
-            max_volume = self.marketconfig.maximum_bid_volume
-
-            if self.marketconfig.price_tick:
-                # max and min should be in units
-                max_price = math.floor(max_price / self.marketconfig.price_tick)
-                min_price = math.ceil(min_price / self.marketconfig.price_tick)
-            if self.marketconfig.volume_tick:
-                max_volume = math.floor(max_volume / self.marketconfig.volume_tick)
-
-            for order in orderbook:
-                order["agent_id"] = (agent_addr, agent_id)
-                if not order.get("only_hours"):
-                    order["only_hours"] = None
-                assert (
-                    order["price"] <= max_price
-                ), f"maximum_bid_price {order['price']}"
-                assert (
-                    order["price"] >= min_price
-                ), f"minimum_bid_price {order['price']}"
-
-                if "bid_type" in order.keys():
-                    order["bid_type"] = (
-                        "SB" if order["bid_type"] == None else order["bid_type"]
-                    )
-                    assert order["bid_type"] in [
-                        "SB",
-                        "BB",
-                    ], f"bid_type {order['bid_type']} not in ['SB', 'BB']"
-
-                if (
-                    "bid_type" in order.keys() and order["bid_type"] == "SB"
-                ) or "bid_type" not in order.keys():
-                    assert (
-                        abs(order["volume"]) <= max_volume
-                    ), f"max_volume {order['volume']}"
-
-                if "bid_type" in order.keys() and order["bid_type"] == "BB":
-                    assert False not in [
-                        abs(volume) <= max_volume
-                        for _, volume in order["volume"].items()
-                    ], f"max_volume {order['volume']}"
-                if self.marketconfig.price_tick:
-                    assert isinstance(order["price"], int)
-                if self.marketconfig.volume_tick:
-                    assert isinstance(order["volume"], int)
-                for field in self.marketconfig.additional_fields:
-                    assert field in order.keys(), f"missing field: {field}"
-                self.all_orders.append(order)
+            self.validate_orderbook(orderbook, (agent_addr, agent_id))
         except Exception as e:
             logger.error(f"error handling message from {agent_id} - {e}")
             self.context.schedule_instant_acl_message(
@@ -303,11 +254,6 @@ class MarketRole(Role):
         )
 
     async def clear_market(self, market_products: list[MarketProduct]):
-        # Check if order is in time slots for current opening
-        # for order in self.all_orders:
-        #     assert (
-        #         order["start_time"] in index
-        #     ), f"order start time not in {self.marketconfig.market_products}"
         """
         This method clears the market and sends the results to the database agent.
 
@@ -318,7 +264,8 @@ class MarketRole(Role):
             accepted_orderbook,
             rejected_orderbook,
             market_meta,
-        ) = self.marketconfig.market_mechanism(self, market_products)
+        ) = self.clear(self.all_orders, market_products)
+        self.open_auctions.get()
 
         accepted_orderbook.sort(key=itemgetter("agent_id"))
         rejected_orderbook.sort(key=itemgetter("agent_id"))

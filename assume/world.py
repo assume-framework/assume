@@ -19,12 +19,13 @@ from tqdm import tqdm
 from assume.common import (
     Forecaster,
     MarketConfig,
+    MarketMechanism,
     UnitsOperator,
     WriteOutput,
     mango_codec_factory,
 )
 from assume.common.base import LearningConfig
-from assume.markets import MarketRole, clearing_mechanisms
+from assume.markets import clearing_mechanisms
 from assume.strategies import LearningStrategy, bidding_strategies
 from assume.units import BaseUnit, Demand, HeatPump, PowerPlant, Storage
 
@@ -93,7 +94,7 @@ class World:
                 "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",
                 e,
             )
-        self.clearing_mechanisms = clearing_mechanisms
+        self.clearing_mechanisms: dict[str, MarketMechanism] = clearing_mechanisms
         self.clearing_mechanisms.update(additional_clearing_mechanisms)
         nest_asyncio.apply()
         self.loop = asyncio.get_event_loop()
@@ -315,19 +316,17 @@ class World:
         marketconfig =
              describes the configuration of a market
         """
-        if isinstance(market_config.market_mechanism, str):
-            if strategy := self.clearing_mechanisms.get(market_config.market_mechanism):
-                market_config.market_mechanism = strategy
-
-            else:
-                raise Exception(f"invalid strategy {market_config.market_mechanism}")
+        if mm_class := self.clearing_mechanisms.get(market_config.market_mechanism):
+            market_role = mm_class(market_config)
+        else:
+            raise Exception(f"invalid {market_config.market_mechanism=}")
 
         market_operator = self.market_operators.get(market_operator_id)
 
         if not market_operator:
-            raise Exception(f"no market operator {market_operator_id}")
+            raise Exception(f"invalid {market_operator_id=}")
 
-        market_operator.add_role(MarketRole(market_config))
+        market_operator.add_role(market_role)
         market_operator.markets.append(market_config)
         self.markets[f"{market_config.name}"] = market_config
 

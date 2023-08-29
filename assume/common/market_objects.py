@@ -87,9 +87,6 @@ class MarketProduct:
     eligible_lambda_function: eligible_lambda | None = None
 
 
-market_mechanism = Callable[[Role, list[MarketProduct]], tuple[Orderbook, dict]]
-
-
 class Product(NamedTuple):
     """
     an actual product with start and end
@@ -105,6 +102,10 @@ class Product(NamedTuple):
     start: datetime
     end: datetime
     only_hours: OnlyHours | None = None
+
+
+class MarketMechanism:
+    pass
 
 
 @dataclass
@@ -123,7 +124,7 @@ class MarketConfig:
     :param opening_duration: the duration of the opening hours
     :type opening_duration: timedelta
     :param market_mechanism: name of method used for clearing
-    :type market_mechanism: market_mechanism | str
+    :type market_mechanism: str
     :param market_products: list of available products to be traded at the market
     :type market_products: list[MarketProduct]
     :param product_type: energy or capacity or heat
@@ -159,7 +160,7 @@ class MarketConfig:
     # continuous markets are clearing just very fast and keep unmatched orders between clearings
     opening_hours: rr.rrule  # dtstart is start/introduction of market
     opening_duration: timedelta
-    market_mechanism: market_mechanism | str  # market_mechanism determines wether old offers are deleted (auction) or not (continuous) after clearing
+    market_mechanism: str
     market_products: list[MarketProduct] = field(default_factory=list)
     product_type: str = "energy"
     maximum_bid_volume: float = 2000.0
@@ -176,6 +177,88 @@ class MarketConfig:
     # lambda: agent.payed_fee
     # obligation should be time-based
     # only allowed to bid regelenergie if regelleistung was accepted in the same hour for this agent by the market
+
+
+class MarketMechanism:
+    """
+    This class represents a market mechanism.
+    It is different thant the MarketRole, in the way that the functionality is unrelated to mango.
+    The MarketMechanism is embedded into the general MarketRole, which takes care of simulation concerns.
+    In the Marketmechanism, all data needed for the clearing is present.
+    """
+
+    all_orders: Orderbook
+    marketconfig: MarketConfig
+    open_auctions: list
+    name: str
+
+    def __init__(self, marketconfig: MarketConfig):
+        self.marketconfig = marketconfig
+        from queue import Queue
+
+        self.open_auctions = Queue()
+        self.all_orders = []
+
+    def validate_registration(self, meta: dict) -> bool:
+        """
+        method to validate a given registration.
+        Used to check if a participant is eligible to bid on this market
+        """
+        return True
+
+    def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> bool:
+        """
+        method to validate a given orderbook
+        This is needed to check if all required fields for this mechanism are present
+        """
+        max_price = self.marketconfig.maximum_bid_price
+        min_price = self.marketconfig.minimum_bid_price
+        max_volume = self.marketconfig.maximum_bid_volume
+
+        if self.marketconfig.price_tick:
+            # max and min should be in units
+            max_price = math.floor(max_price / self.marketconfig.price_tick)
+            min_price = math.ceil(min_price / self.marketconfig.price_tick)
+        if self.marketconfig.volume_tick:
+            max_volume = math.floor(max_volume / self.marketconfig.volume_tick)
+
+        for order in orderbook:
+            order["agent_id"] = agent_tuple
+            if not order.get("only_hours"):
+                order["only_hours"] = None
+            assert order["price"] <= max_price, f"maximum_bid_price {order['price']}"
+            assert order["price"] >= min_price, f"minimum_bid_price {order['price']}"
+
+            if "bid_type" in order.keys():
+                order["bid_type"] = (
+                    "SB" if order["bid_type"] == None else order["bid_type"]
+                )
+                assert order["bid_type"] in [
+                    "SB",
+                    "BB",
+                ], f"bid_type {order['bid_type']} not in ['SB', 'BB']"
+
+            if "bid_type" not in order.keys() or order["bid_type"] == "SB":
+                assert (
+                    abs(order["volume"]) <= max_volume
+                ), f"max_volume {order['volume']}"
+
+            if order.get("bid_type") == "BB":
+                assert False not in [
+                    abs(volume) <= max_volume for _, volume in order["volume"].items()
+                ], f"max_volume {order['volume']}"
+            if self.marketconfig.price_tick:
+                assert isinstance(order["price"], int)
+            if self.marketconfig.volume_tick:
+                assert isinstance(order["volume"], int)
+            for field in self.marketconfig.additional_fields:
+                assert field in order.keys(), f"missing field: {field}"
+            self.all_orders.append(order)
+
+    def clear(
+        self, orderbook: Orderbook, market_products: list[MarketProduct]
+    ) -> (Orderbook, Orderbook, list[dict]):
+        return [], [], []
 
 
 class OpeningMessage(TypedDict):
