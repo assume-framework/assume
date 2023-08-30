@@ -207,7 +207,7 @@ class WriteOutput(Role):
     def write_units_definition(self, unit_info: dict):
         """
         Writes unit definitions to the corresponding data frame and directly store it in db and csv.
-        Since that is only done once, no need for recurrent sheduling arises.
+        Since that is only done once, no need for recurrent scheduling arises.
 
         Args:
             unit_type (str): The type of the unit.
@@ -260,9 +260,9 @@ class WriteOutput(Role):
         if self.db is None:
             return
         queries = [
-            f"select market_id as name, avg(price) as avg_price from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select market_id as name, sum(price*demand_volume_energy) as total_cost from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select market_id as name, sum(demand_volume_energy) as total_volume from market_meta where simulation = '{self.simulation_id}' group by market_id",
+            f"select market_id as name, market_id, avg(price) as avg_price from market_meta where simulation = '{self.simulation_id}' group by market_id",
+            f"select market_id as name, market_id, sum(price*demand_volume_energy) as total_cost from market_meta where simulation = '{self.simulation_id}' group by market_id",
+            f"select market_id as name, market_id, sum(demand_volume_energy) as total_volume from market_meta where simulation = '{self.simulation_id}' group by market_id",
             f"select unit_id as name, market_id, avg(power/max_power) as capacity_factor from market_dispatch ud join power_plant_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by name, market_id",
         ]
         dfs = []

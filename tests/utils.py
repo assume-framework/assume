@@ -45,6 +45,7 @@ def extend_orderbook(
     price,
     orderbook=[],
     bid_type="SB",
+    min_acceptance_ratio=None,
 ):
     """
     Creates constant bids over the time span of all products
@@ -72,6 +73,12 @@ def extend_orderbook(
             "only_hours": None,
             "bid_type": bid_type,
         }
+
+        if min_acceptance_ratio is not None:
+            order.update({"min_acceptance_ratio": min_acceptance_ratio})
+        else:
+            order.update({"min_acceptance_ratio": 0})
+
         orderbook.append(order)
 
     else:
@@ -93,6 +100,12 @@ def extend_orderbook(
                 "only_hours": None,
                 "bid_type": bid_type,
             }
+
+            if min_acceptance_ratio is not None:
+                order.update({"min_acceptance_ratio": min_acceptance_ratio})
+            else:
+                order.update({"min_acceptance_ratio": 0})
+
             orderbook.append(order)
 
     return orderbook
