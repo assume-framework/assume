@@ -22,6 +22,16 @@ logger = logging.getLogger(__name__)
 
 
 class UnitsOperator(Role):
+    """
+    The UnitsOperator is the agent that manages the units.
+    It receives the opening hours of the market and sends back the bids for the market.
+
+    :param available_markets: the available markets
+    :type available_markets: list[MarketConfig]
+    :param opt_portfolio: optimized portfolio strategy
+    :type opt_portfolio: tuple[bool, BaseStrategy] | None
+    """
+
     def __init__(
         self,
         available_markets: list[MarketConfig],
@@ -70,6 +80,9 @@ class UnitsOperator(Role):
     ):
         """
         Create a unit.
+
+        :param unit: the unit to be added
+        :type unit: BaseUnit
         """
         unit.reset()
         self.units[unit.id] = unit
@@ -97,10 +110,19 @@ class UnitsOperator(Role):
         """
         Method which decides if we want to participate on a given Market.
         This always returns true for now
+
+        :param market: the market to participate in
+        :type market: MarketConfig
         """
         return True
 
     def register_market(self, market: MarketConfig):
+        """
+        Register a market.
+
+        :param market: the market to register
+        :type market: MarketConfig
+        """
         self.context.schedule_timestamp_task(
             self.context.send_acl_message(
                 {"context": "registration", "market": market.name},
@@ -119,6 +141,11 @@ class UnitsOperator(Role):
         """
         When we receive an opening from the market, we schedule sending back
         our list of orders as a response
+
+        :param opening: the opening message
+        :type opening: OpeningMessage
+        :param meta: the meta data of the market
+        :type meta: dict[str, str]
         """
         logger.debug(
             f'{self.id} received opening from: {opening["market_id"]} {opening["start"]} until: {opening["stop"]}.'
@@ -131,6 +158,11 @@ class UnitsOperator(Role):
         stores accepted orders, sets the received power
         writes result back for the learning
         and executes the dispatch, including ramping for times in the past
+
+        :param content: the content of the clearing message
+        :type content: ClearingMessage
+        :param meta: the meta data of the market
+        :type meta: dict[str, str]
         """
         logger.debug(f"{self.id} got market result: {content}")
         orderbook: Orderbook = content["orderbook"]
@@ -149,6 +181,11 @@ class UnitsOperator(Role):
         feeds the current market result back to the units
         this does not respect bids from multiple markets
         for the same time period, as we only have access to the current orderbook here
+
+        :param orderbook: the orderbook of the market
+        :type orderbook: Orderbook
+        :param marketconfig: the market configuration
+        :type marketconfig: MarketConfig
         """
         orderbook.sort(key=itemgetter("unit_id"))
         for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
@@ -180,8 +217,13 @@ class UnitsOperator(Role):
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
             current_dispatch = unit.execute_current_dispatch(start, now)
+            end = now - unit.index.freq
             current_dispatch.name = "power"
             data = pd.DataFrame(current_dispatch)
+            data["soc"] = unit.outputs["soc"][start:end]
+            for key in unit.outputs.keys():
+                if "cashflow" in key:
+                    data[key] = unit.outputs[key][start:end]
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
 
@@ -218,7 +260,8 @@ class UnitsOperator(Role):
         formulates an orderbook and sends it to the market.
         This will handle optional portfolio processing
 
-        Return:
+        :param opening: the opening message
+        :type opening: OpeningMessage
         """
 
         products = opening["products"]
@@ -260,6 +303,20 @@ class UnitsOperator(Role):
     async def formulate_bids_portfolio(
         self, market: MarketConfig, products: list[tuple]
     ) -> Orderbook:
+        """
+        Takes information from all units that the unit operator manages and
+        formulates the bid to the market from that according to the bidding strategy of the unit operator.
+
+        This is the portfolio optimization version
+
+        :param market: the market to formulate bids for
+        :type market: MarketConfig
+        :param products: the products to formulate bids for
+        :type products: list[tuple]
+
+        :return: OrderBook that is submitted as a bid to the market
+        :rtype: OrderBook
+        """
         orderbook: Orderbook = []
         # TODO sort units by priority
         # execute operator bidding strategy..?
@@ -274,9 +331,15 @@ class UnitsOperator(Role):
     ) -> Orderbook:
         """
         Takes information from all units that the unit operator manages and
-        formulates the bid to the market from that according to the bidding strategy.
+        formulates the bid to the market from that according to the bidding strategy of the unit itself.
 
-        Return: OrderBook that is submitted as a bid to the market
+        :param market: the market to formulate bids for
+        :type market: MarketConfig
+        :param products: the products to formulate bids for
+        :type products: list[tuple]
+
+        :return OrderBook that is submitted as a bid to the market
+        :rtype OrderBook
         """
 
         orderbook: Orderbook = []
@@ -289,7 +352,7 @@ class UnitsOperator(Role):
             for i, order in enumerate(product_bids):
                 if order["volume"] == 0:
                     continue
-                if order["profile"] is not None:
+                if "profile" in order.keys():
                     if all(volume == 0 for volume in order["profile"].values()):
                         continue
                 order["agent_id"] = (self.context.addr, self.context.aid)
@@ -307,18 +370,25 @@ class UnitsOperator(Role):
     def write_learning_params(self, orderbook: Orderbook, marketconfig: MarketConfig):
         """
         sends the current rl_strategy update to the output agent
+
+        :param orderbook: the orderbook of the market
+        :type orderbook: Orderbook
+        :param marketconfig: the market configuration
+        :type marketconfig: MarketConfig
         """
-        learning_unit_count = 0
+        learning_strategies = []
         action_dimension = 0
         for unit in self.units.values():
             bidding_strategy = unit.bidding_strategies.get(marketconfig.product_type)
             if isinstance(bidding_strategy, LearningStrategy):
-                learning_unit_count += 1
+                learning_strategies.append(bidding_strategy)
                 # should be the same across all strategies
                 action_dimension = bidding_strategy.act_dim
-        if learning_unit_count > 0:
+        if len(learning_strategies) > 0:
             start = orderbook[0]["start_time"]
             unit_rl_strategy_dfs = []
+            learning_unit_count = len(learning_strategies)
+            learning_mode = learning_strategies[0].learning_mode
 
             all_observations = []
             all_rewards = []
@@ -366,7 +436,6 @@ class UnitsOperator(Role):
 
             data = (all_observations, all_actions, all_rewards)
             learning_data = pd.concat(unit_rl_strategy_dfs)
-            # TODO send observation and action also to output agent if neede din visualisation of grafana
 
             db_aid = self.context.data_dict.get("output_agent_id")
             db_addr = self.context.data_dict.get("output_agent_addr")
@@ -383,7 +452,8 @@ class UnitsOperator(Role):
 
             learning_role_id = "learning_agent"
             learning_role_addr = self.context.addr
-            if learning_role_id and learning_role_addr:
+
+            if learning_mode:
                 self.context.schedule_instant_acl_message(
                     receiver_id=learning_role_id,
                     receiver_addr=learning_role_addr,

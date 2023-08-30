@@ -22,7 +22,17 @@ class flexableEOMStorage(BaseStrategy):
         Takes information from a unit that the unit operator manages and
         defines how it is dispatched to the market
 
-        Return: volume, price
+        :param unit: Unit that is dispatched
+        :type unit: SupportsMinMaxCharge
+        :param market_config: Market configuration
+        :type market_config: MarketConfig
+        :param product_tuples: List of product tuples
+        :type product_tuples: list[Product]
+        :param kwargs: Additional keyword arguments
+        :type kwargs: dict
+        :return: bids containing start_time, end_time, only_hours, price, volume
+        :rtype: Orderbook
+
         Strategy analogue to flexABLE
 
         """
@@ -140,6 +150,22 @@ class flexablePosCRMStorage(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
+        """
+        Takes information from a unit that the unit operator manages and
+        defines how it is dispatched to the market
+        Returns bids containing start_time, end_time, only_hours, price, volume
+
+        :param unit: Unit that is dispatched
+        :type unit: SupportsMinMaxCharge
+        :param market_config: Market configuration
+        :type market_config: MarketConfig
+        :param product_tuples: List of product tuples
+        :type product_tuples: list[Product]
+        :param kwargs: Additional keyword arguments
+        :type kwargs: dict
+        :return: bids containing start_time, end_time, only_hours, price, volume
+        :rtype: Orderbook
+        """
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
 
@@ -227,6 +253,21 @@ class flexableNegCRMStorage(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
+        """
+        Takes information from a unit that the unit operator manages and
+        defines how it is dispatched to the market
+
+        :param unit: Unit that is dispatched
+        :type unit: SupportsMinMaxCharge
+        :param market_config: Market configuration
+        :type market_config: MarketConfig
+        :param product_tuples: List of product tuples
+        :type product_tuples: list[Product]
+        :param kwargs: Additional keyword arguments
+        :type kwargs: dict
+        :return: bids containing start_time, end_time, only_hours, price, volume
+        :rtype: Orderbook
+        """
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
 
@@ -280,6 +321,21 @@ class flexableNegCRMStorage(BaseStrategy):
 
 
 def calculate_price_average(unit, current_time, foresight, price_forecast):
+    """
+    Calculates the average price for a given time period
+    Returns the average price
+
+    :param unit: Unit that is dispatched
+    :type unit: SupportsMinMaxCharge
+    :param current_time: Current time
+    :type current_time: pd.Timestamp
+    :param foresight: Foresight
+    :type foresight: pd.Timedelta
+    :param price_forecast: Price forecast
+    :type price_forecast: pd.Series
+    :return: Average price
+    :rtype: float
+    """
     average_price = np.mean(
         price_forecast[current_time - foresight : current_time + foresight]
     )
@@ -288,6 +344,23 @@ def calculate_price_average(unit, current_time, foresight, price_forecast):
 
 
 def get_specific_revenue(unit, marginal_cost, current_time, foresight, price_forecast):
+    """
+    Calculates the specific revenue for a given time period
+    Returns the specific revenue
+
+    :param unit: Unit that is dispatched
+    :type unit: SupportsMinMaxCharge
+    :param marginal_cost: Marginal cost
+    :type marginal_cost: float
+    :param current_time: Current time
+    :type current_time: pd.Timestamp
+    :param foresight: Foresight
+    :type foresight: pd.Timedelta
+    :param price_forecast: Price forecast
+    :type price_forecast: pd.Series
+    :return: Specific revenue
+    :rtype: float
+    """
     t = current_time
 
     if t + foresight > price_forecast.index[-1]:

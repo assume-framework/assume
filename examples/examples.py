@@ -49,8 +49,13 @@ availabe_examples = {
 
 # %%
 if __name__ == "__main__":
-    example = "small_with_opt_clearing"
-    data_format = "timescale"  # "local_db" or "timescale"
+    """
+    Available examples:
+    - local_db: without database and grafana
+    - timescale: with database and grafana (note: you need docker installed)
+    """
+    data_format = "local_db"  # "local_db" or "timescale"
+    example = "small"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
