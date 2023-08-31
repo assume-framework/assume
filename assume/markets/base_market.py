@@ -21,6 +21,16 @@ logger = logging.getLogger(__name__)
 
 
 class MarketRole(Role):
+    """
+    This is the base class for all market roles. It implements the basic functionality of a market role, such as
+    registering agents, clearing the market and sending the results to the database agent.
+
+    :param marketconfig: The configuration of the market
+    :type marketconfig: MarketConfig
+
+    Methods
+    -------
+    """
     longitude: float
     latitude: float
     marketconfig: MarketConfig
@@ -45,6 +55,20 @@ class MarketRole(Role):
                 )
 
     def setup(self):
+        """
+        This method sets up the initial configuration and subscriptions for the market role.  
+        It sets the address and agent ID of the market config to match the current context.
+        
+        It Defines three filter methods (accept_orderbook, accept_registration, and accept_get_unmatched)
+        that serve as validation steps for different types of incoming messages.
+        
+        Subscribes the role to handle incoming order book messages using the handle_orderbook method.
+        Subscribes the role to handle incoming registration messages using the handle_registration method
+        If the market configuration supports "get unmatched" functionality, subscribes the role to handle 
+        such messages using the handle_get_unmatched
+
+        Schedules the opening() method to run at the next opening time of the market.
+        """
         self.marketconfig.addr = self.context.addr
         self.marketconfig.aid = self.context.aid
         self.all_orders: list[Order] = []
@@ -52,6 +76,20 @@ class MarketRole(Role):
         self.open_slots = []
 
         def accept_orderbook(content: dict, meta):
+            """
+            This method is used as a filter or validation step for incoming messages 
+            that contain order book information. It ensures that only valid and relevant order 
+            books from authorized senders associated with the correct market are processed further, 
+            while discarding or ignoring invalid or irrelevant messages.
+
+            :param content: The content of the message
+            :type content: dict
+            :param meta: The metadata of the message
+            :type meta: any
+
+            :return: True if the message is valid, False otherwise
+            :rtype: bool
+            """
             if not isinstance(content, dict):
                 return False
 
@@ -62,6 +100,20 @@ class MarketRole(Role):
             )
 
         def accept_registration(content: dict, meta):
+            """
+            This method is used as a filter or validation step for incoming messages
+            that contain registration information. It ensures that only valid and relevant
+            registration messages from authorized senders associated with the correct market 
+            are processed further, while discarding or ignoring invalid or irrelevant messages.
+
+            :param content: The content of the message
+            :type content: dict
+            :param meta: The metadata of the message
+            :type meta: any
+
+            :return: True if the message is valid, False otherwise
+            :rtype: bool
+            """
             if not isinstance(content, dict):
                 return False
             return (
@@ -70,6 +122,18 @@ class MarketRole(Role):
             )
 
         def accept_get_unmatched(content: dict, meta):
+            """
+            This method serves as a filter to determine whether an incoming message 
+            containing "get unmatched" information is valid and should be processed further
+            
+            :param content: The content of the message
+            :type content: dict
+            :param meta: The metadata of the message
+            :type meta: any
+            
+            :return: True if the message is valid, False otherwise
+            :rtype: bool
+            """
             if not isinstance(content, dict):
                 return False
             return (
@@ -93,6 +157,10 @@ class MarketRole(Role):
         self.context.schedule_timestamp_task(self.opening(), opening_ts)
 
     async def opening(self):
+        """
+        This method is called when the market opens. It sends an opening message to all registered agents,
+        handles scheduling the clearing of the market and the next opening. 
+        """
         # scheduled to be opened now
         market_open = datetime.utcfromtimestamp(self.context.current_timestamp)
         market_closing = market_open + self.marketconfig.opening_duration
@@ -140,6 +208,15 @@ class MarketRole(Role):
             logger.debug(f"market {self.marketconfig.name} - does not reopen")
 
     def handle_registration(self, content: dict, meta: dict):
+        """
+        This method handles incoming registration messages. 
+        It adds the sender of the message to the list of registered agents
+
+        :param content: The content of the message
+        :type content: dict
+        :param meta: The metadata of the message
+        :type meta: any
+        """
         agent = meta["sender_id"]
         agent_addr = meta["sender_addr"]
         # TODO allow accessing agents properties?
@@ -147,6 +224,17 @@ class MarketRole(Role):
             self.registered_agents.append((agent_addr, agent))
 
     def handle_orderbook(self, content: dict, meta: dict):
+        """
+        This method handles incoming order book messages.
+        It validates the order book and adds it to the list of all orders.
+
+        :param content: The content of the message
+        :type content: dict
+        :param meta: The metadata of the message
+        :type meta: any
+
+        :raises AssertionError: If the order book is invalid
+        """
         orderbook: Orderbook = content["orderbook"]
         agent_addr = meta["sender_addr"]
         agent_id = meta["sender_id"]
@@ -219,6 +307,13 @@ class MarketRole(Role):
         """
         A handler which sends the orderbook with unmatched orders to an agent.
         Allows to query a subset of the orderbook.
+
+        :param content: The content of the message
+        :type content: dict
+        :param meta: The metadata of the message
+        :type meta: dict
+
+        :raises AssertionError: If the order book is invalid
         """
         order = content.get("order")
         agent_addr = meta["sender_addr"]
@@ -253,6 +348,12 @@ class MarketRole(Role):
         #     assert (
         #         order["start_time"] in index
         #     ), f"order start time not in {self.marketconfig.market_products}"
+        """
+        This method clears the market and sends the results to the database agent.
+        
+        :param market_products: The products to be traded
+        :type market_products: list[MarketProduct]
+        """
         (
             accepted_orderbook,
             rejected_orderbook,
@@ -304,6 +405,12 @@ class MarketRole(Role):
 
     async def store_order_book(self, orderbook: Orderbook):
         # Send a message to the OutputRole to update data in the database
+        """
+        Sends a message to the OutputRole to update data in the database
+
+        :param orderbook: The order book to be stored
+        :type orderbook: Orderbook
+        """
         message = {
             "context": "write_results",
             "type": "store_order_book",
@@ -321,6 +428,12 @@ class MarketRole(Role):
 
     async def store_market_results(self, market_meta):
         # Send a message to the OutputRole to update data in the database
+        """
+        This method sends a message to the OutputRole to update data in the database
+
+        :param market_meta: The metadata of the market
+        :type market_meta: any
+        """
         message = {
             "context": "write_results",
             "type": "store_market_results",
