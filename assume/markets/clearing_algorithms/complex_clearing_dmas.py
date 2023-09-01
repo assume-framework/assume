@@ -38,6 +38,13 @@ def complex_clearing_dmas(
     This performs the process of "market clearing" for a given market agent and its orders.
     During this process, incoming orders are matched against each other and allocations are determined to adhere to market rules.
     The result are an orderbook, the rejected orders and market metadata.
+
+    :param market_agent: The market agent
+    :type market_agent: MarketRole
+    :param market_products: The products to be traded
+    :type market_products: list[MarketProduct]
+    :return: orderbook, rejected_orders, meta
+    :rtype: tuple[Orderbook, Orderbook, list[dict]]
     """
     # INIT
     start = market_products[0][0]

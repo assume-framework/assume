@@ -17,6 +17,18 @@ def pay_as_clear_opt(
     market_agent: MarketRole,
     market_products: list[MarketProduct],
 ):
+    """
+    This implements pay-as-clear for simpler market scenarios where bids are classified as simple bids (SB) or block bids (BB)
+    without more complex bid structures.
+
+    :param market_agent: The market agent
+    :type market_agent: MarketRole
+    :param market_products: The products to be traded
+    :type market_products: list[MarketProduct]
+
+    :return extract_results(model=model, eps=eps, orders=orders, market_products=market_products, market_clearing_prices=market_clearing_prices)
+    :rtype: tuple[Orderbook, Orderbook, list[dict]]
+    """
     eps = 1e-4
 
     market_getter = itemgetter("start_time", "end_time", "only_hours")
@@ -111,6 +123,17 @@ def pay_as_clear_complex_opt(
     market_agent: MarketRole,
     market_products: list[MarketProduct],
 ):
+    """
+    This implements pay-as-clear with more complex bid structures, including acceptance ratios, bid types, and profiles.
+
+    :param market_agent: The market agent
+    :type market_agent: MarketRole
+    :param market_products: The products to be traded
+    :type market_products: list[MarketProduct]
+
+    :return extract_results(model=model, eps=eps, orders=orders, market_products=market_products, market_clearing_prices=market_clearing_prices)
+    :rtype: tuple[Orderbook, Orderbook, list[dict]]
+    """
     if len(market_agent.all_orders) == 0:
         return [], [], []
 
@@ -257,6 +280,23 @@ def extract_results(
     market_products,
     market_clearing_prices,
 ):
+    """
+    Extracts the results from the model and returns the accepted and rejected orders.
+
+    :param model: The pyomo model
+    :type model: pyomo.ConcreteModel
+    :param eps: The epsilon value
+    :type eps: float
+    :param orders: The orders
+    :type orders: Orderbook
+    :param market_products: The market products
+    :type market_products: list[MarketProduct]
+    :param market_clearing_prices: The market clearing prices
+    :type market_clearing_prices: dict[datetime.datetime, float]
+
+    :return: The accepted orders, the rejected orders and the meta information
+    :rtype: tuple[Orderbook, Orderbook, list[dict]]
+    """
     accepted_orders: Orderbook = []
     rejected_orders: Orderbook = []
     meta = []

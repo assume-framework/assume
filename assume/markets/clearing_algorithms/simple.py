@@ -12,6 +12,17 @@ def pay_as_clear(
     market_agent: MarketRole,
     market_products: list[MarketProduct],
 ):
+    """
+    Performs electricity market clearing using a pay-as-clear mechanism. This means that the clearing price is the
+    highest price that is still accepted. The clearing price is the same for all accepted orders.
+
+    :param market_agent: The market agent
+    :type market_agent: MarketRole
+    :param market_products: The products to be traded
+    :type market_products: list[MarketProduct]
+    :return: accepted_orders, rejected_orders, meta
+    :rtype: tuple[Orderbook, Orderbook, list[dict]]
+    """
     market_getter = itemgetter("start_time", "end_time", "only_hours")
     accepted_orders: Orderbook = []
     rejected_orders: Orderbook = []
@@ -140,6 +151,16 @@ def pay_as_bid(
     market_agent: MarketRole,
     market_products: list[MarketProduct],
 ):
+    """
+    Simulates electricity market clearing using a pay-as-bid mechanism.
+
+    :param market_agent: The market agent
+    :type market_agent: MarketRole
+    :param market_products: The products to be traded
+    :type market_products: list[MarketProduct]
+    :return: accepted_orders, rejected_orders, meta
+    :rtype: tuple[Orderbook, Orderbook, list[dict]]
+    """
     market_getter = itemgetter("start_time", "end_time", "only_hours")
     accepted_orders: Orderbook = []
     rejected_orders: Orderbook = []
