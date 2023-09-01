@@ -31,6 +31,7 @@ class MarketRole(Role):
     Methods
     -------
     """
+
     longitude: float
     latitude: float
     marketconfig: MarketConfig
@@ -56,15 +57,15 @@ class MarketRole(Role):
 
     def setup(self):
         """
-        This method sets up the initial configuration and subscriptions for the market role.  
+        This method sets up the initial configuration and subscriptions for the market role.
         It sets the address and agent ID of the market config to match the current context.
-        
+
         It Defines three filter methods (accept_orderbook, accept_registration, and accept_get_unmatched)
         that serve as validation steps for different types of incoming messages.
-        
+
         Subscribes the role to handle incoming order book messages using the handle_orderbook method.
         Subscribes the role to handle incoming registration messages using the handle_registration method
-        If the market configuration supports "get unmatched" functionality, subscribes the role to handle 
+        If the market configuration supports "get unmatched" functionality, subscribes the role to handle
         such messages using the handle_get_unmatched
 
         Schedules the opening() method to run at the next opening time of the market.
@@ -76,20 +77,6 @@ class MarketRole(Role):
         self.open_slots = []
 
         def accept_orderbook(content: dict, meta):
-            """
-            This method is used as a filter or validation step for incoming messages 
-            that contain order book information. It ensures that only valid and relevant order 
-            books from authorized senders associated with the correct market are processed further, 
-            while discarding or ignoring invalid or irrelevant messages.
-
-            :param content: The content of the message
-            :type content: dict
-            :param meta: The metadata of the message
-            :type meta: any
-
-            :return: True if the message is valid, False otherwise
-            :rtype: bool
-            """
             if not isinstance(content, dict):
                 return False
 
@@ -100,20 +87,6 @@ class MarketRole(Role):
             )
 
         def accept_registration(content: dict, meta):
-            """
-            This method is used as a filter or validation step for incoming messages
-            that contain registration information. It ensures that only valid and relevant
-            registration messages from authorized senders associated with the correct market 
-            are processed further, while discarding or ignoring invalid or irrelevant messages.
-
-            :param content: The content of the message
-            :type content: dict
-            :param meta: The metadata of the message
-            :type meta: any
-
-            :return: True if the message is valid, False otherwise
-            :rtype: bool
-            """
             if not isinstance(content, dict):
                 return False
             return (
@@ -122,18 +95,6 @@ class MarketRole(Role):
             )
 
         def accept_get_unmatched(content: dict, meta):
-            """
-            This method serves as a filter to determine whether an incoming message 
-            containing "get unmatched" information is valid and should be processed further
-            
-            :param content: The content of the message
-            :type content: dict
-            :param meta: The metadata of the message
-            :type meta: any
-            
-            :return: True if the message is valid, False otherwise
-            :rtype: bool
-            """
             if not isinstance(content, dict):
                 return False
             return (
@@ -159,7 +120,7 @@ class MarketRole(Role):
     async def opening(self):
         """
         This method is called when the market opens. It sends an opening message to all registered agents,
-        handles scheduling the clearing of the market and the next opening. 
+        handles scheduling the clearing of the market and the next opening.
         """
         # scheduled to be opened now
         market_open = datetime.utcfromtimestamp(self.context.current_timestamp)
@@ -209,7 +170,7 @@ class MarketRole(Role):
 
     def handle_registration(self, content: dict, meta: dict):
         """
-        This method handles incoming registration messages. 
+        This method handles incoming registration messages.
         It adds the sender of the message to the list of registered agents
 
         :param content: The content of the message
@@ -350,7 +311,7 @@ class MarketRole(Role):
         #     ), f"order start time not in {self.marketconfig.market_products}"
         """
         This method clears the market and sends the results to the database agent.
-        
+
         :param market_products: The products to be traded
         :type market_products: list[MarketProduct]
         """

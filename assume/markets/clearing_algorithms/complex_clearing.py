@@ -18,7 +18,7 @@ def pay_as_clear_opt(
     market_products: list[MarketProduct],
 ):
     """
-    This implements pay-as-clear for simpler market scenarios where bids are classified as simple bids (SB) or block bids (BB) 
+    This implements pay-as-clear for simpler market scenarios where bids are classified as simple bids (SB) or block bids (BB)
     without more complex bid structures.
 
     :param market_agent: The market agent

@@ -28,7 +28,7 @@ def pay_as_clear_aon(market_agent: MarketRole, market_products: list[MarketProdu
     This has the side effect, that the cleared price can be much higher if bids with different volume are accepted
 
     :param market_agent: The market agent
-    :type market_agent: MarketRole 
+    :type market_agent: MarketRole
     :param market_products: The products to be traded
     :type market_products: list[MarketProduct]
     """

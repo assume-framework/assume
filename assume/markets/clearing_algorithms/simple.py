@@ -152,7 +152,7 @@ def pay_as_bid(
     market_products: list[MarketProduct],
 ):
     """
-    Simulates electricity market clearing using a pay-as-bid mechanism. 
+    Simulates electricity market clearing using a pay-as-bid mechanism.
 
     :param market_agent: The market agent
     :type market_agent: MarketRole

@@ -12,11 +12,11 @@ SOLVERS = ["glpk", "cbc", "gurobi", "cplex"]
 
 def nodal_pricing_pyomo(market_agent: MarketRole, market_products: list[MarketProduct]):
     """
-    Performs a nodal pricing optimization using the Pyomo library. 
-    It takes market orders, simulates network congestion, and computes optimal power generation and 
-    consumption at different nodes while considering constraints and objectives. 
+    Performs a nodal pricing optimization using the Pyomo library.
+    It takes market orders, simulates network congestion, and computes optimal power generation and
+    consumption at different nodes while considering constraints and objectives.
     The results are used to update order information and collect meta-information for reporting.
-    
+
     :param market_agent: The market agent
     :type market_agent: MarketRole
     :param market_products: The products to be traded
