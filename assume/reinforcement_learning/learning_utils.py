@@ -18,12 +18,13 @@ observation_dict = dict[list[datetime], ObsActRew]
 
 class CriticTD3(nn.Module):
     """Initialize parameters and build model.
-    Args:
-        n_agents (int): Number of agents
-        obs_dim (int): Dimension of each state
-        act_dim (int): Dimension of each action
-    Return:
-        value output of network
+
+    :param n_agents: Number of agents
+    :type n_agents: int
+    :param obs_dim: Dimension of each state
+    :type obs_dim: int
+    :param act_dim: Dimension of each action
+    :type act_dim: int
     """
 
     def __init__(self, n_agents, obs_dim, act_dim, float_type, unique_obs_len=16):

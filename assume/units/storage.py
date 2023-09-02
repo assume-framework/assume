@@ -73,7 +73,7 @@ class Storage(SupportsMinMaxCharge):
         Defines whether or not the unit bids itself or is portfolio optimized.
     bidding_startegy: str
         In case the unit is active it has to be defined which bidding strategy should be used
-    **kwargs
+    kwargs
         Additional keyword arguments.
     """
 
