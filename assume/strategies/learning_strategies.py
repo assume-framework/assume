@@ -52,7 +52,7 @@ class RLStrategy(LearningStrategy):
         if self.learning_mode:
             self.learning_role = None
             self.collect_initial_experience = kwargs.get(
-                "collect_initial_experience", False
+                "collect_initial_experience", True
             )
 
             self.actor_target = Actor(self.obs_dim, self.act_dim, self.float_type).to(
@@ -179,11 +179,8 @@ class RLStrategy(LearningStrategy):
                     .squeeze()
                 )
 
-                curr_action += th.tensor(
-                    next_observation[-1],
-                    device=self.device,
-                    dtype=self.float_type,
-                )
+                curr_action += next_observation[-1].clone().detach()
+
             else:
                 curr_action = self.actor(next_observation).detach()
                 curr_action += th.tensor(
@@ -310,6 +307,7 @@ class RLStrategy(LearningStrategy):
         regret_scale = 0.2
         profit = 0
         reward = 0
+        opportunity_cost = 0
 
         for order in orderbook:
             start = order["start_time"]
@@ -332,10 +330,10 @@ class RLStrategy(LearningStrategy):
             price_difference = order["price"] - marginal_cost
             duration = (end - start) / timedelta(hours=1)
             # calculate profit as income - running_cost from this event
-            order_profit = order["price"] * order["volume"] * duration
+            order_profit = order["price"] * order["accepted_volume"] * duration
 
             # calculate opportunity cost as the loss of income we have because we are not running at full power
-            opportunity_cost = (
+            order_opportunity_cost = (
                 price_difference
                 * (
                     unit.max_power - unit.outputs[product_type].loc[start:end_excl]
@@ -343,7 +341,7 @@ class RLStrategy(LearningStrategy):
                 * duration
             )
             # opportunity cost must be positive
-            order_opportunity_cost = max(opportunity_cost, 0)
+            order_opportunity_cost = max(order_opportunity_cost, 0)
             opportunity_cost += order_opportunity_cost
 
             # sum up order profit

@@ -138,6 +138,10 @@ class Learning(Role):
                 reward=data[2],
             )
 
+    def turn_off_initial_exploration(self):
+        for unit_id, unit in self.rl_units.items():
+            unit.collect_initial_experience = False
+
     def create_learning_algorithm(self, algorithm):
         if algorithm == "matd3":
             self.rl_algorithm = TD3(
@@ -154,7 +158,8 @@ class Learning(Role):
             )
 
     async def update_policy(self):
-        self.rl_algorithm.update_policy()
+        if self.episodes_done >= self.learning_starts:
+            self.rl_algorithm.update_policy()
 
     # in assume self
     def compare_and_save_policies(self):

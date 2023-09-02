@@ -536,6 +536,11 @@ def load_scenario_folder(
                 )
             )
 
+            # if enough inital experience was collected according to specififcations in learning config
+            # turn off initial exploration and go into full learning mode
+            if episode + 1 == world.learning_role.learning_starts:
+                world.learning_role.turn_off_initial_exploration()
+
             # container shutdown implicitly with new initialisation
 
         logger.info("################")
