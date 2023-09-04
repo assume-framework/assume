@@ -90,7 +90,13 @@ class BaseUnit:
             product_tuples=product_tuples,
         )
         for i, _ in enumerate(bids):
-            bids[i].update({field: None for field in market_config.additional_fields})
+            bids[i].update(
+                {
+                    field: None
+                    for field in market_config.additional_fields
+                    if field not in bids[i].keys()
+                }
+            )
 
         return bids
 
@@ -112,7 +118,15 @@ class BaseUnit:
             start = order["start_time"]
             end = order["end_time"]
             end_excl = end - self.index.freq
-            self.outputs[product_type].loc[start:end_excl] += order["accepted_volume"]
+            if isinstance(order["accepted_volume"], dict):
+                self.outputs[product_type].loc[start:end_excl] += [
+                    order["accepted_volume"][key]
+                    for key in order["accepted_volume"].keys()
+                ]
+            else:
+                self.outputs[product_type].loc[start:end_excl] += order[
+                    "accepted_volume"
+                ]
 
         self.calculate_cashflow(product_type, orderbook)
 
@@ -190,17 +204,19 @@ class BaseUnit:
             end_excl = end - self.index.freq
 
             if isinstance(order["accepted_volume"], dict):
-                cashflow = float(
-                    order["accepted_price"][i] * order["accepted_volume"][i]
+                cashflow = [
+                    float(order["accepted_price"][i] * order["accepted_volume"][i])
                     for i in order["accepted_volume"].keys()
+                ]
+                self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
+                    cashflow * self.index.freq.n
                 )
             else:
                 cashflow = float(order["accepted_price"] * order["accepted_volume"])
-
-            hours = (end - start) / timedelta(hours=1)
-            self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
-                cashflow * hours
-            )
+                hours = (end - start) / timedelta(hours=1)
+                self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
+                    cashflow * hours
+                )
 
 
 class SupportsMinMax(BaseUnit):

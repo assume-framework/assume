@@ -1,4 +1,5 @@
 import logging
+import math
 from itertools import groupby
 from operator import itemgetter
 
@@ -11,6 +12,7 @@ from assume.markets.base_market import MarketRole
 log = logging.getLogger(__name__)
 
 SOLVERS = ["gurobi", "cplex", "glpk", "cbc"]
+EPS = 1e-4
 
 
 def market_clearing_opt(
@@ -81,7 +83,9 @@ def market_clearing_opt(
 
         model.mar_constr = pyo.ConstraintList()
         for order in orders:
-            if order["bid_type"] == "SB":
+            if order["min_acceptance_ratio"] is None:
+                continue
+            elif order["bid_type"] == "SB":
                 model.mar_constr.add(
                     model.xs[order["bid_id"]]
                     >= order["min_acceptance_ratio"] * model.x[order["bid_id"]]
@@ -200,21 +204,44 @@ def pay_as_clear_complex(
         orders_profit = []
         for order in orders:
             if order["bid_type"] == "SB":
-                order_profit = (
-                    (market_clearing_prices[order["start_time"]] - order["price"])
-                    * order["volume"]
-                    * pyo.value(instance.xs[order["bid_id"]])
-                )
+                # order rejected
+                if math.isclose(
+                    pyo.value(instance.xs[order["bid_id"]]), 0, abs_tol=EPS
+                ):
+                    order_profit = 0
+                # marginal bid
+                elif math.isclose(
+                    market_clearing_prices[order["start_time"]] - order["price"],
+                    0,
+                    abs_tol=EPS,
+                ):
+                    order_profit = 0
+                else:
+                    order_profit = (
+                        (market_clearing_prices[order["start_time"]] - order["price"])
+                        * order["volume"]
+                        * pyo.value(instance.xs[order["bid_id"]])
+                    )
 
             elif order["bid_type"] == "BB":
-                bid_volume = sum(order["volume"].values())
-                order_profit = (
-                    sum(
-                        market_clearing_prices[t] * v
-                        for t, v in order["volume"].items()
-                    )
-                    - order["price"] * bid_volume
-                ) * pyo.value(instance.xb[order["bid_id"]])
+                # order rejected
+                if math.isclose(
+                    pyo.value(instance.xb[order["bid_id"]]), 0, abs_tol=EPS
+                ):
+                    order_profit = 0
+                else:
+                    bid_volume = sum(order["volume"].values())
+                    order_profit = (
+                        sum(
+                            market_clearing_prices[t] * v
+                            for t, v in order["volume"].items()
+                        )
+                        - order["price"] * bid_volume
+                    ) * pyo.value(instance.xb[order["bid_id"]])
+
+            # correct rounding
+            if order_profit != 0 and math.isclose(order_profit, 0, abs_tol=EPS):
+                order_profit = 0
 
             orders_profit.append(order_profit)
 
