@@ -8,6 +8,7 @@ import pandas as pd
 from dateutil import rrule as rr
 from mango import Role
 from sqlalchemy import inspect, text
+from sqlalchemy.exc import ProgrammingError
 
 logger = logging.getLogger(__name__)
 
@@ -89,16 +90,17 @@ class WriteOutput(Role):
 
     def del_similar_runs(self):
         query = text("select distinct simulation from market_meta")
-        simulations = self.db.execute(query).fetchall()
+
+        try:
+            simulations = self.db.execute(query).fetchall()
+        except Exception:
+            simulations = []
         simulations = [s[0] for s in simulations]
 
-        # find all simulation_id which are similar to my simulation_id
-        similar_simulations = [
-            s for s in simulations if s.startswith(self.simulation_id[:-1])
-        ]
-
-        for simulation_id in similar_simulations:
-            self.delete_db_scenario(simulation_id)
+        for simulation_id in simulations:
+            # delete all simulation_id which are similar to my simulation_id
+            if simulation_id.startswith(self.simulation_id[:-1]):
+                self.delete_db_scenario(simulation_id)
 
     def setup(self):
         """
@@ -163,7 +165,7 @@ class WriteOutput(Role):
         df["simulation"] = self.simulation_id
         # get characters after last "_" of simulation id string
         episode = self.simulation_id.split("_")[-1]
-        if epsiode.isdigit():
+        if episode.isdigit():
             df["episode"] = int(episode)
         else:
             df["episode"] = None
@@ -306,14 +308,18 @@ class WriteOutput(Role):
             f"select unit_id as name, market_id, avg(power/max_power) as capacity_factor from market_dispatch ud join power_plant_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by name, market_id",
         ]
         dfs = []
-        for query in queries:
-            df = pd.read_sql(query, self.db.bind)
-            dfs.append(df.melt(id_vars=["name"]))
-        df = pd.concat(dfs)
-        df.reset_index()
-        df["simulation"] = self.simulation_id
-        if self.export_csv_path:
-            kpi_data_path = self.p.joinpath("kpis.csv")
-            df.to_csv(kpi_data_path, mode="a", header=not kpi_data_path.exists())
-        if self.db is not None and not df.empty:
-            df.to_sql("kpis", self.db.bind, if_exists="append")
+        try:
+            for query in queries:
+                df = pd.read_sql(query, self.db.bind)
+                dfs.append(df.melt(id_vars=["name"]))
+            df = pd.concat(dfs)
+            df.reset_index()
+            df["simulation"] = self.simulation_id
+            if self.export_csv_path:
+                kpi_data_path = self.p.joinpath("kpis.csv")
+                df.to_csv(kpi_data_path, mode="a", header=not kpi_data_path.exists())
+            if self.db is not None and not df.empty:
+                df.to_sql("kpis", self.db.bind, if_exists="append")
+        except ProgrammingError as e:
+            self.db.rollback()
+            logger.error(f"No scenario run Yet {e}")

@@ -146,13 +146,12 @@ class World:
                     agent.add_role(self.learning_role)
 
                 await self.container.as_agent_process(agent_creator=creator)
+            simulation_id = f"{simulation_id}_{episode}"
 
         self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to world
         self.output_role = WriteOutput(
-            simulation_id=f"{simulation_id}_{episode}"
-            if self.learning_mode
-            else simulation_id,
+            simulation_id=simulation_id,
             start=start,
             end=end,
             db_engine=self.db,

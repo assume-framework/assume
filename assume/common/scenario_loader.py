@@ -475,7 +475,8 @@ def load_scenario_folder(
     inputs_path: str,
     scenario: str,
     study_case: str,
-    disable_learning: bool = True,
+    disable_learning: bool = False,
+    episode: int = 0,
 ):
     """
     Load a scenario from a given path.
@@ -496,6 +497,7 @@ def load_scenario_folder(
             scenario=scenario,
             study_case=study_case,
             disable_learning=disable_learning,
+            episode=episode,
         )
     )
 
@@ -518,6 +520,16 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
         range(world.learning_role.training_episodes),
         desc="Training Episodes",
     ):
+        # TODO normally, loading twice should not create issues, somehow a scheduling issue is raised currently
+        if episode:
+            load_scenario_folder(
+                world,
+                inputs_path,
+                scenario,
+                study_case,
+                episode=world.learning_role.episodes_done,
+                disable_learning=False,
+            )
         # give the newly created rl_agent the buffer that we stored from the beginning
         world.learning_role.load_actors_and_critics(stored_values=actor_critic_values)
         world.learning_role.buffer = buffer
@@ -535,18 +547,19 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
         # as long as we do not skip setup container should be handled correctly
         # if enough initial experience was collected according to specifications in learning config
         # turn off initial exploration and go into full learning mode
+        if episode + 1 >= world.learning_role.learning_starts:
+            world.learning_role.turn_off_initial_exploration()
 
-        world.loop.run_until_complete(
-            load_scenario_folder_async(
-                world,
-                inputs_path,
-                scenario,
-                study_case,
-                episode=world.learning_role.episodes_done,
-                disable_learning=False,
-            )
-        )
         # container shutdown implicitly with new initialisation
+
+    # load scenario for evaluation
+    load_scenario_folder(
+        world,
+        inputs_path,
+        scenario,
+        study_case,
+        disable_learning=True,
+    )
 
     world.learning_role.load_actors_and_critics(stored_values=actor_critic_values)
     world.learning_role.save_actor_params(

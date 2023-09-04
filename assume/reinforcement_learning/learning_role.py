@@ -79,7 +79,7 @@ class Learning(Role):
         recurrency_task = rr.rrule(
             freq=rr.HOURLY,
             interval=self.train_freq,
-            dtstart=self.simulation_start + timedelta(hours=self.learning_starts),
+            dtstart=self.simulation_start,
             until=self.simulation_end,
             cache=True,
         )

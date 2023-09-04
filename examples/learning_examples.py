@@ -66,24 +66,15 @@ if __name__ == "__main__":
         inputs_path="examples/inputs",
         scenario=availabe_examples[example]["scenario"],
         study_case=availabe_examples[example]["study_case"],
-        disable_learning=False,
     )
 
-    # run learning
-    run_learning(
-        world,
-        inputs_path="examples/inputs",
-        scenario=availabe_examples[example]["scenario"],
-        study_case=availabe_examples[example]["study_case"],
-    )
-
-    # load scenario for evaluation
-    load_scenario_folder(
-        world,
-        inputs_path="examples/inputs",
-        scenario=availabe_examples[example]["scenario"],
-        study_case=availabe_examples[example]["study_case"],
-        disable_learning=True,
-    )
+    if world.learning_config.get("learning_mode", False):
+        # run learning
+        run_learning(
+            world,
+            inputs_path="examples/inputs",
+            scenario=availabe_examples[example]["scenario"],
+            study_case=availabe_examples[example]["study_case"],
+        )
 
     world.run()
