@@ -133,7 +133,17 @@ def market_clearing_opt(
     solver = (
         SolverFactory("gurobi") if "gurobi" in solvers else SolverFactory(solvers[0])
     )
-    options = {"eps": EPS}
+
+    if solver.name == "gurobi":
+        options = {"cutoff": -1.0, "eps": EPS}
+    elif solver.name == "cplex":
+        options = {"mip.tolerances.lowercutoff": -1.0, "mip.tolerances.absmipgap": EPS}
+    elif solver.name == "cbc":
+        options = {"sec": 60, "ratio": 0.1}
+    elif solver.name == "glpk":
+        options = {"tmlim": 60, "mipgap": 0.1}
+    else:
+        options = {}
 
     # Solve the model
     instance = model.create_instance()
