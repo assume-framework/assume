@@ -36,7 +36,7 @@ from assume.strategies import (
     flexablePosCRM,
     flexablePosCRMStorage,
 )
-from assume.units import Demand, HeatPump, PowerPlant, Storage
+from assume.units import Demand, dst_units, PowerPlant, Storage
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
 stdout_handler = logging.StreamHandler(stream=sys.stdout)

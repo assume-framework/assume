@@ -1,252 +1,221 @@
 import logging
+import pandas as pd
 import pyomo.environ as pyo
 from pyomo.environ import *
-import pandas as pd
-from enum import Enum
-import numpy as np
-from numpy import ndarray
-from typing import List
-from abc import ABC, abstractmethod
-
-from assume.units.base_unit import BaseUnit
-logger = logging.getLogger(__name__)
 
 
-class DST(ABC, BaseUnit):
+class HeatPump:
     def __init__(
-            self,
-            id: str,
-            unit_operator: str,
-            technology: str,
-            bidding_strategies: dict,
-            location: tuple[float, float] = (0.0, 0.0),
-            node: str = "bus0",
-            index: pd.DatetimeIndex = None,
-            time_steps: pd.DatetimeIndex = None,
-            **kwargs,
+        self, model, id, technology, max_power, min_power, ramp_up, ramp_down, cop
     ):
-        super().__init__(
-            id=id,
-            technology=technology,
-            unit_operator=unit_operator,
-            node=node,
-            bidding_strategies=bidding_strategies,
-            index=index,
-        )
-
-    def create_model(self, model) -> None:
         self.model = model
-        self.define_sets()
-        self.define_parameters()
-        self.define_variables()
-        self.define_constraints()
-        self.define_objective()
+        self.id = id
+        self.max_power = max_power
+        self.min_power = min_power
+        self.ramp_up = ramp_up
+        self.ramp_down = ramp_down
+        self.cop = cop
 
-    def define_sets(self) -> None:
+    def add_to_model(self, unit_block, units, time_steps):
+        self.model = unit_block
+        self.define_parameters(unit_block)
+        self.define_variables(unit_block, units, time_steps)
+        self.define_constraints(unit_block, units, time_steps)
+
+    def define_parameters(self, unit_block) -> None:
+        unit_block.max_power = Param(initialize=self.max_power)
+        unit_block.min_power = Param(initialize=self.min_power)
+        unit_block.ramp_up = Param(initialize=self.ramp_up)
+        unit_block.ramp_down = Param(initialize=self.ramp_down)
+        unit_block.cop = Param(initialize=self.cop)  # Coefficient of Performance
+
+    def define_variables(self, unit_block, units, time_steps):
+        unit_block.heat_out = Var(units, time_steps, within=pyo.NonNegativeReals)
+        unit_block.power_in = Var(units, time_steps, within=pyo.NonNegativeReals)
+
+    def define_constraints(self, unit_block, units, time_steps) -> None:
+        # Heat output bounds
+        @unit_block.Constraint(units, time_steps)
+        def p_output_lower_bound(m, u, t):
+            return m.power_in[u, t] >= m.min_power
+
+        @unit_block.Constraint(units, time_steps)
+        def p_output_upper_bound(m, u, t):
+            return m.power_in[u, t] <= m.max_power
+
+        # Ramp up/down constraints
+        @unit_block.Constraint(units, time_steps)
+        def ramp_up_constraint(m, u, t):
+            if t == 0:
+                return Constraint.Skip
+            return m.heat_out[u, t] - m.heat_out[u, t - 1] <= m.ramp_up
+
+        @unit_block.Constraint(units, time_steps)
+        def ramp_down_constraint(m, u, t):
+            if t == 0:
+                return Constraint.Skip
+            return m.heat_out[u, t - 1] - m.heat_out[u, t] <= m.ramp_down
+
+        # COP constraint
+        @unit_block.Constraint(units, time_steps)
+        def cop_constraint(m, u, t):
+            return m.power_in[u, t] == m.heat_out[u, t] / m.cop
+
+    def define_objective_h(self):
+        # Define the objective function specific to HeatPump if needed
         pass
 
-    def define_parameters(self) -> None:
-        pass
 
-    def define_variables(self) -> None:
-        pass
-
-    def define_constraints(self) -> None:
-        pass
-
-    def define_objective(self) -> None:
-        pass
-
-
-class HeatPump(DST):
+class AirConditioner:
     def __init__(
         self,
         id: str,
-        unit_operator: str,
         technology: str,
-        sector,
-        bidding_strategies: dict,
-        #max_power: float or pd.Series,
-        #min_power: float or pd.Series,
-        #ramp_up_rate: float or pd.Series,
-        #ramp_down_rate: float or pd.Series,
-        #heat_pump_type: str,
-        #source_temp: float or pd.Series = 15,
-        #sink_temp: float or pd.Series = 35,
-        #real_time_prices: float or pd.Series = 35,
-        #electricity_prices: float or pd.Series = 40,
-        index: pd.DatetimeIndex = None,
-        time_steps: pd.DatetimeIndex = None,
-        location: tuple[float, float] = (0.0, 0.0),
-        node: str = "bus0",
+        model,
+        max_power: float = None,
+        min_power: float = None,
+        ramp_up: float = None,  # Ramp-up rate per time step
+        ramp_down: float = None,  # Ramp-down rate per time step
+        cooling_factor: float = None,  # Power to cooling conversion factor
         **kwargs,
     ):
-        super().__init__(
-            id=id,
-            technology=technology,
-            unit_operator=unit_operator,
-            node=node,
-            bidding_strategies=bidding_strategies,
-            index=index,
-        )
-        self.model = ConcreteModel()
-        self.sector = sector
-
-    def add_model_parameters(
-            self,
-            # ramp_up_rate: float or pd.Series = None,
-            # ramp_down_rate: float or pd.Series = None,
-            time_steps: pd.DatetimeIndex = None,
-            heat_pump: List[int] = list(),
-            max_power: float or pd.Series = None,
-            min_power: float or pd.Series = None,
-            heat_pump_type: str = None,
-            source_temp: float or pd.Series = None,
-            sink_temp: float or pd.Series = None,
-
-            real_time_prices: float or pd.Series = None,
-            electricity_prices: float or pd.Series = None,
-            demand: float or pd.Series = None,
-    ):
-        self.time_steps = time_steps
-        self.heat_pump = heat_pump
+        self.model = model
+        self.id = id
         self.max_power = max_power
         self.min_power = min_power
-        #self.ramp_up_rate = ramp_up_rate
-        #self.ramp_down_rate = ramp_down_rate
-        self.heat_pump_type = heat_pump_type
-        self.source_temp = source_temp
-        self.sink_temp = sink_temp
-        self.electricity_prices = electricity_prices
-        self.real_time_prices = real_time_prices
-        self.demand = demand
-        return self
+        self.ramp_up = ramp_up
+        self.ramp_down = ramp_down
+        self.cooling_factor = cooling_factor
 
-    # Define sets
-    def define_sets(self):
-        # self.model.time_steps = Set(initialize={idx: v for idx, v in enumerate(self.time_steps)})
-        # self.model.time_steps = Set(initialize=self.time_steps)
-        self.model.time_steps = Set(initialize=[idx for idx, _ in enumerate(self.time_steps)])
-        # self.model.heat_pumps = Set(within=pyo.NonNegativeIntegers)
-        self.model.heat_pumps = Set(ordered=True, initialize=self.heat_pump)
+    def add_to_model(self, unit_block, units, time_steps):
+        self.model = unit_block
+        self.define_parameters(unit_block)
+        self.define_variables(unit_block, units, time_steps)
+        self.define_constraints(unit_block, units, time_steps)
 
-    # Define parameters
-    def define_parameters(self) -> None:
-        self.model.max_power = Param(initialize=self.max_power)
-        self.model.min_power = Param(initialize=self.min_power)
-        # self.model.ramp_up_rate = Param(self.model.heat_pumps, initialize=self.ramp_down_rate)
-        # self.model.ramp_down_rate = Param(self.model.heat_pumps, initialize=self.ramp_down_rate)
-        self.sink_temp = Param(self.model.time_steps, initialize=self.sink_temp)
-        self.source_temp = Param(self.model.time_steps, initialize=self.source_temp)
-        # self.model.heat_pump_COP = Param(initialize=se)
-        self.model.electricity_prices = Param(self.model.time_steps,
-                                              initialize={idx: v for idx, v in enumerate(self.electricity_prices)})
-        self.model.demand = Param(self.model.time_steps,
-                                              initialize={idx: v for idx, v in enumerate(self.demand)})
-        # self.model.real_time_prices = Param(self.model.time_steps, initialize=self.real_time_prices)
+    def define_parameters(self, unit_block) -> None:
+        unit_block.max_power = Param(initialize=self.max_power)
+        unit_block.min_power = Param(initialize=self.min_power)
+        unit_block.ramp_up = Param(initialize=self.ramp_up)
+        unit_block.ramp_down = Param(initialize=self.ramp_down)
+        unit_block.cooling_factor = Param(
+            initialize=self.cooling_factor
+        )  # Add the cooling factor parameter
 
-        # self.model.electricity_prices = Param(self.model.time_steps, initialize=self.electricity_prices)
-        # self.model.load_profile = Param(self.model.time_steps, initialize=self.load_profile)
+    def define_variables(self, unit_block, units, time_steps):
+        unit_block.cool_out = Var(units, time_steps, within=pyo.NonNegativeReals)
+        unit_block.power_in = Var(units, time_steps, within=pyo.NonNegativeReals)
 
-    # Define variables
-    def define_variables(self) -> None:
-        self.model.power_in = Var(self.model.heat_pumps, self.model.time_steps, domain=pyo.NonNegativeReals)
-        self.model.power_out = Var(self.model.heat_pumps, self.model.time_steps, domain=pyo.NonNegativeReals)
-        self.model.s_on = Var(self.model.time_steps, domain=pyo.Boolean)
-        self.model.s_start = Var(self.model.time_steps, domain=pyo.Boolean)
-        self.model.s_stop = Var(self.model.time_steps, domain=pyo.Boolean)
-        self.model.c = Var(self.model.heat_pumps, self.model.time_steps, domain=pyo.Reals)
+    def define_constraints(self, unit_block, units, time_steps) -> None:
+        # Heat output bounds
+        @unit_block.Constraint(units, time_steps)
+        def p_output_lower_bound(m, u, t):
+            return m.cool_out[u, t] >= m.min_power
 
-    # Define constraints
-    def define_constraints(self):
+        @unit_block.Constraint(units, time_steps)
+        def p_output_upper_bound(m, u, t):
+            return m.cool_out[u, t] <= m.max_power
 
-        @self.model.Constraint(self.model.time_steps)
-        def start_up_constraint(m, t):
-            return m.s_on[t] >= m.demand[t] / m.max_power
+        # Ramp up/down constraints
+        @unit_block.Constraint(units, time_steps)
+        def ramp_up_constraint(m, u, t):
+            if t == 0:
+                return Constraint.Skip
+            return m.cool_out[u, t] - m.cool_out[u, t - 1] <= m.ramp_up
 
-        @self.model.Constraint(self.model.time_steps)
-        def s_on_s_start_relation(m, t):
-            return m.s_on[t] - m.s_on[t - 1] == m.s_start[t] - m.s_stop[t] if t > 0 else Constraint.Skip
+        @unit_block.Constraint(units, time_steps)
+        def ramp_down_constraint(m, u, t):
+            if t == 0:
+                return Constraint.Skip
+            return m.cool_out[u, t - 1] - m.cool_out[u, t] <= m.ramp_down
 
-        @self.model.Constraint(self.model.time_steps)
-        def s_start_s_stop_relation(m, t):
-            return m.s_start[t] + m.s_stop[t] <= 1
-
-        # @self.model.Constraint(self.model.time_steps)
-        # def shut_down_constraint(m, t):
-        #     return m.s_on[t] <= 1 - m.demand[t] / m.max_power
-
-        @self.model.Constraint(self.model.heat_pumps, self.model.time_steps)
-        def p_output_lower_bound(m, h, t):  # pylint: disable=W0612
-            return m.power_out[h, t] * m.s_on[t] >= m.min_power  # * m.s_on[t]
-
-        @self.model.Constraint(self.model.heat_pumps, self.model.time_steps)
-        def p_output_upper_bound(m, h, t):  # pylint: disable=W0612
-            return m.power_out[h, t] * m.s_on[t] <= m.max_power # * m.s_on[t]
-
-        @self.model.Constraint(self.model.heat_pumps, self.model.time_steps)
-        def energy_balance_rule(m, h, t):
-            return m.power_out[h, t] == m.demand[t]
-
-        @self.model.Constraint(self.model.heat_pumps, self.model.time_steps)
-        def p_input_lower_bound(m, h, t):
-            return m.power_in[h, t] == m.power_out[h, t] / 3
-
-        @self.model.Constraint(self.model.heat_pumps, self.model.time_steps)
-        def cost_def(m, h, t):
-            return m.c[h, t] == m.power_out[h, t] * m.electricity_prices[t]
-
-        # self.model.ramp_up_constraint = Constraint(self.model.heat_pumps, self.model.time_steps,
-        #                                               rule=self.ramp_up_constraint_hp_rule)
-        # self.model.ramp_down_constraint_hp = Constraint(self.model.heat_pumps, self.model.time_steps,
-        #                                                 rule=self.ramp_down_constraint_hp_rule)
-        # self.model.energy_balance_hp = Constraint(self.model.heat_pumps, self.model.time_steps,
-        #                                           rule=self.energy_balance_hp_constraint_rule)
+        # Cooling factor constraint
+        @unit_block.Constraint(units, time_steps)
+        def cooling_factor_constraint(m, u, t):
+            return m.power_in[u, t] == m.cool_out[u, t] / m.cooling_factor
 
     def define_objective(self):
-        # objective function
-        self.model.obj = Objective(
-            expr=sum(self.model.c[h, t] for h in self.model.heat_pumps for t in self.model.time_steps), sense=minimize)
+        # Define the objective function specific to HeatPump if needed
+        pass
 
-    # def calculate_delta_t(self, timestamp):
-    #     # Calculate temperature difference between the source and sink temperatures for the heat pump
-    #     source_temp = self.source_temp[timestamp] if isinstance(self.source_temp, pd.Series) else self.source_temp
-    #     sink_temp = self.sink_temp[timestamp] if isinstance(self.sink_temp, pd.Series) else self.sink_temp
-    #
-    #     delta_t = sink_temp - source_temp
-    #
-    #     return delta_t
-    #
-    # def calculate_cop(self, timestamp, heat_pump_type):
-    #     # Calculate the Coefficient of Performance (COP) of the heat pump based on the temperature difference
-    #     source_temp = self.source_temp[timestamp] if isinstance(self.source_temp, pd.Series) else self.source_temp
-    #     sink_temp = self.sink_temp[timestamp] if isinstance(self.sink_temp, pd.Series) else self.sink_temp
-    #
-    #     delta_t = sink_temp - source_temp
-    #
-    #     if heat_pump_type == "ASHP":
-    #         cop = 6.81 + 0.121 * delta_t + 0.000630 * delta_t**2
-    #     elif heat_pump_type == "GSHP":
-    #         cop = 8.77 + 0.150 * delta_t + 0.000734 * delta_t**2
-    #     else:
-    #         raise ValueError("Invalid heat pump type. Must be either 'ASHP' or 'GSHP'")
-    #
-    #     return cop
 
-    # def ramp_up_rule(self, m, t):
-    #     # Ramp-up limit constraint for each time step
-    #     if t == m.time_steps.first():
-    #         return pyo.Constraint.Skip  # Skip constraint for the first time step
-    #     else:
-    #         max_power_capacity = self.max_power  # Maximum rated capacity of the heat pump
-    #         ramp_up_limit = max_power_capacity * (self.ramp_up_rate / 100.0)  # Ramp-up limit as a percentage of max_power
-    #         return m.power_hp[self.id, t] - m.power_hp[self.id, t - 1] <= ramp_up_limit
-    #
-    # def ramp_down_rule(self, m, t):
-    #     # Ramp-down limit constraint for each time step
-    #     if t == m.time_steps.first():
-    #         return pyo.Constraint.Skip  # Skip constraint for the first time step
-    #     else:
-    #         max_power_capacity = self.max_power  # Maximum rated capacity of the heat pump
-    #         ramp_down_limit = max_power_capacity * (self.ramp_down_rate / 100.0)  # Ramp-down limit as a percentage of max_power
-    #         return m.power_hp[self.id, t - 1] - m.power_hp[self.id, t] <= ramp_down_limit
+class Storage:
+    def __init__(
+        self,
+        id: str,
+        model,
+        unit_operator: str,
+        technology: str,
+        bidding_strategies: dict,
+        storage_type: str,  # Either 'heat' or 'electricity'
+        max_capacity: float = None,
+        min_capacity: float = None,
+        charge_efficiency: float = None,
+        discharge_efficiency: float = None,
+        **kwargs,
+    ):
+        self.model = model
+        self.id = id
+        self.storage_type = storage_type
+        self.max_capacity = max_capacity
+        self.min_capacity = min_capacity
+        self.charge_efficiency = charge_efficiency
+        self.discharge_efficiency = discharge_efficiency
+
+    def add_to_model(self, unit_storage_block, storage_units, time_steps):
+        self.model = unit_storage_block
+        self.define_parameters(unit_storage_block)
+        self.define_variables(unit_storage_block, storage_units, time_steps)
+        self.define_constraints(unit_storage_block, storage_units, time_steps)
+
+    def define_parameters(self, unit_storage_block) -> None:
+        unit_storage_block.max_capacity = Param(initialize=self.max_capacity)
+        unit_storage_block.min_capacity = Param(initialize=self.min_capacity)
+        unit_storage_block.charge_efficiency = Param(initialize=self.charge_efficiency)
+        unit_storage_block.discharge_efficiency = Param(
+            initialize=self.discharge_efficiency
+        )
+
+    def define_variables(self, unit_storage_block, storage_units, time_steps):
+        unit_storage_block.state_of_charge = Var(
+            storage_units, time_steps, domain=pyo.NonNegativeReals
+        )
+        unit_storage_block.energy_in = Var(
+            storage_units, time_steps, domain=pyo.NonNegativeReals
+        )
+        unit_storage_block.energy_out = Var(
+            storage_units, time_steps, domain=pyo.NonNegativeReals
+        )
+
+    def define_constraints(self, unit_storage_block, storage_units, time_steps) -> None:
+        @unit_storage_block.Constraint(storage_units, time_steps)
+        def soc_upper_limit(m, u, t):
+            return m.state_of_charge[u, t] <= m.max_capacity
+
+        @unit_storage_block.Constraint(storage_units, time_steps)
+        def soc_lower_limit(m, u, t):
+            return m.min_capacity <= m.state_of_charge[u, t]
+
+        @unit_storage_block.Constraint(storage_units, time_steps)
+        def charge_discharge_balance(m, u, t):
+            if t == 0:
+                return Constraint.Skip
+            return (
+                m.state_of_charge[u, t]
+                == m.state_of_charge[u, t - 1]
+                + m.charge_efficiency * m.energy_in[u, t]
+                - m.energy_out[u, t] / m.discharge_efficiency
+            )
+
+        @unit_storage_block.Constraint(storage_units, time_steps)
+        def energy_in_out_relation(m, u, t):
+            if self.storage_type == "heat":
+                return (
+                    m.energy_in[u, t] == m.heat_out[u, t]
+                )  # Replace with appropriate heat source
+            elif self.storage_type == "electricity":
+                return (
+                    m.energy_in[t] == m.power_out[t]
+                )  # Replace with appropriate power source
+
+        # Additional constraints specific to the storage technology
