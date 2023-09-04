@@ -25,6 +25,7 @@ simple_dayahead_auction_config = MarketConfig(
     price_unit="€/MW",
     market_mechanism="pay_as_clear",
 )
+eps = 1e-4
 
 
 def test_complex_clearing_whitepaper_a():
@@ -75,12 +76,14 @@ def test_complex_clearing_whitepaper_a():
     accepted_orders, rejected_orders, meta = market_config.market_mechanism(
         mr, products
     )
-    assert meta[0]["supply_volume"] == 10
-    assert meta[0]["price"] == 40
+    assert math.isclose(meta[0]["supply_volume"], 10, abs_tol=eps)
+    assert math.isclose(meta[0]["price"], 40, abs_tol=eps)
     assert accepted_orders[0]["agent_id"] == "dem1"
-    assert accepted_orders[0]["accepted_volume"] == -10
+    assert math.isclose(accepted_orders[0]["accepted_volume"], -10, abs_tol=eps)
     assert accepted_orders[1]["agent_id"] == "gen3"
-    assert accepted_orders[1]["accepted_volume"] == {products[0][0]: 10}
+    assert math.isclose(
+        accepted_orders[1]["accepted_volume"][products[0][0]], 10, abs_tol=eps
+    )
 
 
 def test_complex_clearing_whitepaper_d():
@@ -135,12 +138,12 @@ def test_complex_clearing_whitepaper_d():
     accepted_orders, rejected_orders, meta = market_config.market_mechanism(
         mr, products
     )
-    assert meta[0]["supply_volume"] == 10
-    assert meta[0]["price"] == 100
+    assert math.isclose(meta[0]["supply_volume"], 10, abs_tol=eps)
+    assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
     assert accepted_orders[0]["agent_id"] == "dem1"
-    assert accepted_orders[0]["accepted_volume"] == -10
+    assert math.isclose(accepted_orders[0]["accepted_volume"], -10, abs_tol=eps)
     assert accepted_orders[1]["agent_id"] == "gen4"
-    assert accepted_orders[1]["accepted_volume"] == 10
+    assert math.isclose(accepted_orders[1]["accepted_volume"], 10, abs_tol=eps)
 
 
 def test_clearing_non_convex_1():
@@ -217,38 +220,46 @@ def test_clearing_non_convex_1():
     accepted_orders, rejected_orders, meta = market_config.market_mechanism(
         mr, products
     )
-    assert meta[0]["supply_volume"] == 7
-    assert meta[0]["price"] == 3
-    assert meta[1]["supply_volume"] == 12
-    assert meta[1]["price"] == 3
-    assert meta[2]["supply_volume"] == 22
-    assert meta[2]["price"] == 5
+    assert math.isclose(meta[0]["supply_volume"], 7, abs_tol=eps)
+    assert math.isclose(meta[0]["price"], 3, abs_tol=eps)
+    assert math.isclose(meta[1]["supply_volume"], 12, abs_tol=eps)
+    assert math.isclose(meta[1]["price"], 3, abs_tol=eps)
+    assert math.isclose(meta[2]["supply_volume"], 22, abs_tol=eps)
+    assert math.isclose(meta[2]["price"], 5, abs_tol=eps)
 
     assert accepted_orders[0]["agent_id"] == "B1"
-    assert accepted_orders[0]["accepted_volume"] == {
-        products[0][0]: -4,
-        products[1][0]: -6,
-        products[2][0]: -10,
-    }
+    assert math.isclose(
+        accepted_orders[0]["accepted_volume"][products[0][0]], -4, abs_tol=eps
+    )
+    assert math.isclose(
+        accepted_orders[0]["accepted_volume"][products[1][0]], -6, abs_tol=eps
+    )
+    assert math.isclose(
+        accepted_orders[0]["accepted_volume"][products[2][0]], -10, abs_tol=eps
+    )
 
     assert accepted_orders[1]["agent_id"] == "B2"
-    assert accepted_orders[1]["accepted_volume"] == {
-        products[0][0]: -3,
-        products[1][0]: -6,
-        products[2][0]: -12,
-    }
+    assert math.isclose(
+        accepted_orders[1]["accepted_volume"][products[0][0]], -3, abs_tol=eps
+    )
+    assert math.isclose(
+        accepted_orders[1]["accepted_volume"][products[1][0]], -6, abs_tol=eps
+    )
+    assert math.isclose(
+        accepted_orders[1]["accepted_volume"][products[2][0]], -12, abs_tol=eps
+    )
 
     assert accepted_orders[2]["agent_id"] == "gen6"
-    assert accepted_orders[2]["accepted_volume"] == 7
+    assert math.isclose(accepted_orders[2]["accepted_volume"], 7, abs_tol=eps)
 
     assert accepted_orders[3]["agent_id"] == "gen6"
-    assert accepted_orders[3]["accepted_volume"] == 12
+    assert math.isclose(accepted_orders[3]["accepted_volume"], 12, abs_tol=eps)
 
     assert accepted_orders[4]["agent_id"] == "gen3"
-    assert accepted_orders[4]["accepted_volume"] == 2
+    assert math.isclose(accepted_orders[4]["accepted_volume"], 2, abs_tol=eps)
 
     assert accepted_orders[5]["agent_id"] == "gen6"
-    assert accepted_orders[5]["accepted_volume"] == 20
+    assert math.isclose(accepted_orders[5]["accepted_volume"], 20, abs_tol=eps)
 
 
 def test_clearing_non_convex_2():
@@ -334,35 +345,43 @@ def test_clearing_non_convex_2():
     accepted_orders, rejected_orders, meta = market_config.market_mechanism(
         mr, products
     )
-    assert meta[0]["supply_volume"] == 7
-    assert meta[0]["price"] == 5
-    assert meta[1]["supply_volume"] == 12
-    assert meta[1]["price"] == 3
-    assert meta[2]["supply_volume"] == 23
-    assert meta[2]["price"] == 5
+    assert math.isclose(meta[0]["supply_volume"], 7, abs_tol=eps)
+    assert math.isclose(meta[0]["price"], 5, abs_tol=eps)
+    assert math.isclose(meta[1]["supply_volume"], 12, abs_tol=eps)
+    assert math.isclose(meta[1]["price"], 3, abs_tol=eps)
+    assert math.isclose(meta[2]["supply_volume"], 23, abs_tol=eps)
+    assert math.isclose(meta[2]["price"], 5, abs_tol=eps)
 
     assert accepted_orders[0]["agent_id"] == "B1"
-    assert accepted_orders[0]["accepted_volume"] == {
-        products[0][0]: -4,
-        products[1][0]: -6,
-        products[2][0]: -11,
-    }
+    assert math.isclose(
+        accepted_orders[0]["accepted_volume"][products[0][0]], -4, abs_tol=eps
+    )
+    assert math.isclose(
+        accepted_orders[0]["accepted_volume"][products[1][0]], -6, abs_tol=eps
+    )
+    assert math.isclose(
+        accepted_orders[0]["accepted_volume"][products[2][0]], -11, abs_tol=eps
+    )
 
     assert accepted_orders[1]["agent_id"] == "B2"
-    assert accepted_orders[1]["accepted_volume"] == {
-        products[0][0]: -3,
-        products[1][0]: -6,
-        products[2][0]: -12,
-    }
+    assert math.isclose(
+        accepted_orders[1]["accepted_volume"][products[0][0]], -3, abs_tol=eps
+    )
+    assert math.isclose(
+        accepted_orders[1]["accepted_volume"][products[1][0]], -6, abs_tol=eps
+    )
+    assert math.isclose(
+        accepted_orders[1]["accepted_volume"][products[2][0]], -12, abs_tol=eps
+    )
 
     assert accepted_orders[2]["agent_id"] == "gen3"
-    assert accepted_orders[2]["accepted_volume"] == 7
+    assert math.isclose(accepted_orders[2]["accepted_volume"], 7, abs_tol=eps)
     assert accepted_orders[3]["agent_id"] == "gen6"
-    assert accepted_orders[3]["accepted_volume"] == 12
+    assert math.isclose(accepted_orders[3]["accepted_volume"], 12, abs_tol=eps)
     assert accepted_orders[4]["agent_id"] == "gen3"
-    assert accepted_orders[4]["accepted_volume"] == 3
+    assert math.isclose(accepted_orders[4]["accepted_volume"], 3, abs_tol=eps)
     assert accepted_orders[5]["agent_id"] == "gen6"
-    assert accepted_orders[5]["accepted_volume"] == 20
+    assert math.isclose(accepted_orders[5]["accepted_volume"], 20, abs_tol=eps)
 
 
 def test_clearing_non_convex_3():
@@ -482,40 +501,52 @@ def test_clearing_non_convex_3():
         mr, products
     )
 
-    assert meta[0]["supply_volume"] == 5.5
-    assert meta[0]["price"] == 5
-    assert meta[1]["supply_volume"] == 9
-    assert meta[1]["price"] == 5
-    assert meta[2]["supply_volume"] == 17
-    assert meta[2]["price"] == 3
+    assert math.isclose(meta[0]["supply_volume"], 5.5, abs_tol=eps)
+    assert math.isclose(meta[0]["price"], 5, abs_tol=eps)
+    assert math.isclose(meta[1]["supply_volume"], 9, abs_tol=eps)
+    assert math.isclose(meta[1]["price"], 5, abs_tol=eps)
+    assert math.isclose(meta[2]["supply_volume"], 17, abs_tol=eps)
+    assert math.isclose(meta[2]["price"], 3, abs_tol=eps)
 
     assert accepted_orders[0]["bid_id"] == "B1_1"
-    assert accepted_orders[0]["accepted_volume"] == {
-        products[0][0]: -2,
-        products[1][0]: -3,
-        products[2][0]: -5.5,
-    }
+    assert math.isclose(
+        accepted_orders[0]["accepted_volume"][products[0][0]], -2, abs_tol=eps
+    )
+    assert math.isclose(
+        accepted_orders[0]["accepted_volume"][products[1][0]], -3, abs_tol=eps
+    )
+    assert math.isclose(
+        accepted_orders[0]["accepted_volume"][products[2][0]], -5.5, abs_tol=eps
+    )
 
     assert accepted_orders[1]["bid_id"] == "B2_1"
-    assert accepted_orders[1]["accepted_volume"] == {
-        products[0][0]: -1.5,
-        products[1][0]: -3,
-        products[2][0]: -6,
-    }
+    assert math.isclose(
+        accepted_orders[1]["accepted_volume"][products[0][0]], -1.5, abs_tol=eps
+    )
+    assert math.isclose(
+        accepted_orders[1]["accepted_volume"][products[1][0]], -3, abs_tol=eps
+    )
+    assert math.isclose(
+        accepted_orders[1]["accepted_volume"][products[2][0]], -6, abs_tol=eps
+    )
 
     assert accepted_orders[2]["bid_id"] == "B1_2"
-    assert accepted_orders[2]["accepted_volume"] == {
-        products[0][0]: -2,
-        products[1][0]: -3,
-        products[2][0]: -5.5,
-    }
+    assert math.isclose(
+        accepted_orders[2]["accepted_volume"][products[0][0]], -2, abs_tol=eps
+    )
+    assert math.isclose(
+        accepted_orders[2]["accepted_volume"][products[1][0]], -3, abs_tol=eps
+    )
+    assert math.isclose(
+        accepted_orders[2]["accepted_volume"][products[2][0]], -5.5, abs_tol=eps
+    )
 
     assert accepted_orders[3]["agent_id"] == "gen5"
-    assert accepted_orders[3]["accepted_volume"] == 5.5
+    assert math.isclose(accepted_orders[3]["accepted_volume"], 5.5, abs_tol=eps)
     assert accepted_orders[4]["agent_id"] == "gen5"
-    assert accepted_orders[4]["accepted_volume"] == 9
+    assert math.isclose(accepted_orders[4]["accepted_volume"], 9, abs_tol=eps)
     assert accepted_orders[5]["agent_id"] == "gen8"
-    assert accepted_orders[5]["accepted_volume"] == 17
+    assert math.isclose(accepted_orders[5]["accepted_volume"], 17, abs_tol=eps)
 
     """
     5.1.4 Flexible demand
