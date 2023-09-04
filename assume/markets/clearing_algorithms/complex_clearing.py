@@ -487,8 +487,8 @@ def pay_as_clear_complex_opt(
 
 def extract_results(
     model,
-    eps,
     orders,
+    rejected_orders,
     market_products,
     market_clearing_prices,
 ):
@@ -510,7 +510,6 @@ def extract_results(
     :rtype: tuple[Orderbook, Orderbook, list[dict]]
     """
     accepted_orders: Orderbook = []
-    rejected_orders: Orderbook = []
     meta = []
 
     supply_volume_dict = {t: 0.0 for t in model.T}
@@ -532,7 +531,7 @@ def extract_results(
 
         elif order["bid_type"] == "BB":
             acceptance = model.xb[order["bid_id"]].value
-            acceptance = 0 if acceptance < eps else acceptance
+            acceptance = 0 if acceptance < EPS else acceptance
 
             for start_time, volume in order["volume"].items():
                 order["accepted_volume"][start_time] = acceptance * volume
