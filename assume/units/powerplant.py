@@ -62,8 +62,8 @@ class PowerPlant(SupportsMinMax):
     :type location: tuple[float, float], optional
     :param node: The identifier of the electrical bus or network node to which the power plant is connected.(Defaults to "bus0".)
     :type node: str, optional
-    :param **kwargs: Additional keyword arguments to be passed to the base class.
-    :type **kwargs: dict, optional
+    :param kwargs: Additional keyword arguments to be passed to the base class.
+    :type kwargs: dict, optional
 
     """
 

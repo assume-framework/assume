@@ -96,7 +96,9 @@ def pay_as_clear(
 
                 # add left over to supply_orders again
                 supply_orders.insert(0, split_supply_order)
-            # else: diff == 0 perfect match
+            else:
+                # diff == 0 perfect match
+                demand_order["accepted_volume"] = demand_order["volume"]
 
             accepted_product_orders.append(demand_order)
             accepted_product_orders.extend(to_commit)
@@ -229,7 +231,9 @@ def pay_as_bid(
                 gen_vol -= diff
 
                 supply_orders.insert(0, split_supply_order)
-            # else: diff == 0 perfect match
+            else:
+                # diff == 0 perfect match
+                demand_order["accepted_volume"] = demand_order["volume"]
 
             accepted_orders.append(demand_order)
             # pay as bid
