@@ -113,7 +113,6 @@ def pay_as_clear(
             clear_price = 0
 
         for order in accepted_product_orders:
-            order["original_price"] = order["price"]
             order["accepted_price"] = clear_price
 
         accepted_orders.extend(accepted_product_orders)
@@ -238,10 +237,7 @@ def pay_as_bid(
             accepted_orders.append(demand_order)
             # pay as bid
             for supply_order in to_commit:
-                supply_order["original_price"] = supply_order["price"]
                 supply_order["accepted_price"] = supply_order["price"]
-
-                demand_order["original_price"] = demand_order["price"]
                 demand_order["accepted_price"] = supply_order["price"]
             accepted_product_orders.extend(to_commit)
 

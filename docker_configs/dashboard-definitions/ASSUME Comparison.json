@@ -419,13 +419,13 @@
               ],
               "metricColumn": "none",
               "rawQuery": true,
-              "rawSql": "select sim1.\"time\", sim2.\" \" - sim1.\" \" as \"Volume\", sim1.bid_id from (\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(original_price) AS \" \",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1\n) sim1\njoin (\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(original_price) AS \" \",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1) sim2\non sim1.time = sim2.time and sim1.bid_id = sim2.bid_id",
+              "rawSql": "select sim1.\"time\", sim2.\" \" - sim1.\" \" as \"Volume\", sim1.bid_id from (\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(price) AS \" \",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1\n) sim1\njoin (\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(price) AS \" \",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1) sim2\non sim1.time = sim2.time and sim1.bid_id = sim2.bid_id",
               "refId": "A",
               "select": [
                 [
                   {
                     "params": [
-                      "original_price"
+                      "price"
                     ],
                     "type": "column"
                   },
@@ -1476,13 +1476,13 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "select sim1.\"time\", sim2.\"price\" - sim1.\"price\" as \"price\", sim2.\"volume\" - sim1.\"volume\" as \"volume\", sim1.unit_id from (\nselect\n  $__timeGroupAlias(start_time,$__interval),\n  avg(original_price) AS \"price\",\n  avg(volume) AS \"volume\",\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  unit_id in ($Gen_Units) AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, market_id\nORDER BY 1\n) sim1\nleft join (\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(original_price) AS \"price\",\n  avg(volume) AS \"volume\",\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  unit_id in ($Gen_Units) AND\n  simulation = '$simulation_comp'\nGROUP BY 1, unit_id, market_id\nORDER BY 1\n) sim2\non sim1.time = sim2.time and sim1.unit_id = sim2.unit_id",
+          "rawSql": "select sim1.\"time\", sim2.\"price\" - sim1.\"price\" as \"price\", sim2.\"volume\" - sim1.\"volume\" as \"volume\", sim1.unit_id from (\nselect\n  $__timeGroupAlias(start_time,$__interval),\n  avg(price) AS \"price\",\n  avg(volume) AS \"volume\",\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  unit_id in ($Gen_Units) AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, market_id\nORDER BY 1\n) sim1\nleft join (\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(price) AS \"price\",\n  avg(volume) AS \"volume\",\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  unit_id in ($Gen_Units) AND\n  simulation = '$simulation_comp'\nGROUP BY 1, unit_id, market_id\nORDER BY 1\n) sim2\non sim1.time = sim2.time and sim1.unit_id = sim2.unit_id",
           "refId": "A",
           "select": [
             [
               {
                 "params": [
-                  "original_price"
+                  "price"
                 ],
                 "type": "column"
               },
