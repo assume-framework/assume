@@ -533,7 +533,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
 
         # in load_scenario_folder_async, we initiate new container and kill old if present
         # as long as we do not skip setup container should be handled correctly
-        # if enough inital experience was collected according to specififcations in learning config
+        # if enough initial experience was collected according to specififcations in learning config
         # turn off initial exploration and go into full learning mode
 
         world.loop.run_until_complete(
