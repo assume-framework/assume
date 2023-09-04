@@ -326,7 +326,9 @@ def get_test_demand_orders(power: np.array):
 
 def separate_block_orders(orderbook):
     for order in orderbook:
-        if order["bid_type"] == "BB" and isinstance(order["volume"], dict):
+        if "bid_type" not in order.keys():
+            continue
+        elif order["bid_type"] == "BB" and isinstance(order["volume"], dict):
             start_hour = order["start_time"]
             end_hour = order["end_time"]
             duration = (end_hour - start_hour) / len(order["volume"])
@@ -340,7 +342,7 @@ def separate_block_orders(orderbook):
                         "volume": order["volume"][start],
                         "accepted_volume": order["accepted_volume"][start],
                         "accepted_price": order["accepted_price"][start],
-                        "bid_id": f"{order['bid_id']}_{i}",
+                        "bid_id": f"{order['bid_id']}_BB{i}",
                     }
                 )
                 orderbook.append(single_order)

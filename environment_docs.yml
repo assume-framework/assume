@@ -15,3 +15,5 @@ dependencies:
   - nbsphinx
   - nbsphinx_link
   - sphinxcontrib-mermaid
+  - pyomo
+  - torch

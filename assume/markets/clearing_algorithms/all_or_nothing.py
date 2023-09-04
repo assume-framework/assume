@@ -9,6 +9,9 @@ log = logging.getLogger(__name__)
 
 
 def cumsum(orderbook: Orderbook):
+    """
+    This function adds a cumsum field to the orderbook.
+    """
     sum_ = 0
     for order in orderbook:
         sum_ += order["volume"]
@@ -23,6 +26,11 @@ def pay_as_clear_aon(market_agent: MarketRole, market_products: list[MarketProdu
     This implements pay-as-clear where each bids volume needs an exactly matching order with the same volume.
     Partial clearing is not allowed here.
     This has the side effect, that the cleared price can be much higher if bids with different volume are accepted
+
+    :param market_agent: The market agent
+    :type market_agent: MarketRole
+    :param market_products: The products to be traded
+    :type market_products: list[MarketProduct]
     """
     market_getter = itemgetter("start_time", "end_time", "only_hours")
     accepted_orders: Orderbook = []
@@ -110,6 +118,15 @@ def pay_as_clear_aon(market_agent: MarketRole, market_products: list[MarketProdu
 
 # does not allow to have partial accepted bids
 def pay_as_bid_aon(market_agent: MarketRole, market_products: list[MarketProduct]):
+    """
+    This implements pay-as-bid where each bids volume needs an exactly matching order with the same volume.
+    Partial clearing is not allowed here.
+
+    :param market_agent: The market agent
+    :type market_agent: MarketRole
+    :param market_products: The products to be traded
+    :type market_products: list[MarketProduct]
+    """
     market_getter = itemgetter("start_time", "end_time", "only_hours")
     accepted_orders: Orderbook = []
     rejected_orders: Orderbook = []

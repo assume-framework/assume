@@ -12,6 +12,17 @@ def pay_as_clear(
     market_agent: MarketRole,
     market_products: list[MarketProduct],
 ):
+    """
+    Performs electricity market clearing using a pay-as-clear mechanism. This means that the clearing price is the
+    highest price that is still accepted. The clearing price is the same for all accepted orders.
+
+    :param market_agent: The market agent
+    :type market_agent: MarketRole
+    :param market_products: The products to be traded
+    :type market_products: list[MarketProduct]
+    :return: accepted_orders, rejected_orders, meta
+    :rtype: tuple[Orderbook, Orderbook, list[dict]]
+    """
     market_getter = itemgetter("start_time", "end_time", "only_hours")
     accepted_orders: Orderbook = []
     rejected_orders: Orderbook = []
@@ -85,7 +96,9 @@ def pay_as_clear(
 
                 # add left over to supply_orders again
                 supply_orders.insert(0, split_supply_order)
-            # else: diff == 0 perfect match
+            else:
+                # diff == 0 perfect match
+                demand_order["accepted_volume"] = demand_order["volume"]
 
             accepted_product_orders.append(demand_order)
             accepted_product_orders.extend(to_commit)
@@ -140,6 +153,16 @@ def pay_as_bid(
     market_agent: MarketRole,
     market_products: list[MarketProduct],
 ):
+    """
+    Simulates electricity market clearing using a pay-as-bid mechanism.
+
+    :param market_agent: The market agent
+    :type market_agent: MarketRole
+    :param market_products: The products to be traded
+    :type market_products: list[MarketProduct]
+    :return: accepted_orders, rejected_orders, meta
+    :rtype: tuple[Orderbook, Orderbook, list[dict]]
+    """
     market_getter = itemgetter("start_time", "end_time", "only_hours")
     accepted_orders: Orderbook = []
     rejected_orders: Orderbook = []
@@ -208,7 +231,9 @@ def pay_as_bid(
                 gen_vol -= diff
 
                 supply_orders.insert(0, split_supply_order)
-            # else: diff == 0 perfect match
+            else:
+                # diff == 0 perfect match
+                demand_order["accepted_volume"] = demand_order["volume"]
 
             accepted_orders.append(demand_order)
             # pay as bid

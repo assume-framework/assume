@@ -16,7 +16,7 @@ availabe_examples = {
     "small_dam": {"scenario": "example_01a", "study_case": "dam"},
     "small_with_opt_clearing": {
         "scenario": "example_01a",
-        "study_case": "dam_with_complex_opt_clearing",
+        "study_case": "dam_with_complex_clearing",
     },
     "small_with_vre": {"scenario": "example_01b", "study_case": "base"},
     "small_with_vre_and_storage": {
@@ -54,7 +54,7 @@ if __name__ == "__main__":
     - local_db: without database and grafana
     - timescale: with database and grafana (note: you need docker installed)
     """
-    data_format = "local_db"  # "local_db" or "timescale"
+    data_format = "timescale"  # "local_db" or "timescale"
     example = "small"
 
     if data_format == "local_db":
