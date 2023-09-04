@@ -126,7 +126,8 @@ class World:
 
         self.bidding_params.update(self.learning_config)
         # initiate learning if the learning mode is on and hence we want to learn new strategies
-        if self.learning_config.get("learning_mode", False):
+        self.learning_mode = self.learning_config.get("learning_mode", False)
+        if self.learning_mode:
             # if so, we initate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
 
@@ -239,8 +240,11 @@ class World:
                     **self.bidding_params,
                 )
                 # TODO find better way to count learning agents
-                if issubclass(self.bidding_types[strategy], LearningStrategy):
-                    self.learning_role.rl_units[id] = bidding_strategies[product_type]
+                if self.learning_mode:
+                    if issubclass(self.bidding_types[strategy], LearningStrategy):
+                        self.learning_role.rl_units[id] = bidding_strategies[
+                            product_type
+                        ]
 
             except KeyError as e:
                 self.logger.error(
