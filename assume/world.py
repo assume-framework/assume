@@ -25,7 +25,7 @@ from assume.common import (
 )
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import LearningStrategy, bidding_strategies
-from assume.units import BaseUnit, Demand, HeatPump, PowerPlant, Storage
+from assume.units import BaseUnit, Demand, Building, PowerPlant, Storage
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
 stdout_handler = logging.StreamHandler(stream=sys.stdout)

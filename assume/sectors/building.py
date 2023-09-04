@@ -2,7 +2,7 @@ import pyomo.environ as pyo
 from pyomo.environ import *
 import pandas as pd
 from typing import List, Optional, Dict
-from assume.units.base_unit import BaseUnit
+from assume.common.base import BaseUnit
 from assume.units.dst_units import HeatPump, AirConditioner, Storage
 from importlib import import_module
 
