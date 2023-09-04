@@ -33,16 +33,30 @@ Documentation
 * :doc:`installation`
 * :doc:`quick_start`
 * :doc:`market_config`
+* :doc:`market_mechanism`
+* :doc:`bidding_agents`
+* :doc:`assume`
 
 .. toctree::
    :hidden:
-   :maxdepth: 1
-   :caption: Getting Started
+   :maxdepth: 4
+   :caption: Contents
 
    introduction
    installation
    quick_start
    market_config
+   market_mechanism
+   bidding_agents
+   assume
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
+
 
 **Help & References**
 

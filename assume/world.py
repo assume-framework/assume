@@ -17,26 +17,15 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from tqdm import tqdm
 
 from assume.common import (
-    ForecastProvider,
+    Forecaster,
     MarketConfig,
     UnitsOperator,
     WriteOutput,
     mango_codec_factory,
 )
-from assume.markets import MarketRole, pay_as_bid, pay_as_clear
-from assume.strategies import (
-    NaiveNegReserveStrategy,
-    NaivePosReserveStrategy,
-    NaiveStrategy,
-    OTCStrategy,
-    flexableEOM,
-    flexableEOMStorage,
-    flexableNegCRM,
-    flexableNegCRMStorage,
-    flexablePosCRM,
-    flexablePosCRMStorage,
-)
-from assume.units import Demand, dst_units, PowerPlant, Storage
+from assume.markets import MarketRole, clearing_mechanisms
+from assume.strategies import LearningStrategy, bidding_strategies
+from assume.units import BaseUnit, Demand, HeatPump, PowerPlant, Storage
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
 stdout_handler = logging.StreamHandler(stream=sys.stdout)
@@ -54,6 +43,7 @@ class World:
         database_uri: str = "",
         export_csv_path: str = "",
         log_level: str = "INFO",
+        additional_clearing_mechanisms: dict = {},
     ):
         logging.getLogger("assume").setLevel(log_level)
         self.logger = logging.getLogger(__name__)
@@ -70,10 +60,11 @@ class World:
                     self.db.connection()
                     connected = True
                     self.logger.info("connected to db")
-                except OperationalError:
+                except OperationalError as e:
                     self.logger.error(
                         f"could not connect to {database_uri}, trying again"
                     )
+                    self.logger.error(f"{e}")
                     time.sleep(2)
         else:
             self.db = None
@@ -81,36 +72,26 @@ class World:
         self.market_operators: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}
         self.unit_operators: dict[str, UnitsOperator] = {}
-        self.forecast_providers: dict[str, ForecastProvider] = {}
-
         self.unit_types = {
             "power_plant": PowerPlant,
             "heatpump": HeatPump,
             "demand": Demand,
             "storage": Storage,
         }
-        self.bidding_types = {
-            "flexable_eom": flexableEOM,
-            "flexable_pos_crm": flexablePosCRM,
-            "flexable_neg_crm": flexableNegCRM,
-            "flexable_eom_storage": flexableEOMStorage,
-            "flexable_pos_crm_storage": flexablePosCRMStorage,
-            "flexable_neg_crm_storage": flexableNegCRMStorage,
-            "naive": NaiveStrategy,
-            "naive_neg_reserve": NaiveNegReserveStrategy,
-            "naive_pos_reserve": NaivePosReserveStrategy,
-            "otc_strategy": OTCStrategy,
-        }
+
+        self.bidding_types = bidding_strategies
+
         try:
             from assume.strategies.learning_strategies import RLStrategy
 
             self.bidding_types["learning"] = RLStrategy
-        except ImportError:
-            pass
-        self.clearing_mechanisms = {
-            "pay_as_clear": pay_as_clear,
-            "pay_as_bid": pay_as_bid,
-        }
+        except ImportError as e:
+            self.logger.info(
+                "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",
+                e,
+            )
+        self.clearing_mechanisms = clearing_mechanisms
+        self.clearing_mechanisms.update(additional_clearing_mechanisms)
         nest_asyncio.apply()
         self.loop = asyncio.get_event_loop()
         asyncio.set_event_loop(self.loop)
@@ -119,50 +100,75 @@ class World:
         self,
         start: datetime,
         end: datetime,
-        save_frequency_hours: int,
         simulation_id: str,
-        bidding_params: dict,
         index: pd.Series,
+        save_frequency_hours: int = 24,
         same_process: bool = True,
+        bidding_params: dict = {},
+        learning_config: dict = {},
+        episode: int = 0,
     ):
         self.clock = ExternalClock(0)
         self.start = start
         self.end = end
+        self.learning_config = learning_config
         self.bidding_params = bidding_params
         self.index = index
 
         # kill old container if exists
         if isinstance(self.container, Container) and self.container.running:
-            self.container.shutdown()
+            await self.container.shutdown()
 
         # create new container
         self.container = await create_container(
             addr=self.addr, clock=self.clock, codec=mango_codec_factory()
         )
 
+        # initiate learning if the learning mode is on and hence we want to learn new strategies
+        if self.learning_config.get("learning_mode", False):
+            # if so, we initate the rl learning role with parameters
+            from assume.reinforcement_learning.learning_role import Learning
+
+            self.learning_role = Learning(
+                learning_config=self.learning_config,
+                start=self.start,
+                end=self.end,
+            )
+            self.bidding_params.update(self.learning_config)
+
+            if True:  # separate process does not support buffer and learning
+                rl_agent = RoleAgent(self.container, suggested_aid="learning_agent")
+                rl_agent.add_role(self.learning_role)
+            else:
+
+                def creator(container):
+                    agent = RoleAgent(container, suggested_aid="learning_agent")
+                    agent.add_role(self.learning_role)
+
+                await self.container.as_agent_process(agent_creator=creator)
+
         self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to world
-        output_role = WriteOutput(
-            simulation_id=simulation_id,
+        self.output_role = WriteOutput(
+            simulation_id=f"{simulation_id}_{episode}",
             start=start,
             end=end,
             db_engine=self.db,
             export_csv_path=self.export_csv_path,
             save_frequency_hours=save_frequency_hours,
         )
-        same_process = True
         if same_process:
-            self.output_agent = RoleAgent(
+            output_agent = RoleAgent(
                 self.container, suggested_aid=self.output_agent_addr[1]
             )
-            self.output_agent.add_role(output_role)
+            output_agent.add_role(self.output_role)
         else:
             # this does not set the clock in output_agent correctly yet
             # see https://gitlab.com/mango-agents/mango/-/issues/59
             # but still improves performance
             def creator(container):
                 agent = RoleAgent(container, suggested_aid=self.output_agent_addr[1])
-                agent.add_role(output_role)
+                agent.add_role(self.output_role)
 
             await self.container.as_agent_process(agent_creator=creator)
 
@@ -178,6 +184,8 @@ class World:
         id: str or int
 
         """
+        if self.unit_operators.get(id):
+            raise ValueError(f"UnitOperator {id} already exists")
         units_operator = UnitsOperator(available_markets=list(self.markets.values()))
         # creating a new role agent and apply the role of a unitsoperator
         unit_operator_agent = RoleAgent(self.container, suggested_aid=f"{id}")
@@ -192,12 +200,13 @@ class World:
             "output_agent_id": self.output_agent_addr[1],
         }
 
-    async def add_unit(
+    async def async_add_unit(
         self,
         id: str,
         unit_type: str,
         unit_operator_id: str,
         unit_params: dict,
+        forecaster: Forecaster,
     ) -> None:
         """
         Create and add a new unit to the world.
@@ -212,11 +221,11 @@ class World:
         """
 
         # check if unit operator exists
-        if unit_operator_id not in self.unit_operators:
+        if unit_operator_id not in self.unit_operators.keys():
             raise ValueError(f"invalid unit operator {unit_operator_id}")
 
         # provided unit type does not exist yet
-        unit_class = self.unit_types.get(unit_type)
+        unit_class: type[BaseUnit] = self.unit_types.get(unit_type)
         if unit_class is None:
             raise ValueError(f"invalid unit type {unit_type}")
 
@@ -229,19 +238,26 @@ class World:
                 bidding_strategies[product_type] = self.bidding_types[strategy](
                     **self.bidding_params
                 )
-            except KeyError as e:
-                self.logger.error(f"Invalid bidding strategy {strategy}")
-                raise e
+                # TODO find better way to count learning agents
+                if issubclass(self.bidding_types[strategy], LearningStrategy):
+                    self.learning_role.rl_units[id] = bidding_strategies[product_type]
 
+            except KeyError as e:
+                self.logger.error(
+                    f"Bidding strategy {strategy} not registered, could not add {id}"
+                )
+                return
         unit_params["bidding_strategies"] = bidding_strategies
 
         # create unit within the unit operator its associated with
-        await self.unit_operators[unit_operator_id].add_unit(
+        unit = unit_class(
             id=id,
-            unit_class=unit_class,
-            unit_params=unit_params,
+            unit_operator=unit_operator_id,
             index=self.index,
+            forecaster=forecaster,
+            **unit_params,
         )
+        await self.unit_operators[unit_operator_id].add_unit(unit)
 
     def add_market_operator(
         self,
@@ -255,6 +271,8 @@ class World:
         id = int
              market operator id is associated with the market its participating
         """
+        if self.market_operators.get(id):
+            raise ValueError(f"MarketOperator {id} already exists")
         market_operator_agent = RoleAgent(
             self.container,
             suggested_aid=id,
@@ -299,7 +317,7 @@ class World:
         market_operator.markets.append(market_config)
         self.markets[f"{market_config.name}"] = market_config
 
-    async def step(self):
+    async def _step(self):
         next_activity = self.clock.get_next_activity()
         if not next_activity:
             self.logger.info("simulation finished - no schedules left")
@@ -308,22 +326,21 @@ class World:
         self.clock.set_time(next_activity)
         return delta
 
-    async def run_async(self):
+    async def async_run(self, start_ts, end_ts):
         """
         Run the simulation.
+        either in learning mode where we run multiple times or in normal mode
         """
 
         # agent is implicit added to self.container._agents
 
-        start_ts = calendar.timegm(self.start.utctimetuple())
-        end_ts = calendar.timegm(self.end.utctimetuple())
         pbar = tqdm(total=end_ts - start_ts)
 
         # allow registration before first opening
         self.clock.set_time(start_ts - 1)
         while self.clock.time < end_ts:
             await asyncio.sleep(0)
-            delta = await self.step()
+            delta = await self._step()
             if delta:
                 pbar.update(delta)
                 pbar.set_description(
@@ -336,7 +353,37 @@ class World:
         pbar.close()
         await self.container.shutdown()
 
-        logging.info("Simulation finished")
-
     def run(self):
-        return self.loop.run_until_complete(self.run_async())
+        start_ts = calendar.timegm(self.start.utctimetuple())
+        end_ts = calendar.timegm(self.end.utctimetuple())
+
+        try:
+            return self.loop.run_until_complete(
+                self.async_run(start_ts=start_ts, end_ts=end_ts)
+            )
+        except KeyboardInterrupt:
+            pass
+
+    def reset(self):
+        self.market_operators = {}
+        self.markets = {}
+        self.unit_operators = {}
+        self.forecast_providers = {}
+
+    def add_unit(
+        self,
+        id: str,
+        unit_type: str,
+        unit_operator_id: str,
+        unit_params: dict,
+        forecaster: Forecaster,
+    ) -> None:
+        return self.loop.run_until_complete(
+            self.async_add_unit(
+                id=id,
+                unit_type=unit_type,
+                unit_operator_id=unit_operator_id,
+                unit_params=unit_params,
+                forecaster=forecaster,
+            )
+        )

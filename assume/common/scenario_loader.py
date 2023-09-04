@@ -1,14 +1,13 @@
 import logging
 from datetime import datetime
-from typing import Callable
 
 import dateutil.rrule as rr
 import numpy as np
 import pandas as pd
 import yaml
-from mango import RoleAgent
+from tqdm import tqdm
 
-from assume.common import ForecastProvider
+from assume.common.forecasts import CsvForecaster, Forecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.world import World
 
@@ -28,6 +27,20 @@ def load_file(
     file_name: str,
     index: pd.DatetimeIndex = None,
 ) -> pd.DataFrame:
+    """
+    This function loads a csv file from a given path and returns a dataframe.
+
+    :param path: the path to the csv file
+    :type path: str
+    :param config: the config file
+    :type config: dict
+    :param file_name: the name of the csv file
+    :type file_name: str
+    :param index: the index of the dataframe
+    :type index: pd.DatetimeIndex
+    :return: the dataframe
+    :rtype: pd.DataFrame
+    """
     df = None
 
     if file_name in config:
@@ -41,7 +54,7 @@ def load_file(
             index_col=0,
             encoding="utf-8",
             na_values=["n.a.", "None", "-", "none", "nan"],
-            parse_dates=True,
+            parse_dates=index is not None,
         )
 
         for col in df:
@@ -83,11 +96,20 @@ def load_file(
         return df
 
     except FileNotFoundError:
-        logger.warning(f"{file_name} not found. Returning None")
+        logger.info(f"{file_name} not found. Returning None")
         return None
 
 
 def convert_to_rrule_freq(string):
+    """
+    This function converts a string to a rrule frequency and interval.
+    The string should be in the format of "1h" or "1d" or "1w".
+
+    :param string: the string to be converted
+    :type string: str
+    :return: the rrule frequency and interval
+    :rtype: tuple[int, int]
+    """
     freq = freq_map[string[-1]]
     interval = int(string[:-1])
     return freq, interval
@@ -99,6 +121,20 @@ def make_market_config(
     world_start: datetime,
     world_end: datetime,
 ):
+    """
+    This function creates a market config from a given dictionary.
+
+    :param id: the id of the market
+    :type id: str
+    :param market_params: the market parameters
+    :type market_params: dict
+    :param world_start: the start time of the world
+    :type world_start: datetime
+    :param world_end: the end time of the world
+    :type world_end: datetime
+    :return: the market config
+    :rtype: MarketConfig
+    """
     freq, interval = convert_to_rrule_freq(market_params["opening_frequency"])
     start = market_params.get("start_date")
     end = market_params.get("end_date")
@@ -145,15 +181,24 @@ def make_market_config(
     return market_config
 
 
-async def add_units(
+def add_units(
     units_df: pd.DataFrame,
     unit_type: str,
-    callback: Callable[[str, dict], dict],
     world: World,
+    forecaster: Forecaster,
 ):
     """
     This function adds units to the world from a given dataframe.
     The callback is used to adjust unit_params depending on the unit_type, before adding the unit to the world.
+
+    :param units_df: the dataframe containing the units
+    :type units_df: pd.DataFrame
+    :param unit_type: the type of the unit
+    :type unit_type: str
+    :param world: the world
+    :type world: World
+    :param forecaster: the forecaster
+    :type forecaster: Forecaster
     """
     if units_df is None:
         return
@@ -168,14 +213,14 @@ async def add_units(
             if key.startswith("bidding_")
         }
         unit_params["bidding_strategies"] = bidding_strategies
-
-        unit_params = callback(unit_name, unit_params)
-
-        await world.add_unit(
+        operator_id = unit_params["unit_operator"]
+        del unit_params["unit_operator"]
+        world.add_unit(
             id=unit_name,
             unit_type=unit_type,
-            unit_operator_id=unit_params["unit_operator"],
+            unit_operator_id=operator_id,
             unit_params=unit_params,
+            forecaster=forecaster,
         )
 
 
@@ -184,16 +229,19 @@ async def load_scenario_folder_async(
     inputs_path: str,
     scenario: str,
     study_case: str,
+    disable_learning: bool = False,
+    episode: int = 0,
 ):
-    """Load a scenario from a given path.
+    """Load a scenario from a given path. Raises: ValueError: If the scenario or study case is not found.
 
-    Args:
-        inputs_path (str): Path to the inputs folder.
-        scenario (str): Name of the scenario.
-        study_case (str): Name of the study case.
-
-    Raises:
-        ValueError: If the scenario or study case is not found.
+    :param world: The world.
+    :type world: World
+    :param inputs_path: Path to the inputs folder.
+    :type inputs_path: str
+    :param scenario: Name of the scenario.
+    :type scenario: str
+    :param study_case: Name of the study case.
+    :type study_case: str
     """
 
     # load the config file
@@ -205,12 +253,14 @@ async def load_scenario_folder_async(
         config = config[study_case]
     logger.info(f"Starting Scenario {scenario}/{study_case} from {inputs_path}")
 
+    world.reset()
+
     start = pd.Timestamp(config["start_date"])
     end = pd.Timestamp(config["end_date"])
 
     index = pd.date_range(
         start=start,
-        end=end + pd.Timedelta(hours=4),
+        end=end + pd.Timedelta(hours=24),
         freq=config["time_step"],
     )
     # get extra parameters for bidding strategies
@@ -243,69 +293,34 @@ async def load_scenario_folder_async(
         file_name="heatpump_units",
     )
 
-    fuel_prices_df = load_file(
-        path=path,
-        config=config,
-        file_name="fuel_prices_df",
-        index=index,
-    )
-
-    temperature_df = load_file(
-        path=path, config=config, file_name="temperature", index=index
-    )
-
-    electricity_prices_df = load_file(
-        path=path, config=config, file_name="electricity_prices", index=index
-    )
-
-    demand_df = load_file(
-        path=path,
-        config=config,
-        file_name="demand_df",
-        index=index,
-    )
-
-    availability = load_file(
-        path=path,
-        config=config,
-        file_name="availability_df",
-        index=index,
-    )
-
-    cross_border_flows_df = load_file(
-        path=path,
-        config=config,
-        file_name="cross_border_flows",
-        index=index,
-    )
-    cross_border_flows_df
-
-    forecasts_df = load_file(
-        path=path,
-        config=config,
-        file_name="forecasts_df",
-        index=index,
-    )
-
     if powerplant_units is None or demand_units is None:
         raise ValueError("No power plant or no demand units were provided!")
 
-    if demand_df is None:
-        raise ValueError("No demand time series was provided!")
-
     # Initialize world
 
-    save_frequency_hours = config.get("save_frequency_hours", None)
+    save_frequency_hours = config.get("save_frequency_hours", 48)
     sim_id = f"{scenario}_{study_case}"
 
+    learning_config = config.get("learning_config", {})
     bidding_strategy_params = config.get("bidding_strategy_params", {})
-    if "load_learned_path" not in bidding_strategy_params.keys():
-        bidding_strategy_params[
+
+    if "load_learned_path" not in learning_config.keys():
+        learning_config[
             "load_learned_path"
         ] = f"{inputs_path}/learned_strategies/{sim_id}/"
 
+    if disable_learning:
+        learning_config = {}
+
     await world.setup(
-        start, end, save_frequency_hours, sim_id, bidding_strategy_params, index
+        start=start,
+        end=end,
+        save_frequency_hours=save_frequency_hours,
+        simulation_id=sim_id,
+        episode=episode,
+        learning_config=learning_config,
+        bidding_params=bidding_strategy_params,
+        index=index,
     )
 
     # get the market config from the config file and add the markets
@@ -328,28 +343,68 @@ async def load_scenario_folder_async(
         )
 
     # add forecast providers for each market
-    logger.info("Adding forecast providers")
-    for market_id, market_config in world.markets.items():
-        if forecasts_df is not None and market_id in forecasts_df.columns:
-            market_price_forecast = forecasts_df[market_id]
-        else:
-            market_price_forecast = None
+    logger.info("Adding forecast")
+    forecaster = CsvForecaster(
+        index=index,
+        powerplants=powerplant_units,
+    )
 
-        forecast_provider = ForecastProvider(
-            market_id=market_id,
-            forecasts_df=market_price_forecast,
-            fuel_prices_df=fuel_prices_df,
-            availability=availability,
-            powerplants=powerplant_units,
-            demand_df=demand_df[f"demand_{market_id}"],
-        )
-        forecast_agent = RoleAgent(
-            world.container, suggested_aid=f"forecast_agent_{market_id}"
-        )
-        forecast_agent.add_role(forecast_provider)
-        world.forecast_providers[market_id] = forecast_provider
+    forecasts_df = load_file(
+        path=path,
+        config=config,
+        file_name="forecasts_df",
+        index=index,
+    )
+    forecaster.set_forecast(forecasts_df)
 
-        forecast_provider.save_forecasts(path)
+    demand_df = load_file(
+        path=path,
+        config=config,
+        file_name="demand_df",
+        index=index,
+    )
+    if demand_df is None:
+        raise ValueError("No demand time series was provided!")
+    forecaster.set_forecast(demand_df)
+
+    cross_border_flows_df = load_file(
+        path=path,
+        config=config,
+        file_name="cross_border_flows",
+        index=index,
+    )
+    forecaster.set_forecast(cross_border_flows_df)
+
+    availability = load_file(
+        path=path,
+        config=config,
+        file_name="availability_df",
+        index=index,
+    )
+    forecaster.set_forecast(availability, prefix="availability_")
+    electricity_prices_df = load_file(
+        path=path, config=config, file_name="electricity_prices", index=index
+    )
+    forecaster.set_forecast(electricity_prices_df)
+
+    price_forecast_df = load_file(
+        path=path, config=config, file_name="price_forecasts", index=index
+    )
+    forecaster.set_forecast(price_forecast_df, "price_")
+    forecaster.set_forecast(
+        load_file(
+            path=path,
+            config=config,
+            file_name="fuel_prices_df",
+            index=index,
+        ),
+        prefix="fuel_price_",
+    )
+    forecaster.set_forecast(
+        load_file(path=path, config=config, file_name="temperature", index=index)
+    )
+    forecaster.calc_forecast_if_needed()
+    forecaster.save_forecasts(path)
 
     # add the unit operators using unique unit operator names in the powerplants csv
     logger.info("Adding unit operators")
@@ -370,74 +425,35 @@ async def load_scenario_folder_async(
             [all_operators, heatpump_units.unit_operator.unique()]
         )
 
-    def unit_operator_callback(unit_operator):
-        unit_operator.context.data_dict["price_forecast"] = world.forecast_providers[
-            "EOM"
-        ].forecasts["price_forecast"]
-        unit_operator.context.data_dict[
-            "residual_load_forecast"
-        ] = world.forecast_providers["EOM"].forecasts["residual_load_forecast"]
-
     for company_name in set(all_operators):
         world.add_unit_operator(id=str(company_name))
-        unit_operator_callback(world.unit_operators[company_name])
 
     # add the units to corresponsing unit operators
     # if fuel prices are provided, add them to the unit params
     # if vre generation is provided, add them to the vre units
     # if we have RL strategy, add price forecast to unit_params
-    def powerplant_callback(unit_name, unit_params):
-        unit_params["price_forecast"] = world.forecast_providers["EOM"].forecasts[
-            "price_forecast"
-        ]
-
-        if (
-            fuel_prices_df is not None
-            and unit_params["fuel_type"] in fuel_prices_df.columns
-        ):
-            unit_params["fuel_price"] = fuel_prices_df[unit_params["fuel_type"]]
-            unit_params["co2_price"] = fuel_prices_df["co2"]
-
-        if availability is not None and unit_name in availability.columns:
-            unit_params["capacity_factor"] = availability[unit_name]
-
+    def empty_callback(unit_name, unit_params):
         return unit_params
 
-    await add_units(
+    add_units(
         powerplant_units,
         "power_plant",
-        powerplant_callback,
         world,
+        forecaster,
     )
 
-    def heatpump_callback(unit_name, unit_params):
-        if electricity_prices_df is not None:
-            unit_params["electricity_price"] = electricity_prices_df[
-                "electricity_price"
-            ]
-
-        if temperature_df is not None:
-            unit_params["source_temp"] = temperature_df["source_temperature"]
-            unit_params["sink_temp"] = temperature_df["sink_temperature"]
-        return unit_params
-
-    await add_units(
+    add_units(
         heatpump_units,
         "heatpump",
-        heatpump_callback,
         world,
+        forecaster,
     )
 
-    def storage_callback(unit_name, unit_params):
-        unit_params["price_forecast"] = world.forecast_providers["EOM"].forecasts_df
-
-        return unit_params
-
-    await add_units(
+    add_units(
         storage_units,
         "storage",
-        storage_callback,
         world,
+        forecaster,
     )
 
     def demand_callback(unit_name, unit_params):
@@ -446,11 +462,11 @@ async def load_scenario_folder_async(
 
         return unit_params
 
-    await add_units(
+    add_units(
         demand_units,
         "demand",
-        demand_callback,
         world,
+        forecaster,
     )
 
 
@@ -462,8 +478,17 @@ def load_scenario_folder(
 ):
     """
     Load a scenario from a given path.
+
+    :param world: The world.
+    :type world: World
+    :param inputs_path: Path to the inputs folder.
+    :type inputs_path: str
+    :param scenario: Name of the scenario.
+    :type scenario: str
+    :param study_case: Name of the study case.
+    :type study_case: str
     """
-    return world.loop.run_until_complete(
+    world.loop.run_until_complete(
         load_scenario_folder_async(
             world,
             inputs_path,
@@ -471,3 +496,47 @@ def load_scenario_folder(
             study_case,
         )
     )
+    # check if learning mode
+    if world.learning_config.get("learning_mode"):
+        # initiate buffer for rl agent
+        from assume.reinforcement_learning.buffer import ReplayBuffer
+
+        buffer = ReplayBuffer(
+            buffer_size=int(5e5),
+            obs_dim=world.learning_role.obs_dim,
+            act_dim=world.learning_role.act_dim,
+            n_rl_units=len(world.learning_role.rl_units),
+            device=world.learning_role.device,
+        )
+
+        for episode in tqdm(
+            range(world.learning_role.training_episodes),
+            desc="Training Episodes",
+        ):
+            # give the newly created rl_agent the buffer that we stored from the beginning
+            world.learning_role.set_buffer(buffer)
+
+            world.run()
+            world.reset()
+
+            world.learning_role.episodes_done = episode + 1
+
+            disable_learning = episode == world.learning_role.training_episodes - 1
+
+            # in load_scenario_folder_async, we initiate new container and kill old if present
+            # as long as we do not skip setup container should be handled correctly
+            world.loop.run_until_complete(
+                load_scenario_folder_async(
+                    world,
+                    inputs_path,
+                    scenario,
+                    study_case,
+                    episode=world.learning_role.episodes_done,
+                    disable_learning=disable_learning,
+                )
+            )
+
+            # container shutdown implicitly with new initialisation
+
+        logger.info("################")
+        logger.info(f"Training finished, Start evaluation run")

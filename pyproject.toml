@@ -58,9 +58,10 @@ pytest-asyncio = "^0.21.1"
 
 
 [tool.poetry.extras]
-test = ["black", "isort", "matplotlib", "pytest", "pytest-cov", "pytest-asyncio"]
 learning = ["torch"]
 optimize = ["pyomo", "glpk"]
+test = ["black", "isort", "matplotlib", "pytest", "pytest-cov", "pytest-asyncio", "pyomo"]
+
 
 [tool.poetry.scripts]
 assume = "assume.cli:cli"
@@ -83,6 +84,10 @@ filterwarnings = [
     "ignore:Call to deprecated create function FileDescriptor",
     "ignore:Call to deprecated create function EnumValueDescriptor",
     "ignore:Call to deprecated create function EnumDescriptor",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "require_learning",
 ]
 
 [tool.coverage.run]

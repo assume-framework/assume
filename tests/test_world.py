@@ -5,7 +5,7 @@ from assume import World, load_scenario_folder
 
 def test_world():
     scenario = "example_01a"
-    study_case = "example_01a"
+    study_case = "base"
     world = World(database_uri=None, export_csv_path=None)
     load_scenario_folder(
         world, inputs_path="examples/inputs", scenario=scenario, study_case=study_case
@@ -18,4 +18,3 @@ def test_world():
     assert world.market_operators.keys()
     assert world.markets.keys()
     assert world.unit_operators.keys()
-    assert world.forecast_providers.keys()

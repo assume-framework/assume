@@ -9,12 +9,27 @@ from dateutil import rrule as rr
 from mango import Role
 from sqlalchemy import inspect, text
 
-from assume.units.base_unit import BaseUnit
-
 logger = logging.getLogger(__name__)
 
 
 class WriteOutput(Role):
+    """
+    Initializes an instance of the WriteOutput class.
+
+    :param simulation_id: The ID of the simulation as a unique calssifier.
+    :type simulation_id: str
+    :param start: The start datetime of the simulation run.
+    :type start: datetime
+    :param end: The end datetime of the simulation run.
+    :type end: datetime
+    :param db_engine: The database engine. Defaults to None.
+    :type db_engine: optional
+    :param export_csv_path: The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
+    :type export_csv_path: str, optional
+    :param save_frequency_hours: The frequency in hours for storing data in the db and/or csv files. Defaults to None.
+    :type save_frequency_hours: int
+    """
+
     def __init__(
         self,
         simulation_id: str,
@@ -22,25 +37,13 @@ class WriteOutput(Role):
         end: datetime,
         db_engine=None,
         export_csv_path: str = "",
-        save_frequency_hours: int | None = None,
+        save_frequency_hours: int = 24,
     ):
-        """
-        Initializes an instance of the WriteOutput class.
-
-        Args:
-            simulation_id (str): The ID of the simulation as a unique calssifier.
-            start (datetime): The start datetime of the simulation run.
-            end (datetime): The end datetime of the simulation run.
-            db_engine (optional): The database engine. Defaults to None.
-            export_csv_path (str, optional): The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
-            save_frequency_hours (int | None, optional): The frequency in hours for storeing data in the db and/or csv files. Defaults to None.
-        """
-
         super().__init__()
 
         # store needed date
         self.simulation_id = simulation_id
-        self.save_frequency_hours: int = save_frequency_hours or 1
+        self.save_frequency_hours = save_frequency_hours
 
         # make directory if not already present
         self.export_csv_path = export_csv_path
@@ -60,6 +63,12 @@ class WriteOutput(Role):
             self.delete_db_scenario(self.simulation_id)
 
     def delete_db_scenario(self, simulation_id):
+        """
+        Deletes all data from the database for the given simulation id.
+
+        :param simulation_id: The ID of the simulation as a unique calssifier.
+        :type simulation_id: str
+        """
         # Loop throuph all database tables
         # Get list of table names in database
         table_names = inspect(self.db.bind).get_table_names()
@@ -99,9 +108,11 @@ class WriteOutput(Role):
         """
         Handles the incoming messages and performs corresponding actions.
 
-        Args:
-            content (dict): The content of the message.
-            meta: The metadata associated with the message. (not needed yet)
+
+        :param content: The content of the message.
+        :type content: dict
+        :param meta: The metadata associated with the message. (not needed yet)
+        :type meta: any
         """
 
         if content.get("type") == "store_order_book":
@@ -126,8 +137,8 @@ class WriteOutput(Role):
         """
         Writes the RL parameters to the corresponding data frame.
 
-        Args:
-            rl_params: The RL parameters.
+        :param rl_params: The RL parameters.
+        :type rl_params: any
         """
 
         df = pd.DataFrame.from_records(rl_params)
@@ -140,8 +151,8 @@ class WriteOutput(Role):
         """
         Writes market results to the corresponding data frame.
 
-        Args:
-            market_meta: The market metadata, which includes the clearing price and volume.
+        :param market_meta: The market metadata, which includes the clearing price and volume.
+        :type market_meta: any
         """
 
         df = pd.DataFrame(market_meta)
@@ -175,6 +186,12 @@ class WriteOutput(Role):
             self.write_dfs[table] = []
 
     def check_for_tensors(self, data):
+        """
+        Checks if the data contains tensors and converts them to floats.
+
+        :param data: The data to be checked.
+        :type data: any
+        """
         try:
             import torch as th
 
@@ -192,9 +209,10 @@ class WriteOutput(Role):
         Writes market orders to the corresponding data frame.
         Append new data until it is written to db and csv with store_df function.
 
-        Args:
-            market_result: The market result including all orders.
-            market_id: The name of the market.
+        :param market_orders: The market orders.
+        :type market_orders: any
+        :param market_id: The id of the market.
+        :type market_id: str
         """
         # check if market results list is empty and skip the funktion and raise a warning
         if not market_orders:
@@ -206,17 +224,14 @@ class WriteOutput(Role):
         df["market_id"] = market_id
         self.write_dfs["market_orders"].append(df)
 
-    def write_units_definition(self, unit: BaseUnit):
+    def write_units_definition(self, unit_info: dict):
         """
         Writes unit definitions to the corresponding data frame and directly store it in db and csv.
-        Since that is only done once, no need for recurrent sheduling arises.
+        Since that is only done once, no need for recurrent scheduling arises.
 
-        Args:
-            unit_type (str): The type of the unit.
-            unit_params: The parameters of the unit.
+        :param unit_info: The unit information.
+        :type unit_info: dict
         """
-
-        unit_info = unit.as_dict()
 
         table_name = unit_info["unit_type"] + "_meta"
 
@@ -225,7 +240,8 @@ class WriteOutput(Role):
             return False
         del unit_info["unit_type"]
         unit_info["simulation"] = self.simulation_id
-        u_info = {unit.id: unit_info}
+        u_info = {unit_info["id"]: unit_info}
+        del unit_info["id"]
 
         self.write_dfs[table_name].append(pd.DataFrame(u_info).T)
 
@@ -234,9 +250,8 @@ class WriteOutput(Role):
         Writes the planned dispatch of the units after the market clearing to a csv and db
         In the case that we have no portfolio optimisation this equals the resulting bids.
 
-        Args:
-            data: The records to be put into the table.
-            Formatted like, "datetime, power, market_id, unit_id"
+        :param data: The records to be put into the table. Formatted like, "datetime, power, market_id, unit_id"
+        :type data: any
         """
         df = pd.DataFrame(data, columns=["datetime", "power", "market_id", "unit_id"])
         df["simulation"] = self.simulation_id
@@ -246,9 +261,8 @@ class WriteOutput(Role):
         """
         Writes the actual dispatch of the units to a csv and db
 
-        Args:
-            data: The records to be put into the table.
-            Formatted like, "datetime, power, market_id, unit_id"
+        :param data: The records to be put into the table. Formatted like, "datetime, power, market_id, unit_id"
+        :type data: any
         """
         data["simulation"] = self.simulation_id
         self.write_dfs["unit_dispatch"].append(data)
@@ -260,10 +274,12 @@ class WriteOutput(Role):
 
         # insert left records into db
         await self.store_dfs()
+        if self.db is None:
+            return
         queries = [
-            f"select market_id as name, avg(price) as avg_price from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select market_id as name, sum(price*demand_volume_energy) as total_cost from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select market_id as name, sum(demand_volume_energy) as total_volume from market_meta where simulation = '{self.simulation_id}' group by market_id",
+            f"select market_id as name, market_id, avg(price) as avg_price from market_meta where simulation = '{self.simulation_id}' group by market_id",
+            f"select market_id as name, market_id, sum(price*demand_volume_energy) as total_cost from market_meta where simulation = '{self.simulation_id}' group by market_id",
+            f"select market_id as name, market_id, sum(demand_volume_energy) as total_volume from market_meta where simulation = '{self.simulation_id}' group by market_id",
             f"select unit_id as name, market_id, avg(power/max_power) as capacity_factor from market_dispatch ud join power_plant_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by name, market_id",
         ]
         dfs = []

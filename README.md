@@ -1,4 +1,6 @@
 # ASSUME
+![pytest, black, isort](https://github.com/assume-framework/assume/actions/workflows/lint-pytest.yml/badge.svg)
+[![codecov](https://codecov.io/gh/assume-framework/assume/branch/main/graph/badge.svg?token=CZ4FO7P57H)](https://codecov.io/gh/assume-framework/assume)
 
 **ASSUME** is an open-source tool-box for an agent-based simulation
 of the European electricity and later on energy markets with a main
@@ -54,13 +56,30 @@ Afterwards, activate the environment:
 conda activate assume-framework
 ```
 
-After these steps you can also run the example simulation:
+Quick Start
+-----------
+There are 3 ways to run a simulation. <br>
+1.) local (without database and grafana) <br>
+2.) with docker (with database and grafana) <br>
+3.) use CLI to run simulations
+
+1. To run an exemplar simulation without database and grafana, run the following command:
 
 ```
-python examples/example_01a_sqlite.py
+python examples/examples.py
 ```
 
-You can also use the cli to run simulations:
+2. If you have docker installed, you can run the following two commands
+
+Note: you have to select 'timescale' in examples.py
+```
+    docker compose up -d
+    python examples/examples.py
+```
+This will start a container for timescaledb and grafana with preconfigured grafana dashboard.
+Afterwards you can access the Dashboard on `http://localhost:3000`
+
+3. You can also use the cli to run simulations:
 
 ```
 assume -s example_01b -db "postgresql://assume:assume@localhost:5432/assume"
@@ -82,31 +101,36 @@ pip install pre-commit
 pre-commit install
 ```
 
-Access to database and dashboards
+to run pre-commit directly, you can use
+
+```
+pre-commit run --all-files
+```
+
+
+Create Documentation
+--------------------
+
+First, create an environment which includes the docs dependencies:
+
+```
+conda env create -f environment_docs.yml
+```
+
+To create the documentation or update the automatically created docs in `docs/source/assume*` run `sphinx-apidoc -o docs/source -Fa assume`
+
+To create and serve the documentation locally, run
+
+```bash
+make -C docs html && python -m http.server --directory docs/build/html
+```
+
+Use Learning Capabilities
 ---------------------------------
-To save the simulation results to a database and be able to analyze them using Grafan dashboards, install the docker container:
+If you want to use the reinforcement learning strategies of Assume please make sure to install torch on top of the requirements listed in the requirements.txt. If you Ressources do not have a GPU available use the CPU only version of torch, which can be installed like this:
 
-```
-docker compose up
-```
+pip install "torch>=2.0.1+cpu" -f https://download.pytorch.org/whl/torch_stable.html
 
-This will start a container for timescaledb and grafana with preconfigured grafana dashboard.
-
-Quick Start
------------
-
-To run an exemplar simulation without database and grafana, run the following command:
-```
-    python examples/example_01a_sqlite.py
-```
-
-If you have docker installed, you can run the following two commands:
-```
-    docker compose up -d
-    python examples/example_01a_timescale.py
-```
-
-Afterwards you can access the Dashboard on `http://localhost:3000`
 
 Licence
 =======

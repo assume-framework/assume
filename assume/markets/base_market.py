@@ -1,5 +1,6 @@
 import calendar
 import logging
+import math
 from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
@@ -20,28 +21,70 @@ logger = logging.getLogger(__name__)
 
 
 class MarketRole(Role):
+    """
+    This is the base class for all market roles. It implements the basic functionality of a market role, such as
+    registering agents, clearing the market and sending the results to the database agent.
+
+    :param marketconfig: The configuration of the market
+    :type marketconfig: MarketConfig
+
+    Methods
+    -------
+    """
+
     longitude: float
     latitude: float
-    markets: list = []
+    marketconfig: MarketConfig
 
     def __init__(self, marketconfig: MarketConfig):
         super().__init__()
         self.marketconfig: MarketConfig = marketconfig
+        if self.marketconfig.price_tick:
+            if marketconfig.maximum_bid_price % self.marketconfig.price_tick != 0:
+                logger.warning(
+                    f"{marketconfig.name} - max price not a multiple of tick size"
+                )
+            if marketconfig.minimum_bid_price % self.marketconfig.price_tick != 0:
+                logger.warning(
+                    f"{marketconfig.name} - min price not a multiple of tick size"
+                )
+
+        if self.marketconfig.volume_tick:
+            if marketconfig.maximum_bid_volume % self.marketconfig.volume_tick != 0:
+                logger.warning(
+                    f"{marketconfig.name} - max volume not a multiple of tick size"
+                )
 
     def setup(self):
+        """
+        This method sets up the initial configuration and subscriptions for the market role.
+        It sets the address and agent ID of the market config to match the current context.
+
+        It Defines three filter methods (accept_orderbook, accept_registration, and accept_get_unmatched)
+        that serve as validation steps for different types of incoming messages.
+
+        Subscribes the role to handle incoming order book messages using the handle_orderbook method.
+        Subscribes the role to handle incoming registration messages using the handle_registration method
+        If the market configuration supports "get unmatched" functionality, subscribes the role to handle
+        such messages using the handle_get_unmatched
+
+        Schedules the opening() method to run at the next opening time of the market.
+        """
         self.marketconfig.addr = self.context.addr
         self.marketconfig.aid = self.context.aid
         self.all_orders: list[Order] = []
-        self.market_result: Orderbook = []
-        self.registered_agents: list[str] = []
+        self.registered_agents: list[tuple[str, str]] = []
         self.open_slots = []
 
         def accept_orderbook(content: dict, meta):
             if not isinstance(content, dict):
                 return False
-            name_match = content.get("market") == self.marketconfig.name
-            orderbook_exists = content.get("orderbook") is not None
-            return name_match and orderbook_exists
+
+            return (
+                content.get("market") == self.marketconfig.name
+                and content.get("orderbook") is not None
+                and (meta["sender_addr"], meta["sender_id"]) in self.registered_agents
+            )
 
         def accept_registration(content: dict, meta):
             if not isinstance(content, dict):
@@ -61,18 +104,12 @@ class MarketRole(Role):
 
         self.context.subscribe_message(self, self.handle_orderbook, accept_orderbook)
         self.context.subscribe_message(
-            self,
-            self.handle_registration,
-            accept_registration
-            # TODO safer type check? dataclass?
+            self, self.handle_registration, accept_registration
         )
 
         if self.marketconfig.supports_get_unmatched:
             self.context.subscribe_message(
-                self,
-                self.handle_get_unmatched,
-                accept_get_unmatched
-                # TODO safer type check? dataclass?
+                self, self.handle_get_unmatched, accept_get_unmatched
             )
 
         current = datetime.utcfromtimestamp(self.context.current_timestamp)
@@ -81,13 +118,18 @@ class MarketRole(Role):
         self.context.schedule_timestamp_task(self.opening(), opening_ts)
 
     async def opening(self):
+        """
+        This method is called when the market opens. It sends an opening message to all registered agents,
+        handles scheduling the clearing of the market and the next opening.
+        """
         # scheduled to be opened now
         market_open = datetime.utcfromtimestamp(self.context.current_timestamp)
         market_closing = market_open + self.marketconfig.opening_duration
         products = get_available_products(
             self.marketconfig.market_products, market_open
         )
-        if market_closing > self.marketconfig.opening_hours._until:
+        until = self.marketconfig.opening_hours._until
+        if until and market_closing > until:
             # this market should not open, as the clearing is after the markets end time
             return
 
@@ -127,6 +169,15 @@ class MarketRole(Role):
             logger.debug(f"market {self.marketconfig.name} - does not reopen")
 
     def handle_registration(self, content: dict, meta: dict):
+        """
+        This method handles incoming registration messages.
+        It adds the sender of the message to the list of registered agents
+
+        :param content: The content of the message
+        :type content: dict
+        :param meta: The metadata of the message
+        :type meta: any
+        """
         agent = meta["sender_id"]
         agent_addr = meta["sender_addr"]
         # TODO allow accessing agents properties?
@@ -134,10 +185,21 @@ class MarketRole(Role):
             self.registered_agents.append((agent_addr, agent))
 
     def handle_orderbook(self, content: dict, meta: dict):
+        """
+        This method handles incoming order book messages.
+        It validates the order book and adds it to the list of all orders.
+
+        :param content: The content of the message
+        :type content: dict
+        :param meta: The metadata of the message
+        :type meta: any
+
+        :raises AssertionError: If the order book is invalid
+        """
         orderbook: Orderbook = content["orderbook"]
-        # TODO check if agent is allowed to bid
         agent_addr = meta["sender_addr"]
         agent_id = meta["sender_id"]
+        # TODO check if products are part of currently open Market Openings
         try:
             max_price = self.marketconfig.maximum_bid_price
             min_price = self.marketconfig.minimum_bid_price
@@ -145,10 +207,10 @@ class MarketRole(Role):
 
             if self.marketconfig.price_tick:
                 # max and min should be in units
-                max_price = round(max_price / self.marketconfig.price_tick)
-                min_price = round(min_price / self.marketconfig.price_tick)
+                max_price = math.floor(max_price / self.marketconfig.price_tick)
+                min_price = math.ceil(min_price / self.marketconfig.price_tick)
             if self.marketconfig.volume_tick:
-                max_volume = round(max_volume / self.marketconfig.volume_tick)
+                max_volume = math.floor(max_volume / self.marketconfig.volume_tick)
 
             for order in orderbook:
                 order["agent_id"] = (agent_addr, agent_id)
@@ -160,15 +222,34 @@ class MarketRole(Role):
                 assert (
                     order["price"] >= min_price
                 ), f"minimum_bid_price {order['price']}"
-                assert (
-                    abs(order["volume"]) <= max_volume
-                ), f"max_volume {order['volume']}"
+
+                if "bid_type" in order.keys():
+                    order["bid_type"] = (
+                        "SB" if order["bid_type"] == None else order["bid_type"]
+                    )
+                    assert order["bid_type"] in [
+                        "SB",
+                        "BB",
+                    ], f"bid_type {order['bid_type']} not in ['SB', 'BB']"
+
+                if (
+                    "bid_type" in order.keys() and order["bid_type"] == "SB"
+                ) or "bid_type" not in order.keys():
+                    assert (
+                        abs(order["volume"]) <= max_volume
+                    ), f"max_volume {order['volume']}"
+
+                if "bid_type" in order.keys() and order["bid_type"] == "BB":
+                    assert (
+                        abs(order["volume"].values()) <= max_volume
+                    ).all(), f"max_volume {order['volume']}"
+
                 if self.marketconfig.price_tick:
                     assert isinstance(order["price"], int)
                 if self.marketconfig.volume_tick:
                     assert isinstance(order["volume"], int)
                 for field in self.marketconfig.additional_fields:
-                    assert order[field], f"missing field: {field}"
+                    assert field in order.keys(), f"missing field: {field}"
                 self.all_orders.append(order)
         except Exception as e:
             logger.error(f"error handling message from {agent_id} - {e}")
@@ -187,6 +268,13 @@ class MarketRole(Role):
         """
         A handler which sends the orderbook with unmatched orders to an agent.
         Allows to query a subset of the orderbook.
+
+        :param content: The content of the message
+        :type content: dict
+        :param meta: The metadata of the message
+        :type meta: dict
+
+        :raises AssertionError: If the order book is invalid
         """
         order = content.get("order")
         agent_addr = meta["sender_addr"]
@@ -216,21 +304,41 @@ class MarketRole(Role):
         )
 
     async def clear_market(self, market_products: list[MarketProduct]):
-        # print("clear market", len(self.all_orders))
-        self.market_result, market_meta = self.marketconfig.market_mechanism(
-            self, market_products
-        )
+        # Check if order is in time slots for current opening
+        # for order in self.all_orders:
+        #     assert (
+        #         order["start_time"] in index
+        #     ), f"order start time not in {self.marketconfig.market_products}"
+        """
+        This method clears the market and sends the results to the database agent.
 
-        self.market_result.sort(key=itemgetter("agent_id"))
-        for agent, accepted_orderbook in groupby(
-            self.market_result, itemgetter("agent_id")
-        ):
+        :param market_products: The products to be traded
+        :type market_products: list[MarketProduct]
+        """
+        (
+            accepted_orderbook,
+            rejected_orderbook,
+            market_meta,
+        ) = self.marketconfig.market_mechanism(self, market_products)
+
+        accepted_orderbook.sort(key=itemgetter("agent_id"))
+        rejected_orderbook.sort(key=itemgetter("agent_id"))
+        accepted_bids = {
+            agent: list(bids)
+            for agent, bids in groupby(accepted_orderbook, itemgetter("agent_id"))
+        }
+        rejected_bids = {
+            agent: list(bids)
+            for agent, bids in groupby(rejected_orderbook, itemgetter("agent_id"))
+        }
+        for agent in self.registered_agents:
             addr, aid = agent
             meta = {"sender_addr": self.context.addr, "sender_id": self.context.aid}
             closing: ClearingMessage = {
                 "context": "clearing",
                 "market_id": self.marketconfig.name,
-                "orderbook": list(accepted_orderbook),
+                "orderbook": accepted_bids.get(agent, []),
+                "rejected": rejected_bids.get(agent, []),
             }
             await self.context.send_acl_message(
                 closing,
@@ -239,25 +347,31 @@ class MarketRole(Role):
                 acl_metadata=meta,
             )
         # store order book in db agent
-        if not self.market_result:
+        if not accepted_orderbook:
             logger.warning(
                 f"{self.context.current_timestamp} Market result {market_products} for market {self.marketconfig.name} are empty!"
             )
-        await self.store_order_book(self.market_result)
+        await self.store_order_book(accepted_orderbook)
 
         for meta in market_meta:
             logger.debug(
-                f'clearing price for {self.marketconfig.name} is {round(meta["price"],2)}, volume: {meta["demand_volume"]}'
+                f'clearing price for {self.marketconfig.name} is {meta["price"]:.2f}, volume: {meta["demand_volume"]}'
             )
             meta["market_id"] = self.marketconfig.name
-            meta["time"] = self.context.current_timestamp
+            meta["time"] = meta["product_start"]
 
         await self.store_market_results(market_meta)
 
-        return self.market_result, market_meta
+        return accepted_orderbook, market_meta
 
     async def store_order_book(self, orderbook: Orderbook):
         # Send a message to the OutputRole to update data in the database
+        """
+        Sends a message to the OutputRole to update data in the database
+
+        :param orderbook: The order book to be stored
+        :type orderbook: Orderbook
+        """
         message = {
             "context": "write_results",
             "type": "store_order_book",
@@ -275,6 +389,12 @@ class MarketRole(Role):
 
     async def store_market_results(self, market_meta):
         # Send a message to the OutputRole to update data in the database
+        """
+        This method sends a message to the OutputRole to update data in the database
+
+        :param market_meta: The metadata of the market
+        :type market_meta: any
+        """
         message = {
             "context": "write_results",
             "type": "store_market_results",

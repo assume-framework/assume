@@ -9,6 +9,7 @@ from mango import RoleAgent, create_container
 from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 
+from assume.common.forecasts import NaiveForecast
 from assume.common.units_operator import UnitsOperator
 from assume.markets.base_market import MarketConfig, MarketProduct
 from assume.strategies.naive_strategies import NaiveStrategy
@@ -38,19 +39,16 @@ async def units_operator() -> UnitsOperator:
 
     units_role.context.data_dict = {}
 
-    await units_role.add_unit(
-        "testdemand",
-        Demand,
-        {
-            "bidding_strategies": {"energy": NaiveStrategy()},
-            "technology": "energy",
-            "unit_operator": "test_operator",
-            "max_power": 1000,
-            "min_power": 0,
-            "volume": 1000,
-        },
-        index,
-    )
+    params_dict = {
+        "bidding_strategies": {"energy": NaiveStrategy()},
+        "technology": "energy",
+        "unit_operator": "test_operator",
+        "max_power": 1000,
+        "min_power": 0,
+        "forecaster": NaiveForecast(index, demand=1000),
+    }
+    unit = Demand("testdemand", index=index, **params_dict)
+    await units_role.add_unit(unit)
 
     yield units_role
 
@@ -66,7 +64,9 @@ async def test_set_unit_dispatch(units_operator: UnitsOperator):
             "start_time": start,
             "end_time": start + rd(hours=1),
             "volume": 500,
+            "accepted_volume": 500,
             "price": 1000,
+            "accepted_price": 1000,
             "agent_id": "gen1",
             "unit_id": "testdemand",
             "only_hours": None,

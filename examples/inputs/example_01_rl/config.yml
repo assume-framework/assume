@@ -1,8 +1,25 @@
-example_01a:
+base:
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-30 00:00
+  end_date: 2019-01-10 00:00
   time_step: 1h
   save_frequency_hours: 24
+
+  learning_config:
+    observation_dimension: 50
+    action_dimension: 2
+    load_learned_strategies: False
+    max_bid_price: 100
+    learning_mode: True
+    algorithm: matd3
+    collect_inital_experience: 10
+    train_freq: 2
+    learning_rate: 0.01
+    gradient_steps: -1
+    batch_size: 256
+    gamma: 0.999
+    training_episodes: 10
+    device: cpu
+
   markets_config:
     EOM:
       operator: EOM_operator
