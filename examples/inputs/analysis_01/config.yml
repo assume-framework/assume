@@ -1,6 +1,6 @@
 dam_case_2019:
-  start_date: 2019-01-01 00:00
-  end_date: 2019-02-01 00:00
+  start_date: 2019-01-15 00:00
+  end_date: 2019-01-27 00:00
   time_step: 1h
   save_frequency_hours: 24
   markets_config:
@@ -10,7 +10,7 @@ dam_case_2019:
       products:
         - duration: 1h
           count: 24
-          first_delivery: 1h
+          first_delivery: 24h
       opening_frequency: 24h
       opening_duration: 24h
       volume_unit: MWh
@@ -21,8 +21,8 @@ dam_case_2019:
       market_mechanism: pay_as_clear
 
 dam_complex_clearing:
-  start_date: 2019-01-01 00:00
-  end_date: 2019-02-01 00:00
+  start_date: 2019-01-15 00:00
+  end_date: 2019-01-27 00:00
   time_step: 1h
   save_frequency_hours: 24
   markets_config:
@@ -32,7 +32,7 @@ dam_complex_clearing:
       products:
         - duration: 1h
           count: 24
-          first_delivery: 1h
+          first_delivery: 24h
       opening_frequency: 24h
       opening_duration: 24h
       volume_unit: MWh
@@ -40,8 +40,7 @@ dam_complex_clearing:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: pay_as_clear_complex_opt
+      market_mechanism: pay_as_clear_complex
       additional_fields:
         - bid_type
-        - accepted_price
-        - profile
+        - min_acceptance_ratio

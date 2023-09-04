@@ -1,0 +1,2 @@
+﻿name,technology,bidding_energy,bidding_capacity_pos,bidding_capacity_neg,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_volume,max_volume,variable_cost_charge,variable_cost_discharge,natural_inflow,unit_operator
+storage_1,PSPP,flexable_eom_storage,-,-,310,320,0.8,0.87,1,2087,0.28,0.28,0,storage_operator
