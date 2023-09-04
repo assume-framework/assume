@@ -71,6 +71,7 @@ class WriteOutput(Role):
         :param simulation_id: The ID of the simulation as a unique calssifier.
         :type simulation_id: str
         """
+
         # Loop throuph all database tables
         # Get list of table names in database
         table_names = inspect(self.db.bind).get_table_names()
@@ -85,6 +86,19 @@ class WriteOutput(Role):
                 # has to be done manually with raw queries
                 db.commit()
                 logger.debug("deleted %s rows from %s", rowcount, table_name)
+
+    def del_similar_runs(self):
+        query = text("select distinct simulation from market_meta")
+        simulations = self.db.execute(query).fetchall()
+        simulations = [s[0] for s in simulations]
+
+        # find all simulation_id which are similar to my simulation_id
+        similar_simulations = [
+            s for s in simulations if s.startswith(self.simulation_id[:-1])
+        ]
+
+        for simulation_id in similar_simulations:
+            self.delete_db_scenario(simulation_id)
 
     def setup(self):
         """

@@ -145,10 +145,9 @@ class TD3(RLAlgorithm):
                         all_states, all_actions_clone
                     ).mean()
 
-                    # TODO Optimize the actor
-                    # actor.optimizer.zero_grad()
+                    actor.optimizer.zero_grad()
                     actor_loss.backward()
-                    # actor.optimizer.step()
+                    actor.optimizer.step()
 
                     polyak_update(
                         critic.parameters(), critic_target.parameters(), self.tau

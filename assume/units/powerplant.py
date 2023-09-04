@@ -144,6 +144,9 @@ class PowerPlant(SupportsMinMax):
         """Reset the unit to its initial state."""
 
         self.outputs["energy"] = pd.Series(0.0, index=self.index)
+        self.outputs["energy"].iloc[0] = self.min_power + 0.5 * (
+            self.max_power - self.min_power
+        )
         # workaround if market schedules do not match
         # for example neg_reserve is required but market did not bid yet
         # it does set a usage in times where no power is used by the market

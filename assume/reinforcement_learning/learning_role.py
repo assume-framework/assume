@@ -10,7 +10,7 @@ from torch.optim import Adam
 from assume.common.base import LearningStrategy
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
-from assume.reinforcement_learning.learning_utils import CriticTD3
+from assume.reinforcement_learning.learning_utils import Actor, CriticTD3
 
 logger = logging.getLogger(__name__)
 
@@ -43,37 +43,23 @@ class Learning(Role):
 
         th.backends.cuda.matmul.allow_tf32 = True
 
-        if not self.learning_mode:
-            # no training means GPU not necessary as calculations are not that expensive
-            self.device = th.device("cpu")
+        cuda_device = f"cuda:{str(self.cuda_device)}"
+        self.device = th.device(cuda_device if th.cuda.is_available() else "cpu")
 
-            # check if we already trained a model that can be used
-            rl_models_path = f"/outputs/rl_models/{str(self.algorithm)}.py"
-            if not os.path.exists(rl_models_path):
-                self.logger.error(
-                    "Reinforcement Learning training is deactivated and no pretrained model were provided, activate learning or specify model to use in config"
-                )
-            # TODO implement loading models! check Nick
-
-        else:
-            cuda_device = f"cuda:{str(self.cuda_device)}"
-            self.device = th.device(cuda_device if th.cuda.is_available() else "cpu")
-
-            self.learning_rate = learning_config["learning_rate"]
-            self.learning_starts = learning_config["collect_inital_experience"]
-            self.train_freq = learning_config["train_freq"]
-            self.gradient_steps = learning_config["gradient_steps"]
-            self.batch_size = learning_config["batch_size"]
-            self.gamma = learning_config["gamma"]
-            self.training_episodes = learning_config["training_episodes"]
-            self.eval_episodes_done = 0
-            self.max_eval_reward = -1e9
-            self.max_eval_regret = 1e9
-            self.max_eval_profit = -1e9
+        self.learning_rate = learning_config["learning_rate"]
+        self.learning_starts = learning_config["collect_initial_experience"]
+        self.train_freq = learning_config["train_freq"]
+        self.gradient_steps = learning_config["gradient_steps"]
+        self.batch_size = learning_config["batch_size"]
+        self.gamma = learning_config["gamma"]
+        self.training_episodes = learning_config["training_episodes"]
+        self.eval_episodes_done = 0
+        self.max_eval_reward = -1e9
+        self.max_eval_regret = 1e9
+        self.max_eval_profit = -1e9
 
         self.float_type = th.float16 if self.cuda_device == "cuda" else th.float
 
-    def init_learning(self):
         # function that initializes learning, needs to be an extra function so that it can be called after buffer is given to Role
         self.create_learning_algorithm(self.rl_algorithm)
 
@@ -81,26 +67,6 @@ class Learning(Role):
         self.rl_eval_rewards = []
         self.rl_eval_profits = []
         self.rl_eval_regrets = []
-
-        n_agents = len(self.rl_units)
-        strategy: LearningStrategy
-        for u_id, strategy in self.rl_units.items():
-            self.critics[u_id] = CriticTD3(
-                n_agents, strategy.obs_dim, strategy.act_dim, self.float_type
-            )
-            self.target_critics[u_id] = CriticTD3(
-                n_agents, strategy.obs_dim, strategy.act_dim, self.float_type
-            )
-
-            self.critics[u_id].optimizer = Adam(
-                self.critics[u_id].parameters(), lr=self.learning_rate
-            )
-
-            self.target_critics[u_id].load_state_dict(self.critics[u_id].state_dict())
-            self.target_critics[u_id].train(mode=False)
-
-            self.critics[u_id] = self.critics[u_id].to(self.device)
-            self.target_critics[u_id] = self.target_critics[u_id].to(self.device)
 
     def setup(self):
         # subscribe to messages for handling the training process
@@ -158,7 +124,7 @@ class Learning(Role):
             )
 
     async def update_policy(self):
-        if self.episodes_done >= self.learning_starts:
+        if self.episodes_done > self.learning_starts:
             self.rl_algorithm.update_policy()
 
     # in assume self
@@ -194,23 +160,31 @@ class Learning(Role):
                     f"Policies saved, episode: {self.eval_episodes_done + 1}, mode: {mode}, value: {value:.2f}"
                 )
 
-    def set_buffer(self, buffer: ReplayBuffer):
-        self.buffer = buffer
-        self.init_learning()
-
-    def save_params(self, dir_name: str = "best_policy"):
+    def save_params(self, directory):
         def save_obj(obj, directory, agent):
-            path = f"{directory}critic_{str(agent)}"
+            path = f"{directory}/critic_{str(agent)}"
             th.save(obj, path)
 
-        directory = f"output/{simulation_id}/{dir_name}/"
         os.makedirs(directory, exist_ok=True)
-
         for u_id in self.rl_units.keys():
             obj = {
                 "critic": self.critics[u_id].state_dict(),
                 "critic_target": self.target_critics[u_id].state_dict(),
                 "critic_optimizer": self.critics[u_id].optimizer.state_dict(),
+            }
+            save_obj(obj, directory, u_id)
+
+    def save_actor_params(self, directory):
+        def save_obj(obj, directory, agent):
+            path = f"{directory}/actor_{str(agent)}"
+            th.save(obj, path)
+
+        os.makedirs(directory, exist_ok=True)
+        for u_id in self.rl_units.keys():
+            obj = {
+                "actor": self.rl_units[u_id].actor.state_dict(),
+                "actor_target": self.rl_units[u_id].actor_target.state_dict(),
+                "actor_optimizer": self.rl_units[u_id].actor.optimizer.state_dict(),
             }
             save_obj(obj, directory, u_id)
 
@@ -244,3 +218,68 @@ class Learning(Role):
                 self.world.logger.info(
                     "No critic values loaded for agent {}".format(u_id)
                 )
+
+    def store_actors_and_critics(self):
+        actors = {}
+        actor_targets = {}
+
+        for u_id, unit_strategy in self.rl_units.items():
+            actors[u_id] = unit_strategy.actor
+            actor_targets[u_id] = unit_strategy.actor_target
+
+        stored_values = {
+            "actors": actors,
+            "actor_targets": actor_targets,
+            "critics": self.critics,
+            "target_critics": self.target_critics,
+        }
+
+        return stored_values
+
+    def load_actors_and_critics(self, stored_values):
+        if stored_values is None:
+            n_agents = len(self.rl_units)
+            strategy: LearningStrategy
+
+            for u_id, unit_strategy in self.rl_units.items():
+                unit_strategy.actor = Actor(
+                    self.obs_dim, self.act_dim, self.float_type
+                ).to(self.device)
+                unit_strategy.actor_target = Actor(
+                    self.obs_dim, self.act_dim, self.float_type
+                ).to(self.device)
+                unit_strategy.actor_target.load_state_dict(
+                    unit_strategy.actor.state_dict()
+                )
+                unit_strategy.actor_target.train(mode=False)
+
+                unit_strategy.actor.optimizer = Adam(
+                    unit_strategy.actor.parameters(), lr=self.learning_rate
+                )
+
+            for u_id, strategy in self.rl_units.items():
+                self.critics[u_id] = CriticTD3(
+                    n_agents, strategy.obs_dim, strategy.act_dim, self.float_type
+                )
+                self.target_critics[u_id] = CriticTD3(
+                    n_agents, strategy.obs_dim, strategy.act_dim, self.float_type
+                )
+
+                self.critics[u_id].optimizer = Adam(
+                    self.critics[u_id].parameters(), lr=self.learning_rate
+                )
+
+                self.target_critics[u_id].load_state_dict(
+                    self.critics[u_id].state_dict()
+                )
+                self.target_critics[u_id].train(mode=False)
+
+                self.critics[u_id] = self.critics[u_id].to(self.device)
+                self.target_critics[u_id] = self.target_critics[u_id].to(self.device)
+
+        else:
+            self.critics = stored_values["critics"]
+            self.target_critics = stored_values["target_critics"]
+            for u_id, unit_strategy in self.rl_units.items():
+                unit_strategy.actor = stored_values["actors"][u_id]
+                unit_strategy.actor_target = stored_values["actor_targets"][u_id]

@@ -31,7 +31,7 @@ class RLStrategy(LearningStrategy):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+        self.unit_id = kwargs["unit_id"]
         self.foresight = kwargs.get("foresight", 24)
 
         # RL agent parameters
@@ -47,20 +47,11 @@ class RLStrategy(LearningStrategy):
 
         self.learning_mode = kwargs.get("learning_mode", False)
 
-        self.actor = Actor(self.obs_dim, self.act_dim, self.float_type).to(self.device)
-
         if self.learning_mode:
             self.learning_role = None
             self.collect_initial_experience = kwargs.get(
                 "collect_initial_experience", True
             )
-
-            self.actor_target = Actor(self.obs_dim, self.act_dim, self.float_type).to(
-                self.device
-            )
-            self.actor_target.load_state_dict(self.actor.state_dict())
-            # Target networks should always be in eval mode
-            self.actor_target.train(mode=False)
 
             self.action_noise = NormalActionNoise(
                 mu=0.0,
@@ -71,10 +62,7 @@ class RLStrategy(LearningStrategy):
             )
 
         else:
-            self.actor_target = None
-
-        if kwargs.get("load_learned_strategies", False):
-            self.load_params(kwargs["load_learned_path"])
+            self.load_actor_params(load_path=kwargs["load_learned_path"])
 
         self.reset()
 
@@ -242,15 +230,14 @@ class RLStrategy(LearningStrategy):
                 / self.max_demand
             )
 
-        if end_excl + forecast_len > unit.forecaster["price_forecast"].index[-1]:
+        if end_excl + forecast_len > unit.forecaster["price_EOM"].index[-1]:
             scaled_price_forecast = (
-                unit.forecaster["price_forecast"].loc[start:].values
-                / self.max_bid_price
+                unit.forecaster["price_EOM"].loc[start:].values / self.max_bid_price
             )
             scaled_price_forecast = np.concatenate(
                 [
                     scaled_price_forecast,
-                    unit.forecaster["price_forecast"].iloc[
+                    unit.forecaster["price_EOM"].iloc[
                         : self.foresight - len(scaled_price_forecast)
                     ],
                 ]
@@ -258,9 +245,7 @@ class RLStrategy(LearningStrategy):
 
         else:
             scaled_price_forecast = (
-                unit.forecaster["price_forecast"]
-                .loc[start : end_excl + forecast_len]
-                .values
+                unit.forecaster["price_EOM"].loc[start : end_excl + forecast_len].values
                 / self.max_bid_price
             )
 
@@ -374,3 +359,22 @@ class RLStrategy(LearningStrategy):
         actions = transitions.actions
         next_states = transitions.next_observations
         rewards = transitions.rewards
+
+    def load_actor_params(self, load_path):
+        """
+        Load actor parameters
+
+        :param simulation_id: Simulation ID
+        :type simulation_id: str
+        """
+        directory = f"{load_path}/actors/actor_{self.unit_id}"
+        params = th.load(directory)
+
+        self.actor = Actor(self.obs_dim, self.act_dim, self.float_type)
+        self.actor.load_state_dict(params["actor"])
+
+        if self.learning_mode:
+            self.actor_target = Actor(self.obs_dim, self.act_dim, self.float_type)
+            self.actor_target.load_state_dict(params["actor_target"])
+            self.actor_target.eval()
+            self.actor.optimizer.load_state_dict(params["actor_optimizer"])

@@ -11,13 +11,13 @@ base:
     max_bid_price: 100
     learning_mode: True
     algorithm: matd3
-    collect_inital_experience: 4
-    train_freq: 2
+    training_episodes: 50
+    collect_initial_experience: 5
+    train_freq: 24
     learning_rate: 0.01
-    gradient_steps: -1
-    batch_size: 256
+    gradient_steps: 100
+    batch_size: 128
     gamma: 0.999
-    training_episodes: 30
     device: cpu
 
   markets_config:

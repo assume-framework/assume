@@ -304,13 +304,13 @@ async def load_scenario_folder_async(
     learning_config = config.get("learning_config", {})
     bidding_strategy_params = config.get("bidding_strategy_params", {})
 
+    if disable_learning:
+        learning_config["learning_mode"] = False
+
     if "load_learned_path" not in learning_config.keys():
         learning_config[
             "load_learned_path"
         ] = f"{inputs_path}/learned_strategies/{sim_id}/"
-
-    if disable_learning:
-        learning_config = {}
 
     await world.setup(
         start=start,
@@ -475,6 +475,7 @@ def load_scenario_folder(
     inputs_path: str,
     scenario: str,
     study_case: str,
+    disable_learning: bool = True,
 ):
     """
     Load a scenario from a given path.
@@ -490,58 +491,66 @@ def load_scenario_folder(
     """
     world.loop.run_until_complete(
         load_scenario_folder_async(
-            world,
-            inputs_path,
-            scenario,
-            study_case,
+            world=world,
+            inputs_path=inputs_path,
+            scenario=scenario,
+            study_case=study_case,
+            disable_learning=disable_learning,
         )
     )
-    # check if learning mode
-    if world.learning_config.get("learning_mode"):
-        # initiate buffer for rl agent
-        from assume.reinforcement_learning.buffer import ReplayBuffer
 
-        buffer = ReplayBuffer(
-            buffer_size=int(5e5),
-            obs_dim=world.learning_role.obs_dim,
-            act_dim=world.learning_role.act_dim,
-            n_rl_units=len(world.learning_role.rl_units),
-            device=world.learning_role.device,
-        )
 
-        for episode in tqdm(
-            range(world.learning_role.training_episodes),
-            desc="Training Episodes",
-        ):
-            # give the newly created rl_agent the buffer that we stored from the beginning
-            world.learning_role.set_buffer(buffer)
+def run_learning(world: World, inputs_path: str, scenario: str, study_case: str):
+    # initiate buffer for rl agent
+    from assume.reinforcement_learning.buffer import ReplayBuffer
 
-            world.run()
-            world.reset()
+    buffer = ReplayBuffer(
+        buffer_size=int(5e5),
+        obs_dim=world.learning_role.obs_dim,
+        act_dim=world.learning_role.act_dim,
+        n_rl_units=len(world.learning_role.rl_units),
+        device=world.learning_role.device,
+    )
+    actor_critic_values = None
+    world.output_role.del_similar_runs()
 
-            world.learning_role.episodes_done = episode + 1
+    for episode in tqdm(
+        range(world.learning_role.training_episodes),
+        desc="Training Episodes",
+    ):
+        # give the newly created rl_agent the buffer that we stored from the beginning
+        world.learning_role.load_actors_and_critics(stored_values=actor_critic_values)
+        world.learning_role.buffer = buffer
+        world.learning_role.episodes_done = episode
 
-            disable_learning = episode == world.learning_role.training_episodes - 1
+        world.run()
+        actor_critic_values = world.learning_role.store_actors_and_critics()
 
-            # in load_scenario_folder_async, we initiate new container and kill old if present
-            # as long as we do not skip setup container should be handled correctly
-            world.loop.run_until_complete(
-                load_scenario_folder_async(
-                    world,
-                    inputs_path,
-                    scenario,
-                    study_case,
-                    episode=world.learning_role.episodes_done,
-                    disable_learning=disable_learning,
-                )
+        world.reset()
+
+        # in load_scenario_folder_async, we initiate new container and kill old if present
+        # as long as we do not skip setup container should be handled correctly
+        # if enough inital experience was collected according to specififcations in learning config
+        # turn off initial exploration and go into full learning mode
+        if episode + 1 == world.learning_role.learning_starts:
+            world.learning_role.turn_off_initial_exploration()
+
+        world.loop.run_until_complete(
+            load_scenario_folder_async(
+                world,
+                inputs_path,
+                scenario,
+                study_case,
+                episode=world.learning_role.episodes_done,
+                disable_learning=False,
             )
+        )
+        # container shutdown implicitly with new initialisation
 
-            # if enough inital experience was collected according to specififcations in learning config
-            # turn off initial exploration and go into full learning mode
-            if episode + 1 == world.learning_role.learning_starts:
-                world.learning_role.turn_off_initial_exploration()
+    world.learning_role.load_actors_and_critics(stored_values=actor_critic_values)
+    world.learning_role.save_actor_params(
+        directory=f"{inputs_path}/learned_strategies/{scenario}_{study_case}/actors"
+    )
 
-            # container shutdown implicitly with new initialisation
-
-        logger.info("################")
-        logger.info(f"Training finished, Start evaluation run")
+    logger.info("################")
+    logger.info("Training finished, Start evaluation run")
