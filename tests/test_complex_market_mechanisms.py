@@ -111,7 +111,7 @@ def test_complex_clearing_BB():
     accepted_orders, rejected_orders, meta = market_config.market_mechanism(
         mr, products
     )
-
+    # accept only cheapes simple bids
     assert meta[0]["price"] == 50
     assert rejected_orders[1]["agent_id"] == "block_gen7"
     assert rejected_orders[1]["accepted_volume"] == {
@@ -127,7 +127,7 @@ def test_complex_clearing_BB():
     accepted_orders, rejected_orders, meta = market_config.market_mechanism(
         mr, products
     )
-
+    # accept block order and part of cheaper simple order
     assert meta[0]["price"] == 50
     assert accepted_orders[2]["agent_id"] == "block_gen7"
     assert accepted_orders[2]["accepted_volume"][products[0][0]] == 100
@@ -179,9 +179,9 @@ def test_complex_clearing_BB():
     assert meta[1]["price"] == 50
     # block bid should be accepted, because surplus for block is 90-90=0
     # and general surplus through introduction of block > 0
-    assert accepted_orders[2]["agent_id"] == "block_gen7"
-    assert accepted_orders[2]["accepted_volume"][products[0][0]] == 100
-    assert accepted_orders[2]["accepted_price"][products[0][0]] == 40
+    assert rejected_orders[1]["agent_id"] == "block_gen7"
+    assert rejected_orders[1]["accepted_volume"][products[0][0]] == 0
+    assert rejected_orders[1]["accepted_price"][products[0][0]] == 40
     assert mr.all_orders == []
 
     # introducing profile block order by increasing the volume for the hour with a higher mcp

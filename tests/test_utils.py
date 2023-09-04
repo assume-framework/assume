@@ -12,6 +12,7 @@ from assume.common.utils import (
     get_available_products,
     initializer,
     plot_orderbook,
+    separate_block_orders,
     visualize_orderbook,
 )
 
@@ -106,6 +107,7 @@ def test_aggregate_step_amount():
             "price": 120,
             "agent_id": "gen1",
             "only_hours": None,
+            "accepted_volume": 0,
         },
         {
             "start_time": start,
@@ -114,6 +116,7 @@ def test_aggregate_step_amount():
             "price": 58,
             "agent_id": "gen1",
             "only_hours": None,
+            "accepted_volume": 0,
         },
         {
             "start_time": start,
@@ -122,6 +125,7 @@ def test_aggregate_step_amount():
             "price": 53,
             "agent_id": "gen1",
             "only_hours": None,
+            "accepted_volume": 0,
         },
         {
             "start_time": start,
@@ -130,6 +134,7 @@ def test_aggregate_step_amount():
             "price": 70,
             "agent_id": "dem1",
             "only_hours": None,
+            "accepted_volume": 0,
         },
     ]
 
@@ -146,6 +151,41 @@ def test_initializer():
     t = Test("teststr")
     assert t.test == "teststr"
     assert t.test2 == "test2str"
+
+
+def test_sep_block_orders():
+    start = datetime(2020, 1, 1)
+    end = datetime(2020, 1, 2)
+    index = pd.date_range(start, end - pd.Timedelta("1H"), freq="1H")
+    orderbook = [
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": {i: 50 for i in index},
+            "price": 120,
+            "agent_id": "block1",
+            "only_hours": None,
+            "accepted_volume": {i: 0 for i in index},
+            "accepted_price": {i: None for i in index},
+            "bid_type": "BB",
+            "bid_id": "block1_1",
+        },
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": 80,
+            "price": 58,
+            "agent_id": "gen1",
+            "only_hours": None,
+            "accepted_volume": 0,
+            "accepted_price": None,
+            "bid_type": "SB",
+            "bid_id": "gen1_1",
+        },
+    ]
+    assert len(orderbook) == 2
+    orderbook = separate_block_orders(orderbook)
+    assert len(orderbook) == 25
 
 
 @patch("matplotlib.pyplot.show")

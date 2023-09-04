@@ -85,11 +85,15 @@ class flexableEOM(BaseStrategy):
             # =============================================================================
             if unit.get_operation_time(start) > 0:
                 bid_price_inflex = calculate_EOM_price_if_on(
-                    unit, start, marginal_cost_inflex, bid_quantity_inflex
+                    unit,
+                    start,
+                    marginal_cost_inflex,
+                    bid_quantity_inflex,
+                    self.foresight,
                 )
             else:
                 bid_price_inflex = calculate_EOM_price_if_off(
-                    unit, marginal_cost_flex, bid_quantity_inflex, start
+                    unit, start, marginal_cost_flex, bid_quantity_inflex
                 )
 
             if unit.outputs["heat"][start] > 0:
@@ -212,11 +216,15 @@ class flexableEOMBlock(BaseStrategy):
             # =============================================================================
             if unit.get_operation_time(start) > 0:
                 bid_price_inflex = calculate_EOM_price_if_on(
-                    unit, start, marginal_cost_inflex, bid_quantity_inflex
+                    unit,
+                    start,
+                    marginal_cost_inflex,
+                    bid_quantity_inflex,
+                    self.foresight,
                 )
             else:
                 bid_price_inflex = calculate_EOM_price_if_off(
-                    unit, marginal_cost_flex, bid_quantity_inflex, start
+                    unit, start, marginal_cost_flex, bid_quantity_inflex
                 )
 
             if unit.outputs["heat"][start] > 0:
@@ -465,11 +473,10 @@ class flexableNegCRM(BaseStrategy):
 
 
 def calculate_EOM_price_if_off(
-    self,
     unit: SupportsMinMax,
+    start,
     marginal_cost_inflex,
     bid_quantity_inflex,
-    start: datetime,
 ):
     """
     The powerplant is currently off and calculates a startup markup as an extra
@@ -503,7 +510,11 @@ def calculate_EOM_price_if_off(
 
 
 def calculate_EOM_price_if_on(
-    self, unit: SupportsMinMax, start, marginal_cost_inflex, bid_quantity_inflex
+    unit: SupportsMinMax,
+    start,
+    marginal_cost_inflex,
+    bid_quantity_inflex,
+    foresight,
 ):
     """
     Check the description provided by Thomas in last version, the average downtime is not available
@@ -542,7 +553,7 @@ def calculate_EOM_price_if_on(
         unit=unit,
         marginal_cost=marginal_cost_inflex,
         t=start,
-        foresight=self.foresight,
+        foresight=foresight,
     )
     if (
         possible_revenue >= 0
@@ -558,7 +569,7 @@ def calculate_EOM_price_if_on(
     return bid_price_inflex
 
 
-def get_starting_costs(self, time, unit):
+def get_starting_costs(time, unit):
     """
     Calculates the starting costs of a unit
 
