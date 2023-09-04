@@ -508,7 +508,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
         buffer_size=int(5e5),
         obs_dim=world.learning_role.obs_dim,
         act_dim=world.learning_role.act_dim,
-        n_rl_units=len(world.learning_role.rl_units),
+        n_rl_units=len(world.learning_role.rl_strats),
         device=world.learning_role.device,
     )
     actor_critic_values = None
@@ -533,7 +533,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
 
         # in load_scenario_folder_async, we initiate new container and kill old if present
         # as long as we do not skip setup container should be handled correctly
-        # if enough initial experience was collected according to specififcations in learning config
+        # if enough initial experience was collected according to specifications in learning config
         # turn off initial exploration and go into full learning mode
 
         world.loop.run_until_complete(

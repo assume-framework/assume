@@ -162,7 +162,11 @@ class WriteOutput(Role):
             return
         df["simulation"] = self.simulation_id
         # get characters after last "_" of simulation id string
-        df["episode"] = self.simulation_id.split("_")[-1]
+        episode = self.simulation_id.split("_")[-1]
+        if epsiode.isdigit():
+            df["episode"] = int(episode)
+        else:
+            df["episode"] = None
         self.write_dfs["rl_params"].append(df)
 
     def write_market_results(self, market_meta):

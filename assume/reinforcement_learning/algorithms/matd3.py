@@ -53,17 +53,17 @@ class TD3(RLAlgorithm):
 
     def update_policy(self):
         logger.info(f"Updating Policy")
-        n_rl_agents = len(self.learning_role.rl_units)
+        n_rl_agents = len(self.learning_role.rl_strats.keys())
         for _ in range(self.gradient_steps):
             self.n_updates += 1
             i = 0
             strategy: LearningStrategy
 
-            for u_id, strategy in self.learning_role.rl_units.items():
+            for u_id, strategy in self.learning_role.rl_strats.items():
                 critic_target = self.learning_role.target_critics[u_id]
                 critic = self.learning_role.critics[u_id]
-                actor = self.learning_role.rl_units[u_id].actor
-                actor_target = self.learning_role.rl_units[u_id].actor_target
+                actor = self.learning_role.rl_strats[u_id].actor
+                actor_target = self.learning_role.rl_strats[u_id].actor_target
 
                 if i % 100 == 0:
                     transitions = self.learning_role.buffer.sample(self.batch_size)
@@ -84,9 +84,7 @@ class TD3(RLAlgorithm):
                             (actor_target(next_states[:, i, :]) + noise[:, i, :]).clamp(
                                 -1, 1
                             )
-                            for i, agent in enumerate(
-                                self.learning_role.rl_units.values()
-                            )
+                            for i in range(n_rl_agents)
                         ]
                         next_actions = th.stack(next_actions)
 

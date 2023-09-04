@@ -244,7 +244,7 @@ class World:
                 # TODO find better way to count learning agents
                 if self.learning_mode:
                     if issubclass(self.bidding_types[strategy], LearningStrategy):
-                        self.learning_role.rl_units[id] = bidding_strategies[
+                        self.learning_role.rl_strats[id] = bidding_strategies[
                             product_type
                         ]
 

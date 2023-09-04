@@ -30,7 +30,7 @@ class Learning(Role):
         self.obs_dim = learning_config["observation_dimension"]
         self.act_dim = learning_config["action_dimension"]
         self.episodes_done = 0
-        self.rl_units: dict[int, LearningStrategy] = {}
+        self.rl_strats: dict[int, LearningStrategy] = {}
         self.rl_algorithm = learning_config["algorithm"]
         self.critics = {}
         self.target_critics = {}
@@ -105,7 +105,7 @@ class Learning(Role):
             )
 
     def turn_off_initial_exploration(self):
-        for unit_id, unit in self.rl_units.items():
+        for unit_id, unit in self.rl_strats.items():
             unit.collect_initial_experience = False
 
     def create_learning_algorithm(self, algorithm):
@@ -167,7 +167,7 @@ class Learning(Role):
             th.save(obj, path)
 
         os.makedirs(directory, exist_ok=True)
-        for u_id in self.rl_units.keys():
+        for u_id in self.rl_strats.keys():
             obj = {
                 "critic": self.critics[u_id].state_dict(),
                 "critic_target": self.target_critics[u_id].state_dict(),
@@ -181,11 +181,11 @@ class Learning(Role):
             th.save(obj, path)
 
         os.makedirs(directory, exist_ok=True)
-        for u_id in self.rl_units.keys():
+        for u_id in self.rl_strats.keys():
             obj = {
-                "actor": self.rl_units[u_id].actor.state_dict(),
-                "actor_target": self.rl_units[u_id].actor_target.state_dict(),
-                "actor_optimizer": self.rl_units[u_id].actor.optimizer.state_dict(),
+                "actor": self.rl_strats[u_id].actor.state_dict(),
+                "actor_target": self.rl_strats[u_id].actor_target.state_dict(),
+                "actor_optimizer": self.rl_strats[u_id].actor.optimizer.state_dict(),
             }
             save_obj(obj, directory, u_id)
 
@@ -209,7 +209,7 @@ class Learning(Role):
                 "Specified directory for loading the critics does not exist!"
             )
 
-        for u_id in self.rl_units.keys():
+        for u_id in self.rl_strats.keys():
             try:
                 params = load_obj(directory, agent.name)
                 self.critics[u_id].load_state_dict(params["critic"])
@@ -224,7 +224,7 @@ class Learning(Role):
         actors = {}
         actor_targets = {}
 
-        for u_id, unit_strategy in self.rl_units.items():
+        for u_id, unit_strategy in self.rl_strats.items():
             actors[u_id] = unit_strategy.actor
             actor_targets[u_id] = unit_strategy.actor_target
 
@@ -239,10 +239,10 @@ class Learning(Role):
 
     def load_actors_and_critics(self, stored_values):
         if stored_values is None:
-            n_agents = len(self.rl_units)
+            n_rl_agents = len(self.rl_strats)
             strategy: LearningStrategy
 
-            for u_id, unit_strategy in self.rl_units.items():
+            for u_id, unit_strategy in self.rl_strats.items():
                 unit_strategy.actor = Actor(
                     self.obs_dim, self.act_dim, self.float_type
                 ).to(self.device)
@@ -258,12 +258,12 @@ class Learning(Role):
                     unit_strategy.actor.parameters(), lr=self.learning_rate
                 )
 
-            for u_id, strategy in self.rl_units.items():
+            for u_id, strategy in self.rl_strats.items():
                 self.critics[u_id] = CriticTD3(
-                    n_agents, strategy.obs_dim, strategy.act_dim, self.float_type
+                    n_rl_agents, strategy.obs_dim, strategy.act_dim, self.float_type
                 )
                 self.target_critics[u_id] = CriticTD3(
-                    n_agents, strategy.obs_dim, strategy.act_dim, self.float_type
+                    n_rl_agents, strategy.obs_dim, strategy.act_dim, self.float_type
                 )
 
                 self.critics[u_id].optimizer = Adam(
@@ -281,6 +281,6 @@ class Learning(Role):
         else:
             self.critics = stored_values["critics"]
             self.target_critics = stored_values["target_critics"]
-            for u_id, unit_strategy in self.rl_units.items():
+            for u_id, unit_strategy in self.rl_strats.items():
                 unit_strategy.actor = stored_values["actors"][u_id]
                 unit_strategy.actor_target = stored_values["actor_targets"][u_id]
