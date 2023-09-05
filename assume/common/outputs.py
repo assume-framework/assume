@@ -92,7 +92,8 @@ class WriteOutput(Role):
         query = text("select distinct simulation from market_meta")
 
         try:
-            simulations = self.db.execute(query).fetchall()
+            with self.db() as db:
+                simulations = db.execute(query).fetchall()
         except Exception:
             simulations = []
         simulations = [s[0] for s in simulations]
