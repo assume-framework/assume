@@ -373,24 +373,29 @@ class UnitsOperator(Role):
         return orderbook
 
     def write_learning_to_output(self, start: datetime, marketconfig: MarketConfig):
-        output_agent_df = []
+        output_agent_list = []
         for unit_id, unit in self.units.items():
             # rl only for energy market for now!
             if isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
                 LearningStrategy,
             ):
-                output_data = pd.DataFrame(
-                    {
+                
+                output_dict = {
+                        "datetime": start,
                         "profit": unit.outputs["profit"].loc[start],
                         "reward": unit.outputs["reward"].loc[start],
                         "regret": unit.outputs["regret"].loc[start],
-                    },
-                    index=[start],
-                )
-                output_data["unit"] = unit_id
-                output_agent_df.append(output_data)
-        learning_output = pd.concat(output_agent_df)
+                        "unit": unit_id
+                }
+                noise_tuple = unit.outputs["rl_exploration_noise"].loc[start]
+                action_tuple = unit.outputs["rl_actions"].loc[start]
+                action_dim = len(action_tuple)
+                for i in range(action_dim):
+                    output_dict[f"exploration_noise_{i}"] = noise_tuple[i]
+                    output_dict[f"actions_{i}"] = action_tuple[i]
+
+                output_agent_list.append(output_dict)
         db_aid = self.context.data_dict.get("output_agent_id")
         db_addr = self.context.data_dict.get("output_agent_addr")
         if db_aid and db_addr:
@@ -400,7 +405,7 @@ class UnitsOperator(Role):
                 content={
                     "context": "write_results",
                     "type": "rl_learning_params",
-                    "data": learning_output[["profit", "reward", "regret", "unit"]],
+                    "data": output_agent_list
                 },
             )
 

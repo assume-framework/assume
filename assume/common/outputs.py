@@ -160,7 +160,7 @@ class WriteOutput(Role):
         :type rl_params: any
         """
 
-        df = pd.DataFrame.from_records(rl_params)
+        df = pd.DataFrame.from_records(rl_params, index="datetime")
         if df.empty:
             return
         df["simulation"] = self.simulation_id

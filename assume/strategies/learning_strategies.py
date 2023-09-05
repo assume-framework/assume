@@ -111,8 +111,9 @@ class RLStrategy(LearningStrategy):
             end=end,
         )
 
-        actions = self.get_actions(next_observation)
+        actions, noise = self.get_actions(next_observation)
         unit.outputs["rl_actions"][start] = actions
+        unit.outputs["rl_exploration_noise"][start] = noise
 
         bid_prices = actions * self.max_bid_price
 
@@ -167,19 +168,21 @@ class RLStrategy(LearningStrategy):
                     .squeeze()
                 )
 
+                noise = curr_action
                 curr_action += next_observation[-1].clone().detach()
 
             else:
                 curr_action = self.actor(next_observation).detach()
-                curr_action += th.tensor(
+                noise = th.tensor(
                     self.action_noise.noise(), device=self.device, dtype=self.float_type
                 )
+                curr_action += noise
         else:
             curr_action = self.actor(next_observation).detach()
 
         curr_action = curr_action.clamp(-1, 1)
 
-        return curr_action
+        return curr_action, noise 
 
     def create_observation(
         self,
@@ -346,9 +349,9 @@ class RLStrategy(LearningStrategy):
             profit = profit - unit.hot_start_cost / 2
 
         reward = float(profit - regret_scale * opportunity_cost) * scaling
-        unit.outputs["rl_rewards"][start] = reward
         unit.outputs["profit"].loc[start:end_excl] += float(profit)
-        unit.outputs["reward"].loc[start:end_excl] += reward
+        # if multi market rl is used, the reward should be added up for all market results
+        unit.outputs["reward"].loc[start:end_excl] = reward
         unit.outputs["regret"].loc[start:end_excl] = float(opportunity_cost)
 
     def load_actor_params(self, load_path):
