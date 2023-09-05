@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 4,
+  "id": 2,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -715,8 +715,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -845,8 +844,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1176,8 +1174,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1387,8 +1384,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1647,8 +1643,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1929,8 +1924,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -2108,9 +2102,9 @@
     "list": [
       {
         "current": {
-          "selected": true,
-          "text": "crm_case_2019",
-          "value": "crm_case_2019"
+          "selected": false,
+          "text": "example_01_rl_base_0",
+          "value": "example_01_rl_base_0"
         },
         "datasource": {
           "type": "postgres",
@@ -2133,8 +2127,8 @@
       {
         "current": {
           "selected": false,
-          "text": "CRM_pos",
-          "value": "CRM_pos"
+          "text": "EOM",
+          "value": "EOM"
         },
         "datasource": {
           "type": "postgres",
@@ -2156,15 +2150,9 @@
       },
       {
         "current": {
-          "selected": true,
-          "text": [
-            "KKW ISAR 2",
-            "NEURATH F"
-          ],
-          "value": [
-            "KKW ISAR 2",
-            "NEURATH F"
-          ]
+          "selected": false,
+          "text": "Unit 1",
+          "value": "Unit 1"
         },
         "datasource": {
           "type": "postgres",
@@ -2188,8 +2176,8 @@
       {
         "current": {
           "selected": false,
-          "text": "demand_CRM_neg",
-          "value": "demand_CRM_neg"
+          "text": "demand_EOM",
+          "value": "demand_EOM"
         },
         "datasource": {
           "type": "postgres",
@@ -2212,9 +2200,10 @@
       },
       {
         "current": {
+          "isNone": true,
           "selected": false,
-          "text": "Bleiloch",
-          "value": "Bleiloch"
+          "text": "None",
+          "value": ""
         },
         "datasource": {
           "type": "postgres",
@@ -2245,6 +2234,6 @@
   "timezone": "",
   "title": "ASSUME",
   "uid": "mQ3Lvkr4k",
-  "version": 7,
+  "version": 1,
   "weekStart": ""
 }
