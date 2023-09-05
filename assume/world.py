@@ -150,7 +150,9 @@ class World:
         self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to world
         self.output_role = WriteOutput(
-            simulation_id=f"{simulation_id}_{episode}",
+            simulation_id=f"{simulation_id}_{episode}"
+            if self.learning_mode
+            else simulation_id,
             start=start,
             end=end,
             db_engine=self.db,

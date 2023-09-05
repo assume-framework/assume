@@ -163,10 +163,6 @@ class WriteOutput(Role):
         df["simulation"] = self.simulation_id
         # get characters after last "_" of simulation id string
         df["episode"] = self.simulation_id.split("_")[-1]
-        df["internal_time+episode"] = rl_params.index[0] + pd.Timedelta(
-            int(self.simulation_id.split("_")[-1]) * (self.end - self.start).days * 24,
-            "h",
-        )
         self.write_dfs["rl_params"].append(df)
 
     def write_market_results(self, market_meta):
