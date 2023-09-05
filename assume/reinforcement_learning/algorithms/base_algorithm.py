@@ -1,7 +1,4 @@
 import logging
-import os
-
-import torch as th
 
 logger = logging.getLogger(__name__)
 

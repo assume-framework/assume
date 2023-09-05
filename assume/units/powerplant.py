@@ -1,11 +1,10 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from functools import lru_cache
 
 import pandas as pd
 
 from assume.common.base import SupportsMinMax
-from assume.common.market_objects import Orderbook
 
 logger = logging.getLogger(__name__)
 
