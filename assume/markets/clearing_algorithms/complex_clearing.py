@@ -1,5 +1,4 @@
 import logging
-import math
 from itertools import groupby
 from operator import itemgetter
 
@@ -194,15 +193,12 @@ def pay_as_clear_complex(
         for order in orders:
             if order["bid_type"] == "SB":
                 # order rejected
-                if math.isclose(
-                    pyo.value(instance.xs[order["bid_id"]]), 0, abs_tol=EPS
-                ):
+                if pyo.value(instance.xs[order["bid_id"]]) < EPS:
                     order_profit = 0
                 # marginal bid
-                elif math.isclose(
-                    market_clearing_prices[order["start_time"]] - order["price"],
-                    0,
-                    abs_tol=EPS,
+                elif (
+                    abs(market_clearing_prices[order["start_time"]] - order["price"])
+                    < EPS
                 ):
                     order_profit = 0
                 else:
@@ -214,9 +210,7 @@ def pay_as_clear_complex(
 
             elif order["bid_type"] == "BB":
                 # order rejected
-                if math.isclose(
-                    pyo.value(instance.xb[order["bid_id"]]), 0, abs_tol=EPS
-                ):
+                if pyo.value(instance.xb[order["bid_id"]]) < EPS:
                     order_profit = 0
                 else:
                     bid_volume = sum(order["volume"].values())
@@ -229,7 +223,7 @@ def pay_as_clear_complex(
                     ) * pyo.value(instance.xb[order["bid_id"]])
 
             # correct rounding
-            if order_profit != 0 and math.isclose(order_profit, 0, abs_tol=EPS):
+            if order_profit != 0 and abs(order_profit) < EPS:
                 order_profit = 0
 
             orders_profit.append(order_profit)
