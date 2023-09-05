@@ -1,5 +1,3 @@
-import os
-import pickle
 import warnings
 from typing import NamedTuple
 
@@ -38,10 +36,6 @@ class ReplayBuffer:
         self.observations = np.zeros(
             (self.buffer_size, self.n_rl_units, self.obs_dim), dtype=self.np_float_type
         )
-        self.next_observations = np.zeros(
-            (self.buffer_size, self.n_rl_units, self.obs_dim), dtype=self.np_float_type
-        )
-
         self.actions = np.zeros(
             (self.buffer_size, self.n_rl_units, self.act_dim), dtype=self.np_float_type
         )
@@ -54,10 +48,7 @@ class ReplayBuffer:
             mem_available = psutil.virtual_memory().available
 
             total_memory_usage = (
-                self.observations.nbytes
-                + self.actions.nbytes
-                + self.rewards.nbytes
-                + self.next_observations.nbytes
+                self.observations.nbytes + self.actions.nbytes + self.rewards.nbytes
             )
 
             if total_memory_usage > mem_available:
@@ -70,10 +61,7 @@ class ReplayBuffer:
                 )
 
     def size(self):
-        if self.full:
-            return self.buffer_size
-        else:
-            return self.pos
+        return self.buffer_size if self.full else self.pos
 
     def reset(self):
         self.pos = 0
@@ -117,46 +105,3 @@ class ReplayBuffer:
         )
 
         return ReplayBufferSamples(*tuple(map(self.to_torch, data)))
-
-    def save_params(self, simulation_id):
-        def save_obj(name, values, directory):
-            with open(directory + name + ".pkl", "wb") as f:
-                pickle.dump(values, f, pickle.HIGHEST_PROTOCOL)
-
-        directory = "output/" + simulation_id + "/buffer/"
-        if not os.path.exists(directory):
-            os.makedirs(directory)
-
-        params = {
-            "observations": self.observations[: self.pos],
-            "next_observations": self.next_observations[: self.pos],
-            "actions": self.actions[: self.pos],
-            "rewards": self.rewards[: self.pos],
-            "pos": self.pos,
-            "full": self.full,
-        }
-
-        for name, values in params.items():
-            save_obj(name, values, directory)
-
-    def load_params(self, simulation_id):
-        def load_obj(directory, name):
-            with open(directory + name + ".pkl", "rb") as f:
-                return pickle.load(f)
-
-        directory = "output/" + simulation_id + "/buffer/"
-        if not os.path.exists(directory):
-            raise FileNotFoundError(
-                "Specified directory for loading the buffer does not exist!"
-            )
-
-        self.pos = load_obj(directory, "pos")
-
-        self.observations[: self.pos] = load_obj(directory, "observations")[: self.pos]
-        self.next_observations[: self.pos] = load_obj(directory, "next_observations")[
-            : self.pos
-        ]
-        self.actions[: self.pos] = load_obj(directory, "actions")[: self.pos]
-        self.rewards[: self.pos] = load_obj(directory, "rewards")[: self.pos]
-
-        self.full = load_obj(directory, "full")

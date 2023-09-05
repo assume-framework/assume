@@ -460,7 +460,6 @@ class UnitsOperator(Role):
                     content={
                         "context": "rl_training",
                         "type": "replay_buffer",
-                        "start": start,
                         "data": data,
                     },
                 )

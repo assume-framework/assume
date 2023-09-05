@@ -513,7 +513,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
         n_rl_units=len(world.learning_role.rl_strats),
         device=world.learning_role.device,
     )
-    actor_critic_values = None
+    actors_and_critics = None
     world.output_role.del_similar_runs()
 
     for episode in tqdm(
@@ -531,7 +531,9 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
                 disable_learning=False,
             )
         # give the newly created rl_agent the buffer that we stored from the beginning
-        world.learning_role.load_actors_and_critics(stored_values=actor_critic_values)
+        world.learning_role.create_actors_and_critics(
+            actors_and_critics=actors_and_critics
+        )
         world.learning_role.buffer = buffer
         world.learning_role.episodes_done = episode
 
@@ -539,7 +541,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
             world.learning_role.turn_off_initial_exploration()
 
         world.run()
-        actor_critic_values = world.learning_role.store_actors_and_critics()
+        actors_and_critics = world.learning_role.extract_actors_and_critics()
 
         world.reset()
 
@@ -552,18 +554,9 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
 
         # container shutdown implicitly with new initialisation
 
-    # load scenario for evaluation
-    load_scenario_folder(
-        world,
-        inputs_path,
-        scenario,
-        study_case,
-        disable_learning=True,
-    )
-
-    world.learning_role.load_actors_and_critics(stored_values=actor_critic_values)
-    world.learning_role.save_actor_params(
-        directory=f"{inputs_path}/learned_strategies/{scenario}_{study_case}/actors"
+    world.learning_role.create_actors_and_critics(actors_and_critics=actors_and_critics)
+    world.learning_role.save_params(
+        directory=f"{inputs_path}/learned_strategies/{scenario}_{study_case}"
     )
 
     logger.info("################")

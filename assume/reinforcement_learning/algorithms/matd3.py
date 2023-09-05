@@ -19,7 +19,6 @@ class TD3(RLAlgorithm):
         batch_size=1024,
         tau=0.005,
         gamma=0.99,
-        train_freq=1,
         gradient_steps=-1,
         policy_delay=2,
         target_policy_noise=0.2,
@@ -32,10 +31,7 @@ class TD3(RLAlgorithm):
         self.gamma = gamma
         self.tau = tau
 
-        self.train_freq = train_freq
-        self.gradient_steps = (
-            self.train_freq if gradient_steps == -1 else gradient_steps
-        )
+        self.gradient_steps = gradient_steps
 
         self.policy_delay = policy_delay
         self.target_noise_clip = target_noise_clip

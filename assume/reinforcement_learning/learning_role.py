@@ -38,27 +38,31 @@ class Learning(Role):
         # define whether we train model or evaluate it
         self.training_episodes = learning_config["training_episodes"]
         self.learning_mode = learning_config["learning_mode"]
-        self.cuda_device = learning_config["device"]
-        self.float_type = th.float
 
+        cuda_device = (
+            learning_config["device"]
+            if "cuda" in learning_config.get("device", "cpu")
+            else "cpu"
+        )
+        self.device = th.device(cuda_device if th.cuda.is_available() else "cpu")
+        self.float_type = th.float16 if "cuda" in cuda_device else th.float
         th.backends.cuda.matmul.allow_tf32 = True
 
-        cuda_device = f"cuda:{str(self.cuda_device)}"
-        self.device = th.device(cuda_device if th.cuda.is_available() else "cpu")
+        self.learning_rate = learning_config.get("learning_rate", 1e-4)
+        self.learning_starts = learning_config.get("collect_initial_experience", 5)
+        self.train_freq = learning_config.get("train_freq", 1)
+        self.gradient_steps = (
+            self.train_freq
+            if learning_config.get("gradient_steps", -1) == -1
+            else learning_config["gradient_steps"]
+        )
+        self.batch_size = learning_config.get("batch_size", 128)
+        self.gamma = learning_config.get("gamma", 0.99)
 
-        self.learning_rate = learning_config["learning_rate"]
-        self.learning_starts = learning_config["collect_initial_experience"]
-        self.train_freq = learning_config["train_freq"]
-        self.gradient_steps = learning_config["gradient_steps"]
-        self.batch_size = learning_config["batch_size"]
-        self.gamma = learning_config["gamma"]
-        self.training_episodes = learning_config["training_episodes"]
         self.eval_episodes_done = 0
         self.max_eval_reward = -1e9
         self.max_eval_regret = 1e9
         self.max_eval_profit = -1e9
-
-        self.float_type = th.float16 if self.cuda_device == "cuda" else th.float
 
         # function that initializes learning, needs to be an extra function so that it can be called after buffer is given to Role
         self.create_learning_algorithm(self.rl_algorithm)
@@ -67,6 +71,16 @@ class Learning(Role):
         self.rl_eval_rewards = []
         self.rl_eval_profits = []
         self.rl_eval_regrets = []
+
+        if learning_config.get("continue_learning", False):
+            load_directory = learning_config.get("load_model_path", None)
+            if load_directory is not None:
+                self.logger.warning(
+                    "You have specified continue learning as True but no load_model_path was given!"
+                )
+                self.info("Continuing learning with randomly initialized values!")
+            else:
+                self.load_params.get(learning_config["load_model_path"])
 
     def setup(self):
         # subscribe to messages for handling the training process
@@ -96,7 +110,6 @@ class Learning(Role):
         """
 
         if content.get("type") == "replay_buffer":
-            start = content.get("start")
             data = content["data"]
             self.buffer.add(
                 obs=data[0],
@@ -105,7 +118,7 @@ class Learning(Role):
             )
 
     def turn_off_initial_exploration(self):
-        for unit_id, unit in self.rl_strats.items():
+        for _, unit in self.rl_strats.items():
             unit.collect_initial_experience = False
 
     def create_learning_algorithm(self, algorithm):
@@ -114,21 +127,18 @@ class Learning(Role):
                 learning_role=self,
                 learning_rate=self.learning_rate,
                 learning_starts=self.learning_starts,
-                train_freq=self.train_freq,
                 gradient_steps=self.gradient_steps,
                 batch_size=self.batch_size,
                 gamma=self.gamma,
             )
         else:
-            self.logger.error(
-                f"you specified an reinforcement learning algorithm {algorithm}, for which no files where provided"
-            )
+            self.logger.error(f"Learning algorithm {algorithm} not implemented!")
 
     async def update_policy(self):
         if self.episodes_done > self.learning_starts:
             self.rl_algorithm.update_policy()
 
-    # in assume self
+    # TODO: add evaluation function
     def compare_and_save_policies(self):
         modes = ["reward", "profit", "regret"]
         for mode in modes:
@@ -162,6 +172,10 @@ class Learning(Role):
                 )
 
     def save_params(self, directory):
+        self.save_critic_params(directory=f"{directory}/critics")
+        self.save_actor_params(directory=f"{directory}/actors")
+
+    def save_critic_params(self, directory):
         def save_obj(obj, directory, agent):
             path = f"{directory}/critic_{str(agent)}"
             th.save(obj, path)
@@ -189,38 +203,61 @@ class Learning(Role):
             }
             save_obj(obj, directory, u_id)
 
-    def load_params(self, load_params: dict):
-        if not load_params["load_critics"]:
-            return None
+    def load_obj(self, directory):
+        return th.load(directory, map_location=self.device)
 
-        sim_id = load_params["id"]
-        load_dir = load_params["dir"]
+    def load_params(self, directory):
+        self.load_critic_params(directory)
+        self.load_actor_params(directory)
 
-        self.env.logger.info("Loading critic parameters...")
-
-        def load_obj(directory, agent):
-            path = f"{directory}critic_{str(agent)}"
-            return th.load(path, map_location=self.device)
-
-        directory = load_params["policy_dir"] + sim_id + "/" + load_dir + "/"
+    def load_critic_params(self, directory):
+        self.logger.info("Loading critic parameters...")
 
         if not os.path.exists(directory):
-            raise FileNotFoundError(
-                "Specified directory for loading the critics does not exist!"
+            self.logger.warning(
+                "Specified directory for loading the critics does not exist! Starting with randomly initialized values!"
             )
+            return
 
         for u_id in self.rl_strats.keys():
             try:
-                params = load_obj(directory, agent.name)
-                self.critics[u_id].load_state_dict(params["critic"])
-                self.target_critics[u_id].load_state_dict(params["critic_target"])
-                self.critics[u_id].optimizer.load_state_dict(params["critic_optimizer"])
-            except Exception:
-                self.world.logger.info(
-                    "No critic values loaded for agent {}".format(u_id)
+                critic_params = self.load_obj(
+                    directory=f"{directory}/critics/critic_{str(u_id)}"
                 )
+                self.critics[u_id].load_state_dict(critic_params["critic"])
+                self.target_critics[u_id].load_state_dict(
+                    critic_params["critic_target"]
+                )
+                self.critics[u_id].optimizer.load_state_dict(
+                    critic_params["critic_optimizer"]
+                )
+            except Exception:
+                self.logger.warning(f"No critic values loaded for agent {u_id}")
 
-    def store_actors_and_critics(self):
+    def load_actor_params(self, directory):
+        self.logger.info("Loading actor parameters...")
+        if not os.path.exists(directory):
+            self.logger.warning(
+                "Specified directory for loading the actors does not exist! Starting with randomly initialized values!"
+            )
+            return
+
+        for u_id in self.rl_strats.keys():
+            try:
+                actor_params = self.load_obj(
+                    directory=f"{directory}/actors/actor_{str(u_id)}"
+                )
+                self.rl_strats[u_id].actor.load_state_dict(actor_params["actor"])
+                self.rl_strats[u_id].actor_target.load_state_dict(
+                    actor_params["actor_target"]
+                )
+                self.rl_strats[u_id].actor.optimizer.load_state_dict(
+                    actor_params["actor_optimizer"]
+                )
+            except Exception:
+                self.logger.warning(f"No actor values loaded for agent {u_id}")
+
+    def extract_actors_and_critics(self):
         actors = {}
         actor_targets = {}
 
@@ -228,59 +265,61 @@ class Learning(Role):
             actors[u_id] = unit_strategy.actor
             actor_targets[u_id] = unit_strategy.actor_target
 
-        stored_values = {
+        actors_and_critics = {
             "actors": actors,
             "actor_targets": actor_targets,
             "critics": self.critics,
             "target_critics": self.target_critics,
         }
 
-        return stored_values
+        return actors_and_critics
 
-    def load_actors_and_critics(self, stored_values):
-        if stored_values is None:
-            n_rl_agents = len(self.rl_strats)
-            strategy: LearningStrategy
-
-            for u_id, unit_strategy in self.rl_strats.items():
-                unit_strategy.actor = Actor(
-                    self.obs_dim, self.act_dim, self.float_type
-                ).to(self.device)
-                unit_strategy.actor_target = Actor(
-                    self.obs_dim, self.act_dim, self.float_type
-                ).to(self.device)
-                unit_strategy.actor_target.load_state_dict(
-                    unit_strategy.actor.state_dict()
-                )
-                unit_strategy.actor_target.train(mode=False)
-
-                unit_strategy.actor.optimizer = Adam(
-                    unit_strategy.actor.parameters(), lr=self.learning_rate
-                )
-
-            for u_id, strategy in self.rl_strats.items():
-                self.critics[u_id] = CriticTD3(
-                    n_rl_agents, strategy.obs_dim, strategy.act_dim, self.float_type
-                )
-                self.target_critics[u_id] = CriticTD3(
-                    n_rl_agents, strategy.obs_dim, strategy.act_dim, self.float_type
-                )
-
-                self.critics[u_id].optimizer = Adam(
-                    self.critics[u_id].parameters(), lr=self.learning_rate
-                )
-
-                self.target_critics[u_id].load_state_dict(
-                    self.critics[u_id].state_dict()
-                )
-                self.target_critics[u_id].train(mode=False)
-
-                self.critics[u_id] = self.critics[u_id].to(self.device)
-                self.target_critics[u_id] = self.target_critics[u_id].to(self.device)
+    def create_actors_and_critics(self, actors_and_critics):
+        if actors_and_critics is None:
+            self.create_actors()
+            self.create_critics()
 
         else:
-            self.critics = stored_values["critics"]
-            self.target_critics = stored_values["target_critics"]
+            self.critics = actors_and_critics["critics"]
+            self.target_critics = actors_and_critics["target_critics"]
             for u_id, unit_strategy in self.rl_strats.items():
-                unit_strategy.actor = stored_values["actors"][u_id]
-                unit_strategy.actor_target = stored_values["actor_targets"][u_id]
+                unit_strategy.actor = actors_and_critics["actors"][u_id]
+                unit_strategy.actor_target = actors_and_critics["actor_targets"][u_id]
+
+    def create_actors(self):
+        for _, unit_strategy in self.rl_strats.items():
+            unit_strategy.actor = Actor(self.obs_dim, self.act_dim, self.float_type).to(
+                self.device
+            )
+
+            unit_strategy.actor_target = Actor(
+                self.obs_dim, self.act_dim, self.float_type
+            ).to(self.device)
+            unit_strategy.actor_target.load_state_dict(unit_strategy.actor.state_dict())
+            unit_strategy.actor_target.train(mode=False)
+
+            unit_strategy.actor.optimizer = Adam(
+                unit_strategy.actor.parameters(), lr=self.learning_rate
+            )
+
+    def create_critics(self):
+        n_agents = len(self.rl_strats)
+        strategy: LearningStrategy
+
+        for u_id, strategy in self.rl_strats.items():
+            self.critics[u_id] = CriticTD3(
+                n_agents, strategy.obs_dim, strategy.act_dim, self.float_type
+            )
+            self.target_critics[u_id] = CriticTD3(
+                n_agents, strategy.obs_dim, strategy.act_dim, self.float_type
+            )
+
+            self.critics[u_id].optimizer = Adam(
+                self.critics[u_id].parameters(), lr=self.learning_rate
+            )
+
+            self.target_critics[u_id].load_state_dict(self.critics[u_id].state_dict())
+            self.target_critics[u_id].train(mode=False)
+
+            self.critics[u_id] = self.critics[u_id].to(self.device)
+            self.target_critics[u_id] = self.target_critics[u_id].to(self.device)
