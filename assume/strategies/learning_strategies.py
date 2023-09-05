@@ -358,7 +358,7 @@ class RLStrategy(LearningStrategy):
         :param simulation_id: Simulation ID
         :type simulation_id: str
         """
-        directory = f"{load_path}/actors/actor_{self.unit_id}"
+        directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
         params = th.load(directory)
 
         self.actor = Actor(self.obs_dim, self.act_dim, self.float_type)

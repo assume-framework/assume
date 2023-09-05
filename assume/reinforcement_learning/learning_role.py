@@ -73,14 +73,14 @@ class Learning(Role):
         self.rl_eval_regrets = []
 
         if learning_config.get("continue_learning", False):
-            load_directory = learning_config.get("load_model_path", None)
+            load_directory = learning_config.get("load_model_path")
             if load_directory is not None:
                 self.logger.warning(
                     "You have specified continue learning as True but no load_model_path was given!"
                 )
                 self.info("Continuing learning with randomly initialized values!")
             else:
-                self.load_params.get(learning_config["load_model_path"])
+                self.load_params(load_directory)
 
     def setup(self):
         # subscribe to messages for handling the training process
