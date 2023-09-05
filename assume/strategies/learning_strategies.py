@@ -55,7 +55,7 @@ class RLStrategy(LearningStrategy):
 
             self.action_noise = NormalActionNoise(
                 mu=0.0,
-                sigma=kwargs.get("noise_sigma", 0.2),
+                sigma=kwargs.get("noise_sigma", 0.1),
                 action_dimension=self.act_dim,
                 scale=kwargs.get("noise_scale", 1.0),
                 dt=kwargs.get("noise_dt", 1.0),

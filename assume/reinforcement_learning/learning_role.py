@@ -112,6 +112,7 @@ class Learning(Role):
         if algorithm == "matd3":
             self.rl_algorithm = TD3(
                 learning_role=self,
+                learning_rate=self.learning_rate,
                 learning_starts=self.learning_starts,
                 train_freq=self.train_freq,
                 gradient_steps=self.gradient_steps,
