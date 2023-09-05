@@ -367,6 +367,88 @@ class UnitsOperator(Role):
 
         return orderbook
 
+    def write_learning_to_output(self, start: datetime, marketconfig: MarketConfig):
+        output_agent_df = []
+        for unit_id, unit in self.units.items():
+            # rl only for energy market for now!
+            if isinstance(
+                unit.bidding_strategies.get(marketconfig.product_type),
+                LearningStrategy,
+            ):
+                output_data = pd.DataFrame(
+                    {
+                        "profit": unit.outputs["profit"].loc[start],
+                        "reward": unit.outputs["reward"].loc[start],
+                        "regret": unit.outputs["regret"].loc[start],
+                    },
+                    index=[start],
+                )
+                output_data["unit"] = unit_id
+                output_agent_df.append(output_data)
+        learning_output = pd.concat(output_agent_df)
+        db_aid = self.context.data_dict.get("output_agent_id")
+        db_addr = self.context.data_dict.get("output_agent_addr")
+        if db_aid and db_addr:
+            self.context.schedule_instant_acl_message(
+                receiver_id=db_aid,
+                receiver_addr=db_addr,
+                content={
+                    "context": "write_results",
+                    "type": "rl_learning_params",
+                    "data": learning_output[["profit", "reward", "regret", "unit"]],
+                },
+            )
+
+    def write_to_learning(
+        self,
+        start: datetime,
+        marketconfig: MarketConfig,
+        action_dimension: int,
+        learning_unit_count: int,
+    ):
+        learning_role_id = "learning_agent"
+        learning_role_addr = self.context.addr
+
+        all_observations = []
+        all_rewards = []
+        try:
+            import torch as th
+
+            all_actions = th.zeros(
+                (learning_unit_count, action_dimension), device="cpu"
+            )
+        except ImportError:
+            logger.error("tried writing learning_params, but torch is not installed")
+            all_actions = np.zeros((learning_unit_count, action_dimension))
+
+        i = 0
+        for unit_id, unit in self.units.items():
+            # rl only for energy market for now!
+            if isinstance(
+                unit.bidding_strategies.get(marketconfig.product_type),
+                LearningStrategy,
+            ):
+                all_observations.append(
+                    np.array(unit.outputs["rl_observations"][start])
+                )
+                all_actions[i, :] = unit.outputs["rl_actions"][start]
+                all_rewards.append(unit.outputs["rl_rewards"][start])
+                i += 1
+        # convert all_actions list of tensor to numpy 2D array
+        all_actions = all_actions.squeeze().cpu().numpy()
+        all_rewards = np.array(all_rewards)
+        rl_agent_data = (np.array(all_observations), all_actions, all_rewards)
+
+        self.context.schedule_instant_acl_message(
+            receiver_id=learning_role_id,
+            receiver_addr=learning_role_addr,
+            content={
+                "context": "rl_training",
+                "type": "replay_buffer",
+                "data": rl_agent_data,
+            },
+        )
+
     def write_learning_params(self, orderbook: Orderbook, marketconfig: MarketConfig):
         """
         sends the current rl_strategy update to the output agent
@@ -384,82 +466,17 @@ class UnitsOperator(Role):
                 learning_strategies.append(bidding_strategy)
                 # should be the same across all strategies
                 action_dimension = bidding_strategy.act_dim
-        if len(learning_strategies) > 0:
+        # should write learning results if at least one bidding_strategy is a learning strategy
+        write_learning_results = len(learning_strategies) > 0 and orderbook
+        if write_learning_results:
             start = orderbook[0]["start_time"]
-            unit_rl_strategy_dfs = []
-            learning_unit_count = len(learning_strategies)
-            learning_mode = learning_strategies[0].learning_mode
+            # write learning output
+            self.write_learning_to_output(start, marketconfig)
 
-            all_observations = []
-            all_rewards = []
-            try:
-                import torch as th
-
-                all_actions = th.zeros(
-                    (learning_unit_count, action_dimension), device="cpu"
-                )
-            except ImportError:
-                logger.error(
-                    "tried writing learning_params, but torch is not installed"
-                )
-                all_actions = np.zeros((learning_unit_count, action_dimension))
-
-            i = 0
-
-            for unit_id, unit in self.units.items():
-                # rl only for energy market for now!
-                if isinstance(
-                    unit.bidding_strategies.get(marketconfig.product_type),
-                    LearningStrategy,
-                ):
-                    data = pd.DataFrame(
-                        {
-                            "profit": unit.outputs["profit"].loc[start],
-                            "reward": unit.outputs["reward"].loc[start],
-                            "regret": unit.outputs["regret"].loc[start],
-                        },
-                        index=[start],
-                    )
-                    data["unit"] = unit_id
-                    unit_rl_strategy_dfs.append(data)
-                    all_observations.append(
-                        np.array(unit.outputs["rl_observations"][start])
-                    )
-                    all_actions[i, :] = unit.outputs["rl_actions"][start]
-                    all_rewards.append(unit.outputs["rl_rewards"][start])
-
-                    i += 1
-            all_observations = np.array(all_observations)
-            # convert all_actions list of tensor to numpy 2D array
-            all_actions = all_actions.squeeze().cpu().numpy()
-            all_rewards = np.array(all_rewards)
-
-            data = (all_observations, all_actions, all_rewards)
-            learning_data = pd.concat(unit_rl_strategy_dfs)
-
-            db_aid = self.context.data_dict.get("output_agent_id")
-            db_addr = self.context.data_dict.get("output_agent_addr")
-            if db_aid and db_addr:
-                self.context.schedule_instant_acl_message(
-                    receiver_id=db_aid,
-                    receiver_addr=db_addr,
-                    content={
-                        "context": "write_results",
-                        "type": "rl_learning_params",
-                        "data": learning_data[["profit", "reward", "regret", "unit"]],
-                    },
-                )
-
-            learning_role_id = "learning_agent"
-            learning_role_addr = self.context.addr
-
-            if learning_mode:
-                self.context.schedule_instant_acl_message(
-                    receiver_id=learning_role_id,
-                    receiver_addr=learning_role_addr,
-                    content={
-                        "context": "rl_training",
-                        "type": "replay_buffer",
-                        "data": data,
-                    },
+            # we are using the first learning_strategy to check learning_mode
+            # as this should be the same value for all strategies
+            if learning_strategies[0].learning_mode:
+                # in learning mode we are sending data to learning
+                self.write_to_learning(
+                    start, marketconfig, action_dimension, len(learning_strategies)
                 )
