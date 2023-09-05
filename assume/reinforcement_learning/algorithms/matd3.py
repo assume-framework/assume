@@ -24,27 +24,18 @@ class TD3(RLAlgorithm):
         target_policy_noise=0.2,
         target_noise_clip=0.5,
     ):
-        self.learning_role = learning_role
-        self.learning_rate = learning_rate
-        self.learning_starts = learning_starts
-        self.batch_size = batch_size
-        self.gamma = gamma
-        self.tau = tau
-
-        self.gradient_steps = gradient_steps
-
-        self.policy_delay = policy_delay
-        self.target_noise_clip = target_noise_clip
-        self.target_policy_noise = target_policy_noise
-
-        self.obs_dim = self.learning_role.obs_dim
-        self.act_dim = self.learning_role.act_dim
-
-        self.device = self.learning_role.device
-        self.float_type = self.learning_role.float_type
-
-        self.unique_obs_len = 8
-
+        super().__init__(
+            learning_role,
+            learning_rate,
+            learning_starts,
+            batch_size,
+            tau,
+            gamma,
+            gradient_steps,
+            policy_delay,
+            target_policy_noise,
+            target_noise_clip,
+        )
         self.n_updates = 0
 
     def update_policy(self):

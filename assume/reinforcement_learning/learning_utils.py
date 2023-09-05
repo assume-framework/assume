@@ -103,6 +103,7 @@ class Actor(nn.Module):
         return x
 
 
+# Ornstein-Uhlenbeck Noise
 # from https://github.com/songrotek/DDPG/blob/master/ou_noise.py
 class OUNoise:
     def __init__(self, action_dimension, mu=0, sigma=0.5, theta=0.15, dt=1e-2):
