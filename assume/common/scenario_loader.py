@@ -561,3 +561,13 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
 
     logger.info("################")
     logger.info("Training finished, Start evaluation run")
+
+    # load scenario for evaluation
+    load_scenario_folder(
+        world,
+        inputs_path,
+        scenario,
+        study_case,
+        episode=world.learning_role.episodes_done,
+        disable_learning=True,
+    )

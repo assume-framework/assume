@@ -114,6 +114,7 @@ class World:
         self.learning_config = learning_config
         self.bidding_params = bidding_params
         self.index = index
+        self.same_process = same_process
 
         # kill old container if exists
         if isinstance(self.container, Container) and self.container.running:
@@ -123,7 +124,12 @@ class World:
         self.container = await create_container(
             addr=self.addr, clock=self.clock, codec=mango_codec_factory()
         )
+        await self.setup_learning()
+        if self.learning_mode:
+            simulation_id = f"{simulation_id}_{episode}"
+        await self.setup_output_agent(simulation_id, save_frequency_hours)
 
+    async def setup_learning(self):
         self.bidding_params.update(self.learning_config)
         # initiate learning if the learning mode is on and hence we want to learn new strategies
         self.learning_mode = self.learning_config.get("learning_mode", False)
@@ -136,7 +142,9 @@ class World:
                 start=self.start,
                 end=self.end,
             )
-            if True:  # separate process does not support buffer and learning
+            # if self.same_process:
+            # separate process does not support buffer and learning
+            if True:
                 rl_agent = RoleAgent(self.container, suggested_aid="learning_agent")
                 rl_agent.add_role(self.learning_role)
             else:
@@ -146,19 +154,19 @@ class World:
                     agent.add_role(self.learning_role)
 
                 await self.container.as_agent_process(agent_creator=creator)
-            simulation_id = f"{simulation_id}_{episode}"
 
+    async def setup_output_agent(self, simulation_id: str, save_frequency_hours: int):
         self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to world
         self.output_role = WriteOutput(
             simulation_id=simulation_id,
-            start=start,
-            end=end,
+            start=self.start,
+            end=self.end,
             db_engine=self.db,
             export_csv_path=self.export_csv_path,
             save_frequency_hours=save_frequency_hours,
         )
-        if same_process:
+        if self.same_process:
             output_agent = RoleAgent(
                 self.container, suggested_aid=self.output_agent_addr[1]
             )

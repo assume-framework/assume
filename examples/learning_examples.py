@@ -76,13 +76,4 @@ if __name__ == "__main__":
             scenario=availabe_examples[example]["scenario"],
             study_case=availabe_examples[example]["study_case"],
         )
-
-    # load scenario for evaluation
-    load_scenario_folder(
-        world,
-        inputs_path="examples/inputs",
-        scenario=availabe_examples[example]["scenario"],
-        study_case=availabe_examples[example]["study_case"],
-        disable_learning=True,
-    )
     world.run()
