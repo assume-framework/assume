@@ -177,7 +177,7 @@ class Learning(Role):
 
     def save_critic_params(self, directory):
         def save_obj(obj, directory, agent):
-            path = f"{directory}/critic_{str(agent)}"
+            path = f"{directory}/critic_{str(agent)}.pt"
             th.save(obj, path)
 
         os.makedirs(directory, exist_ok=True)
@@ -191,7 +191,7 @@ class Learning(Role):
 
     def save_actor_params(self, directory):
         def save_obj(obj, directory, agent):
-            path = f"{directory}/actor_{str(agent)}"
+            path = f"{directory}/actor_{str(agent)}.pt"
             th.save(obj, path)
 
         os.makedirs(directory, exist_ok=True)
@@ -222,7 +222,7 @@ class Learning(Role):
         for u_id in self.rl_strats.keys():
             try:
                 critic_params = self.load_obj(
-                    directory=f"{directory}/critics/critic_{str(u_id)}"
+                    directory=f"{directory}/critics/critic_{str(u_id)}.pt"
                 )
                 self.critics[u_id].load_state_dict(critic_params["critic"])
                 self.target_critics[u_id].load_state_dict(
@@ -245,7 +245,7 @@ class Learning(Role):
         for u_id in self.rl_strats.keys():
             try:
                 actor_params = self.load_obj(
-                    directory=f"{directory}/actors/actor_{str(u_id)}"
+                    directory=f"{directory}/actors/actor_{str(u_id)}.pt"
                 )
                 self.rl_strats[u_id].actor.load_state_dict(actor_params["actor"])
                 self.rl_strats[u_id].actor_target.load_state_dict(

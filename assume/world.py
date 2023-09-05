@@ -158,6 +158,7 @@ class World:
     async def setup_output_agent(self, simulation_id: str, save_frequency_hours: int):
         self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to world
+        self.logger.debug(f"creating output agent {self.db=} {self.export_csv_path=}")
         self.output_role = WriteOutput(
             simulation_id=simulation_id,
             start=self.start,

@@ -506,6 +506,10 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
     # initiate buffer for rl agent
     from assume.reinforcement_learning.buffer import ReplayBuffer
 
+    # remove csv path so that nothing is written while learning
+    temp_csv_path = world.export_csv_path
+    world.export_csv_path = ""
+
     buffer = ReplayBuffer(
         buffer_size=int(5e5),
         obs_dim=world.learning_role.obs_dim,
@@ -561,6 +565,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
 
     logger.info("################")
     logger.info("Training finished, Start evaluation run")
+    world.export_csv_path = temp_csv_path
 
     # load scenario for evaluation
     load_scenario_folder(
