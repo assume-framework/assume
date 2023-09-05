@@ -11,7 +11,7 @@ from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)
 
-SOLVERS = ["gurobi", "cplex", "glpk", "cbc"]
+SOLVERS = ["gurobi", "glpk"]
 EPS = 1e-4
 
 
@@ -140,8 +140,8 @@ def market_clearing_opt(
         options = {"mip.tolerances.lowercutoff": -1.0, "mip.tolerances.absmipgap": EPS}
     elif solver.name == "cbc":
         options = {"sec": 60, "ratio": 0.1}
-    elif solver.name == "glpk":
-        options = {"tmlim": 60, "mipgap": 0.1}
+    # elif solver.name == "glpk":
+    #     options = {"tmlim": 60, "mipgap": 0.1}
     else:
         options = {}
 

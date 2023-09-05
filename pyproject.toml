@@ -60,7 +60,7 @@ pytest-asyncio = "^0.21.1"
 [tool.poetry.extras]
 learning = ["torch"]
 optimize = ["pyomo", "glpk"]
-test = ["black", "isort", "matplotlib", "pytest", "pytest-cov", "pytest-asyncio", "pyomo"]
+test = ["black", "isort", "matplotlib", "pytest", "pytest-cov", "pytest-asyncio", "pyomo", "glpk"]
 
 
 [tool.poetry.scripts]

@@ -206,12 +206,12 @@ class DmasPowerplantStrategy(BaseStrategy):
 
         # -> fuel costs
         fuel_cost = [
-            (self.model.p_out[t] / unit.efficiency) * fuel_prices[t] for t in tr
+            (self.model.p_out[t] / unit.efficiency) * fuel_prices.iloc[t] for t in tr
         ]
         # -> emission costs
         emission_cost = [
             (self.model.p_out[t] / unit.efficiency * unit.emission_factor)
-            * emission_prices[t]
+            * emission_prices.iloc[t]
             for t in tr
         ]
         # -> start costs
