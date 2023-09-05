@@ -130,6 +130,11 @@ class BaseUnit:
 
         self.calculate_cashflow(product_type, orderbook)
 
+        self.outputs[product_type + "_marginal_costs"].loc[start:end_excl] = (
+            self.calculate_marginal_cost(start, self.outputs[product_type].loc[start])
+            * self.outputs[product_type].loc[start:end_excl]
+        )
+
         self.bidding_strategies[product_type].calculate_reward(
             unit=self,
             marketconfig=marketconfig,

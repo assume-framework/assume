@@ -221,9 +221,14 @@ class UnitsOperator(Role):
             current_dispatch.name = "power"
             data = pd.DataFrame(current_dispatch)
             data["soc"] = unit.outputs["soc"][start:end]
+            # TODO make that right for all products
             for key in unit.outputs.keys():
-                if "cashflow" in key:
+                if "energy_cashflow" in key:
                     data[key] = unit.outputs[key][start:end]
+
+                if "energy_marginal_costs" in key:
+                    data[key] = unit.outputs[key][start:end]
+
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
 
