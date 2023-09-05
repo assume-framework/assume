@@ -262,9 +262,16 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=No
         add = ()
         for field in groupby:
             add += (bid[field],)
-        if bid["only_hours"] is None:
-            deltas.append((bid["start_time"], bid["volume"]) + add)
-            deltas.append((bid["end_time"], -bid["volume"]) + add)
+        if bid["only_hours"] is None and not isinstance(bid["accepted_volume"], dict):
+            deltas.append((bid["start_time"], bid["accepted_volume"]) + add)
+            deltas.append((bid["end_time"], -bid["accepted_volume"]) + add)
+        elif isinstance(bid["accepted_volume"], dict):
+            start_hour = bid["start_time"]
+            end_hour = bid["end_time"]
+            duration = (start_hour - end_hour) / len(bid["accepted_volume"])
+            for key in bid["accepted_volume"].keys():
+                deltas.append((key, bid["accepted_volume"][key]) + add)
+                deltas.append((key + duration, -bid["accepted_volume"][key]) + add)
         else:
             # only_hours allows to have peak or off-peak bids
             start_hour, end_hour = bid["only_hours"]
@@ -315,3 +322,31 @@ def get_test_demand_orders(power: np.array):
     demand_order = pd.DataFrame.from_dict(order_book, orient="index")
     demand_order = demand_order.set_index(["block_id", "hour", "name"])
     return demand_order
+
+
+def separate_block_orders(orderbook):
+    for order in orderbook:
+        if "bid_type" not in order.keys():
+            continue
+        elif order["bid_type"] == "BB" and isinstance(order["volume"], dict):
+            start_hour = order["start_time"]
+            end_hour = order["end_time"]
+            duration = (end_hour - start_hour) / len(order["volume"])
+            i = 1
+            for start in pd.date_range(start_hour, end_hour - duration, freq=duration):
+                single_order = order.copy()
+                single_order.update(
+                    {
+                        "start_time": start,
+                        "end_time": start + duration,
+                        "volume": order["volume"][start],
+                        "accepted_volume": order["accepted_volume"][start],
+                        "accepted_price": order["accepted_price"][start],
+                        "bid_id": f"{order['bid_id']}_BB{i}",
+                    }
+                )
+                orderbook.append(single_order)
+                i += 1
+            orderbook.remove(order)
+
+    return orderbook

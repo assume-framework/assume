@@ -92,7 +92,7 @@ class NaiveDAStrategy(BaseStrategy):
         profile = {product[0]: volume for product in product_tuples}
         order: Order = {
             "start_time": start,
-            "end_time": product_tuples[0][1],
+            "end_time": product_tuples[-1][1],
             "only_hours": product_tuples[0][2],
             "price": marginal_cost,
             "volume": profile,

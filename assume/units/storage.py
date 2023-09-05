@@ -1,5 +1,4 @@
 import logging
-import math
 from datetime import timedelta
 from functools import lru_cache
 
@@ -8,6 +7,7 @@ import pandas as pd
 from assume.common.base import SupportsMinMaxCharge
 
 logger = logging.getLogger(__name__)
+EPS = 1e-4
 
 
 class Storage(SupportsMinMaxCharge):
@@ -242,7 +242,7 @@ class Storage(SupportsMinMaxCharge):
                 max_soc_discharge = self.calculate_soc_max_discharge(soc)
 
                 if self.outputs["energy"][t] > max_soc_discharge:
-                    if not math.isclose(self.outputs["energy"][t], max_soc_discharge):
+                    if abs(self.outputs["energy"][t] - max_soc_discharge) > EPS:
                         logger.error(
                             f"The energy dispatched exceeds the minimum SOC significantly, the dispatched amount is adjusted."
                         )
@@ -261,7 +261,7 @@ class Storage(SupportsMinMaxCharge):
                 max_soc_charge = self.calculate_soc_max_charge(soc)
 
                 if self.outputs["energy"][t] < max_soc_charge:
-                    if not math.isclose(self.outputs["energy"][t], max_soc_charge):
+                    if abs(self.outputs["energy"][t] - max_soc_charge) > EPS:
                         logger.error(
                             f"The energy dispatched exceeds the maximum SOC, the dispatched amount is adjusted."
                         )

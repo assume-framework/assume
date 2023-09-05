@@ -99,14 +99,14 @@ def test_calculate_operational_window(storage_unit):
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end
     )
-    assert min_power_charge[0] == -40
-    assert max_power_charge[0] == -60
+    assert min_power_charge.iloc[0] == -40
+    assert max_power_charge.iloc[0] == -60
 
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
     )
-    assert min_power_discharge[0] == 40
-    assert max_power_discharge[0] == 60
+    assert min_power_discharge.iloc[0] == 40
+    assert max_power_discharge.iloc[0] == 60
 
     start = start + timedelta(hours=1)
 
@@ -129,18 +129,18 @@ def test_soc_constraint(storage_unit):
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
     )
-    assert min_power_discharge[0] == 40
+    assert min_power_discharge.iloc[0] == 40
     assert math.isclose(
-        max_power_discharge[0], (50 * storage_unit.efficiency_discharge)
+        max_power_discharge.iloc[0], (50 * storage_unit.efficiency_discharge)
     )
 
     storage_unit.outputs["soc"][start - storage_unit.index.freq] = 0.95
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end
     )
-    assert min_power_charge[0] == -40
+    assert min_power_charge.iloc[0] == -40
     assert math.isclose(
-        max_power_charge[0], -50 / storage_unit.efficiency_charge, abs_tol=0.1
+        max_power_charge.iloc[0], -50 / storage_unit.efficiency_charge, abs_tol=0.1
     )
 
 
@@ -315,7 +315,7 @@ def test_execute_dispatch(storage_unit):
 
     # dispatch full discharge
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
-    assert dispatched_energy[0] == 100
+    assert dispatched_energy.iloc[0] == 100
     assert math.isclose(
         storage_unit.outputs["soc"][start],
         0.5 - 100 / storage_unit.efficiency_discharge / storage_unit.max_volume,
@@ -325,7 +325,7 @@ def test_execute_dispatch(storage_unit):
     storage_unit.outputs["energy"][start] = -100
     storage_unit.outputs["soc"][start - storage_unit.index.freq] = 0.5
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
-    assert dispatched_energy[0] == -100
+    assert dispatched_energy.iloc[0] == -100
     assert math.isclose(
         storage_unit.outputs["soc"][start],
         0.5 + 100 * storage_unit.efficiency_charge / storage_unit.max_volume,
@@ -334,13 +334,13 @@ def test_execute_dispatch(storage_unit):
     storage_unit.outputs["soc"][start - storage_unit.index.freq] = 0.05
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert math.isclose(
-        dispatched_energy[0], 50 * storage_unit.efficiency_discharge, abs_tol=0.1
+        dispatched_energy.iloc[0], 50 * storage_unit.efficiency_discharge, abs_tol=0.1
     )
     storage_unit.outputs["energy"][start] = -100
     storage_unit.outputs["soc"][start - storage_unit.index.freq] = 0.95
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert math.isclose(
-        dispatched_energy[0], -50 / storage_unit.efficiency_charge, abs_tol=0.1
+        dispatched_energy.iloc[0], -50 / storage_unit.efficiency_charge, abs_tol=0.1
     )
     storage_unit.outputs["soc"][start] = 1
 
@@ -348,7 +348,7 @@ def test_execute_dispatch(storage_unit):
     end = end + storage_unit.index.freq
     storage_unit.outputs["energy"][start] = -100
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
-    assert dispatched_energy[0] == 0
+    assert dispatched_energy.iloc[0] == 0
     storage_unit.outputs["soc"][start] = 1
 
 

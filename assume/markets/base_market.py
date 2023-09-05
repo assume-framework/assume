@@ -5,6 +5,7 @@ from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
 
+import pandas as pd
 from mango import Role
 
 from assume.common.market_objects import (
@@ -199,7 +200,6 @@ class MarketRole(Role):
         orderbook: Orderbook = content["orderbook"]
         agent_addr = meta["sender_addr"]
         agent_id = meta["sender_id"]
-        # TODO check if products are part of currently open Market Openings
         try:
             max_price = self.marketconfig.maximum_bid_price
             min_price = self.marketconfig.minimum_bid_price
@@ -240,10 +240,10 @@ class MarketRole(Role):
                     ), f"max_volume {order['volume']}"
 
                 if "bid_type" in order.keys() and order["bid_type"] == "BB":
-                    assert (
-                        abs(order["volume"].values()) <= max_volume
-                    ).all(), f"max_volume {order['volume']}"
-
+                    assert False not in [
+                        abs(volume) <= max_volume
+                        for _, volume in order["volume"].items()
+                    ], f"max_volume {order['volume']}"
                 if self.marketconfig.price_tick:
                     assert isinstance(order["price"], int)
                 if self.marketconfig.volume_tick:
