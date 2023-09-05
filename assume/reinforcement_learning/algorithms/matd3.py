@@ -141,7 +141,4 @@ class TD3(RLAlgorithm):
                         actor.parameters(), actor_target.parameters(), self.tau
                     )
 
-                # TODO return a transition back to the strategy
-                strategy.update_transition(transitions)
-
                 i += 1

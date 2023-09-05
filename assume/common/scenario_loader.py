@@ -543,6 +543,11 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
         world.run()
         actors_and_critics = world.learning_role.extract_actors_and_critics()
 
+        if episode == world.learning_role.training_episodes - 1:
+            world.learning_role.save_params(
+                directory=f"{inputs_path}/learned_strategies/{scenario}_{study_case}"
+            )
+
         world.reset()
 
         # in load_scenario_folder_async, we initiate new container and kill old if present
@@ -553,11 +558,6 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
             world.learning_role.turn_off_initial_exploration()
 
         # container shutdown implicitly with new initialisation
-
-    world.learning_role.create_actors_and_critics(actors_and_critics=actors_and_critics)
-    world.learning_role.save_params(
-        directory=f"{inputs_path}/learned_strategies/{scenario}_{study_case}"
-    )
 
     logger.info("################")
     logger.info("Training finished, Start evaluation run")

@@ -351,15 +351,6 @@ class RLStrategy(LearningStrategy):
         unit.outputs["reward"].loc[start:end_excl] += reward
         unit.outputs["regret"].loc[start:end_excl] = float(opportunity_cost)
 
-    def update_transition(self, transitions):
-        if not self.learning_mode:
-            raise Exception("got transition while not in learningmode")
-        super().update_transition(transitions)
-        states = transitions.observations
-        actions = transitions.actions
-        next_states = transitions.next_observations
-        rewards = transitions.rewards
-
     def load_actor_params(self, load_path):
         """
         Load actor parameters
