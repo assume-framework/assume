@@ -25,7 +25,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2,
+  "id": 3,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -417,6 +417,7 @@
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -471,21 +472,6 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "reward (mean)"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "dark-red",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
               "options": "regret (mean)"
             },
             "properties": [
@@ -500,28 +486,13 @@
           },
           {
             "matcher": {
-              "id": "byName",
-              "options": "profit (mean)"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "green",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
               "id": "byType",
               "options": "time"
             },
             "properties": [
               {
                 "id": "custom.axisPlacement",
-                "value": "hidden"
+                "value": "auto"
               },
               {
                 "id": "custom.axisLabel",
@@ -560,11 +531,11 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
-          "format": "table",
+          "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT *\r\nFROM\r\n  rl_params\r\nORDER BY\r\n  simulation, index\r\n",
+          "rawSql": "SELECT \r\n  $__timeGroupAlias(index,$__interval),\r\n  'episode ' || episode AS \"episode\",\r\n  sum(sum(reward)) OVER (PARTITION BY episode ORDER BY index) AS \"cumulative_reward\"\r\nFROM\r\n  rl_params\r\nWHERE\r\n  $__timeFilter(index) \r\nGROUP BY 1, index, episode\r\nORDER BY 1\r\n\r\n\r\n\r\n",
           "refId": "A",
           "select": [
             [
@@ -588,87 +559,8 @@
           ]
         }
       ],
-      "title": "Temporal Development of Avergage Profit over all Units",
-      "transformations": [
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "cumulative_reward": {
-                "aggregations": [
-                  "mean"
-                ],
-                "operation": "aggregate"
-              },
-              "episode": {
-                "aggregations": [
-                  "firstNotNull"
-                ],
-                "operation": "aggregate"
-              },
-              "index": {
-                "aggregations": []
-              },
-              "index  simulation": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "internal_time+episode": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "profit": {
-                "aggregations": [
-                  "mean"
-                ],
-                "operation": "aggregate"
-              },
-              "regret": {
-                "aggregations": [
-                  "mean"
-                ],
-                "operation": "aggregate"
-              },
-              "reward": {
-                "aggregations": []
-              },
-              "simulation": {
-                "aggregations": [
-                  "firstNotNull"
-                ]
-              },
-              "simulation  index": {
-                "aggregations": [
-                  "first"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "id": "convertFieldType",
-          "options": {
-            "conversions": [
-              {
-                "destinationType": "time",
-                "targetField": "internal_time+episode"
-              }
-            ],
-            "fields": {}
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "field": "internal_time+episode"
-              }
-            ]
-          }
-        }
-      ],
+      "title": "Cumulative avergage Profit over all Units per episode",
+      "transformations": [],
       "type": "timeseries"
     },
     {
@@ -1209,7 +1101,7 @@
       },
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": [
             "example_01_rl_base_0"
           ],
@@ -1221,30 +1113,55 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT \n  simulation\nFROM power_plant_meta\ngroup by simulation;",
+        "definition": "SELECT \n  simulation\nFROM rl_params\ngroup by simulation;",
         "description": "Can choose which simulation we want to show ",
         "hide": 0,
         "includeAll": false,
         "multi": true,
         "name": "simulation",
         "options": [],
-        "query": "SELECT \n  simulation\nFROM power_plant_meta\ngroup by simulation;",
+        "query": "SELECT \n  simulation\nFROM rl_params\ngroup by simulation;",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "sort": 1,
         "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "1",
+          "value": "1"
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "P7B13B9DF907EC40C"
+        },
+        "definition": "SELECT \n  CAST(episode AS INT) AS episode_int\nFROM rl_params\ngroup by episode_int;",
+        "description": "Gives us the number of runs of the simulation period learned ",
+        "hide": 0,
+        "includeAll": false,
+        "label": "learning episode",
+        "multi": false,
+        "name": "episode",
+        "options": [],
+        "query": "SELECT \n  CAST(episode AS INT) AS episode_int\nFROM rl_params\ngroup by episode_int;",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
       }
     ]
   },
   "time": {
-    "from": "2018-12-31T23:00:00.000Z",
-    "to": "2019-01-31T22:59:59.000Z"
+    "from": "2019-01-01T19:39:43.800Z",
+    "to": "2019-01-03T20:04:32.202Z"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Assume_Learning",
   "uid": "JKQzx0q4k",
-  "version": 10,
+  "version": 7,
   "weekStart": ""
 }
