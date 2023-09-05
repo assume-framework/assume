@@ -523,6 +523,9 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
         world.learning_role.buffer = buffer
         world.learning_role.episodes_done = episode
 
+        if episode + 1 >= world.learning_role.learning_starts:
+            world.learning_role.turn_off_initial_exploration()
+
         world.run()
         actor_critic_values = world.learning_role.store_actors_and_critics()
 
@@ -532,8 +535,6 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
         # as long as we do not skip setup container should be handled correctly
         # if enough inital experience was collected according to specififcations in learning config
         # turn off initial exploration and go into full learning mode
-        if episode + 1 == world.learning_role.learning_starts:
-            world.learning_role.turn_off_initial_exploration()
 
         world.loop.run_until_complete(
             load_scenario_folder_async(
