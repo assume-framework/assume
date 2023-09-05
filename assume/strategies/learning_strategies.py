@@ -160,7 +160,7 @@ class RLStrategy(LearningStrategy):
         """
         if self.learning_mode:
             if self.collect_initial_experience:
-                curr_action = (
+                noise = (
                     th.normal(
                         mean=0.0, std=0.2, size=(1, self.act_dim), dtype=self.float_type
                     )
@@ -168,8 +168,7 @@ class RLStrategy(LearningStrategy):
                     .squeeze()
                 )
 
-                noise = curr_action
-                curr_action += next_observation[-1].clone().detach()
+                curr_action = noise + next_observation[-1].clone().detach()
 
             else:
                 curr_action = self.actor(next_observation).detach()
@@ -182,7 +181,7 @@ class RLStrategy(LearningStrategy):
 
         curr_action = curr_action.clamp(-1, 1)
 
-        return curr_action, noise 
+        return curr_action, noise
 
     def create_observation(
         self,

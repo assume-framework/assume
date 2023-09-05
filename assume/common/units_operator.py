@@ -380,13 +380,12 @@ class UnitsOperator(Role):
                 unit.bidding_strategies.get(marketconfig.product_type),
                 LearningStrategy,
             ):
-                
                 output_dict = {
-                        "datetime": start,
-                        "profit": unit.outputs["profit"].loc[start],
-                        "reward": unit.outputs["reward"].loc[start],
-                        "regret": unit.outputs["regret"].loc[start],
-                        "unit": unit_id
+                    "datetime": start,
+                    "profit": unit.outputs["profit"].loc[start],
+                    "reward": unit.outputs["reward"].loc[start],
+                    "regret": unit.outputs["regret"].loc[start],
+                    "unit": unit_id,
                 }
                 noise_tuple = unit.outputs["rl_exploration_noise"].loc[start]
                 action_tuple = unit.outputs["rl_actions"].loc[start]
@@ -405,7 +404,7 @@ class UnitsOperator(Role):
                 content={
                     "context": "write_results",
                     "type": "rl_learning_params",
-                    "data": output_agent_list
+                    "data": output_agent_list,
                 },
             )
 
