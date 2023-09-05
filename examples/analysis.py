@@ -27,11 +27,19 @@ availabe_examples = {
         "scenario": "analysis_02",
         "study_case": "dam_complex_cearing",
     },
+    "minimal_base": {
+        "scenario": "minimal",
+        "study_case": "dam_case_2019",
+    },
+    "minimal_complex": {
+        "scenario": "minimal",
+        "study_case": "dam_complex_clearing",
+    },
 }
 
 # %%
 if __name__ == "__main__":
-    example = "complex_clearing_2019"
+    example = "minimal_base"
     data_format = "timescale"  # "local_db" or "timescale"
 
     if data_format == "local_db":

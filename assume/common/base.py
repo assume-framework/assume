@@ -218,6 +218,19 @@ class BaseUnit:
                     cashflow * hours
                 )
 
+    def calculate_costs(self, dispatch: pd.Series):
+        """
+        Calculates the profit in each time step from cashflow and costs
+        and stores it in outputs["profit"]
+
+        :param dispatch: dispatched power
+        :type start: pd.Series
+        :return: the costs for the given dispatch
+        :rtype: pd.Series
+        """
+
+        return pd.Series(0, index=dispatch.index)
+
 
 class SupportsMinMax(BaseUnit):
     """

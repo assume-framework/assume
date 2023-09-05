@@ -368,3 +368,15 @@ class PowerPlant(SupportsMinMax):
             return self.warm_start_cost
         else:
             return self.cold_start_cost
+
+    def calculate_costs(self, dispatch):
+        costs = pd.Series(self.fixed_cost, index=dispatch.index)
+        for start in dispatch.index:
+            if dispatch[start] != 0:
+                op_time = self.get_operation_time(start)
+                costs[start] += self.get_starting_costs(op_time)
+                costs[start] += dispatch[start] * self.calculate_marginal_cost(
+                    start, dispatch[start]
+                )
+
+        return costs
