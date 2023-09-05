@@ -75,7 +75,7 @@ class flexableEOMStorage(BaseStrategy):
                 previous_power,
                 max_power_discharge[start],
                 current_power_discharge,
-                min_power_discharge[0],
+                min_power_discharge.iloc[0],
             )
             min_power_discharge[start] = unit.calculate_ramp_discharge(
                 theoretic_SOC,
@@ -383,7 +383,7 @@ def get_specific_revenue(unit, marginal_cost, current_time, foresight, price_for
         theoretic_power_discharge = unit.calculate_ramp_discharge(
             soc,
             previous_power=previous_power,
-            power_discharge=max_power_discharge[i],
+            power_discharge=max_power_discharge.iloc[i],
         )
         possible_revenue += (market_price - marginal_cost) * theoretic_power_discharge
         theoretic_SOC -= theoretic_power_discharge / unit.max_volume

@@ -300,7 +300,7 @@ class DmasStorageStrategy(BaseStrategy):
             min_discharging_price = max_charging_price / (
                 unit.efficiency_discharge * unit.efficiency_discharge
             )
-            prc[ask_hours] = (power_prices[ask_hours] + min_discharging_price) / 2
+            prc[ask_hours] = (power_prices.iloc[ask_hours] + min_discharging_price) / 2
             prc[bid_hours] = power_prices.values[bid_hours]
             add = True
             for orders in total_orders.values():
