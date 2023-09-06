@@ -46,7 +46,6 @@ def test_init_function(storage_unit):
 
 
 def test_reset_function(storage_unit):
-    storage_unit.reset()
     # check if total_power_output is reset
     assert storage_unit.outputs["energy"].equals(
         pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
@@ -61,8 +60,6 @@ def test_reset_function(storage_unit):
 
 
 def test_calculate_operational_window(storage_unit):
-    storage_unit.reset()
-
     product_tuple = (
         pd.Timestamp("2022-01-01 00:00:00"),
         pd.Timestamp("2022-01-01 01:00:00"),
@@ -145,8 +142,6 @@ def test_soc_constraint(storage_unit):
 
 
 def test_storage_feedback(storage_unit, mock_market_config):
-    storage_unit.reset()
-
     product_tuple = (
         pd.Timestamp("2022-01-01 00:00:00"),
         pd.Timestamp("2022-01-01 01:00:00"),
@@ -213,8 +208,6 @@ def test_storage_feedback(storage_unit, mock_market_config):
 
 
 def test_storage_ramping(storage_unit):
-    storage_unit.reset()
-
     product_tuple = (
         pd.Timestamp("2022-01-01 00:00:00"),
         pd.Timestamp("2022-01-01 04:00:00"),
@@ -300,8 +293,6 @@ def test_storage_ramping(storage_unit):
 
 
 def test_execute_dispatch(storage_unit):
-    storage_unit.reset()
-
     product_tuple = (
         pd.Timestamp("2022-01-01 01:00:00"),
         pd.Timestamp("2022-01-01 02:00:00"),

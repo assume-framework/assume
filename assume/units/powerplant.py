@@ -140,30 +140,6 @@ class PowerPlant(SupportsMinMax):
         """
         self.marginal_cost = self.calc_simple_marginal_cost()
 
-    def reset(self):
-        """Reset the unit to its initial state."""
-
-        self.outputs["energy"] = pd.Series(0.0, index=self.index)
-        self.outputs["energy"].iloc[0] = self.min_power + 0.5 * (
-            self.max_power - self.min_power
-        )
-        # workaround if market schedules do not match
-        # for example neg_reserve is required but market did not bid yet
-        # it does set a usage in times where no power is used by the market
-        # self.outputs["energy"].loc[:] = self.min_power + 0.5 * (
-        #    self.max_power - self.min_power
-        # )
-
-        self.outputs["heat"] = pd.Series(0.0, index=self.index)
-        self.outputs["power_loss"] = pd.Series(0.0, index=self.index)
-
-        self.outputs["capacity_pos"] = pd.Series(0.0, index=self.index)
-        self.outputs["capacity_neg"] = pd.Series(0.0, index=self.index)
-
-        self.outputs["profits"] = pd.Series(0.0, index=self.index)
-        self.outputs["rewards"] = pd.Series(0.0, index=self.index)
-        self.outputs["regrets"] = pd.Series(0.0, index=self.index)
-
     def execute_current_dispatch(
         self,
         start: pd.Timestamp,

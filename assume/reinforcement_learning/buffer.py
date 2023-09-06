@@ -63,10 +63,6 @@ class ReplayBuffer:
     def size(self):
         return self.buffer_size if self.full else self.pos
 
-    def reset(self):
-        self.pos = 0
-        self.full = False
-
     def to_torch(self, array, copy=True):
         """
         Convert a numpy array to a PyTorch tensor.

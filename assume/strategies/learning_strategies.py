@@ -64,11 +64,6 @@ class RLStrategy(LearningStrategy):
         else:
             self.load_actor_params(load_path=kwargs["load_learned_path"])
 
-        self.reset()
-
-    def reset(
-        self,
-    ):
         self.curr_reward = None
 
     def calculate_bids(

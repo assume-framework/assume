@@ -64,10 +64,6 @@ class BaseUnit:
         else:
             self.forecaster = defaultdict(lambda: pd.Series(0.0, index=self.index))
 
-    def reset(self):
-        """Reset the unit to its initial state."""
-        raise NotImplementedError()
-
     def calculate_bids(
         self,
         market_config: MarketConfig,

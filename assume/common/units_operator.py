@@ -84,7 +84,6 @@ class UnitsOperator(Role):
         :param unit: the unit to be added
         :type unit: BaseUnit
         """
-        unit.reset()
         self.units[unit.id] = unit
 
         db_aid = self.context.data_dict.get("output_agent_id")
