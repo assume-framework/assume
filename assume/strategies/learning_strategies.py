@@ -193,7 +193,7 @@ class RLStrategy(LearningStrategy):
         if self.learning_mode:
             # if we are in learning mode the first x episodes we want to explore the entire action space
             # to get a good initial experience, in the area around the costs of the agent
-            if self.collect_initial_experience:
+            if self.collect_initial_experience_mode:
                 # define current action as soley noise
                 noise = (
                     th.normal(
