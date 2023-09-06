@@ -349,7 +349,7 @@ class WriteOutput(Role):
         ]
         return queries
 
-    def get_episode_sum_reward(self):
+    def get_sum_reward(self):
         query = text(
             "select value from kpis where variable = 'sum_reward' and ident = '{self.simulation_id}'"
         )

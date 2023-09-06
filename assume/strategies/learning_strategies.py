@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -62,7 +63,8 @@ class RLStrategy(LearningStrategy):
             )
 
         else:
-            self.load_actor_params(load_path=kwargs["load_learned_path"])
+            if Path(load_path=kwargs["load_learned_path"]).is_dir():
+                self.load_actor_params(load_path=kwargs["load_learned_path"])
 
         self.curr_reward = None
 
@@ -358,6 +360,7 @@ class RLStrategy(LearningStrategy):
         :type simulation_id: str
         """
         directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
+
         params = th.load(directory)
 
         self.actor = Actor(self.obs_dim, self.act_dim, self.float_type)
