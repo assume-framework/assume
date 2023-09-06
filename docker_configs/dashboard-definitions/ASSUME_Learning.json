@@ -608,8 +608,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -721,8 +720,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -838,8 +836,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -965,8 +962,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1138,8 +1134,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1368,8 +1363,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1506,8 +1500,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1645,14 +1638,14 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT \n  simulation\nFROM rl_params\ngroup by simulation;",
+        "definition": "CREATE OR REPLACE FUNCTION get_simulation_data()\nRETURNS TABLE (\n  market_simulation TEXT,\n  simulation TEXT\n) AS $$\nBEGIN\n  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'rl_params') THEN\n    -- Table rl_params exists, execute the join query\n    RETURN QUERY EXECUTE '\n      SELECT DISTINCT\n        m.simulation AS market_simulation,\n        o.simulation\n      FROM \n        market_meta m\n      LEFT OUTER JOIN\n        rl_params o\n      ON\n        m.simulation = o.simulation\n      WHERE\n        o.learning_mode = ''true''\n    ';\n  ELSE\n    -- Table rl_params doesn't exist, execute the query for market_meta only\n    RETURN QUERY EXECUTE '\n      SELECT DISTINCT\n        simulation AS market_simulation,\n        NULL AS simulation\n      FROM \n        market_meta\n    ';\n  END IF;\nEND;\n$$ LANGUAGE plpgsql;\n\nSELECT * FROM get_simulation_data();\n",
         "description": "Can choose which simulation we want to show ",
         "hide": 0,
         "includeAll": false,
         "multi": true,
         "name": "simulation",
         "options": [],
-        "query": "SELECT \n  simulation\nFROM rl_params\ngroup by simulation;",
+        "query": "CREATE OR REPLACE FUNCTION get_simulation_data()\nRETURNS TABLE (\n  market_simulation TEXT,\n  simulation TEXT\n) AS $$\nBEGIN\n  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'rl_params') THEN\n    -- Table rl_params exists, execute the join query\n    RETURN QUERY EXECUTE '\n      SELECT DISTINCT\n        m.simulation AS market_simulation,\n        o.simulation\n      FROM \n        market_meta m\n      LEFT OUTER JOIN\n        rl_params o\n      ON\n        m.simulation = o.simulation\n      WHERE\n        o.learning_mode = ''true''\n    ';\n  ELSE\n    -- Table rl_params doesn't exist, execute the query for market_meta only\n    RETURN QUERY EXECUTE '\n      SELECT DISTINCT\n        simulation AS market_simulation,\n        NULL AS simulation\n      FROM \n        market_meta\n    ';\n  END IF;\nEND;\n$$ LANGUAGE plpgsql;\n\nSELECT * FROM get_simulation_data();\n",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -1694,6 +1687,6 @@
   "timezone": "",
   "title": "Assume_Learning",
   "uid": "JKQzx0q4k",
-  "version": 3,
+  "version": 2,
   "weekStart": ""
 }

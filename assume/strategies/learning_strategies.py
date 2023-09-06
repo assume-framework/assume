@@ -347,6 +347,8 @@ class RLStrategy(LearningStrategy):
         # if multi market rl is used, the reward should be added up for all market results
         unit.outputs["reward"].loc[start:end_excl] = reward
         unit.outputs["regret"].loc[start:end_excl] = float(opportunity_cost)
+        # store if we are in learning mode
+        unit.outputs["learning_mode"].loc[start:end_excl] = self.learning_mode
 
     def load_actor_params(self, load_path):
         """

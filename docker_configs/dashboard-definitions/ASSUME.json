@@ -33,12 +33,99 @@
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 90,
+      "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "9.2.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "table",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "CREATE OR REPLACE FUNCTION get_simulation_data()\r\nRETURNS TABLE (\r\n  market_simulation TEXT,\r\n  simulation TEXT\r\n) AS $$\r\nBEGIN\r\n  IF to_regclass('rl_params') THEN\r\n    -- Table rl_params exists, execute the join query\r\n    RETURN QUERY EXECUTE '\r\n      SELECT DISTINCT\r\n        m.simulation AS market_simulation,\r\n        o.simulation\r\n      FROM \r\n        market_meta m\r\n      LEFT OUTER JOIN\r\n        rl_params o\r\n      ON\r\n        m.simulation = o.simulation\r\n      WHERE\r\n        o.learning_mode = ''false''\r\n    ';\r\n  ELSE\r\n    -- Table rl_params doesn't exist, execute the query for market_meta only\r\n    RETURN QUERY EXECUTE '\r\n      SELECT DISTINCT\r\n        simulation AS market_simulation,\r\n        NULL AS simulation\r\n      FROM \r\n        market_meta\r\n    ';\r\n  END IF;\r\nEND;\r\n$$ LANGUAGE plpgsql;\r\n\r\nSELECT * FROM get_simulation_data();\r\n",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "power"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "market_dispatch",
+          "timeColumn": "datetime",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Panel Title",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
       "description": "",
       "gridPos": {
         "h": 4,
         "w": 24,
         "x": 0,
-        "y": 0
+        "y": 8
       },
       "id": 4,
       "options": {
@@ -60,7 +147,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 4
+        "y": 12
       },
       "id": 30,
       "panels": [],
@@ -76,7 +163,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 5
+        "y": 13
       },
       "id": 17,
       "options": {
@@ -224,7 +311,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 8
+        "y": 16
       },
       "id": 11,
       "maxPerRow": 4,
@@ -382,7 +469,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 104
+        "y": 40
       },
       "id": 19,
       "options": {
@@ -559,7 +646,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 104
+        "y": 40
       },
       "id": 20,
       "options": {
@@ -679,7 +766,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 112
+        "y": 48
       },
       "id": 74,
       "panels": [],
@@ -768,7 +855,7 @@
         "h": 12,
         "w": 10,
         "x": 0,
-        "y": 113
+        "y": 49
       },
       "id": 72,
       "options": {
@@ -890,7 +977,7 @@
         "h": 12,
         "w": 9,
         "x": 10,
-        "y": 113
+        "y": 49
       },
       "id": 76,
       "options": {
@@ -975,7 +1062,7 @@
         "h": 12,
         "w": 5,
         "x": 19,
-        "y": 113
+        "y": 49
       },
       "id": 7,
       "options": {
@@ -1068,7 +1155,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 125
+        "y": 61
       },
       "id": 22,
       "options": {
@@ -1123,7 +1210,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 128
+        "y": 64
       },
       "id": 41,
       "panels": [],
@@ -1195,7 +1282,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 129
+        "y": 65
       },
       "id": 24,
       "options": {
@@ -1308,7 +1395,7 @@
         "h": 8,
         "w": 5,
         "x": 18,
-        "y": 129
+        "y": 65
       },
       "id": 26,
       "options": {
@@ -1454,7 +1541,7 @@
         "h": 9,
         "w": 5,
         "x": 18,
-        "y": 137
+        "y": 73
       },
       "id": 78,
       "options": {
@@ -1633,7 +1720,7 @@
         "h": 8,
         "w": 18,
         "x": 0,
-        "y": 138
+        "y": 74
       },
       "id": 70,
       "options": {
@@ -1822,7 +1909,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 146
+        "y": 82
       },
       "id": 82,
       "options": {
@@ -1914,7 +2001,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 156
+        "y": 92
       },
       "id": 39,
       "panels": [],
@@ -1983,7 +2070,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 157
+        "y": 93
       },
       "id": 36,
       "options": {
@@ -2095,7 +2182,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 157
+        "y": 93
       },
       "id": 37,
       "options": {
@@ -2228,7 +2315,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 166
+        "y": 102
       },
       "id": 86,
       "options": {
@@ -2404,7 +2491,7 @@
         "h": 9,
         "w": 5,
         "x": 18,
-        "y": 166
+        "y": 102
       },
       "id": 87,
       "options": {
@@ -2513,7 +2600,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 175
+        "y": 111
       },
       "id": 44,
       "panels": [],
@@ -2584,7 +2671,7 @@
         "h": 9,
         "w": 9,
         "x": 0,
-        "y": 176
+        "y": 112
       },
       "id": 65,
       "options": {
@@ -2731,7 +2818,7 @@
         "h": 9,
         "w": 11,
         "x": 9,
-        "y": 176
+        "y": 112
       },
       "id": 80,
       "options": {
@@ -2828,7 +2915,7 @@
         "h": 9,
         "w": 4,
         "x": 20,
-        "y": 176
+        "y": 112
       },
       "id": 47,
       "options": {
@@ -2961,7 +3048,7 @@
         "h": 8,
         "w": 19,
         "x": 0,
-        "y": 185
+        "y": 121
       },
       "id": 84,
       "options": {
@@ -3137,7 +3224,7 @@
         "h": 9,
         "w": 5,
         "x": 19,
-        "y": 185
+        "y": 121
       },
       "id": 88,
       "options": {
@@ -3250,21 +3337,21 @@
       {
         "current": {
           "selected": false,
-          "text": "example_01c_eom_only",
-          "value": "example_01c_eom_only"
+          "text": "example_01_rl_base",
+          "value": "example_01_rl_base"
         },
         "datasource": {
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT \n  simulation\nFROM power_plant_meta\ngroup by simulation;",
+        "definition": "CREATE OR REPLACE FUNCTION get_simulation_data()\nRETURNS TABLE (\n  market_simulation TEXT,\n  simulation TEXT\n) AS $$\nBEGIN\n  IF to_regclass('rl_params') THEN\n    -- Table rl_params exists, execute the join query\n    RETURN QUERY EXECUTE '\n      SELECT DISTINCT\n        m.simulation AS market_simulation,\n        o.simulation\n      FROM \n        market_meta m\n      LEFT OUTER JOIN\n        rl_params o\n      ON\n        m.simulation = o.simulation\n      WHERE\n        o.learning_mode = ''false''\n    ';\n  ELSE\n    -- Table rl_params doesn't exist, execute the query for market_meta only\n    RETURN QUERY EXECUTE '\n      SELECT DISTINCT\n        simulation AS market_simulation,\n        NULL AS simulation\n      FROM \n        market_meta\n    ';\n  END IF;\nEND;\n$$ LANGUAGE plpgsql;\n\nSELECT * FROM get_simulation_data();\n",
         "description": "Can choose which simulation we want to show ",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "simulation",
         "options": [],
-        "query": "SELECT \n  simulation\nFROM power_plant_meta\ngroup by simulation;",
+        "query": "CREATE OR REPLACE FUNCTION get_simulation_data()\nRETURNS TABLE (\n  market_simulation TEXT,\n  simulation TEXT\n) AS $$\nBEGIN\n  IF to_regclass('rl_params') THEN\n    -- Table rl_params exists, execute the join query\n    RETURN QUERY EXECUTE '\n      SELECT DISTINCT\n        m.simulation AS market_simulation,\n        o.simulation\n      FROM \n        market_meta m\n      LEFT OUTER JOIN\n        rl_params o\n      ON\n        m.simulation = o.simulation\n      WHERE\n        o.learning_mode = ''false''\n    ';\n  ELSE\n    -- Table rl_params doesn't exist, execute the query for market_meta only\n    RETURN QUERY EXECUTE '\n      SELECT DISTINCT\n        simulation AS market_simulation,\n        NULL AS simulation\n      FROM \n        market_meta\n    ';\n  END IF;\nEND;\n$$ LANGUAGE plpgsql;\n\nSELECT * FROM get_simulation_data();\n",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -3347,13 +3434,10 @@
       },
       {
         "current": {
-          "selected": true,
-          "text": [
-            "Storage 1"
-          ],
-          "value": [
-            "Storage 1"
-          ]
+          "isNone": true,
+          "selected": false,
+          "text": "None",
+          "value": ""
         },
         "datasource": {
           "type": "postgres",
@@ -3384,6 +3468,6 @@
   "timezone": "",
   "title": "ASSUME",
   "uid": "mQ3Lvkr4k",
-  "version": 5,
+  "version": 4,
   "weekStart": ""
 }

@@ -384,6 +384,7 @@ class UnitsOperator(Role):
                     "profit": unit.outputs["profit"].loc[start],
                     "reward": unit.outputs["reward"].loc[start],
                     "regret": unit.outputs["regret"].loc[start],
+                    "learning_mode": unit.outputs["learning_mode"].loc[start],
                     "unit": unit_id,
                 }
                 noise_tuple = unit.outputs["rl_exploration_noise"].loc[start]
