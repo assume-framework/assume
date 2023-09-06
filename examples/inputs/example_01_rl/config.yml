@@ -14,7 +14,7 @@ base:
     algorithm: matd3
     learning_rate: 0.001
     training_episodes: 30
-    collect_initial_experience: 2
+    collecting_initial_experience: 2
     train_freq: 24
     gradient_steps: -1
     batch_size: 128

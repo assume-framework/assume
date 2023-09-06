@@ -23,6 +23,7 @@ from assume.common import (
     WriteOutput,
     mango_codec_factory,
 )
+from assume.common.base import LearningConfig
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import LearningStrategy, bidding_strategies
 from assume.units import BaseUnit, Demand, HeatPump, PowerPlant, Storage
@@ -105,7 +106,7 @@ class World:
         save_frequency_hours: int = 24,
         same_process: bool = True,
         bidding_params: dict = {},
-        learning_config: dict = {},
+        learning_config: LearningConfig = {},
         episode: int = 0,
     ):
         self.clock = ExternalClock(0)

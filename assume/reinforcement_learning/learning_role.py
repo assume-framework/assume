@@ -7,7 +7,7 @@ from dateutil import rrule as rr
 from mango import Role
 from torch.optim import Adam
 
-from assume.common.base import LearningStrategy
+from assume.common.base import LearningConfig, LearningStrategy
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
 from assume.reinforcement_learning.learning_utils import Actor, CriticTD3
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class Learning(Role):
     def __init__(
         self,
-        learning_config,
+        learning_config: LearningConfig,
         start: datetime,
         end: datetime,
     ):
@@ -49,7 +49,9 @@ class Learning(Role):
         th.backends.cuda.matmul.allow_tf32 = True
 
         self.learning_rate = learning_config.get("learning_rate", 1e-4)
-        self.learning_starts = learning_config.get("collect_initial_experience", 5)
+        self.episodes_collecting_initial_experience = learning_config.get(
+            "episodes_collecting_initial_experience", 5
+        )
         self.train_freq = learning_config.get("train_freq", 1)
         self.gradient_steps = (
             self.train_freq
@@ -119,14 +121,14 @@ class Learning(Role):
 
     def turn_off_initial_exploration(self):
         for _, unit in self.rl_strats.items():
-            unit.collect_initial_experience = False
+            unit.collect_initial_experience_mode = False
 
     def create_learning_algorithm(self, algorithm):
         if algorithm == "matd3":
             self.rl_algorithm = TD3(
                 learning_role=self,
                 learning_rate=self.learning_rate,
-                learning_starts=self.learning_starts,
+                episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,
                 gradient_steps=self.gradient_steps,
                 batch_size=self.batch_size,
                 gamma=self.gamma,
@@ -135,7 +137,7 @@ class Learning(Role):
             self.logger.error(f"Learning algorithm {algorithm} not implemented!")
 
     async def update_policy(self):
-        if self.episodes_done > self.learning_starts:
+        if self.episodes_done > self.episodes_collecting_initial_experience:
             self.rl_algorithm.update_policy()
 
     # TODO: add evaluation function
