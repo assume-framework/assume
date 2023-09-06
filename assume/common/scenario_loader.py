@@ -556,8 +556,9 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
 
         world.run()
         actors_and_critics = world.learning_role.extract_actors_and_critics()
-        validation_interval = world.learning_config.get(
-            "validation_episodes_interval", 5
+        validation_interval = min(
+            world.learning_role.training_episodes,
+            world.learning_config.get("validation_episodes_interval", 5),
         )
         if (episode + 1) % validation_interval == 0:
             old_path = world.learning_config["load_learned_path"]
@@ -594,12 +595,6 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
             world.learning_role.turn_off_initial_exploration()
 
         # container shutdown implicitly with new initialisation
-    if world.learning_role.training_episodes < validation_interval:
-        print("DAATA")
-        # if validation_interval is > than episode count - use last
-        save_path = world.learning_config["load_learned_path"]
-        world.learning_role.save_params(directory=save_path)
-
     logger.info("################")
     logger.info("Training finished, Start evaluation run")
     world.export_csv_path = temp_csv_path
