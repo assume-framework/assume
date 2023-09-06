@@ -28,7 +28,7 @@ jobs:
         cache-dependency-path: '**/pyproject.toml'
     - name: Install dependencies
       run: |
-        sudo apt-get update && sudo apt-get install --no-install-recommends -y coinor-cbc && sudo rm -rf /var/lib/apt/lists/*
+        sudo apt-get update && sudo apt-get install --no-install-recommends -y coinor-cbc gcc g++ libglpk-dev glpk-utils && sudo rm -rf /var/lib/apt/lists/*
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         python -m pip install -e .[test]

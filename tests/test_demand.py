@@ -74,9 +74,9 @@ def test_demand_series():
     )
 
     demand = pd.Series(100, index=index)
-    demand[1] = 80
+    demand.iloc[1] = 80
     price = pd.Series(1000, index=index)
-    price[1] = 0
+    price.iloc[1] = 0
 
     ff = NaiveForecast(index, demand=demand)
     dem = Demand(
@@ -117,7 +117,7 @@ def test_demand_series():
         assert "volume" in bid.keys()
     assert len(bids) == 1
     assert bids[0]["volume"] == max_power
-    assert bids[0]["price"] == price[1]
+    assert bids[0]["price"] == price.iloc[1]
 
 
 if __name__ == "__main__":
