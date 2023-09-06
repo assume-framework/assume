@@ -169,7 +169,6 @@ class RLStrategy(LearningStrategy):
                 )
 
                 curr_action = noise + next_observation[-1].clone().detach()
-
             else:
                 curr_action = self.actor(next_observation).detach()
                 noise = th.tensor(
@@ -178,6 +177,7 @@ class RLStrategy(LearningStrategy):
                 curr_action += noise
         else:
             curr_action = self.actor(next_observation).detach()
+            noise = tuple([0 for i in range(self.act_dim)])
 
         curr_action = curr_action.clamp(-1, 1)
 

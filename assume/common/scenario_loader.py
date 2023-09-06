@@ -509,6 +509,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
     # remove csv path so that nothing is written while learning
     temp_csv_path = world.export_csv_path
     world.export_csv_path = ""
+    best_reward = -1e10
 
     buffer = ReplayBuffer(
         buffer_size=int(5e5),
@@ -546,11 +547,13 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
 
         world.run()
         actors_and_critics = world.learning_role.extract_actors_and_critics()
+        avg_reward = world.output_role.get_episode_sum_reward()
+        path = world.learning_config["load_learned_path"]
+        if best_reward < avg_reward:
+            world.learning_role.save_params(directory=path)
 
         if episode == world.learning_role.training_episodes - 1:
-            world.learning_role.save_params(
-                directory=f"{inputs_path}/learned_strategies/{scenario}_{study_case}"
-            )
+            world.learning_role.save_params(directory=path)
 
         world.reset()
 

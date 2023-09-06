@@ -56,6 +56,13 @@ class WriteOutput(Role):
             self.p.mkdir(parents=True)
         self.db = db_engine
 
+        # learning
+        episode = self.simulation_id.split("_")[-1]
+        if episode.isdigit():
+            self.episode = int(episode)
+        else:
+            self.episode = None
+
         # contruct all timeframe under which hourly values are written to excel and db
         self.start = start
         self.end = end
@@ -165,11 +172,7 @@ class WriteOutput(Role):
             return
         df["simulation"] = self.simulation_id
         # get characters after last "_" of simulation id string
-        episode = self.simulation_id.split("_")[-1]
-        if episode.isdigit():
-            df["episode"] = int(episode)
-        else:
-            df["episode"] = None
+        df["episode"] = self.episode
         self.write_dfs["rl_params"].append(df)
 
     def write_market_results(self, market_meta):
@@ -303,24 +306,58 @@ class WriteOutput(Role):
         if self.db is None:
             return
         queries = [
-            f"select market_id as name, market_id, avg(price) as avg_price from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select market_id as name, market_id, sum(price*demand_volume_energy) as total_cost from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select market_id as name, market_id, sum(demand_volume_energy) as total_volume from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select unit_id as name, market_id, avg(power/max_power) as capacity_factor from market_dispatch ud join power_plant_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by name, market_id",
+            f"select 'avg_price' as variable, market_id as ident, avg(price) as value from market_meta where simulation = '{self.simulation_id}' group by market_id",
+            f"select 'total_cost' as variable, market_id as ident, sum(price*demand_volume_energy) as value from market_meta where simulation = '{self.simulation_id}' group by market_id",
+            f"select 'total_volume' as variable, market_id as ident, sum(demand_volume_energy) as value from market_meta where simulation = '{self.simulation_id}' group by market_id",
+            f"select 'capacity_factor' as variable, market_id as ident, avg(power/max_power) as value from market_dispatch ud join power_plant_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by variable, market_id",
         ]
         dfs = []
+
+        learning_queries = self.learning_queries()
+        if learning_queries:
+            queries.extend(learning_queries)
+
         try:
             for query in queries:
                 df = pd.read_sql(query, self.db.bind)
-                dfs.append(df.melt(id_vars=["name"]))
+                dfs.append(df)
             df = pd.concat(dfs)
             df.reset_index()
             df["simulation"] = self.simulation_id
             if self.export_csv_path:
                 kpi_data_path = self.p.joinpath("kpis.csv")
-                df.to_csv(kpi_data_path, mode="a", header=not kpi_data_path.exists())
+                df.to_csv(
+                    kpi_data_path,
+                    mode="a",
+                    header=not kpi_data_path.exists(),
+                    index=None,
+                )
             if self.db is not None and not df.empty:
-                df.to_sql("kpis", self.db.bind, if_exists="append")
+                df.to_sql("kpis", self.db.bind, if_exists="append", index=None)
         except ProgrammingError as e:
             self.db.rollback()
             logger.error(f"No scenario run Yet {e}")
+
+    def learning_queries(self):
+        if not self.episode:
+            return []
+
+        queries = [
+            f"SELECT 'sum_reward' as variable, simulation as ident, sum(reward) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+            f"SELECT 'sum_regret' as variable, simulation as ident, sum(regret) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+            f"SELECT 'sum_profit' as variable, simulation as ident, sum(profit) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+        ]
+        return queries
+
+    def get_episode_sum_reward(self):
+        query = text(
+            "select value from kpis where variable = 'sum_reward' and ident = '{self.simulation_id}'"
+        )
+
+        try:
+            with self.db() as db:
+                avg_reward = db.execute(query).fetchall()[0]
+        except Exception:
+            avg_reward = 0
+
+        return avg_reward
