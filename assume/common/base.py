@@ -55,7 +55,7 @@ class BaseUnit:
         # series does not like to convert from tensor to float otherwise
         self.outputs["rl_actions"] = pd.Series(0.0, index=self.index, dtype=object)
         self.outputs["rl_observations"] = pd.Series(0.0, index=self.index, dtype=object)
-        self.outputs["rewards"] = pd.Series(0.0, index=self.index, dtype=object)
+        self.outputs["reward"] = pd.Series(0.0, index=self.index, dtype=object)
         self.outputs["rl_exploration_noise"] = pd.Series(
             0.0, index=self.index, dtype=object
         )

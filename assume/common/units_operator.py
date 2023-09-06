@@ -441,7 +441,7 @@ class UnitsOperator(Role):
                     np.array(unit.outputs["rl_observations"][start])
                 )
                 all_actions[i, :] = unit.outputs["rl_actions"][start]
-                all_rewards.append(unit.outputs["rl_rewards"][start])
+                all_rewards.append(unit.outputs["reward"][start])
                 i += 1
         # convert all_actions list of tensor to numpy 2D array
         all_actions = all_actions.squeeze().cpu().numpy()
