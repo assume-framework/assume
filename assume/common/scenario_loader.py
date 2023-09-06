@@ -7,6 +7,7 @@ import pandas as pd
 import yaml
 from tqdm import tqdm
 
+from assume.common.base import LearningConfig
 from assume.common.forecasts import CsvForecaster, Forecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.world import World
@@ -301,7 +302,7 @@ async def load_scenario_folder_async(
     save_frequency_hours = config.get("save_frequency_hours", 48)
     sim_id = f"{scenario}_{study_case}"
 
-    learning_config = config.get("learning_config", {})
+    learning_config: LearningConfig = config.get("learning_config", {})
     bidding_strategy_params = config.get("bidding_strategy_params", {})
 
     if disable_learning:
@@ -542,7 +543,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
         world.learning_role.buffer = buffer
         world.learning_role.episodes_done = episode
 
-        if episode + 1 >= world.learning_role.learning_starts:
+        if episode + 1 >= world.learning_role.episodes_collecting_initial_experience:
             world.learning_role.turn_off_initial_exploration()
 
         world.run()
@@ -561,7 +562,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
         # as long as we do not skip setup container should be handled correctly
         # if enough initial experience was collected according to specifications in learning config
         # turn off initial exploration and go into full learning mode
-        if episode + 1 >= world.learning_role.learning_starts:
+        if episode + 1 >= world.learning_role.episodes_collecting_initial_experience:
             world.learning_role.turn_off_initial_exploration()
 
         # container shutdown implicitly with new initialisation

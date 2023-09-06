@@ -49,8 +49,8 @@ class RLStrategy(LearningStrategy):
 
         if self.learning_mode:
             self.learning_role = None
-            self.collect_initial_experience = kwargs.get(
-                "collect_initial_experience", True
+            self.collect_initial_experience_mode = kwargs.get(
+                "collecting_initial_experience", True
             )
 
             self.action_noise = NormalActionNoise(
@@ -154,7 +154,7 @@ class RLStrategy(LearningStrategy):
         :rtype: torch.Tensor
         """
         if self.learning_mode:
-            if self.collect_initial_experience:
+            if self.collect_initial_experience_mode:
                 noise = (
                     th.normal(
                         mean=0.0, std=0.2, size=(1, self.act_dim), dtype=self.float_type
