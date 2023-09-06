@@ -11,11 +11,22 @@ from assume.reinforcement_learning.learning_utils import polyak_update
 
 
 class TD3(RLAlgorithm):
+    """
+    Twin Delayed Deep Deterministic Policy Gradients (TD3).
+    Addressing Function Approximation Error in Actor-Critic Methods.
+    TD3 is a direct successor of DDPG and improves it using three major tricks:
+    clipped double Q-Learning, delayed policy update and target policy smoothing.
+
+    Open AI Spinning guide: https://spinningup.openai.com/en/latest/algorithms/td3.html
+
+    Original paper: https://arxiv.org/pdf/1802.09477.pdf
+    """
+
     def __init__(
         self,
         learning_role,
         learning_rate=1e-4,
-        learning_starts=100,
+        episodes_collecting_initial_experience=100,
         batch_size=1024,
         tau=0.005,
         gamma=0.99,
@@ -27,7 +38,7 @@ class TD3(RLAlgorithm):
         super().__init__(
             learning_role,
             learning_rate,
-            learning_starts,
+            episodes_collecting_initial_experience,
             batch_size,
             tau,
             gamma,
@@ -39,6 +50,24 @@ class TD3(RLAlgorithm):
         self.n_updates = 0
 
     def update_policy(self):
+        """
+        Update the policy of the reinforcement learning agent using the Twin Delayed Deep Deterministic Policy Gradients (TD3) algorithm.
+
+        This function performs the policy update step, which involves updating the actor (policy) and critic (Q-function) networks
+        using TD3 algorithm. It iterates over the specified number of gradient steps and performs the following steps for each
+        learning strategy:
+
+        1. Sample a batch of transitions from the replay buffer.
+        2. Calculate the next actions with added noise using the actor target network.
+        3. Compute the target Q-values based on the next states, rewards, and the target critic network.
+        4. Compute the critic loss as the mean squared error between current Q-values and target Q-values.
+        5. Optimize the critic network by performing a gradient descent step.
+        6. Optionally, update the actor network if the specified policy delay is reached.
+        7. Apply Polyak averaging to update target networks.
+
+        This function implements the TD3 algorithm's key step for policy improvement and exploration.
+        """
+
         logger.info(f"Updating Policy")
         n_rl_agents = len(self.learning_role.rl_strats.keys())
         for _ in range(self.gradient_steps):

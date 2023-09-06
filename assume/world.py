@@ -23,6 +23,7 @@ from assume.common import (
     WriteOutput,
     mango_codec_factory,
 )
+from assume.common.base import LearningConfig
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import LearningStrategy, bidding_strategies
 from assume.units import BaseUnit, Demand, HeatPump, PowerPlant, Storage
@@ -64,7 +65,9 @@ class World:
                     self.logger.error(
                         f"could not connect to {database_uri}, trying again"
                     )
-                    self.logger.error(f"{e}")
+                    # log error if not connection refused
+                    if not e.code == "e3q8":
+                        self.logger.error(f"{e}")
                     time.sleep(2)
         else:
             self.db = None
@@ -105,8 +108,7 @@ class World:
         save_frequency_hours: int = 24,
         same_process: bool = True,
         bidding_params: dict = {},
-        learning_config: dict = {},
-        episode: int = 0,
+        learning_config: LearningConfig = {},
     ):
         self.clock = ExternalClock(0)
         self.start = start
@@ -125,8 +127,6 @@ class World:
             addr=self.addr, clock=self.clock, codec=mango_codec_factory()
         )
         await self.setup_learning()
-        if self.learning_mode:
-            simulation_id = f"{simulation_id}_{episode}"
         await self.setup_output_agent(simulation_id, save_frequency_hours)
 
     async def setup_learning(self):

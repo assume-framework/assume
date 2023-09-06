@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -53,8 +54,8 @@ class RLStrategy(LearningStrategy):
 
         if self.learning_mode:
             self.learning_role = None
-            self.collect_initial_experience = kwargs.get(
-                "collect_initial_experience", True
+            self.collect_initial_experience_mode = kwargs.get(
+                "collecting_initial_experience", True
             )
 
             self.action_noise = NormalActionNoise(
@@ -66,7 +67,8 @@ class RLStrategy(LearningStrategy):
             )
 
         else:
-            self.load_actor_params(load_path=kwargs["load_learned_path"])
+            if Path(load_path=kwargs["load_learned_path"]).is_dir():
+                self.load_actor_params(load_path=kwargs["load_learned_path"])
 
         self.curr_reward = None
 
@@ -191,10 +193,8 @@ class RLStrategy(LearningStrategy):
         if self.learning_mode:
             # if we are in learning mode the first x episodes we want to explore the entire action space
             # to get a good initial experience, in the area around the costs of the agent
-
             if self.collect_initial_experience:
                 # define current action as soley noise
-
                 noise = (
                     th.normal(
                         mean=0.0, std=0.2, size=(1, self.act_dim), dtype=self.float_type
@@ -465,6 +465,7 @@ class RLStrategy(LearningStrategy):
         :type simulation_id: str
         """
         directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
+
         params = th.load(directory)
 
         self.actor = Actor(self.obs_dim, self.act_dim, self.float_type)
