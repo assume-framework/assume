@@ -573,7 +573,6 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
                 inputs_path,
                 scenario,
                 study_case,
-                episode=world.learning_role.episodes_done,
                 disable_learning=True,
                 load_learned_path=new_path,
             )
@@ -605,6 +604,5 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
         inputs_path,
         scenario,
         study_case,
-        episode=world.learning_role.episodes_done,
         disable_learning=True,
     )

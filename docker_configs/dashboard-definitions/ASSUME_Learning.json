@@ -303,7 +303,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  episode,\n  reward\nFROM rl_params\n",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  episode,\n  reward\nFROM rl_params\nwhere simulation like ${simulation} || '_%'\nand learning_mode is true",
           "refId": "A",
           "select": [
             [
@@ -535,7 +535,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT \r\n  $__timeGroupAlias(datetime,$__interval),\r\n  'episode ' || episode AS \"episode\",\r\n  sum(sum(reward)) OVER (PARTITION BY episode ORDER BY datetime) AS \"reward\"\r\nFROM\r\n  rl_params\r\nWHERE\r\n  $__timeFilter(datetime) \r\nGROUP BY 1, datetime, episode\r\nORDER BY 1\r\n\r\n\r\n\r\n",
+          "rawSql": "-- this query creates a cumulative sum of the reward until now\r\nSELECT \r\n  $__timeGroupAlias(datetime,$__interval),\r\n  'episode ' || episode AS \"episode\",\r\n  sum(sum(reward)) OVER (PARTITION BY episode ORDER BY datetime) AS \"reward\"\r\nFROM\r\n  rl_params\r\nWHERE\r\n  $__timeFilter(datetime) \r\n  and simulation like ${simulation} || '_%'\r\nGROUP BY 1, datetime, episode\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -649,7 +649,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT \r\n  $__timeGroupAlias(datetime,$__interval),\r\n  'episode ' || episode AS \"episode\",\r\n  sum(sum(profit)) OVER (PARTITION BY episode ORDER BY datetime) AS \"profit\"\r\nFROM\r\n  rl_params\r\nWHERE\r\n  $__timeFilter(datetime) \r\nGROUP BY 1, datetime, episode\r\nORDER BY 1",
+          "rawSql": "SELECT \r\n  $__timeGroupAlias(datetime,$__interval),\r\n  'episode ' || episode AS \"episode\",\r\n  sum(sum(profit)) OVER (PARTITION BY episode ORDER BY datetime) AS \"profit\"\r\nFROM\r\n  rl_params\r\nWHERE\r\n  $__timeFilter(datetime)\r\n  and simulation like ${simulation} || '_%'\r\nGROUP BY 1, datetime, episode\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -731,35 +731,7 @@
             ]
           }
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "accepted_volume episode example_01_rl_base_0",
-                  "accepted_volume episode example_01_rl_base_28",
-                  "accepted_volume episode example_01_rl_base_22",
-                  "accepted_volume episode example_01_rl_base_25"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
@@ -791,7 +763,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_volume/volume) AS \"accepted_volume\",\r\n  'episode ' || simulation AS \"episode\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time)\r\nGROUP BY 1, start_time, episode\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_volume/volume) AS \"accepted_volume\",\r\n  'episode ' || simulation AS \"episode\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time)\r\n  and simulation like ${simulation} || '_%'\r\nGROUP BY 1, start_time, episode\r\nORDER BY 1",
           "refId": "B",
           "select": [
             [
@@ -1407,7 +1379,7 @@
           ]
         }
       ],
-      "title": "Panel Title",
+      "title": "Bid Overview",
       "type": "table"
     },
     {
@@ -1569,8 +1541,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1655,7 +1626,7 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT distinct unit\nFROM rl_params",
+        "definition": "SELECT distinct unit\nFROM rl_params\nwhere simulation like ${simulation} || '_%'",
         "description": "All units that have an reinforcment learning strategy and hence have the Rl specific parameteres logged",
         "hide": 0,
         "includeAll": false,
@@ -1663,7 +1634,7 @@
         "multi": false,
         "name": "rl_unit",
         "options": [],
-        "query": "SELECT distinct unit\nFROM rl_params",
+        "query": "SELECT distinct unit\nFROM rl_params\nwhere simulation like ${simulation} || '_%'",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -1674,24 +1645,24 @@
         "current": {
           "selected": true,
           "text": [
-            "example_01_rl_base_5"
+            "example_01_rl_base"
           ],
           "value": [
-            "example_01_rl_base_5"
+            "example_01_rl_base"
           ]
         },
         "datasource": {
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "CREATE OR REPLACE FUNCTION get_simulation_data()\nRETURNS TABLE (\n  market_simulation TEXT,\n  simulation TEXT\n) AS $$\nBEGIN\n  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'rl_params') THEN\n    -- Table rl_params exists, execute the join query\n    RETURN QUERY EXECUTE '\n      SELECT DISTINCT\n        m.simulation AS market_simulation,\n        o.simulation\n      FROM \n        market_meta m\n      LEFT OUTER JOIN\n        rl_params o\n      ON\n        m.simulation = o.simulation\n      WHERE\n        o.learning_mode = ''true''\n    ';\n  ELSE\n    -- Table rl_params doesn't exist, execute the query for market_meta only\n    RETURN QUERY EXECUTE '\n      SELECT DISTINCT\n        simulation AS market_simulation,\n        NULL AS simulation\n      FROM \n        market_meta\n    ';\n  END IF;\nEND;\n$$ LANGUAGE plpgsql;\n\nSELECT * FROM get_simulation_data();\n",
+        "definition": "SELECT DISTINCT\n        SUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\n      FROM \n        market_meta m\n      LEFT OUTER JOIN\n        rl_params o\n      ON\n        m.simulation = o.simulation\n      WHERE\n        o.learning_mode is true",
         "description": "Can choose which simulation we want to show ",
         "hide": 0,
         "includeAll": false,
         "multi": true,
         "name": "simulation",
         "options": [],
-        "query": "CREATE OR REPLACE FUNCTION get_simulation_data()\nRETURNS TABLE (\n  market_simulation TEXT,\n  simulation TEXT\n) AS $$\nBEGIN\n  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'rl_params') THEN\n    -- Table rl_params exists, execute the join query\n    RETURN QUERY EXECUTE '\n      SELECT DISTINCT\n        m.simulation AS market_simulation,\n        o.simulation\n      FROM \n        market_meta m\n      LEFT OUTER JOIN\n        rl_params o\n      ON\n        m.simulation = o.simulation\n      WHERE\n        o.learning_mode = ''true''\n    ';\n  ELSE\n    -- Table rl_params doesn't exist, execute the query for market_meta only\n    RETURN QUERY EXECUTE '\n      SELECT DISTINCT\n        simulation AS market_simulation,\n        NULL AS simulation\n      FROM \n        market_meta\n    ';\n  END IF;\nEND;\n$$ LANGUAGE plpgsql;\n\nSELECT * FROM get_simulation_data();\n",
+        "query": "SELECT DISTINCT\n        SUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\n      FROM \n        market_meta m\n      LEFT OUTER JOIN\n        rl_params o\n      ON\n        m.simulation = o.simulation\n      WHERE\n        o.learning_mode is true",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -1708,7 +1679,7 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT \n  CAST(episode AS INT) AS episode_int\nFROM rl_params\ngroup by episode_int;",
+        "definition": "SELECT \n  distinct episode\nFROM rl_params\nwhere simulation like ${simulation} || '_%';",
         "description": "Gives us the number of runs of the simulation period learned ",
         "hide": 0,
         "includeAll": false,
@@ -1716,11 +1687,11 @@
         "multi": false,
         "name": "episode",
         "options": [],
-        "query": "SELECT \n  CAST(episode AS INT) AS episode_int\nFROM rl_params\ngroup by episode_int;",
+        "query": "SELECT \n  distinct episode\nFROM rl_params\nwhere simulation like ${simulation} || '_%';",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
-        "sort": 0,
+        "sort": 3,
         "type": "query"
       }
     ]
@@ -1733,6 +1704,6 @@
   "timezone": "",
   "title": "Assume_Learning",
   "uid": "JKQzx0q4k",
-  "version": 15,
+  "version": 13,
   "weekStart": ""
 }
