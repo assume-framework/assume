@@ -91,12 +91,6 @@ class Electrolyser(BaseUnit):
         self.location = location
         self.dr_factor = dr_factor
 
-    def reset(self):
-        """
-        Reset the unit to its initial state.
-        """
-        pass
-
     def calculate_min_max_power(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[float]:

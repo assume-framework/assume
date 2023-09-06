@@ -1,5 +1,4 @@
 import logging
-from itertools import groupby
 from operator import itemgetter
 
 import pyomo.environ as pyo

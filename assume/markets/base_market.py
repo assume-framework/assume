@@ -5,7 +5,6 @@ from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
 
-import pandas as pd
 from mango import Role
 
 from assume.common.market_objects import (

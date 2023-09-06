@@ -19,51 +19,38 @@ class TD3(RLAlgorithm):
         batch_size=1024,
         tau=0.005,
         gamma=0.99,
-        train_freq=1,
         gradient_steps=-1,
         policy_delay=2,
         target_policy_noise=0.2,
         target_noise_clip=0.5,
     ):
-        self.learning_role = learning_role
-        self.learning_rate = learning_rate
-        self.learning_starts = learning_starts
-        self.batch_size = batch_size
-        self.gamma = gamma
-        self.tau = tau
-
-        self.train_freq = train_freq
-        self.gradient_steps = (
-            self.train_freq if gradient_steps == -1 else gradient_steps
+        super().__init__(
+            learning_role,
+            learning_rate,
+            learning_starts,
+            batch_size,
+            tau,
+            gamma,
+            gradient_steps,
+            policy_delay,
+            target_policy_noise,
+            target_noise_clip,
         )
-
-        self.policy_delay = policy_delay
-        self.target_noise_clip = target_noise_clip
-        self.target_policy_noise = target_policy_noise
-
-        self.obs_dim = self.learning_role.obs_dim
-        self.act_dim = self.learning_role.act_dim
-
-        self.device = self.learning_role.device
-        self.float_type = self.learning_role.float_type
-
-        self.unique_obs_len = 8
-
         self.n_updates = 0
 
     def update_policy(self):
         logger.info(f"Updating Policy")
-        n_rl_agents = len(self.learning_role.rl_units)
+        n_rl_agents = len(self.learning_role.rl_strats.keys())
         for _ in range(self.gradient_steps):
             self.n_updates += 1
             i = 0
             strategy: LearningStrategy
 
-            for u_id, strategy in self.learning_role.rl_units.items():
+            for u_id, strategy in self.learning_role.rl_strats.items():
                 critic_target = self.learning_role.target_critics[u_id]
                 critic = self.learning_role.critics[u_id]
-                actor = self.learning_role.rl_units[u_id].actor
-                actor_target = self.learning_role.rl_units[u_id].actor_target
+                actor = self.learning_role.rl_strats[u_id].actor
+                actor_target = self.learning_role.rl_strats[u_id].actor_target
 
                 if i % 100 == 0:
                     transitions = self.learning_role.buffer.sample(self.batch_size)
@@ -84,9 +71,7 @@ class TD3(RLAlgorithm):
                             (actor_target(next_states[:, i, :]) + noise[:, i, :]).clamp(
                                 -1, 1
                             )
-                            for i, agent in enumerate(
-                                self.learning_role.rl_units.values()
-                            )
+                            for i in range(n_rl_agents)
                         ]
                         next_actions = th.stack(next_actions)
 
@@ -145,10 +130,9 @@ class TD3(RLAlgorithm):
                         all_states, all_actions_clone
                     ).mean()
 
-                    # TODO Optimize the actor
-                    # actor.optimizer.zero_grad()
+                    actor.optimizer.zero_grad()
                     actor_loss.backward()
-                    # actor.optimizer.step()
+                    actor.optimizer.step()
 
                     polyak_update(
                         critic.parameters(), critic_target.parameters(), self.tau
@@ -156,8 +140,5 @@ class TD3(RLAlgorithm):
                     polyak_update(
                         actor.parameters(), actor_target.parameters(), self.tau
                     )
-
-                # TODO return a transition back to the strategy
-                strategy.update_transition(transitions)
 
                 i += 1

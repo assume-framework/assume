@@ -55,15 +55,15 @@ class BaseUnit:
         # series does not like to convert from tensor to float otherwise
         self.outputs["rl_actions"] = pd.Series(0.0, index=self.index, dtype=object)
         self.outputs["rl_observations"] = pd.Series(0.0, index=self.index, dtype=object)
-        self.outputs["rl_rewards"] = pd.Series(0.0, index=self.index, dtype=object)
+        self.outputs["reward"] = pd.Series(0.0, index=self.index, dtype=object)
+        self.outputs["learning_mode"] = pd.Series(False, index=self.index, dtype=bool)
+        self.outputs["rl_exploration_noise"] = pd.Series(
+            0.0, index=self.index, dtype=object
+        )
         if forecaster:
             self.forecaster = forecaster
         else:
             self.forecaster = defaultdict(lambda: pd.Series(0.0, index=self.index))
-
-    def reset(self):
-        """Reset the unit to its initial state."""
-        raise NotImplementedError()
 
     def calculate_bids(
         self,
@@ -129,6 +129,11 @@ class BaseUnit:
                 ]
 
         self.calculate_cashflow(product_type, orderbook)
+
+        self.outputs[product_type + "_marginal_costs"].loc[start:end_excl] = (
+            self.calculate_marginal_cost(start, self.outputs[product_type].loc[start])
+            * self.outputs[product_type].loc[start:end_excl]
+        )
 
         self.bidding_strategies[product_type].calculate_reward(
             unit=self,
@@ -654,6 +659,3 @@ class LearningStrategy(BaseStrategy):
         super().__init__(*args, **kwargs)
         self.obs_dim = kwargs.get("observation_dimension", 50)
         self.act_dim = kwargs.get("action_dimension", 2)
-
-    def update_transition(self, transitions):
-        pass

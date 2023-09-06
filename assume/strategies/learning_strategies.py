@@ -31,7 +31,7 @@ class RLStrategy(LearningStrategy):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+        self.unit_id = kwargs["unit_id"]
         self.foresight = kwargs.get("foresight", 24)
 
         # RL agent parameters
@@ -47,40 +47,23 @@ class RLStrategy(LearningStrategy):
 
         self.learning_mode = kwargs.get("learning_mode", False)
 
-        self.actor = Actor(self.obs_dim, self.act_dim, self.float_type).to(self.device)
-
         if self.learning_mode:
             self.learning_role = None
             self.collect_initial_experience = kwargs.get(
-                "collect_initial_experience", False
+                "collect_initial_experience", True
             )
-
-            self.actor_target = Actor(self.obs_dim, self.act_dim, self.float_type).to(
-                self.device
-            )
-            self.actor_target.load_state_dict(self.actor.state_dict())
-            # Target networks should always be in eval mode
-            self.actor_target.train(mode=False)
 
             self.action_noise = NormalActionNoise(
                 mu=0.0,
-                sigma=kwargs.get("noise_sigma", 0.2),
+                sigma=kwargs.get("noise_sigma", 0.1),
                 action_dimension=self.act_dim,
                 scale=kwargs.get("noise_scale", 1.0),
                 dt=kwargs.get("noise_dt", 1.0),
             )
 
         else:
-            self.actor_target = None
+            self.load_actor_params(load_path=kwargs["load_learned_path"])
 
-        if kwargs.get("load_learned_strategies", False):
-            self.load_params(kwargs["load_learned_path"])
-
-        self.reset()
-
-    def reset(
-        self,
-    ):
         self.curr_reward = None
 
     def calculate_bids(
@@ -123,8 +106,9 @@ class RLStrategy(LearningStrategy):
             end=end,
         )
 
-        actions = self.get_actions(next_observation)
+        actions, noise = self.get_actions(next_observation)
         unit.outputs["rl_actions"][start] = actions
+        unit.outputs["rl_exploration_noise"][start] = noise
 
         bid_prices = actions * self.max_bid_price
 
@@ -171,7 +155,7 @@ class RLStrategy(LearningStrategy):
         """
         if self.learning_mode:
             if self.collect_initial_experience:
-                curr_action = (
+                noise = (
                     th.normal(
                         mean=0.0, std=0.2, size=(1, self.act_dim), dtype=self.float_type
                     )
@@ -179,22 +163,20 @@ class RLStrategy(LearningStrategy):
                     .squeeze()
                 )
 
-                curr_action += th.tensor(
-                    next_observation[-1],
-                    device=self.device,
-                    dtype=self.float_type,
-                )
+                curr_action = noise + next_observation[-1].clone().detach()
             else:
                 curr_action = self.actor(next_observation).detach()
-                curr_action += th.tensor(
+                noise = th.tensor(
                     self.action_noise.noise(), device=self.device, dtype=self.float_type
                 )
+                curr_action += noise
         else:
             curr_action = self.actor(next_observation).detach()
+            noise = tuple([0 for i in range(self.act_dim)])
 
         curr_action = curr_action.clamp(-1, 1)
 
-        return curr_action
+        return curr_action, noise
 
     def create_observation(
         self,
@@ -245,15 +227,14 @@ class RLStrategy(LearningStrategy):
                 / self.max_demand
             )
 
-        if end_excl + forecast_len > unit.forecaster["price_forecast"].index[-1]:
+        if end_excl + forecast_len > unit.forecaster["price_EOM"].index[-1]:
             scaled_price_forecast = (
-                unit.forecaster["price_forecast"].loc[start:].values
-                / self.max_bid_price
+                unit.forecaster["price_EOM"].loc[start:].values / self.max_bid_price
             )
             scaled_price_forecast = np.concatenate(
                 [
                     scaled_price_forecast,
-                    unit.forecaster["price_forecast"].iloc[
+                    unit.forecaster["price_EOM"].iloc[
                         : self.foresight - len(scaled_price_forecast)
                     ],
                 ]
@@ -261,9 +242,7 @@ class RLStrategy(LearningStrategy):
 
         else:
             scaled_price_forecast = (
-                unit.forecaster["price_forecast"]
-                .loc[start : end_excl + forecast_len]
-                .values
+                unit.forecaster["price_EOM"].loc[start : end_excl + forecast_len].values
                 / self.max_bid_price
             )
 
@@ -310,6 +289,7 @@ class RLStrategy(LearningStrategy):
         regret_scale = 0.2
         profit = 0
         reward = 0
+        opportunity_cost = 0
 
         for order in orderbook:
             start = order["start_time"]
@@ -332,10 +312,10 @@ class RLStrategy(LearningStrategy):
             price_difference = order["price"] - marginal_cost
             duration = (end - start) / timedelta(hours=1)
             # calculate profit as income - running_cost from this event
-            order_profit = order["price"] * order["volume"] * duration
+            order_profit = order["price"] * order["accepted_volume"] * duration
 
             # calculate opportunity cost as the loss of income we have because we are not running at full power
-            opportunity_cost = (
+            order_opportunity_cost = (
                 price_difference
                 * (
                     unit.max_power - unit.outputs[product_type].loc[start:end_excl]
@@ -343,7 +323,7 @@ class RLStrategy(LearningStrategy):
                 * duration
             )
             # opportunity cost must be positive
-            order_opportunity_cost = max(opportunity_cost, 0)
+            order_opportunity_cost = max(order_opportunity_cost, 0)
             opportunity_cost += order_opportunity_cost
 
             # sum up order profit
@@ -363,16 +343,28 @@ class RLStrategy(LearningStrategy):
             profit = profit - unit.hot_start_cost / 2
 
         reward = float(profit - regret_scale * opportunity_cost) * scaling
-        unit.outputs["rl_rewards"][start] = reward
         unit.outputs["profit"].loc[start:end_excl] += float(profit)
-        unit.outputs["reward"].loc[start:end_excl] += reward
+        # if multi market rl is used, the reward should be added up for all market results
+        unit.outputs["reward"].loc[start:end_excl] = reward
         unit.outputs["regret"].loc[start:end_excl] = float(opportunity_cost)
+        # store if we are in learning mode
+        unit.outputs["learning_mode"].loc[start:end_excl] = self.learning_mode
 
-    def update_transition(self, transitions):
-        if not self.learning_mode:
-            raise Exception("got transition while not in learningmode")
-        super().update_transition(transitions)
-        states = transitions.observations
-        actions = transitions.actions
-        next_states = transitions.next_observations
-        rewards = transitions.rewards
+    def load_actor_params(self, load_path):
+        """
+        Load actor parameters
+
+        :param simulation_id: Simulation ID
+        :type simulation_id: str
+        """
+        directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
+        params = th.load(directory)
+
+        self.actor = Actor(self.obs_dim, self.act_dim, self.float_type)
+        self.actor.load_state_dict(params["actor"])
+
+        if self.learning_mode:
+            self.actor_target = Actor(self.obs_dim, self.act_dim, self.float_type)
+            self.actor_target.load_state_dict(params["actor_target"])
+            self.actor_target.eval()
+            self.actor.optimizer.load_state_dict(params["actor_optimizer"])
