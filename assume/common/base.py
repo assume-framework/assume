@@ -56,6 +56,7 @@ class BaseUnit:
         self.outputs["rl_actions"] = pd.Series(0.0, index=self.index, dtype=object)
         self.outputs["rl_observations"] = pd.Series(0.0, index=self.index, dtype=object)
         self.outputs["reward"] = pd.Series(0.0, index=self.index, dtype=object)
+        self.outputs["learning_mode"] = pd.Series(False, index=self.index, dtype=bool)
         self.outputs["rl_exploration_noise"] = pd.Series(
             0.0, index=self.index, dtype=object
         )
