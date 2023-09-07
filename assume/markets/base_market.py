@@ -201,6 +201,8 @@ class MarketRole(MarketMechanism, Role):
         agent_id = meta["sender_id"]
         try:
             self.validate_orderbook(orderbook, (agent_addr, agent_id))
+            for order in orderbook:
+                self.all_orders.append(order)
         except Exception as e:
             logger.error(f"error handling message from {agent_id} - {e}")
             self.context.schedule_instant_acl_message(
@@ -263,9 +265,11 @@ class MarketRole(MarketMechanism, Role):
         (
             accepted_orderbook,
             rejected_orderbook,
+            # pending_orderbook,
             market_meta,
         ) = self.clear(self.all_orders, market_products)
         self.open_auctions.get()
+        # self.all_orders = pending_orderbook
 
         accepted_orderbook.sort(key=itemgetter("agent_id"))
         rejected_orderbook.sort(key=itemgetter("agent_id"))
@@ -297,7 +301,8 @@ class MarketRole(MarketMechanism, Role):
             logger.warning(
                 f"{self.context.current_timestamp} Market result {market_products} for market {self.marketconfig.name} are empty!"
             )
-        await self.store_order_book(accepted_orderbook)
+        all_orders = accepted_orderbook + rejected_orderbook
+        await self.store_order_book(all_orders)
 
         for meta in market_meta:
             logger.debug(

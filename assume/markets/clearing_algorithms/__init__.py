@@ -20,9 +20,6 @@ class MarketMechanismRole(MarketRole, MarketMechanism):
 clearing_mechanisms: dict[str, MarketRole] = {
     "pay_as_clear": PayAsClearRole,
     "pay_as_bid": PayAsBidRole,
-    # "pay_as_bid_all_or_nothing": MarketMechanismRole(pay_as_bid_aon),
-    # "pay_as_clear_all_or_nothing": MarketMechanismRole(pay_as_clear_aon),
-    # "nodal_pricing_pyomo": MarketMechanismRole(nodal_pricing_pyomo),
-    # "pay_as_clear_complex": MarketMechanismRole(pay_as_clear_complex),
+    "pay_as_clear_complex": ComplexClearingRole,
     # "pay_as_clear_complex_dmas": complex_clearing_dmas,
 }

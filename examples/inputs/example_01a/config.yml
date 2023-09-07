@@ -58,7 +58,7 @@ dam_with_complex_clearing:
       opening_frequency: 24h
       opening_duration: 24h
       volume_unit: MWh
-      maximum_bid_volume: 100000
+      maximum_bid_volume: null
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh

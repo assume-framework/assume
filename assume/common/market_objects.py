@@ -163,8 +163,8 @@ class MarketConfig:
     market_mechanism: str
     market_products: list[MarketProduct] = field(default_factory=list)
     product_type: str = "energy"
-    maximum_bid_volume: float = 2000.0
-    maximum_bid_price: float = 3000.0
+    maximum_bid_volume: float | None = 2000.0
+    maximum_bid_price: float | None = 3000.0
     minimum_bid_price: float = -500.0
     maximum_gradient: float = None  # very specific - should be in market clearing
     additional_fields: list[str] = field(default_factory=list)
@@ -206,7 +206,7 @@ class MarketMechanism:
         """
         return True
 
-    def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> bool:
+    def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> None:
         """
         method to validate a given orderbook
         This is needed to check if all required fields for this mechanism are present
@@ -216,10 +216,13 @@ class MarketMechanism:
         max_volume = self.marketconfig.maximum_bid_volume
 
         if self.marketconfig.price_tick:
+            assert max_price is not None, "max_price unset"
+            assert min_price is not None, "min_price unset"
             # max and min should be in units
             max_price = math.floor(max_price / self.marketconfig.price_tick)
             min_price = math.ceil(min_price / self.marketconfig.price_tick)
         if self.marketconfig.volume_tick:
+            assert max_volume is not None, "max_volume unset"
             max_volume = math.floor(max_volume / self.marketconfig.volume_tick)
 
         for order in orderbook:
@@ -229,31 +232,17 @@ class MarketMechanism:
             assert order["price"] <= max_price, f"maximum_bid_price {order['price']}"
             assert order["price"] >= min_price, f"minimum_bid_price {order['price']}"
 
-            if "bid_type" in order.keys():
-                order["bid_type"] = (
-                    "SB" if order["bid_type"] == None else order["bid_type"]
-                )
-                assert order["bid_type"] in [
-                    "SB",
-                    "BB",
-                ], f"bid_type {order['bid_type']} not in ['SB', 'BB']"
-
-            if "bid_type" not in order.keys() or order["bid_type"] == "SB":
+            if max_volume:
                 assert (
                     abs(order["volume"]) <= max_volume
                 ), f"max_volume {order['volume']}"
 
-            if order.get("bid_type") == "BB":
-                assert False not in [
-                    abs(volume) <= max_volume for _, volume in order["volume"].items()
-                ], f"max_volume {order['volume']}"
             if self.marketconfig.price_tick:
                 assert isinstance(order["price"], int)
             if self.marketconfig.volume_tick:
                 assert isinstance(order["volume"], int)
             for field in self.marketconfig.additional_fields:
                 assert field in order.keys(), f"missing field: {field}"
-            self.all_orders.append(order)
 
     def clear(
         self, orderbook: Orderbook, market_products: list[MarketProduct]
