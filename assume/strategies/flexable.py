@@ -43,11 +43,13 @@ class flexableEOM(BaseStrategy):
         """
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
+        first_delivery = unit.index[0] + market_config.market_products[0].first_delivery
 
         previous_power = unit.get_output_before(start)
         min_power, max_power = unit.calculate_min_max_power(start, end)
 
         bids = []
+        op_time = unit.get_operation_time(start)
         for product in product_tuples:
             bid_quantity_inflex, bid_price_inflex = 0, 0
             bid_quantity_flex, bid_price_flex = 0, 0
@@ -83,7 +85,7 @@ class flexableEOM(BaseStrategy):
             # =============================================================================
             # Calculating possible price
             # =============================================================================
-            if unit.get_operation_time(start) > 0:
+            if op_time > 0:
                 bid_price_inflex = calculate_EOM_price_if_on(
                     unit,
                     start,
@@ -93,7 +95,12 @@ class flexableEOM(BaseStrategy):
                 )
             else:
                 bid_price_inflex = calculate_EOM_price_if_off(
-                    unit, start, marginal_cost_flex, bid_quantity_inflex
+                    unit,
+                    start,
+                    marginal_cost_flex,
+                    bid_quantity_inflex,
+                    op_time,
+                    first_delivery,
                 )
 
             if unit.outputs["heat"][start] > 0:
@@ -104,10 +111,7 @@ class flexableEOM(BaseStrategy):
                 power_loss_ratio = 0.0
 
             # Flex-bid price formulation
-            if (
-                unit.get_operation_time(start) <= -unit.min_down_time
-                or unit.get_operation_time(start) > 0
-            ):
+            if op_time <= -unit.min_down_time or op_time > 0:
                 bid_quantity_flex = max_power[start] - bid_quantity_inflex
                 bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
 
@@ -131,6 +135,10 @@ class flexableEOM(BaseStrategy):
             )
             # calculate previous power with planned dispatch (bid_quantity)
             previous_power = bid_quantity_inflex + bid_quantity_flex + current_power
+            if previous_power > 0:
+                op_time = max(op_time, 0) + 1
+            else:
+                op_time = min(op_time, 0) - 1
 
         return bids
 
@@ -477,6 +485,8 @@ def calculate_EOM_price_if_off(
     start,
     marginal_cost_inflex,
     bid_quantity_inflex,
+    op_time,
+    first_delivery,
 ):
     """
     The powerplant is currently off and calculates a startup markup as an extra
@@ -492,9 +502,10 @@ def calculate_EOM_price_if_off(
     :return: The bid price of the unit
     :rtype: float
     """
-    av_operating_time = max((unit.outputs["energy"][:start] > 0).mean(), 1)
+    av_operating_time = max(
+        (unit.outputs["energy"][first_delivery:start] > 0).mean(), 1
+    )
     # 1 prevents division by 0
-    op_time = unit.get_operation_time(start)
     starting_cost = unit.get_starting_costs(op_time)
     # if we split starting_cost across av_operating_time
     # we are never adding the other parts of the cost to the following hours
@@ -535,9 +546,8 @@ def calculate_EOM_price_if_on(
         return 0
 
     t = start
-    op_time = unit.get_operation_time(start)
     # TODO is it correct to bill for cold, hot and warm starts in one start?
-    starting_cost = unit.get_starting_costs(op_time)
+    starting_cost = unit.get_starting_costs(-max(unit.min_down_time, 1))
 
     price_reduction_restart = starting_cost / unit.min_down_time / bid_quantity_inflex
 
