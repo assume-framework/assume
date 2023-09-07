@@ -97,7 +97,7 @@ class flexableEOM(BaseStrategy):
                 bid_price_inflex = calculate_EOM_price_if_off(
                     unit,
                     start,
-                    marginal_cost_flex,
+                    marginal_cost_inflex,
                     bid_quantity_inflex,
                     op_time,
                     first_delivery,
@@ -179,33 +179,40 @@ class flexableEOMBlock(BaseStrategy):
         """
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
+        first_delivery = unit.index[0] + market_config.market_products[0].first_delivery
 
         previous_power = unit.get_output_before(start)
         min_power, max_power = unit.calculate_min_max_power(start, end)
 
+        current_power = unit.outputs["energy"].at[start]
+        # adjust for ramp speed
+        min_power[start] = unit.calculate_ramp(
+            previous_power, min_power[start], current_power
+        )
+
         bids = []
         bid_quantity_block = {}
         bid_price_block = []
+        op_time = unit.get_operation_time(start)
 
         for product in product_tuples:
             bid_quantity_flex, bid_price_flex = 0, 0
-            bid_quantity_inflex, bid_price_inflex = 0, 0
+            bid_price_inflex = 0
+            bid_quantity_inflex = min_power[start]
 
             start = product[0]
             end = product[1]
 
             current_power = unit.outputs["energy"].at[start]
 
-            # adjust for ramp down speed
+            # adjust for ramp speed
             max_power[start] = unit.calculate_ramp(
                 previous_power, max_power[start], current_power
             )
-            # adjust for ramp up speed
+            # adjust for ramp speed
             min_power[start] = unit.calculate_ramp(
                 previous_power, min_power[start], current_power
             )
-
-            bid_quantity_inflex = min_power[start]
 
             # =============================================================================
             # Powerplant is either on, or is able to turn on
@@ -222,17 +229,22 @@ class flexableEOMBlock(BaseStrategy):
             # =============================================================================
             # Calculating possible price
             # =============================================================================
-            if unit.get_operation_time(start) > 0:
+            if op_time > 0:
                 bid_price_inflex = calculate_EOM_price_if_on(
                     unit,
                     start,
-                    marginal_cost_inflex,
+                    marginal_cost_flex,
                     bid_quantity_inflex,
                     self.foresight,
                 )
             else:
                 bid_price_inflex = calculate_EOM_price_if_off(
-                    unit, start, marginal_cost_flex, bid_quantity_inflex
+                    unit,
+                    start,
+                    marginal_cost_inflex,
+                    bid_quantity_inflex,
+                    op_time,
+                    first_delivery,
                 )
 
             if unit.outputs["heat"][start] > 0:
@@ -243,14 +255,9 @@ class flexableEOMBlock(BaseStrategy):
                 power_loss_ratio = 0.0
 
             # Flex-bid price formulation
-            if (
-                unit.get_operation_time(start) <= -unit.min_down_time
-                or unit.get_operation_time(start) > 0
-            ):
+            if op_time <= -unit.min_down_time or op_time > 0:
                 bid_quantity_flex = max_power[start] - bid_quantity_inflex
-                bid_price_flex = (
-                    1 - power_loss_ratio
-                ) * marginal_cost_flex + bid_price_inflex  # hihger price than inflex
+                bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
 
             bid_quantity_block[product[0]] = bid_quantity_inflex
             bid_price_block.append(bid_price_inflex)
@@ -267,6 +274,10 @@ class flexableEOMBlock(BaseStrategy):
             )
             # calculate previous power with planned dispatch (bid_quantity)
             previous_power = bid_quantity_inflex + bid_quantity_flex + current_power
+            if previous_power > 0:
+                op_time = max(op_time, 0) + 1
+            else:
+                op_time = min(op_time, 0) - 1
 
         bids.append(
             {
@@ -503,7 +514,9 @@ def calculate_EOM_price_if_off(
     :rtype: float
     """
     av_operating_time = max(
-        (unit.outputs["energy"][first_delivery:start] > 0).mean(), 1
+        (unit.outputs["energy"][first_delivery:start] > 0).mean(),
+        1,
+        unit.min_operating_time,
     )
     # 1 prevents division by 0
     starting_cost = unit.get_starting_costs(op_time)
@@ -523,7 +536,7 @@ def calculate_EOM_price_if_off(
 def calculate_EOM_price_if_on(
     unit: SupportsMinMax,
     start,
-    marginal_cost_inflex,
+    marginal_cost_flex,
     bid_quantity_inflex,
     foresight,
 ):
@@ -561,18 +574,18 @@ def calculate_EOM_price_if_on(
 
     possible_revenue = get_specific_revenue(
         unit=unit,
-        marginal_cost=marginal_cost_inflex,
+        marginal_cost=marginal_cost_flex,
         t=start,
         foresight=foresight,
     )
     if (
         possible_revenue >= 0
-        and unit.forecaster["price_forecast"][t] < marginal_cost_inflex
+        and unit.forecaster["price_forecast"][t] < marginal_cost_flex
     ):
-        marginal_cost_inflex = 0
+        marginal_cost_flex = 0
 
     bid_price_inflex = max(
-        -price_reduction_restart - heat_gen_cost + marginal_cost_inflex,
+        -price_reduction_restart - heat_gen_cost + marginal_cost_flex,
         -499.00,
     )
 
