@@ -1,5 +1,8 @@
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
+import pandas as pd
+from assume.units.building import Building
+from assume.common.forecasts import CsvForecaster
 
 
 class NaiveStrategy(BaseStrategy):
@@ -103,6 +106,53 @@ class NaiveDAStrategy(BaseStrategy):
         bids = [order]
         return bids
 
+
+class NaiveDABuildingStrategy(BaseStrategy):
+    def calculate_bids(
+        self,
+        unit: Building,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        start: pd.Timestamp = None,
+        end: pd.Timestamp = None,
+        **kwargs,
+    ) -> Orderbook:
+        # Run the optimization for the building unit
+        t = start
+
+        heating_demand = unit.forecaster['heating_demand']
+        print(heating_demand)
+        unit.heating_demand = heating_demand
+        unit.run_optimization()
+
+        # Fetch the optimized demand (aggregated_power_in)
+        optimized_demand = unit.model.aggregated_power_in.get_values()
+
+        start = product_tuples[0][0]
+        end_all = product_tuples[-1][1]
+
+        # Populate product_tuples with optimized demand values
+        product_tuples = [(t, optimized_demand[t]) for t in unit.model.time_steps]
+
+        # Calculate the marginal cost based on the optimized demand
+
+        marginal_cost = optimized_demand[t] * unit.forecaster.get_electricity_price("EOM")[t]
+
+        # Create the profile using optimized_demand
+        profile = {product[0]: product[1] for product in product_tuples}
+
+        order: Order = {
+            "start_time": start,
+            "end_time": end_all,
+            "only_hours": product_tuples[0][2],
+            "price": marginal_cost,
+            "volume": profile,
+            "accepted_volume": {product[0]: 0 for product in product_tuples},
+            "bid_type": "BB",
+        }
+
+        bids = [order]
+        return bids
 
 class NaivePosReserveStrategy(BaseStrategy):
     """

@@ -1,9 +1,11 @@
 import pyomo.environ as pyo
 from pyomo.environ import *
 import pandas as pd
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 from assume.common.base import BaseUnit
-from assume.units.dst_units import HeatPump, AirConditioner, Storage
+from assume.units.dst_components import HeatPump, AirConditioner, Storage
+from assume.common.market_objects import Product
+from assume.common.forecasts import CsvForecaster, Forecaster
 from importlib import import_module
 
 
@@ -12,47 +14,58 @@ class Building(BaseUnit):
         self,
         id: str,
         unit_operator: str,
-        technology: str,
+        technology: Union[str, List[str]],
         bidding_strategies: dict,
         node: str = "bus0",
         index: pd.DatetimeIndex = None,
-        time_steps: pd.DatetimeIndex = None,
+        start: pd.DatetimeIndex = None,
+        end: pd.DatetimeIndex = None,
         location: tuple[float, float] = (0.0, 0.0),
-        unit_list: List = None,  # List of units
         storage_list: List = None,  # List of storage units
-        unit_parameters: dict = None,
+        unit_params_dict: dict = None,
         objective: str = "minimize_cost",
+        forecaster: CsvForecaster = None,
         heating_demand: Optional[List[float]] = None,
         cooling_demand: Optional[List[float]] = None,
         electricity_price: List[float] = None,
         **kwargs,
     ):
         print("Initializing Building")
+
+        if isinstance(technology, str):
+            technology = [tech.strip() for tech in technology.split(',')]
+
         super().__init__(
             id=id,
             unit_operator=unit_operator,
             technology=technology,
             bidding_strategies=bidding_strategies,
             index=index,
+            start=start,
+            end=end,
             node=node,
+            forecaster=forecaster,
         )
 
-        self.unit_list = unit_list
+        self.unit_list = technology
         self.storage_list = storage_list
         self.units = {}
         self.storage_units = {}
-        self.time_steps = time_steps
+        # self.start = start
+        # self.end = end
+        self.time_steps = pd.date_range(start, end, freq='H')
+        # self.time_steps = time_steps
         self.storage_list = storage_list
-        self.unit_parameters = unit_parameters
-        self.heating_demand = heating_demand
-        self.cooling_demand = cooling_demand
-        self.electricity_price = electricity_price
+        self.unit_params = unit_params_dict if unit_params_dict is not None else {}
+        self.heating_demand = forecaster['heating_demand']
+        self.cooling_demand = forecaster['cooling_demand']
+        self.electricity_price = forecaster.get_electricity_price(EOM='EOM')
         self.objective = objective
 
         self.create_model()
 
         # Initialize units based on the list passed
-        self.initialize_units_from_list(unit_list)
+        self.initialize_units_from_list(technology)
         self.define_constraints()
 
     def create_model(self):
@@ -65,20 +78,19 @@ class Building(BaseUnit):
         self.define_objective()
 
     # Initialize units based on the list passed
-    def initialize_units_from_list(self, unit_list):
+    def initialize_units_from_list(self, technology):
         print("Initializing Units from List")
-        print(f"Unit list received: {unit_list}")
-        for unit_name in unit_list:
-            unit_params = self.unit_parameters.get(unit_name, {})
+        for unit_name in technology:
+            # unit_params = self.unit_params.get(unit_name, {})
             unit_class = globals().get(unit_name)
 
             if unit_class is not None:
                 self.model.units.add(unit_name)
                 unit_block = Block()
                 self.model.add_component(unit_name, unit_block)
-
+                unit_params = self.unit_params
                 unit_params["model"] = unit_block
-                new_unit = unit_class(**unit_params)
+                new_unit = unit_class(id, **unit_params)
                 new_unit.add_to_model(
                     unit_block, self.model.units, self.model.time_steps
                 )
@@ -122,20 +134,54 @@ class Building(BaseUnit):
                 ...
 
     def define_sets(self) -> None:
+
         self.model.time_steps = Set(
             initialize=[idx for idx, _ in enumerate(self.time_steps)]
         )
+        # self.model.time_steps = Set(initialize=self.index.tolist())
+
         self.model.units = Set(ordered=True, initialize=self.units.keys())
 
     def define_parameters(self) -> None:
-        self.model.heating_demand = Param(
-            self.model.time_steps,
-            initialize={idx: v for idx, v in enumerate(self.heating_demand)},
-        )
-        self.model.cooling_demand = Param(
-            self.model.time_steps,
-            initialize={idx: v for idx, v in enumerate(self.cooling_demand)},
-        )
+
+        # if self.heating_demand is not None:
+        #     # Ensure the heating_demand index aligns with the model's time steps
+        #     if set(self.heating_demand.index.tolist()) == set([pd.Timestamp(t) for t in self.model.time_steps]):
+        #         self.model.heating_demand = Param(
+        #             self.model.time_steps,
+        #             initialize=self.heating_demand.to_dict(),
+        #             domain=pyo.NonNegativeReals
+        #         )
+        #     else:
+        #         raise ValueError("Time index of heating_demand does not align with the model's time steps.")
+        # else:
+        #     raise ValueError("heating_demand is None.")
+        #
+        # if self.cooling_demand is not None:
+        #     # Ensure the heating_demand index aligns with the model's time steps
+        #     if set(self.cooling_demand.index.tolist()) == set([pd.Timestamp(t) for t in self.model.time_steps]):
+        #         self.model.cooling_demand = Param(
+        #             self.model.time_steps,
+        #             initialize=self.heating_demand.to_dict(),
+        #             domain=pyo.NonNegativeReals
+        #         )
+        #     else:
+        #         raise ValueError("Time index of cooling_demand does not align with the model's time steps.")
+        # else:
+        #     raise ValueError("cooling_demand is None.")
+
+        self.model.heating_demand = Param(self.model.time_steps,
+                                          initialize={idx: v for idx, v in enumerate(self.heating_demand)})
+        # self.model.heating_demand = Param(self.model.time_steps,
+        #                                   initialize=self.heating_demand.to_dict(), domain=pyo.NonNegativeReals)
+        # self.model.cooling_demand = Param(self.model.time_steps,
+        #                                   initialize=self.cooling_demand, domain=pyo.NonNegativeReals)
+        self.model.cooling_demand = Param(self.model.time_steps,
+                                          initialize={idx: v for idx, v in enumerate(self.cooling_demand)})
+
+        self.model.electricity_price = Param(self.model.time_steps, initialize=self.electricity_price.to_dict(),
+                                             domain=pyo.Reals)
+
 
     def define_variables(self):
 
@@ -204,3 +250,11 @@ class Building(BaseUnit):
             pass
         else:
             raise ValueError(f"Unknown objective: {self.objective}")
+
+    def run_optimization(self):
+
+        # Create a solver
+        solver = SolverFactory('gurobi')
+
+        # Solve the model
+        solver.solve(self.model, tee=True)

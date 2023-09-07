@@ -1,0 +1,7 @@
+name,technology,bidding_energy,fuel_type,emission_factor,max_power,min_power,efficiency,fixed_cost,unit_operator
+Wind onshore,wind_onshore,naive,renewable,0,2500,0,1,0,vre_operator
+Wind offshore,wind_offshore,naive,renewable,0,400,0,1,0,vre_operator
+Solar,solar,naive,renewable,0,2500,0,1,0,vre_operator
+Hydro,hydro,naive,renewable,0,250,0,1,0,vre_operator
+Biomass,biomass,naive,biomass,0,400,0,1,0,vre_operator
+Unit 1,nuclear,flexable_eom,uranium,0,1000,200,0.3,10.3,Operator 1

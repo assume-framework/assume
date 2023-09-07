@@ -74,6 +74,8 @@ class PowerPlant(SupportsMinMax):
         technology: str,
         bidding_strategies: dict,
         index: pd.DatetimeIndex,
+        start: pd.DatetimeIndex,
+        end: pd.DatetimeIndex,
         max_power: float,
         min_power: float = 0.0,
         efficiency: float = 1.0,
@@ -102,6 +104,8 @@ class PowerPlant(SupportsMinMax):
             technology=technology,
             bidding_strategies=bidding_strategies,
             index=index,
+            start=start,
+            end=end,
             node=node,
             **kwargs,
         )

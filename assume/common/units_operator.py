@@ -16,7 +16,7 @@ from assume.common.market_objects import (
 )
 from assume.common.utils import aggregate_step_amount
 from assume.strategies import BaseStrategy, LearningStrategy
-from assume.units import BaseUnit
+from assume.common.base import BaseUnit
 
 logger = logging.getLogger(__name__)
 

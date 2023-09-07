@@ -23,6 +23,8 @@ availabe_examples = {
         "scenario": "example_01c",
         "study_case": "eom_only",
     },
+    "small_with_vre_and_building": {"scenario": "example_03", "study_case": "base_case_building_2019"
+    },
     "small_with_crm": {
         "scenario": "example_01c",
         "study_case": "eom_and_crm",
@@ -51,7 +53,7 @@ if __name__ == "__main__":
     - timescale: with database and grafana (note: you need docker installed)
     """
     data_format = "local_db"  # "local_db" or "timescale"
-    example = "small"
+    example = "small_with_vre_and_building"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
@@ -61,7 +63,7 @@ if __name__ == "__main__":
     world = World(database_uri=db_uri, export_csv_path=csv_path)
     load_scenario_folder(
         world,
-        inputs_path="examples/inputs",
+        inputs_path="C:/Manish_REPO/ASSUME/examples/inputs",          #examples/inputs
         scenario=availabe_examples[example]["scenario"],
         study_case=availabe_examples[example]["study_case"],
     )

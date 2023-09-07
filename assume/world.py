@@ -4,6 +4,7 @@ import logging
 import sys
 import time
 from datetime import datetime
+from typing import List, Union, Optional
 
 import nest_asyncio
 import pandas as pd
@@ -25,7 +26,8 @@ from assume.common import (
 )
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import LearningStrategy, bidding_strategies
-from assume.units import BaseUnit, Demand, Building, PowerPlant, Storage
+from assume.common.base import BaseUnit
+from assume.units import Demand, Building, PowerPlant, Storage
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
 stdout_handler = logging.StreamHandler(stream=sys.stdout)
@@ -74,8 +76,8 @@ class World:
         self.unit_operators: dict[str, UnitsOperator] = {}
         self.unit_types = {
             "power_plant": PowerPlant,
-            "heatpump": HeatPump,
-            "demand": Demand,
+            "building": Building,
+      #       "demand": Demand,
             "storage": Storage,
         }
 
@@ -206,13 +208,16 @@ class World:
         unit_type: str,
         unit_operator_id: str,
         unit_params: dict,
+        technologies: Union[str, List[str]],
+        unit_params_dict: Optional[dict],
         forecaster: Forecaster,
     ) -> None:
+
         """
         Create and add a new unit to the world.
 
         Params
-        ------
+        ------sssssssssssssssssssssssssssssssssssssssssss
         id: str
         unit_type: str
         unit_operator_id: str
@@ -254,7 +259,11 @@ class World:
             id=id,
             unit_operator=unit_operator_id,
             index=self.index,
+            start=self.start,
+            end=self.end,
+            technologies=technologies,
             forecaster=forecaster,
+            unit_params_dict=unit_params_dict,
             **unit_params,
         )
         await self.unit_operators[unit_operator_id].add_unit(unit)
@@ -375,8 +384,10 @@ class World:
         id: str,
         unit_type: str,
         unit_operator_id: str,
+        technologies: Union[str, List[str]],
         unit_params: dict,
         forecaster: Forecaster,
+        unit_params_dict: Optional[dict]
     ) -> None:
         return self.loop.run_until_complete(
             self.async_add_unit(
@@ -384,6 +395,8 @@ class World:
                 unit_type=unit_type,
                 unit_operator_id=unit_operator_id,
                 unit_params=unit_params,
+                technologies=technologies,
                 forecaster=forecaster,
+                unit_params_dict=unit_params_dict
             )
         )

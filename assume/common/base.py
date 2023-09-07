@@ -2,6 +2,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 import pandas as pd
+from typing import List, Union
 
 from assume.common.forecasts import Forecaster
 from assume.common.market_objects import MarketConfig, Orderbook, Product
@@ -38,9 +39,11 @@ class BaseUnit:
         self,
         id: str,
         unit_operator: str,
-        technology: str,
+        technology: Union[str, List[str]],
         bidding_strategies: dict[str, BaseStrategy],
         index: pd.DatetimeIndex,
+        start: pd.DatetimeIndex,
+        end: pd.DatetimeIndex,
         node: str = "",
         forecaster: Forecaster = None,
         **kwargs,
@@ -51,6 +54,8 @@ class BaseUnit:
         self.node = node
         self.bidding_strategies: dict[str, BaseStrategy] = bidding_strategies
         self.index = index
+        self.start = start
+        self.end = end
         self.outputs = defaultdict(lambda: pd.Series(0.0, index=self.index))
         # series does not like to convert from tensor to float otherwise
         self.outputs["rl_actions"] = pd.Series(0.0, index=self.index, dtype=object)

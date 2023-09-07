@@ -98,9 +98,7 @@ class AirConditioner:
         unit_block.min_power = Param(initialize=self.min_power)
         unit_block.ramp_up = Param(initialize=self.ramp_up)
         unit_block.ramp_down = Param(initialize=self.ramp_down)
-        unit_block.cooling_factor = Param(
-            initialize=self.cooling_factor
-        )  # Add the cooling factor parameter
+        unit_block.cooling_factor = Param(initialize=self.cooling_factor)  # Add the cooling factor parameter
 
     def define_variables(self, unit_block, units, time_steps):
         unit_block.cool_out = Var(units, time_steps, within=pyo.NonNegativeReals)

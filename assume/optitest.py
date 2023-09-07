@@ -1,4 +1,4 @@
-from assume.sectors.building import Building
+from assume.units.building import Building
 from pyomo.environ import *
 from pyomo.environ import SolverFactory
 import pandas as pd
@@ -15,8 +15,8 @@ electricity_price = [0.12, 0.13, 0.14, 0.15, 0.16]
 # Create unit list
 unit_parameters = {
     "HeatPump": {
-        "id": "heatpump1",
-        "technology": "HeatPumpTechnology",
+        "id": "demand_building_NRW",
+        "technology": "HeatPump",
         "max_power": 25,
         "min_power": 10,
         "ramp_up": 1,
@@ -24,7 +24,7 @@ unit_parameters = {
         "cop": 2,
     },
     "AirConditioner": {
-        "id": "airconditioner1",
+        "id": "demand_building_NRW",
         "technology": "AirConditioner",
         "max_power": 20,
         "min_power": 2,
@@ -34,19 +34,15 @@ unit_parameters = {
     },
 }
 
-# Just the names of the unit classes as strings
-unit_list = ["HeatPump", "AirConditioner"]  #'AirConditioner'
-
 # Create Building object
 building = Building(
-    id="building1",
+    id="demand_building_NRW",
     unit_operator="Operator1",
-    technology="mixed",
+    technology=["HeatPump", "AirConditioner"],
     bidding_strategies={},
     index=time_steps,
     node="bus_1",
     time_steps=time_steps,
-    unit_list=unit_list,
     unit_parameters=unit_parameters,
     objective="minimize_cost",
     heating_demand=heating_demand,

@@ -13,11 +13,13 @@ from assume.strategies.naive_strategies import (
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
     NaiveStrategy,
+    NaiveDABuildingStrategy,
 )
 
 bidding_strategies: dict[str, BaseStrategy] = {
     "naive": NaiveStrategy,
     "naive_da": NaiveDAStrategy,
+    "naive_da_building": NaiveDABuildingStrategy,
     "naive_pos_reserve": NaivePosReserveStrategy,
     "naive_neg_reserve": NaiveNegReserveStrategy,
     "otc_strategy": OTCStrategy,

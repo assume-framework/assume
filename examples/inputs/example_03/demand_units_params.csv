@@ -1,0 +1,3 @@
+id,technology,max_power,min_power,ramp_up,ramp_down,cop,cooling_factor
+demand_building_NRW,HeatPump,50,2,1,-1,2,
+demand_building_NRW,AirConditioner,25,0,1,1,,0.8
