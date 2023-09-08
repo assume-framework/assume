@@ -245,15 +245,14 @@ class RLStrategy(LearningStrategy):
                 / self.max_demand
             )
 
-        if end_excl + forecast_len > unit.forecaster["price_forecast"].index[-1]:
+        if end_excl + forecast_len > unit.forecaster["price_EOM"].index[-1]:
             scaled_price_forecast = (
-                unit.forecaster["price_forecast"].loc[start:].values
-                / self.max_bid_price
+                unit.forecaster["price_EOM"].loc[start:].values / self.max_bid_price
             )
             scaled_price_forecast = np.concatenate(
                 [
                     scaled_price_forecast,
-                    unit.forecaster["price_forecast"].iloc[
+                    unit.forecaster["price_EOM"].iloc[
                         : self.foresight - len(scaled_price_forecast)
                     ],
                 ]
@@ -261,9 +260,7 @@ class RLStrategy(LearningStrategy):
 
         else:
             scaled_price_forecast = (
-                unit.forecaster["price_forecast"]
-                .loc[start : end_excl + forecast_len]
-                .values
+                unit.forecaster["price_EOM"].loc[start : end_excl + forecast_len].values
                 / self.max_bid_price
             )
 

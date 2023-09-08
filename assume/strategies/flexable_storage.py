@@ -99,7 +99,7 @@ class flexableEOMStorage(BaseStrategy):
                 min_power_charge[start],
             )
 
-            price_forecast = unit.forecaster["price_forecast"]
+            price_forecast = unit.forecaster["price_EOM"]
 
             average_price = calculate_price_average(
                 unit=unit,
@@ -128,12 +128,56 @@ class flexableEOMStorage(BaseStrategy):
 
             if previous_power > 0:
                 theoretic_SOC -= (
-                    bid_quantity + current_power
-                ) / unit.efficiency_discharge
+                    (bid_quantity + current_power)
+                    / unit.efficiency_discharge
+                    / unit.max_volume
+                )
             elif previous_power < 0:
-                theoretic_SOC -= (bid_quantity + current_power) * unit.efficiency_charge
+                theoretic_SOC -= (
+                    (bid_quantity + current_power)
+                    * unit.efficiency_charge
+                    / unit.max_volume
+                )
 
         return bids
+
+    def calculate_reward(
+        self,
+        unit,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ):
+        """
+        Calculate reward (costs and profit)
+
+        :param unit: Unit to calculate reward for
+        :type unit: SupportsMinMax
+        :param marketconfig: Market configuration
+        :type marketconfig: MarketConfig
+        :param orderbook: Orderbook
+        :type orderbook: Orderbook
+        """
+        # TODO: Calculate profits over all markets
+        product_type = marketconfig.product_type
+
+        for order in orderbook:
+            start = order["start_time"]
+            end = order["end_time"]
+            end_excl = end - unit.index.freq
+            index = pd.date_range(start, end_excl, freq=unit.index.freq)
+            costs = pd.Series(unit.fixed_cost, index=index)
+            for start in index:
+                if unit.outputs[product_type][start] != 0:
+                    costs[start] += unit.outputs[product_type][
+                        start
+                    ] * unit.calculate_marginal_cost(
+                        start, unit.outputs[product_type][start]
+                    )
+
+            unit.outputs["profits"][index] = (
+                unit.outputs[f"{product_type}_cashflow"][index] - costs
+            )
+            unit.outputs["costs"][index] = costs
 
 
 class flexablePosCRMStorage(BaseStrategy):
@@ -199,7 +243,7 @@ class flexablePosCRMStorage(BaseStrategy):
                 marginal_cost=marginal_cost,
                 current_time=start,
                 foresight=self.foresight,
-                price_forecast=unit.forecaster["price_forecast"],
+                price_forecast=unit.forecaster["price_EOM"],
             )
 
             if specific_revenue >= 0:
@@ -208,7 +252,7 @@ class flexablePosCRMStorage(BaseStrategy):
                 capacity_price = (
                     abs(specific_revenue) * unit.min_power_discharge / bid_quantity
                 )
-            soc = unit.get_soc_before(start)
+
             energy_price = capacity_price / (soc * unit.max_volume)
 
             if market_config.product_type == "capacity_pos":

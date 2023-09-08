@@ -218,6 +218,19 @@ class BaseUnit:
                     cashflow * hours
                 )
 
+    def get_starting_costs(self, op_time: int):
+        """
+        op_time is hours running from get_operation_time
+        returns the costs if start_up is planned
+
+        :param op_time: operation time
+        :type op_time: int
+        :return: start_costs
+        :rtype: float
+
+        """
+        return 0
+
 
 class SupportsMinMax(BaseUnit):
     """
@@ -361,7 +374,7 @@ class SupportsMinMax(BaseUnit):
             runn += 1
         return (-1) ** is_off * runn
 
-    def get_starting_costs(self, op_time):
+    def get_starting_costs(self, op_time: int):
         """
         op_time is hours running from get_operation_time
         returns the costs if start_up is planned
@@ -375,16 +388,17 @@ class SupportsMinMax(BaseUnit):
         if op_time > 0:
             # unit is running
             return 0
-        if self.downtime_hot_start is not None:
-            if -op_time < self.downtime_hot_start:
+
+        if self.downtime_hot_start is not None and self.hot_start_cost is not None:
+            if -op_time <= self.downtime_hot_start:
                 return self.hot_start_cost
-        elif self.downtime_warm_start is not None:
-            if -op_time < self.downtime_warm_start:
+        if self.downtime_warm_start is not None and self.warm_start_cost is not None:
+            if -op_time <= self.downtime_warm_start:
                 return self.warm_start_cost
-        elif self.cold_start_cost is not None:
+        if self.cold_start_cost is not None:
             return self.cold_start_cost
-        else:
-            return 0
+
+        return 0
 
 
 class SupportsMinMaxCharge(BaseUnit):
@@ -491,6 +505,7 @@ class SupportsMinMaxCharge(BaseUnit):
         :return: the SoC before the given datetime
         :rtype: float
         """
+
         if dt - self.index.freq < self.index[0]:
             return self.initial_soc
         else:

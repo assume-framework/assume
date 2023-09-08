@@ -101,13 +101,6 @@ class Storage(SupportsMinMaxCharge):
         ramp_up_discharge: float = None,
         ramp_down_discharge: float = None,
         fixed_cost: float = 0,
-        hot_start_cost: float = 0,
-        warm_start_cost: float = 0,
-        cold_start_cost: float = 0,
-        min_operating_time: float = 0,
-        min_down_time: float = 0,
-        downtime_hot_start: int = 8,  # hours
-        downtime_warm_start: int = 48,  # hours
         index: pd.DatetimeIndex = None,
         location: tuple[float, float] = None,
         node: str = None,
@@ -148,6 +141,7 @@ class Storage(SupportsMinMaxCharge):
         # The variable costs to charge/discharge the storage unit.
         self.variable_cost_charge = variable_cost_charge
         self.variable_cost_discharge = variable_cost_discharge
+        self.fixed_cost = fixed_cost
 
         # The emission factor of the storage unit.
         self.emission_factor = emission_factor
@@ -172,21 +166,6 @@ class Storage(SupportsMinMaxCharge):
             else ramp_down_discharge
         )
 
-        # How long the storage unit has to be in operation before it can be shut down.
-        self.min_operating_time = min_operating_time
-        # How long the storage unit has to be shut down before it can be started.
-        self.min_down_time = min_down_time
-        # The downtime before hot start of the storage unit.
-        self.downtime_hot_start = downtime_hot_start
-        # The downtime before warm start of the storage unit.
-        self.warm_start_cost = downtime_warm_start
-
-        self.fixed_cost = fixed_cost
-
-        self.hot_start_cost = hot_start_cost * max_power_discharge
-        self.warm_start_cost = warm_start_cost * max_power_discharge
-        self.cold_start_cost = cold_start_cost * max_power_discharge
-
         self.location = location
 
     def reset(self):
@@ -196,6 +175,7 @@ class Storage(SupportsMinMaxCharge):
 
         # outputs["energy"] > 0 discharging, outputs["energy"] < 0 charging
         self.outputs["energy"] = pd.Series(0.0, index=self.index)
+        self.outputs["soc"] = pd.Series(self.initial_soc, index=self.index)
 
         # always starting with discharging?
         # self.outputs["energy"].iat[0] = self.min_power_discharge
@@ -250,8 +230,7 @@ class Storage(SupportsMinMaxCharge):
 
                 delta_soc = (
                     -self.outputs["energy"][t]
-                    * self.index.freq
-                    / timedelta(hours=1)
+                    * (self.index.freq / timedelta(hours=1))
                     / self.efficiency_discharge
                     / self.max_volume
                 )
@@ -269,8 +248,7 @@ class Storage(SupportsMinMaxCharge):
 
                 delta_soc = (
                     -self.outputs["energy"][t]
-                    * self.index.freq
-                    / timedelta(hours=1)
+                    * (self.index.freq / timedelta(hours=1))
                     * self.efficiency_charge
                     / self.max_volume
                 )
@@ -301,7 +279,7 @@ class Storage(SupportsMinMaxCharge):
             )
             efficiency = self.efficiency_charge
 
-        marginal_cost = variable_cost / efficiency + self.fixed_cost
+        marginal_cost = variable_cost / efficiency
 
         return marginal_cost
 
@@ -497,17 +475,3 @@ class Storage(SupportsMinMaxCharge):
             power_charge = 0
 
         return power_charge
-
-    def get_starting_costs(self, op_time):
-        """
-        op_time is hours running
-        """
-        if op_time > 0:
-            # unit is running
-            return 0
-        if -op_time < self.downtime_hot_start:
-            return self.hot_start_cost
-        elif -op_time < self.downtime_warm_start:
-            return self.warm_start_cost
-        else:
-            return self.cold_start_cost
