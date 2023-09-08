@@ -218,19 +218,6 @@ class BaseUnit:
                     cashflow * hours
                 )
 
-    def calculate_costs(self, dispatch: pd.Series):
-        """
-        Calculates the profit in each time step from cashflow and costs
-        and stores it in outputs["profit"]
-
-        :param dispatch: dispatched power
-        :type start: pd.Series
-        :return: the costs for the given dispatch
-        :rtype: pd.Series
-        """
-
-        return pd.Series(0, index=dispatch.index)
-
 
 class SupportsMinMax(BaseUnit):
     """
@@ -373,6 +360,31 @@ class SupportsMinMax(BaseUnit):
                 break
             runn += 1
         return (-1) ** is_off * runn
+
+    def get_starting_costs(self, op_time):
+        """
+        op_time is hours running from get_operation_time
+        returns the costs if start_up is planned
+
+        :param op_time: operation time
+        :type op_time: int
+        :return: start_costs
+        :rtype: float
+
+        """
+        if op_time > 0:
+            # unit is running
+            return 0
+        if self.downtime_hot_start is not None:
+            if -op_time < self.downtime_hot_start:
+                return self.hot_start_cost
+        elif self.downtime_warm_start is not None:
+            if -op_time < self.downtime_warm_start:
+                return self.warm_start_cost
+        elif self.cold_start_cost is not None:
+            return self.cold_start_cost
+        else:
+            return 0
 
 
 class SupportsMinMaxCharge(BaseUnit):

@@ -142,6 +142,21 @@ class flexableEOM(BaseStrategy):
 
         return bids
 
+    def calculate_reward(
+        self,
+        unit,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ):
+        # TODO: Calculate profits over all markets
+
+        calculate_reward_EOM(
+            self,
+            unit,
+            marketconfig=marketconfig,
+            orderbook=orderbook,
+        )
+
 
 class flexableEOMBlock(BaseStrategy):
     """
@@ -293,6 +308,21 @@ class flexableEOMBlock(BaseStrategy):
         )
 
         return bids
+
+    def calculate_reward(
+        self,
+        unit,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ):
+        # TODO: Calculate profits over all markets
+
+        calculate_reward_EOM(
+            self,
+            unit,
+            marketconfig=marketconfig,
+            orderbook=orderbook,
+        )
 
 
 class flexablePosCRM(BaseStrategy):
@@ -639,3 +669,44 @@ def get_specific_revenue(
     possible_revenue = (price_forecast - marginal_cost).sum()
 
     return possible_revenue
+
+
+def calculate_reward_EOM(
+    self,
+    unit,
+    marketconfig: MarketConfig,
+    orderbook: Orderbook,
+):
+    """
+    Calculate reward (costs and profit)
+
+    :param unit: Unit to calculate reward for
+    :type unit: SupportsMinMax
+    :param marketconfig: Market configuration
+    :type marketconfig: MarketConfig
+    :param orderbook: Orderbook
+    :type orderbook: Orderbook
+    """
+    # TODO: Calculate profits over all markets
+    product_type = marketconfig.product_type
+
+    for order in orderbook:
+        start = order["start_time"]
+        end = order["end_time"]
+        end_excl = end - unit.index.freq
+        index = pd.date_range(start, end_excl, freq=unit.index.freq)
+        costs = pd.Series(unit.fixed_cost, index=index)
+        for start in index:
+            if unit.outputs[product_type][start] != 0:
+                op_time = unit.get_operation_time(start - unit.index.freq)
+                costs[start] += unit.get_starting_costs(op_time)
+                costs[start] += unit.outputs[product_type][
+                    start
+                ] * unit.calculate_marginal_cost(
+                    start, unit.outputs[product_type][start]
+                )
+
+        unit.outputs["profits"][index] = (
+            unit.outputs[f"{product_type}_cashflow"][index] - costs
+        )
+        unit.outputs["costs"][index] = costs

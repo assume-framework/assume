@@ -220,16 +220,11 @@ class UnitsOperator(Role):
             end = now - unit.index.freq
             current_dispatch.name = "power"
             data = pd.DataFrame(current_dispatch)
-            data["gen_costs"] = unit.calculate_costs(data["power"])
             data["soc"] = unit.outputs["soc"][start:end]
+            data["profits"] = unit.outputs["profits"][start:end]
             for key in unit.outputs.keys():
-                if "cashflow" in key:
+                if "cashflow" in key or "costs" in key:
                     data[key] = unit.outputs[key][start:end]
-            profit = -data["gen_costs"]
-            cashflows = [cashflow for cashflow in data.keys() if "cashflow" in cashflow]
-            for cashflow_type in cashflows:
-                profit += data[cashflow_type]
-            data["profit"] = profit
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
 

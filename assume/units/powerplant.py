@@ -356,29 +356,3 @@ class PowerPlant(SupportsMinMax):
         )
 
         return unit_dict
-
-    def get_starting_costs(self, op_time):
-        """
-        op_time is hours running
-        """
-        if op_time > 0:
-            # unit is running
-            return 0
-        if -op_time < self.downtime_hot_start:
-            return self.hot_start_cost
-        elif -op_time < self.downtime_warm_start:
-            return self.warm_start_cost
-        else:
-            return self.cold_start_cost
-
-    def calculate_costs(self, dispatch):
-        costs = pd.Series(self.fixed_cost, index=dispatch.index)
-        for start in dispatch.index:
-            if dispatch[start] != 0:
-                op_time = self.get_operation_time(start)
-                costs[start] += self.get_starting_costs(op_time)
-                costs[start] += dispatch[start] * self.calculate_marginal_cost(
-                    start, dispatch[start]
-                )
-
-        return costs
