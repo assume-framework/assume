@@ -14,12 +14,27 @@ os.makedirs("./examples/local_db", exist_ok=True)
 availabe_examples = {
     "base_2019": {
         # merit order clearing for 24 hours
-        "scenario": "analysis_01",
-        "study_case": "dam_case_2019",
+        "scenario": "2019_SB",
+        "study_case": "dam",
     },
-    "complex_clearing_2019": {
+    "complex_SB_2019": {
+        # merit order clearing for 24 hours
+        "scenario": "2019_SB",
+        "study_case": "dam_complex_clearing",
+    },
+    "complex_BB_2019": {
         # complex clearing with naive strategies - no blocks
-        "scenario": "analysis_01",
+        "scenario": "2019_BB",
+        "study_case": "dam_complex_clearing",
+    },
+    "complex_SB_2020": {
+        # merit order clearing for 24 hours
+        "scenario": "2020_SB",
+        "study_case": "dam_complex_clearing",
+    },
+    "complex_BB_2020": {
+        # complex clearing with naive strategies - no blocks
+        "scenario": "2020_BB",
         "study_case": "dam_complex_clearing",
     },
     "complex_clearing_blocks": {
@@ -28,18 +43,18 @@ availabe_examples = {
         "study_case": "dam_complex_cearing",
     },
     "minimal_base": {
-        "scenario": "minimal",
+        "scenario": "minimal_SB",
         "study_case": "dam_case_2019",
     },
     "minimal_complex": {
-        "scenario": "minimal",
+        "scenario": "minimal_BB",
         "study_case": "dam_complex_clearing",
     },
 }
 
 # %%
 if __name__ == "__main__":
-    example = "minimal_base"
+    example = "complex_BB_2020"
     data_format = "timescale"  # "local_db" or "timescale"
 
     if data_format == "local_db":

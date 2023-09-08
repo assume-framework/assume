@@ -1,0 +1,49 @@
+dam:
+  start_date: 2019-01-15 12:00
+  end_date: 2019-01-30 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+      additional_fields:
+        - bid_type
+        - min_acceptance_ratio
+
+dam_complex_clearing:
+  start_date: 2019-01-15 12:00
+  end_date: 2019-01-30 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear_complex
+      additional_fields:
+        - bid_type
+        - min_acceptance_ratio
