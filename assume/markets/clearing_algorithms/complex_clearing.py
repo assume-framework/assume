@@ -4,8 +4,8 @@ from operator import itemgetter
 import pyomo.environ as pyo
 from pyomo.opt import SolverFactory, TerminationCondition, check_available_solvers
 
-from assume.common.market_objects import MarketProduct, Orderbook
-from assume.markets.base_market import MarketRole
+from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
+from assume.markets.base_market import MarketMechanism, MarketRole
 
 log = logging.getLogger(__name__)
 
@@ -13,154 +13,126 @@ SOLVERS = ["gurobi", "glpk"]
 EPS = 1e-4
 
 
-class MarketClearingOptRole(MarketRole, MarketMechanism):
-    def __init__(self, marketconfig: MarketConfig):
-        super().__init__(marketconfig)
+def market_clearing_opt(orders, market_products, mode):
+    model = pyo.ConcreteModel()
+    model.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT_EXPORT)
 
-    def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> None:
-        super().validate_orderbook(orderbook, agent_tuple)
-        for order in orderbook:
-            order["bid_type"] = "SB" if order["bid_type"] == None else order["bid_type"]
-            assert order["bid_type"] in [
-                "SB",
-                "BB",
-            ], f"bid_type {order['bid_type']} not in ['SB', 'BB']"
+    model.T = pyo.Set(
+        initialize=[market_product[0] for market_product in market_products],
+        doc="timesteps",
+    )
+    model.sBids = pyo.Set(
+        initialize=[order["bid_id"] for order in orders if order["bid_type"] == "SB"],
+        doc="simple_bids",
+    )
+    model.bBids = pyo.Set(
+        initialize=[order["bid_id"] for order in orders if order["bid_type"] == "BB"],
+        doc="block_bids",
+    )
 
-            if order.get("bid_type") == "BB":
-                assert False not in [
-                    abs(volume) <= max_volume for _, volume in order["volume"].items()
-                ], f"max_volume {order['volume']}"
+    model.xs = pyo.Var(
+        model.sBids,
+        domain=pyo.NonNegativeReals,
+        bounds=(0, 1),
+        doc="simple_bid_acceptance",
+    )
+    model.xb = pyo.Var(
+        model.bBids,
+        domain=pyo.NonNegativeReals,
+        bounds=(0, 1),
+        doc="block_bid_acceptance",
+    )
 
-    def clear(
-        self, orderbook: Orderbook, market_products
-    ) -> (Orderbook, Orderbook, list[dict]):
-        if "min_acceptance_ratio" in self.marketconfig.additional_fields:
-            mode = "with_min_acceptance_ratio"
-        else:
-            mode = "default"
-        model = pyo.ConcreteModel()
-        model.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT_EXPORT)
-
-        model.T = pyo.Set(
-            initialize=[market_product[0] for market_product in market_products],
-            doc="timesteps",
+    if mode == "with_min_acceptance_ratio":
+        model.Bids = pyo.Set(
+            initialize=[order["bid_id"] for order in orders], doc="all_bids"
         )
-        model.sBids = pyo.Set(
-            initialize=[
-                order["bid_id"] for order in orders if order["bid_type"] == "SB"
-            ],
-            doc="simple_bids",
-        )
-        model.bBids = pyo.Set(
-            initialize=[
-                order["bid_id"] for order in orders if order["bid_type"] == "BB"
-            ],
-            doc="block_bids",
+        model.x = pyo.Var(
+            model.Bids,
+            domain=pyo.Binary,
+            doc="bid_accepted",
         )
 
-        model.xs = pyo.Var(
-            model.sBids,
-            domain=pyo.NonNegativeReals,
-            bounds=(0, 1),
-            doc="simple_bid_acceptance",
-        )
-        model.xb = pyo.Var(
-            model.bBids,
-            domain=pyo.NonNegativeReals,
-            bounds=(0, 1),
-            doc="block_bid_acceptance",
-        )
-
-        if mode == "with_min_acceptance_ratio":
-            model.Bids = pyo.Set(
-                initialize=[order["bid_id"] for order in orders], doc="all_bids"
-            )
-            model.x = pyo.Var(
-                model.Bids,
-                domain=pyo.Binary,
-                doc="bid_accepted",
-            )
-
-            model.mar_constr = pyo.ConstraintList()
-            for order in orders:
-                if order["min_acceptance_ratio"] is None:
-                    continue
-                elif order["bid_type"] == "SB":
-                    model.mar_constr.add(
-                        model.xs[order["bid_id"]]
-                        >= order["min_acceptance_ratio"] * model.x[order["bid_id"]]
-                    )
-                    model.mar_constr.add(
-                        model.xs[order["bid_id"]] <= model.x[order["bid_id"]]
-                    )
-
-                elif order["bid_type"] == "BB":
-                    model.mar_constr.add(
-                        model.xb[order["bid_id"]]
-                        >= order["min_acceptance_ratio"] * model.x[order["bid_id"]]
-                    )
-                    model.mar_constr.add(
-                        model.xb[order["bid_id"]] <= model.x[order["bid_id"]]
-                    )
-
-        balance_expr = {t: 0.0 for t in model.T}
+        model.mar_constr = pyo.ConstraintList()
         for order in orders:
-            if order["bid_type"] == "SB":
-                balance_expr[order["start_time"]] += (
-                    order["volume"] * model.xs[order["bid_id"]]
+            if order["min_acceptance_ratio"] is None:
+                continue
+            elif order["bid_type"] == "SB":
+                model.mar_constr.add(
+                    model.xs[order["bid_id"]]
+                    >= order["min_acceptance_ratio"] * model.x[order["bid_id"]]
                 )
+                model.mar_constr.add(
+                    model.xs[order["bid_id"]] <= model.x[order["bid_id"]]
+                )
+
             elif order["bid_type"] == "BB":
-                for start_time, volume in order["volume"].items():
-                    balance_expr[start_time] += volume * model.xb[order["bid_id"]]
+                model.mar_constr.add(
+                    model.xb[order["bid_id"]]
+                    >= order["min_acceptance_ratio"] * model.x[order["bid_id"]]
+                )
+                model.mar_constr.add(
+                    model.xb[order["bid_id"]] <= model.x[order["bid_id"]]
+                )
 
-        def energy_balance_rule(m, t):
-            return balance_expr[t] == 0
+    balance_expr = {t: 0.0 for t in model.T}
+    for order in orders:
+        if order["bid_type"] == "SB":
+            balance_expr[order["start_time"]] += (
+                order["volume"] * model.xs[order["bid_id"]]
+            )
+        elif order["bid_type"] == "BB":
+            for start_time, volume in order["volume"].items():
+                balance_expr[start_time] += volume * model.xb[order["bid_id"]]
 
-        model.energy_balance = pyo.Constraint(model.T, rule=energy_balance_rule)
+    def energy_balance_rule(m, t):
+        return balance_expr[t] == 0
 
-        obj_expr = 0
-        for order in orders:
-            if order["bid_type"] == "SB":
-                obj_expr += order["price"] * order["volume"] * model.xs[order["bid_id"]]
-            elif order["bid_type"] == "BB":
-                for start_time, volume in order["volume"].items():
-                    obj_expr += order["price"] * volume * model.xb[order["bid_id"]]
+    model.energy_balance = pyo.Constraint(model.T, rule=energy_balance_rule)
 
-        model.objective = pyo.Objective(expr=obj_expr, sense=pyo.minimize)
+    obj_expr = 0
+    for order in orders:
+        if order["bid_type"] == "SB":
+            obj_expr += order["price"] * order["volume"] * model.xs[order["bid_id"]]
+        elif order["bid_type"] == "BB":
+            for start_time, volume in order["volume"].items():
+                obj_expr += order["price"] * volume * model.xb[order["bid_id"]]
 
-        solvers = check_available_solvers(*SOLVERS)
-        if len(solvers) < 1:
-            raise Exception(f"None of {SOLVERS} are available")
+    model.objective = pyo.Objective(expr=obj_expr, sense=pyo.minimize)
 
-        solver = SolverFactory(solvers[0])
+    solvers = check_available_solvers(*SOLVERS)
+    if len(solvers) < 1:
+        raise Exception(f"None of {SOLVERS} are available")
 
-        if solver.name == "gurobi":
-            options = {"cutoff": -1.0, "eps": EPS}
-        elif solver.name == "cplex":
-            options = {
-                "mip.tolerances.lowercutoff": -1.0,
-                "mip.tolerances.absmipgap": EPS,
-            }
-        elif solver.name == "cbc":
-            options = {"sec": 60, "ratio": 0.1}
-        # elif solver.name == "glpk":
-        #     options = {"tmlim": 60, "mipgap": 0.1}
-        else:
-            options = {}
+    solver = SolverFactory(solvers[0])
 
-        # Solve the model
-        instance = model.create_instance()
+    if solver.name == "gurobi":
+        options = {"cutoff": -1.0, "eps": EPS}
+    elif solver.name == "cplex":
+        options = {
+            "mip.tolerances.lowercutoff": -1.0,
+            "mip.tolerances.absmipgap": EPS,
+        }
+    elif solver.name == "cbc":
+        options = {"sec": 60, "ratio": 0.1}
+    # elif solver.name == "glpk":
+    #     options = {"tmlim": 60, "mipgap": 0.1}
+    else:
+        options = {}
+
+    # Solve the model
+    instance = model.create_instance()
+    results = solver.solve(instance, options=options)
+
+    # fix all model.x to the values in the solution
+    if mode == "with_min_acceptance_ratio":
+        for bid_id in instance.Bids:
+            instance.x[bid_id].fix(instance.x[bid_id].value)
+
+        # resolve the model
         results = solver.solve(instance, options=options)
 
-        # fix all model.x to the values in the solution
-        if mode == "with_min_acceptance_ratio":
-            for bid_id in instance.Bids:
-                instance.x[bid_id].fix(instance.x[bid_id].value)
-
-            # resolve the model
-            results = solver.solve(instance, options=options)
-
-        return instance, [], results
+    return instance, results
 
 
 class ComplexClearingRole(MarketRole, MarketMechanism):

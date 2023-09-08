@@ -40,18 +40,18 @@ class MarketRole(MarketMechanism, Role):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
         self.marketconfig: MarketConfig = marketconfig
-        if self.marketconfig.price_tick:
-            if marketconfig.maximum_bid_price % self.marketconfig.price_tick != 0:
+        if marketconfig.price_tick:
+            if marketconfig.maximum_bid_price % marketconfig.price_tick != 0:
                 logger.warning(
                     f"{marketconfig.name} - max price not a multiple of tick size"
                 )
-            if marketconfig.minimum_bid_price % self.marketconfig.price_tick != 0:
+            if marketconfig.minimum_bid_price % marketconfig.price_tick != 0:
                 logger.warning(
                     f"{marketconfig.name} - min price not a multiple of tick size"
                 )
 
-        if self.marketconfig.volume_tick:
-            if marketconfig.maximum_bid_volume % self.marketconfig.volume_tick != 0:
+        if marketconfig.volume_tick and marketconfig.maximum_bid_volume:
+            if marketconfig.maximum_bid_volume % marketconfig.volume_tick != 0:
                 logger.warning(
                     f"{marketconfig.name} - max volume not a multiple of tick size"
                 )

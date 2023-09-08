@@ -6,7 +6,7 @@ from dateutil.relativedelta import relativedelta as rd
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Order
 from assume.common.utils import get_available_products
-from assume.markets import MarketRole, clearing_mechanisms
+from assume.markets.clearing_algorithms import ComplexClearingRole, clearing_mechanisms
 
 from .utils import extend_orderbook
 
@@ -23,7 +23,7 @@ simple_dayahead_auction_config = MarketConfig(
     volume_unit="MW",
     volume_tick=0.1,
     price_unit="€/MW",
-    market_mechanism="pay_as_clear",
+    market_mechanism="pay_as_clear_complex",
 )
 eps = 1e-4
 
@@ -40,12 +40,10 @@ def test_complex_clearing_whitepaper_a():
 
     market_config = copy.copy(simple_dayahead_auction_config)
 
-    market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex"]
     market_config.market_products = [MarketProduct(rd(hours=+1), 1, rd(hours=1))]
     market_config.additional_fields = [
         "bid_type",
     ]
-    mr = MarketRole(market_config)
     next_opening = market_config.opening_hours.after(datetime.now())
     products = get_available_products(market_config.market_products, next_opening)
     assert len(products) == 1
@@ -72,10 +70,8 @@ def test_complex_clearing_whitepaper_a():
     orderbook[3]["agent_id"] = orderbook[2]["agent_id"]
     assert len(orderbook) == 5
 
-    mr.all_orders = orderbook
-    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
-        mr, products
-    )
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
     assert math.isclose(meta[0]["supply_volume"], 10, abs_tol=eps)
     assert math.isclose(meta[0]["price"], 40, abs_tol=eps)
     assert accepted_orders[0]["agent_id"] == "dem1"
@@ -97,14 +93,11 @@ def test_complex_clearing_whitepaper_d():
     import copy
 
     market_config = copy.copy(simple_dayahead_auction_config)
-
-    market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex"]
     market_config.market_products = [MarketProduct(rd(hours=+1), 1, rd(hours=1))]
     market_config.additional_fields = [
         "bid_type",
         "min_acceptance_ratio",
     ]
-    mr = MarketRole(market_config)
     next_opening = market_config.opening_hours.after(datetime.now())
     products = get_available_products(market_config.market_products, next_opening)
     assert len(products) == 1
@@ -134,10 +127,8 @@ def test_complex_clearing_whitepaper_d():
 
     assert len(orderbook) == 4
 
-    mr.all_orders = orderbook
-    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
-        mr, products
-    )
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
     assert math.isclose(meta[0]["supply_volume"], 10, abs_tol=eps)
     assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
     assert accepted_orders[0]["agent_id"] == "dem1"
@@ -158,13 +149,10 @@ def test_clearing_non_convex_1():
     import copy
 
     market_config = copy.copy(simple_dayahead_auction_config)
-
-    market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex"]
     market_config.market_products = [MarketProduct(rd(hours=+1), 3, rd(hours=1))]
     market_config.additional_fields = [
         "bid_type",
     ]
-    mr = MarketRole(market_config)
     next_opening = market_config.opening_hours.after(datetime.now())
     products = get_available_products(market_config.market_products, next_opening)
     assert len(products) == 3
@@ -216,10 +204,8 @@ def test_clearing_non_convex_1():
     assert len(orderbook) == 8
     assert len(orderbook_demand) == 2
 
-    mr.all_orders = orderbook
-    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
-        mr, products
-    )
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
     assert math.isclose(meta[0]["supply_volume"], 7, abs_tol=eps)
     assert math.isclose(meta[0]["price"], 3, abs_tol=eps)
     assert math.isclose(meta[1]["supply_volume"], 12, abs_tol=eps)
@@ -272,14 +258,11 @@ def test_clearing_non_convex_2():
     import copy
 
     market_config = copy.copy(simple_dayahead_auction_config)
-
-    market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex"]
     market_config.market_products = [MarketProduct(rd(hours=+1), 3, rd(hours=1))]
     market_config.additional_fields = [
         "bid_type",
         "min_acceptance_ratio",
     ]
-    mr = MarketRole(market_config)
     next_opening = market_config.opening_hours.after(datetime.now())
     products = get_available_products(market_config.market_products, next_opening)
     assert len(products) == 3
@@ -341,10 +324,8 @@ def test_clearing_non_convex_2():
         min_acceptance_ratio=10 / 20,
     )
 
-    mr.all_orders = orderbook
-    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
-        mr, products
-    )
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
     assert math.isclose(meta[0]["supply_volume"], 7, abs_tol=eps)
     assert math.isclose(meta[0]["price"], 5, abs_tol=eps)
     assert math.isclose(meta[1]["supply_volume"], 12, abs_tol=eps)
@@ -393,14 +374,11 @@ def test_clearing_non_convex_3():
     import copy
 
     market_config = copy.copy(simple_dayahead_auction_config)
-
-    market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex"]
     market_config.market_products = [MarketProduct(rd(hours=+1), 3, rd(hours=1))]
     market_config.additional_fields = [
         "bid_type",
         "min_acceptance_ratio",
     ]
-    mr = MarketRole(market_config)
     next_opening = market_config.opening_hours.after(datetime.now())
     products = get_available_products(market_config.market_products, next_opening)
     assert len(products) == 3
@@ -496,10 +474,8 @@ def test_clearing_non_convex_3():
         min_acceptance_ratio=10 / 20,
     )
 
-    mr.all_orders = orderbook
-    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
-        mr, products
-    )
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
 
     assert math.isclose(meta[0]["supply_volume"], 5.5, abs_tol=eps)
     assert math.isclose(meta[0]["price"], 5, abs_tol=eps)
