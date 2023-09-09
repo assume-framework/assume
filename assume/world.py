@@ -259,8 +259,6 @@ class World:
             id=id,
             unit_operator=unit_operator_id,
             index=self.index,
-            start=self.start,
-            end=self.end,
             technologies=technologies,
             forecaster=forecaster,
             unit_params_dict=unit_params_dict,

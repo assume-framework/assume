@@ -18,8 +18,6 @@ class Building(BaseUnit):
         bidding_strategies: dict,
         node: str = "bus0",
         index: pd.DatetimeIndex = None,
-        start: pd.DatetimeIndex = None,
-        end: pd.DatetimeIndex = None,
         location: tuple[float, float] = (0.0, 0.0),
         storage_list: List = None,  # List of storage units
         unit_params_dict: dict = None,
@@ -41,8 +39,6 @@ class Building(BaseUnit):
             technology=technology,
             bidding_strategies=bidding_strategies,
             index=index,
-            start=start,
-            end=end,
             node=node,
             forecaster=forecaster,
         )
@@ -51,10 +47,7 @@ class Building(BaseUnit):
         self.storage_list = storage_list
         self.units = {}
         self.storage_units = {}
-        # self.start = start
-        # self.end = end
-        self.time_steps = pd.date_range(start, end, freq='H')
-        # self.time_steps = time_steps
+        # self.time_steps = pd.date_range(start, end, freq='H')
         self.storage_list = storage_list
         self.unit_params = unit_params_dict if unit_params_dict is not None else {}
         self.heating_demand = forecaster['heating_demand']
@@ -135,15 +128,14 @@ class Building(BaseUnit):
 
     def define_sets(self) -> None:
 
-        self.model.time_steps = Set(
-            initialize=[idx for idx, _ in enumerate(self.time_steps)]
-        )
-        # self.model.time_steps = Set(initialize=self.index.tolist())
+        # self.model.time_steps = Set(
+        #     initialize=[idx for idx, _ in enumerate(self.time_steps)]
+        # )
+        self.model.time_steps = Set(initialize=[idx for idx, _ in enumerate(self.index)])
 
         self.model.units = Set(ordered=True, initialize=self.units.keys())
 
     def define_parameters(self) -> None:
-
         # if self.heating_demand is not None:
         #     # Ensure the heating_demand index aligns with the model's time steps
         #     if set(self.heating_demand.index.tolist()) == set([pd.Timestamp(t) for t in self.model.time_steps]):
@@ -172,16 +164,10 @@ class Building(BaseUnit):
 
         self.model.heating_demand = Param(self.model.time_steps,
                                           initialize={idx: v for idx, v in enumerate(self.heating_demand)})
-        # self.model.heating_demand = Param(self.model.time_steps,
-        #                                   initialize=self.heating_demand.to_dict(), domain=pyo.NonNegativeReals)
-        # self.model.cooling_demand = Param(self.model.time_steps,
-        #                                   initialize=self.cooling_demand, domain=pyo.NonNegativeReals)
         self.model.cooling_demand = Param(self.model.time_steps,
                                           initialize={idx: v for idx, v in enumerate(self.cooling_demand)})
-
-        self.model.electricity_price = Param(self.model.time_steps, initialize=self.electricity_price.to_dict(),
-                                             domain=pyo.Reals)
-
+        self.model.electricity_price = Param(self.model.time_steps,
+                                             initialize={idx: v for idx, v in enumerate(self.electricity_price)})
 
     def define_variables(self):
 
@@ -196,14 +182,6 @@ class Building(BaseUnit):
         )
 
     def define_constraints(self):
-        print("Defining Building Constraints")
-        print(
-            f"Units index set just before constraint definition: {list(self.model.units)}"
-        )
-        print(
-            f"Time steps index set just before constraint definition: {list(self.model.time_steps)}"
-        )
-
         @self.model.Constraint(self.model.time_steps)
         def aggregate_power_in_constraint(m, t):
             return m.aggregated_power_in[t] == sum(
