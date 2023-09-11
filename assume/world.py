@@ -4,7 +4,7 @@ import logging
 import sys
 import time
 from datetime import datetime
-from typing import List, Union, Optional
+from typing import List, Optional, Union
 
 import nest_asyncio
 import pandas as pd
@@ -24,10 +24,10 @@ from assume.common import (
     WriteOutput,
     mango_codec_factory,
 )
+from assume.common.base import BaseUnit
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import LearningStrategy, bidding_strategies
-from assume.common.base import BaseUnit
-from assume.units import Demand, Building, PowerPlant, Storage
+from assume.units import Building, Demand, PowerPlant, Storage
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
 stdout_handler = logging.StreamHandler(stream=sys.stdout)
@@ -77,7 +77,7 @@ class World:
         self.unit_types = {
             "power_plant": PowerPlant,
             "building": Building,
-      #       "demand": Demand,
+            "demand": Demand,
             "storage": Storage,
         }
 
@@ -210,7 +210,6 @@ class World:
         unit_params: dict,
         forecaster: Forecaster,
     ) -> None:
-
         """
         Create and add a new unit to the world.
 
@@ -258,7 +257,7 @@ class World:
             unit_operator=unit_operator_id,
             index=self.index,
             forecaster=forecaster,
-            **unit_params
+            **unit_params,
         )
         await self.unit_operators[unit_operator_id].add_unit(unit)
 

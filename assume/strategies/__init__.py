@@ -9,11 +9,11 @@ from assume.strategies.flexable_storage import (
     flexablePosCRMStorage,
 )
 from assume.strategies.naive_strategies import (
+    NaiveDABuildingStrategy,
     NaiveDAStrategy,
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
     NaiveStrategy,
-    NaiveDABuildingStrategy,
 )
 
 bidding_strategies: dict[str, BaseStrategy] = {

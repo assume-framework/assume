@@ -1,4 +1,5 @@
 import logging
+
 import pandas as pd
 import pyomo.environ as pyo
 from pyomo.environ import *
@@ -6,7 +7,15 @@ from pyomo.environ import *
 
 class HeatPump:
     def __init__(
-        self, model, id, technology, max_power, min_power, ramp_up, ramp_down, cop
+        self,
+        model,
+        id,
+        max_power,
+        min_power,
+        ramp_up,
+        ramp_down,
+        cop,
+        **kwargs,
     ):
         self.model = model
         self.id = id
@@ -16,50 +25,52 @@ class HeatPump:
         self.ramp_down = ramp_down
         self.cop = cop
 
-    def add_to_model(self, unit_block, units, time_steps):
-        self.model = unit_block
-        self.define_parameters(unit_block)
-        self.define_variables(unit_block, units, time_steps)
-        self.define_constraints(unit_block, units, time_steps)
+    def add_to_model(self, unit_block, time_steps):
+        self.component_block = unit_block
+        self.define_parameters()
+        self.define_variables(time_steps)
+        self.define_constraints(time_steps)
 
-    def define_parameters(self, unit_block) -> None:
-        unit_block.max_power = Param(initialize=self.max_power)
-        unit_block.min_power = Param(initialize=self.min_power)
-        unit_block.ramp_up = Param(initialize=self.ramp_up)
-        unit_block.ramp_down = Param(initialize=self.ramp_down)
-        unit_block.cop = Param(initialize=self.cop)  # Coefficient of Performance
+    def define_parameters(self) -> None:
+        self.component_block.max_power = Param(initialize=self.max_power)
+        self.component_block.min_power = Param(initialize=self.min_power)
+        self.component_block.ramp_up = Param(initialize=self.ramp_up)
+        self.component_block.ramp_down = Param(initialize=self.ramp_down)
+        self.component_block.cop = Param(
+            initialize=self.cop
+        )  # Coefficient of Performance
 
-    def define_variables(self, unit_block, units, time_steps):
-        unit_block.heat_out = Var(units, time_steps, within=pyo.NonNegativeReals)
-        unit_block.power_in = Var(units, time_steps, within=pyo.NonNegativeReals)
+    def define_variables(self, time_steps):
+        self.component_block.heat_out = Var(time_steps, within=pyo.NonNegativeReals)
+        self.component_block.power_in = Var(time_steps, within=pyo.NonNegativeReals)
 
-    def define_constraints(self, unit_block, units, time_steps) -> None:
+    def define_constraints(self, time_steps) -> None:
         # Heat output bounds
-        @unit_block.Constraint(units, time_steps)
-        def p_output_lower_bound(m, u, t):
-            return m.power_in[u, t] >= m.min_power
+        @self.component_block.Constraint(time_steps)
+        def p_output_lower_bound(m, t):
+            return m.power_in[t] >= m.min_power
 
-        @unit_block.Constraint(units, time_steps)
-        def p_output_upper_bound(m, u, t):
-            return m.power_in[u, t] <= m.max_power
+        @self.component_block.Constraint(time_steps)
+        def p_output_upper_bound(m, t):
+            return m.power_in[t] <= m.max_power
 
         # Ramp up/down constraints
-        @unit_block.Constraint(units, time_steps)
-        def ramp_up_constraint(m, u, t):
+        @self.component_block.Constraint(time_steps)
+        def ramp_up_constraint(m, t):
             if t == 0:
                 return Constraint.Skip
-            return m.heat_out[u, t] - m.heat_out[u, t - 1] <= m.ramp_up
+            return m.heat_out[t] - m.heat_out[t - 1] <= m.ramp_up
 
-        @unit_block.Constraint(units, time_steps)
-        def ramp_down_constraint(m, u, t):
+        @self.component_block.Constraint(time_steps)
+        def ramp_down_constraint(m, t):
             if t == 0:
                 return Constraint.Skip
-            return m.heat_out[u, t - 1] - m.heat_out[u, t] <= m.ramp_down
+            return m.heat_out[t - 1] - m.heat_out[t] <= m.ramp_down
 
         # COP constraint
-        @unit_block.Constraint(units, time_steps)
-        def cop_constraint(m, u, t):
-            return m.power_in[u, t] == m.heat_out[u, t] / m.cop
+        @self.component_block.Constraint(time_steps)
+        def cop_constraint(m, t):
+            return m.power_in[t] == m.heat_out[t] / m.cop
 
     def define_objective_h(self):
         # Define the objective function specific to HeatPump if needed
@@ -70,7 +81,6 @@ class AirConditioner:
     def __init__(
         self,
         id: str,
-        technology: str,
         model,
         max_power: float = None,
         min_power: float = None,
@@ -87,50 +97,52 @@ class AirConditioner:
         self.ramp_down = ramp_down
         self.cooling_factor = cooling_factor
 
-    def add_to_model(self, unit_block, units, time_steps):
-        self.model = unit_block
-        self.define_parameters(unit_block)
-        self.define_variables(unit_block, units, time_steps)
-        self.define_constraints(unit_block, units, time_steps)
+    def add_to_model(self, unit_block, time_steps):
+        self.component_block = unit_block
+        self.define_parameters()
+        self.define_variables(time_steps)
+        self.define_constraints(time_steps)
 
-    def define_parameters(self, unit_block) -> None:
-        unit_block.max_power = Param(initialize=self.max_power)
-        unit_block.min_power = Param(initialize=self.min_power)
-        unit_block.ramp_up = Param(initialize=self.ramp_up)
-        unit_block.ramp_down = Param(initialize=self.ramp_down)
-        unit_block.cooling_factor = Param(initialize=self.cooling_factor)  # Add the cooling factor parameter
+    def define_parameters(self) -> None:
+        self.component_block.max_power = Param(initialize=self.max_power)
+        self.component_block.min_power = Param(initialize=self.min_power)
+        self.component_block.ramp_up = Param(initialize=self.ramp_up)
+        self.component_block.ramp_down = Param(initialize=self.ramp_down)
+        self.component_block.cooling_factor = Param(
+            initialize=self.cooling_factor
+        )  # Add the cooling factor parameter
 
-    def define_variables(self, unit_block, units, time_steps):
-        unit_block.cool_out = Var(units, time_steps, within=pyo.NonNegativeReals)
-        unit_block.power_in = Var(units, time_steps, within=pyo.NonNegativeReals)
+    def define_variables(self, time_steps):
+        self.component_block.cool_out = Var(time_steps, within=pyo.NonNegativeReals)
+        self.component_block.power_in = Var(time_steps, within=pyo.NonNegativeReals)
 
-    def define_constraints(self, unit_block, units, time_steps) -> None:
+    def define_constraints(self, time_steps) -> None:
         # Heat output bounds
-        @unit_block.Constraint(units, time_steps)
-        def p_output_lower_bound(m, u, t):
-            return m.cool_out[u, t] >= m.min_power
+        @self.component_block.Constraint(time_steps)
+        def p_output_lower_bound(m, t):
+            return m.cool_out[t] >= m.min_power
 
-        @unit_block.Constraint(units, time_steps)
-        def p_output_upper_bound(m, u, t):
-            return m.cool_out[u, t] <= m.max_power
+        @self.component_block.Constraint(time_steps)
+        def p_output_upper_bound(m, t):
+            return m.cool_out[t] <= m.max_power
 
         # Ramp up/down constraints
-        @unit_block.Constraint(units, time_steps)
-        def ramp_up_constraint(m, u, t):
+        @self.component_block.Constraint(time_steps)
+        def ramp_up_constraint(m, t):
             if t == 0:
                 return Constraint.Skip
-            return m.cool_out[u, t] - m.cool_out[u, t - 1] <= m.ramp_up
+            return m.cool_out[t] - m.cool_out[t - 1] <= m.ramp_up
 
-        @unit_block.Constraint(units, time_steps)
-        def ramp_down_constraint(m, u, t):
+        @self.component_block.Constraint(time_steps)
+        def ramp_down_constraint(m, t):
             if t == 0:
                 return Constraint.Skip
-            return m.cool_out[u, t - 1] - m.cool_out[u, t] <= m.ramp_down
+            return m.cool_out[t - 1] - m.cool_out[t] <= m.ramp_down
 
         # Cooling factor constraint
-        @unit_block.Constraint(units, time_steps)
-        def cooling_factor_constraint(m, u, t):
-            return m.power_in[u, t] == m.cool_out[u, t] / m.cooling_factor
+        @self.component_block.Constraint(time_steps)
+        def cooling_factor_constraint(m, t):
+            return m.power_in[t] == m.cool_out[t] / m.cooling_factor
 
     def define_objective(self):
         # Define the objective function specific to HeatPump if needed
@@ -142,9 +154,6 @@ class Storage:
         self,
         id: str,
         model,
-        unit_operator: str,
-        technology: str,
-        bidding_strategies: dict,
         storage_type: str,  # Either 'heat' or 'electricity'
         max_capacity: float = None,
         min_capacity: float = None,

@@ -1,8 +1,8 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
+from typing import List, Union
 
 import pandas as pd
-from typing import List, Union
 
 from assume.common.forecasts import Forecaster
 from assume.common.market_objects import MarketConfig, Orderbook, Product

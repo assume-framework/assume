@@ -1,3 +1,2 @@
-name,technology,bidding_energy,unit_operator,objective,max_power,min_power,ramp_up,ramp_down,cop,cooling_factor
-building_NRW,HeatPump,naive_da_building,Aggregator,minimize_cost,100,0,99,99,2,
-building_NRW,AirConditioner,naive_da_building,Aggregator,minimize_cost,50,0,23,23,,0.8
+name,technology,bidding_energy,max_power,min_power,unit_operator
+demand_EOM,inflex_demand,naive,1000000,0,eom_de

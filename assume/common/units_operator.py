@@ -8,6 +8,7 @@ import pandas as pd
 from mango import Role
 from mango.messages.message import Performatives
 
+from assume.common.base import BaseUnit
 from assume.common.market_objects import (
     ClearingMessage,
     MarketConfig,
@@ -16,7 +17,6 @@ from assume.common.market_objects import (
 )
 from assume.common.utils import aggregate_step_amount
 from assume.strategies import BaseStrategy, LearningStrategy
-from assume.common.base import BaseUnit
 
 logger = logging.getLogger(__name__)
 

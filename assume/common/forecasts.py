@@ -154,7 +154,7 @@ class CsvForecaster(Forecaster):
 
         :rtype: pd.Series
         """
-        return self.forecasts.get('heating_demand', pd.Series(0, self.index))
+        return self.forecasts.get("heating_demand", pd.Series(0, self.index))
 
     def get_cooling_demand(self) -> pd.Series:
         """
@@ -162,7 +162,7 @@ class CsvForecaster(Forecaster):
 
         :rtype: pd.Series
         """
-        return self.forecasts.get('cooling_demand', pd.Series(0, self.index))
+        return self.forecasts.get("cooling_demand", pd.Series(0, self.index))
 
     def get_eom_price_forcast(self) -> pd.Series:
         """
@@ -170,8 +170,7 @@ class CsvForecaster(Forecaster):
 
         :rtype: pd.Series
         """
-        return self.forecasts.get('price_EOM', pd.Series(0, self.index))
-
+        return self.forecasts.get("price_EOM", pd.Series(0, self.index))
 
     def get_registered_market_participants(self, market_id):
         """

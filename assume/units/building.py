@@ -1,12 +1,21 @@
-import pyomo.environ as pyo
-from pyomo.environ import *
+import logging
+from typing import Dict, List
+
 import pandas as pd
-from typing import List, Optional, Dict, Union
+import pyomo.environ as pyo
+from pyomo.opt import SolverFactory, SolverStatus, TerminationCondition
+
 from assume.common.base import BaseUnit
-from assume.units.dst_components import HeatPump, AirConditioner, Storage
-from assume.common.market_objects import Product
-from assume.common.forecasts import CsvForecaster, Forecaster
-from importlib import import_module
+from assume.units.dst_components import AirConditioner, HeatPump, Storage
+
+logger = logging.getLogger(__name__)
+
+dst_components = {
+    "heat_pump": HeatPump,
+    "air_conditioner": AirConditioner,
+    "thermal_storage": Storage,
+    "electrical_storage": Storage,
+}
 
 
 class Building(BaseUnit):
@@ -14,24 +23,16 @@ class Building(BaseUnit):
         self,
         id: str,
         unit_operator: str,
-        technology: Union[str, List[str]],
         bidding_strategies: dict,
+        technology: str = "building",
         node: str = "bus0",
         index: pd.DatetimeIndex = None,
         location: tuple[float, float] = (0.0, 0.0),
         storage_list: List = None,  # List of storage units
-        unit_params: Dict[str, Dict] = None,
+        components: Dict[str, Dict] = None,
         objective: str = "minimize_cost",
-        forecaster: CsvForecaster = None,
-        heating_demand: Optional[List[float]] = None,
-        cooling_demand: Optional[List[float]] = None,
         **kwargs,
     ):
-        print("Initializing Building")
-
-        # if isinstance(technology, str):
-        #     technology = [tech.strip() for tech in technology.split(',')]
-
         super().__init__(
             id=id,
             unit_operator=unit_operator,
@@ -39,93 +40,104 @@ class Building(BaseUnit):
             bidding_strategies=bidding_strategies,
             index=index,
             node=node,
-            forecaster=forecaster,
+            **kwargs,
         )
 
-        # self.unit_list = technology
         self.storage_list = storage_list
-        self.units = {}
+        self.components = {}
         self.storage_units = {}
-        # self.time_steps = pd.date_range(start, end, freq='H')
-        self.storage_list = storage_list
-        self.unit_list = list(unit_params.keys()) if unit_params is not None else []
-        # self.unit_params = unit_params_dict if unit_params_dict is not None else {}
-        self.heating_demand = forecaster['heating_demand']
-        self.cooling_demand = forecaster['cooling_demand']
-        self.electricity_price = forecaster.get_electricity_price(EOM='EOM')
+
+        self.heating_demand = self.forecaster[f"{self.id}_heating"]
+        self.cooling_demand = self.forecaster[f"{self.id}_cooling"]
+        self.electricity_price = self.forecaster.get_electricity_price(EOM="EOM")
         self.objective = objective
 
-        self.create_model()
+        self.location = location
 
-        # Initialize units based on the list passed
-        self.initialize_units_from_list(unit_params)
-        # self.initialize_units_from_list(self.unit_list, self.unit_params)
+        self.create_model()
+        self.initialize_components(components=components)
         self.define_constraints()
+
+        print(self.model.display())
 
     def create_model(self):
         print("Creating Master Model for Building")
-        self.model = ConcreteModel()
+        self.model = pyo.ConcreteModel()
         self.define_sets()
         self.define_parameters()
         self.define_variables()
-        # self.define_constraints()
         self.define_objective()
 
-    def reset(self):
-        """Reset the unit to its initial state."""
-        pass
+    def define_sets(self) -> None:
+        self.model.time_steps = pyo.Set(
+            initialize=[idx for idx, _ in enumerate(self.index)]
+        )
+
+    def define_parameters(self) -> None:
+        self.model.heating_demand = pyo.Param(
+            self.model.time_steps, initialize=dict(enumerate(self.heating_demand))
+        )
+        self.model.cooling_demand = pyo.Param(
+            self.model.time_steps, initialize=dict(enumerate(self.cooling_demand))
+        )
+        self.model.electricity_price = pyo.Param(
+            self.model.time_steps,
+            initialize=dict(enumerate(self.electricity_price)),
+        )
+
+    def define_variables(self):
+        self.model.aggregated_power_in = pyo.Var(
+            self.model.time_steps, within=pyo.NonNegativeReals
+        )
+        self.model.aggregated_heat_out = pyo.Var(
+            self.model.time_steps, within=pyo.NonNegativeReals
+        )
+        self.model.aggregated_cool_out = pyo.Var(
+            self.model.time_steps, within=pyo.NonNegativeReals
+        )
+
+    def define_objective(self):
+        if self.objective == "minimize_cost":
+
+            @self.model.Objective(sense=pyo.minimize)
+            def obj_rule(m):
+                return sum(
+                    m.aggregated_power_in[t] * self.electricity_price[t]
+                    for t in self.model.time_steps
+                )
+
+        elif self.objective == "maximize_comfort":
+            # Define your comfort metric here
+            pass
+        else:
+            raise ValueError(f"Unknown objective: {self.objective}")
 
     # Initialize units based on the list passed
-    def initialize_units_from_list(self, unit_params=None):
-        if unit_params is None:
-            unit_params = {}
+    def initialize_components(self, components: Dict[str, Dict] = None):
+        if self.components is None:
+            logger.warning("No components specified for building")
+            return
 
-        print("Initializing Units from Dictionary")
+        for i, (unit_type, tech_params) in enumerate(components.items()):
+            unit_name = f"{unit_type.lower()}_{i+1}"
+            component_class = dst_components.get(unit_type)
+            if component_class is None:
+                raise ValueError(f"Unknown unit type: {unit_type}")
 
-        for unit_name, tech_params in unit_params.items():
-            unit_class = globals().get(unit_name)
+            unit_block = pyo.Block()
+            self.model.add_component(unit_name, unit_block)
 
-            if unit_class is not None:
-                unit_block = Block()
-                self.model.add_component(unit_name, unit_block)
+            new_component = component_class(
+                id=self.id,
+                model=self.model,
+                **tech_params,
+            )
 
-                merged_params = {**tech_params, **{'model': unit_block}}
-
-                new_unit = unit_class(id=self.id, unit_operator=self.unit_operator,
-                                      technology=unit_name, **merged_params)
-
-                new_unit.add_to_model(
-                    unit_block, self.model.units, self.model.time_steps
-                )
-                self.units[unit_name] = new_unit
-
-                print(f"Units index set after initialization: {list(self.model.units)}")
-            else:
-                print(f"Warning: No class found for unit name {unit_name}")
-
-    # def initialize_units_from_list(self, technology):
-    #     print("Initializing Units from List")
-    #     for unit_name in technology:
-    #         # unit_params = self.unit_params.get(unit_name, {})
-    #         unit_class = globals().get(unit_name)
-    #
-    #         if unit_class is not None:
-    #             self.model.units.add(unit_name)
-    #             unit_block = Block()
-    #             self.model.add_component(unit_name, unit_block)
-    #             unit_params = self.unit_params
-    #             unit_params["model"] = unit_block
-    #             new_unit = unit_class(id, **unit_params)
-    #             new_unit.add_to_model(
-    #                 unit_block, self.model.units, self.model.time_steps
-    #             )
-    #             self.units[unit_name] = new_unit
-    #             # Append the unit's master variables and constraints to the building's master lists
-    #             print(
-    #                 f"Units index set after initialization: {list(self.model.units)}"
-    #             )  # Debugging line
-    #         else:
-    #             print(f"Warning: No class found for unit name {unit_name}")
+            new_component.add_to_model(
+                unit_block=unit_block,
+                time_steps=self.model.time_steps,
+            )
+            self.components[unit_name] = new_component
 
     def initialize_storages_from_list(self, storage_list):
         for storage_type in storage_list:
@@ -144,65 +156,27 @@ class Building(BaseUnit):
             elif storage_type == "electrical":
                 self.connect_electrical_units(storage_unit)
 
-    def connect_thermal_units(self, storage_unit):
-        for unit_name, unit in self.units.items():
-            if hasattr(unit, "heat_out"):
-                # Add constraint or equation relating unit's heat_out and storage_unit's energy_in
-                # This might be part of your optimization model
-                ...
-
-    def connect_electrical_units(self, storage_unit):
-        for unit_name, unit in self.units.items():
-            if hasattr(unit, "power_in"):
-                # Add constraint or equation relating unit's power_in, storage_unit's power_in, and grid's power_out
-                # This would also be part of your optimization model
-                ...
-
-    def define_sets(self) -> None:
-        self.model.time_steps = Set(initialize=[idx for idx, _ in enumerate(self.index)])
-        self.model.units = Set(ordered=True, initialize=self.units.keys())
-
-    def define_parameters(self) -> None:
-        self.model.heating_demand = Param(self.model.time_steps,
-                                          initialize={idx: v for idx, v in enumerate(self.heating_demand)})
-        self.model.cooling_demand = Param(self.model.time_steps,
-                                          initialize={idx: v for idx, v in enumerate(self.cooling_demand)})
-        self.model.electricity_price = Param(self.model.time_steps,
-                                             initialize={idx: v for idx, v in enumerate(self.electricity_price)})
-
-    def define_variables(self):
-
-        self.model.aggregated_power_in = Var(
-            self.model.time_steps, within=pyo.NonNegativeReals
-        )
-        self.model.aggregated_heat_out = Var(
-            self.model.time_steps, within=pyo.NonNegativeReals
-        )
-        self.model.aggregated_cool_out = Var(
-            self.model.time_steps, within=pyo.NonNegativeReals
-        )
-
     def define_constraints(self):
         @self.model.Constraint(self.model.time_steps)
         def aggregate_power_in_constraint(m, t):
             return m.aggregated_power_in[t] == sum(
-                getattr(m, unit_name).power_in[unit_name, t]
-                for unit_name in self.units.keys()
+                getattr(m, unit_name).power_in[t]
+                for unit_name in self.components.keys()
             )
 
         @self.model.Constraint(self.model.time_steps)
         def aggregate_heat_out_constraint(m, t):
             return m.aggregated_heat_out[t] == sum(
-                getattr(m, unit_name).heat_out[unit_name, t]
-                for unit_name in self.units.keys()
+                getattr(m, unit_name).heat_out[t]
+                for unit_name in self.components.keys()
                 if hasattr(getattr(m, unit_name), "heat_out")
             )
 
         @self.model.Constraint(self.model.time_steps)
         def aggregate_cool_out_constraint(m, t):
             return m.aggregated_cool_out[t] == sum(
-                getattr(m, unit_name).cool_out[unit_name, t]
-                for unit_name in self.units.keys()
+                getattr(m, unit_name).cool_out[t]
+                for unit_name in self.components.keys()
                 if hasattr(getattr(m, unit_name), "cool_out")
             )
 
@@ -214,26 +188,23 @@ class Building(BaseUnit):
         def cool_balance(m, t):
             return m.aggregated_cool_out[t] == self.cooling_demand[t]
 
-    def define_objective(self):
-        if self.objective == "minimize_cost":
+    def connect_thermal_units(self, storage_unit):
+        for unit_name, unit in self.components.items():
+            if hasattr(unit, "heat_out"):
+                # Add constraint or equation relating unit's heat_out and storage_unit's energy_in
+                # This might be part of your optimization model
+                ...
 
-            @self.model.Objective(sense=pyo.minimize)
-            def obj_rule(m):
-                return sum(
-                    m.aggregated_power_in[t] * self.electricity_price[t]
-                    for t in self.model.time_steps
-                )
-
-        elif self.objective == "maximize_comfort":
-            # Define your comfort metric here
-            pass
-        else:
-            raise ValueError(f"Unknown objective: {self.objective}")
+    def connect_electrical_units(self, storage_unit):
+        for unit_name, unit in self.components.items():
+            if hasattr(unit, "power_in"):
+                # Add constraint or equation relating unit's power_in, storage_unit's power_in, and grid's power_out
+                # This would also be part of your optimization model
+                ...
 
     def run_optimization(self):
-
         # Create a solver
-        solver = SolverFactory('gurobi')
+        solver = SolverFactory("gurobi")
 
         # Solve the model
         solver.solve(self.model, tee=True)
@@ -243,7 +214,7 @@ class Building(BaseUnit):
 
         # Check solver status and termination condition
         if (results.solver.status == SolverStatus.ok) and (
-                results.solver.termination_condition == TerminationCondition.optimal
+            results.solver.termination_condition == TerminationCondition.optimal
         ):
             print("The model was solved optimally.")
 

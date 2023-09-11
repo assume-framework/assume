@@ -1,13 +1,13 @@
 import logging
+from copy import deepcopy
 from datetime import datetime
+from typing import List, Optional, Union
 
 import dateutil.rrule as rr
 import numpy as np
 import pandas as pd
-from copy import deepcopy
 import yaml
 from tqdm import tqdm
-from typing import List, Union, Optional
 
 from assume.common.forecasts import CsvForecaster, Forecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
@@ -183,159 +183,109 @@ def make_market_config(
     return market_config
 
 
-def add_units(
-        units_df: pd.DataFrame,
-        unit_type: str,
-        world: World,
-        forecaster: Forecaster,
+def add_dsm_units(
+    units_df: pd.DataFrame,
+    unit_type: str,
+    world: World,
+    forecaster: Forecaster,
 ):
     if units_df is None:
         return
 
     logger.info(f"Adding {unit_type} units")
 
-    # Reset the index to make 'name' a column
-    units_df = units_df.reset_index()
-
     units_df = units_df.fillna(0)
 
-    unique_columns = ['name', 'unit_operator', 'bidding_energy']
-    if 'objective' in units_df.columns:
-        unique_columns.append('objective')
-
-    unique_configurations = units_df[unique_columns].drop_duplicates()
-
-    for _, unique_config in unique_configurations.iterrows():
-        # Filter rows that match the unique attributes
-        filtered_df = units_df[
-            (units_df['name'] == unique_config['name']) &
-            (units_df['unit_operator'] == unique_config['unit_operator']) &
-            (units_df['bidding_energy'] == unique_config['bidding_energy'])
-            ]
-        if 'objective' in unique_config:
-            filtered_df = filtered_df[
-                filtered_df['objective'] == unique_config['objective']
-                ]
-
-        unit_params = {}
-        for _, row in filtered_df.iterrows():
-            technology = row['technology']  # Assuming 'technology' is a column in filtered_df
-            tech_params = row.drop(unique_columns).to_dict()
-            unit_params[technology] = tech_params
-            unit_params.update(tech_params)
-
+    # group unit_df by index and iterate over groups
+    for unit_id, unit_df in units_df.groupby(level=0):
         bidding_strategies = {
-            key.split("bidding_")[1]: unique_config[key]
-            for key in unique_config.keys()
+            key.split("bidding_")[1]: unit_df[key].unique()
+            for key in unit_df.keys()
             if key.startswith("bidding_")
         }
-        unit_params["bidding_strategies"] = bidding_strategies
+        for name, bidding_strategy in bidding_strategies.items():
+            if len(bidding_strategy) > 1:
+                logger.warning(
+                    f"Unit {unit_id} has multiple bidding strategies for {name}. Using first one."
+                )
+            bidding_strategies[name] = bidding_strategy[0]
 
-        # Remove 'unit_operator' to avoid duplicate argument
-        merged_params = {**unique_config.to_dict(), **unit_params}
-        merged_params.pop('unit_operator', None)
+        unit_params = {"bidding_strategies": bidding_strategies}
+        # delete all columns starting with bidding_ from the dataframe
+        unit_df = unit_df.drop(
+            columns=[col for col in unit_df.columns if col.startswith("bidding_")]
+        )
+
+        unit_operator = unit_df["unit_operator"].unique()
+        if len(unit_operator) > 1:
+            logger.warning(
+                f"Unit {unit_id} has multiple unit operators: {unit_operator}. Using first one."
+            )
+        unit_operator = unit_operator[0]
+        del unit_df["unit_operator"]
+
+        unit_objective = unit_df["objective"].unique()
+        if len(unit_objective) > 1:
+            logger.warning(
+                f"Unit {unit_id} has multiple objectives: {unit_objective}. Using first one."
+            )
+        unit_params["objective"] = unit_objective[0]
+        del unit_df["objective"]
+
+        unit_params["components"] = {
+            df["technology"]: df.to_dict() for _, df in unit_df.iterrows()
+        }
 
         world.add_unit(
-            id=unique_config['name'],
+            id=unit_id,
             unit_type=unit_type,
-            unit_operator_id=unique_config['unit_operator'],
-            unit_params=merged_params,
-            forecaster=forecaster
+            unit_operator_id=unit_operator,
+            unit_params=unit_params,
+            forecaster=forecaster,
         )
 
 
-# def add_units(
-#     primary_units_df: pd.DataFrame,
-#     unit_type: str,
-#     world: World,
-#     forecaster: Forecaster,
-#     secondary_units_df: Optional[pd.DataFrame],
-# ):
-#     """
-#     This function adds units to the world from a given dataframe.
-#     The callback is used to adjust unit_params depending on the unit_type, before adding the unit to the world.
-#
-#     :param units_df: the dataframe containing the units
-#     :type units_df: pd.DataFrame
-#     :param unit_type: the type of the unit
-#     :type unit_type: str
-#     :param world: the world
-#     :type world: World
-#     :param forecaster: the forecaster
-#     :type forecaster: Forecaster
-#     """
-#     if primary_units_df is None:
-#         return
-#
-#     logger.info(f"Adding {unit_type} units")
-#
-#     units_df = primary_units_df.fillna(0)
-#
-#     for unit_name, unit_params in units_df.iterrows():
-#         bidding_strategies = {
-#             key.split("bidding_")[1]: unit_params[key]
-#             for key in unit_params.keys()
-#             if key.startswith("bidding_")
-#         }
-#
-#         unit_params["bidding_strategies"] = bidding_strategies
-#         operator_id = unit_params["unit_operator"]
-#
-#         # Remove any leading/trailing whitespaces around technology names
-#         technologies = [tech.strip() for tech in unit_params["technology"].split(",")]
-#         unit_params_dict = unit_params.to_dict()
-#
-#         if secondary_units_df is not None and not secondary_units_df.empty:
-#             # print(f"secondary_units_df exists: {secondary_units_df.head()}")  # Debug print
-#
-#             for tech in technologies:
-#                 # print(f"Processing technology: {tech}")  # Debug print
-#                 # print(f"Available technologies in secondary_units_df: {secondary_units_df['technology'].values}")
-#
-#                 if tech in secondary_units_df['technology'].values:
-#                     tech_params = secondary_units_df.query(f'technology == "{tech}"').iloc[0].to_dict()
-#                     print(f"Tech params: {tech_params}")  # Debug print
-#                     unit_params_dict.update(tech_params)  # Update the unit_params with technology-specific parameters
-#                 else:
-#                     print(f"No parameters found for technology: {tech}")  # Debug print
-#
-#         unit_params = pd.Series(unit_params_dict)
-#
-#         print(f"Final unit_params: {unit_params}")  # Debug print
-#
-#         del unit_params["unit_operator"]
-#
-#         world.add_unit(
-#             id=unit_name,
-#             unit_type=unit_type,
-#             unit_operator_id=operator_id,
-#             unit_params=unit_params.to_dict(),
-#             technologies=technologies,
-#             forecaster=forecaster,
-#             unit_params_dict=unit_params_dict
-#         )
+def add_units(
+    units_df: pd.DataFrame,
+    unit_type: str,
+    world: World,
+    forecaster: Forecaster,
+):
+    """
+    This function adds units to the world from a given dataframe.
+    The callback is used to adjust unit_params depending on the unit_type, before adding the unit to the world.
 
-        ###################################################
+    :param units_df: the dataframe containing the units
+    :type units_df: pd.DataFrame
+    :param unit_type: the type of the unit
+    :type unit_type: str
+    :param world: the world
+    :type world: World
+    :param forecaster: the forecaster
+    :type forecaster: Forecaster
+    """
+    if units_df is None:
+        return
 
-    # units_df = units_df.fillna(0)
-    # for unit_name, unit_params in units_df.iterrows():
-    #     bidding_strategies = {
-    #         key.split("bidding_")[1]: unit_params[key]
-    #         for key in unit_params.keys()
-    #         if key.startswith("bidding_")
-    #     }
-    #     unit_params["bidding_strategies"] = bidding_strategies
-    #     operator_id = unit_params["unit_operator"]
-    #     technologies = unit_params["technology"]
-    #     del unit_params["unit_operator"]
-    #     world.add_unit(
-    #         id=unit_name,
-    #         unit_type=unit_type,
-    #         unit_operator_id=operator_id,
-    #         unit_params=unit_params,
-    #         technologies=technologies,
-    #         forecaster=forecaster,
-    #     )
+    logger.info(f"Adding {unit_type} units")
+
+    units_df = units_df.fillna(0)
+    for unit_name, unit_params in units_df.iterrows():
+        bidding_strategies = {
+            key.split("bidding_")[1]: unit_params[key]
+            for key in unit_params.keys()
+            if key.startswith("bidding_")
+        }
+        unit_params["bidding_strategies"] = bidding_strategies
+        operator_id = unit_params["unit_operator"]
+        del unit_params["unit_operator"]
+        world.add_unit(
+            id=unit_name,
+            unit_type=unit_type,
+            unit_operator_id=operator_id,
+            unit_params=unit_params,
+            forecaster=forecaster,
+        )
 
 
 async def load_scenario_folder_async(
@@ -401,16 +351,10 @@ async def load_scenario_folder_async(
         file_name="demand_units",
     )
 
-    # heatpump_units = load_file(
-    #     path=path,
-    #     config=config,
-    #     file_name="heatpump_units",
-    # )
-
-    demand_side_units_params = load_file(
+    dsm_units = load_file(
         path=path,
         config=config,
-        file_name="demand_units_params",
+        file_name="dsm_units",
     )
 
     if powerplant_units is None or demand_units is None:
@@ -487,16 +431,6 @@ async def load_scenario_folder_async(
         raise ValueError("No demand time series was provided!")
     forecaster.set_forecast(demand_df)
 
-    building_demand_df = load_file(
-        path=path,
-        config=config,
-        file_name="building_demand_df",
-        index=index,
-    )
-    if building_demand_df is None:
-        raise ValueError("No building demand time series was provided!")
-    forecaster.set_forecast(building_demand_df)
-
     cross_border_flows_df = load_file(
         path=path,
         config=config,
@@ -550,25 +484,13 @@ async def load_scenario_folder_async(
             [all_operators, storage_units.unit_operator.unique()]
         )
 
-    # if heatpump_units is not None:
-    #     all_operators = np.concatenate(
-    #         [all_operators, heatpump_units.unit_operator.unique()]
-    #     )
-
-    # if demand_units is not None:
-    #     all_operators = np.concatenate(
-    #         [all_operators, demand_units.unit_operator.unique()]
-    #     )
+    if dsm_units is not None:
+        all_operators = np.concatenate(
+            [all_operators, dsm_units.unit_operator.unique()]
+        )
 
     for company_name in set(all_operators):
         world.add_unit_operator(id=str(company_name))
-
-    # add the units to corresponsing unit operators
-    # if fuel prices are provided, add them to the unit params
-    # if vre generation is provided, add them to the vre units
-    # if we have RL strategy, add price forecast to unit_params
-    def empty_callback(unit_name, unit_params):
-        return unit_params
 
     add_units(
         units_df=powerplant_units,
@@ -577,46 +499,26 @@ async def load_scenario_folder_async(
         forecaster=forecaster,
     )
 
-    # add_units(
-    #     heatpump_units,
-    #     "heatpump",
-    #     world,
-    #     forecaster,
-    # )
-
     add_units(
-        units_df=demand_units,
-        unit_type="building",
+        units_df=storage_units,
+        unit_type="storage",
         world=world,
         forecaster=forecaster,
     )
 
-    # add_units(
-    #     demand_side_units_params,
-    #     "demand_side_units_params",
-    #     world,
-    #     forecaster,
-    # )
-
     add_units(
-
-        storage_units,
-        "storage",
-        world,
-        forecaster,
+        units_df=demand_units,
+        unit_type="demand",
+        world=world,
+        forecaster=forecaster,
     )
 
-    def demand_callback(unit_name, unit_params):
-        if demand_df is not None and unit_name in demand_df.columns:
-            unit_params["volume"] = demand_df[unit_name]
-
-        return unit_params
-
-    def building_demand_callback(unit_name, unit_params):
-        if demand_df is not None and unit_name in building_demand_df.columns:
-            unit_params["volume"] = building_demand_df[unit_name]
-
-        return unit_params
+    add_dsm_units(
+        units_df=dsm_units,
+        unit_type="building",
+        world=world,
+        forecaster=forecaster,
+    )
 
 
 def load_scenario_folder(

@@ -1,0 +1,5 @@
+name,technology,bidding_energy,unit_operator,objective,max_power,min_power,ramp_up,ramp_down,cop,cooling_factor
+building_NRW,heat_pump,naive_da_building,dsm_operator_1,minimize_cost,100,0,99,99,2,
+building_NRW,air_conditioner,naive_da_building,dsm_operator_1,minimize_cost,50,0,23,23,,0.8
+building_BW,heat_pump,naive_da_building,dsm_operator_2,minimize_cost,100,0,99,99,2,
+building_BW,air_conditioner,naive_da_building,dsm_operator_2,minimize_cost,50,0,23,23,,0.8
