@@ -1,5 +1,6 @@
 import calendar
 import logging
+import math
 from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
@@ -9,7 +10,6 @@ from mango import Role
 from assume.common.market_objects import (
     ClearingMessage,
     MarketConfig,
-    MarketMechanism,
     MarketProduct,
     OpeningMessage,
     Orderbook,
@@ -17,6 +17,77 @@ from assume.common.market_objects import (
 from assume.common.utils import get_available_products
 
 logger = logging.getLogger(__name__)
+
+
+class MarketMechanism:
+    """
+    This class represents a market mechanism.
+    It is different thant the MarketRole, in the way that the functionality is unrelated to mango.
+    The MarketMechanism is embedded into the general MarketRole, which takes care of simulation concerns.
+    In the Marketmechanism, all data needed for the clearing is present.
+    """
+
+    all_orders: Orderbook
+    marketconfig: MarketConfig
+    open_auctions: list
+    name: str
+
+    def __init__(self, marketconfig: MarketConfig):
+        self.marketconfig = marketconfig
+        from queue import Queue
+
+        self.open_auctions = Queue()
+        self.all_orders = []
+
+    def validate_registration(self, meta: dict) -> bool:
+        """
+        method to validate a given registration.
+        Used to check if a participant is eligible to bid on this market
+        """
+        return True
+
+    def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> None:
+        """
+        method to validate a given orderbook
+        This is needed to check if all required fields for this mechanism are present
+        """
+        max_price = self.marketconfig.maximum_bid_price
+        min_price = self.marketconfig.minimum_bid_price
+        max_volume = self.marketconfig.maximum_bid_volume
+
+        if self.marketconfig.price_tick:
+            assert max_price is not None, "max_price unset"
+            assert min_price is not None, "min_price unset"
+            # max and min should be in units
+            max_price = math.floor(max_price / self.marketconfig.price_tick)
+            min_price = math.ceil(min_price / self.marketconfig.price_tick)
+        if self.marketconfig.volume_tick:
+            assert max_volume is not None, "max_volume unset"
+            max_volume = math.floor(max_volume / self.marketconfig.volume_tick)
+
+        for order in orderbook:
+            order["agent_id"] = agent_tuple
+            if not order.get("only_hours"):
+                order["only_hours"] = None
+            assert order["price"] <= max_price, f"maximum_bid_price {order['price']}"
+            assert order["price"] >= min_price, f"minimum_bid_price {order['price']}"
+
+            if max_volume:
+                assert (
+                    abs(order["volume"]) <= max_volume
+                ), f"max_volume {order['volume']}"
+
+            if self.marketconfig.price_tick:
+                assert isinstance(order["price"], int)
+            if self.marketconfig.volume_tick:
+                assert isinstance(order["volume"], int)
+            for field in self.marketconfig.additional_fields:
+                assert field in order.keys(), f"missing field: {field}"
+
+    def clear(
+        self, orderbook: Orderbook, market_products: list[MarketProduct]
+    ) -> (Orderbook, Orderbook, list[dict]):
+        return [], [], []
 
 
 class MarketRole(MarketMechanism, Role):

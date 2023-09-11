@@ -21,14 +21,14 @@ except ImportError:
     pass
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
-from assume.markets.base_market import MarketMechanism, MarketRole
+from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)
 
 SOLVERS = ["glpk", "cbc", "gurobi", "cplex"]
 
 
-class NodalPyomoMarketRole(MarketRole, MarketMechanism):
+class NodalPyomoMarketRole(MarketRole):
     def __init__(
         self,
         marketconfig: MarketConfig,

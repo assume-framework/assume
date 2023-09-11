@@ -19,13 +19,12 @@ from tqdm import tqdm
 from assume.common import (
     Forecaster,
     MarketConfig,
-    MarketMechanism,
     UnitsOperator,
     WriteOutput,
     mango_codec_factory,
 )
 from assume.common.base import LearningConfig
-from assume.markets import clearing_mechanisms
+from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import LearningStrategy, bidding_strategies
 from assume.units import BaseUnit, Demand, HeatPump, PowerPlant, Storage
 
@@ -94,7 +93,7 @@ class World:
                 "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",
                 e,
             )
-        self.clearing_mechanisms: dict[str, MarketMechanism] = clearing_mechanisms
+        self.clearing_mechanisms: dict[str, MarketRole] = clearing_mechanisms
         self.clearing_mechanisms.update(additional_clearing_mechanisms)
         nest_asyncio.apply()
         self.loop = asyncio.get_event_loop()

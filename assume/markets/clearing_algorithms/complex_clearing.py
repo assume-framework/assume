@@ -6,7 +6,7 @@ import pyomo.environ as pyo
 from pyomo.opt import SolverFactory, TerminationCondition, check_available_solvers
 
 from assume.common.market_objects import MarketConfig, Orderbook
-from assume.markets.base_market import MarketMechanism, MarketRole
+from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)
 
@@ -136,15 +136,16 @@ def market_clearing_opt(orders, market_products, mode):
     return instance, results
 
 
-class ComplexClearingRole(MarketRole, MarketMechanism):
+class ComplexClearingRole(MarketRole):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
         assert "bid_type" in self.marketconfig.additional_fields
 
     def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> None:
         super().validate_orderbook(orderbook, agent_tuple)
+        max_volume = self.marketconfig.maximum_bid_volume
         for order in orderbook:
-            order["bid_type"] = "SB" if order["bid_type"] == None else order["bid_type"]
+            order["bid_type"] = "SB" if order["bid_type"] is None else order["bid_type"]
             assert order["bid_type"] in [
                 "SB",
                 "BB",

@@ -21,7 +21,7 @@ from pyomo.environ import value as get_real_number
 from pyomo.opt import SolverFactory, check_available_solvers
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Order, Orderbook
-from assume.markets.base_market import MarketMechanism, MarketRole
+from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ SOLVERS = ["glpk", "cbc", "gurobi", "cplex"]
 order_types = ["single_ask", "single_bid", "linked_ask", "exclusive_ask"]
 
 
-class ComplexDmasClearingRole(MarketRole, MarketMechanism):
+class ComplexDmasClearingRole(MarketRole):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
         assert "link" in self.marketconfig.additional_fields

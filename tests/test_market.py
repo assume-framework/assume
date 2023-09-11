@@ -8,7 +8,8 @@ from mango import RoleAgent, create_container
 from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 
-from assume.markets.base_market import MarketConfig, MarketProduct, MarketRole
+from assume.common.market_objects import MarketConfig
+from assume.markets.base_market import MarketProduct, MarketRole
 
 start = datetime(2020, 1, 1)
 end = datetime(2020, 12, 2)

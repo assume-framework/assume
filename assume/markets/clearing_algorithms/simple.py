@@ -3,12 +3,7 @@ from datetime import timedelta
 from itertools import groupby
 from operator import itemgetter
 
-from assume.common.market_objects import (
-    MarketConfig,
-    MarketMechanism,
-    MarketProduct,
-    Orderbook,
-)
+from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)
@@ -42,7 +37,7 @@ def calculate_meta(accepted_supply_orders, accepted_demand_orders, product):
     }
 
 
-class PayAsClearRole(MarketRole, MarketMechanism):
+class PayAsClearRole(MarketRole):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
 
@@ -165,7 +160,7 @@ class PayAsClearRole(MarketRole, MarketMechanism):
         return accepted_orders, rejected_orders, meta
 
 
-class PayAsBidRole(MarketRole, MarketMechanism):
+class PayAsBidRole(MarketRole):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
 
