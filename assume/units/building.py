@@ -21,7 +21,6 @@ class Building(BaseUnit):
         location: tuple[float, float] = (0.0, 0.0),
         storage_list: List = None,  # List of storage units
         unit_params: Dict[str, Dict] = None,
-        unit_params_dict: dict = None,
         objective: str = "minimize_cost",
         forecaster: CsvForecaster = None,
         heating_demand: Optional[List[float]] = None,
@@ -30,8 +29,8 @@ class Building(BaseUnit):
     ):
         print("Initializing Building")
 
-        if isinstance(technology, str):
-            technology = [tech.strip() for tech in technology.split(',')]
+        # if isinstance(technology, str):
+        #     technology = [tech.strip() for tech in technology.split(',')]
 
         super().__init__(
             id=id,
@@ -43,13 +42,13 @@ class Building(BaseUnit):
             forecaster=forecaster,
         )
 
-        self.unit_list = technology
+        # self.unit_list = technology
         self.storage_list = storage_list
         self.units = {}
         self.storage_units = {}
         # self.time_steps = pd.date_range(start, end, freq='H')
         self.storage_list = storage_list
-        self.unit_params = unit_params_dict if unit_params_dict is not None else {}
+        self.unit_list = list(unit_params.keys()) if unit_params is not None else []
         # self.unit_params = unit_params_dict if unit_params_dict is not None else {}
         self.heating_demand = forecaster['heating_demand']
         self.cooling_demand = forecaster['cooling_demand']
@@ -59,8 +58,8 @@ class Building(BaseUnit):
         self.create_model()
 
         # Initialize units based on the list passed
-        # self.initialize_units_from_list(technology)
-        self.initialize_units_from_list(self.unit_list, self.unit_params)
+        self.initialize_units_from_list(unit_params)
+        # self.initialize_units_from_list(self.unit_list, self.unit_params)
         self.define_constraints()
 
     def create_model(self):
@@ -77,42 +76,30 @@ class Building(BaseUnit):
         pass
 
     # Initialize units based on the list passed
-    def initialize_units_from_list(self, unit_names: list, unit_params: Dict[str, Dict]):
-        """
-        Initialize units from a dictionary of parameters.
-
-        :param unit_names: List of unit names (e.g., technology types)
-        :param unit_params: Dictionary of dictionaries containing technology-specific parameters
-        """
+    def initialize_units_from_list(self, unit_params=None):
+        if unit_params is None:
+            unit_params = {}
 
         print("Initializing Units from Dictionary")
 
-        for unit_name in unit_names:
-            tech_params = unit_params.get(unit_name, {})
+        for unit_name, tech_params in unit_params.items():
             unit_class = globals().get(unit_name)
 
             if unit_class is not None:
-                # Add the unit name to the model's set of units
-                self.model.units.add(unit_name)
-
-                # Create a new Block for this unit
                 unit_block = Block()
                 self.model.add_component(unit_name, unit_block)
 
-                # Merge global unit_params and technology-specific params
                 merged_params = {**tech_params, **{'model': unit_block}}
 
-                # Create and initialize the unit
                 new_unit = unit_class(id=self.id, unit_operator=self.unit_operator,
                                       technology=unit_name, **merged_params)
 
-                # Add the unit to the Building's Block and to the dictionary of units
                 new_unit.add_to_model(
                     unit_block, self.model.units, self.model.time_steps
                 )
                 self.units[unit_name] = new_unit
 
-                print(f"Units index set after initialization: {list(self.model.units)}")  # Debugging line
+                print(f"Units index set after initialization: {list(self.model.units)}")
             else:
                 print(f"Warning: No class found for unit name {unit_name}")
 
@@ -252,7 +239,7 @@ class Building(BaseUnit):
         solver.solve(self.model, tee=True)
         results = solver.solve(self.model, tee=True)  # , tee=True
         # print(results)
-        self.model.display()
+        # self.model.display()
 
         # Check solver status and termination condition
         if (results.solver.status == SolverStatus.ok) and (

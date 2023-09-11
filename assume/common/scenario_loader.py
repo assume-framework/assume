@@ -219,7 +219,9 @@ def add_units(
 
         unit_params = {}
         for _, row in filtered_df.iterrows():
+            technology = row['technology']  # Assuming 'technology' is a column in filtered_df
             tech_params = row.drop(unique_columns).to_dict()
+            unit_params[technology] = tech_params
             unit_params.update(tech_params)
 
         bidding_strategies = {

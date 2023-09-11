@@ -123,7 +123,7 @@ class NaiveDABuildingStrategy(BaseStrategy):
         heating_demand = unit.forecaster['heating_demand']
         cooling_demand = unit.forecaster['cooling_demand']
         unit.heating_demand = heating_demand
-        print(heating_demand)
+        # print(heating_demand)
         unit.heating_demand = cooling_demand
         unit.run_optimization()
 

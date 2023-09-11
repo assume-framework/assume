@@ -258,7 +258,7 @@ class World:
             unit_operator=unit_operator_id,
             index=self.index,
             forecaster=forecaster,
-            **unit_params,
+            **unit_params
         )
         await self.unit_operators[unit_operator_id].add_unit(unit)
 
@@ -386,7 +386,7 @@ class World:
                 id=id,
                 unit_type=unit_type,
                 unit_operator_id=unit_operator_id,
-                unit_params=unit_params,
+                unit_params=unit_params if unit_params is not None else {},
                 forecaster=forecaster,
             )
         )
