@@ -115,7 +115,8 @@ def test_complex_clearing_BB():
     assert mr.all_orders == []
 
     # change the price of the block order to be in-the-money
-    orderbook[6]["price"] = 45
+    assert orderbook[3]["agent_id"] == "block_gen7"
+    orderbook[3]["price"] = 45
 
     mr = ComplexClearingRole(market_config)
     accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
@@ -128,6 +129,7 @@ def test_complex_clearing_BB():
     assert mr.all_orders == []
 
     # change price of simple bid to lower the mcp for one hour
+    assert orderbook[2]["bid_id"] == "bid_5"
     orderbook[2]["price"] = 41
 
     mr = ComplexClearingRole(market_config)
@@ -146,6 +148,7 @@ def test_complex_clearing_BB():
     assert mr.all_orders == []
 
     # change price of simple bid to lower the mcp for one hour even more
+    assert orderbook[2]["bid_id"] == "bid_5"
     orderbook[2]["price"] = 39
 
     mr = ComplexClearingRole(market_config)
@@ -164,6 +167,7 @@ def test_complex_clearing_BB():
     assert mr.all_orders == []
 
     # change price of simple bid to see equilibrium case
+    assert orderbook[2]["bid_id"] == "bid_5"
     orderbook[2]["price"] = 40
 
     mr = ComplexClearingRole(market_config)
@@ -183,7 +187,8 @@ def test_complex_clearing_BB():
     assert mr.all_orders == []
 
     # introducing profile block order by increasing the volume for the hour with a higher mcp
-    orderbook[6]["volume"][products[1][0]] = 900
+    assert orderbook[3]["agent_id"] == "block_gen7"
+    orderbook[3]["volume"][products[1][0]] = 900
 
     mr = ComplexClearingRole(market_config)
     accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
