@@ -80,8 +80,8 @@ class PowerPlant(SupportsMinMax):
         partial_load_eff: bool = False,
         fuel_type: str = "others",
         emission_factor: float = 0.0,
-        ramp_up: float = None,
-        ramp_down: float = None,
+        ramp_up: float | None = None,
+        ramp_down: float | None = None,
         hot_start_cost: float = 0,
         warm_start_cost: float = 0,
         cold_start_cost: float = 0,
@@ -113,12 +113,12 @@ class PowerPlant(SupportsMinMax):
         self.emission_factor = emission_factor
 
         # check ramping enabled
-        self.ramp_down = max_power if ramp_down is None else ramp_down
-        self.ramp_up = max_power if ramp_up is None else ramp_up
+        self.ramp_down = max_power if ramp_down == 0 or ramp_down is None else ramp_down
+        self.ramp_up = max_power if ramp_up == 0 or ramp_up is None else ramp_up
         self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
         self.min_down_time = min_down_time if min_down_time > 0 else 1
-        self.downtime_hot_start = (
-            downtime_hot_start / self.index.freq.delta.total_seconds() / 3600
+        self.downtime_hot_start = downtime_hot_start / (
+            self.index.freq / timedelta(hours=1)
         )
         self.downtime_warm_start = downtime_warm_start
 
@@ -139,27 +139,6 @@ class PowerPlant(SupportsMinMax):
         Initialize the marginal cost of the unit.
         """
         self.marginal_cost = self.calc_simple_marginal_cost()
-
-    def reset(self):
-        """Reset the unit to its initial state."""
-
-        self.outputs["energy"] = pd.Series(0.0, index=self.index)
-        # workaround if market schedules do not match
-        # for example neg_reserve is required but market did not bid yet
-        # it does set a usage in times where no power is used by the market
-        # self.outputs["energy"].loc[:] = self.min_power + 0.5 * (
-        #    self.max_power - self.min_power
-        # )
-
-        self.outputs["heat"] = pd.Series(0.0, index=self.index)
-        self.outputs["power_loss"] = pd.Series(0.0, index=self.index)
-
-        self.outputs["capacity_pos"] = pd.Series(0.0, index=self.index)
-        self.outputs["capacity_neg"] = pd.Series(0.0, index=self.index)
-
-        self.outputs["profits"] = pd.Series(0.0, index=self.index)
-        self.outputs["rewards"] = pd.Series(0.0, index=self.index)
-        self.outputs["regrets"] = pd.Series(0.0, index=self.index)
 
     def execute_current_dispatch(
         self,

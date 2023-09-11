@@ -1,6 +1,6 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import List, Union
+from typing import TypedDict
 
 import pandas as pd
 
@@ -56,15 +56,15 @@ class BaseUnit:
         # series does not like to convert from tensor to float otherwise
         self.outputs["rl_actions"] = pd.Series(0.0, index=self.index, dtype=object)
         self.outputs["rl_observations"] = pd.Series(0.0, index=self.index, dtype=object)
-        self.outputs["rl_rewards"] = pd.Series(0.0, index=self.index, dtype=object)
+        self.outputs["reward"] = pd.Series(0.0, index=self.index, dtype=object)
+        self.outputs["learning_mode"] = pd.Series(False, index=self.index, dtype=bool)
+        self.outputs["rl_exploration_noise"] = pd.Series(
+            0.0, index=self.index, dtype=object
+        )
         if forecaster:
             self.forecaster = forecaster
         else:
             self.forecaster = defaultdict(lambda: pd.Series(0.0, index=self.index))
-
-    def reset(self):
-        """Reset the unit to its initial state."""
-        raise NotImplementedError()
 
     def calculate_bids(
         self,
@@ -90,8 +90,15 @@ class BaseUnit:
             market_config=market_config,
             product_tuples=product_tuples,
         )
+        # TODO one should make sure to use valid bidding strategies
         for i, _ in enumerate(bids):
-            bids[i].update({field: None for field in market_config.additional_fields})
+            bids[i].update(
+                {
+                    field: None
+                    for field in market_config.additional_fields
+                    if field not in bids[i].keys()
+                }
+            )
 
         return bids
 
@@ -113,9 +120,22 @@ class BaseUnit:
             start = order["start_time"]
             end = order["end_time"]
             end_excl = end - self.index.freq
-            self.outputs[product_type].loc[start:end_excl] += order["accepted_volume"]
+            if isinstance(order["accepted_volume"], dict):
+                self.outputs[product_type].loc[start:end_excl] += [
+                    order["accepted_volume"][key]
+                    for key in order["accepted_volume"].keys()
+                ]
+            else:
+                self.outputs[product_type].loc[start:end_excl] += order[
+                    "accepted_volume"
+                ]
 
         self.calculate_cashflow(product_type, orderbook)
+
+        self.outputs[product_type + "_marginal_costs"].loc[start:end_excl] = (
+            self.calculate_marginal_cost(start, self.outputs[product_type].loc[start])
+            * self.outputs[product_type].loc[start:end_excl]
+        )
 
         self.bidding_strategies[product_type].calculate_reward(
             unit=self,
@@ -191,17 +211,19 @@ class BaseUnit:
             end_excl = end - self.index.freq
 
             if isinstance(order["accepted_volume"], dict):
-                cashflow = float(
-                    order["accepted_price"][i] * order["accepted_volume"][i]
+                cashflow = [
+                    float(order["accepted_price"][i] * order["accepted_volume"][i])
                     for i in order["accepted_volume"].keys()
+                ]
+                self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
+                    cashflow * self.index.freq.n
                 )
             else:
                 cashflow = float(order["accepted_price"] * order["accepted_volume"])
-
-            hours = (end - start) / timedelta(hours=1)
-            self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
-                cashflow * hours
-            )
+                hours = (end - start) / timedelta(hours=1)
+                self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
+                    cashflow * hours
+                )
 
 
 class SupportsMinMax(BaseUnit):
@@ -338,7 +360,7 @@ class SupportsMinMax(BaseUnit):
         if len(arr) < 1:
             # before start of index
             return max_time
-        is_off = not arr[0]
+        is_off = not arr.iloc[0]
         runn = 0
         for val in arr:
             if val == is_off:
@@ -640,5 +662,67 @@ class LearningStrategy(BaseStrategy):
         self.obs_dim = kwargs.get("observation_dimension", 50)
         self.act_dim = kwargs.get("action_dimension", 2)
 
-    def update_transition(self, transitions):
-        pass
+
+class LearningConfig(TypedDict):
+    """
+    A class for the learning configuration.
+
+    :param observation_dimension: The observation dimension.
+    :type observation_dimension: int
+    :param action_dimension: The action dimension.
+    :type action_dimension: int
+    :param continue_learning: Whether to continue learning.
+    :type continue_learning: bool
+    :param load_model_path: The path to the model to load.
+    :type load_model_path: str
+    :param max_bid_price: The maximum bid price.
+    :type max_bid_price: float
+    :param learning_mode: Whether to use learning mode.
+    :type learning_mode: bool
+    :param algorithm: The algorithm to use.
+    :type algorithm: str
+    :param learning_rate: The learning rate.
+    :type learning_rate: float
+    :param training_episodes: The number of training episodes.
+    :type training_episodes: int
+    :param episodes_collecting_initial_experience: The number of episodes collecting initial experience.
+    :type episodes_collecting_initial_experience: int
+    :param train_freq: The training frequency.
+    :type train_freq: int
+    :param gradient_steps: The number of gradient steps.
+    :type gradient_steps: int
+    :param batch_size: The batch size.
+    :type batch_size: int
+    :param gamme: The discount factor.
+    :type gamma: float
+    :param device: The device to use.
+    :type device: str
+    :param noise_sigma : The standard deviation of the noise.
+    :type noise_sigma: float
+    :param noise_scale: Controls the initial strength of the noise.
+    :type noise_scale: int
+    :param noise_dt: Determines how quickly the noise weakens over time.
+    :type noise_dt: int
+    :param load_learned_path: The path to the learned model to load.
+    :type load_learned_path: str
+    """
+
+    observation_dimension: int
+    action_dimension: int
+    continue_learning: bool
+    load_model_path: str
+    max_bid_price: float
+    learning_mode: bool
+    algorithm: str
+    learning_rate: float
+    training_episodes: int
+    episodes_collecting_initial_experience: int
+    train_freq: int
+    gradient_steps: int
+    batch_size: int
+    gamma: float
+    device: str
+    noise_sigma: float
+    noise_scale: int
+    noise_dt: int
+    load_learned_path: str

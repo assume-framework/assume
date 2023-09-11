@@ -103,6 +103,7 @@ class Actor(nn.Module):
         return x
 
 
+# Ornstein-Uhlenbeck Noise
 # from https://github.com/songrotek/DDPG/blob/master/ou_noise.py
 class OUNoise:
     def __init__(self, action_dimension, mu=0, sigma=0.5, theta=0.15, dt=1e-2):
@@ -112,9 +113,6 @@ class OUNoise:
         self.sigma = sigma
         self.dt = dt
         self.noise_prev = np.zeros(self.action_dimension)
-        self.reset()
-
-    def reset(self):
         self.noise_prev = (
             self.initial_noise
             if self.initial_noise is not None
@@ -146,9 +144,6 @@ class NormalActionNoise:
         noise = self.scale * np.random.normal(self.mu, self.sigma, self.act_dimension)
         self.scale = self.dt * self.scale  # if self.scale >= 0.1 else self.scale
         return noise
-
-    def reset(self):
-        self.scale = 1.0
 
 
 def polyak_update(params, target_params, tau):

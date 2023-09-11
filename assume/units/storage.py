@@ -1,5 +1,4 @@
 import logging
-import math
 from datetime import timedelta
 from functools import lru_cache
 
@@ -8,6 +7,7 @@ import pandas as pd
 from assume.common.base import SupportsMinMaxCharge
 
 logger = logging.getLogger(__name__)
+EPS = 1e-4
 
 
 class Storage(SupportsMinMaxCharge):
@@ -189,19 +189,6 @@ class Storage(SupportsMinMaxCharge):
 
         self.location = location
 
-    def reset(self):
-        """
-        Reset the unit to its initial state.
-        """
-
-        # outputs["energy"] > 0 discharging, outputs["energy"] < 0 charging
-        self.outputs["energy"] = pd.Series(0.0, index=self.index)
-
-        # always starting with discharging?
-        # self.outputs["energy"].iat[0] = self.min_power_discharge
-        self.outputs["pos_capacity"] = pd.Series(0.0, index=self.index)
-        self.outputs["neg_capacity"] = pd.Series(0.0, index=self.index)
-
     def execute_current_dispatch(self, start: pd.Timestamp, end: pd.Timestamp):
         """
         Execute the current dispatch of the storage unit.
@@ -242,7 +229,7 @@ class Storage(SupportsMinMaxCharge):
                 max_soc_discharge = self.calculate_soc_max_discharge(soc)
 
                 if self.outputs["energy"][t] > max_soc_discharge:
-                    if not math.isclose(self.outputs["energy"][t], max_soc_discharge):
+                    if abs(self.outputs["energy"][t] - max_soc_discharge) > EPS:
                         logger.error(
                             f"The energy dispatched exceeds the minimum SOC significantly, the dispatched amount is adjusted."
                         )
@@ -261,7 +248,7 @@ class Storage(SupportsMinMaxCharge):
                 max_soc_charge = self.calculate_soc_max_charge(soc)
 
                 if self.outputs["energy"][t] < max_soc_charge:
-                    if not math.isclose(self.outputs["energy"][t], max_soc_charge):
+                    if abs(self.outputs["energy"][t] - max_soc_charge) > EPS:
                         logger.error(
                             f"The energy dispatched exceeds the maximum SOC, the dispatched amount is adjusted."
                         )

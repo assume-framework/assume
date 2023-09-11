@@ -100,7 +100,6 @@ def test_init_function(power_plant_1, power_plant_2, power_plant_3):
 
 
 def test_reset_function(power_plant_1):
-    power_plant_1.reset()
     # check if total_power_output is reset
     assert power_plant_1.outputs["energy"].equals(
         pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
@@ -123,8 +122,6 @@ def test_reset_function(power_plant_1):
 
 
 def test_calculate_operational_window(power_plant_1):
-    power_plant_1.reset()
-
     product_tuple = (
         pd.Timestamp("2022-01-01 00:00:00"),
         pd.Timestamp("2022-01-01 01:00:00"),
@@ -149,8 +146,6 @@ def test_calculate_operational_window(power_plant_1):
 
 
 def test_powerplant_feedback(power_plant_1, mock_market_config):
-    power_plant_1.reset()
-
     product_tuple = (
         pd.Timestamp("2022-01-01 00:00:00"),
         pd.Timestamp("2022-01-01 01:00:00"),
@@ -212,7 +207,6 @@ def test_powerplant_feedback(power_plant_1, mock_market_config):
 def test_powerplant_ramping(power_plant_1):
     power_plant_1.ramp_down = 100
     power_plant_1.ramp_up = 200
-    power_plant_1.reset()
 
     start = datetime(2022, 1, 1, 0)
     end = datetime(2022, 1, 1, 1)
@@ -279,7 +273,6 @@ def test_powerplant_availability(power_plant_1):
     power_plant_1.min_power = 200
     power_plant_1.ramp_down = 1000
     power_plant_1.ramp_up = 1000
-    power_plant_1.reset()
 
     start = datetime(2022, 1, 1, 0)
     end = datetime(2022, 1, 1, 1)

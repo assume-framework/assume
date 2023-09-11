@@ -98,17 +98,6 @@ class HP(SupportsMinMax):
 
         self.dr_factor = dr_factor
 
-    def reset(self):
-        """Reset the unit to its initial state."""
-
-        self.outputs["heat"] = pd.Series(0.0, index=self.index)
-        min_thermal_output = self.outputs["heat"].loc[
-            self.index[0] : self.index[0] + pd.Timedelta("24h")
-        ]
-
-        self.outputs["pos_capacity"] = pd.Series(0.0, index=self.index)
-        self.outputs["neg_capacity"] = pd.Series(0.0, index=self.index)
-
     def calculate_cop(self):
         """
         Calculates the COP of a heat pump given the temperature difference between the source and sink temperatures.

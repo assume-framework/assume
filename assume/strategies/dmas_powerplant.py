@@ -206,19 +206,19 @@ class DmasPowerplantStrategy(BaseStrategy):
 
         # -> fuel costs
         fuel_cost = [
-            (self.model.p_out[t] / unit.efficiency) * fuel_prices[t] for t in tr
+            (self.model.p_out[t] / unit.efficiency) * fuel_prices.iloc[t] for t in tr
         ]
         # -> emission costs
         emission_cost = [
             (self.model.p_out[t] / unit.efficiency * unit.emission_factor)
-            * emission_prices[t]
+            * emission_prices.iloc[t]
             for t in tr
         ]
         # -> start costs
         start_cost = [self.model.v[t] * unit.cold_start_cost for t in tr]
 
         # -> profit and resulting cashflow
-        profit = [self.model.p_out[t] * power_prices[t] for t in tr]
+        profit = [self.model.p_out[t] * power_prices.iloc[t] for t in tr]
         cashflow = [
             profit[t] - (fuel_cost[t] + emission_cost[t] + start_cost[t]) for t in tr
         ]
@@ -420,8 +420,7 @@ class DmasPowerplantStrategy(BaseStrategy):
                 if r.solver.termination_condition == TerminationCondition.infeasible:
                     log.error(f"infeasible model in step: {step}")
                 else:
-                    print(step)
-                    log.error(r.solver)
+                    log.error(f"{step} - {r.solver}")
                 for key in ["power", "emission", "fuel", "start", "profit"]:
                     self.opt_results[step][key] = np.zeros(self.T)
                 self.opt_results[step]["obj"] = 0
@@ -551,8 +550,8 @@ class DmasPowerplantStrategy(BaseStrategy):
         self.optimize(unit, start, hour_count, base_price)
 
         def get_cost(p: float, t: int):
-            f = fuel_price[t]
-            e = e_price[t]
+            f = fuel_price.iloc[t]
+            e = e_price.iloc[t]
             return (p / unit.efficiency) * (f + e * unit.emission_factor)
 
         def get_marginal(p0: float, p1: float, t: int):

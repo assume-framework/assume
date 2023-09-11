@@ -74,12 +74,6 @@ class Demand(SupportsMinMax):
         self.price = price
         self.location = location
 
-    def reset(self):
-        """
-        Reset the unit.
-        """
-        self.outputs["energy"] = pd.Series(0, index=self.index)
-
     def execute_current_dispatch(
         self,
         start: pd.Timestamp,

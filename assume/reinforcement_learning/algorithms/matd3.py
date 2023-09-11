@@ -11,59 +11,75 @@ from assume.reinforcement_learning.learning_utils import polyak_update
 
 
 class TD3(RLAlgorithm):
+    """
+    Twin Delayed Deep Deterministic Policy Gradients (TD3).
+    Addressing Function Approximation Error in Actor-Critic Methods.
+    TD3 is a direct successor of DDPG and improves it using three major tricks:
+    clipped double Q-Learning, delayed policy update and target policy smoothing.
+
+    Open AI Spinning guide: https://spinningup.openai.com/en/latest/algorithms/td3.html
+
+    Original paper: https://arxiv.org/pdf/1802.09477.pdf
+    """
+
     def __init__(
         self,
         learning_role,
         learning_rate=1e-4,
-        learning_starts=100,
+        episodes_collecting_initial_experience=100,
         batch_size=1024,
         tau=0.005,
         gamma=0.99,
-        train_freq=1,
         gradient_steps=-1,
         policy_delay=2,
         target_policy_noise=0.2,
         target_noise_clip=0.5,
     ):
-        self.learning_role = learning_role
-        self.learning_rate = learning_rate
-        self.learning_starts = learning_starts
-        self.batch_size = batch_size
-        self.gamma = gamma
-        self.tau = tau
-
-        self.train_freq = train_freq
-        self.gradient_steps = (
-            self.train_freq if gradient_steps == -1 else gradient_steps
+        super().__init__(
+            learning_role,
+            learning_rate,
+            episodes_collecting_initial_experience,
+            batch_size,
+            tau,
+            gamma,
+            gradient_steps,
+            policy_delay,
+            target_policy_noise,
+            target_noise_clip,
         )
-
-        self.policy_delay = policy_delay
-        self.target_noise_clip = target_noise_clip
-        self.target_policy_noise = target_policy_noise
-
-        self.obs_dim = self.learning_role.obs_dim
-        self.act_dim = self.learning_role.act_dim
-
-        self.device = self.learning_role.device
-        self.float_type = self.learning_role.float_type
-
-        self.unique_obs_len = 8
-
         self.n_updates = 0
 
     def update_policy(self):
+        """
+        Update the policy of the reinforcement learning agent using the Twin Delayed Deep Deterministic Policy Gradients (TD3) algorithm.
+
+        This function performs the policy update step, which involves updating the actor (policy) and critic (Q-function) networks
+        using TD3 algorithm. It iterates over the specified number of gradient steps and performs the following steps for each
+        learning strategy:
+
+        1. Sample a batch of transitions from the replay buffer.
+        2. Calculate the next actions with added noise using the actor target network.
+        3. Compute the target Q-values based on the next states, rewards, and the target critic network.
+        4. Compute the critic loss as the mean squared error between current Q-values and target Q-values.
+        5. Optimize the critic network by performing a gradient descent step.
+        6. Optionally, update the actor network if the specified policy delay is reached.
+        7. Apply Polyak averaging to update target networks.
+
+        This function implements the TD3 algorithm's key step for policy improvement and exploration.
+        """
+
         logger.info(f"Updating Policy")
-        n_rl_agents = len(self.learning_role.rl_units)
+        n_rl_agents = len(self.learning_role.rl_strats.keys())
         for _ in range(self.gradient_steps):
             self.n_updates += 1
             i = 0
             strategy: LearningStrategy
 
-            for u_id, strategy in self.learning_role.rl_units.items():
+            for u_id, strategy in self.learning_role.rl_strats.items():
                 critic_target = self.learning_role.target_critics[u_id]
                 critic = self.learning_role.critics[u_id]
-                actor = self.learning_role.rl_units[u_id].actor
-                actor_target = self.learning_role.rl_units[u_id].actor_target
+                actor = self.learning_role.rl_strats[u_id].actor
+                actor_target = self.learning_role.rl_strats[u_id].actor_target
 
                 if i % 100 == 0:
                     transitions = self.learning_role.buffer.sample(self.batch_size)
@@ -84,9 +100,7 @@ class TD3(RLAlgorithm):
                             (actor_target(next_states[:, i, :]) + noise[:, i, :]).clamp(
                                 -1, 1
                             )
-                            for i, agent in enumerate(
-                                self.learning_role.rl_units.values()
-                            )
+                            for i in range(n_rl_agents)
                         ]
                         next_actions = th.stack(next_actions)
 
@@ -145,10 +159,9 @@ class TD3(RLAlgorithm):
                         all_states, all_actions_clone
                     ).mean()
 
-                    # TODO Optimize the actor
-                    # actor.optimizer.zero_grad()
+                    actor.optimizer.zero_grad()
                     actor_loss.backward()
-                    # actor.optimizer.step()
+                    actor.optimizer.step()
 
                     polyak_update(
                         critic.parameters(), critic_target.parameters(), self.tau
@@ -156,8 +169,5 @@ class TD3(RLAlgorithm):
                     polyak_update(
                         actor.parameters(), actor_target.parameters(), self.tau
                     )
-
-                # TODO return a transition back to the strategy
-                strategy.update_transition(transitions)
 
                 i += 1

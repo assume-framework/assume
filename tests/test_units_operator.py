@@ -10,8 +10,8 @@ from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 
 from assume.common.forecasts import NaiveForecast
+from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
-from assume.markets.base_market import MarketConfig, MarketProduct
 from assume.strategies.naive_strategies import NaiveStrategy
 from assume.units.demand import Demand
 
