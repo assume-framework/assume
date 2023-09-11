@@ -1,2 +1,0 @@
-name,technology,max_power,min_power,unit_operator,bidding_energy,bidding_capacity
-demand_EOM,inflex_demand,1000000.0,0.0,eom_de,naive,naive
