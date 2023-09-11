@@ -3,22 +3,18 @@ from itertools import groupby
 from operator import itemgetter
 
 import pandas as pd
-
-try:
-    from pyomo.environ import (
-        ConcreteModel,
-        ConstraintList,
-        NonNegativeReals,
-        Objective,
-        Reals,
-        Set,
-        Suffix,
-        Var,
-        maximize,
-    )
-    from pyomo.opt import SolverFactory, check_available_solvers
-except ImportError:
-    pass
+from pyomo.environ import (
+    ConcreteModel,
+    ConstraintList,
+    NonNegativeReals,
+    Objective,
+    Reals,
+    Set,
+    Suffix,
+    Var,
+    maximize,
+)
+from pyomo.opt import SolverFactory, check_available_solvers
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.markets.base_market import MarketRole
@@ -29,6 +25,8 @@ SOLVERS = ["glpk", "cbc", "gurobi", "cplex"]
 
 
 class NodalPyomoMarketRole(MarketRole):
+    required_fields = ["node_id"]
+
     def __init__(
         self,
         marketconfig: MarketConfig,
@@ -45,7 +43,6 @@ class NodalPyomoMarketRole(MarketRole):
         network = {"Line_0": (0, 1, 100), "Line_1": (1, 2, 100), "Line_2": (2, 0, 100)}
         """
         super().__init__(marketconfig)
-        assert "node_id" in self.marketconfig.additional_fields
         self.nodes = nodes
         self.network = network
 

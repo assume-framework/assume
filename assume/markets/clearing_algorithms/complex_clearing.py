@@ -137,9 +137,10 @@ def market_clearing_opt(orders, market_products, mode):
 
 
 class ComplexClearingRole(MarketRole):
+    required_fields = ["bid_type"]
+
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
-        assert "bid_type" in self.marketconfig.additional_fields
 
     def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> None:
         super().validate_orderbook(orderbook, agent_tuple)

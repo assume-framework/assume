@@ -31,11 +31,10 @@ order_types = ["single_ask", "single_bid", "linked_ask", "exclusive_ask"]
 
 
 class ComplexDmasClearingRole(MarketRole):
+    required_fields = ["link", "block_id", "exclusive_id"]
+
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
-        assert "link" in self.marketconfig.additional_fields
-        assert "block_id" in self.marketconfig.additional_fields
-        assert "exclusive_id" in self.marketconfig.additional_fields
 
     def clear(
         self, orderbook: Orderbook, market_products: list[MarketProduct]
