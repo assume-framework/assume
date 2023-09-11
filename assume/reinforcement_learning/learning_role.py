@@ -1,6 +1,6 @@
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import torch as th
 from dateutil import rrule as rr
@@ -8,6 +8,7 @@ from mango import Role
 from torch.optim import Adam
 
 from assume.common.base import LearningConfig, LearningStrategy
+from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
 from assume.reinforcement_learning.learning_utils import Actor, CriticTD3
@@ -99,7 +100,7 @@ class Learning(Role):
             else:
                 self.load_params(load_directory)
 
-    def setup(self):
+    def setup(self) -> None:
         """
         Set up the learning role for reinforcement learning training.
 
@@ -123,7 +124,7 @@ class Learning(Role):
 
         self.context.schedule_recurrent_task(self.update_policy, recurrency_task)
 
-    def handle_message(self, content, meta):
+    def handle_message(self, content: dict, meta: dict) -> None:
         """
         Handles the incoming messages and performs corresponding actions.
 
@@ -135,12 +136,12 @@ class Learning(Role):
         if content.get("type") == "replay_buffer":
             data = content["data"]
             self.buffer.add(
-                obs=data[0],
+                obs=data[0][0],
                 actions=data[1],
                 reward=data[2],
             )
 
-    def turn_off_initial_exploration(self):
+    def turn_off_initial_exploration(self) -> None:
         """
         Disable initial exploration mode for all learning strategies.
 
@@ -151,7 +152,7 @@ class Learning(Role):
         for _, unit in self.rl_strats.items():
             unit.collect_initial_experience_mode = False
 
-    def create_learning_algorithm(self, algorithm):
+    def create_learning_algorithm(self, algorithm: RLAlgorithm):
         """
         Create and initialize the reinforcement learning algorithm.
 
@@ -173,7 +174,7 @@ class Learning(Role):
         else:
             self.logger.error(f"Learning algorithm {algorithm} not implemented!")
 
-    async def update_policy(self):
+    async def update_policy(self) -> None:
         """
         Update the policy of the reinforcement learning agent.
 
@@ -188,7 +189,7 @@ class Learning(Role):
             self.rl_algorithm.update_policy()
 
     # TODO: add evaluation function
-    def compare_and_save_policies(self):
+    def compare_and_save_policies(self) -> None:
         """
         Compare evaluation metrics and save policies based on the best achieved performance.
 
@@ -253,11 +254,6 @@ class Learning(Role):
         :param directory: The base directory for saving the parameters.
         :type directory: str
         """
-
-        def save_obj(obj, directory, agent):
-            path = f"{directory}/critic_{str(agent)}.pt"
-            th.save(obj, path)
-
         os.makedirs(directory, exist_ok=True)
         for u_id in self.rl_strats.keys():
             obj = {
@@ -265,7 +261,8 @@ class Learning(Role):
                 "critic_target": self.target_critics[u_id].state_dict(),
                 "critic_optimizer": self.critics[u_id].optimizer.state_dict(),
             }
-            save_obj(obj, directory, u_id)
+            path = f"{directory}/critic_{u_id}.pt"
+            th.save(obj, path)
 
     def save_actor_params(self, directory):
         """
@@ -278,11 +275,6 @@ class Learning(Role):
         :param directory: The base directory for saving the parameters.
         :type directory: str
         """
-
-        def save_obj(obj, directory, agent):
-            path = f"{directory}/actor_{str(agent)}.pt"
-            th.save(obj, path)
-
         os.makedirs(directory, exist_ok=True)
         for u_id in self.rl_strats.keys():
             obj = {
@@ -290,9 +282,10 @@ class Learning(Role):
                 "actor_target": self.rl_strats[u_id].actor_target.state_dict(),
                 "actor_optimizer": self.rl_strats[u_id].actor.optimizer.state_dict(),
             }
-            save_obj(obj, directory, u_id)
+            path = f"{directory}/actor_{u_id}.pt"
+            th.save(obj, path)
 
-    def load_obj(self, directory):
+    def load_obj(self, directory: str):
         """
         Load an object from a specified directory.
 
@@ -306,7 +299,7 @@ class Learning(Role):
         """
         return th.load(directory, map_location=self.device)
 
-    def load_params(self, directory):
+    def load_params(self, directory: str) -> None:
         """
         Load the parameters of both actor and critic networks.
 
@@ -319,7 +312,7 @@ class Learning(Role):
         self.load_critic_params(directory)
         self.load_actor_params(directory)
 
-    def load_critic_params(self, directory):
+    def load_critic_params(self, directory: str) -> None:
         """
         Load the parameters of critic networks from a specified directory.
 
@@ -353,7 +346,7 @@ class Learning(Role):
             except Exception:
                 self.logger.warning(f"No critic values loaded for agent {u_id}")
 
-    def load_actor_params(self, directory):
+    def load_actor_params(self, directory: str) -> None:
         """
         Load the parameters of actor networks from a specified directory.
 
@@ -386,7 +379,7 @@ class Learning(Role):
             except Exception:
                 self.logger.warning(f"No actor values loaded for agent {u_id}")
 
-    def extract_actors_and_critics(self):
+    def extract_actors_and_critics(self) -> dict:
         """
         Extract actor and critic networks.
 
@@ -413,7 +406,7 @@ class Learning(Role):
 
         return actors_and_critics
 
-    def create_actors_and_critics(self, actors_and_critics):
+    def create_actors_and_critics(self, actors_and_critics: dict = None) -> None:
         """
         Create actor and critic networks for reinforcement learning.
 
@@ -434,7 +427,7 @@ class Learning(Role):
                 unit_strategy.actor = actors_and_critics["actors"][u_id]
                 unit_strategy.actor_target = actors_and_critics["actor_targets"][u_id]
 
-    def create_actors(self):
+    def create_actors(self) -> None:
         """
         Create actor networks for reinforcement learning for each unit strategy.
 
@@ -458,7 +451,7 @@ class Learning(Role):
                 unit_strategy.actor.parameters(), lr=self.learning_rate
             )
 
-    def create_critics(self):
+    def create_critics(self) -> None:
         """
         Create critic networks for reinforcement learning.
 
