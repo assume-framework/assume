@@ -4,6 +4,7 @@ import math
 from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
+from queue import Queue
 
 from mango import Role
 
@@ -29,13 +30,11 @@ class MarketMechanism:
 
     all_orders: Orderbook
     marketconfig: MarketConfig
-    open_auctions: list
+    open_auctions: list[dict]
     name: str
 
     def __init__(self, marketconfig: MarketConfig):
         self.marketconfig = marketconfig
-        from queue import Queue
-
         self.open_auctions = Queue()
         self.all_orders = []
 
@@ -105,10 +104,12 @@ class MarketRole(MarketMechanism, Role):
     longitude: float
     latitude: float
     marketconfig: MarketConfig
+    registered_agents: list[tuple[str, str]]
+    required_fields: list[str] = []
 
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
-        self.marketconfig: MarketConfig = marketconfig
+        self.registered_agents = []
         if marketconfig.price_tick:
             if marketconfig.maximum_bid_price % marketconfig.price_tick != 0:
                 logger.warning(
@@ -142,7 +143,9 @@ class MarketRole(MarketMechanism, Role):
         """
         self.marketconfig.addr = self.context.addr
         self.marketconfig.aid = self.context.aid
-        self.registered_agents: list[tuple[str, str]] = []
+
+        for field in self.required_fields:
+            assert field in self.marketconfig.additional_fields, "missing field"
 
         def accept_orderbook(content: dict, meta):
             if not isinstance(content, dict):
