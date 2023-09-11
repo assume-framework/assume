@@ -38,12 +38,17 @@ def test_replay_buffer_add():
     actions = np.ones((n_rl_units, act_dim))
     reward = np.ones(n_rl_units)
     buffer.add(obs, actions, reward)
+    # can't sample with only one entry
+    with pytest.raises(Exception):
+        sample = buffer.sample(1)
+    buffer.add(obs, actions, reward)
 
     sample = buffer.sample(1)
     (observations, actions, next_observations, rewards) = sample
 
     assert rewards.shape == (1, 4)
     assert actions.shape == (1, 4, 3)
+    assert next_observations.shape == (1, 4, 2)
     assert observations.shape == (1, 4, 2)
 
     # now sample twice
@@ -52,4 +57,5 @@ def test_replay_buffer_add():
 
     assert rewards.shape == (2, 4)
     assert actions.shape == (2, 4, 3)
+    assert next_observations.shape == (2, 4, 2)
     assert observations.shape == (2, 4, 2)

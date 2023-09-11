@@ -103,7 +103,9 @@ class ReplayBuffer:
 
     def sample(self, batch_size: int) -> ReplayBufferSamples:
         upper_bound = self.buffer_size if self.full else self.pos
-        batch_inds = np.random.randint(0, upper_bound, size=batch_size)
+        if upper_bound < 2:
+            raise Exception("at least two entries needed to sample")
+        batch_inds = np.random.randint(0, upper_bound - 1, size=batch_size)
 
         data = (
             self.observations[batch_inds, :, :],
