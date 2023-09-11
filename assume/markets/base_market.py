@@ -1,6 +1,5 @@
 import calendar
 import logging
-import math
 from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
@@ -13,7 +12,6 @@ from assume.common.market_objects import (
     MarketMechanism,
     MarketProduct,
     OpeningMessage,
-    Order,
     Orderbook,
 )
 from assume.common.utils import get_available_products

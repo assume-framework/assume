@@ -5,6 +5,8 @@ from operator import itemgetter
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.markets.base_market import MarketMechanism, MarketRole
 
+from .simple import calculate_meta
+
 log = logging.getLogger(__name__)
 
 
@@ -90,6 +92,7 @@ class PayAsClearAonRole(MarketRole, MarketMechanism):
 
             for order in accepted_product_orders:
                 order["accepted_price"] = clear_price
+            accepted_orders.extend(accepted_product_orders)
 
             accepted_supply_orders = [
                 x for x in accepted_product_orders if x["accepted_volume"] > 0
@@ -97,28 +100,12 @@ class PayAsClearAonRole(MarketRole, MarketMechanism):
             accepted_demand_orders = [
                 x for x in accepted_product_orders if x["accepted_volume"] < 0
             ]
-            supply_volume = sum(
-                map(itemgetter("accepted_volume"), accepted_supply_orders)
-            )
-            demand_volume = -sum(
-                map(itemgetter("accepted_volume"), accepted_demand_orders)
-            )
-            accepted_orders.extend(accepted_product_orders)
-            prices = list(map(itemgetter("accepted_price"), accepted_supply_orders))
-            if not prices:
-                prices = [self.marketconfig.maximum_bid]
-
             meta.append(
-                {
-                    "supply_volume": supply_volume,
-                    "demand_volume": demand_volume,
-                    "uniform_price": clear_price,
-                    "price": clear_price,
-                    "node_id": None,
-                    "product_start": product[0],
-                    "product_end": product[1],
-                    "only_hours": product[2],
-                }
+                calculate_meta(
+                    accepted_supply_orders,
+                    accepted_demand_orders,
+                    product,
+                )
             )
         # accepted orders can not be used in future
         return accepted_orders, rejected_orders, meta
@@ -190,34 +177,20 @@ class PayAsBidAonRole(MarketRole, MarketMechanism):
                 rejected_orders.extend(demand_orders[i:])
                 rejected_orders.extend(supply_orders[i:])
 
+            accepted_orders.extend(accepted_product_orders)
+
+            # meta calculation
             accepted_supply_orders = [
                 x for x in accepted_product_orders if x["accepted_volume"] > 0
             ]
             accepted_demand_orders = [
                 x for x in accepted_product_orders if x["accepted_volume"] < 0
             ]
-            supply_volume = sum(
-                map(itemgetter("accepted_volume"), accepted_supply_orders)
-            )
-            demand_volume = -sum(
-                map(itemgetter("accepted_volume"), accepted_demand_orders)
-            )
-            accepted_orders.extend(accepted_product_orders)
-            prices = list(map(itemgetter("accepted_price"), accepted_supply_orders))
-            if not prices:
-                prices = [self.marketconfig.maximum_bid]
-
             meta.append(
-                {
-                    "supply_volume": supply_volume,
-                    "demand_volume": demand_volume,
-                    "price": sum(prices) / len(prices),
-                    "max_price": max(prices),
-                    "min_price": min(prices),
-                    "node_id": None,
-                    "product_start": product[0],
-                    "product_end": product[1],
-                    "only_hours": product[2],
-                }
+                calculate_meta(
+                    accepted_supply_orders,
+                    accepted_demand_orders,
+                    product,
+                )
             )
         return accepted_orders, rejected_orders, meta

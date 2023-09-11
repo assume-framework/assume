@@ -6,7 +6,7 @@ from dateutil.relativedelta import relativedelta as rd
 
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
-from assume.markets.clearing_algorithms import ComplexClearingRole, clearing_mechanisms
+from assume.markets.clearing_algorithms import ComplexClearingRole
 
 from .utils import extend_orderbook
 

@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import lru_cache
 
 import pandas as pd
@@ -117,8 +117,8 @@ class PowerPlant(SupportsMinMax):
         self.ramp_up = max_power if ramp_up == 0 or ramp_up is None else ramp_up
         self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
         self.min_down_time = min_down_time if min_down_time > 0 else 1
-        self.downtime_hot_start = (
-            downtime_hot_start / self.index.freq.delta.total_seconds() / 3600
+        self.downtime_hot_start = downtime_hot_start / (
+            self.index.freq / timedelta(hours=1)
         )
         self.downtime_warm_start = downtime_warm_start
 

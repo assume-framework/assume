@@ -1,10 +1,11 @@
 import logging
+from datetime import timedelta
 from operator import itemgetter
 
 import pyomo.environ as pyo
 from pyomo.opt import SolverFactory, TerminationCondition, check_available_solvers
 
-from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
+from assume.common.market_objects import MarketConfig, Orderbook
 from assume.markets.base_market import MarketMechanism, MarketRole
 
 log = logging.getLogger(__name__)
@@ -138,6 +139,7 @@ def market_clearing_opt(orders, market_products, mode):
 class ComplexClearingRole(MarketRole, MarketMechanism):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
+        assert "bid_type" in self.marketconfig.additional_fields
 
     def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> None:
         super().validate_orderbook(orderbook, agent_tuple)
@@ -168,8 +170,6 @@ class ComplexClearingRole(MarketRole, MarketMechanism):
 
         if len(orderbook) == 0:
             return [], [], []
-
-        assert "bid_type" in self.marketconfig.additional_fields
 
         market_getter = itemgetter("start_time", "end_time", "only_hours")
         orderbook.sort(key=market_getter)
@@ -314,7 +314,7 @@ def extract_results(
 
         supply_volume = supply_volume_dict[t]
         demand_volume = demand_volume_dict[t]
-        duration_hours = (product[1] - product[0]).total_seconds() / 60 / 60
+        duration_hours = (product[1] - product[0]) / timedelta(hours=1)
 
         meta.append(
             {

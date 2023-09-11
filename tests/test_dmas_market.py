@@ -5,7 +5,7 @@ from dateutil.relativedelta import relativedelta as rd
 
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
-from assume.markets.base_market import MarketConfig, MarketProduct, MarketRole
+from assume.markets.base_market import MarketConfig, MarketProduct
 from assume.markets.clearing_algorithms.complex_clearing_dmas import (
     ComplexDmasClearingRole,
 )

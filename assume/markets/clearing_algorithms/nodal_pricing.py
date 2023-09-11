@@ -29,9 +29,30 @@ SOLVERS = ["glpk", "cbc", "gurobi", "cplex"]
 
 
 class NodalPyomoMarketRole(MarketRole, MarketMechanism):
-    def __init__(self, marketconfig: MarketConfig):
+    def __init__(
+        self,
+        marketconfig: MarketConfig,
+        nodes=[0, 1, 2],
+        network={"Line_0": (0, 1, 100), "Line_1": (1, 2, 100), "Line_2": (2, 0, 100)},
+    ):
+        """
+        Network can be for example:
+
+        defined as connections between nodes as a tuple of (node1, node2, capacity)
+        network = {"Line_0": (0, 1, 0), "Line_1": (1, 2, 0), "Line_2": (2, 0, 0)}
+
+        or with added congestion
+        network = {"Line_0": (0, 1, 100), "Line_1": (1, 2, 100), "Line_2": (2, 0, 100)}
+        """
         super().__init__(marketconfig)
         assert "node_id" in self.marketconfig.additional_fields
+        self.nodes = nodes
+        self.network = network
+
+        self.incidence_matrix = pd.DataFrame(0, index=self.nodes, columns=self.network)
+        for i, (node1, node2, capacity) in self.network.items():
+            self.incidence_matrix.at[node1, i] = 1
+            self.incidence_matrix.at[node2, i] = -1
 
     def clear(
         self, orderbook: Orderbook, market_products: list[MarketProduct]
@@ -47,21 +68,6 @@ class NodalPyomoMarketRole(MarketRole, MarketMechanism):
         :return: accepted_orders, [], meta
         :rtype: tuple[Orderbook, Orderbook, list[dict]]
         """
-
-        # define list of nodes
-        nodes = [0, 1, 2]
-
-        # define a dict with connections between nodes as a tuple of (node1, node2, capacity)
-        network = {"Line_0": (0, 1, 0), "Line_1": (1, 2, 0), "Line_2": (2, 0, 0)}
-
-        # add congestion
-        network = {"Line_0": (0, 1, 100), "Line_1": (1, 2, 100), "Line_2": (2, 0, 100)}
-
-        incidence_matrix = pd.DataFrame(0, index=nodes, columns=network)
-        for i, (node1, node2, capacity) in network.items():
-            incidence_matrix.at[node1, i] = 1
-            incidence_matrix.at[node2, i] = -1
-
         market_getter = itemgetter("start_time", "end_time", "only_hours")
         accepted_orders: Orderbook = []
         rejected_orders: Orderbook = []
@@ -125,19 +131,19 @@ class NodalPyomoMarketRole(MarketRole, MarketMechanism):
             model.p_consumption = Var(range(len(demand_bids)), domain=NonNegativeReals)
 
             # Create a set for the lines in the network
-            model.lines = Set(initialize=network.keys())
+            model.lines = Set(initialize=self.network.keys())
             # Create a variable for the flow over each line
             model.flow = Var(model.lines, domain=Reals)
 
             # Create a constraint that the flow over each line must be less than or equal to the capacity of the line
             model.capacity_constraint = ConstraintList()
-            for i, (node1, node2, capacity) in network.items():
+            for i, (node1, node2, capacity) in self.network.items():
                 model.capacity_constraint.add(model.flow[i] <= capacity)
                 model.capacity_constraint.add(model.flow[i] >= -capacity)
 
             # Create a constraint that the flow over each line must be less than or equal to the capacity of the line
             model.balance_constraint = ConstraintList()
-            for node in nodes:
+            for node in self.nodes:
                 model.balance_constraint.add(
                     sum(
                         model.p_generation[i]
@@ -145,8 +151,8 @@ class NodalPyomoMarketRole(MarketRole, MarketMechanism):
                         if supply_bids[i][0] == node
                     )
                     - sum(
-                        incidence_matrix.at[node, i] * model.flow[i]
-                        for i in network.keys()
+                        self.incidence_matrix.at[node, i] * model.flow[i]
+                        for i in self.network.keys()
                     )
                     - sum(
                         model.p_consumption[i]
@@ -222,8 +228,8 @@ class NodalPyomoMarketRole(MarketRole, MarketMechanism):
             duals_dict = {str(key): -model.dual[key] for key in model.dual.keys()}
 
             # Find sum of generation per node
-            generation = {node: 0 for node in nodes}
-            consumption = {node: 0 for node in nodes}
+            generation = {node: 0 for node in self.nodes}
+            consumption = {node: 0 for node in self.nodes}
             # add demand to accepted orders with confirmed volume
             for i in range(len(demand_orders)):
                 node = demand_orders[i]["node_id"]
@@ -243,15 +249,13 @@ class NodalPyomoMarketRole(MarketRole, MarketMechanism):
                 if opt_volume != 0:
                     accepted_orders.append(supply_orders[i])
 
-            # Find sum of power flowing into each node
-            power_in = {
-                node: sum(
-                    incidence_matrix.at[node, i] * model.flow[i]()
-                    for i in network.keys()
+            # calculate meta
+            for node in self.nodes:
+                # Find sum of power flowing into each node
+                power_in = sum(
+                    self.incidence_matrix.at[node, i] * model.flow[i]()
+                    for i in self.network.keys()
                 )
-                for node in nodes
-            }
-            for node in nodes:
                 meta.append(
                     {
                         "supply_volume": generation[node],

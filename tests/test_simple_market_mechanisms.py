@@ -5,11 +5,7 @@ from dateutil.relativedelta import relativedelta as rd
 
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
-from assume.markets.clearing_algorithms import (
-    PayAsBidRole,
-    PayAsClearRole,
-    clearing_mechanisms,
-)
+from assume.markets.clearing_algorithms import PayAsClearRole, clearing_mechanisms
 
 from .utils import create_orderbook, extend_orderbook
 
