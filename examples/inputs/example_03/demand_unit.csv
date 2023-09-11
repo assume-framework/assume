@@ -1,0 +1,2 @@
+name,technology,bidding_energy,unit_operator,objective
+building_NRW,"AirConditioner, HeatPump",naive_da_building,Aggregator,minimize_cost
