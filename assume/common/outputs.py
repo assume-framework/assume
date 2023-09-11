@@ -41,6 +41,7 @@ class WriteOutput(Role):
         db_engine=None,
         export_csv_path: str = "",
         save_frequency_hours: int = 24,
+        learning_mode: bool = False,
     ):
         super().__init__()
 
@@ -57,11 +58,10 @@ class WriteOutput(Role):
         self.db = db_engine
 
         # learning
-        episode = self.simulation_id.split("_")[-1]
-        if episode.isdigit():
+        self.learning_mode = learning_mode
+        if self.learning_mode:
+            episode = self.simulation_id.split("_")[-1]
             self.episode = int(episode)
-        else:
-            self.episode = None
 
         # contruct all timeframe under which hourly values are written to excel and db
         self.start = start
@@ -313,9 +313,8 @@ class WriteOutput(Role):
         ]
         dfs = []
 
-        learning_queries = self.learning_queries()
-        if learning_queries:
-            queries.extend(learning_queries)
+        if self.learning_mode:
+            queries.extend(self.learning_queries())
 
         try:
             for query in queries:
@@ -339,9 +338,6 @@ class WriteOutput(Role):
             logger.error(f"No scenario run Yet {e}")
 
     def learning_queries(self):
-        if not self.episode:
-            return []
-
         queries = [
             f"SELECT 'sum_reward' as variable, simulation as ident, sum(reward) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
             f"SELECT 'sum_regret' as variable, simulation as ident, sum(regret) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",

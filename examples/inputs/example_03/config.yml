@@ -1,6 +1,6 @@
 base_case_building_2019:
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-01 03:00
+  end_date: 2019-01-05 23:00
   time_step: 1h
   save_frequency_hours: 24
   markets_config:

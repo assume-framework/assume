@@ -3,12 +3,19 @@ from typing import Dict, List
 
 import pandas as pd
 import pyomo.environ as pyo
-from pyomo.opt import SolverFactory, SolverStatus, TerminationCondition
+from pyomo.opt import (
+    SolverFactory,
+    SolverStatus,
+    TerminationCondition,
+    check_available_solvers,
+)
 
 from assume.common.base import BaseUnit
 from assume.units.dst_components import AirConditioner, HeatPump, Storage
 
 logger = logging.getLogger(__name__)
+
+SOLVERS = ["gurobi", "glpk"]
 
 dst_components = {
     "heat_pump": HeatPump,
@@ -58,10 +65,9 @@ class Building(BaseUnit):
         self.initialize_components(components=components)
         self.define_constraints()
 
-        print(self.model.display())
+        self.results = None
 
     def create_model(self):
-        print("Creating Master Model for Building")
         self.model = pyo.ConcreteModel()
         self.define_sets()
         self.define_parameters()
@@ -204,27 +210,31 @@ class Building(BaseUnit):
 
     def run_optimization(self):
         # Create a solver
-        solver = SolverFactory("gurobi")
+        solvers = check_available_solvers(*SOLVERS)
+        if len(solvers) < 1:
+            raise Exception(f"None of {SOLVERS} are available")
+
+        solver = SolverFactory(solvers[0])
 
         # Solve the model
-        solver.solve(self.model, tee=True)
-        results = solver.solve(self.model, tee=True)  # , tee=True
-        # print(results)
-        # self.model.display()
+        self.results = solver.solve(self.model, tee=False)
 
         # Check solver status and termination condition
-        if (results.solver.status == SolverStatus.ok) and (
-            results.solver.termination_condition == TerminationCondition.optimal
+        if (self.results.solver.status == SolverStatus.ok) and (
+            self.results.solver.termination_condition == TerminationCondition.optimal
         ):
-            print("The model was solved optimally.")
+            logger.debug("The model was solved optimally.")
 
-            # Display the Objective Function Value
-            objective_value = self.model.obj_rule()
-            print(f"The value of the objective function is {objective_value}.")
-
-        elif results.solver.termination_condition == TerminationCondition.infeasible:
-            print("The model is infeasible.")
+        elif (
+            self.results.solver.termination_condition == TerminationCondition.infeasible
+        ):
+            logger.debug("The model is infeasible.")
 
         else:
-            print("Solver Status: ", results.solver.status)
-            print("Termination Condition: ", results.solver.termination_condition)
+            logger.debug("Solver Status: ", self.results.solver.status)
+            logger.debug(
+                "Termination Condition: ", self.results.solver.termination_condition
+            )
+
+    def calculate_marginal_cost(self, start, **kwargs):
+        return self.electricity_price[start]

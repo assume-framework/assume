@@ -1,7 +1,5 @@
 import logging
-from copy import deepcopy
 from datetime import datetime
-from typing import List, Optional, Union
 
 import dateutil.rrule as rr
 import numpy as np
