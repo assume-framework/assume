@@ -1,10 +1,11 @@
 import logging
+from datetime import timedelta
 from operator import itemgetter
 
 import pyomo.environ as pyo
 from pyomo.opt import SolverFactory, TerminationCondition, check_available_solvers
 
-from assume.common.market_objects import MarketProduct, Orderbook
+from assume.common.market_objects import MarketConfig, Orderbook
 from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)
@@ -13,11 +14,7 @@ SOLVERS = ["gurobi", "glpk"]
 EPS = 1e-4
 
 
-def market_clearing_opt(
-    orders,
-    market_products,
-    mode="with_min_acceptance_ratio",
-):
+def market_clearing_opt(orders, market_products, mode):
     model = pyo.ConcreteModel()
     model.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT_EXPORT)
 
@@ -113,7 +110,10 @@ def market_clearing_opt(
     if solver.name == "gurobi":
         options = {"cutoff": -1.0, "eps": EPS}
     elif solver.name == "cplex":
-        options = {"mip.tolerances.lowercutoff": -1.0, "mip.tolerances.absmipgap": EPS}
+        options = {
+            "mip.tolerances.lowercutoff": -1.0,
+            "mip.tolerances.absmipgap": EPS,
+        }
     elif solver.name == "cbc":
         options = {"sec": 60, "ratio": 0.1}
     # elif solver.name == "glpk":
@@ -136,114 +136,129 @@ def market_clearing_opt(
     return instance, results
 
 
-def pay_as_clear_complex(
-    market_agent: MarketRole,
-    market_products: list[MarketProduct],
-):
-    """
-    This implements pay-as-clear with more complex bid structures, including acceptance ratios, bid types, and profiled volumes.
+class ComplexClearingRole(MarketRole):
+    def __init__(self, marketconfig: MarketConfig):
+        super().__init__(marketconfig)
+        assert "bid_type" in self.marketconfig.additional_fields
 
-    :param market_agent: The market agent
-    :type market_agent: MarketRole
-    :param market_products: The products to be traded
-    :type market_products: list[MarketProduct]
+    def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> None:
+        super().validate_orderbook(orderbook, agent_tuple)
+        max_volume = self.marketconfig.maximum_bid_volume
+        for order in orderbook:
+            order["bid_type"] = "SB" if order["bid_type"] is None else order["bid_type"]
+            assert order["bid_type"] in [
+                "SB",
+                "BB",
+            ], f"bid_type {order['bid_type']} not in ['SB', 'BB']"
 
-    :return extract_results(model=model, eps=eps, orders=orders, market_products=market_products, market_clearing_prices=market_clearing_prices)
-    :rtype: tuple[Orderbook, Orderbook, list[dict]]
-    """
+            if order["bid_type"] == "BB":
+                assert False not in [
+                    abs(volume) <= max_volume for _, volume in order["volume"].items()
+                ], f"max_volume {order['volume']}"
 
-    if len(market_agent.all_orders) == 0:
-        return [], [], []
+    def clear(
+        self, orderbook: Orderbook, market_products
+    ) -> (Orderbook, Orderbook, list[dict]):
+        """
+        This implements pay-as-clear with more complex bid structures, including acceptance ratios, bid types, and profiled volumes.
 
-    assert "bid_type" in market_agent.marketconfig.additional_fields
+        :param market_products: The products to be traded
+        :type market_products: list[MarketProduct]
 
-    market_getter = itemgetter("start_time", "end_time", "only_hours")
-    market_agent.all_orders.sort(key=market_getter)
+        :return extract_results(model=model, eps=eps, orders=orders, market_products=market_products, market_clearing_prices=market_clearing_prices)
+        :rtype: tuple[Orderbook, Orderbook, list[dict]]
+        """
 
-    orders = market_agent.all_orders
-    for order in orders:
-        order["accepted_price"] = {}
-        order["accepted_volume"] = {}
+        if len(orderbook) == 0:
+            return [], [], []
 
-    rejected_orders: Orderbook = []
+        market_getter = itemgetter("start_time", "end_time", "only_hours")
+        orderbook.sort(key=market_getter)
 
-    mode = "default"
-    if "min_acceptance_ratio" in market_agent.marketconfig.additional_fields:
-        mode = "with_min_acceptance_ratio"
+        for order in orderbook:
+            order["accepted_price"] = {}
+            order["accepted_volume"] = {}
 
-    while True:
-        instance, results = market_clearing_opt(
-            orders=orders,
-            market_products=market_products,
-            mode=mode,
-        )
+        rejected_orders: Orderbook = []
 
-        if results.solver.termination_condition == TerminationCondition.infeasible:
-            market_agent.all_orders = []
-            raise Exception("infeasible")
+        mode = "default"
+        if "min_acceptance_ratio" in self.marketconfig.additional_fields:
+            mode = "with_min_acceptance_ratio"
 
-        # extract dual from model.energy_balance
-        market_clearing_prices = {
-            t: instance.dual[instance.energy_balance[t]] for t in instance.T
-        }
+        while True:
+            instance, results = market_clearing_opt(
+                orders=orderbook,
+                market_products=market_products,
+                mode=mode,
+            )
 
-        # check the profit of each order and remove those with negative profit
-        orders_profit = []
-        for order in orders:
-            if order["bid_type"] == "SB":
-                # order rejected
-                if pyo.value(instance.xs[order["bid_id"]]) < EPS:
-                    order_profit = 0
-                # marginal bid
-                elif (
-                    abs(market_clearing_prices[order["start_time"]] - order["price"])
-                    < EPS
-                ):
-                    order_profit = 0
-                else:
-                    order_profit = (
-                        (market_clearing_prices[order["start_time"]] - order["price"])
-                        * order["volume"]
-                        * pyo.value(instance.xs[order["bid_id"]])
-                    )
+            if results.solver.termination_condition == TerminationCondition.infeasible:
+                raise Exception("infeasible")
 
-            elif order["bid_type"] == "BB":
-                # order rejected
-                if pyo.value(instance.xb[order["bid_id"]]) < EPS:
-                    order_profit = 0
-                else:
-                    bid_volume = sum(order["volume"].values())
-                    order_profit = (
-                        sum(
-                            market_clearing_prices[t] * v
-                            for t, v in order["volume"].items()
+            # extract dual from model.energy_balance
+            market_clearing_prices = {
+                t: instance.dual[instance.energy_balance[t]] for t in instance.T
+            }
+
+            # check the profit of each order and remove those with negative profit
+            orders_profit = []
+            for order in orderbook:
+                if order["bid_type"] == "SB":
+                    # order rejected
+                    if pyo.value(instance.xs[order["bid_id"]]) < EPS:
+                        order_profit = 0
+                    # marginal bid
+                    elif (
+                        abs(
+                            market_clearing_prices[order["start_time"]] - order["price"]
                         )
-                        - order["price"] * bid_volume
-                    ) * pyo.value(instance.xb[order["bid_id"]])
+                        < EPS
+                    ):
+                        order_profit = 0
+                    else:
+                        order_profit = (
+                            (
+                                market_clearing_prices[order["start_time"]]
+                                - order["price"]
+                            )
+                            * order["volume"]
+                            * pyo.value(instance.xs[order["bid_id"]])
+                        )
 
-            # correct rounding
-            if order_profit != 0 and abs(order_profit) < EPS:
-                order_profit = 0
+                elif order["bid_type"] == "BB":
+                    # order rejected
+                    if pyo.value(instance.xb[order["bid_id"]]) < EPS:
+                        order_profit = 0
+                    else:
+                        bid_volume = sum(order["volume"].values())
+                        order_profit = (
+                            sum(
+                                market_clearing_prices[t] * v
+                                for t, v in order["volume"].items()
+                            )
+                            - order["price"] * bid_volume
+                        ) * pyo.value(instance.xb[order["bid_id"]])
 
-            orders_profit.append(order_profit)
+                # correct rounding
+                if order_profit != 0 and abs(order_profit) < EPS:
+                    order_profit = 0
 
-            if order_profit < 0:
-                rejected_orders.append(order)
-                orders.remove(order)
+                orders_profit.append(order_profit)
 
-        # check if all orders have positive profit
-        if all(order_profit >= 0 for order_profit in orders_profit):
-            break
+                if order_profit < 0:
+                    rejected_orders.append(order)
+                    orderbook.remove(order)
 
-    market_agent.all_orders = []
-
-    return extract_results(
-        model=instance,
-        orders=orders,
-        rejected_orders=rejected_orders,
-        market_products=market_products,
-        market_clearing_prices=market_clearing_prices,
-    )
+            # check if all orders have positive profit
+            if all(order_profit >= 0 for order_profit in orders_profit):
+                break
+        return extract_results(
+            model=instance,
+            orders=orderbook,
+            rejected_orders=rejected_orders,
+            market_products=market_products,
+            market_clearing_prices=market_clearing_prices,
+        )
 
 
 def extract_results(
@@ -300,7 +315,7 @@ def extract_results(
 
         supply_volume = supply_volume_dict[t]
         demand_volume = demand_volume_dict[t]
-        duration_hours = (product[1] - product[0]).total_seconds() / 60 / 60
+        duration_hours = (product[1] - product[0]) / timedelta(hours=1)
 
         meta.append(
             {

@@ -85,7 +85,7 @@ def test_available_products():
     for prod in products:
         assert prod[0] == start + timedelta(hours=(1 + i)), "start {i}"
         assert prod[1] == start + timedelta(hours=(2 + i)), "end {i}"
-        assert prod[2] == None, "only_hour {i}"
+        assert prod[2] is None, "only_hour {i}"
         i += 1
 
 

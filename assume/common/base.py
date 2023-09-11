@@ -90,6 +90,7 @@ class BaseUnit:
             market_config=market_config,
             product_tuples=product_tuples,
         )
+        # TODO one should make sure to use valid bidding strategies
         for i, _ in enumerate(bids):
             bids[i].update(
                 {

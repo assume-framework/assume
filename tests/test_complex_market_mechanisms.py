@@ -6,7 +6,7 @@ from dateutil.relativedelta import relativedelta as rd
 
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
-from assume.markets import MarketRole, clearing_mechanisms
+from assume.markets.clearing_algorithms import ComplexClearingRole
 
 from .utils import extend_orderbook
 
@@ -22,8 +22,9 @@ simple_dayahead_auction_config = MarketConfig(
     opening_duration=timedelta(hours=1),
     volume_unit="MW",
     volume_tick=0.1,
+    maximum_bid_volume=None,
     price_unit="€/MW",
-    market_mechanism="pay_as_clear",
+    market_mechanism="pay_as_clear_complex",
 )
 eps = 1e-4
 
@@ -32,14 +33,11 @@ def test_complex_clearing():
     import copy
 
     market_config = copy.copy(simple_dayahead_auction_config)
-
-    market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex"]
     h = 24
     market_config.market_products = [MarketProduct(rd(hours=+1), h, rd(hours=1))]
     market_config.additional_fields = [
         "bid_type",
     ]
-    mr = MarketRole(market_config)
     next_opening = market_config.opening_hours.after(datetime.now())
     products = get_available_products(market_config.market_products, next_opening)
     assert len(products) == h
@@ -55,10 +53,8 @@ def test_complex_clearing():
     orderbook = extend_orderbook(products, 1000, 100, orderbook)
     orderbook = extend_orderbook(products, 900, 50, orderbook)
 
-    mr.all_orders = orderbook
-    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
-        mr, products
-    )
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
 
     assert math.isclose(meta[0]["supply_volume"], 1000, abs_tol=eps)
     assert math.isclose(meta[0]["demand_volume"], -1000, abs_tol=eps)
@@ -76,14 +72,11 @@ def test_complex_clearing_BB():
     import copy
 
     market_config = copy.copy(simple_dayahead_auction_config)
-
-    market_config.market_mechanism = clearing_mechanisms["pay_as_clear_complex"]
     market_config.market_products = [MarketProduct(rd(hours=+1), 2, rd(hours=1))]
     market_config.additional_fields = [
         "bid_type",
         "min_acceptance_ratio",
     ]
-    mr = MarketRole(market_config)
     next_opening = market_config.opening_hours.after(datetime.now())
     products = get_available_products(market_config.market_products, next_opening)
     assert len(products) == 2
@@ -108,10 +101,8 @@ def test_complex_clearing_BB():
         products, 100, 75, orderbook, bid_type="BB", min_acceptance_ratio=1
     )
 
-    mr.all_orders = orderbook.copy()
-    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
-        mr, products
-    )
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
     # accept only cheapes simple bids
     assert math.isclose(meta[0]["price"], 50, abs_tol=eps)
     assert rejected_orders[1]["agent_id"] == "block_gen7"
@@ -124,12 +115,11 @@ def test_complex_clearing_BB():
     assert mr.all_orders == []
 
     # change the price of the block order to be in-the-money
-    orderbook[6]["price"] = 45
+    assert orderbook[3]["agent_id"] == "block_gen7"
+    orderbook[3]["price"] = 45
 
-    mr.all_orders = orderbook.copy()
-    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
-        mr, products
-    )
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
     # accept block order and part of cheaper simple order
     assert math.isclose(meta[0]["price"], 50, abs_tol=eps)
     assert accepted_orders[2]["agent_id"] == "block_gen7"
@@ -139,12 +129,11 @@ def test_complex_clearing_BB():
     assert mr.all_orders == []
 
     # change price of simple bid to lower the mcp for one hour
+    assert orderbook[2]["bid_id"] == "bid_5"
     orderbook[2]["price"] = 41
 
-    mr.all_orders = orderbook.copy()
-    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
-        mr, products
-    )
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
 
     assert math.isclose(meta[0]["price"], 41, abs_tol=eps)
     assert math.isclose(meta[1]["price"], 50, abs_tol=eps)
@@ -159,12 +148,11 @@ def test_complex_clearing_BB():
     assert mr.all_orders == []
 
     # change price of simple bid to lower the mcp for one hour even more
+    assert orderbook[2]["bid_id"] == "bid_5"
     orderbook[2]["price"] = 39
 
-    mr.all_orders = orderbook.copy()
-    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
-        mr, products
-    )
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
 
     assert math.isclose(meta[0]["price"], 39, abs_tol=eps)
     assert math.isclose(meta[1]["price"], 50, abs_tol=eps)
@@ -179,13 +167,11 @@ def test_complex_clearing_BB():
     assert mr.all_orders == []
 
     # change price of simple bid to see equilibrium case
+    assert orderbook[2]["bid_id"] == "bid_5"
     orderbook[2]["price"] = 40
 
-    mr.all_orders = orderbook.copy()
-    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
-        mr, products
-    )
-
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
     assert math.isclose(meta[0]["price"], 40, abs_tol=eps)
     assert math.isclose(meta[1]["price"], 50, abs_tol=eps)
     # the acceptance depends on the solver:
@@ -201,12 +187,11 @@ def test_complex_clearing_BB():
     assert mr.all_orders == []
 
     # introducing profile block order by increasing the volume for the hour with a higher mcp
-    orderbook[6]["volume"][products[1][0]] = 900
+    assert orderbook[3]["agent_id"] == "block_gen7"
+    orderbook[3]["volume"][products[1][0]] = 900
 
-    mr.all_orders = orderbook.copy()
-    accepted_orders, rejected_orders, meta = market_config.market_mechanism(
-        mr, products
-    )
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
     assert math.isclose(meta[0]["price"], 40, abs_tol=eps)
     assert math.isclose(meta[1]["price"], 50, abs_tol=eps)
     # block bid should be accepted, because surplus is (40-45)*100+(50-45)*900=4000

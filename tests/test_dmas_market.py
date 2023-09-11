@@ -5,9 +5,8 @@ from dateutil.relativedelta import relativedelta as rd
 
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
-from assume.markets.base_market import MarketConfig, MarketProduct, MarketRole
 from assume.markets.clearing_algorithms.complex_clearing_dmas import (
-    complex_clearing_dmas,
+    ComplexDmasClearingRole,
 )
 
 start = datetime(2020, 1, 1)
@@ -30,7 +29,7 @@ simple_dayahead_auction_config = MarketConfig(
 
 
 def test_dmas_market_init():
-    mr = MarketRole(simple_dayahead_auction_config)
+    mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
     next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
     products = get_available_products(
         simple_dayahead_auction_config.market_products, next_opening
@@ -46,7 +45,6 @@ def test_market():
     sources = [value(model.source[key]) for key in model.source]
     [model.use_hourly_ask[(block, hour, agent)].value for block, hour, agent in orders["single_ask"].keys()]
     """
-    mr = MarketRole(simple_dayahead_auction_config)
     next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
     products = get_available_products(
         simple_dayahead_auction_config.market_products, next_opening
@@ -108,15 +106,12 @@ def test_market():
             "link": None,
         },
     ]
-    simple_dayahead_auction_config.market_mechanism = complex_clearing_dmas
-    mr.all_orders = orderbook
-    accepted, rejected, meta = simple_dayahead_auction_config.market_mechanism(
-        mr, products
-    )
+    mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
     assert meta[0]["demand_volume"] > 0
     assert meta[0]["price"] > 0
     import pandas as pd
 
-    print(pd.DataFrame(mr.all_orders))
-    print(pd.DataFrame(accepted))
+    print(pd.DataFrame(accepted_orders))
+    print(pd.DataFrame(rejected_orders))
     print(meta)
