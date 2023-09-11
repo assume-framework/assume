@@ -3,7 +3,7 @@ import pandas as pd
 from assume.common.base import SupportsMinMax
 
 
-class HeatPump(SupportsMinMax):
+class HP(SupportsMinMax):
     """A class for a heatpump unit.
 
     :param id: unique identifier for the unit

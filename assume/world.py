@@ -208,8 +208,6 @@ class World:
         unit_type: str,
         unit_operator_id: str,
         unit_params: dict,
-        technologies: Union[str, List[str]],
-        unit_params_dict: Optional[dict],
         forecaster: Forecaster,
     ) -> None:
 
@@ -259,9 +257,7 @@ class World:
             id=id,
             unit_operator=unit_operator_id,
             index=self.index,
-            technologies=technologies,
             forecaster=forecaster,
-            unit_params_dict=unit_params_dict,
             **unit_params,
         )
         await self.unit_operators[unit_operator_id].add_unit(unit)
@@ -382,10 +378,8 @@ class World:
         id: str,
         unit_type: str,
         unit_operator_id: str,
-        technologies: Union[str, List[str]],
         unit_params: dict,
         forecaster: Forecaster,
-        unit_params_dict: Optional[dict]
     ) -> None:
         return self.loop.run_until_complete(
             self.async_add_unit(
@@ -393,8 +387,6 @@ class World:
                 unit_type=unit_type,
                 unit_operator_id=unit_operator_id,
                 unit_params=unit_params,
-                technologies=technologies,
                 forecaster=forecaster,
-                unit_params_dict=unit_params_dict
             )
         )

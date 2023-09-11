@@ -121,8 +121,10 @@ class NaiveDABuildingStrategy(BaseStrategy):
         t = start
 
         heating_demand = unit.forecaster['heating_demand']
-        print(heating_demand)
+        cooling_demand = unit.forecaster['cooling_demand']
         unit.heating_demand = heating_demand
+        print(heating_demand)
+        unit.heating_demand = cooling_demand
         unit.run_optimization()
 
         # Fetch the optimized demand (aggregated_power_in)
