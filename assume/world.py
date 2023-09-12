@@ -166,6 +166,7 @@ class World:
             db_engine=self.db,
             export_csv_path=self.export_csv_path,
             save_frequency_hours=save_frequency_hours,
+            learning_mode=self.learning_mode,
         )
         if self.same_process:
             output_agent = RoleAgent(
