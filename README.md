@@ -1,6 +1,9 @@
 # ASSUME
 ![pytest, black, isort](https://github.com/assume-framework/assume/actions/workflows/lint-pytest.yml/badge.svg)
 [![codecov](https://codecov.io/gh/assume-framework/assume/branch/main/graph/badge.svg?token=CZ4FO7P57H)](https://codecov.io/gh/assume-framework/assume)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8088760.svg)](https://doi.org/10.5281/zenodo.8088760)
+
+
 
 **ASSUME** is an open-source tool-box for an agent-based simulation
 of the European electricity and later on energy markets with a main
