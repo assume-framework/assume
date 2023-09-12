@@ -56,12 +56,13 @@ class WriteOutput(Role):
             shutil.rmtree(self.p, ignore_errors=True)
             self.p.mkdir(parents=True)
         self.db = db_engine
-
-        # learning
         self.learning_mode = learning_mode
+
+        self.episode = None
         if self.learning_mode:
             episode = self.simulation_id.split("_")[-1]
-            self.episode = int(episode)
+            if episode.isdigit():
+                self.episode = int(episode)
 
         # contruct all timeframe under which hourly values are written to excel and db
         self.start = start

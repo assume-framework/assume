@@ -37,15 +37,15 @@ jobs:
         # stop the build if there are Python syntax errors or undefined names
         black --check assume examples tests
         isort --check assume examples tests
-    - name: Test with pytest
+    - name: Test with pytest & integration tests
       run: |
-        pytest --cov --cov-report=xml --junitxml="result.xml"
+        pytest -m "not require_learning"
     - name: Install torch dependencies
       run: |
         python -m pip install -e .[learning]
-    - name: Run Learning with assume cli in in-memory db
+    - name: Test pytest with torch & integration tests
       run: |
-        assume -s example_01_rl -db "sqlite:///"
+        pytest --cov --cov-report=xml --junitxml="result.xml"
 
     - name: Upload tests results
       uses: actions/upload-artifact@v3

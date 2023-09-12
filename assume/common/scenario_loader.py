@@ -324,7 +324,7 @@ async def load_scenario_folder_async(
 
     index = pd.date_range(
         start=start,
-        end=end + pd.Timedelta(hours=24),
+        end=end,
         freq=config["time_step"],
     )
     # get extra parameters for bidding strategies
