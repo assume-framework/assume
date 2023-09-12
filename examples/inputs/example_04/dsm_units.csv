@@ -1,0 +1,2 @@
+name,technology,bidding_energy,unit_operator,objective,max_capacity,min_load,standby_power,startup_cost,hydrogen_price
+DE6_hamburg,electrolyser,naive_da_plant,dsm_operator_1,minimize_cost,52.25,7.84,0.52,2612.5,2100
