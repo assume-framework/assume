@@ -204,18 +204,6 @@ def market_clearing_opt(orders, market_products):
 
 
 class UCClearingRole(MarketRole):
-    required_fields = [
-        "min_power",
-        "max_power",
-        "ramp_up",
-        "ramp_down",
-        "no_load_cost",
-        "start_up_cost",
-        "shut_down_cost",
-        "initial_output",
-        "initial_status",
-    ]
-
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
 
