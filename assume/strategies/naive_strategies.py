@@ -1,9 +1,10 @@
-from assume.common.base import BaseStrategy, SupportsMinMax
-from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 import pandas as pd
+
+from assume.common.base import BaseStrategy, SupportsMinMax
+from assume.common.forecasts import CsvForecaster
+from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 from assume.units.building import Building
 from assume.units.plant import Plant
-from assume.common.forecasts import CsvForecaster
 
 
 class NaiveStrategy(BaseStrategy):
@@ -137,9 +138,7 @@ class NaiveDABuildingStrategy(BaseStrategy):
 
         # Calculate the marginal cost based on the optimized demand
 
-        marginal_cost = (
-            optimized_demand[t] * unit.forecaster.get_electricity_price("EOM")[t]
-        )
+        marginal_cost = optimized_demand[t] * unit.calculate_marginal_cost(start=t)
 
         # Create the profile using optimized_demand
         profile = {product[0]: product[1] for product in product_tuples}
@@ -156,7 +155,8 @@ class NaiveDABuildingStrategy(BaseStrategy):
 
         bids = [order]
         return bids
-    
+
+
 class NaiveDAplantStrategy(BaseStrategy):
     def calculate_bids(
         self,
@@ -186,7 +186,9 @@ class NaiveDAplantStrategy(BaseStrategy):
 
         # Calculate the marginal cost based on the optimized demand
 
-        marginal_cost = optimized_demand[t] * unit.forecaster.get_electricity_price("EOM")[t]
+        marginal_cost = (
+            optimized_demand[t] * unit.forecaster.get_electricity_price("EOM")[t]
+        )
 
         # Create the profile using optimized_demand
         profile = {product[0]: product[1] for product in product_tuples}
@@ -203,6 +205,7 @@ class NaiveDAplantStrategy(BaseStrategy):
 
         bids = [order]
         return bids
+
 
 class NaivePosReserveStrategy(BaseStrategy):
     """
