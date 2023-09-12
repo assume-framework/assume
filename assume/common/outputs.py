@@ -12,7 +12,7 @@ from sqlalchemy.exc import ProgrammingError
 
 logger = logging.getLogger(__name__)
 
-from assume.common.utils import separate_block_orders
+from assume.common.utils import separate_orders
 
 
 class WriteOutput(Role):
@@ -247,7 +247,7 @@ class WriteOutput(Role):
         # check if market results list is empty and skip the funktion and raise a warning
         if not market_orders:
             return
-        market_orders = separate_block_orders(market_orders)
+        market_orders = separate_orders(market_orders)
         df = pd.DataFrame.from_records(market_orders, index="start_time")
         del df["only_hours"]
         del df["agent_id"]

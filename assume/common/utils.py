@@ -324,29 +324,31 @@ def get_test_demand_orders(power: np.array):
     return demand_order
 
 
-def separate_block_orders(orderbook):
+def separate_orders(orderbook):
+    delete_orders = []
     for order in orderbook:
-        if "bid_type" not in order.keys():
-            continue
-        elif order["bid_type"] == "BB" and isinstance(order["volume"], dict):
+        if True in [isinstance(order[key], dict) for key in order.keys()]:
             start_hour = order["start_time"]
             end_hour = order["end_time"]
-            duration = (end_hour - start_hour) / len(order["volume"])
+            duration = (end_hour - start_hour) / max(
+                len(order[key]) for key in order.keys() if isinstance(order[key], dict)
+            )
             i = 1
             for start in pd.date_range(start_hour, end_hour - duration, freq=duration):
                 single_order = order.copy()
-                single_order.update(
-                    {
-                        "start_time": start,
-                        "end_time": start + duration,
-                        "volume": order["volume"][start],
-                        "accepted_volume": order["accepted_volume"][start],
-                        "accepted_price": order["accepted_price"][start],
-                        "bid_id": f"{order['bid_id']}_BB{i}",
-                    }
-                )
+                for key in order.keys():
+                    if isinstance(order[key], dict):
+                        single_order.update({key: float(order[key][start])})
+                if single_order != order:
+                    single_order.update(
+                        {"bid_id": f"{order['bid_id']}_{order['bid_type']}{i}"}
+                    )
+
                 orderbook.append(single_order)
                 i += 1
-            orderbook.remove(order)
+            delete_orders.append(order)
+
+    for order in delete_orders:
+        orderbook.remove(order)
 
     return orderbook
