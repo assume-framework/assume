@@ -265,15 +265,15 @@ class Electrolyser:
         self.component_block.startup_cost = Param(initialize=self.startup_cost)
 
     def define_variables(self, time_steps):
-        self.component_block.power_in = Var(time_steps, within=NonNegativeReals)
-        self.component_block.hydrogen_produced = Var(time_steps, within=NonNegativeReals)
+        self.component_block.power_in = Var(time_steps, within=pyo.NonNegativeReals)
+        self.component_block.hydrogen_produced = Var(time_steps, within=pyo.NonNegativeReals)
 
-        self.component_block.is_online = Var(time_steps, within=Binary)
-        self.component_block.is_offline = Var(time_steps, within=Binary)
-        self.component_block.is_standby = Var(time_steps, within=Binary)
-        self.component_block.is_startup = Var(time_steps, within=Binary)
+        self.component_block.is_online = Var(time_steps, within=pyo.Binary)
+        self.component_block.is_offline = Var(time_steps, within=pyo.Binary)
+        self.component_block.is_standby = Var(time_steps, within=pyo.Binary)
+        self.component_block.is_startup = Var(time_steps, within=pyo.Binary)
 
-        self.component_block.startup_cost_incurred = Var(time_steps, within=NonNegativeReals)
+        self.component_block.startup_cost_incurred = Var(time_steps, within=pyo.NonNegativeReals)
 
     def define_constraints(self, time_steps):
         @self.component_block.Constraint(time_steps)
