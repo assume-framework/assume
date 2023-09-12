@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 5,
+  "id": 3,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -1552,6 +1552,7 @@
           ],
           "show": false
         },
+        "frameIndex": 0,
         "showHeader": true,
         "sortBy": [
           {
@@ -1572,8 +1573,41 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  simulation,\n  name,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'avg_price') as avg_price,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_cost') as total_cost,\n  sum(round(CAST(value AS numeric), 2)*1000)  FILTER (WHERE variable = 'total_volume') as total_volume\n  \nFROM kpis\nwhere variable in ('total_cost', 'total_volume', 'avg_price')\ngroup by simulation, name\nORDER BY simulation",
+          "rawSql": "SELECT\n  simulation,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'avg_price') as avg_price,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_cost') as total_cost,\n  sum(round(CAST(value AS numeric), 2)*1000)  FILTER (WHERE variable = 'total_volume') as total_volume\n  \nFROM kpis\nwhere variable in ('total_cost', 'total_volume', 'avg_price')\ngroup by simulation\nORDER BY simulation",
           "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "power"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "market_dispatch",
+          "timeColumn": "datetime",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "table",
+          "group": [],
+          "hide": false,
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  simulation,\n  -sum(round(CAST(price * accepted_volume AS numeric), 2)) as social_welfare\nFROM market_orders\nGROUP BY simulation\nORDER BY simulation",
+          "refId": "B",
           "select": [
             [
               {
@@ -1710,12 +1744,141 @@
       "type": "piechart"
     },
     {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "currencyEUR"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Social welfare"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "unit",
+                "value": "currencyEUR"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 10,
+        "x": 0,
+        "y": 61
+      },
+      "id": 86,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "vertical",
+        "showValue": "never",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xField": "simulation",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "9.2.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "table",
+          "group": [],
+          "hide": false,
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  simulation,\n  -sum(round(CAST(price * accepted_volume AS numeric), 2)) as \"Social welfare\"\nFROM market_orders\ngroup by simulation\nORDER BY simulation",
+          "refId": "Cost",
+          "select": [
+            [
+              {
+                "params": [
+                  "power"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "market_dispatch",
+          "timeColumn": "datetime",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Total Social Welfare",
+      "type": "barchart"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 61
+        "y": 73
       },
       "id": 41,
       "panels": [],
@@ -1732,7 +1895,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 62
+        "y": 74
       },
       "id": 22,
       "options": {
@@ -1846,7 +2009,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 65
+        "y": 77
       },
       "id": 24,
       "options": {
@@ -1926,7 +2089,7 @@
         "h": 17,
         "w": 6,
         "x": 18,
-        "y": 65
+        "y": 77
       },
       "id": 26,
       "options": {
@@ -2046,7 +2209,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 74
+        "y": 86
       },
       "id": 81,
       "options": {
@@ -2148,7 +2311,7 @@
         "h": 17,
         "w": 6,
         "x": 18,
-        "y": 82
+        "y": 94
       },
       "id": 85,
       "options": {
@@ -2290,7 +2453,7 @@
         "h": 8,
         "w": 18,
         "x": 0,
-        "y": 83
+        "y": 95
       },
       "id": 70,
       "options": {
@@ -2494,7 +2657,7 @@
         "h": 8,
         "w": 18,
         "x": 0,
-        "y": 91
+        "y": 103
       },
       "id": 82,
       "options": {
@@ -2612,7 +2775,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 99
+        "y": 111
       },
       "id": 39,
       "panels": [],
@@ -2629,7 +2792,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 100
+        "y": 112
       },
       "id": 35,
       "options": {
@@ -2740,7 +2903,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 103
+        "y": 115
       },
       "id": 36,
       "options": {
@@ -2852,7 +3015,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 103
+        "y": 115
       },
       "id": 37,
       "options": {
@@ -2969,7 +3132,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 112
+        "y": 124
       },
       "id": 83,
       "options": {
@@ -3060,7 +3223,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 121
+        "y": 133
       },
       "id": 44,
       "panels": [],
@@ -3079,7 +3242,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 122
+        "y": 134
       },
       "id": 45,
       "options": {
@@ -3190,7 +3353,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 125
+        "y": 137
       },
       "id": 65,
       "options": {
@@ -3302,7 +3465,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 125
+        "y": 137
       },
       "id": 47,
       "options": {
@@ -3419,7 +3582,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 134
+        "y": 146
       },
       "id": 84,
       "options": {
@@ -3563,12 +3726,10 @@
         "current": {
           "selected": true,
           "text": [
-            "coal_unit",
-            "lignite_unit"
+            "coal_unit"
           ],
           "value": [
-            "coal_unit",
-            "lignite_unit"
+            "coal_unit"
           ]
         },
         "datasource": {
@@ -3592,7 +3753,7 @@
       },
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": [
             "demand_EOM"
           ],
@@ -3651,13 +3812,13 @@
     ]
   },
   "time": {
-    "from": "2020-01-15T23:00:00.000Z",
-    "to": "2020-01-30T22:59:59.000Z"
+    "from": "2019-12-31T23:00:00.000Z",
+    "to": "2020-01-10T22:59:59.000Z"
   },
   "timepicker": {},
   "timezone": "",
   "title": "ASSUME Comparison Block Bids",
   "uid": "LlWPcjzSz",
-  "version": 4,
+  "version": 2,
   "weekStart": ""
 }
