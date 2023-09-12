@@ -56,7 +56,7 @@ class Building(BaseUnit):
 
         self.heating_demand = self.forecaster[f"{self.id}_heating"]
         self.cooling_demand = self.forecaster[f"{self.id}_cooling"]
-        self.electricity_price = self.forecaster.get_electricity_price(EOM="EOM")
+        self.electricity_price = self.forecaster["price_EOM"]
         self.objective = objective
 
         self.location = location

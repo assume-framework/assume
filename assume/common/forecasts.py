@@ -52,17 +52,6 @@ class Forecaster:
         """
         return self[f"fuel_price_{fuel_type}"]
 
-    def get_electricity_price(self, EOM: str):
-        """
-        Returns the price for a given fuel_type
-        or zeros if type does not exist
-
-        :param electricity price: the fuel type
-        :type electriicty price: str
-        :rtype: pd.Series
-        """
-        return self[f"price_{EOM}"]
-
     def get_demand(self, demand_prefix: str) -> pd.Series:
         """
         Returns the demand of the building based on the provided prefix
@@ -147,30 +136,6 @@ class CsvForecaster(Forecaster):
             self.forecasts[
                 "residual_load_EOM"
             ] = self.calculate_residual_demand_forecast()
-
-    def get_heating_demand(self) -> pd.Series:
-        """
-        Returns the heating demand of the building
-
-        :rtype: pd.Series
-        """
-        return self.forecasts.get("heating_demand", pd.Series(0, self.index))
-
-    def get_cooling_demand(self) -> pd.Series:
-        """
-        Returns the cooling demand of the building
-
-        :rtype: pd.Series
-        """
-        return self.forecasts.get("cooling_demand", pd.Series(0, self.index))
-
-    def get_eom_price_forcast(self) -> pd.Series:
-        """
-        Returns the heating demand of the building
-
-        :rtype: pd.Series
-        """
-        return self.forecasts.get("price_EOM", pd.Series(0, self.index))
 
     def get_registered_market_participants(self, market_id):
         """
