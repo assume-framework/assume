@@ -19,7 +19,14 @@ class ReplayBufferSamples(NamedTuple):
 
 
 class ReplayBuffer:
-    def __init__(self, buffer_size, obs_dim, act_dim, n_rl_units, device):
+    def __init__(
+        self,
+        buffer_size: int,
+        obs_dim: int,
+        act_dim: int,
+        n_rl_units: int,
+        device: str,
+    ):
         self.buffer_size = buffer_size
         self.obs_dim = obs_dim
         self.act_dim = act_dim
@@ -63,7 +70,7 @@ class ReplayBuffer:
     def size(self):
         return self.buffer_size if self.full else self.pos
 
-    def to_torch(self, array, copy=True):
+    def to_torch(self, array: np.array, copy=True):
         """
         Convert a numpy array to a PyTorch tensor.
         Note: it copies the data by default
@@ -78,9 +85,14 @@ class ReplayBuffer:
 
         return th.as_tensor(array, dtype=self.th_float_type, device=self.device)
 
-    def add(self, obs, actions, reward):
+    def add(
+        self,
+        obs: np.array,
+        actions: np.array,
+        reward: np.array,
+    ):
         # copying all to avoid modification
-        self.observations[self.pos] = obs[0].copy()
+        self.observations[self.pos] = obs.copy()
         self.actions[self.pos] = actions.copy()
         self.rewards[self.pos] = reward.copy()
 
@@ -89,8 +101,10 @@ class ReplayBuffer:
             self.full = True
             self.pos = 0
 
-    def sample(self, batch_size):
+    def sample(self, batch_size: int) -> ReplayBufferSamples:
         upper_bound = self.buffer_size if self.full else self.pos
+        if upper_bound < 2:
+            raise Exception("at least two entries needed to sample")
         batch_inds = np.random.randint(0, upper_bound - 1, size=batch_size)
 
         data = (

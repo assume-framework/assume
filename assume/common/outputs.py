@@ -41,6 +41,7 @@ class WriteOutput(Role):
         db_engine=None,
         export_csv_path: str = "",
         save_frequency_hours: int = 24,
+        learning_mode: bool = False,
     ):
         super().__init__()
 
@@ -55,13 +56,14 @@ class WriteOutput(Role):
             shutil.rmtree(self.p, ignore_errors=True)
             self.p.mkdir(parents=True)
         self.db = db_engine
+        self.learning_mode = learning_mode
 
         # learning
-        episode = self.simulation_id.split("_")[-1]
-        if episode.isdigit():
-            self.episode = int(episode)
-        else:
-            self.episode = None
+        self.episode = None
+        if self.learning_mode:
+            episode = self.simulation_id.split("_")[-1]
+            if episode.isdigit():
+                self.episode = int(episode)
 
         # contruct all timeframe under which hourly values are written to excel and db
         self.start = start
@@ -339,7 +341,7 @@ class WriteOutput(Role):
             logger.error(f"No scenario run Yet {e}")
 
     def learning_queries(self):
-        if not self.episode:
+        if not self.learning_mode:
             return []
 
         queries = [
