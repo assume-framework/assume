@@ -6,6 +6,7 @@ from .complex_clearing import ComplexClearingRole
 from .complex_clearing_dmas import ComplexDmasClearingRole
 from .nodal_pricing import NodalPyomoMarketRole
 from .simple import PayAsBidRole, PayAsClearRole
+from .uc_clearing import UCClearingRole
 
 clearing_mechanisms: dict[str, MarketRole] = {
     "pay_as_clear": PayAsClearRole,
@@ -15,4 +16,5 @@ clearing_mechanisms: dict[str, MarketRole] = {
     "pay_as_bid_aon": PayAsBidAonRole,
     "pay_as_clear_aon": PayAsClearAonRole,
     "nodal_pricing": NodalPyomoMarketRole,
+    "uc_clearing": UCClearingRole,
 }

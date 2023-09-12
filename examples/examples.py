@@ -45,6 +45,10 @@ availabe_examples = {
         "study_case": "dam_case_2019",
     },
     "rl": {"scenario": "example_01_rl", "study_case": "base"},
+    "uc_clearing": {
+        "scenario": "example_01_uc",
+        "study_case": "dam_with_complex_clearing",
+    },
 }
 
 # %%
