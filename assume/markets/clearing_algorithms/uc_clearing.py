@@ -207,6 +207,18 @@ class UCClearingRole(MarketRole):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
 
+    def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> None:
+        super().validate_orderbook(orderbook, agent_tuple)
+
+        for order in orderbook:
+            order["bid_type"] = (
+                "SB" if order.get("bid_type") is None else order["bid_type"]
+            )
+            assert order["bid_type"] in [
+                "SB",
+                "MPB",
+            ], f"bid_type {order['bid_type']} not in ['SB', 'MPB']"
+
     def clear(
         self, orderbook: Orderbook, market_products
     ) -> (Orderbook, Orderbook, list[dict]):

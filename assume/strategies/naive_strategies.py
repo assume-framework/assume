@@ -232,21 +232,22 @@ class NaiveUCStrategy(BaseStrategy):
 
         current_power = unit.outputs["energy"].at[start]
         marginal_cost = unit.calculate_marginal_cost(start, previous_power)
+        current_status = 1 if unit.get_operation_time(start) > 0 else 0
 
         order: Order = {
             "start_time": start,
             "end_time": end_all,
-            "volume": 0,
+            "volume": -1,
             "price": {product[0]: marginal_cost for product in product_tuples},
             "min_power": unit.min_power,
             "max_power": unit.max_power,
             "ramp_up": unit.ramp_up,
             "ramp_down": unit.ramp_down,
             "no_load_cost": unit.no_load_cost,
-            "start_up_cost": unit.start_up_cost,
+            "start_up_cost": unit.hot_start_cost,
             "shut_down_cost": unit.shut_down_cost,
             "initial_output": current_power,
-            "initial_status": 1 if current_power > 0 else 0,
+            "initial_status": current_status,
             "bid_type": "MPB",
         }
 

@@ -68,13 +68,30 @@ class MarketMechanism:
             order["agent_id"] = agent_tuple
             if not order.get("only_hours"):
                 order["only_hours"] = None
-            assert order["price"] <= max_price, f"maximum_bid_price {order['price']}"
-            assert order["price"] >= min_price, f"minimum_bid_price {order['price']}"
+
+            if isinstance(order["price"], dict):
+                for _, price in order["price"].items():
+                    assert price <= max_price, f"maximum_bid_price {price}"
+                    assert price >= min_price, f"minimum_bid_price {price}"
+            else:
+                assert (
+                    order["price"] <= max_price
+                ), f"maximum_bid_price {order['price']}"
+                assert (
+                    order["price"] >= min_price
+                ), f"minimum_bid_price {order['price']}"
 
             if max_volume:
-                assert (
-                    abs(order["volume"]) <= max_volume
-                ), f"max_volume {order['volume']}"
+                # check if volume is a dict
+                if isinstance(order["volume"], dict):
+                    for _, volume in order["volume"].items():
+                        assert (
+                            abs(volume) <= max_volume
+                        ), f"max_volume {order['volume']}"
+                else:
+                    assert (
+                        abs(order["volume"]) <= max_volume
+                    ), f"max_volume {order['volume']}"
 
             if self.marketconfig.price_tick:
                 assert isinstance(order["price"], int)

@@ -85,6 +85,8 @@ class PowerPlant(SupportsMinMax):
         hot_start_cost: float = 0,
         warm_start_cost: float = 0,
         cold_start_cost: float = 0,
+        shut_down_cost: float = 0,
+        no_load_cost: float = 0,
         min_operating_time: float = 0,
         min_down_time: float = 0,
         downtime_hot_start: int = 8,  # hours
@@ -123,14 +125,19 @@ class PowerPlant(SupportsMinMax):
         self.downtime_warm_start = downtime_warm_start
 
         self.fixed_cost = fixed_cost
-        self.hot_start_cost = hot_start_cost * max_power
-        self.warm_start_cost = warm_start_cost * max_power
-        self.cold_start_cost = cold_start_cost * max_power
+        self.no_load_cost = no_load_cost
+
+        self.hot_start_cost = hot_start_cost
+        self.warm_start_cost = warm_start_cost
+        self.cold_start_cost = cold_start_cost
+        self.shut_down_cost = shut_down_cost
 
         self.heat_extraction = heat_extraction
         self.max_heat_extraction = max_heat_extraction
 
         self.location = location
+
+        self.current_status = 1
 
         self.init_marginal_cost()
 

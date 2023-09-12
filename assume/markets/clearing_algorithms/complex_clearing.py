@@ -133,16 +133,13 @@ class ComplexClearingRole(MarketRole):
         super().validate_orderbook(orderbook, agent_tuple)
         max_volume = self.marketconfig.maximum_bid_volume
         for order in orderbook:
-            order["bid_type"] = "SB" if order["bid_type"] is None else order["bid_type"]
+            order["bid_type"] = (
+                "SB" if order.get("bid_type") is None else order["bid_type"]
+            )
             assert order["bid_type"] in [
                 "SB",
                 "BB",
             ], f"bid_type {order['bid_type']} not in ['SB', 'BB']"
-
-            if order["bid_type"] == "BB":
-                assert False not in [
-                    abs(volume) <= max_volume for _, volume in order["volume"].items()
-                ], f"max_volume {order['volume']}"
 
     def clear(
         self, orderbook: Orderbook, market_products

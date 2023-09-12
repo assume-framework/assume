@@ -357,7 +357,7 @@ class SupportsMinMax(BaseUnit):
         begin = before - self.index.freq * max_time
         end = before
         arr = self.outputs["energy"][begin:end][::-1] > 0
-        if len(arr) < 1:
+        if len(arr) <= 1:
             # before start of index
             return max_time
         is_off = not arr.iloc[0]
