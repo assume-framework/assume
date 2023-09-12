@@ -111,19 +111,19 @@ class NaiveDAStrategy(BaseStrategy):
 class NaiveDABuildingStrategy(BaseStrategy):
     def calculate_bids(
         self,
-        unit: Building,
+        unit: SupportsMinMax,
         market_config: MarketConfig,
         product_tuples: list[Product],
-        start: pd.Timestamp = None,
-        end: pd.Timestamp = None,
         **kwargs,
     ) -> Orderbook:
         # Run the optimization for the building unit
         t = start
 
-        heating_demand = unit.forecaster.get_heating_demand()
-        print(heating_demand)
+        heating_demand = unit.forecaster["heating_demand"]
+        cooling_demand = unit.forecaster["cooling_demand"]
         unit.heating_demand = heating_demand
+        # print(heating_demand)
+        unit.heating_demand = cooling_demand
         unit.run_optimization()
 
         # Fetch the optimized demand (aggregated_power_in)
@@ -137,7 +137,9 @@ class NaiveDABuildingStrategy(BaseStrategy):
 
         # Calculate the marginal cost based on the optimized demand
 
-        marginal_cost = optimized_demand[t] * unit.forecaster.get_electricity_price("EOM")[t]
+        marginal_cost = (
+            optimized_demand[t] * unit.forecaster.get_electricity_price("EOM")[t]
+        )
 
         # Create the profile using optimized_demand
         profile = {product[0]: product[1] for product in product_tuples}

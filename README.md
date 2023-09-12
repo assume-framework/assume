@@ -1,6 +1,9 @@
 # ASSUME
 ![pytest, black, isort](https://github.com/assume-framework/assume/actions/workflows/lint-pytest.yml/badge.svg)
 [![codecov](https://codecov.io/gh/assume-framework/assume/branch/main/graph/badge.svg?token=CZ4FO7P57H)](https://codecov.io/gh/assume-framework/assume)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8088760.svg)](https://doi.org/10.5281/zenodo.8088760)
+
+
 
 **ASSUME** is an open-source tool-box for an agent-based simulation
 of the European electricity and later on energy markets with a main
@@ -8,7 +11,7 @@ focus on the German market setup. As a newly developed open-source
 model its priority is to ensure usability and customisability
 for a variety of users and use cases in the energy system modelling community.
 
-The unique feature of the ASSUME tool-box is the integration of **deep reinforcement
+The unique feature of the ASSUME toolbox is the integration of **deep reinforcement
 learning** methods into the behavioural strategies of market agents.
 The model comes with different predefined agent representations for the demand and
 generation side that can be used as plug-and-play modules,
@@ -17,7 +20,7 @@ This setup enables a research of new market designs and dynamics in the energy m
 
 The project is developed by [developers](https://assume.readthedocs.io/en/latest/developers.html) from INATECH at University of Freiburg, IISM at KIT, Fraunhofer ISI, FH Aachen.
 The project ASSUME is funded by the Federal Ministry for Economic
-Affairs and Energy (BMWK).
+Affairs and Climate Action (BMWK).
 
 Documentation
 =============
@@ -29,6 +32,23 @@ Documentation
 
 Installation
 ============
+
+
+Using pip
+---------
+
+The project is available on [PyPi](https://pypi.org/) and can be simply installed:
+
+```
+pip install assume-framework
+```
+
+if you want to install it with testin capabilities run:
+
+```
+pip install assume-framework[test]
+```
+
 
 Using conda
 -----------

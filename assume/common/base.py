@@ -1,6 +1,6 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import TypedDict
+from typing import List, TypedDict, Union
 
 import pandas as pd
 
@@ -133,7 +133,9 @@ class BaseUnit:
         self.calculate_cashflow(product_type, orderbook)
 
         self.outputs[product_type + "_marginal_costs"].loc[start:end_excl] = (
-            self.calculate_marginal_cost(start, self.outputs[product_type].loc[start])
+            self.calculate_marginal_cost(
+                start=start, power=self.outputs[product_type].loc[start]
+            )
             * self.outputs[product_type].loc[start:end_excl]
         )
 
