@@ -24,10 +24,10 @@ from assume.common import (
     WriteOutput,
     mango_codec_factory,
 )
-from assume.common.base import LearningConfig
+from assume.common.base import LearningConfig, BaseUnit
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import LearningStrategy, bidding_strategies
-from assume.units import Building, Demand, PowerPlant, Storage
+from assume.units import Building, Demand, PowerPlant, Storage, Plant
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
 stdout_handler = logging.StreamHandler(stream=sys.stdout)
@@ -79,6 +79,7 @@ class World:
         self.unit_types = {
             "power_plant": PowerPlant,
             "building": Building,
+            "plant": Plant,
             "demand": Demand,
             "storage": Storage,
         }

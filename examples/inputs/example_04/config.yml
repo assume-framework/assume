@@ -1,4 +1,4 @@
-base_case_building_2019:
+base_case_plant_2019:
   start_date: 2019-01-01 00:00
   end_date: 2019-01-01 23:00
   time_step: 1h

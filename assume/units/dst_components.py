@@ -226,3 +226,89 @@ class Storage:
                 )  # Replace with appropriate power source
 
         # Additional constraints specific to the storage technology
+
+class Electrolyser:
+    def __init__(
+        self,
+        model,
+        id,
+        max_capacity,
+        min_load, 
+        standby_power,
+        startup_cost,
+        **kwargs
+    ):
+        self.model = model
+        self.id = id
+
+        self.max_capacity = max_capacity
+        self.min_load = min_load
+        self.standby_power = standby_power
+        self.startup_cost = startup_cost
+
+    def add_to_model(self, unit_block, time_steps):
+        self.component_block = unit_block
+        self.define_parameters()
+        self.define_variables(time_steps)
+        self.define_constraints(time_steps)
+
+    def define_parameters(self):
+        self.component_block.max_capacity = Param(initialize=self.max_capacity)
+        self.component_block.min_load = Param(initialize=self.min_load)
+        self.component_block.standby_power = Param(initialize=self.standby_power)
+
+        self.component_block.startup_cost = Param(initialize=self.startup_cost)
+
+    def define_variables(self, time_steps):
+        self.component_block.power_in = Var(time_steps, within=NonNegativeReals)
+        self.component_block.hydrogen_produced = Var(time_steps, within=NonNegativeReals)
+
+        self.component_block.is_online = Var(time_steps, within=Binary)
+        self.component_block.is_offline = Var(time_steps, within=Binary)
+        self.component_block.is_standby = Var(time_steps, within=Binary)
+        self.component_block.is_startup = Var(time_steps, within=Binary)
+
+        self.component_block.startup_cost_incurred = Var(time_steps, within=NonNegativeReals)
+
+    def define_constraints(self, time_steps):
+        @self.component_block.Constraint(time_steps)
+        def operational_states(m, t):
+            return m.is_online[t] + m.is_offline[t] + m.is_standby[t] == 1
+        
+        # Startup condition
+        @self.component_block.Constraint(time_steps)
+        def startup_condition(m, t):
+            if t == 0:
+                return Constraint.Skip
+            return m.is_startup[t] >= m.is_online[t] - m.is_online[t-1] - m.is_standby[t-1]
+
+        # Startup cost incurred
+        @self.component_block.Constraint(time_steps)
+        def startup_cost_constraint(m, t):
+            return m.startup_cost_incurred[t] == m.startup_cost * m.is_startup[t]
+
+        @self.component_block.Constraint(time_steps)
+        def upper_bound(m, t):
+            return m.power_in[t] <= m.max_capacity * m.is_online[t] + m.standby_power * m.is_standby[t]
+
+        @self.component_block.Constraint(time_steps)
+        def lower_bound(m, t):
+            return m.power_in[t] >= m.min_load * m.is_online[t] + m.standby_power * m.is_standby[t]
+
+        @self.component_block.Constraint(time_steps)
+        def hydrogen_production(m, t):
+            power_in = m.power_in[t]
+
+            # Constraints for each piece of the piecewise function
+            piece1_constraint = (power_in >= 7.84) and (power_in <= 16)
+            piece2_constraint = (power_in > 16) and (power_in <= 52.25)
+
+            # Define the piecewise function using conditional expressions
+            return m.hydrogen_produced[t] == (
+                24.51 * power_in * piece1_constraint -
+                92.16 * piece1_constraint +
+                17.93 * power_in * piece2_constraint +
+                13.10 * piece2_constraint
+            )
+
+    
