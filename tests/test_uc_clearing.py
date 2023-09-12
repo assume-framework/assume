@@ -3,11 +3,12 @@ from datetime import datetime, timedelta
 
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
-from utils import extend_orderbook
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Order
 from assume.common.utils import get_available_products
 from assume.markets.clearing_algorithms import UCClearingRole
+
+from .utils import extend_orderbook
 
 simple_dayahead_auction_config = MarketConfig(
     "simple_dayahead_auction",
@@ -259,7 +260,7 @@ def test_complex_clearing_BB():
 
 
 if __name__ == "__main__":
-    test_complex_clearing()
+    pass
     # from assume.common.utils import plot_orderbook
     # clearing_result, meta = test_market_mechanism()
     # only works with per node clearing

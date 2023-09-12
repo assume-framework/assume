@@ -16,5 +16,5 @@ clearing_mechanisms: dict[str, MarketRole] = {
     "pay_as_bid_aon": PayAsBidAonRole,
     "pay_as_clear_aon": PayAsClearAonRole,
     "nodal_pricing": NodalPyomoMarketRole,
-    "uc_clearing": UCClearingRole,
+    "complex_uc_clearing": UCClearingRole,
 }
