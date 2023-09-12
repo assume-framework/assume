@@ -170,13 +170,14 @@ class NaiveDAplantStrategy(BaseStrategy):
         # Run the optimization for the building unit
         t = start
 
-        hydrogen_demand = unit.forecaster.get_heating_demand()
+        hydrogen_demand = unit.forecaster['hydrogen_demand']
         print(hydrogen_demand)
         unit.hydrogen_demand = hydrogen_demand
         unit.run_optimization()
 
         # Fetch the optimized demand (aggregated_power_in)
         optimized_demand = unit.model.aggregated_power_in.get_values()
+        hydrogen_output = unit.model.aggregated_hydrogen_production.get_values()
 
         start = product_tuples[0][0]
         end_all = product_tuples[-1][1]
@@ -188,6 +189,18 @@ class NaiveDAplantStrategy(BaseStrategy):
 
         marginal_cost = optimized_demand[t] * unit.forecaster.get_electricity_price("EOM")[t]
 
+        # Calculate the revenues based on the optimized demand
+
+        revenues = hydrogen_output[t] * unit.hydrogen_price
+
+        possible_revenue = (revenues - marginal_cost).sum()
+
+        if possible_revenue >= 0:
+            bid_price = possible_revenue
+        else:
+            bid_price = possible_revenue + possible_revenue
+        
+
         # Create the profile using optimized_demand
         profile = {product[0]: product[1] for product in product_tuples}
 
@@ -195,10 +208,10 @@ class NaiveDAplantStrategy(BaseStrategy):
             "start_time": start,
             "end_time": end_all,
             "only_hours": product_tuples[0][2],
-            "price": marginal_cost,
+            "price": bid_price,
             "volume": profile,
             "accepted_volume": {product[0]: 0 for product in product_tuples},
-            "bid_type": "BB",
+            "bid_type": "BP",
         }
 
         bids = [order]

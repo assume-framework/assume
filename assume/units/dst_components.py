@@ -246,6 +246,11 @@ class Electrolyser:
         self.standby_power = standby_power
         self.startup_cost = startup_cost
 
+        # Define breakpoints and slopes for the piecewise expression here
+        self.segments = [1, 2, 3, 4]
+        self.breakpoints = [7.84, 16, 52.25]
+        self.slopes = [24.51, -92.16, 17.93, 13.10]
+
     def add_to_model(self, unit_block, time_steps):
         self.component_block = unit_block
         self.define_parameters()
@@ -297,18 +302,11 @@ class Electrolyser:
 
         @self.component_block.Constraint(time_steps)
         def hydrogen_production(m, t):
-            power_in = m.power_in[t]
-
-            # Constraints for each piece of the piecewise function
-            piece1_constraint = (power_in >= 7.84) and (power_in <= 16)
-            piece2_constraint = (power_in > 16) and (power_in <= 52.25)
-
-            # Define the piecewise function using conditional expressions
-            return m.hydrogen_produced[t] == (
-                24.51 * power_in * piece1_constraint -
-                92.16 * piece1_constraint +
-                17.93 * power_in * piece2_constraint +
-                13.10 * piece2_constraint
+            return m.hydrogen_produced[t] == Piecewise(
+                ((self.slopes[0] * m.power_in[t]) + (self.slopes[1] * m.power_in[t]) + (self.slopes[2] * m.power_in[t]), m.power_in[t] <= self.breakpoints[0]),
+                ((self.slopes[1] * m.power_in[t]) + (self.slopes[2] * m.power_in[t]), self.breakpoints[0] < m.power_in[t] <= self.breakpoints[1]),
+                (self.slopes[2] * m.power_in[t], self.breakpoints[1] < m.power_in[t] <= self.breakpoints[2]),
+                (0, True)  # Default value if none of the conditions are met
             )
 
     
