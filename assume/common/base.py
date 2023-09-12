@@ -39,7 +39,7 @@ class BaseUnit:
         self,
         id: str,
         unit_operator: str,
-        technology: Union[str, List[str]],
+        technology: str,
         bidding_strategies: dict[str, BaseStrategy],
         index: pd.DatetimeIndex,
         node: str = "",
