@@ -5,7 +5,7 @@ from typing import Callable, NamedTuple, Optional, TypedDict
 
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
-from mango import Agent, Role
+from mango import Agent
 
 
 class OnlyHours(NamedTuple):
@@ -87,9 +87,6 @@ class MarketProduct:
     eligible_lambda_function: eligible_lambda | None = None
 
 
-market_mechanism = Callable[[Role, list[MarketProduct]], tuple[Orderbook, dict]]
-
-
 class Product(NamedTuple):
     """
     an actual product with start and end
@@ -123,7 +120,7 @@ class MarketConfig:
     :param opening_duration: the duration of the opening hours
     :type opening_duration: timedelta
     :param market_mechanism: name of method used for clearing
-    :type market_mechanism: market_mechanism | str
+    :type market_mechanism: str
     :param market_products: list of available products to be traded at the market
     :type market_products: list[MarketProduct]
     :param product_type: energy or capacity or heat
@@ -159,11 +156,11 @@ class MarketConfig:
     # continuous markets are clearing just very fast and keep unmatched orders between clearings
     opening_hours: rr.rrule  # dtstart is start/introduction of market
     opening_duration: timedelta
-    market_mechanism: market_mechanism | str  # market_mechanism determines wether old offers are deleted (auction) or not (continuous) after clearing
+    market_mechanism: str
     market_products: list[MarketProduct] = field(default_factory=list)
     product_type: str = "energy"
-    maximum_bid_volume: float = 2000.0
-    maximum_bid_price: float = 3000.0
+    maximum_bid_volume: float | None = 2000.0
+    maximum_bid_price: float | None = 3000.0
     minimum_bid_price: float = -500.0
     maximum_gradient: float = None  # very specific - should be in market clearing
     additional_fields: list[str] = field(default_factory=list)

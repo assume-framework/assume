@@ -23,6 +23,7 @@ from assume.common import (
     WriteOutput,
     mango_codec_factory,
 )
+from assume.common.base import LearningConfig
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import LearningStrategy, bidding_strategies
 from assume.units import BaseUnit, Demand, HeatPump, PowerPlant, Storage
@@ -64,7 +65,9 @@ class World:
                     self.logger.error(
                         f"could not connect to {database_uri}, trying again"
                     )
-                    self.logger.error(f"{e}")
+                    # log error if not connection refused
+                    if not e.code == "e3q8":
+                        self.logger.error(f"{e}")
                     time.sleep(2)
         else:
             self.db = None
@@ -90,7 +93,7 @@ class World:
                 "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",
                 e,
             )
-        self.clearing_mechanisms = clearing_mechanisms
+        self.clearing_mechanisms: dict[str, MarketRole] = clearing_mechanisms
         self.clearing_mechanisms.update(additional_clearing_mechanisms)
         nest_asyncio.apply()
         self.loop = asyncio.get_event_loop()
@@ -105,8 +108,7 @@ class World:
         save_frequency_hours: int = 24,
         same_process: bool = True,
         bidding_params: dict = {},
-        learning_config: dict = {},
-        episode: int = 0,
+        learning_config: LearningConfig = {},
     ):
         self.clock = ExternalClock(0)
         self.start = start
@@ -114,6 +116,7 @@ class World:
         self.learning_config = learning_config
         self.bidding_params = bidding_params
         self.index = index
+        self.same_process = same_process
 
         # kill old container if exists
         if isinstance(self.container, Container) and self.container.running:
@@ -123,9 +126,14 @@ class World:
         self.container = await create_container(
             addr=self.addr, clock=self.clock, codec=mango_codec_factory()
         )
+        await self.setup_learning()
+        await self.setup_output_agent(simulation_id, save_frequency_hours)
 
+    async def setup_learning(self):
+        self.bidding_params.update(self.learning_config)
         # initiate learning if the learning mode is on and hence we want to learn new strategies
-        if self.learning_config.get("learning_mode", False):
+        self.learning_mode = self.learning_config.get("learning_mode", False)
+        if self.learning_mode:
             # if so, we initate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
 
@@ -134,9 +142,9 @@ class World:
                 start=self.start,
                 end=self.end,
             )
-            self.bidding_params.update(self.learning_config)
-
-            if True:  # separate process does not support buffer and learning
+            # if self.same_process:
+            # separate process does not support buffer and learning
+            if True:
                 rl_agent = RoleAgent(self.container, suggested_aid="learning_agent")
                 rl_agent.add_role(self.learning_role)
             else:
@@ -147,17 +155,20 @@ class World:
 
                 await self.container.as_agent_process(agent_creator=creator)
 
+    async def setup_output_agent(self, simulation_id: str, save_frequency_hours: int):
         self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to world
+        self.logger.debug(f"creating output agent {self.db=} {self.export_csv_path=}")
         self.output_role = WriteOutput(
-            simulation_id=f"{simulation_id}_{episode}",
-            start=start,
-            end=end,
+            simulation_id=simulation_id,
+            start=self.start,
+            end=self.end,
             db_engine=self.db,
             export_csv_path=self.export_csv_path,
             save_frequency_hours=save_frequency_hours,
+            learning_mode=self.learning_mode,
         )
-        if same_process:
+        if self.same_process:
             output_agent = RoleAgent(
                 self.container, suggested_aid=self.output_agent_addr[1]
             )
@@ -236,11 +247,15 @@ class World:
 
             try:
                 bidding_strategies[product_type] = self.bidding_types[strategy](
-                    **self.bidding_params
+                    unit_id=id,
+                    **self.bidding_params,
                 )
                 # TODO find better way to count learning agents
-                if issubclass(self.bidding_types[strategy], LearningStrategy):
-                    self.learning_role.rl_units[id] = bidding_strategies[product_type]
+                if self.learning_mode:
+                    if issubclass(self.bidding_types[strategy], LearningStrategy):
+                        self.learning_role.rl_strats[id] = bidding_strategies[
+                            product_type
+                        ]
 
             except KeyError as e:
                 self.logger.error(
@@ -301,19 +316,17 @@ class World:
         marketconfig =
              describes the configuration of a market
         """
-        if isinstance(market_config.market_mechanism, str):
-            if strategy := self.clearing_mechanisms.get(market_config.market_mechanism):
-                market_config.market_mechanism = strategy
-
-            else:
-                raise Exception(f"invalid strategy {market_config.market_mechanism}")
+        if mm_class := self.clearing_mechanisms.get(market_config.market_mechanism):
+            market_role = mm_class(market_config)
+        else:
+            raise Exception(f"invalid {market_config.market_mechanism=}")
 
         market_operator = self.market_operators.get(market_operator_id)
 
         if not market_operator:
-            raise Exception(f"no market operator {market_operator_id}")
+            raise Exception(f"invalid {market_operator_id=}")
 
-        market_operator.add_role(MarketRole(market_config))
+        market_operator.add_role(market_role)
         market_operator.markets.append(market_config)
         self.markets[f"{market_config.name}"] = market_config
 

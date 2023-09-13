@@ -168,20 +168,6 @@ class Storage(SupportsMinMaxCharge):
 
         self.location = location
 
-    def reset(self):
-        """
-        Reset the unit to its initial state.
-        """
-
-        # outputs["energy"] > 0 discharging, outputs["energy"] < 0 charging
-        self.outputs["energy"] = pd.Series(0.0, index=self.index)
-        self.outputs["soc"] = pd.Series(self.initial_soc, index=self.index)
-
-        # always starting with discharging?
-        # self.outputs["energy"].iat[0] = self.min_power_discharge
-        self.outputs["pos_capacity"] = pd.Series(0.0, index=self.index)
-        self.outputs["neg_capacity"] = pd.Series(0.0, index=self.index)
-
     def execute_current_dispatch(self, start: pd.Timestamp, end: pd.Timestamp):
         """
         Execute the current dispatch of the storage unit.

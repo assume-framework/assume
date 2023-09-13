@@ -49,7 +49,6 @@ def test_flexable_eom_storage(mock_market_config, storage):
     strategy = flexableEOMStorage()
     mc = mock_market_config
     product_tuples = [(start, end, None)]
-    storage.reset()
 
     # constant price of 50
     storage.forecaster = NaiveForecast(index, availability=1, price_forecast=50)
@@ -83,7 +82,6 @@ def test_flexable_pos_crm_storage(mock_market_config, storage):
     mc = mock_market_config
     mc.product_type = "energy_pos"
     product_tuples = [(start, end, None)]
-    storage.reset()
 
     # constant price of 50
     specific_revenue = (50 - (4 / 0.95 + 1)) * 360 / (0.36 * 1000)
@@ -127,7 +125,6 @@ def test_flexable_neg_crm_storage(mock_market_config, storage):
     # Calculations for negative energy
     mc.product_type = "energy_neg"
     product_tuples = [(start, end, None)]
-    storage.reset()
 
     # constant price of 50
     storage.forecaster = NaiveForecast(index, availability=1, price_forecast=50)

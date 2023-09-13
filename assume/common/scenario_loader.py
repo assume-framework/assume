@@ -7,6 +7,7 @@ import pandas as pd
 import yaml
 from tqdm import tqdm
 
+from assume.common.base import LearningConfig
 from assume.common.forecasts import CsvForecaster, Forecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.world import World
@@ -231,6 +232,7 @@ async def load_scenario_folder_async(
     study_case: str,
     disable_learning: bool = False,
     episode: int = 0,
+    load_learned_path: str = "",
 ):
     """Load a scenario from a given path. Raises: ValueError: If the scenario or study case is not found.
 
@@ -260,7 +262,7 @@ async def load_scenario_folder_async(
 
     index = pd.date_range(
         start=start,
-        end=end + pd.Timedelta(hours=24),
+        end=end,
         freq=config["time_step"],
     )
     # get extra parameters for bidding strategies
@@ -287,37 +289,34 @@ async def load_scenario_folder_async(
         file_name="demand_units",
     )
 
-    heatpump_units = load_file(
-        path=path,
-        config=config,
-        file_name="heatpump_units",
-    )
-
     if powerplant_units is None or demand_units is None:
         raise ValueError("No power plant or no demand units were provided!")
-
-    # Initialize world
 
     save_frequency_hours = config.get("save_frequency_hours", 48)
     sim_id = f"{scenario}_{study_case}"
 
-    learning_config = config.get("learning_config", {})
+    learning_config: LearningConfig = config.get("learning_config", {})
     bidding_strategy_params = config.get("bidding_strategy_params", {})
 
-    if "load_learned_path" not in learning_config.keys():
-        learning_config[
-            "load_learned_path"
-        ] = f"{inputs_path}/learned_strategies/{sim_id}/"
-
     if disable_learning:
-        learning_config = {}
+        learning_config["learning_mode"] = False
+
+    if "load_learned_path" not in learning_config.keys():
+        if load_learned_path:
+            learning_config["load_learned_path"] = load_learned_path
+        else:
+            learning_config[
+                "load_learned_path"
+            ] = f"{inputs_path}/learned_strategies/{sim_id}"
+
+    if learning_config.get("learning_mode", False):
+        sim_id = f"{sim_id}_{episode}"
 
     await world.setup(
         start=start,
         end=end,
         save_frequency_hours=save_frequency_hours,
         simulation_id=sim_id,
-        episode=episode,
         learning_config=learning_config,
         bidding_params=bidding_strategy_params,
         index=index,
@@ -420,31 +419,13 @@ async def load_scenario_folder_async(
             [all_operators, storage_units.unit_operator.unique()]
         )
 
-    if heatpump_units is not None:
-        all_operators = np.concatenate(
-            [all_operators, heatpump_units.unit_operator.unique()]
-        )
-
     for company_name in set(all_operators):
         world.add_unit_operator(id=str(company_name))
 
     # add the units to corresponsing unit operators
-    # if fuel prices are provided, add them to the unit params
-    # if vre generation is provided, add them to the vre units
-    # if we have RL strategy, add price forecast to unit_params
-    def empty_callback(unit_name, unit_params):
-        return unit_params
-
     add_units(
         powerplant_units,
         "power_plant",
-        world,
-        forecaster,
-    )
-
-    add_units(
-        heatpump_units,
-        "heatpump",
         world,
         forecaster,
     )
@@ -455,12 +436,6 @@ async def load_scenario_folder_async(
         world,
         forecaster,
     )
-
-    def demand_callback(unit_name, unit_params):
-        if demand_df is not None and unit_name in demand_df.columns:
-            unit_params["volume"] = demand_df[unit_name]
-
-        return unit_params
 
     add_units(
         demand_units,
@@ -475,6 +450,9 @@ def load_scenario_folder(
     inputs_path: str,
     scenario: str,
     study_case: str,
+    disable_learning: bool = False,
+    episode: int = 0,
+    load_learned_path="",
 ):
     """
     Load a scenario from a given path.
@@ -490,53 +468,109 @@ def load_scenario_folder(
     """
     world.loop.run_until_complete(
         load_scenario_folder_async(
-            world,
-            inputs_path,
-            scenario,
-            study_case,
+            world=world,
+            inputs_path=inputs_path,
+            scenario=scenario,
+            study_case=study_case,
+            disable_learning=disable_learning,
+            episode=episode,
+            load_learned_path=load_learned_path,
         )
     )
-    # check if learning mode
-    if world.learning_config.get("learning_mode"):
-        # initiate buffer for rl agent
-        from assume.reinforcement_learning.buffer import ReplayBuffer
 
-        buffer = ReplayBuffer(
-            buffer_size=int(5e5),
-            obs_dim=world.learning_role.obs_dim,
-            act_dim=world.learning_role.act_dim,
-            n_rl_units=len(world.learning_role.rl_units),
-            device=world.learning_role.device,
+
+def run_learning(world: World, inputs_path: str, scenario: str, study_case: str):
+    # initiate buffer for rl agent
+    from assume.reinforcement_learning.buffer import ReplayBuffer
+
+    # remove csv path so that nothing is written while learning
+    temp_csv_path = world.export_csv_path
+    world.export_csv_path = ""
+    best_reward = -1e10
+
+    buffer = ReplayBuffer(
+        buffer_size=int(5e5),
+        obs_dim=world.learning_role.obs_dim,
+        act_dim=world.learning_role.act_dim,
+        n_rl_units=len(world.learning_role.rl_strats),
+        device=world.learning_role.device,
+    )
+    actors_and_critics = None
+    world.output_role.del_similar_runs()
+
+    for episode in tqdm(
+        range(world.learning_role.training_episodes),
+        desc="Training Episodes",
+    ):
+        # TODO normally, loading twice should not create issues, somehow a scheduling issue is raised currently
+        if episode:
+            load_scenario_folder(
+                world,
+                inputs_path,
+                scenario,
+                study_case,
+                episode=world.learning_role.episodes_done,
+                disable_learning=False,
+            )
+        # give the newly created rl_agent the buffer that we stored from the beginning
+        world.learning_role.create_actors_and_critics(
+            actors_and_critics=actors_and_critics
         )
+        world.learning_role.buffer = buffer
+        world.learning_role.episodes_done = episode
 
-        for episode in tqdm(
-            range(world.learning_role.training_episodes),
-            desc="Training Episodes",
-        ):
-            # give the newly created rl_agent the buffer that we stored from the beginning
-            world.learning_role.set_buffer(buffer)
+        if episode + 1 >= world.learning_role.episodes_collecting_initial_experience:
+            world.learning_role.turn_off_initial_exploration()
 
-            world.run()
+        world.run()
+        actors_and_critics = world.learning_role.extract_actors_and_critics()
+        validation_interval = min(
+            world.learning_role.training_episodes,
+            world.learning_config.get("validation_episodes_interval", 5),
+        )
+        if (episode + 1) % validation_interval == 0:
+            old_path = world.learning_config["load_learned_path"]
+            new_path = f"{old_path}_eval"
+            # save validation params in validation path
+            world.learning_role.save_params(directory=new_path)
             world.reset()
 
-            world.learning_role.episodes_done = episode + 1
-
-            disable_learning = episode == world.learning_role.training_episodes - 1
-
-            # in load_scenario_folder_async, we initiate new container and kill old if present
-            # as long as we do not skip setup container should be handled correctly
-            world.loop.run_until_complete(
-                load_scenario_folder_async(
-                    world,
-                    inputs_path,
-                    scenario,
-                    study_case,
-                    episode=world.learning_role.episodes_done,
-                    disable_learning=disable_learning,
-                )
+            # load validation run
+            load_scenario_folder(
+                world,
+                inputs_path,
+                scenario,
+                study_case,
+                disable_learning=True,
+                load_learned_path=new_path,
             )
+            world.run()
+            avg_reward = world.output_role.get_sum_reward()
+            # check reward improvement in validation run
+            world.learning_config["load_learned_path"] = old_path
+            if best_reward < avg_reward:
+                # save new best params for simulation
+                best_reward = avg_reward
+                world.learning_role.save_params(directory=old_path)
+        world.reset()
 
-            # container shutdown implicitly with new initialisation
+        # in load_scenario_folder_async, we initiate new container and kill old if present
+        # as long as we do not skip setup container should be handled correctly
+        # if enough initial experience was collected according to specifications in learning config
+        # turn off initial exploration and go into full learning mode
+        if episode + 1 >= world.learning_role.episodes_collecting_initial_experience:
+            world.learning_role.turn_off_initial_exploration()
 
-        logger.info("################")
-        logger.info(f"Training finished, Start evaluation run")
+        # container shutdown implicitly with new initialisation
+    logger.info("################")
+    logger.info("Training finished, Start evaluation run")
+    world.export_csv_path = temp_csv_path
+
+    # load scenario for evaluation
+    load_scenario_folder(
+        world,
+        inputs_path,
+        scenario,
+        study_case,
+        disable_learning=True,
+    )
