@@ -1,4 +1,4 @@
-# ASSUME - Agent-Based Electricity Markets Simulation Toolbox
+# ASSUME: Agent-Based Electricity Markets Simulation Toolbox
 
 ![Lint Status](https://github.com/assume-framework/assume/actions/workflows/lint-pytest.yml/badge.svg)
 [![Code Coverage](https://codecov.io/gh/assume-framework/assume/branch/main/graph/badge.svg?token=CZ4FO7P57H)](https://codecov.io/gh/assume-framework/assume)
