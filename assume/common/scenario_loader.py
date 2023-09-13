@@ -289,16 +289,8 @@ async def load_scenario_folder_async(
         file_name="demand_units",
     )
 
-    heatpump_units = load_file(
-        path=path,
-        config=config,
-        file_name="heatpump_units",
-    )
-
     if powerplant_units is None or demand_units is None:
         raise ValueError("No power plant or no demand units were provided!")
-
-    # Initialize world
 
     save_frequency_hours = config.get("save_frequency_hours", 48)
     sim_id = f"{scenario}_{study_case}"
@@ -427,31 +419,13 @@ async def load_scenario_folder_async(
             [all_operators, storage_units.unit_operator.unique()]
         )
 
-    if heatpump_units is not None:
-        all_operators = np.concatenate(
-            [all_operators, heatpump_units.unit_operator.unique()]
-        )
-
     for company_name in set(all_operators):
         world.add_unit_operator(id=str(company_name))
 
     # add the units to corresponsing unit operators
-    # if fuel prices are provided, add them to the unit params
-    # if vre generation is provided, add them to the vre units
-    # if we have RL strategy, add price forecast to unit_params
-    def empty_callback(unit_name, unit_params):
-        return unit_params
-
     add_units(
         powerplant_units,
         "power_plant",
-        world,
-        forecaster,
-    )
-
-    add_units(
-        heatpump_units,
-        "heatpump",
         world,
         forecaster,
     )
@@ -462,12 +436,6 @@ async def load_scenario_folder_async(
         world,
         forecaster,
     )
-
-    def demand_callback(unit_name, unit_params):
-        if demand_df is not None and unit_name in demand_df.columns:
-            unit_params["volume"] = demand_df[unit_name]
-
-        return unit_params
 
     add_units(
         demand_units,
