@@ -108,11 +108,16 @@ class World:
         same_process: bool = True,
         bidding_params: dict = {},
         learning_config: LearningConfig = {},
+        forecaster: Forecaster = None,
     ):
         self.clock = ExternalClock(0)
         self.start = start
         self.end = end
         self.learning_config = learning_config
+
+        # forecaster is used only when loading custom unit types
+        self.forecaster = forecaster
+
         self.bidding_params = bidding_params
         self.index = index
         self.same_process = same_process
@@ -195,7 +200,9 @@ class World:
 
         """
         if self.unit_operators.get(id):
-            raise ValueError(f"UnitOperator {id} already exists")
+            self.logger.warning(f"Unit operator {id} already exists. Skipping.")
+            return
+
         units_operator = UnitsOperator(available_markets=list(self.markets.values()))
         # creating a new role agent and apply the role of a unitsoperator
         unit_operator_agent = RoleAgent(self.container, suggested_aid=f"{id}")
@@ -239,6 +246,11 @@ class World:
         if unit_class is None:
             raise ValueError(f"invalid unit type {unit_type}")
 
+        # check if unit operator already has a unit with the same id
+        if self.unit_operators[unit_operator_id].units.get(id):
+            self.logger.warning(f"Unit {id} already exists. Skipping.")
+            return
+
         bidding_strategies = {}
         for product_type, strategy in unit_params["bidding_strategies"].items():
             if not strategy:
@@ -250,11 +262,10 @@ class World:
                     **self.bidding_params,
                 )
                 # TODO find better way to count learning agents
-                if self.learning_mode:
-                    if issubclass(self.bidding_strategies[strategy], LearningStrategy):
-                        self.learning_role.rl_strats[id] = bidding_strategies[
-                            product_type
-                        ]
+                if self.learning_mode and issubclass(
+                    self.bidding_strategies[strategy], LearningStrategy
+                ):
+                    self.learning_role.rl_strats[id] = bidding_strategies[product_type]
 
             except KeyError as e:
                 self.logger.error(
