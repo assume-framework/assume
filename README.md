@@ -1,160 +1,142 @@
-# ASSUME
-![pytest, black, isort](https://github.com/assume-framework/assume/actions/workflows/lint-pytest.yml/badge.svg)
-[![codecov](https://codecov.io/gh/assume-framework/assume/branch/main/graph/badge.svg?token=CZ4FO7P57H)](https://codecov.io/gh/assume-framework/assume)
+# ASSUME - Agent-Based Electricity Markets Simulation Toolbox
+
+![Lint Status](https://github.com/assume-framework/assume/actions/workflows/lint-pytest.yml/badge.svg)
+[![Code Coverage](https://codecov.io/gh/assume-framework/assume/branch/main/graph/badge.svg?token=CZ4FO7P57H)](https://codecov.io/gh/assume-framework/assume)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8088760.svg)](https://doi.org/10.5281/zenodo.8088760)
 
+**ASSUME** is an open-source toolbox for agent-based simulations of European electricity markets, with a primary focus on the German market setup. Developed as an open-source model, its primary objectives are to ensure usability and customizability for a wide range of users and use cases in the energy system modeling community.
+
+## Introduction
+
+A unique feature of the ASSUME toolbox is its integration of **Deep Reinforcement Learning** methods into the behavioral strategies of market agents. The model offers various predefined agent representations for both the demand and generation sides, which can be used as plug-and-play modules, simplifying the reinforcement of learning strategies. This setup enables research into new market designs and dynamics in energy markets.
 
 
-**ASSUME** is an open-source tool-box for an agent-based simulation
-of the European electricity and later on energy markets with a main
-focus on the German market setup. As a newly developed open-source
-model its priority is to ensure usability and customisability
-for a variety of users and use cases in the energy system modelling community.
+## Documentation
 
-The unique feature of the ASSUME toolbox is the integration of **deep reinforcement
-learning** methods into the behavioural strategies of market agents.
-The model comes with different predefined agent representations for the demand and
-generation side that can be used as plug-and-play modules,
-which facilitate reinforcement of learning strategies.
-This setup enables a research of new market designs and dynamics in the energy markets.
+- [User Documentation](https://assume.readthedocs.io/en/latest/)
+- [Installation Guide](https://assume.readthedocs.io/en/latest/installation.html)
 
-The project is developed by [developers](https://assume.readthedocs.io/en/latest/developers.html) from INATECH at University of Freiburg, IISM at KIT, Fraunhofer ISI, FH Aachen.
-The project ASSUME is funded by the Federal Ministry for Economic
-Affairs and Climate Action (BMWK).
+## Installation
 
-Documentation
-=============
+You can install ASSUME using pip. Choose the appropriate installation method based on your needs:
 
-[Documentation](https://assume.readthedocs.io/en/latest/)
+### Using pip
 
-[Installation](https://assume.readthedocs.io/en/latest/installation.html)
+To install the core package:
 
-
-Installation
-============
-
-
-Using pip
----------
-
-The project is available on [PyPi](https://pypi.org/) and can be simply installed:
-
-```
+```bash
 pip install assume-framework
 ```
 
-if you want to install it with testin capabilities run:
+To install with testing capabilities:
 
-```
+```bash
 pip install assume-framework[test]
 ```
 
+### Timescale Database and Grafana Dashboards
 
-Using conda
------------
+If you want to benefit from a supported database and integrated Grafana dashboards for scenario analysis, you can use the provided Docker Compose file.
 
-First clone the repository:
+Follow these steps:
 
-```
+1. Clone the repository and navigate to its directory:
+
+```bash
 git clone https://github.com/assume-framework/assume.git
+cd assume
 ```
 
-Next, navigate to the cloned directory:
+2. Start the database and Grafana using the following command:
 
-```
-cd $where you cloned the repo$
-```
-
-Now, create a conda environment:
-
-```
-conda env create -f environment.yml
+```bash
+docker-compose up -d
 ```
 
-Afterwards, activate the environment:
-```
-conda activate assume-framework
+This will launch a container for TimescaleDB and Grafana with preconfigured dashboards for analysis. You can access the Grafana dashboards at `http://localhost:3000`.
+
+### Using Learning Capabilities
+
+If you intend to use the reinforcement learning capabilities of ASSUME and train your agents, make sure to install Torch. Detailed installation instructions can be found [here](https://pytorch.org/get-started/locally/).
+
+## Trying out the Examples
+
+To explore the provided examples, follow these steps:
+
+1. Clone the repository and navigate to its directory:
+
+```bash
+git clone https://github.com/assume-framework/assume.git
+cd assume
 ```
 
-Quick Start
------------
-There are 3 ways to run a simulation. <br>
-1.) local (without database and grafana) <br>
-2.) with docker (with database and grafana) <br>
-3.) use CLI to run simulations
+2. Quick Start:
 
-1. To run an exemplar simulation without database and grafana, run the following command:
+There are three ways to run a simulation:
 
-```
+- Local:
+
+```bash
 python examples/examples.py
 ```
 
-2. If you have docker installed, you can run the following two commands
+- Using the provided Docker setup:
 
-Note: you have to select 'timescale' in examples.py
-```
-    docker compose up -d
-    python examples/examples.py
-```
-This will start a container for timescaledb and grafana with preconfigured grafana dashboard.
-Afterwards you can access the Dashboard on `http://localhost:3000`
+If you have installed Docker and set up the Docker Compose file previously, you can select 'timescale' in `examples.py` before running the simulation. This will save the simulation results in a Timescale database, and you can access the Dashboard at `http://localhost:3000`.
 
-3. You can also use the cli to run simulations:
+- Using the CLI to run simulations:
 
-```
+```bash
 assume -s example_01b -db "postgresql://assume:assume@localhost:5432/assume"
 ```
 
-If you need help using the CLI run `assume -h`
+For additional CLI options, run `assume -h`.
 
+## Development
 
-Please note that if you have python running on windows that you need to alter the same_process binary in world to True (to be changed).
+If you're contributing to the development of ASSUME, follow these steps:
 
+1. Install pre-commit:
 
-Development
------------
-
-install pre-commit
-
-```
+```bash
 pip install pre-commit
 pre-commit install
 ```
 
-to run pre-commit directly, you can use
+To run pre-commit checks directly, use:
 
-```
+```bash
 pre-commit run --all-files
 ```
 
+## Creating Documentation
 
-Create Documentation
---------------------
+First, create an environment that includes the documentation dependencies:
 
-First, create an environment which includes the docs dependencies:
-
-```
+```bash
 conda env create -f environment_docs.yml
 ```
 
-To create the documentation or update the automatically created docs in `docs/source/assume*` run `sphinx-apidoc -o docs/source -Fa assume`
+To generate or update the automatically created docs in `docs/source/assume*`, run:
 
-To create and serve the documentation locally, run
+```bash
+sphinx-apidoc -o docs/source -Fa assume
+```
+
+To create and serve the documentation locally, use:
 
 ```bash
 make -C docs html && python -m http.server --directory docs/build/html
 ```
 
-Use Learning Capabilities
----------------------------------
-If you want to use the reinforcement learning strategies of Assume please make sure to install torch on top of the requirements listed in the requirements.txt. If you Ressources do not have a GPU available use the CPU only version of torch, which can be installed like this:
+## Contributors and Funding
 
-pip install "torch>=2.0.1+cpu" -f https://download.pytorch.org/whl/torch_stable.html
+The project is developed by a collaborative team of researchers from INATECH at the University of Freiburg, IISM at Karlsruhe Institute of Technology, Fraunhofer Institute for Systems and Innovation Research, Fraunhofer Institution for Energy Infrastructures and Geothermal Energy, and FH Aachen - University of Applied Sciences. Each contributor brings valuable expertise in electricity market modeling, deep reinforcement learning, demand side flexibility, and infrastructure modeling.
 
+ASSUME is funded by the Federal Ministry for Economic Affairs and Climate Action (BMWK). We are grateful for their support in making this project possible.
 
-Licence
-=======
+## License
 
-Copyright 2022-2023 [ASSUME developers](https://assume.readthedocs.io/en/latest/developers.html)
+Copyright 2022-2023 [ASSUME developers](https://assume.readthedocs.io/en/latest/developers.html).
 
-ASSUME is licensed under the [GNU Affero General Public License v3.0](./LICENSE)
+ASSUME is licensed under the [GNU Affero General Public License v3.0](./LICENSE). This license is a strong copyleft license that requires that any derivative work be licensed under the same terms as the original work. It is approved by the [Open Source Initiative](https://opensource.org/licenses/AGPL-3.0).
