@@ -481,7 +481,8 @@ async def async_load_custom_units(
 
     operators = custom_units.unit_operator.unique()
     for operator in operators:
-        world.add_unit_operator(id=str(operator))
+        if operator not in world.unit_operators:
+            world.add_unit_operator(id=str(operator))
 
     add_units(
         units_df=custom_units,

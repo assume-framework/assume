@@ -200,8 +200,7 @@ class World:
 
         """
         if self.unit_operators.get(id):
-            self.logger.warning(f"Unit operator {id} already exists. Skipping.")
-            return
+            raise ValueError(f"Unit operator {id} already exists")
 
         units_operator = UnitsOperator(available_markets=list(self.markets.values()))
         # creating a new role agent and apply the role of a unitsoperator
