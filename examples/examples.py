@@ -68,6 +68,19 @@ if __name__ == "__main__":
         study_case=availabe_examples[example]["study_case"],
     )
 
+    from heatpump import Heatpump, HeatpumpStrategy
+
+    world.unit_types["heatpump"] = Heatpump
+    world.bidding_types["heatpump_strategy"] = HeatpumpStrategy
+
+    custom_units = load_file(
+        path=path,
+        config=config,
+        file_name=c["file_name"],
+    )
+
+    add_units(custom_units, c["unit_name"], world)
+
     if world.learning_config.get("learning_mode", False):
         # run learning
         run_learning(

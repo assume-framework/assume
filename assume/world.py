@@ -81,12 +81,12 @@ class World:
             "storage": Storage,
         }
 
-        self.bidding_types = bidding_strategies
+        self.bidding_strategies = bidding_strategies
 
         try:
             from assume.strategies.learning_strategies import RLStrategy
 
-            self.bidding_types["learning"] = RLStrategy
+            self.bidding_strategies["learning"] = RLStrategy
         except ImportError as e:
             self.logger.info(
                 "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",
@@ -245,13 +245,13 @@ class World:
                 continue
 
             try:
-                bidding_strategies[product_type] = self.bidding_types[strategy](
+                bidding_strategies[product_type] = self.bidding_strategies[strategy](
                     unit_id=id,
                     **self.bidding_params,
                 )
                 # TODO find better way to count learning agents
                 if self.learning_mode:
-                    if issubclass(self.bidding_types[strategy], LearningStrategy):
+                    if issubclass(self.bidding_strategies[strategy], LearningStrategy):
                         self.learning_role.rl_strats[id] = bidding_strategies[
                             product_type
                         ]
