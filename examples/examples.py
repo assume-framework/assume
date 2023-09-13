@@ -31,10 +31,6 @@ availabe_examples = {
         "scenario": "example_01c",
         "study_case": "eom_and_crm",
     },
-    "small_with_heatpumps": {
-        "scenario": "example_01_heatpumps",
-        "study_case": "with_heat_pumps",
-    },
     "large_2019_eom": {"scenario": "example_02", "study_case": "base_case_2019"},
     "large_2019_eom_crm": {
         "scenario": "example_02",
