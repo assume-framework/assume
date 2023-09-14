@@ -247,8 +247,7 @@ class World:
 
         # check if unit operator already has a unit with the same id
         if self.unit_operators[unit_operator_id].units.get(id):
-            self.logger.warning(f"Unit {id} already exists. Skipping.")
-            return
+            raise ValueError(f"Unit {id} already exists")
 
         bidding_strategies = {}
         for product_type, strategy in unit_params["bidding_strategies"].items():
