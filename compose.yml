@@ -25,6 +25,7 @@ services:
     user: "104"
     depends_on:
       - assume_db
+      - renderer
     ports:
       - 3000:3000
     environment:
@@ -33,6 +34,9 @@ services:
       GF_INSTALL_PLUGINS: "marcusolsson-dynamictext-panel"
       GF_SECURITY_ADMIN_USER: assume
       GF_SECURITY_ADMIN_PASSWORD: "assume"
+      GF_RENDERING_SERVER_URL: http://renderer:8081/render
+      GF_RENDERING_CALLBACK_URL: http://grafana:3000/
+      GF_LOG_FILTERS: rendering:debug
     volumes:
       - ./docker_configs/grafana.ini:/etc/grafana/grafana.ini
       - ./docker_configs/datasources:/etc/grafana/provisioning/datasources
@@ -44,6 +48,12 @@ services:
       replicas: 1
       placement:
         constraints: [node.role == manager]
+
+  renderer:
+    image: grafana/grafana-image-renderer:latest
+    profiles: ["enable-renderer"]
+    ports:
+      - 8081
 
 
   simulation:
@@ -58,4 +68,4 @@ services:
       - 5000:5000
     depends_on:
       - assume_db
-    command: -s example_01a -c base -db "sqlite:///"
+    command: -s example_02 -c base -db "sqlite:///"

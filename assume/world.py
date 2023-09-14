@@ -26,7 +26,7 @@ from assume.common import (
 from assume.common.base import LearningConfig
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import LearningStrategy, bidding_strategies
-from assume.units import BaseUnit, Demand, HeatPump, PowerPlant, Storage
+from assume.units import BaseUnit, Demand, PowerPlant, Storage
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
 stdout_handler = logging.StreamHandler(stream=sys.stdout)
@@ -77,17 +77,16 @@ class World:
         self.unit_operators: dict[str, UnitsOperator] = {}
         self.unit_types = {
             "power_plant": PowerPlant,
-            "heatpump": HeatPump,
             "demand": Demand,
             "storage": Storage,
         }
 
-        self.bidding_types = bidding_strategies
+        self.bidding_strategies = bidding_strategies
 
         try:
             from assume.strategies.learning_strategies import RLStrategy
 
-            self.bidding_types["learning"] = RLStrategy
+            self.bidding_strategies["learning"] = RLStrategy
         except ImportError as e:
             self.logger.info(
                 "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",
@@ -109,11 +108,16 @@ class World:
         same_process: bool = True,
         bidding_params: dict = {},
         learning_config: LearningConfig = {},
+        forecaster: Forecaster = None,
     ):
         self.clock = ExternalClock(0)
         self.start = start
         self.end = end
         self.learning_config = learning_config
+
+        # forecaster is used only when loading custom unit types
+        self.forecaster = forecaster
+
         self.bidding_params = bidding_params
         self.index = index
         self.same_process = same_process
@@ -196,7 +200,8 @@ class World:
 
         """
         if self.unit_operators.get(id):
-            raise ValueError(f"UnitOperator {id} already exists")
+            raise ValueError(f"Unit operator {id} already exists")
+
         units_operator = UnitsOperator(available_markets=list(self.markets.values()))
         # creating a new role agent and apply the role of a unitsoperator
         unit_operator_agent = RoleAgent(self.container, suggested_aid=f"{id}")
@@ -240,22 +245,25 @@ class World:
         if unit_class is None:
             raise ValueError(f"invalid unit type {unit_type}")
 
+        # check if unit operator already has a unit with the same id
+        if self.unit_operators[unit_operator_id].units.get(id):
+            raise ValueError(f"Unit {id} already exists")
+
         bidding_strategies = {}
         for product_type, strategy in unit_params["bidding_strategies"].items():
             if not strategy:
                 continue
 
             try:
-                bidding_strategies[product_type] = self.bidding_types[strategy](
+                bidding_strategies[product_type] = self.bidding_strategies[strategy](
                     unit_id=id,
                     **self.bidding_params,
                 )
                 # TODO find better way to count learning agents
-                if self.learning_mode:
-                    if issubclass(self.bidding_types[strategy], LearningStrategy):
-                        self.learning_role.rl_strats[id] = bidding_strategies[
-                            product_type
-                        ]
+                if self.learning_mode and issubclass(
+                    self.bidding_strategies[strategy], LearningStrategy
+                ):
+                    self.learning_role.rl_strats[id] = bidding_strategies[product_type]
 
             except KeyError as e:
                 self.logger.error(

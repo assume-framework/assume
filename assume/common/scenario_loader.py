@@ -289,16 +289,8 @@ async def load_scenario_folder_async(
         file_name="demand_units",
     )
 
-    heatpump_units = load_file(
-        path=path,
-        config=config,
-        file_name="heatpump_units",
-    )
-
     if powerplant_units is None or demand_units is None:
         raise ValueError("No power plant or no demand units were provided!")
-
-    # Initialize world
 
     save_frequency_hours = config.get("save_frequency_hours", 48)
     sim_id = f"{scenario}_{study_case}"
@@ -320,36 +312,7 @@ async def load_scenario_folder_async(
     if learning_config.get("learning_mode", False):
         sim_id = f"{sim_id}_{episode}"
 
-    await world.setup(
-        start=start,
-        end=end,
-        save_frequency_hours=save_frequency_hours,
-        simulation_id=sim_id,
-        learning_config=learning_config,
-        bidding_params=bidding_strategy_params,
-        index=index,
-    )
-
-    # get the market config from the config file and add the markets
-    logger.info("Adding markets")
-    for market_id, market_params in config["markets_config"].items():
-        market_config = make_market_config(
-            id=market_id,
-            market_params=market_params,
-            world_start=start,
-            world_end=end,
-        )
-
-        operator_id = str(market_params["operator"])
-        if operator_id not in world.market_operators:
-            world.add_market_operator(id=operator_id)
-
-        world.add_market(
-            market_operator_id=operator_id,
-            market_config=market_config,
-        )
-
-    # add forecast providers for each market
+    # add forecast provider
     logger.info("Adding forecast")
     forecaster = CsvForecaster(
         index=index,
@@ -413,6 +376,36 @@ async def load_scenario_folder_async(
     forecaster.calc_forecast_if_needed()
     forecaster.save_forecasts(path)
 
+    await world.setup(
+        start=start,
+        end=end,
+        save_frequency_hours=save_frequency_hours,
+        simulation_id=sim_id,
+        learning_config=learning_config,
+        bidding_params=bidding_strategy_params,
+        index=index,
+        forecaster=forecaster,
+    )
+
+    # get the market config from the config file and add the markets
+    logger.info("Adding markets")
+    for market_id, market_params in config["markets_config"].items():
+        market_config = make_market_config(
+            id=market_id,
+            market_params=market_params,
+            world_start=start,
+            world_end=end,
+        )
+
+        operator_id = str(market_params["operator"])
+        if operator_id not in world.market_operators:
+            world.add_market_operator(id=operator_id)
+
+        world.add_market(
+            market_operator_id=operator_id,
+            market_config=market_config,
+        )
+
     # add the unit operators using unique unit operator names in the powerplants csv
     logger.info("Adding unit operators")
     all_operators = np.concatenate(
@@ -427,53 +420,93 @@ async def load_scenario_folder_async(
             [all_operators, storage_units.unit_operator.unique()]
         )
 
-    if heatpump_units is not None:
-        all_operators = np.concatenate(
-            [all_operators, heatpump_units.unit_operator.unique()]
-        )
-
     for company_name in set(all_operators):
         world.add_unit_operator(id=str(company_name))
 
     # add the units to corresponsing unit operators
-    # if fuel prices are provided, add them to the unit params
-    # if vre generation is provided, add them to the vre units
-    # if we have RL strategy, add price forecast to unit_params
-    def empty_callback(unit_name, unit_params):
-        return unit_params
-
     add_units(
-        powerplant_units,
-        "power_plant",
-        world,
-        forecaster,
+        units_df=powerplant_units,
+        unit_type="power_plant",
+        world=world,
+        forecaster=forecaster,
     )
 
     add_units(
-        heatpump_units,
-        "heatpump",
-        world,
-        forecaster,
+        units_df=storage_units,
+        unit_type="storage",
+        world=world,
+        forecaster=forecaster,
     )
 
     add_units(
-        storage_units,
-        "storage",
-        world,
-        forecaster,
+        units_df=demand_units,
+        unit_type="demand",
+        world=world,
+        forecaster=forecaster,
     )
 
-    def demand_callback(unit_name, unit_params):
-        if demand_df is not None and unit_name in demand_df.columns:
-            unit_params["volume"] = demand_df[unit_name]
 
-        return unit_params
+async def async_load_custom_units(
+    world: World,
+    inputs_path: str,
+    scenario: str,
+    file_name: str,
+    unit_type: str,
+):
+    """
+    This function loads custom units from a given path.
+
+    :param world: the world
+    :type world: World
+    :param inputs_path: the path to the inputs folder
+    :type inputs_path: str
+    :param scenario: the name of the scenario
+    :type scenario: str
+    :param file_name: the name of the file
+    :type file_name: str
+    :param unit_type: the type of the unit
+    :type unit_type: str
+    """
+
+    path = f"{inputs_path}/{scenario}"
+
+    custom_units = load_file(
+        path=path,
+        config={},
+        file_name=file_name,
+    )
+
+    if custom_units is None:
+        logger.warning(f"No {file_name} units were provided!")
+
+    operators = custom_units.unit_operator.unique()
+    for operator in operators:
+        if operator not in world.unit_operators:
+            world.add_unit_operator(id=str(operator))
 
     add_units(
-        demand_units,
-        "demand",
-        world,
-        forecaster,
+        units_df=custom_units,
+        unit_type=unit_type,
+        world=world,
+        forecaster=world.forecaster,
+    )
+
+
+def load_custom_units(
+    world: World,
+    inputs_path: str,
+    scenario: str,
+    file_name: str,
+    unit_type: str,
+):
+    world.loop.run_until_complete(
+        async_load_custom_units(
+            world=world,
+            inputs_path=inputs_path,
+            scenario=scenario,
+            file_name=file_name,
+            unit_type=unit_type,
+        )
     )
 
 
