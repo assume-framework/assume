@@ -256,7 +256,7 @@ class UCClearingRole(MarketRole):
         market_clearing_prices = {
             t: instance.dual[instance.energy_balance[t]] for t in instance.T
         }
-
+        self.all_orders = []
         return extract_results(
             model=instance,
             orders=orderbook,
