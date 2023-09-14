@@ -25,7 +25,6 @@ services:
     user: "104"
     depends_on:
       - assume_db
-      - renderer
     ports:
       - 3000:3000
     environment:
