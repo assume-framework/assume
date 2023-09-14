@@ -329,14 +329,22 @@ def separate_orders(orderbook):
     delete_orders = []
     for order in orderbook:
         order_len = len(order["volume"]) if isinstance(order["volume"], dict) else 1
-        if order_len > 1:
+        order_len = len(order["price"]) if isinstance(order["price"], dict) else 1
+
+        if (
+            isinstance(order["price"], dict)
+            or isinstance(order["volume"], dict)
+            or isinstance(order["accepted_volume"], dict)
+            or isinstance(order["accepted_price"], dict)
+        ):
             start_hour = order["start_time"]
             end_hour = order["end_time"]
             duration = (end_hour - start_hour) / order_len
-            i = 1
-            for start in pd.date_range(start_hour, end_hour - duration, freq=duration):
+            for i, start in enumerate(
+                pd.date_range(start_hour, end_hour - duration, freq=duration), start=1
+            ):
                 single_order = order.copy()
-                for key in order.keys():
+                for key in ["price", "volume", "accepted_volume", "accepted_price"]:
                     if isinstance(order[key], dict):
                         single_order.update({key: order[key][start]})
                 if single_order != order:
@@ -349,7 +357,6 @@ def separate_orders(orderbook):
                     )
 
                 orderbook.append(single_order)
-                i += 1
             delete_orders.append(order)
 
     for order in delete_orders:
