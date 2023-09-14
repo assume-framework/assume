@@ -200,7 +200,7 @@ def test_sep_block_orders():
         {
             "start_time": start,
             "end_time": end,
-            "volume": {i: 60 for i in index},
+            "volume": 50,
             "price": {i: 110 for i in index},
             "agent_id": "mpb1",
             "only_hours": None,
