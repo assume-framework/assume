@@ -12,7 +12,7 @@ from assume.common.utils import (
     get_available_products,
     initializer,
     plot_orderbook,
-    separate_block_orders,
+    separate_orders,
     visualize_orderbook,
 )
 
@@ -85,7 +85,7 @@ def test_available_products():
     for prod in products:
         assert prod[0] == start + timedelta(hours=(1 + i)), "start {i}"
         assert prod[1] == start + timedelta(hours=(2 + i)), "end {i}"
-        assert prod[2] == None, "only_hour {i}"
+        assert prod[2] is None, "only_hour {i}"
         i += 1
 
 
@@ -173,6 +173,18 @@ def test_sep_block_orders():
         {
             "start_time": start,
             "end_time": end,
+            "volume": {i: 60 for i in index},
+            "price": {i: 110 for i in index},
+            "agent_id": "block1",
+            "only_hours": None,
+            "accepted_volume": {i: 0 for i in index},
+            "accepted_price": {i: None for i in index},
+            "bid_type": "BB",
+            "bid_id": "block2_1",
+        },
+        {
+            "start_time": start,
+            "end_time": end,
             "volume": 80,
             "price": 58,
             "agent_id": "gen1",
@@ -183,9 +195,26 @@ def test_sep_block_orders():
             "bid_id": "gen1_1",
         },
     ]
-    assert len(orderbook) == 2
-    orderbook = separate_block_orders(orderbook)
-    assert len(orderbook) == 25
+    index = pd.date_range(start, end - pd.Timedelta("1H"), freq="4H")
+    orderbook.append(
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": {i: 60 for i in index},
+            "price": {i: 110 for i in index},
+            "agent_id": "mpb1",
+            "only_hours": None,
+            "accepted_volume": {i: 0 for i in index},
+            "accepted_price": {i: None for i in index},
+            "bid_type": "MPB",
+            "bid_id": "mpb1_1",
+        },
+    )
+    assert len(orderbook) == 4
+    orderbook = separate_orders(orderbook)
+    assert len(orderbook) == 55
+    for order in orderbook:
+        assert True not in [isinstance(order[key], dict) for key in order.keys()]
 
 
 @patch("matplotlib.pyplot.show")

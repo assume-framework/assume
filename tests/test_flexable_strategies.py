@@ -38,7 +38,6 @@ def test_flexable_eom(mock_market_config, power_plant):
     strategy = flexableEOM()
     mc = mock_market_config
     product_tuples = [(start, end, None)]
-    power_plant.reset()
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
     assert len(bids) == 2
     assert bids[0]["price"] == 40
@@ -56,7 +55,6 @@ def test_flexable_eom(mock_market_config, power_plant):
     assert bids[1]["volume"] == 200
 
     # CHP with ramping restrictions, but without start-up
-    power_plant.reset()
     power_plant.outputs["heat"][start] = 300
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
     assert len(bids) == 2

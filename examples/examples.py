@@ -2,7 +2,7 @@
 import logging
 import os
 
-from assume import World, load_scenario_folder
+from assume import World, load_scenario_folder, run_learning
 
 log = logging.getLogger(__name__)
 
@@ -31,10 +31,6 @@ availabe_examples = {
         "scenario": "example_01c",
         "study_case": "eom_and_crm",
     },
-    "small_with_heatpumps": {
-        "scenario": "example_01_heatpumps",
-        "study_case": "with_heat_pumps",
-    },
     "large_2019_eom": {"scenario": "example_02", "study_case": "base_case_2019"},
     "large_2019_eom_crm": {
         "scenario": "example_02",
@@ -54,7 +50,7 @@ if __name__ == "__main__":
     - local_db: without database and grafana
     - timescale: with database and grafana (note: you need docker installed)
     """
-    data_format = "timescale"  # "local_db" or "timescale"
+    data_format = "local_db"  # "local_db" or "timescale"
     example = "small"
 
     if data_format == "local_db":
@@ -62,11 +58,22 @@ if __name__ == "__main__":
     elif data_format == "timescale":
         db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
+    # create world
     world = World(database_uri=db_uri, export_csv_path=csv_path)
+    # load scenario for learning
     load_scenario_folder(
         world,
         inputs_path="examples/inputs",
         scenario=availabe_examples[example]["scenario"],
         study_case=availabe_examples[example]["study_case"],
     )
+
+    if world.learning_config.get("learning_mode", False):
+        # run learning
+        run_learning(
+            world,
+            inputs_path="examples/inputs",
+            scenario=availabe_examples[example]["scenario"],
+            study_case=availabe_examples[example]["study_case"],
+        )
     world.run()

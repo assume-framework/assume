@@ -420,8 +420,7 @@ class DmasPowerplantStrategy(BaseStrategy):
                 if r.solver.termination_condition == TerminationCondition.infeasible:
                     log.error(f"infeasible model in step: {step}")
                 else:
-                    print(step)
-                    log.error(r.solver)
+                    log.error(f"{step} - {r.solver}")
                 for key in ["power", "emission", "fuel", "start", "profit"]:
                     self.opt_results[step][key] = np.zeros(self.T)
                 self.opt_results[step]["obj"] = 0

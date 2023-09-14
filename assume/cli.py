@@ -2,7 +2,7 @@ import argparse
 import os
 import sys
 
-from assume import World, load_scenario_folder
+from assume import World, load_scenario_folder, run_learning
 
 os.makedirs("./examples/outputs", exist_ok=True)
 os.makedirs("./examples/local_db", exist_ok=True)
@@ -76,12 +76,22 @@ def cli(args=None):
             scenario=args.scenario,
             study_case=args.case_study,
         )
+
+        if world.learning_config.get("learning_mode", False):
+            run_learning(
+                world,
+                inputs_path=args.input_path,
+                scenario=args.scenario,
+                study_case=args.case_study,
+            )
+
         world.run()
+
     except KeyboardInterrupt:
         pass
 
 
 if __name__ == "__main__":
     # cli()
-    args = "-s example_01a -db postgresql://assume:assume@localhost:5432/assume"
+    args = "-s example_01_rl -db postgresql://assume:assume@localhost:5432/assume"
     cli(args.split(" "))

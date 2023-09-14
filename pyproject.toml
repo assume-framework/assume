@@ -1,8 +1,8 @@
 [tool.poetry]
-name = "assume_framework"
-version = "0.0.1"
-description = "ASSUME - Agent based energy market modeling using mango agents"
-authors = ["ASSUME developers <nick.harder@inatech.uni-freiburg.de>"]
+name = "assume-framework"
+version = "0.1.0"
+description = "ASSUME - Agent-Based Electricity Markets Simulation Toolbox"
+authors = ["ASSUME Developers <contact@assume-project.de>"]
 license = "LICENSE"
 readme = "README.md"
 
@@ -14,10 +14,9 @@ keywords = ["agent based simulation", "energy market", "reinforcement learning",
 classifiers=[
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: GNU Affero General Public License v3 (AGPLv3)",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     "Operating System :: OS Independent",
-    "Framework :: asyncio",
-    "Framework :: mango-agents",
+    "Framework :: AsyncIO",
     "Topic :: Scientific/Engineering",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
@@ -29,7 +28,7 @@ packages = [
 [tool.poetry.dependencies]
 python = "^3.10"
 paho-mqtt = "^1.5.1"
-mango-agents = {git = "https://gitlab.com/maurerle/mango"}
+mango-agents = "^1.1.1"
 tqdm = "^4.64.1"
 python-dateutil = "^2.8.2"
 sqlalchemy = "^2.0.9"
@@ -89,6 +88,7 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "require_learning",
 ]
+addopts = "--ignore=assume-db"
 
 [tool.coverage.run]
 omit = ["tests/*"]

@@ -5,7 +5,7 @@ from dateutil.relativedelta import relativedelta as rd
 
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
-from assume.markets import MarketRole, clearing_mechanisms
+from assume.markets.clearing_algorithms import PayAsClearRole, clearing_mechanisms
 
 from .utils import create_orderbook, extend_orderbook
 
@@ -27,7 +27,6 @@ simple_dayahead_auction_config = MarketConfig(
 
 
 def test_market():
-    mr = MarketRole(simple_dayahead_auction_config)
     next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
     products = get_available_products(
         simple_dayahead_auction_config.market_products, next_opening
@@ -49,10 +48,8 @@ def test_market():
     simple_dayahead_auction_config.market_mechanism = clearing_mechanisms[
         simple_dayahead_auction_config.market_mechanism
     ]
-    mr.all_orders = orderbook
-    accepted, rejected, meta = simple_dayahead_auction_config.market_mechanism(
-        mr, products
-    )
+    mr = PayAsClearRole(simple_dayahead_auction_config)
+    accepted, rejected, meta = mr.clear(orderbook, products)
     assert meta[0]["demand_volume"] > 0
     assert meta[0]["price"] > 0
     import pandas as pd
@@ -65,14 +62,13 @@ def test_market():
 def test_simple_market_mechanism():
     import copy
 
-    for name, mechanism in clearing_mechanisms.items():
+    for name, role in clearing_mechanisms.items():
         if "complex" in name:
             continue
 
         print(name)
         market_config = copy.copy(simple_dayahead_auction_config)
-        market_config.market_mechanism = mechanism
-        mr = MarketRole(market_config)
+        market_config.market_mechanism = name
         next_opening = market_config.opening_hours.after(datetime.now())
         products = get_available_products(market_config.market_products, next_opening)
         assert len(products) == 1
@@ -83,8 +79,8 @@ def test_simple_market_mechanism():
         }
 
         orderbook = create_orderbook(order, node_ids=[0, 1, 2])
-        mr.all_orders = orderbook
-        accepted, rejected, meta = market_config.market_mechanism(mr, products)
+        mr = role(simple_dayahead_auction_config)
+        accepted, rejected, meta = mr.clear(orderbook, products)
         assert meta[0]["supply_volume"] > 0
         assert meta[0]["price"] > 0
         # import pandas as pd
