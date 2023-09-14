@@ -177,8 +177,8 @@ class BaseUnit:
         :return: the output before the given datetime
         :rtype: float
         """
-        if dt - self.index.freq < self.index[0]:
-            return 0
+        if dt - self.index.freq < self.index[1]:
+            return self.min_power + (self.max_power - self.min_power) / 2
         else:
             return self.outputs["energy"].at[dt - self.index.freq]
 

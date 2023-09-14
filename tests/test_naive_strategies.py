@@ -50,7 +50,7 @@ def test_naive_neg_strategy(mock_market_config, mock_supports_minmax):
     product_tuples = [(start, end, None)]
     bids = strategy.calculate_bids(unit, mc, product_tuples=product_tuples)
     assert bids[0]["price"] == 0
-    assert bids[0]["volume"] == 100
+    assert bids[0]["volume"] == 300
     assert len(bids) == 1
 
 

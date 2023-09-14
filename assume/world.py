@@ -82,16 +82,6 @@ class World:
         }
 
         self.bidding_strategies = bidding_strategies
-
-        try:
-            from assume.strategies.learning_strategies import RLStrategy
-
-            self.bidding_strategies["learning"] = RLStrategy
-        except ImportError as e:
-            self.logger.info(
-                "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",
-                e,
-            )
         self.clearing_mechanisms: dict[str, MarketRole] = clearing_mechanisms
         self.clearing_mechanisms.update(additional_clearing_mechanisms)
         nest_asyncio.apply()

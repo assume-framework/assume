@@ -244,6 +244,8 @@ class UCClearingRole(MarketRole):
 
         rejected_orders: Orderbook = []
 
+        orderbook = check_for_tensors(orderbook)
+
         instance, results = market_clearing_opt(
             orders=orderbook,
             market_products=market_products,
@@ -256,7 +258,9 @@ class UCClearingRole(MarketRole):
         market_clearing_prices = {
             t: instance.dual[instance.energy_balance[t]] for t in instance.T
         }
+
         self.all_orders = []
+
         return extract_results(
             model=instance,
             orders=orderbook,
@@ -340,3 +344,31 @@ def extract_results(
         )
 
     return accepted_orders, rejected_orders, meta
+
+
+def check_for_tensors(orderbook):
+    """
+    Checks if the data contains tensors and converts them to floats.
+
+    :param data: The data to be checked.
+    :type data: any
+    """
+    try:
+        import torch as th
+
+        # data is a list of dictionaries
+        # check if any value in those dictionaries is a tensor
+        for order in orderbook:
+            if isinstance(order["price"], dict):
+                for start, value in order["price"].items():
+                    if isinstance(value, th.Tensor):
+                        order["price"][start] = value.item()
+            if isinstance(order["volume"], dict):
+                for start, value in order["volume"].items():
+                    if isinstance(value, th.Tensor):
+                        order["volume"][start] = value.item()
+
+    except ImportError:
+        pass
+
+    return orderbook

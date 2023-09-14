@@ -36,3 +36,17 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "flexable_neg_crm_storage": flexableNegCRMStorage,
     "flexable_pos_crm_storage": flexablePosCRMStorage,
 }
+
+try:
+    from assume.strategies.learning_strategies import RLStrategy, RlUCStrategy
+
+    bidding_strategies["learning_powerplant"] = RLStrategy
+    bidding_strategies["learning_uc"] = RlUCStrategy
+except ImportError as e:
+    import logging
+
+    logger = logging.getLogger(__name__)
+    logger.info(
+        "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",
+        e,
+    )

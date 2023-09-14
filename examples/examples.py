@@ -43,7 +43,11 @@ availabe_examples = {
     "rl": {"scenario": "example_01_rl", "study_case": "base"},
     "uc_clearing": {
         "scenario": "example_01_uc",
-        "study_case": "dam_with_complex_clearing",
+        "study_case": "dam_with_uc_clearing",
+    },
+    "uc_clearing_with_rl": {
+        "scenario": "example_01_uc",
+        "study_case": "dam_with_complex_clearing_rl",
     },
 }
 

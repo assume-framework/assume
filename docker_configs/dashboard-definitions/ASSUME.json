@@ -259,7 +259,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  demand_volume AS \"Demand Volume\",\n  supply_volume AS \"Supply Volume\"\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, demand_volume, supply_volume\nORDER BY 1;\n",
+          "rawSql": "SELECT\n  product_start AS \"time\",\n  -demand_volume AS \"Demand Volume\",\n  supply_volume AS \"Supply Volume\"\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, demand_volume, supply_volume\nORDER BY 1;\n",
           "refId": "Volume",
           "select": [
             [
@@ -382,7 +382,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 20
+        "y": 68
       },
       "id": 19,
       "options": {
@@ -423,7 +423,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(original_price) AS \" \",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(price) AS \" \",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -559,7 +559,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 20
+        "y": 68
       },
       "id": 20,
       "options": {
@@ -679,7 +679,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 28
+        "y": 76
       },
       "id": 74,
       "panels": [],
@@ -767,7 +767,7 @@
         "h": 12,
         "w": 10,
         "x": 0,
-        "y": 29
+        "y": 77
       },
       "id": 72,
       "options": {
@@ -847,7 +847,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -900,7 +901,7 @@
         "h": 12,
         "w": 9,
         "x": 10,
-        "y": 29
+        "y": 77
       },
       "id": 76,
       "options": {
@@ -985,7 +986,7 @@
         "h": 12,
         "w": 5,
         "x": 19,
-        "y": 29
+        "y": 77
       },
       "id": 7,
       "options": {
@@ -1078,7 +1079,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 41
+        "y": 89
       },
       "id": 22,
       "options": {
@@ -1133,7 +1134,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 44
+        "y": 92
       },
       "id": 41,
       "panels": [],
@@ -1188,7 +1189,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1204,7 +1206,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 45
+        "y": 93
       },
       "id": 24,
       "options": {
@@ -1301,7 +1303,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1316,7 +1319,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 45
+        "y": 93
       },
       "id": 26,
       "options": {
@@ -1417,7 +1420,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1446,7 +1450,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 54
+        "y": 102
       },
       "id": 70,
       "options": {
@@ -1605,7 +1609,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1649,7 +1654,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 54
+        "y": 102
       },
       "id": 78,
       "options": {
@@ -1797,7 +1802,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1828,7 +1834,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 62
+        "y": 110
       },
       "id": 82,
       "options": {
@@ -1920,7 +1926,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 72
+        "y": 120
       },
       "id": 39,
       "panels": [],
@@ -1988,7 +1994,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 73
+        "y": 121
       },
       "id": 36,
       "options": {
@@ -2099,7 +2105,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 73
+        "y": 121
       },
       "id": 37,
       "options": {
@@ -2231,7 +2237,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 82
+        "y": 130
       },
       "id": 86,
       "options": {
@@ -2406,7 +2412,7 @@
         "h": 9,
         "w": 5,
         "x": 18,
-        "y": 82
+        "y": 130
       },
       "id": 87,
       "options": {
@@ -2515,7 +2521,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 91
+        "y": 139
       },
       "id": 44,
       "panels": [],
@@ -2583,7 +2589,7 @@
         "h": 9,
         "w": 9,
         "x": 0,
-        "y": 92
+        "y": 140
       },
       "id": 65,
       "options": {
@@ -2729,7 +2735,7 @@
         "h": 9,
         "w": 11,
         "x": 9,
-        "y": 92
+        "y": 140
       },
       "id": 80,
       "options": {
@@ -2825,7 +2831,7 @@
         "h": 9,
         "w": 4,
         "x": 20,
-        "y": 92
+        "y": 140
       },
       "id": 47,
       "options": {
@@ -2957,7 +2963,7 @@
         "h": 8,
         "w": 19,
         "x": 0,
-        "y": 101
+        "y": 149
       },
       "id": 84,
       "options": {
@@ -3132,7 +3138,7 @@
         "h": 9,
         "w": 5,
         "x": 19,
-        "y": 101
+        "y": 149
       },
       "id": 88,
       "options": {
@@ -3294,10 +3300,10 @@
         "current": {
           "selected": true,
           "text": [
-            "Unit 3"
+            "Unit 1"
           ],
           "value": [
-            "Unit 3"
+            "Unit 1"
           ]
         },
         "datasource": {
@@ -3321,9 +3327,13 @@
       },
       {
         "current": {
-          "selected": false,
-          "text": "demand_EOM",
-          "value": "demand_EOM"
+          "selected": true,
+          "text": [
+            "demand_EOM"
+          ],
+          "value": [
+            "demand_EOM"
+          ]
         },
         "datasource": {
           "type": "postgres",
@@ -3346,10 +3356,13 @@
       },
       {
         "current": {
-          "isNone": true,
-          "selected": false,
-          "text": "None",
-          "value": ""
+          "selected": true,
+          "text": [
+            "None"
+          ],
+          "value": [
+            ""
+          ]
         },
         "datasource": {
           "type": "postgres",
@@ -3373,8 +3386,8 @@
     ]
   },
   "time": {
-    "from": "2018-12-31T23:00:00.000Z",
-    "to": "2019-01-05T22:59:59.000Z"
+    "from": "2019-02-28T23:00:00.000Z",
+    "to": "2019-03-03T22:59:59.000Z"
   },
   "timepicker": {},
   "timezone": "",
