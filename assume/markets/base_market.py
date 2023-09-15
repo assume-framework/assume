@@ -4,7 +4,6 @@ import math
 from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
-from queue import Queue
 
 from mango import Role
 
@@ -35,7 +34,7 @@ class MarketMechanism:
 
     def __init__(self, marketconfig: MarketConfig):
         self.marketconfig = marketconfig
-        self.open_auctions = Queue()
+        self.open_auctions = set()
         self.all_orders = []
 
     def validate_registration(self, meta: dict) -> bool:
@@ -70,6 +69,10 @@ class MarketMechanism:
                 order["only_hours"] = None
             assert order["price"] <= max_price, f"maximum_bid_price {order['price']}"
             assert order["price"] >= min_price, f"minimum_bid_price {order['price']}"
+
+            # check that the product is part of an open auction
+            product = (order["start_time"], order["end_time"], order["only_hours"])
+            assert product in self.open_auctions, "no open auction"
 
             if max_volume:
                 assert (
@@ -212,7 +215,7 @@ class MarketRole(MarketMechanism, Role):
             "products": products,
         }
 
-        self.open_auctions.put(opening_message)
+        self.open_auctions |= set(opening_message["products"])
 
         for agent in self.registered_agents:
             agent_addr, agent_id = agent
@@ -340,7 +343,8 @@ class MarketRole(MarketMechanism, Role):
             # pending_orderbook,
             market_meta,
         ) = self.clear(self.all_orders, market_products)
-        self.open_auctions.get()
+        self.all_orders = []
+        self.open_auctions - set(market_products)
         # self.all_orders = pending_orderbook
 
         accepted_orderbook.sort(key=itemgetter("agent_id"))

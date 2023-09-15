@@ -44,18 +44,18 @@ async def test_market_init(market_role: MarketRole):
         "sender_addr": market_role.context.addr,
         "sender_id": market_role.context.aid,
     }
-
+    end = start + rd(hours=1)
     orderbook = [
         {
             "start_time": start,
-            "end_time": start + rd(hours=1),
+            "end_time": end,
             "volume": 120,
             "price": 120,
             "agent_id": "gen1",
             "only_hours": None,
         }
     ]
-
+    market_role.open_auctions |= {(start, end, None)}
     market_role.handle_orderbook(content={"orderbook": orderbook}, meta=meta)
     assert len(market_role.all_orders) == 1
 
@@ -77,6 +77,7 @@ async def test_market_tick(market_role: MarketRole):
             "only_hours": None,
         }
     ]
+    market_role.open_auctions |= {(start, end, None)}
     market_role.handle_orderbook(content={"orderbook": orderbook}, meta=meta)
     assert len(market_role.all_orders) == 1
     assert market_role.all_orders[0]["price"] == 1201
@@ -105,6 +106,7 @@ async def test_market_max(market_role: MarketRole):
     market_role.marketconfig.maximum_bid_price = 1000
     market_role.marketconfig.minimum_bid_price = -500
     market_role.marketconfig.maximum_bid_volume = 9090
+    market_role.open_auctions |= {(start, end, None)}
 
     orderbook = [
         {
@@ -192,6 +194,7 @@ async def test_market_unmatched(market_role: MarketRole):
             "only_hours": None,
         }
     ]
+    market_role.open_auctions |= {(start, end, None)}
     market_role.handle_orderbook(content={"orderbook": orderbook}, meta=meta)
 
     content = {
