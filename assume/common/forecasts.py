@@ -94,12 +94,15 @@ class CsvForecaster(Forecaster):
             return
         elif isinstance(data, pd.DataFrame):
             if prefix:
+                # set prefix for columns to set
                 columns = [prefix + column for column in data.columns]
                 data.columns = columns
             if len(data.index) == 1:
+                # if we have a single value which should be set for the whole series
                 for column in data.columns:
                     self.forecasts[column] = data[column].item()
             else:
+                # if some columns already exist, just add the new columns
                 new_columns = set(data.columns) - set(self.forecasts.columns)
                 self.forecasts = pd.concat(
                     [self.forecasts, data[list(new_columns)]], axis=1

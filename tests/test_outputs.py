@@ -12,7 +12,7 @@ DB_URI = "sqlite:///./examples/local_db/test_outputs.db"
 
 
 def test_output_market_orders():
-    engine = scoped_session(sessionmaker(create_engine(DB_URI)))
+    engine = create_engine(DB_URI)
     start = datetime(2020, 1, 1)
     end = datetime(2020, 1, 2)
     output_writer = WriteOutput("test_sim", start, end, engine)
@@ -73,7 +73,7 @@ def test_output_market_orders():
 
 
 def test_output_market_results():
-    engine = scoped_session(sessionmaker(create_engine(DB_URI)))
+    engine = create_engine(DB_URI)
     start = datetime(2020, 1, 1)
     end = datetime(2020, 1, 2)
     output_writer = WriteOutput("test_sim", start, end, engine)
@@ -106,7 +106,7 @@ def test_output_market_results():
 
 
 def test_output_market_dispatch():
-    engine = scoped_session(sessionmaker(create_engine(DB_URI)))
+    engine = create_engine(DB_URI)
     start = datetime(2020, 1, 1)
     end = datetime(2020, 1, 2)
     output_writer = WriteOutput("test_sim", start, end, engine)
@@ -118,7 +118,7 @@ def test_output_market_dispatch():
 
 
 def test_output_unit_dispatch():
-    engine = scoped_session(sessionmaker(create_engine(DB_URI)))
+    engine = create_engine(DB_URI)
     start = datetime(2020, 1, 1)
     end = datetime(2020, 1, 2)
     output_writer = WriteOutput("test_sim", start, end, engine)
