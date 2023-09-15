@@ -44,7 +44,7 @@ dam:
 
 dam_with_uc_clearing_rl:
   start_date: 2019-03-01 00:00
-  end_date: 2019-03-05 00:00
+  end_date: 2019-03-03 00:00
   time_step: 1h
   save_frequency_hours: 24
 
@@ -52,13 +52,13 @@ dam_with_uc_clearing_rl:
     observation_dimension: 50
     action_dimension: 24
     continue_learning: False
-    load_model_path: None
+    load_learned_path: null
     max_bid_price: 100
-    learning_mode: True
+    learning_mode: False
     algorithm: matd3
     learning_rate: 0.001
-    training_episodes: 10
-    collecting_initial_experience: 2
+    training_episodes: 100
+    collecting_initial_experience: 5
     train_freq: 24
     gradient_steps: -1
     batch_size: 128

@@ -512,7 +512,8 @@ class RlUCStrategy(RLStrategy):
         current_status = 1 if unit.get_operation_time(start) > 0 else 0
 
         actions, noise = self.get_actions(next_observation)
-        bid_prices = (actions + 1) * marginal_cost
+        # convert actions from -1 to 1 into 1 to 2
+        bid_prices = (actions + 3) / 2 * marginal_cost
         price_profile = {
             product[0]: bid_prices[i] for i, product in enumerate(product_tuples)
         }

@@ -190,12 +190,14 @@ def market_clearing_opt(orders, market_products):
 
     # Solve the model
     instance = model.create_instance()
-    results = solver.solve(instance)
+    results = solver.solve(instance, options=options)
 
     # fix the status variables
     for bid_id in instance.bBids:
         for t in instance.T:
-            instance.status[bid_id, t].fix(instance.status[bid_id, t].value)
+            status_value = instance.status[bid_id, t].value
+            status_value = 0 if status_value < EPS else status_value
+            instance.status[bid_id, t].fix(status_value)
 
     # resolve the model
     results = solver.solve(instance)

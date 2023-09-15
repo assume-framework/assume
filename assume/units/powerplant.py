@@ -5,6 +5,7 @@ from functools import lru_cache
 import pandas as pd
 
 from assume.common.base import SupportsMinMax
+from assume.common.market_objects import Orderbook
 
 logger = logging.getLogger(__name__)
 
@@ -353,3 +354,50 @@ class PowerPlant(SupportsMinMax):
             return self.warm_start_cost
         else:
             return self.cold_start_cost
+
+    def calculate_cashflow(self, product_type: str, orderbook: Orderbook):
+        """
+        calculates the cashflow for the given product_type
+
+        :param product_type: the product type
+        :type product_type: str
+        :param orderbook: The orderbook.
+        :type orderbook: Orderbook
+        """
+        for order in orderbook:
+            start = order["start_time"]
+            end = order["end_time"]
+            end_excl = end - self.index.freq
+
+            if isinstance(order["accepted_volume"], dict):
+                cashflow = [
+                    float(order["accepted_price"][i] * order["accepted_volume"][i])
+                    for i in order["accepted_volume"].keys()
+                ]
+                self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
+                    cashflow * self.index.freq.n
+                )
+
+                for i in order["accepted_volume"].keys():
+                    if (
+                        order["accepted_volume"][i] != 0
+                        and self.outputs[product_type].loc[i - self.index.freq] == 0
+                        and i - self.index.freq != self.index[0]
+                    ):
+                        self.outputs[f"{product_type}_cashflow"].loc[
+                            i
+                        ] -= self.hot_start_cost
+                    elif (
+                        order["accepted_volume"][i] == 0
+                        and self.outputs[product_type].loc[i - self.index.freq] != 0
+                    ):
+                        self.outputs[f"{product_type}_cashflow"].loc[
+                            i
+                        ] -= self.shut_down_cost
+
+            else:
+                cashflow = float(order["accepted_price"] * order["accepted_volume"])
+                hours = (end - start) / timedelta(hours=1)
+                self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
+                    cashflow * hours
+                )

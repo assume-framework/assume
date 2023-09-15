@@ -47,7 +47,7 @@ availabe_examples = {
     },
     "uc_clearing_with_rl": {
         "scenario": "example_01_uc",
-        "study_case": "dam_with_complex_clearing_rl",
+        "study_case": "dam_with_uc_clearing_rl",
     },
 }
 
@@ -59,7 +59,7 @@ if __name__ == "__main__":
     - timescale: with database and grafana (note: you need docker installed)
     """
     data_format = "timescale"  # "local_db" or "timescale"
-    example = "uc_clearing"
+    example = "uc_clearing_with_rl"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
@@ -106,3 +106,41 @@ if __name__ == "__main__":
         )
 
     world.run()
+    # %%
+    import pandas as pd
+    import plotly.express as px
+
+    cashflows = pd.read_csv(
+        "outputs/example_01_uc_dam_with_uc_clearing_rl/unit_dispatch.csv",
+        index_col=0,
+        parse_dates=True,
+    )
+    cashflows = cashflows.loc["2019-03-01"]
+
+    profits = pd.DataFrame(index=cashflows.index.unique())
+    # group by unit and iterate to get profit
+    for unit, df in cashflows.groupby("unit"):
+        profit = df["energy_cashflow"] - df["energy_marginal_costs"]
+        profits[f"{unit}_profit"] = round(profit / 1000, 0)
+        # profits[f"{unit}_mc"] = (round(df["energy_marginal_costs"]/1000,0))
+        # profits[f"{unit}_cf"] = (round(df["energy_cashflow"]/1000,0))
+
+    # print total profit per unit
+    print(profits.sum(axis=0))
+
+    # delete demand_EOM_profit
+    profits = profits.drop(columns=["demand_EOM_profit"])
+
+    # using plotly plot total profits per unit
+    fig = px.bar(
+        profits.sum(axis=0),
+        title="Total profit per unit",
+        labels={"index": "Unit", "Profit": "Profit [k€]"},
+    )
+    # renamy axis to profit in kEUR
+    fig.update_yaxes(title_text="Profit [k€]")
+    # remove legend
+    fig.update_layout(showlegend=False)
+    fig.show()
+
+# %%

@@ -301,13 +301,12 @@ async def load_scenario_folder_async(
     if disable_learning:
         learning_config["learning_mode"] = False
 
-    if "load_learned_path" not in learning_config.keys():
-        if load_learned_path:
-            learning_config["load_learned_path"] = load_learned_path
-        else:
-            learning_config[
-                "load_learned_path"
-            ] = f"{inputs_path}/learned_strategies/{sim_id}"
+    if load_learned_path:
+        learning_config["load_learned_path"] = load_learned_path
+    elif learning_config.get("load_learned_path") is None:
+        learning_config[
+            "load_learned_path"
+        ] = f"{inputs_path}/learned_strategies/{sim_id}"
 
     if learning_config.get("learning_mode", False):
         sim_id = f"{sim_id}_{episode}"
