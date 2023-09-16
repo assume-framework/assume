@@ -5,31 +5,79 @@ import numpy as np
 import pandas as pd
 import torch as th
 
-from assume.common.base import LearningStrategy, SupportsMinMax
+from assume.common.base import BaseStrategy, LearningStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.reinforcement_learning.learning_utils import Actor, NormalActionNoise
 
 
+class NaiveStrategyElectrolyser(BaseStrategy):
+    """
+    A naive strategy that bids the marginal cost of the electrolyser on the market.
+    """
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Takes information from a unit that the unit operator manages and
+        defines how it is dispatched to the market
+
+        :param unit: the unit to be dispatched
+        :type unit: SupportsMinMax
+        :param market_config: the market configuration
+        :type market_config: MarketConfig
+        :param product_tuples: list of all products the unit can offer
+        :type product_tuples: list[Product]
+        :return: the bids
+        :rtype: Orderbook
+        """
+        start = product_tuples[0][0]  # start time of the first product
+
+        bids = []
+        for product in product_tuples:
+            """
+            for each product, calculate the marginal cost of the unit at the start time of the product
+            and the volume of the product. Dispatch the order to the market.
+            """
+
+            start = product[0]
+            end = product[1]
+
+            power = unit.calculate_min_max_power(
+                start=start,
+                end=end,
+                product_type="energy",
+            )
+
+            # Calculate marginal cost using the adjusted efficiency
+            hydrogen_demand = unit.forecaster[f"{unit.id}_h2demand"].loc[start]
+            marginal_cost = unit.forecaster["price_EOM"].at[start] + unit.fixed_cost
+            revenue = (
+                unit.forecaster[f"{unit.id}_h2price"].loc[start]
+                * hydrogen_demand
+                / power
+            )
+
+            bid_price = marginal_cost if marginal_cost >= revenue else revenue
+
+            order: Order = {
+                "start_time": product[0],
+                "end_time": product[1],
+                "only_hours": product[2],
+                "price": bid_price,
+                "volume": -power,
+            }
+
+            bids.append(order)
+
+        return bids
+
+
 class RLStrategy(LearningStrategy):
-    """
-    Reinforcement Learning Strategy
-
-    :param foresight: Number of time steps to look ahead. Default 24.
-    :type foresight: int
-    :param max_bid_price: Maximum bid price
-    :type max_bid_price: float
-    :param max_demand: Maximum demand
-    :type max_demand: float
-    :param device: Device to run on
-    :type device: str
-    :param float_type: Float type to use
-    :type float_type: str
-    :param learning_mode: Whether to use learning mode
-    :type learning_mode: bool
-    :param actor: Actor network
-    :type actor: torch.nn.Module
-    """
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -102,6 +150,8 @@ class RLStrategy(LearningStrategy):
         # =============================================================================
         # 1. Get the Observations, which are the basis of the action decision
         # =============================================================================
+
+        # => enter your code in self.create_observation(...)
         next_observation = self.create_observation(
             unit=unit,
             start=start,
@@ -111,6 +161,8 @@ class RLStrategy(LearningStrategy):
         # =============================================================================
         # 2. Get the Actions, based on the observations
         # =============================================================================
+
+        # => enter your code in self.get_actions(...)
         actions, noise = self.get_actions(next_observation)
 
         # =============================================================================
@@ -118,17 +170,35 @@ class RLStrategy(LearningStrategy):
         # =============================================================================
         # actions are in the range [0,1], we need to transform them into actual bids
         # we can use our domain knowledge to guide the bid formulation
-        bid_prices = actions * self.max_bid_price
 
+        # => enter your code here
+
+        # ---------------------------
+        # 3.1 rescale actiosn to actual prices
+        # bid_prices = ?
+
+        bid_prices = actions * self.max_bid_price
+        # ---------------------------
+
+        # ---------------------------
         # 3.1 formulate the bids for Pmin
         # Pmin, the minium run capacity is the inflexible part of the bid, which should always be accepted
+        # bid_quantity_inflex = ?
+        # bid_price_inflex = ?
+
         bid_quantity_inflex = min_power
         bid_price_inflex = min(bid_prices)
+        # ---------------------------
 
+        # ---------------------------
         # 3.1 formulate the bids for Pmax - Pmin
         # Pmin, the minium run capacity is the inflexible part of the bid, which should always be accepted
+        # bid_quantity_flex = ?
+        # bid_price_flex = ?
+
         bid_quantity_flex = max_power - bid_quantity_inflex
         bid_price_flex = max(bid_prices)
+        # ---------------------------
 
         # actually formulate bids in orderbook format
         bids = [
@@ -182,16 +252,20 @@ class RLStrategy(LearningStrategy):
                 # =============================================================================
                 # 2.1 Get Actions and handle exploration
                 # =============================================================================
+
+                # => Your code here:
                 base_bid = next_observation[-1]
 
                 # add niose to the last dimension of the observation
                 # needs to be adjusted if observation space is changed, because only makes sense
                 # if the last dimension of the observation space are the marginal cost
+
                 curr_action = noise + base_bid.clone().detach()
 
             else:
                 # if we are not in the initial exploration phase we chose the action with the actor neuronal net
                 # and add noise to the action
+
                 curr_action = self.actor(next_observation).detach()
                 noise = th.tensor(
                     self.action_noise.noise(), device=self.device, dtype=self.float_type
@@ -232,12 +306,21 @@ class RLStrategy(LearningStrategy):
         # =============================================================================
         # 1.1 Get the Observations, which are the basis of the action decision
         # =============================================================================
+
+        # => Your code here:
+        # Pick suitable scaling factors for the individual observations
+        # Why do we need scaling? What should you pay attention to while scaling?
+
+        # residual load forecast
+        # Obs[0:foresight-1]
         scaling_factor_res_load = self.max_demand
 
         # price forecast
+        # Obs[foresight:2*foresight-1]
         scaling_factor_price = self.max_bid_price
 
         # total capacity and marginal cost
+        # Obs[2*foresight:2*foresight+1]
         scaling_factor_total_capacity = unit.max_power
 
         # marginal cost
@@ -346,12 +429,14 @@ class RLStrategy(LearningStrategy):
         opportunity_cost = 0
 
         # iterate over all orders in the orderbook, to calculate order specific profit
+
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
             end_excl = end - unit.index.freq
 
             # depending on way the unit calaculates marginal costs we take costs
+
             if unit.marginal_cost is not None:
                 marginal_cost = (
                     unit.marginal_cost[start]
@@ -405,6 +490,8 @@ class RLStrategy(LearningStrategy):
         # The straight forward implemntation would be reward = profit, yet we would like to give the agent more guidance
         # in the learning process, so we add a regret term to the reward, which is the opportunity cost
         # define the reward and scale it
+
+        # reward = ?
 
         scaling = 0.1 / unit.max_power
         regret_scale = 0.2
