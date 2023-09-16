@@ -40,18 +40,18 @@ class WriteOutput(Role):
         start: datetime,
         end: datetime,
         db_engine=None,
-        export_csv_path: str = "",
-        save_frequency_hours: int = 24,
+        export_csv_path: str = None,
+        save_frequency_hours: int = None,
         learning_mode: bool = False,
     ):
         super().__init__()
 
         # store needed date
         self.simulation_id = simulation_id
-        self.save_frequency_hours = save_frequency_hours
+        self.save_frequency_hours = save_frequency_hours or (end - start).days * 24
 
         # make directory if not already present
-        self.export_csv_path = export_csv_path
+        self.export_csv_path = export_csv_path or 0
         if self.export_csv_path:
             self.p = Path(self.export_csv_path, simulation_id)
             shutil.rmtree(self.p, ignore_errors=True)
