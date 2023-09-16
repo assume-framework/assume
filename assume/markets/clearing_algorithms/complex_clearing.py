@@ -254,8 +254,6 @@ class ComplexClearingRole(MarketRole):
             if all(order_profit >= 0 for order_profit in orders_profit):
                 break
 
-        self.all_orders = []
-
         return extract_results(
             model=instance,
             orders=orderbook,
