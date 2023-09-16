@@ -41,14 +41,14 @@ class WriteOutput(Role):
         end: datetime,
         db_engine=None,
         export_csv_path: str = "",
-        save_frequency_hours: int = 24,
+        save_frequency_hours: int = None,
         learning_mode: bool = False,
     ):
         super().__init__()
 
         # store needed date
         self.simulation_id = simulation_id
-        self.save_frequency_hours = save_frequency_hours
+        self.save_frequency_hours = save_frequency_hours or (end - start).days * 24
 
         # make directory if not already present
         self.export_csv_path = export_csv_path
