@@ -79,6 +79,9 @@ class CsvForecaster(Forecaster):
             if "availability" in column:
                 return pd.Series(1, self.index)
             return pd.Series(0, self.index)
+        elif column == "price_forecast":
+            return self.forecasts["price_EOM"]
+
         return self.forecasts[column]
 
     def set_forecast(self, data: pd.DataFrame | pd.Series | None, prefix=""):

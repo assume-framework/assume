@@ -64,7 +64,6 @@ class flexableEOMStorage(BaseStrategy):
         for product in product_tuples:
             start = product[0]
             end = product[1]
-            end_excl = end - unit.index.freq
 
             current_power = unit.outputs["energy"].at[start]
             current_power_discharge = max(current_power, 0)
@@ -99,7 +98,7 @@ class flexableEOMStorage(BaseStrategy):
                 min_power_charge[start],
             )
 
-            price_forecast = unit.forecaster["price_forecast"]
+            price_forecast = unit.forecaster["price_EOM"]
 
             average_price = calculate_price_average(
                 unit=unit,
@@ -199,7 +198,7 @@ class flexablePosCRMStorage(BaseStrategy):
                 marginal_cost=marginal_cost,
                 current_time=start,
                 foresight=self.foresight,
-                price_forecast=unit.forecaster["price_forecast"],
+                price_forecast=unit.forecaster["price_EOM"],
             )
 
             if specific_revenue >= 0:
