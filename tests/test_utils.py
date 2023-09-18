@@ -173,14 +173,13 @@ def test_sep_block_orders():
         {
             "start_time": start,
             "end_time": end,
-            "volume": {i: 60 for i in index},
+            "volume": 60,
             "price": {i: 110 for i in index},
             "agent_id": "block1",
             "only_hours": None,
             "accepted_volume": {i: 0 for i in index},
             "accepted_price": {i: None for i in index},
             "bid_type": "BB",
-            "bid_id": "block2_1",
         },
         {
             "start_time": start,

@@ -1,6 +1,7 @@
 import calendar
 from datetime import datetime
 
+import pandas as pd
 import pytest
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
@@ -164,6 +165,36 @@ async def test_market_max(market_role: MarketRole):
     assert len(market_role.all_orders) == 1
     assert market_role.all_orders[0]["price"] == 1000
     assert market_role.all_orders[0]["volume"] == 9090
+
+
+async def test_market_for_BB(market_role: MarketRole):
+    meta = {
+        "sender_addr": market_role.context.addr,
+        "sender_id": market_role.context.aid,
+    }
+    market_role.marketconfig.maximum_bid_price = 1000
+    market_role.marketconfig.minimum_bid_price = -500
+    market_role.marketconfig.maximum_bid_volume = 9090
+
+    end = start + rd(hours=24)
+    time_range = pd.date_range(start, end - pd.Timedelta("1H"), freq="1H")
+    market_role.open_auctions |= {
+        (time, time + rd(hours=1), None) for time in time_range
+    }
+
+    orderbook = [
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": {time: 50 for time in time_range},
+            "price": {time: 1000 for time in time_range},
+            "agent_id": "gen1",
+            "only_hours": None,
+            "bid_type": "BB",
+        }
+    ]
+    market_role.handle_orderbook(content={"orderbook": orderbook}, meta=meta)
+    assert len(market_role.all_orders) == 1
 
 
 async def test_market_registration(market_role: MarketRole):
