@@ -14,7 +14,7 @@ from assume.common.market_objects import (
     OpeningMessage,
     Orderbook,
 )
-from assume.common.utils import get_available_products
+from assume.common.utils import get_available_products, separate_orders
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +56,7 @@ class MarketMechanism:
         if self.marketconfig.price_tick:
             assert max_price is not None, "max_price unset"
             assert min_price is not None, "min_price unset"
+            assert max_volume is not None, "max_volume unset"
             # max and min should be in units
             max_price = math.floor(max_price / self.marketconfig.price_tick)
             min_price = math.ceil(min_price / self.marketconfig.price_tick)
@@ -67,6 +68,11 @@ class MarketMechanism:
             order["agent_id"] = agent_tuple
             if not order.get("only_hours"):
                 order["only_hours"] = None
+            for field in self.marketconfig.additional_fields:
+                assert field in order.keys(), f"missing field: {field}"
+
+        sep_orders = separate_orders(orderbook.copy())
+        for order in sep_orders:
             assert order["price"] <= max_price, f"maximum_bid_price {order['price']}"
             assert order["price"] >= min_price, f"minimum_bid_price {order['price']}"
 
@@ -83,8 +89,6 @@ class MarketMechanism:
                 assert isinstance(order["price"], int)
             if self.marketconfig.volume_tick:
                 assert isinstance(order["volume"], int)
-            for field in self.marketconfig.additional_fields:
-                assert field in order.keys(), f"missing field: {field}"
 
     def clear(
         self, orderbook: Orderbook, market_products: list[MarketProduct]
