@@ -17,6 +17,10 @@ availabe_examples = {
         "scenario": "example_01a",
         "study_case": "dam_with_complex_clearing",
     },
+    "small_with_BB": {
+        "scenario": "example_01e",
+        "study_case": "dam_with_complex_clearing",
+    },
     "small_with_vre": {"scenario": "example_01b", "study_case": "base"},
     "small_with_vre_and_storage": {
         "scenario": "example_01c",
