@@ -50,8 +50,8 @@ class flexableEOMStorage(BaseStrategy):
             (unit.outputs["energy"] / unit.efficiency_discharge),
             (unit.outputs["energy"] * unit.efficiency_charge),
         )
-        soc = unit.get_soc_before(start)
-        theoretic_SOC = soc - ((dispatch / unit.max_volume)).sum()
+
+        theoretic_SOC = unit.initial_soc - ((dispatch / unit.max_volume)).sum()
 
         min_power_charge, max_power_charge = unit.calculate_min_max_charge(
             start, end_all
@@ -75,7 +75,7 @@ class flexableEOMStorage(BaseStrategy):
                 previous_power,
                 max_power_discharge[start],
                 current_power_discharge,
-                min_power_discharge.iloc[0],
+                min_power_discharge[start],
             )
             min_power_discharge[start] = unit.calculate_ramp_discharge(
                 theoretic_SOC,
@@ -113,6 +113,7 @@ class flexableEOMStorage(BaseStrategy):
             elif price_forecast[start] <= average_price * unit.efficiency_charge:
                 bid_quantity = max_power_charge[start]
             else:
+                previous_power = current_power
                 continue
 
             bids.append(

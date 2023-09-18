@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 from dateutil import rrule as rr
 from mango import Role
+from pandas.api.types import is_numeric_dtype
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import ProgrammingError
 
@@ -84,10 +85,10 @@ class WriteOutput(Role):
 
         # Loop throuph all database tables
         # Get list of table names in database
-        table_names = inspect(self.db.bind).get_table_names()
+        table_names = inspect(self.db).get_table_names()
         # Iterate through each table
         for table_name in table_names:
-            with self.db() as db:
+            with self.db.begin() as db:
                 # Read table into Pandas DataFrame
                 query = text(
                     f"delete from {table_name} where simulation = '{simulation_id}'"
@@ -101,7 +102,7 @@ class WriteOutput(Role):
         query = text("select distinct simulation from market_meta")
 
         try:
-            with self.db() as db:
+            with self.db.begin() as db:
                 simulations = db.execute(query).fetchall()
         except Exception:
             simulations = []
@@ -212,8 +213,38 @@ class WriteOutput(Role):
                 df.to_csv(data_path, mode="a", header=not data_path.exists())
 
             if self.db is not None:
-                df.to_sql(table, self.db.bind, if_exists="append")
+                try:
+                    with self.db.begin() as db:
+                        df.to_sql(table, db, if_exists="append")
+                except ProgrammingError:
+                    self.check_columns(table, df)
+                    # now try again
+                    with self.db.begin() as db:
+                        df.to_sql(table, db, if_exists="append")
+
             self.write_dfs[table] = []
+
+    def check_columns(self, table: str, df: pd.DataFrame):
+        """
+        If a simulation before has been started which does not include an additional field
+        we try to add the field.
+        For now, this only works for float and text.
+        An alternative which finds the correct types would be to use
+        """
+        with self.db.begin() as db:
+            # Read table into Pandas DataFrame
+            query = f"select * from {table} where 1=0"
+            db_columns = pd.read_sql(query, db).columns
+        for column in df.columns:
+            if column not in db_columns:
+                try:
+                    # TODO this only works for float and text
+                    column_type = "float" if is_numeric_dtype(df[column]) else "text"
+                    query = f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"
+                    with self.db.begin() as db:
+                        db.execute(text(query))
+                except Exception:
+                    logger.exception("Error converting column")
 
     def check_for_tensors(self, data):
         """
@@ -321,7 +352,7 @@ class WriteOutput(Role):
 
         try:
             for query in queries:
-                df = pd.read_sql(query, self.db.bind)
+                df = pd.read_sql(query, self.db)
                 dfs.append(df)
             df = pd.concat(dfs)
             df.reset_index()
@@ -335,7 +366,8 @@ class WriteOutput(Role):
                     index=None,
                 )
             if self.db is not None and not df.empty:
-                df.to_sql("kpis", self.db.bind, if_exists="append", index=None)
+                with self.db.begin() as db:
+                    df.to_sql("kpis", self.db, if_exists="append", index=None)
         except ProgrammingError as e:
             self.db.rollback()
             logger.error(f"No scenario run Yet {e}")
@@ -357,7 +389,7 @@ class WriteOutput(Role):
         )
 
         try:
-            with self.db() as db:
+            with self.db.begin() as db:
                 avg_reward = db.execute(query).fetchall()[0]
         except Exception:
             avg_reward = 0

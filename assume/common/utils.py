@@ -328,12 +328,13 @@ def separate_orders(orderbook):
     # separate orders with several hours into single hour orders
     delete_orders = []
     for order in orderbook:
-        if True in [isinstance(order[key], dict) for key in order.keys()]:
+        if any([isinstance(order[key], dict) for key in order.keys()]):
+            order_len = max(
+                len(value) for value in order.values() if isinstance(value, dict)
+            )
             start_hour = order["start_time"]
             end_hour = order["end_time"]
-            duration = (end_hour - start_hour) / max(
-                len(order[key]) for key in order.keys() if isinstance(order[key], dict)
-            )
+            duration = (end_hour - start_hour) / order_len
             i = 1
             for start in pd.date_range(start_hour, end_hour - duration, freq=duration):
                 single_order = order.copy()

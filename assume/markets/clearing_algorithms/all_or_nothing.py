@@ -81,12 +81,6 @@ class PayAsClearAonRole(MarketRole):
                 # resulting i is the cut point
                 accepted_product_orders.extend(demand_orders[:i])
                 accepted_product_orders.extend(supply_orders[:i])
-
-                for order in supply_orders[i:]:
-                    order["accepted_volume"] = 0
-                for order in demand_orders[i:]:
-                    order["accepted_volume"] = 0
-
                 rejected_orders.extend(demand_orders[i:])
                 rejected_orders.extend(supply_orders[i:])
 
@@ -168,12 +162,6 @@ class PayAsBidAonRole(MarketRole):
 
                 accepted_product_orders.extend(demand_orders[:i])
                 accepted_product_orders.extend(supply_orders[:i])
-
-                for order in supply_orders[i:]:
-                    order["accepted_volume"] = 0
-                for order in demand_orders[i:]:
-                    order["accepted_volume"] = 0
-
                 rejected_orders.extend(demand_orders[i:])
                 rejected_orders.extend(supply_orders[i:])
 
