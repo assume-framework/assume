@@ -10,6 +10,7 @@ import pandas as pd
 from mango import RoleAgent, create_container
 from mango.container.core import Container
 from mango.util.clock import ExternalClock
+from mango.util.distributed_clock import DistributedClockAgent, DistributedClockManager
 from mango.util.termination_detection import tasks_complete_or_sleeping
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
@@ -103,7 +104,7 @@ class World:
         simulation_id: str,
         index: pd.Series,
         save_frequency_hours: int = 24,
-        same_process: bool = True,
+        same_process: bool = False,
         bidding_params: dict = {},
         learning_config: LearningConfig = {},
         forecaster: Forecaster = None,
@@ -137,6 +138,9 @@ class World:
             codec=mango_codec_factory(),
             addr=self.addr,
             clock=self.clock,
+        )
+        self.clock_manager = DistributedClockManager(
+            self.container, receiver_clock_addresses=[self.addr]
         )
         await self.setup_learning()
         await self.setup_output_agent(simulation_id, save_frequency_hours)
@@ -193,12 +197,11 @@ class World:
             )
             output_agent.add_role(self.output_role)
         else:
-            # this does not set the clock in output_agent correctly yet
-            # see https://gitlab.com/mango-agents/mango/-/issues/59
-            # but still improves performance
+
             def creator(container):
                 agent = RoleAgent(container, suggested_aid=self.output_agent_addr[1])
                 agent.add_role(self.output_role)
+                clock_agent = DistributedClockAgent(container)
 
             await self.container.as_agent_process(agent_creator=creator)
 
@@ -369,7 +372,11 @@ class World:
         self.markets[f"{market_config.name}"] = market_config
 
     async def _step(self):
-        next_activity = self.clock.get_next_activity()
+        if self.same_process:
+            await tasks_complete_or_sleeping(self.container)
+            next_activity = self.clock.get_next_activity()
+        else:
+            next_activity = await self.clock_manager.distribute_time()
         if not next_activity:
             self.logger.info("simulation finished - no schedules left")
             return None
@@ -400,8 +407,6 @@ class World:
                 )
             else:
                 self.clock.set_time(end_ts)
-
-            await tasks_complete_or_sleeping(self.container)
         pbar.close()
         await self.container.shutdown()
 
