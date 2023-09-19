@@ -28,6 +28,7 @@ def storage_unit() -> Storage:
         variable_cost_charge=3,
         variable_cost_discharge=4,
         fixed_cost=1,
+        initial_soc=0.5,
     )
 
 
@@ -43,6 +44,7 @@ def test_init_function(storage_unit):
     assert storage_unit.ramp_down_discharge == 50
     assert storage_unit.ramp_up_charge == -60
     assert storage_unit.ramp_up_discharge == 60
+    assert storage_unit.initial_soc == 0.5
 
 
 def test_reset_function(storage_unit):
@@ -56,6 +58,9 @@ def test_reset_function(storage_unit):
     )
     assert storage_unit.outputs["neg_capacity"].equals(
         pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
+    )
+    assert storage_unit.outputs["soc"].equals(
+        pd.Series(0.5, index=pd.date_range("2022-01-01", periods=4, freq="H"))
     )
 
 
@@ -122,7 +127,7 @@ def test_soc_constraint(storage_unit):
     storage_unit.outputs["capacity_neg"][start] = -50
     storage_unit.outputs["capacity_pos"][start] = 30
 
-    storage_unit.outputs["soc"][start - storage_unit.index.freq] = 0.05
+    storage_unit.outputs["soc"][start] = 0.05
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
     )
@@ -131,7 +136,7 @@ def test_soc_constraint(storage_unit):
         max_power_discharge.iloc[0], (50 * storage_unit.efficiency_discharge)
     )
 
-    storage_unit.outputs["soc"][start - storage_unit.index.freq] = 0.95
+    storage_unit.outputs["soc"][start] = 0.95
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end
     )
@@ -302,45 +307,48 @@ def test_execute_dispatch(storage_unit):
     end = product_tuple[1]
 
     storage_unit.outputs["energy"][start] = 100
-    storage_unit.outputs["soc"][start - storage_unit.index.freq] = 0.5
+    storage_unit.outputs["soc"][start] = 0.5
 
     # dispatch full discharge
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy.iloc[0] == 100
     assert math.isclose(
-        storage_unit.outputs["soc"][start],
+        storage_unit.outputs["soc"][end],
         0.5 - 100 / storage_unit.efficiency_discharge / storage_unit.max_volume,
     )
 
     # dispatch full charging
     storage_unit.outputs["energy"][start] = -100
-    storage_unit.outputs["soc"][start - storage_unit.index.freq] = 0.5
+    storage_unit.outputs["soc"][start] = 0.5
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy.iloc[0] == -100
     assert math.isclose(
-        storage_unit.outputs["soc"][start],
+        storage_unit.outputs["soc"][end],
         0.5 + 100 * storage_unit.efficiency_charge / storage_unit.max_volume,
     )
+    # adjust dispatch to soc limit for discharge
     storage_unit.outputs["energy"][start] = 100
-    storage_unit.outputs["soc"][start - storage_unit.index.freq] = 0.05
+    storage_unit.outputs["soc"][start] = 0.05
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert math.isclose(
         dispatched_energy.iloc[0], 50 * storage_unit.efficiency_discharge, abs_tol=0.1
     )
+    # adjust dispatch to soc limit for charging
     storage_unit.outputs["energy"][start] = -100
-    storage_unit.outputs["soc"][start - storage_unit.index.freq] = 0.95
+    storage_unit.outputs["soc"][start] = 0.95
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert math.isclose(
         dispatched_energy.iloc[0], -50 / storage_unit.efficiency_charge, abs_tol=0.1
     )
-    storage_unit.outputs["soc"][start] = 1
+    assert math.isclose(storage_unit.outputs["soc"][end], 1, abs_tol=0.1)
 
+    # step into the next hour
     start = start + storage_unit.index.freq
     end = end + storage_unit.index.freq
     storage_unit.outputs["energy"][start] = -100
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy.iloc[0] == 0
-    storage_unit.outputs["soc"][start] = 1
+    assert math.isclose(storage_unit.outputs["soc"][end], 1, abs_tol=0.1)
 
 
 if __name__ == "__main__":

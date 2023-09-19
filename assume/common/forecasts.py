@@ -79,6 +79,9 @@ class CsvForecaster(Forecaster):
             if "availability" in column:
                 return pd.Series(1, self.index)
             return pd.Series(0, self.index)
+        elif column == "price_forecast":
+            return self.forecasts["price_EOM"]
+
         return self.forecasts[column]
 
     def set_forecast(self, data: pd.DataFrame | pd.Series | None, prefix=""):
@@ -329,6 +332,8 @@ class NaiveForecast(Forecaster):
         elif "demand" in column:
             value = self.demand
         elif column == "price_forecast":
+            value = self.price_forecast
+        elif column == "price_EOM":
             value = self.price_forecast
         else:
             value = 0

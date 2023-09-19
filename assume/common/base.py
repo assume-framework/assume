@@ -512,8 +512,7 @@ class SupportsMinMaxCharge(BaseUnit):
         :return: the SoC before the given datetime
         :rtype: float
         """
-
-        if dt - self.index.freq < self.index[0]:
+        if dt - self.index.freq <= self.index[0]:
             return self.initial_soc
         else:
             return self.outputs["soc"].at[dt - self.index.freq]

@@ -206,6 +206,8 @@ class WriteOutput(Role):
             if df.empty:
                 continue
 
+            if table == "unit_dispatch":
+                print("")
             df = df.apply(self.check_for_tensors)
 
             if self.export_csv_path:
