@@ -455,7 +455,6 @@ class RLStrategy(LearningStrategy):
         unit.outputs["profit"].loc[start:end_excl] += float(profit)
         unit.outputs["reward"].loc[start:end_excl] = reward
         unit.outputs["regret"].loc[start:end_excl] = float(opportunity_cost)
-        unit.outputs["learning_mode"].loc[start:end_excl] = self.learning_mode
 
     def load_actor_params(self, load_path):
         """
