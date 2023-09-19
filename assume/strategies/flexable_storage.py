@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import numpy as np
 import pandas as pd
 
@@ -44,14 +46,7 @@ class flexableEOMStorage(BaseStrategy):
 
         previous_power = unit.get_output_before(start)
 
-        # get the dispatched power from last day
-        dispatch = np.where(
-            unit.outputs["energy"] > 0,
-            (unit.outputs["energy"] / unit.efficiency_discharge),
-            (unit.outputs["energy"] * unit.efficiency_charge),
-        )
-        soc = unit.get_soc_before(start)
-        theoretic_SOC = soc - ((dispatch / unit.max_volume)).sum()
+        theoretic_SOC = unit.outputs["soc"][start]
 
         min_power_charge, max_power_charge = unit.calculate_min_max_charge(
             start, end_all
@@ -123,14 +118,27 @@ class flexableEOMStorage(BaseStrategy):
                     "volume": bid_quantity,
                 }
             )
-            previous_power = bid_quantity + current_power
 
-            if previous_power > 0:
-                theoretic_SOC -= (
-                    bid_quantity + current_power
-                ) / unit.efficiency_discharge
-            elif previous_power < 0:
-                theoretic_SOC -= (bid_quantity + current_power) * unit.efficiency_charge
+            time_delta = (end - start) / timedelta(hours=1)
+            if bid_quantity + current_power > 0:
+                delta_soc = -(
+                    (bid_quantity + current_power)
+                    * time_delta
+                    / unit.efficiency_discharge
+                    / unit.max_volume
+                )
+            elif bid_quantity + current_power < 0:
+                delta_soc = -(
+                    (bid_quantity + current_power)
+                    * time_delta
+                    * unit.efficiency_charge
+                    / unit.max_volume
+                )
+            else:
+                delta_soc = 0
+
+            theoretic_SOC += delta_soc
+            previous_power = bid_quantity + current_power
 
         return bids
 
@@ -174,13 +182,13 @@ class flexablePosCRMStorage(BaseStrategy):
             start, end
         )
         bids = []
+        theoretic_SOC = unit.outputs["soc"][start]
         for product in product_tuples:
             start = product[0]
             current_power = unit.outputs["energy"].at[start]
-            soc = unit.get_soc_before(start)
 
             bid_quantity = unit.calculate_ramp_discharge(
-                soc,
+                theoretic_SOC,
                 previous_power,
                 max_power_discharge[start],
                 current_power,
@@ -207,8 +215,8 @@ class flexablePosCRMStorage(BaseStrategy):
                 capacity_price = (
                     abs(specific_revenue) * unit.min_power_discharge / bid_quantity
                 )
-            soc = unit.get_soc_before(start)
-            energy_price = capacity_price / (soc * unit.max_volume)
+
+            energy_price = capacity_price / (theoretic_SOC * unit.max_volume)
 
             if market_config.product_type == "capacity_pos":
                 bids.append(
@@ -220,6 +228,8 @@ class flexablePosCRMStorage(BaseStrategy):
                         "volume": bid_quantity,
                     }
                 )
+                previous_power = current_power
+
             elif market_config.product_type == "energy_pos":
                 bids.append(
                     {
@@ -230,11 +240,21 @@ class flexablePosCRMStorage(BaseStrategy):
                         "volume": bid_quantity,
                     }
                 )
+                time_delta = (end - start) / timedelta(hours=1)
+                delta_soc = -(
+                    (bid_quantity + current_power)
+                    * time_delta
+                    / unit.efficiency_discharge
+                    / unit.max_volume
+                )
+                theoretic_SOC += delta_soc
+                previous_power = bid_quantity + current_power
+
             else:
+                previous_power = current_power
                 raise ValueError(
                     f"Product {market_config.product_type} is not supported by this strategy."
                 )
-            previous_power = bid_quantity + current_power
 
         return bids
 
@@ -271,7 +291,8 @@ class flexableNegCRMStorage(BaseStrategy):
         end = product_tuples[-1][1]
 
         previous_power = unit.get_output_before(start)
-        soc = unit.get_soc_before(start)
+
+        theoretic_SOC = unit.outputs["soc"][start]
 
         min_power_charge, max_power_charge = unit.calculate_min_max_charge(start, end)
 
@@ -280,7 +301,7 @@ class flexableNegCRMStorage(BaseStrategy):
             start = product[0]
             current_power = unit.outputs["energy"].at[start]
             bid_quantity = unit.calculate_ramp_charge(
-                soc,
+                theoretic_SOC,
                 previous_power,
                 max_power_charge[start],
                 current_power,
@@ -300,6 +321,8 @@ class flexableNegCRMStorage(BaseStrategy):
                         "volume": bid_quantity,
                     }
                 )
+                previous_power = current_power
+
             elif market_config.product_type == "energy_neg":
                 bids.append(
                     {
@@ -310,11 +333,21 @@ class flexableNegCRMStorage(BaseStrategy):
                         "volume": bid_quantity,
                     }
                 )
+                time_delta = (end - start) / timedelta(hours=1)
+                delta_soc = (
+                    (bid_quantity + current_power)
+                    * time_delta
+                    * unit.efficiency_charge
+                    / unit.max_volume
+                )
+                theoretic_SOC += delta_soc
+                previous_power = bid_quantity + current_power
+
             else:
+                previous_power = current_power
                 raise ValueError(
                     f"Product {market_config.product_type} is not supported by this strategy."
                 )
-            previous_power = current_power + bid_quantity
 
         return bids
 

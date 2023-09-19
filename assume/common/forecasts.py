@@ -333,6 +333,8 @@ class NaiveForecast(Forecaster):
             value = self.demand
         elif column == "price_forecast":
             value = self.price_forecast
+        elif column == "price_EOM":
+            value = self.price_forecast
         else:
             value = 0
         if isinstance(value, pd.Series):

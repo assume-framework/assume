@@ -133,6 +133,7 @@ class Storage(SupportsMinMaxCharge):
         self.max_power_discharge = max_power_discharge
         self.min_power_discharge = min_power_discharge
         self.initial_soc = initial_soc
+        self.outputs["soc"] = pd.Series(self.initial_soc, index=self.index, dtype=float)
 
         self.soc_tick = soc_tick
 
@@ -201,9 +202,9 @@ class Storage(SupportsMinMaxCharge):
         """
         end_excl = end - self.index.freq
 
-        for t in self.outputs["energy"][start:end].index:
+        for t in self.outputs["energy"][start:end_excl].index:
             delta_soc = 0
-            soc = self.get_soc_before(t)
+            soc = self.outputs["soc"][t]
             if self.outputs["energy"][t] > self.max_power_discharge:
                 self.outputs["energy"][t] = self.max_power_discharge
                 logger.error(
@@ -262,7 +263,7 @@ class Storage(SupportsMinMaxCharge):
                     / self.max_volume
                 )
 
-            self.outputs["soc"][t] = soc + delta_soc
+            self.outputs["soc"][t + self.index.freq :] = soc + delta_soc
 
         return self.outputs["energy"].loc[start:end_excl]
 
@@ -361,7 +362,7 @@ class Storage(SupportsMinMaxCharge):
         )
 
         # restrict charging according to max_volume
-        max_soc_charge = self.calculate_soc_max_charge(self.get_soc_before(start))
+        max_soc_charge = self.calculate_soc_max_charge(self.outputs["soc"][start])
         max_power_charge = max_power_charge.clip(lower=max_soc_charge)
 
         return min_power_charge, max_power_charge
@@ -408,7 +409,7 @@ class Storage(SupportsMinMaxCharge):
         )
 
         # restrict according to min_volume
-        max_soc_discharge = self.calculate_soc_max_discharge(self.get_soc_before(start))
+        max_soc_discharge = self.calculate_soc_max_discharge(self.outputs["soc"][start])
         max_power_discharge = max_power_discharge.clip(upper=max_soc_discharge)
 
         return min_power_discharge, max_power_discharge
@@ -471,7 +472,7 @@ class Storage(SupportsMinMaxCharge):
         if -op_time < self.downtime_hot_start:
             return self.hot_start_cost
         elif -op_time < self.downtime_warm_start:
-            return self.downtime_warm_start
+            return self.warm_start_cost
         else:
             return self.cold_start_cost
 

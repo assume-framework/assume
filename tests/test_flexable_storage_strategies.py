@@ -1,6 +1,7 @@
 import math
-from datetime import datetime
+from datetime import datetime, timedelta
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -19,7 +20,7 @@ end = datetime(2023, 7, 2)
 @pytest.fixture
 def storage() -> Storage:
     # Create a PowerPlant instance with some example parameters
-    index = pd.date_range("2023-07-01", periods=4, freq="H")
+    index = pd.date_range("2023-07-01", periods=48, freq="H")
     # constant price of 50
     ff = NaiveForecast(index, availability=1, price_forecast=50)
     return Storage(
@@ -73,6 +74,53 @@ def test_flexable_eom_storage(mock_market_config, storage):
     assert len(bids) == 1
     assert bids[0]["price"] == 47.5
     assert bids[0]["volume"] == -60
+
+    # change to dam bidding
+    day = pd.date_range(start, start + timedelta(hours=23), freq="H")
+    index = pd.date_range("2023-07-01", periods=24, freq="H")
+    product_tuples = [(start, start + timedelta(hours=1), None) for start in day]
+    storage.foresight = pd.Timedelta(hours=4)
+    forecast = [
+        20,
+        50,
+        50,
+        50,
+        80,
+        50,
+        50,
+        50,
+        80,
+        50,
+        50,
+        50,
+        80,
+        50,
+        50,
+        50,
+        20,
+        50,
+        50,
+        50,
+        20,
+        50,
+        50,
+        50,
+    ]
+    storage.forecaster = NaiveForecast(index, availability=1, price_forecast=forecast)
+    bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
+    assert len(bids) == 6
+    assert math.isclose(bids[0]["price"], np.mean(forecast[0:13]), abs_tol=0.01)
+    assert bids[0]["volume"] == -60
+    assert math.isclose(bids[1]["price"], np.mean(forecast[0:17]), abs_tol=0.01)
+    assert bids[1]["volume"] == 0
+    assert math.isclose(bids[2]["price"], np.mean(forecast[0:21]), abs_tol=0.01)
+    assert bids[2]["volume"] == 60
+    assert math.isclose(bids[3]["price"], np.mean(forecast[0:25]), abs_tol=0.01)
+    assert bids[3]["volume"] == 100
+    assert math.isclose(bids[4]["price"], np.mean(forecast[4:]), abs_tol=0.01)
+    assert bids[4]["volume"] == 0
+    assert math.isclose(bids[5]["price"], np.mean(forecast[8:]), abs_tol=0.01)
+    assert bids[5]["volume"] == -60
 
 
 def test_flexable_pos_crm_storage(mock_market_config, storage):
