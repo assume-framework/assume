@@ -41,7 +41,7 @@ class WriteOutput(Role):
         end: datetime,
         db_engine=None,
         export_csv_path: str = "",
-        save_frequency_hours: int = None,
+        save_frequency_hours: int = 24,
         learning_mode: bool = False,
     ):
         super().__init__()
