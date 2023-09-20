@@ -6,8 +6,7 @@ from assume import World, load_scenario_folder, run_learning
 
 log = logging.getLogger(__name__)
 
-csv_path = "./examples/outputs"
-os.makedirs(csv_path, exist_ok=True)
+csv_path = ""
 
 os.makedirs("./examples/local_db", exist_ok=True)
 
