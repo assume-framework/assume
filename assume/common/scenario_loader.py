@@ -574,7 +574,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
                 inputs_path,
                 scenario,
                 study_case,
-                episode=world.learning_role.episodes_done,
+                episode=episode,
                 disable_learning=False,
             )
         # give the newly created rl_agent the buffer that we stored from the beginning
