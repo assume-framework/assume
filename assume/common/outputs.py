@@ -174,6 +174,7 @@ class WriteOutput(Role):
         if df.empty:
             return
         df["simulation"] = self.simulation_id
+        df["learning_mode"] = self.learning_mode
         # get characters after last "_" of simulation id string
         df["episode"] = self.episode
         self.write_dfs["rl_params"].append(df)

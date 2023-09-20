@@ -365,7 +365,8 @@ class World:
             if delta:
                 pbar.update(delta)
                 pbar.set_description(
-                    f"{datetime.utcfromtimestamp(self.clock.time)}", refresh=False
+                    f"{self.output_role.simulation_id} {datetime.utcfromtimestamp(self.clock.time)}",
+                    refresh=False,
                 )
             else:
                 self.clock.set_time(end_ts)
