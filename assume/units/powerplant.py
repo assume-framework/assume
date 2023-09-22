@@ -162,14 +162,27 @@ class PowerPlant(SupportsMinMax):
         """
 
         end_excl = end - self.index.freq
-        # TODO ramp down and turn off only for relevant timesteps
-        if self.outputs["energy"][start:end_excl].mean() < self.min_power:
-            self.outputs["energy"].loc[start:end_excl] = 0
+        min_power, max_power = self.calculate_min_max_power(start, end)
 
-        # TODO check if resulting power is < max_power
-        # if self.outputs["energy"][start:end_excl].max() > self.max_power:
-        #     max_pow = self.outputs["energy"][start:end_excl].max()
-        #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")
+        for t in self.outputs[start:end_excl].index:
+            current_power = self.outputs["energy"][t]
+            previous_power = self.outputs["energy"][t - self.index.freq]
+
+            max_power_t = self.calculate_ramp(previous_power, max_power[t], 0)
+            min_power_t = self.calculate_ramp(previous_power, min_power[t], 0)
+
+            if current_power > max_power_t:
+                logger.error(
+                    f"Power output {current_power} greater than max_power {max_power_t}"
+                )
+                self.outputs["energy"][t] = max_power_t
+
+            elif current_power < min_power_t:
+                logger.error(
+                    f"Power output {current_power} smaller than min_power {min_power_t}"
+                )
+                self.outputs["energy"][t] = 0
+
         return self.outputs["energy"].loc[start:end_excl]
 
     def calc_simple_marginal_cost(

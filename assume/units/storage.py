@@ -101,6 +101,13 @@ class Storage(SupportsMinMaxCharge):
         ramp_up_discharge: float = None,
         ramp_down_discharge: float = None,
         fixed_cost: float = 0,
+        hot_start_cost: float = 0,
+        warm_start_cost: float = 0,
+        cold_start_cost: float = 0,
+        min_operating_time: float = 0,
+        min_down_time: float = 0,
+        downtime_hot_start: int = 8,  # hours
+        downtime_warm_start: int = 48,  # hours
         index: pd.DatetimeIndex = None,
         location: tuple[float, float] = None,
         node: str = None,

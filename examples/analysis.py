@@ -15,32 +15,32 @@ availabe_examples = {
     "base_2019": {
         # merit order clearing for 24 hours
         "scenario": "2019_SB",
-        "study_case": "dam",
+        "study_case": "dam_simple",
     },
     "complex_SB_2019": {
         # merit order clearing for 24 hours
         "scenario": "2019_SB",
-        "study_case": "dam_complex_clearing",
+        "study_case": "dam",
     },
     "complex_BB_2019": {
         # complex clearing with naive strategies - no blocks
         "scenario": "2019_BB",
-        "study_case": "dam_complex_clearing",
+        "study_case": "dam",
     },
     "complex_SB_2020": {
         # merit order clearing for 24 hours
         "scenario": "2020_SB",
-        "study_case": "dam_complex_clearing",
+        "study_case": "dam",
     },
     "complex_BB_2020": {
         # complex clearing with naive strategies - no blocks
         "scenario": "2020_BB",
-        "study_case": "dam_complex_clearing",
+        "study_case": "dam",
     },
     "complex_clearing_blocks": {
         # complex clearing with dam naive strategies - with profile blocks in PPs
         "scenario": "analysis_02",
-        "study_case": "dam_complex_cearing",
+        "study_case": "dam_complex_clearing",
     },
     "minimal_base": {
         "scenario": "minimal_SB",
@@ -54,7 +54,7 @@ availabe_examples = {
 
 # %%
 if __name__ == "__main__":
-    example = "complex_BB_2020"
+    example = "complex_SB_2020"
     data_format = "timescale"  # "local_db" or "timescale"
 
     if data_format == "local_db":

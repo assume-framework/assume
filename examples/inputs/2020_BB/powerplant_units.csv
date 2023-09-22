@@ -1,12 +1,12 @@
-﻿name,technology,bidding_energy,bidding_capacity_pos,bidding_capacity_neg,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,fixed_cost,hot_start_cost,warm_start_cost,cold_start_cost,min_operating_time,min_down_time,heat_extraction,max_heat_extraction,unit_operator,variable_cost
-Wind onshore,wind_onshore,flexable_eom,-,-,renewable,0,2693,0,1,-,-,0,0,0,0,0,0,0,0,renewables_operator,0.612
-Wind offshore,wind_offshore,flexable_eom,-,-,renewable,0,374,0,1,-,-,0,0,0,0,0,0,0,0,renewables_operator,0.968
-Solar,solar,flexable_eom,-,-,renewable,0,2846,0,1,-,-,0,0,0,0,0,0,0,0,renewables_operator,0.726
-Hydro,hydro,flexable_eom,-,-,renewable,0,235,0,1,-,-,0,0,0,0,0,0,0,0,renewables_operator,50
-Biomass,biomass,flexable_eom,-,-,renewable,0,456,0,1,-,-,0,0,0,0,0,0,0,0,renewables_operator,
-nuclear_unit,nuclear,flexable_eom_block,-,-,uranium,0,197,80,0.33,120,120,10.3,140,140,140,72,10,no,0,nuclear_unit_operator,
-lignite_unit,lignite,flexable_eom_block,-,-,lignite,0.406,907,460,0.415,480,480,1.65,30.4,47.5,69.3,10,7,yes,65,lginite_unit_operator,
-coal_unit,hard coal,flexable_eom_block,-,-,hard coal,0.335,912,370,0.452,620,620,1.3,30.4,47.5,69.3,7,6,yes,220,coal_unit_operator,
-open_gas_unit,open cycle gas turbine,flexable_eom_block,-,-,natural gas,0.201,890,115,0.363,455,455,5.5,17.1,21.8,29.6,0,0,no,0,open_gas_unit_operator,
-combined_gas_unit,combined cycle gas turbine,flexable_eom_block,-,-,natural gas,0.201,650,240,0.59,490,490,3.5,24.1,34.2,46.7,5,3,no,0,combined_gas_unit_operator,
-oil_unit,oil,flexable_eom_block,-,-,oil,0.776,225,33,0.298,123,123,5.5,20.7,35.8,45.1,0,0,no,0,oil_unit_operator,
+﻿name,technology,bidding_energy,bidding_capacity_pos,bidding_capacity_neg,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,fixed_cost,hot_start_cost,warm_start_cost,cold_start_cost,min_operating_time,min_down_time,heat_extraction,max_heat_extraction,unit_operator,
+Wind onshore,wind_onshore,flexable_eom,-,-,renewable,0,2805,0,1,-,-,0,0,0,0,0,0,0,0,renewables_operator,
+Wind offshore,wind_offshore,flexable_eom,-,-,renewable,0,390,0,1,-,-,0,0,0,0,0,0,0,0,renewables_operator,
+Solar,solar,flexable_eom,-,-,renewable,0,2965,0,1,-,-,0,0,0,0,0,0,0,0,renewables_operator,
+Hydro,hydro,flexable_eom,-,-,renewable,0,245,0,1,-,-,0,0,0,0,0,0,0,0,renewables_operator,
+Biomass,biomass,flexable_eom,-,-,renewable,0,475,0,1,-,-,0,0,0,0,0,0,0,0,renewables_operator,
+nuclear_unit,nuclear,flexable_eom_block,-,-,uranium,0,205,82.4,0.33,123.5,123.5,1.6,21.4,21.4,21.4,72,10,no,0,nuclear_unit_operator,
+lignite_unit,lignite,flexable_eom_block,-,-,lignite,0.406,945,476.2,0.422,504.2,504.2,1.5,28.4,44.4,64.7,10,7,no,0,lignite_unit_operator,
+coal_unit,hard coal,flexable_eom_block,-,-,hard coal,0.335,950,385.8,0.396,646.5,646.5,1.4,31.7,49.5,72.3,7,6,no,0,coal_unit_operator,
+combined_gas_unit,combined cycle gas turbine,flexable_eom_block,-,-,natural gas,0.201,890,362.2,0.597,734.8,734.8,3.6,24.9,35.4,48.3,5,3,no,0,combined_gas_unit_operator,
+open_gas_unit,open cycle gas turbine,flexable_eom_block,-,-,natural gas,0.201,715,183.9,0.317,715,715,6.3,19.7,25.1,34,0,0,no,0,open_gas_unit_operator,
+oil_unit,oil,flexable_eom_block,-,-,oil,0.776,235,59.8,0.308,235,235,4.7,17.7,30.6,38.5,0,0,no,0,oil_unit_operator,
