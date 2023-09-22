@@ -43,12 +43,13 @@ class World:
         database_uri: str = "",
         export_csv_path: str = "",
         log_level: str = "INFO",
-        additional_clearing_mechanisms: dict = {},
+        is_manager: bool = False,
     ):
         logging.getLogger("assume").setLevel(log_level)
         self.logger = logging.getLogger(__name__)
         self.addr = addr
         self.container = None
+        self.is_manager = is_manager
 
         self.export_csv_path = export_csv_path
         # intialize db connection at beginning of simulation
@@ -92,7 +93,7 @@ class World:
                 e,
             )
         self.clearing_mechanisms: dict[str, MarketRole] = clearing_mechanisms
-        self.clearing_mechanisms.update(additional_clearing_mechanisms)
+        self.addresses = [self.addr]
         nest_asyncio.apply()
         self.loop = asyncio.get_event_loop()
         asyncio.set_event_loop(self.loop)
@@ -139,17 +140,21 @@ class World:
             addr=self.addr,
             clock=self.clock,
         )
-        self.clock_manager = DistributedClockManager(
-            self.container, receiver_clock_addresses=[self.addr]
-        )
-        await self.setup_learning()
-        await self.setup_output_agent(simulation_id, save_frequency_hours)
+        self.learning_mode = self.learning_config.get("learning_mode", False)
+        if self.is_manager:
+            self.clock_manager = DistributedClockManager(
+                self.container, receiver_clock_addresses=self.addresses
+            )
+            await self.setup_learning()
+            await self.setup_output_agent(simulation_id, save_frequency_hours)
+        else:
+            self.clock_agent = DistributedClockAgent(self.container)
+            self.output_agent_addr = (("localhost", 9099), "export_agent_1")
 
     async def setup_learning(self):
         self.bidding_params.update(self.learning_config)
 
         # initiate learning if the learning mode is on and hence we want to learn new strategies
-        self.learning_mode = self.learning_config.get("learning_mode", False)
         self.evaluation_mode = self.learning_config.get("evaluation_mode", False)
 
         if self.learning_mode:
@@ -376,7 +381,10 @@ class World:
             await tasks_complete_or_sleeping(self.container)
             next_activity = self.clock.get_next_activity()
         else:
-            next_activity = await self.clock_manager.distribute_time()
+            if self.is_manager:
+                next_activity = await self.clock_manager.distribute_time()
+            else:
+                next_activity = await self.clock.get_next_activity()
         if not next_activity:
             self.logger.info("simulation finished - no schedules left")
             return None

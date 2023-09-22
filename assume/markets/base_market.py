@@ -44,7 +44,7 @@ class MarketMechanism:
         """
         return True
 
-    def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> None:
+    def validate_orderbook(self, orderbook: Orderbook, agent_tuple: tuple) -> None:
         """
         method to validate a given orderbook
         This is needed to check if all required fields for this mechanism are present
@@ -161,7 +161,8 @@ class MarketRole(MarketMechanism, Role):
             return (
                 content.get("market") == self.marketconfig.name
                 and content.get("orderbook") is not None
-                and (meta["sender_addr"], meta["sender_id"]) in self.registered_agents
+                and (tuple(meta["sender_addr"]), meta["sender_id"])
+                in self.registered_agents
             )
 
         def accept_registration(content: dict, meta):
@@ -225,7 +226,7 @@ class MarketRole(MarketMechanism, Role):
             agent_addr, agent_id = agent
             await self.context.send_acl_message(
                 opening_message,
-                agent_addr,
+                receiver_addr=agent_addr,
                 receiver_id=agent_id,
                 acl_metadata={
                     "sender_addr": self.context.addr,
@@ -261,7 +262,7 @@ class MarketRole(MarketMechanism, Role):
         agent = meta["sender_id"]
         agent_addr = meta["sender_addr"]
         if self.validate_registration(meta):
-            self.registered_agents.append((agent_addr, agent))
+            self.registered_agents.append((tuple(agent_addr), agent))
 
     def handle_orderbook(self, content: dict, meta: dict):
         """
@@ -276,7 +277,7 @@ class MarketRole(MarketMechanism, Role):
         :raises AssertionError: If the order book is invalid
         """
         orderbook: Orderbook = content["orderbook"]
-        agent_addr = meta["sender_addr"]
+        agent_addr = tuple(meta["sender_addr"])
         agent_id = meta["sender_id"]
         try:
             self.validate_orderbook(orderbook, (agent_addr, agent_id))

@@ -12,10 +12,10 @@ log = logging.getLogger(__name__)
 
 db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
-world = World(database_uri=db_uri, is_manager=True)
+world = World(database_uri=db_uri, port=9098)
 
 
-async def init():
+async def worker():
     start = datetime(2023, 10, 4)
     end = datetime(2023, 12, 5)
     index = pd.date_range(
@@ -44,31 +44,28 @@ async def init():
         )
     ]
 
-    mo_id = "market_operator"
-    world.add_market_operator(id=mo_id)
     for market_config in marketdesign:
-        world.add_market(mo_id, market_config)
+        market_config.addr = ("localhost", "9099")
+        market_config.aid = "market_operator"
+        world.markets[f"{market_config.name}"] = market_config
 
-    world.add_unit_operator("my_operator")
-
-    nuclear_forecast = NaiveForecast(index, availability=1, fuel_price=3, co2_price=0.1)
+    world.add_unit_operator("my_demand")
     world.add_unit(
-        "nuclear1",
-        "power_plant",
-        "my_operator",
+        "demand1",
+        "demand",
+        "my_demand",
+        # the unit_params have no hints
         {
-            "min_power": 200,
+            "min_power": 0,
             "max_power": 1000,
             "bidding_strategies": {"energy": "naive"},
-            "technology": "nuclear",
+            "technology": "demand",
         },
-        nuclear_forecast,
+        NaiveForecast(index, demand=100),
     )
-    world.addresses.append(("localhost", 9098))
+
+    await world.clock_agent.stopped
+    await world.container.shutdown()
 
 
-world.loop.run_until_complete(init())
-import time
-
-time.sleep(3)
-world.run()
+world.loop.run_until_complete(worker())
