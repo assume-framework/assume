@@ -39,7 +39,7 @@ logging.getLogger("mango").setLevel(logging.WARNING)
 class World:
     def __init__(
         self,
-        ifac_addr: str = "localhost",
+        ifac_addr: str = "0.0.0.0",
         port: int = 9099,
         database_uri: str = "",
         export_csv_path: str = "",

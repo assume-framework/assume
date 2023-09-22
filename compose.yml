@@ -60,11 +60,6 @@ services:
     image: ghcr.io/assume-framework/assume:latest
     profiles: ["cli-only"]
     build: .
-    environment:
-      DATABASE_URI: 'postgresql://assume:assume@assume_db/assume'
-      EXPORT_CSV_PATH: ''
-    ports:
-      - 5000:5000
     depends_on:
       - assume_db
-    command: -s example_02 -c base -db "sqlite:///"
+    command: -s example_02 -db "postgresql://assume:assume@assume_db:5432/assume"
