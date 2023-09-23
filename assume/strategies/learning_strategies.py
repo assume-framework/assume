@@ -39,15 +39,18 @@ class RLStrategy(LearningStrategy):
         self.max_bid_price = kwargs.get("max_bid_price", 100)
         self.max_demand = kwargs.get("max_demand", 10e3)
 
+        # tells us whether we are training the agents or just executing per-learnind stategies
+        self.learning_mode = kwargs.get("learning_mode", False)
+
         # sets the devide of the actor network
         device = kwargs.get("device", "cpu")
         self.device = th.device(device if th.cuda.is_available() else "cpu")
+        if not self.learning_mode:
+            self.device = th.device("cpu")
 
-        float_type = kwargs.get("float_type", "float32")
-        self.float_type = th.float if float_type == "float32" else th.float16
-
-        # tells us whether we are training the agents or just executing per-learnind stategies
-        self.learning_mode = kwargs.get("learning_mode", False)
+        # future: add option to choose between float16 and float32
+        # float_type = kwargs.get("float_type", "float32")
+        self.float_type = th.float
 
         # for definition of observation space
         self.foresight = kwargs.get("foresight", 24)

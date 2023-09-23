@@ -11,8 +11,8 @@ class RLAlgorithm:
     :type learning_role: Learning Role object
     :param learning_rate: learning rate for adam optimizer
     :type learning_rate: float
-    :param episodes_collecting_initial_experience: how many steps of the model to collect transitions for before learning starts
-    :type episodes_collecting_initial_experience: int
+    :param episodes_initial_experience: how many steps of the model to collect transitions for before learning starts
+    :type episodes_initial_experience: int
     :param batch_size: Minibatch size for each gradient update
     :type batch_size: int
     :param tau: the soft update coefficient ("Polyak update", between 0 and 1)
@@ -34,7 +34,7 @@ class RLAlgorithm:
         # init learning_role as object of Learning class
         learning_role,
         learning_rate=1e-4,
-        episodes_collecting_initial_experience=100,
+        episodes_initial_experience=100,
         batch_size=1024,
         tau=0.005,
         gamma=0.99,
@@ -47,9 +47,7 @@ class RLAlgorithm:
 
         self.learning_role = learning_role
         self.learning_rate = learning_rate
-        self.episodes_collecting_initial_experience = (
-            episodes_collecting_initial_experience
-        )
+        self.episodes_initial_experience = episodes_initial_experience
         self.batch_size = batch_size
         self.gamma = gamma
         self.tau = tau

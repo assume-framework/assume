@@ -428,7 +428,7 @@ class UnitsOperator(Role):
             logger.error("tried writing learning_params, but torch is not installed")
             all_actions = np.zeros((learning_unit_count, act_dim))
             return
-        
+
         all_observations = th.zeros((learning_unit_count, obs_dim), device=device)
         all_actions = th.zeros((learning_unit_count, act_dim), device=device)
 

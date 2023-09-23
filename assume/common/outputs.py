@@ -202,7 +202,11 @@ class WriteOutput(Role):
         for table in self.write_dfs.keys():
             if len(self.write_dfs[table]) == 0:
                 continue
+
+            # exclude all empty dataframes from self.write_dfs[table]
+            self.write_dfs[table] = [df for df in self.write_dfs[table] if not df.empty]
             df = pd.concat(self.write_dfs[table], axis=0)
+
             df.reset_index()
             if df.empty:
                 continue
