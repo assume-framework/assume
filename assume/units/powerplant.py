@@ -160,16 +160,19 @@ class PowerPlant(SupportsMinMax):
         :return: the volume of the unit within the given time range
         :rtype: float
         """
-
+        start = max(start, self.index[0])
         end_excl = end - self.index.freq
-        min_power, max_power = self.calculate_min_max_power(start, end)
 
-        for t in self.outputs[start:end_excl].index:
+        max_power = (
+            self.forecaster.get_availability(self.id)[start:end_excl] * self.max_power
+        )
+
+        for t in self.outputs["energy"][start:end_excl].index:
             current_power = self.outputs["energy"][t]
-            previous_power = self.outputs["energy"][t - self.index.freq]
+            previous_power = self.get_output_before(t)
 
-            max_power_t = self.calculate_ramp(previous_power, max_power[t], 0)
-            min_power_t = self.calculate_ramp(previous_power, min_power[t], 0)
+            max_power_t = self.calculate_ramp(previous_power, max_power[t])
+            min_power_t = self.calculate_ramp(previous_power, self.min_power)
 
             if current_power > max_power_t:
                 logger.error(
@@ -177,7 +180,7 @@ class PowerPlant(SupportsMinMax):
                 )
                 self.outputs["energy"][t] = max_power_t
 
-            elif current_power < min_power_t:
+            elif current_power < min_power_t and current_power > 0:
                 logger.error(
                     f"Power output {current_power} smaller than min_power {min_power_t}"
                 )

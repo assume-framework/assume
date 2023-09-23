@@ -24,7 +24,7 @@ dam_simple:
         - min_acceptance_ratio
 
 dam:
-  start_date: 2020-01-01 00:00
+  start_date: 2020-01-01 23:00
   end_date: 2020-12-31 23:00
   time_step: 1h
   save_frequency_hours: 24
@@ -35,7 +35,7 @@ dam:
       products:
         - duration: 1h
           count: 24
-          first_delivery: 24h
+          first_delivery: 1h
       opening_frequency: 24h
       opening_duration: 24h
       volume_unit: MWh

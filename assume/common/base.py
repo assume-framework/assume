@@ -381,6 +381,52 @@ class SupportsMinMax(BaseUnit):
             runn += 1
         return (-1) ** is_off * runn
 
+    def get_average_operation_times(self, start: datetime):
+        """
+        calculates the average uninterupted operation time
+
+        :param start: the current time
+        :type start: datetime
+        :return: avg_op_time
+        :rtype: float
+        :return: avg_down_time
+        :rtype: float
+        """
+        op_series = []
+
+        before = start - self.index.freq
+        arr = self.outputs["energy"][self.index[0] : before][::-1] > 0
+
+        if len(arr) < 1:
+            # before start of index
+            return self.min_operating_time, self.min_down_time
+
+        op_series = []
+        status = arr.iloc[0]
+        runn = 0
+        for val in arr:
+            if val == status:
+                runn += 1
+            else:
+                op_series.append(-((-1) ** status) * runn)
+                runn = 0
+                status = val
+        op_series.append(-((-1) ** status) * runn)
+
+        op_times = [operation for operation in op_series if operation > 0]
+        if op_times == []:
+            avg_op_time = self.min_operating_time
+        else:
+            avg_op_time = sum(op_times) / len(op_times)
+
+        down_times = [operation for operation in op_series if operation < 0]
+        if down_times == []:
+            avg_down_time = self.min_down_time
+        else:
+            avg_down_time = abs(sum(down_times) / len(down_times))
+
+        return max(1, avg_op_time), max(1, avg_down_time)
+
     def get_starting_costs(self, op_time: int):
         """
         op_time is hours running from get_operation_time
