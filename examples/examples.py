@@ -6,8 +6,7 @@ from assume import World, load_scenario_folder, run_learning
 
 log = logging.getLogger(__name__)
 
-csv_path = "./examples/outputs"
-os.makedirs(csv_path, exist_ok=True)
+csv_path = ""
 
 os.makedirs("./examples/local_db", exist_ok=True)
 
@@ -16,6 +15,10 @@ availabe_examples = {
     "small_dam": {"scenario": "example_01a", "study_case": "dam"},
     "small_with_opt_clearing": {
         "scenario": "example_01a",
+        "study_case": "dam_with_complex_clearing",
+    },
+    "small_with_BB": {
+        "scenario": "example_01e",
         "study_case": "dam_with_complex_clearing",
     },
     "small_with_vre": {"scenario": "example_01b", "study_case": "base"},
