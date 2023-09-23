@@ -41,7 +41,7 @@ class RLStrategy(LearningStrategy):
 
         # sets the devide of the actor network
         device = kwargs.get("device", "cpu")
-        self.device = th.device(device)
+        self.device = th.device(device if th.cuda.is_available() else "cpu")
 
         float_type = kwargs.get("float_type", "float32")
         self.float_type = th.float if float_type == "float32" else th.float16

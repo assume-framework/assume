@@ -1,2 +1,0 @@
-name,technology,bidding_energy,max_power,min_power,efficiency,fixed_cost,conversion_factor,unit_operator
-elektrolyser_01,electrolyser,electrolyser_naive,50,10,0.85,10,5,electrolyser_operator
