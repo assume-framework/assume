@@ -406,15 +406,17 @@ class MarketRole(MarketMechanism, Role):
         :param orderbook: The order book to be stored
         :type orderbook: Orderbook
         """
-        message = {
-            "context": "write_results",
-            "type": "store_order_book",
-            "sender": self.marketconfig.name,
-            "data": orderbook,
-        }
+
         db_aid = self.context.data_dict.get("output_agent_id")
         db_addr = self.context.data_dict.get("output_agent_addr")
+
         if db_aid and db_addr:
+            message = {
+                "context": "write_results",
+                "type": "store_order_book",
+                "sender": self.marketconfig.name,
+                "data": orderbook,
+            }
             await self.context.send_acl_message(
                 receiver_id=db_aid,
                 receiver_addr=db_addr,
@@ -429,15 +431,17 @@ class MarketRole(MarketMechanism, Role):
         :param market_meta: The metadata of the market
         :type market_meta: any
         """
-        message = {
-            "context": "write_results",
-            "type": "store_market_results",
-            "sender": self.marketconfig.name,
-            "data": market_meta,
-        }
+
         db_aid = self.context.data_dict.get("output_agent_id")
         db_addr = self.context.data_dict.get("output_agent_addr")
+
         if db_aid and db_addr:
+            message = {
+                "context": "write_results",
+                "type": "store_market_results",
+                "sender": self.marketconfig.name,
+                "data": market_meta,
+            }
             await self.context.send_acl_message(
                 receiver_id=db_aid,
                 receiver_addr=db_addr,
