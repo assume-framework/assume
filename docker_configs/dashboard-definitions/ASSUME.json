@@ -382,7 +382,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 20
+        "y": 32
       },
       "id": 19,
       "options": {
@@ -559,7 +559,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 20
+        "y": 32
       },
       "id": 20,
       "options": {
@@ -679,7 +679,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 29
+        "y": 41
       },
       "id": 74,
       "panels": [],
@@ -768,7 +768,7 @@
         "h": 12,
         "w": 10,
         "x": 0,
-        "y": 30
+        "y": 42
       },
       "id": 72,
       "options": {
@@ -804,7 +804,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  simulation,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_cost') as \"Total cost\",\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_volume') as \"Total volume\"\nFROM kpis\ngroup by simulation\nORDER BY simulation",
+          "rawSql": "SELECT\n  simulation,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_cost') as \"Total cost\",\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_volume') as \"Total volume\"\nFROM kpis\nWHERE simulation = '$simulation'\ngroup by simulation",
           "refId": "Cost",
           "select": [
             [
@@ -902,7 +902,7 @@
         "h": 12,
         "w": 9,
         "x": 10,
-        "y": 30
+        "y": 42
       },
       "id": 76,
       "options": {
@@ -987,7 +987,7 @@
         "h": 12,
         "w": 5,
         "x": 19,
-        "y": 30
+        "y": 42
       },
       "id": 7,
       "options": {
@@ -1080,7 +1080,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 54
       },
       "id": 22,
       "options": {
@@ -1135,7 +1135,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 45
+        "y": 57
       },
       "id": 41,
       "panels": [],
@@ -1190,7 +1190,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1206,7 +1207,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 46
+        "y": 58
       },
       "id": 24,
       "options": {
@@ -1307,7 +1308,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1322,7 +1324,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 46
+        "y": 58
       },
       "id": 26,
       "options": {
@@ -1423,7 +1425,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1452,7 +1455,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 55
+        "y": 67
       },
       "id": 70,
       "options": {
@@ -1479,6 +1482,39 @@
             "uid": "P7B13B9DF907EC40C"
           },
           "format": "time_series",
+          "group": [],
+          "hide": false,
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_price::float) AS \"Accepted price:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id\r\nORDER BY 1\r\n",
+          "refId": "B",
+          "select": [
+            [
+              {
+                "params": [
+                  "power"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "market_dispatch",
+          "timeColumn": "datetime",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
           "group": [
             {
               "params": [
@@ -1496,7 +1532,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  accepted_price AS \"Accepted price:\",\r\n  price AS \"Bid price:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id, price, accepted_price\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  price AS \"Bid price:\",\r\n  unit_id as \"unit_id\",\r\n  bid_id as \"bid_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id, price, bid_id\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -1615,7 +1651,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1659,7 +1696,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 55
+        "y": 67
       },
       "id": 78,
       "options": {
@@ -1721,7 +1758,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(volume) AS \"Bid volume:\",\r\n  unit_id\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  volume AS \"Bid volume:\",\r\n  unit_id as \"unit_id\",\r\n  bid_id as \"bid_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id, volume, bid_id\r\nORDER BY 1",
           "refId": "B",
           "select": [
             [
@@ -1811,7 +1848,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1842,7 +1880,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 63
+        "y": 75
       },
       "id": 82,
       "options": {
@@ -1939,7 +1977,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 72
+        "y": 84
       },
       "id": 39,
       "panels": [],
@@ -1991,7 +2029,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2007,7 +2046,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 73
+        "y": 85
       },
       "id": 36,
       "options": {
@@ -2107,7 +2146,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2122,7 +2162,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 73
+        "y": 85
       },
       "id": 37,
       "options": {
@@ -2223,7 +2263,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2252,7 +2293,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 82
+        "y": 94
       },
       "id": 89,
       "options": {
@@ -2296,7 +2337,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  accepted_price AS \"Accepted price:\",\r\n  price AS \"Bid price:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Demand_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id, price, accepted_price\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_price::float) AS \"Accepted price:\",\r\n  price AS \"Bid price:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Demand_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id, price\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2415,7 +2456,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2459,7 +2501,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 82
+        "y": 94
       },
       "id": 90,
       "options": {
@@ -2611,7 +2653,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2643,7 +2686,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 91
+        "y": 103
       },
       "id": 86,
       "options": {
@@ -2739,7 +2782,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 100
+        "y": 112
       },
       "id": 44,
       "panels": [],
@@ -2791,7 +2834,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2807,7 +2851,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 101
+        "y": 113
       },
       "id": 65,
       "options": {
@@ -2907,7 +2951,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2922,7 +2967,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 101
+        "y": 113
       },
       "id": 47,
       "options": {
@@ -3022,7 +3067,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3038,7 +3084,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 110
+        "y": 122
       },
       "id": 80,
       "options": {
@@ -3158,7 +3204,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3187,7 +3234,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 119
+        "y": 131
       },
       "id": 91,
       "options": {
@@ -3350,7 +3397,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3394,7 +3442,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 119
+        "y": 131
       },
       "id": 92,
       "options": {
@@ -3546,7 +3594,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3578,7 +3627,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 128
+        "y": 140
       },
       "id": 84,
       "options": {
@@ -3725,9 +3774,15 @@
       },
       {
         "current": {
-          "selected": false,
-          "text": "Unit 1",
-          "value": "Unit 1"
+          "selected": true,
+          "text": [
+            "Unit 1",
+            "Unit 3"
+          ],
+          "value": [
+            "Unit 1",
+            "Unit 3"
+          ]
         },
         "datasource": {
           "type": "postgres",
@@ -3817,6 +3872,6 @@
   "timezone": "",
   "title": "ASSUME: Main overview",
   "uid": "mQ3Lvkr4k",
-  "version": 3,
+  "version": 6,
   "weekStart": ""
 }

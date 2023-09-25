@@ -222,16 +222,19 @@ class World:
         self.unit_operators[id] = units_operator
 
         # after creation of an agent - we set additional context params
-        unit_operator_agent._role_context.data_dict = {
-            "output_agent_addr": self.output_agent_addr[0],
-            "output_agent_id": self.output_agent_addr[1],
-            "learning_agent_addr": self.learning_agent_addr[0]
-            if self.learning_mode
-            else None,
-            "learning_agent_id": self.learning_agent_addr[1]
-            if self.learning_mode
-            else None,
-        }
+        unit_operator_agent._role_context.data_dict = {}
+        if self.learning_mode:
+            unit_operator_agent._role_context.data_dict = {
+                "learning_output_agent_addr": self.output_agent_addr[0],
+                "learning_output_agent_id": self.output_agent_addr[1],
+                "learning_agent_addr": self.learning_agent_addr[0],
+                "learning_agent_id": self.learning_agent_addr[1],
+            }
+        else:
+            unit_operator_agent._role_context.data_dict = {
+                "output_agent_addr": self.output_agent_addr[0],
+                "output_agent_id": self.output_agent_addr[1],
+            }
 
     async def async_add_unit(
         self,

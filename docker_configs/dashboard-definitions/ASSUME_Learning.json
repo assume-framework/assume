@@ -303,7 +303,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  episode,\n  reward\nFROM rl_params\nwhere simulation like ${simulation} || '_%'\nand learning_mode is true",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  episode,\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%'\nand learning_mode is true",
           "refId": "A",
           "select": [
             [
@@ -535,7 +535,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "-- this query creates a cumulative sum of the reward until now\r\nSELECT \r\n  $__timeGroupAlias(datetime,$__interval),\r\n  'episode ' || episode AS \"episode\",\r\n  sum(sum(reward)) OVER (PARTITION BY episode ORDER BY datetime) AS \"reward\"\r\nFROM\r\n  rl_params\r\nWHERE\r\n  $__timeFilter(datetime) \r\n  and simulation like ${simulation} || '_%'\r\nGROUP BY 1, datetime, episode\r\nORDER BY 1",
+          "rawSql": "-- this query creates a cumulative sum of the reward until now\r\nSELECT \r\n  $__timeGroupAlias(datetime,$__interval),\r\n  'episode ' || episode AS \"episode\",\r\n  sum(sum(reward)) OVER (PARTITION BY episode ORDER BY datetime) AS \"reward\"\r\nFROM\r\n  rl_params\r\nWHERE\r\n  $__timeFilter(datetime) \r\n  and simulation like '${simulation}' || '_%'\r\nGROUP BY 1, datetime, episode\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -608,7 +608,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -648,7 +649,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT \r\n  $__timeGroupAlias(datetime,$__interval),\r\n  'episode ' || episode AS \"episode\",\r\n  sum(sum(profit)) OVER (PARTITION BY episode ORDER BY datetime) AS \"profit\"\r\nFROM\r\n  rl_params\r\nWHERE\r\n  $__timeFilter(datetime)\r\n  and simulation like ${simulation} || '_%'\r\nGROUP BY 1, datetime, episode\r\nORDER BY 1",
+          "rawSql": "SELECT \r\n  $__timeGroupAlias(datetime,$__interval),\r\n  'episode ' || episode AS \"episode\",\r\n  sum(sum(profit)) OVER (PARTITION BY episode ORDER BY datetime) AS \"profit\"\r\nFROM\r\n  rl_params\r\nWHERE\r\n  $__timeFilter(datetime)\r\n  and simulation like '${simulation}' || '_%'\r\nGROUP BY 1, datetime, episode\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -720,7 +721,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -761,7 +763,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_volume/volume) AS \"accepted_volume\",\r\n  'episode ' || simulation AS \"episode\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time)\r\n  and simulation like ${simulation} || '_%'\r\nGROUP BY 1, start_time, episode\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_volume/volume) AS \"accepted_volume\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time)\r\n  and simulation = '$simulation'\r\nGROUP BY 1, start_time\r\nORDER BY 1",
           "refId": "B",
           "select": [
             [
@@ -808,7 +810,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -920,7 +923,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -986,7 +990,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  episode,\n  reward\nFROM rl_params\nwhere simulation like ${simulation} || '_%' AND\n      unit = '$rl_unit'",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  episode,\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit'",
           "refId": "A",
           "select": [
             [
@@ -1127,7 +1131,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1193,7 +1198,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  episode,\n  profit\nFROM rl_params\nwhere simulation like ${simulation} || '_%' AND\n      unit = '$rl_unit'",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  episode,\n  profit\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit'",
           "refId": "A",
           "select": [
             [
@@ -1346,7 +1351,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1572,7 +1578,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1609,23 +1616,23 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
-          "format": "table",
+          "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_volume) AS \" \",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  price AS \"Bid price:\",\r\n  bid_id as \"bid_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  simulation = '$simulation'\r\n  AND unit_id = '$rl_unit'\r\nGROUP BY 1, unit_id, price, bid_id\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
               {
                 "params": [
-                  "power"
+                  "price"
                 ],
                 "type": "column"
               }
             ]
           ],
-          "table": "market_dispatch",
+          "table": "market_orders",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
           "where": [
@@ -1685,7 +1692,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1722,11 +1730,11 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
-          "format": "table",
+          "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_volume) AS \" \",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  volume AS \"Bid volume:\",\r\n  bid_id as \"bid_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  simulation = '$simulation'\r\n  AND unit_id = '$rl_unit'\r\nGROUP BY 1, unit_id, volume, bid_id\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -1798,7 +1806,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1838,7 +1847,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  actions_0 AS \"action_Pinflex\",\n  actions_0+exploration_noise_0 AS \"noisy_action_Pinflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation IN ($simulation) AND\n  unit = '$rl_unit'\n\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  actions_0 AS \"action_Pinflex\",\n  actions_0+exploration_noise_0 AS \"noisy_action_Pinflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit = '$rl_unit'\n\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -1911,7 +1920,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1951,7 +1961,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  actions_1 AS \"action_Pflex\",\n  actions_1+exploration_noise_1 AS \"noisy_action_Pflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation IN ($simulation) AND\n  unit = '$rl_unit'\n\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  actions_1 AS \"action_Pflex\",\n  actions_1+exploration_noise_1 AS \"noisy_action_Pflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit = '$rl_unit'\n\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -1988,6 +1998,34 @@
     "list": [
       {
         "current": {
+          "selected": true,
+          "text": [
+            "example_01_rl_base"
+          ],
+          "value": [
+            "example_01_rl_base"
+          ]
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "P7B13B9DF907EC40C"
+        },
+        "definition": "SELECT DISTINCT\n        SUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\n      FROM \n        rl_params m",
+        "description": "Can choose which simulation we want to show ",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "simulation",
+        "options": [],
+        "query": "SELECT DISTINCT\n        SUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\n      FROM \n        rl_params m",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
           "selected": false,
           "text": "Unit 3",
           "value": "Unit 3"
@@ -2010,34 +2048,6 @@
         "skipUrlSync": false,
         "sort": 0,
         "type": "query"
-      },
-      {
-        "current": {
-          "selected": true,
-          "text": [
-            "example_01_rl_base"
-          ],
-          "value": [
-            "example_01_rl_base"
-          ]
-        },
-        "datasource": {
-          "type": "postgres",
-          "uid": "P7B13B9DF907EC40C"
-        },
-        "definition": "SELECT DISTINCT\n        SUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\n      FROM \n        rl_params m",
-        "description": "Can choose which simulation we want to show ",
-        "hide": 0,
-        "includeAll": false,
-        "multi": true,
-        "name": "simulation",
-        "options": [],
-        "query": "SELECT DISTINCT\n        SUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\n      FROM \n        rl_params m",
-        "refresh": 2,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
       }
     ]
   },
@@ -2058,6 +2068,6 @@
   "timezone": "",
   "title": "Assume: Training progress",
   "uid": "JKQzx0q4k",
-  "version": 7,
+  "version": 6,
   "weekStart": ""
 }

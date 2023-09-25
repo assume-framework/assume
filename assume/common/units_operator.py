@@ -86,25 +86,24 @@ class UnitsOperator(Role):
         """
         self.units[unit.id] = unit
 
-        if self.context.data_dict.get("learning_agent_addr") is None:
-            db_aid = self.context.data_dict.get("output_agent_id")
-            db_addr = self.context.data_dict.get("output_agent_addr")
-            if db_aid and db_addr:
-                # send unit data to db agent to store it
-                message = {
-                    "context": "write_results",
-                    "type": "store_units",
-                    "data": self.units[unit.id].as_dict(),
-                }
-                await self.context.send_acl_message(
-                    receiver_id=db_aid,
-                    receiver_addr=db_addr,
-                    content=message,
-                    acl_metadata={
-                        "sender_addr": self.context.addr,
-                        "sender_id": self.context.aid,
-                    },
-                )
+        db_aid = self.context.data_dict.get("output_agent_id")
+        db_addr = self.context.data_dict.get("output_agent_addr")
+        if db_aid and db_addr:
+            # send unit data to db agent to store it
+            message = {
+                "context": "write_results",
+                "type": "store_units",
+                "data": self.units[unit.id].as_dict(),
+            }
+            await self.context.send_acl_message(
+                receiver_id=db_aid,
+                receiver_addr=db_addr,
+                content=message,
+                acl_metadata={
+                    "sender_addr": self.context.addr,
+                    "sender_id": self.context.aid,
+                },
+            )
 
     def participate(self, market: MarketConfig):
         """
@@ -236,30 +235,29 @@ class UnitsOperator(Role):
             filter(lambda x: x["end_time"] >= now, self.valid_orders)
         )
 
-        if self.context.data_dict.get("learning_agent_addr") is None:
-            db_aid = self.context.data_dict.get("output_agent_id")
-            db_addr = self.context.data_dict.get("output_agent_addr")
-            if db_aid and db_addr:
+        db_aid = self.context.data_dict.get("output_agent_id")
+        db_addr = self.context.data_dict.get("output_agent_addr")
+        if db_aid and db_addr:
+            self.context.schedule_instant_acl_message(
+                receiver_id=db_aid,
+                receiver_addr=db_addr,
+                content={
+                    "context": "write_results",
+                    "type": "market_dispatch",
+                    "data": market_dispatch,
+                },
+            )
+            if unit_dispatch_dfs:
+                unit_dispatch = pd.concat(unit_dispatch_dfs)
                 self.context.schedule_instant_acl_message(
                     receiver_id=db_aid,
                     receiver_addr=db_addr,
                     content={
                         "context": "write_results",
-                        "type": "market_dispatch",
-                        "data": market_dispatch,
+                        "type": "unit_dispatch",
+                        "data": unit_dispatch,
                     },
                 )
-                if unit_dispatch_dfs:
-                    unit_dispatch = pd.concat(unit_dispatch_dfs)
-                    self.context.schedule_instant_acl_message(
-                        receiver_id=db_aid,
-                        receiver_addr=db_addr,
-                        content={
-                            "context": "write_results",
-                            "type": "unit_dispatch",
-                            "data": unit_dispatch,
-                        },
-                    )
 
     async def submit_bids(self, opening: OpeningMessage):
         """
@@ -397,19 +395,18 @@ class UnitsOperator(Role):
 
                 output_agent_list.append(output_dict)
 
-        if self.context.data_dict.get("learning_agent_addr"):
-            db_aid = self.context.data_dict.get("output_agent_id")
-            db_addr = self.context.data_dict.get("output_agent_addr")
-            if db_aid and db_addr:
-                self.context.schedule_instant_acl_message(
-                    receiver_id=db_aid,
-                    receiver_addr=db_addr,
-                    content={
-                        "context": "write_results",
-                        "type": "rl_learning_params",
-                        "data": output_agent_list,
-                    },
-                )
+        db_aid = self.context.data_dict.get("learning_output_agent_id")
+        db_addr = self.context.data_dict.get("learning_output_agent_addr")
+        if db_aid and db_addr:
+            self.context.schedule_instant_acl_message(
+                receiver_id=db_aid,
+                receiver_addr=db_addr,
+                content={
+                    "context": "write_results",
+                    "type": "rl_learning_params",
+                    "data": output_agent_list,
+                },
+            )
 
     def write_to_learning(
         self,
@@ -453,15 +450,16 @@ class UnitsOperator(Role):
         learning_role_id = self.context.data_dict.get("learning_agent_id")
         learning_role_addr = self.context.data_dict.get("learning_agent_addr")
 
-        self.context.schedule_instant_acl_message(
-            receiver_id=learning_role_id,
-            receiver_addr=learning_role_addr,
-            content={
-                "context": "rl_training",
-                "type": "replay_buffer",
-                "data": rl_agent_data,
-            },
-        )
+        if learning_role_id and learning_role_addr:
+            self.context.schedule_instant_acl_message(
+                receiver_id=learning_role_id,
+                receiver_addr=learning_role_addr,
+                content={
+                    "context": "rl_training",
+                    "type": "replay_buffer",
+                    "data": rl_agent_data,
+                },
+            )
 
     def write_learning_params(self, orderbook: Orderbook, marketconfig: MarketConfig):
         """
