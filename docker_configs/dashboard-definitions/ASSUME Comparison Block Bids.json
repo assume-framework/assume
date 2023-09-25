@@ -628,7 +628,8 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "  {simulation=\"2020_SB_dam\", unit_id=\"coal_unit\"}"
+                  "  {simulation=\"2020_BB_dam\", unit_id=\"lignite_unit\"}",
+                  "  {simulation=\"2020_SB_dam\", unit_id=\"lignite_unit\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -1321,7 +1322,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1432,7 +1434,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1550,7 +1553,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1568,7 +1572,8 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "dispatch {simulation=\"2020_BB_dam_complex_clearing\", unit=\"lignite_unit\"}"
+                  "dispatch {simulation=\"2020_SB_dam\", unit=\"lignite_unit\"}",
+                  "dispatch {simulation=\"2020_BB_dam\", unit=\"lignite_unit\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -1690,7 +1695,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1728,7 +1734,9 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "volume {bid_type=\"BB\", simulation=\"2020_BB_dam_complex_clearing\", unit_id=\"lignite_unit\"}"
+                  "price {bid_type=\"SB\", simulation=\"2020_SB_dam\", unit_id=\"nuclear_unit\"}",
+                  "price {bid_type=\"BB\", simulation=\"2020_BB_dam\", unit_id=\"nuclear_unit\"}",
+                  "price {bid_type=\"SB\", simulation=\"2020_BB_dam\", unit_id=\"nuclear_unit\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -1912,7 +1920,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1930,7 +1939,8 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "mismatch {simulation=\"2020_BB_dam_complex_clearing\", unit_id=\"lignite_unit\"}"
+                  "mismatch {simulation=\"2020_SB_dam\", unit_id=\"lignite_unit\"}",
+                  "mismatch {simulation=\"2020_BB_dam\", unit_id=\"lignite_unit\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -1979,7 +1989,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "Select (market_outcome.\"Accepted Volume\" - actual_dispatch.power)  as \"mismatch\",\n  market_outcome.unit_id,\n  actual_dispatch.\"time\",\n  market_outcome.simulation\nFrom(\nSELECT\n  $__timeGroupAlias(index,$__interval),\n  power,\n  unit,\n  simulation\nFROM unit_dispatch\nWHERE\n  $__timeFilter(index) AND\n  unit in ($Gen_Units) AND\n  simulation in ($simulation)\nGROUP BY 1, unit, power, simulation\nORDER BY 1) actual_dispatch\nleft join(\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  sum(accepted_volume) as \"Accepted Volume\",\n  simulation,\n  unit_id\nFROM market_orders\nWhere\n  $__timeFilter(start_time) AND\n  unit_id in ($Gen_Units) AND\n  simulation in ($simulation)\nGROUP BY 1, unit_id, simulation\nORDER BY 1\n) market_outcome on (market_outcome.time = actual_dispatch.time AND\n  actual_dispatch.unit = market_outcome.unit_id AND\n  actual_dispatch.simulation = market_outcome.simulation)\n\n",
+          "rawSql": "Select (market_outcome.\"Accepted Volume\" - actual_dispatch.power)  as \"mismatch\",\n  market_outcome.unit_id,\n  actual_dispatch.\"time\",\n  market_outcome.simulation\nFrom(\nSELECT\n  $__timeGroupAlias(index,$__interval),\n  power,\n  unit,\n  simulation\nFROM unit_dispatch\nWHERE\n  $__timeFilter(index) AND\n  unit in ($Gen_Units) AND\n  simulation in ($simulation)\nGROUP BY 1, unit, power, simulation, index\nORDER BY 1) actual_dispatch\nleft join(\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  sum(accepted_volume) as \"Accepted Volume\",\n  simulation,\n  unit_id\nFROM market_orders\nWhere\n  $__timeFilter(start_time) AND\n  unit_id in ($Gen_Units) AND\n  simulation in ($simulation)\nGROUP BY 1, unit_id, simulation, start_time\nORDER BY 1\n) market_outcome on (market_outcome.time = actual_dispatch.time AND\n  actual_dispatch.unit = market_outcome.unit_id AND\n  actual_dispatch.simulation = market_outcome.simulation)\n\n",
           "refId": "Dispatch",
           "select": [
             [
@@ -2039,7 +2049,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -2091,7 +2102,7 @@
         ]
       },
       "gridPos": {
-        "h": 10,
+        "h": 13,
         "w": 11,
         "x": 0,
         "y": 85
@@ -2107,7 +2118,7 @@
           "placement": "bottom",
           "showLegend": true
         },
-        "orientation": "auto",
+        "orientation": "horizontal",
         "showValue": "always",
         "stacking": "none",
         "tooltip": {
@@ -2163,7 +2174,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 95
+        "y": 98
       },
       "id": 39,
       "panels": [],
@@ -2180,7 +2191,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 96
+        "y": 99
       },
       "id": 35,
       "options": {
@@ -2274,7 +2285,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2290,7 +2302,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 99
+        "y": 102
       },
       "id": 36,
       "options": {
@@ -2386,7 +2398,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2401,7 +2414,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 99
+        "y": 102
       },
       "id": 37,
       "options": {
@@ -2462,7 +2475,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 108
+        "y": 111
       },
       "id": 44,
       "panels": [],
@@ -2481,7 +2494,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 109
+        "y": 112
       },
       "id": 45,
       "options": {
@@ -2591,7 +2604,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 112
+        "y": 115
       },
       "id": 65,
       "options": {
@@ -2702,7 +2715,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 112
+        "y": 115
       },
       "id": 47,
       "options": {
@@ -2768,12 +2781,30 @@
         "current": {
           "selected": true,
           "text": [
+            "Biomass",
+            "Hydro",
+            "Solar",
+            "Wind offshore",
+            "Wind onshore",
+            "coal_unit",
             "combined_gas_unit",
-            "lignite_unit"
+            "lignite_unit",
+            "nuclear_unit",
+            "oil_unit",
+            "open_gas_unit"
           ],
           "value": [
+            "Biomass",
+            "Hydro",
+            "Solar",
+            "Wind offshore",
+            "Wind onshore",
+            "coal_unit",
             "combined_gas_unit",
-            "lignite_unit"
+            "lignite_unit",
+            "nuclear_unit",
+            "oil_unit",
+            "open_gas_unit"
           ]
         },
         "datasource": {
@@ -2857,12 +2888,12 @@
         "current": {
           "selected": true,
           "text": [
-            "2020_SB_dam",
-            "2020_BB_dam"
+            "2020_BB_dam",
+            "2020_SB_dam"
           ],
           "value": [
-            "2020_SB_dam",
-            "2020_BB_dam"
+            "2020_BB_dam",
+            "2020_SB_dam"
           ]
         },
         "datasource": {
@@ -2886,13 +2917,13 @@
     ]
   },
   "time": {
-    "from": "2020-01-19T23:00:00.000Z",
-    "to": "2020-01-26T22:59:59.000Z"
+    "from": "2020-03-23T23:00:00.000Z",
+    "to": "2020-03-31T21:59:59.000Z"
   },
   "timepicker": {},
   "timezone": "",
   "title": "ASSUME Comparison Block Bids",
   "uid": "LlWPcjzSz",
-  "version": 16,
+  "version": 19,
   "weekStart": ""
 }
