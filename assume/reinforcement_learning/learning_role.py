@@ -61,8 +61,13 @@ class Learning(Role):
             else "cpu"
         )
         self.device = th.device(cuda_device if th.cuda.is_available() else "cpu")
-        self.float_type = th.float16 if "cuda" in cuda_device else th.float
+
+        # future: add option to choose between float16 and float32
+        # float_type = learning_config.get("float_type", "float32")
+        self.float_type = th.float
+
         th.backends.cuda.matmul.allow_tf32 = True
+        th.backends.cudnn.allow_tf32 = True
 
         self.learning_rate = learning_config.get("learning_rate", 1e-4)
         self.episodes_collecting_initial_experience = learning_config.get(
@@ -437,12 +442,12 @@ class Learning(Role):
         The created actor networks are associated with each unit strategy and stored as attributes.
         """
         for _, unit_strategy in self.rl_strats.items():
-            unit_strategy.actor = Actor(self.obs_dim, self.act_dim, self.float_type).to(
-                self.device
-            )
+            unit_strategy.actor = Actor(
+                obs_dim=self.obs_dim, act_dim=self.act_dim, float_type=self.float_type
+            ).to(self.device)
 
             unit_strategy.actor_target = Actor(
-                self.obs_dim, self.act_dim, self.float_type
+                obs_dim=self.obs_dim, act_dim=self.act_dim, float_type=self.float_type
             ).to(self.device)
             unit_strategy.actor_target.load_state_dict(unit_strategy.actor.state_dict())
             unit_strategy.actor_target.train(mode=False)

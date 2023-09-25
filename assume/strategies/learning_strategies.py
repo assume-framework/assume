@@ -39,15 +39,18 @@ class RLStrategy(LearningStrategy):
         self.max_bid_price = kwargs.get("max_bid_price", 100)
         self.max_demand = kwargs.get("max_demand", 10e3)
 
-        # sets the devide of the actor network
-        device = kwargs.get("device", "cpu")
-        self.device = th.device(device)
-
-        float_type = kwargs.get("float_type", "float32")
-        self.float_type = th.float if float_type == "float32" else th.float16
-
         # tells us whether we are training the agents or just executing per-learnind stategies
         self.learning_mode = kwargs.get("learning_mode", False)
+
+        # sets the devide of the actor network
+        device = kwargs.get("device", "cpu")
+        self.device = th.device(device if th.cuda.is_available() else "cpu")
+        if not self.learning_mode:
+            self.device = th.device("cpu")
+
+        # future: add option to choose between float16 and float32
+        # float_type = kwargs.get("float_type", "float32")
+        self.float_type = th.float
 
         # for definition of observation space
         self.foresight = kwargs.get("foresight", 24)
@@ -55,7 +58,7 @@ class RLStrategy(LearningStrategy):
         if self.learning_mode:
             self.learning_role = None
             self.collect_initial_experience_mode = kwargs.get(
-                "collecting_initial_experience", True
+                "episodes_collecting_initial_experience", True
             )
 
             self.action_noise = NormalActionNoise(
@@ -66,11 +69,8 @@ class RLStrategy(LearningStrategy):
                 dt=kwargs.get("noise_dt", 1.0),
             )
 
-        else:
-            if Path(load_path=kwargs["load_learned_path"]).is_dir():
-                self.load_actor_params(load_path=kwargs["load_learned_path"])
-
-        self.curr_reward = None
+        elif Path(load_path=kwargs["load_learned_path"]).is_dir():
+            self.load_actor_params(load_path=kwargs["load_learned_path"])
 
     def calculate_bids(
         self,
@@ -91,6 +91,7 @@ class RLStrategy(LearningStrategy):
         :return: Bids containing start time, end time, price and volume
         :rtype: Orderbook
         """
+
         bid_quantity_inflex, bid_price_inflex = 0, 0
         bid_quantity_flex, bid_price_flex = 0, 0
 
@@ -104,8 +105,6 @@ class RLStrategy(LearningStrategy):
         # =============================================================================
         # 1. Get the Observations, which are the basis of the action decision
         # =============================================================================
-
-        # => enter your code in self.create_observation(...)
         next_observation = self.create_observation(
             unit=unit,
             start=start,
@@ -115,8 +114,6 @@ class RLStrategy(LearningStrategy):
         # =============================================================================
         # 2. Get the Actions, based on the observations
         # =============================================================================
-
-        # => enter your code in self.get_actions(...)
         actions, noise = self.get_actions(next_observation)
 
         # =============================================================================
@@ -124,35 +121,17 @@ class RLStrategy(LearningStrategy):
         # =============================================================================
         # actions are in the range [0,1], we need to transform them into actual bids
         # we can use our domain knowledge to guide the bid formulation
-
-        # => enter your code here
-
-        # ---------------------------
-        # 3.1 rescale actiosn to actual prices
-        # bid_prices = ?
-
         bid_prices = actions * self.max_bid_price
-        # ---------------------------
 
-        # ---------------------------
         # 3.1 formulate the bids for Pmin
         # Pmin, the minium run capacity is the inflexible part of the bid, which should always be accepted
-        # bid_quantity_inflex = ?
-        # bid_price_inflex = ?
-
         bid_quantity_inflex = min_power
         bid_price_inflex = min(bid_prices)
-        # ---------------------------
 
-        # ---------------------------
         # 3.1 formulate the bids for Pmax - Pmin
         # Pmin, the minium run capacity is the inflexible part of the bid, which should always be accepted
-        # bid_quantity_flex = ?
-        # bid_price_flex = ?
-
         bid_quantity_flex = max_power - bid_quantity_inflex
         bid_price_flex = max(bid_prices)
-        # ---------------------------
 
         # actually formulate bids in orderbook format
         bids = [
@@ -206,20 +185,16 @@ class RLStrategy(LearningStrategy):
                 # =============================================================================
                 # 2.1 Get Actions and handle exploration
                 # =============================================================================
-
-                # => Your code here:
                 base_bid = next_observation[-1]
 
                 # add niose to the last dimension of the observation
                 # needs to be adjusted if observation space is changed, because only makes sense
                 # if the last dimension of the observation space are the marginal cost
-
                 curr_action = noise + base_bid.clone().detach()
 
             else:
                 # if we are not in the initial exploration phase we chose the action with the actor neuronal net
                 # and add noise to the action
-
                 curr_action = self.actor(next_observation).detach()
                 noise = th.tensor(
                     self.action_noise.noise(), device=self.device, dtype=self.float_type
@@ -229,7 +204,7 @@ class RLStrategy(LearningStrategy):
             # if we are not in learning mode we just use the actor neuronal net to get the action without adding noise
 
             curr_action = self.actor(next_observation).detach()
-            noise = tuple([0 for i in range(self.act_dim)])
+            noise = tuple(0 for _ in range(self.act_dim))
 
         curr_action = curr_action.clamp(-1, 1)
 
@@ -260,21 +235,12 @@ class RLStrategy(LearningStrategy):
         # =============================================================================
         # 1.1 Get the Observations, which are the basis of the action decision
         # =============================================================================
-
-        # => Your code here:
-        # Pick suitable scaling factors for the individual observations
-        # Why do we need scaling? What should you pay attention to while scaling?
-
-        # residual load forecast
-        # Obs[0:foresight-1]
         scaling_factor_res_load = self.max_demand
 
         # price forecast
-        # Obs[foresight:2*foresight-1]
         scaling_factor_price = self.max_bid_price
 
         # total capacity and marginal cost
-        # Obs[2*foresight:2*foresight+1]
         scaling_factor_total_capacity = unit.max_power
 
         # marginal cost
@@ -380,14 +346,12 @@ class RLStrategy(LearningStrategy):
         opportunity_cost = 0
 
         # iterate over all orders in the orderbook, to calculate order specific profit
-
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
             end_excl = end - unit.index.freq
 
             # depending on way the unit calaculates marginal costs we take costs
-
             if unit.marginal_cost is not None:
                 marginal_cost = (
                     unit.marginal_cost[start]
@@ -442,8 +406,6 @@ class RLStrategy(LearningStrategy):
         # in the learning process, so we add a regret term to the reward, which is the opportunity cost
         # define the reward and scale it
 
-        # reward = ?
-
         scaling = 0.1 / unit.max_power
         regret_scale = 0.2
         reward = float(profit - regret_scale * opportunity_cost) * scaling
@@ -452,7 +414,6 @@ class RLStrategy(LearningStrategy):
         unit.outputs["profit"].loc[start:end_excl] += float(profit)
         unit.outputs["reward"].loc[start:end_excl] = reward
         unit.outputs["regret"].loc[start:end_excl] = float(opportunity_cost)
-        unit.outputs["learning_mode"].loc[start:end_excl] = self.learning_mode
 
     def load_actor_params(self, load_path):
         """

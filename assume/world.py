@@ -39,7 +39,7 @@ logging.getLogger("mango").setLevel(logging.WARNING)
 class World:
     def __init__(
         self,
-        ifac_addr: str = "localhost",
+        ifac_addr: str = "0.0.0.0",
         port: int = 9099,
         database_uri: str = "",
         export_csv_path: str = "",
@@ -365,7 +365,8 @@ class World:
             if delta:
                 pbar.update(delta)
                 pbar.set_description(
-                    f"{datetime.utcfromtimestamp(self.clock.time)}", refresh=False
+                    f"{self.output_role.simulation_id} {datetime.utcfromtimestamp(self.clock.time)}",
+                    refresh=False,
                 )
             else:
                 self.clock.set_time(end_ts)
