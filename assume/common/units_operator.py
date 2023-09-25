@@ -433,7 +433,7 @@ class UnitsOperator(Role):
         all_actions = th.zeros((learning_unit_count, act_dim), device=device)
 
         i = 0
-        for _, unit in self.units.items():
+        for unit in self.units.values():
             # rl only for energy market for now!
             if isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
