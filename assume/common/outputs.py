@@ -203,10 +203,7 @@ class WriteOutput(Role):
             if len(self.write_dfs[table]) == 0:
                 continue
 
-            # exclude all empty dataframes from self.write_dfs[table]
-            self.write_dfs[table] = [df for df in self.write_dfs[table] if not df.empty]
             df = pd.concat(self.write_dfs[table], axis=0)
-
             df.reset_index()
             if df.empty:
                 continue
@@ -322,7 +319,8 @@ class WriteOutput(Role):
         """
         df = pd.DataFrame(data, columns=["datetime", "power", "market_id", "unit_id"])
         df["simulation"] = self.simulation_id
-        self.write_dfs["market_dispatch"].append(df)
+        if not df.empty:
+            self.write_dfs["market_dispatch"].append(df)
 
     def write_unit_dispatch(self, data):
         """
