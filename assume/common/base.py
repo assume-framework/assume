@@ -225,6 +225,17 @@ class BaseUnit:
                     cashflow * hours
                 )
 
+    def get_starting_costs(self, op_time: int):
+        """
+        op_time is hours running from get_operation_time
+        returns the costs if start_up is planned
+        :param op_time: operation time
+        :type op_time: int
+        :return: start_costs
+        :rtype: float
+        """
+        return 0
+
 
 class SupportsMinMax(BaseUnit):
     """
@@ -368,6 +379,75 @@ class SupportsMinMax(BaseUnit):
             runn += 1
         return (-1) ** is_off * runn
 
+    def get_average_operation_times(self, start: datetime):
+        """
+        calculates the average uninterupted operation time
+        :param start: the current time
+        :type start: datetime
+        :return: avg_op_time
+        :rtype: float
+        :return: avg_down_time
+        :rtype: float
+        """
+        op_series = []
+
+        before = start - self.index.freq
+        arr = self.outputs["energy"][self.index[0] : before][::-1] > 0
+
+        if len(arr) < 1:
+            # before start of index
+            return self.min_operating_time, self.min_down_time
+
+        op_series = []
+        status = arr.iloc[0]
+        runn = 0
+        for val in arr:
+            if val == status:
+                runn += 1
+            else:
+                op_series.append(-((-1) ** status) * runn)
+                runn = 0
+                status = val
+        op_series.append(-((-1) ** status) * runn)
+
+        op_times = [operation for operation in op_series if operation > 0]
+        if op_times == []:
+            avg_op_time = self.min_operating_time
+        else:
+            avg_op_time = sum(op_times) / len(op_times)
+
+        down_times = [operation for operation in op_series if operation < 0]
+        if down_times == []:
+            avg_down_time = self.min_down_time
+        else:
+            avg_down_time = abs(sum(down_times) / len(down_times))
+
+        return max(1, avg_op_time), max(1, avg_down_time)
+
+    def get_starting_costs(self, op_time: int):
+        """
+        op_time is hours running from get_operation_time
+        returns the costs if start_up is planned
+        :param op_time: operation time
+        :type op_time: int
+        :return: start_costs
+        :rtype: float
+        """
+        if op_time > 0:
+            # unit is running
+            return 0
+
+        if self.downtime_hot_start is not None and self.hot_start_cost is not None:
+            if -op_time <= self.downtime_hot_start:
+                return self.hot_start_cost
+        if self.downtime_warm_start is not None and self.warm_start_cost is not None:
+            if -op_time <= self.downtime_warm_start:
+                return self.warm_start_cost
+        if self.cold_start_cost is not None:
+            return self.cold_start_cost
+
+        return 0
+
 
 class SupportsMinMaxCharge(BaseUnit):
     """
@@ -473,7 +553,7 @@ class SupportsMinMaxCharge(BaseUnit):
         :return: the SoC before the given datetime
         :rtype: float
         """
-        if dt - self.index.freq < self.index[0]:
+        if dt - self.index.freq <= self.index[0]:
             return self.initial_soc
         else:
             return self.outputs["soc"].at[dt - self.index.freq]
