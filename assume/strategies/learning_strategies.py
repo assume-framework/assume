@@ -58,7 +58,7 @@ class RLStrategy(LearningStrategy):
         if self.learning_mode:
             self.learning_role = None
             self.collect_initial_experience_mode = kwargs.get(
-                "collecting_initial_experience", True
+                "episodes_collecting_initial_experience", True
             )
 
             self.action_noise = NormalActionNoise(
