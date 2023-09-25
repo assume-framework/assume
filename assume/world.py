@@ -39,8 +39,7 @@ logging.getLogger("mango").setLevel(logging.WARNING)
 class World:
     def __init__(
         self,
-        ifac_addr: str = "0.0.0.0",
-        port: int = 9099,
+        addr: tuple[str, int] | str = "world",
         database_uri: str = "",
         export_csv_path: str = "",
         log_level: str = "INFO",
@@ -48,7 +47,7 @@ class World:
     ):
         logging.getLogger("assume").setLevel(log_level)
         self.logger = logging.getLogger(__name__)
-        self.addr = (ifac_addr, port)
+        self.addr = addr
         self.container = None
 
         self.export_csv_path = export_csv_path
@@ -127,8 +126,18 @@ class World:
             await self.container.shutdown()
 
         # create new container
+        if self.addr == "world":
+            connection_type = "external_connection"
+        elif isinstance(self.addr, tuple):
+            connection_type = "tcp"
+        else:
+            connection_type = "mqtt"
+
         self.container = await create_container(
-            addr=self.addr, clock=self.clock, codec=mango_codec_factory()
+            connection_type=connection_type,
+            codec=mango_codec_factory(),
+            addr=self.addr,
+            clock=self.clock,
         )
         await self.setup_learning()
         await self.setup_output_agent(simulation_id, save_frequency_hours)
