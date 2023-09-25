@@ -685,8 +685,8 @@ class LearningConfig(TypedDict):
     :type learning_rate: float
     :param training_episodes: The number of training episodes.
     :type training_episodes: int
-    :param episodes_initial_experience: The number of episodes collecting initial experience.
-    :type episodes_initial_experience: int
+    :param episodes_collecting_initial_experience: The number of episodes collecting initial experience.
+    :type episodes_collecting_initial_experience: int
     :param train_freq: The training frequency.
     :type train_freq: int
     :param gradient_steps: The number of gradient steps.
@@ -716,7 +716,7 @@ class LearningConfig(TypedDict):
     algorithm: str
     learning_rate: float
     training_episodes: int
-    episodes_initial_experience: int
+    episodes_collecting_initial_experience: int
     train_freq: int
     gradient_steps: int
     batch_size: int

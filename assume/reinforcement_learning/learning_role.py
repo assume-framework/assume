@@ -70,8 +70,8 @@ class Learning(Role):
         th.backends.cudnn.allow_tf32 = True
 
         self.learning_rate = learning_config.get("learning_rate", 1e-4)
-        self.episodes_initial_experience = learning_config.get(
-            "episodes_initial_experience", 5
+        self.episodes_collecting_initial_experience = learning_config.get(
+            "episodes_collecting_initial_experience", 5
         )
         self.train_freq = learning_config.get("train_freq", 1)
         self.gradient_steps = (
@@ -171,7 +171,7 @@ class Learning(Role):
             self.rl_algorithm = TD3(
                 learning_role=self,
                 learning_rate=self.learning_rate,
-                episodes_initial_experience=self.episodes_initial_experience,
+                episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,
                 gradient_steps=self.gradient_steps,
                 batch_size=self.batch_size,
                 gamma=self.gamma,
@@ -190,7 +190,7 @@ class Learning(Role):
         Note:
         This method is typically scheduled to run periodically during training to continuously improve the agent's policy.
         """
-        if self.episodes_done > self.episodes_initial_experience:
+        if self.episodes_done > self.episodes_collecting_initial_experience:
             self.rl_algorithm.update_policy()
 
     # TODO: add evaluation function

@@ -585,7 +585,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
         world.learning_role.buffer = buffer
         world.learning_role.episodes_done = episode
 
-        if episode + 1 > world.learning_role.episodes_initial_experience:
+        if episode + 1 > world.learning_role.episodes_collecting_initial_experience:
             world.learning_role.turn_off_initial_exploration()
 
         world.run()
@@ -594,7 +594,9 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
             world.learning_role.training_episodes,
             world.learning_config.get("validation_episodes_interval", 5),
         )
-        if (episode + 1) % validation_interval == 0:
+        if (episode + 1) % validation_interval == 0 and (
+            episode + 1
+        ) > world.learning_role.episodes_collecting_initial_experience:
             old_path = world.learning_config["load_learned_path"]
             new_path = f"{old_path}_eval"
             # save validation params in validation path
@@ -624,7 +626,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
         # as long as we do not skip setup container should be handled correctly
         # if enough initial experience was collected according to specifications in learning config
         # turn off initial exploration and go into full learning mode
-        if episode + 1 >= world.learning_role.episodes_initial_experience:
+        if episode + 1 >= world.learning_role.episodes_collecting_initial_experience:
             world.learning_role.turn_off_initial_exploration()
 
         # container shutdown implicitly with new initialisation
