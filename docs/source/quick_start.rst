@@ -58,7 +58,7 @@ Building Docs
 
 Create the Docs environment::
 
-    conda env create -f environment_docs.yml
+    conda env create -f environment_docs.yaml
 
 Then you can build the docs using the Makefile in the docs directory::
 

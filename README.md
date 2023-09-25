@@ -1,6 +1,6 @@
 # ASSUME: Agent-Based Electricity Markets Simulation Toolbox
 
-![Lint Status](https://github.com/assume-framework/assume/actions/workflows/lint-pytest.yml/badge.svg)
+![Lint Status](https://github.com/assume-framework/assume/actions/workflows/lint-pytest.yaml/badge.svg)
 [![Code Coverage](https://codecov.io/gh/assume-framework/assume/branch/main/graph/badge.svg?token=CZ4FO7P57H)](https://codecov.io/gh/assume-framework/assume)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8088760.svg)](https://doi.org/10.5281/zenodo.8088760)
 
@@ -114,7 +114,7 @@ pre-commit run --all-files
 First, create an environment that includes the documentation dependencies:
 
 ```bash
-conda env create -f environment_docs.yml
+conda env create -f environment_docs.yaml
 ```
 
 To generate or update the automatically created docs in `docs/source/assume*`, run:

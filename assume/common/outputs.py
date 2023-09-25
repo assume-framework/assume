@@ -41,7 +41,7 @@ class WriteOutput(Role):
         end: datetime,
         db_engine=None,
         export_csv_path: str = "",
-        save_frequency_hours: int = 24,
+        save_frequency_hours: int = None,
         learning_mode: bool = False,
     ):
         super().__init__()
@@ -202,6 +202,7 @@ class WriteOutput(Role):
         for table in self.write_dfs.keys():
             if len(self.write_dfs[table]) == 0:
                 continue
+
             df = pd.concat(self.write_dfs[table], axis=0)
             df.reset_index()
             if df.empty:
@@ -318,7 +319,8 @@ class WriteOutput(Role):
         """
         df = pd.DataFrame(data, columns=["datetime", "power", "market_id", "unit_id"])
         df["simulation"] = self.simulation_id
-        self.write_dfs["market_dispatch"].append(df)
+        if not df.empty:
+            self.write_dfs["market_dispatch"].append(df)
 
     def write_unit_dispatch(self, data):
         """

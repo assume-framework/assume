@@ -411,7 +411,9 @@ class UnitsOperator(Role):
         self,
         start: datetime,
         marketconfig: MarketConfig,
-        action_dimension: int,
+        obs_dim: int,
+        act_dim: int,
+        device: str,
         learning_unit_count: int,
     ):
         learning_role_id = "learning_agent"
@@ -422,27 +424,28 @@ class UnitsOperator(Role):
         try:
             import torch as th
 
-            all_actions = th.zeros(
-                (learning_unit_count, action_dimension), device="cpu"
-            )
         except ImportError:
             logger.error("tried writing learning_params, but torch is not installed")
-            all_actions = np.zeros((learning_unit_count, action_dimension))
+            all_actions = np.zeros((learning_unit_count, act_dim))
+            return
+
+        all_observations = th.zeros((learning_unit_count, obs_dim), device=device)
+        all_actions = th.zeros((learning_unit_count, act_dim), device=device)
 
         i = 0
-        for unit_id, unit in self.units.items():
+        for unit in self.units.values():
             # rl only for energy market for now!
             if isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
                 LearningStrategy,
             ):
-                all_observations.append(
-                    np.array(unit.outputs["rl_observations"][start])
-                )
+                all_observations[i, :] = unit.outputs["rl_observations"][start]
                 all_actions[i, :] = unit.outputs["rl_actions"][start]
                 all_rewards.append(unit.outputs["reward"][start])
                 i += 1
+
         # convert all_actions list of tensor to numpy 2D array
+        all_observations = all_observations.squeeze().cpu().numpy()
         all_actions = all_actions.squeeze().cpu().numpy()
         all_rewards = np.array(all_rewards)
         rl_agent_data = (np.array(all_observations), all_actions, all_rewards)
@@ -467,16 +470,18 @@ class UnitsOperator(Role):
         :type marketconfig: MarketConfig
         """
         learning_strategies = []
-        action_dimension = 0
+
         for unit in self.units.values():
             bidding_strategy = unit.bidding_strategies.get(marketconfig.product_type)
             if isinstance(bidding_strategy, LearningStrategy):
                 learning_strategies.append(bidding_strategy)
                 # should be the same across all strategies
-                action_dimension = bidding_strategy.act_dim
+                obs_dim = bidding_strategy.obs_dim
+                act_dim = bidding_strategy.act_dim
+                device = bidding_strategy.device
+
         # should write learning results if at least one bidding_strategy is a learning strategy
-        write_learning_results = len(learning_strategies) > 0 and orderbook
-        if write_learning_results:
+        if learning_strategies and orderbook:
             start = orderbook[0]["start_time"]
             # write learning output
             self.write_learning_to_output(start, marketconfig)
@@ -486,5 +491,10 @@ class UnitsOperator(Role):
             if learning_strategies[0].learning_mode:
                 # in learning mode we are sending data to learning
                 self.write_to_learning(
-                    start, marketconfig, action_dimension, len(learning_strategies)
+                    start=start,
+                    marketconfig=marketconfig,
+                    obs_dim=obs_dim,
+                    act_dim=act_dim,
+                    device=device,
+                    learning_unit_count=len(learning_strategies),
                 )
