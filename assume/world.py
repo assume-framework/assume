@@ -13,7 +13,6 @@ from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import scoped_session, sessionmaker
 from tqdm import tqdm
 
 from assume.common import (
@@ -214,6 +213,7 @@ class World:
         unit_operator_agent._role_context.data_dict = {
             "output_agent_addr": self.output_agent_addr[0],
             "output_agent_id": self.output_agent_addr[1],
+            "learning_mode": self.learning_mode,
         }
 
     async def async_add_unit(
@@ -306,6 +306,7 @@ class World:
         market_operator_agent._role_context.data_dict = {
             "output_agent_addr": self.output_agent_addr[0],
             "output_agent_id": self.output_agent_addr[1],
+            "learning_mode": self.learning_mode,
         }
         self.market_operators[id] = market_operator_agent
 

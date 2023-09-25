@@ -406,12 +406,16 @@ class MarketRole(MarketMechanism, Role):
         :param orderbook: The order book to be stored
         :type orderbook: Orderbook
         """
+        if self.context.data_dict.get("learning_mode"):
+            return
+
         message = {
             "context": "write_results",
             "type": "store_order_book",
             "sender": self.marketconfig.name,
             "data": orderbook,
         }
+
         db_aid = self.context.data_dict.get("output_agent_id")
         db_addr = self.context.data_dict.get("output_agent_addr")
         if db_aid and db_addr:
@@ -429,6 +433,10 @@ class MarketRole(MarketMechanism, Role):
         :param market_meta: The metadata of the market
         :type market_meta: any
         """
+
+        if self.context.data_dict.get("learning_mode"):
+            return
+
         message = {
             "context": "write_results",
             "type": "store_market_results",

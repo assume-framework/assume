@@ -86,24 +86,25 @@ class UnitsOperator(Role):
         """
         self.units[unit.id] = unit
 
-        db_aid = self.context.data_dict.get("output_agent_id")
-        db_addr = self.context.data_dict.get("output_agent_addr")
-        if db_aid and db_addr:
-            # send unit data to db agent to store it
-            message = {
-                "context": "write_results",
-                "type": "store_units",
-                "data": self.units[unit.id].as_dict(),
-            }
-            await self.context.send_acl_message(
-                receiver_id=db_aid,
-                receiver_addr=db_addr,
-                content=message,
-                acl_metadata={
-                    "sender_addr": self.context.addr,
-                    "sender_id": self.context.aid,
-                },
-            )
+        if not self.context.data_dict.get("learning_mode"):
+            db_aid = self.context.data_dict.get("output_agent_id")
+            db_addr = self.context.data_dict.get("output_agent_addr")
+            if db_aid and db_addr:
+                # send unit data to db agent to store it
+                message = {
+                    "context": "write_results",
+                    "type": "store_units",
+                    "data": self.units[unit.id].as_dict(),
+                }
+                await self.context.send_acl_message(
+                    receiver_id=db_aid,
+                    receiver_addr=db_addr,
+                    content=message,
+                    acl_metadata={
+                        "sender_addr": self.context.addr,
+                        "sender_id": self.context.aid,
+                    },
+                )
 
     def participate(self, market: MarketConfig):
         """
@@ -231,33 +232,34 @@ class UnitsOperator(Role):
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
 
-        db_aid = self.context.data_dict.get("output_agent_id")
-        db_addr = self.context.data_dict.get("output_agent_addr")
-        if db_aid and db_addr:
-            self.context.schedule_instant_acl_message(
-                receiver_id=db_aid,
-                receiver_addr=db_addr,
-                content={
-                    "context": "write_results",
-                    "type": "market_dispatch",
-                    "data": market_dispatch,
-                },
-            )
-            if unit_dispatch_dfs:
-                unit_dispatch = pd.concat(unit_dispatch_dfs)
+        self.valid_orders = list(
+            filter(lambda x: x["end_time"] >= now, self.valid_orders)
+        )
+
+        if not self.context.data_dict.get("learning_mode"):
+            db_aid = self.context.data_dict.get("output_agent_id")
+            db_addr = self.context.data_dict.get("output_agent_addr")
+            if db_aid and db_addr:
                 self.context.schedule_instant_acl_message(
                     receiver_id=db_aid,
                     receiver_addr=db_addr,
                     content={
                         "context": "write_results",
-                        "type": "unit_dispatch",
-                        "data": unit_dispatch,
+                        "type": "market_dispatch",
+                        "data": market_dispatch,
                     },
                 )
-
-        self.valid_orders = list(
-            filter(lambda x: x["end_time"] >= now, self.valid_orders)
-        )
+                if unit_dispatch_dfs:
+                    unit_dispatch = pd.concat(unit_dispatch_dfs)
+                    self.context.schedule_instant_acl_message(
+                        receiver_id=db_aid,
+                        receiver_addr=db_addr,
+                        content={
+                            "context": "write_results",
+                            "type": "unit_dispatch",
+                            "data": unit_dispatch,
+                        },
+                    )
 
     async def submit_bids(self, opening: OpeningMessage):
         """
@@ -394,18 +396,20 @@ class UnitsOperator(Role):
                     output_dict[f"actions_{i}"] = action_tuple[i]
 
                 output_agent_list.append(output_dict)
-        db_aid = self.context.data_dict.get("output_agent_id")
-        db_addr = self.context.data_dict.get("output_agent_addr")
-        if db_aid and db_addr:
-            self.context.schedule_instant_acl_message(
-                receiver_id=db_aid,
-                receiver_addr=db_addr,
-                content={
-                    "context": "write_results",
-                    "type": "rl_learning_params",
-                    "data": output_agent_list,
-                },
-            )
+
+        if self.context.data_dict.get("learning_mode"):
+            db_aid = self.context.data_dict.get("output_agent_id")
+            db_addr = self.context.data_dict.get("output_agent_addr")
+            if db_aid and db_addr:
+                self.context.schedule_instant_acl_message(
+                    receiver_id=db_aid,
+                    receiver_addr=db_addr,
+                    content={
+                        "context": "write_results",
+                        "type": "rl_learning_params",
+                        "data": output_agent_list,
+                    },
+                )
 
     def write_to_learning(
         self,
@@ -426,7 +430,6 @@ class UnitsOperator(Role):
 
         except ImportError:
             logger.error("tried writing learning_params, but torch is not installed")
-            all_actions = np.zeros((learning_unit_count, act_dim))
             return
 
         all_observations = th.zeros((learning_unit_count, obs_dim), device=device)

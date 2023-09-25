@@ -341,19 +341,20 @@ class WriteOutput(Role):
         await self.store_dfs()
         if self.db is None:
             return
-        queries = [
-            f"select 'avg_price' as variable, market_id as ident, avg(price) as value from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select 'total_cost' as variable, market_id as ident, sum(price*demand_volume_energy) as value from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select 'total_volume' as variable, market_id as ident, sum(demand_volume_energy) as value from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select 'capacity_factor' as variable, market_id as ident, avg(power/max_power) as value from market_dispatch ud join power_plant_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by variable, market_id",
-        ]
-        dfs = []
 
-        learning_queries = self.learning_queries()
-        if learning_queries:
-            queries.extend(learning_queries)
+        queries = []
+        if self.learning_mode:
+            queries.extend(self.learning_queries())
+        else:
+            queries = [
+                f"select 'avg_price' as variable, market_id as ident, avg(price) as value from market_meta where simulation = '{self.simulation_id}' group by market_id",
+                f"select 'total_cost' as variable, market_id as ident, sum(price*demand_volume_energy) as value from market_meta where simulation = '{self.simulation_id}' group by market_id",
+                f"select 'total_volume' as variable, market_id as ident, sum(demand_volume_energy) as value from market_meta where simulation = '{self.simulation_id}' group by market_id",
+                f"select 'capacity_factor' as variable, market_id as ident, avg(power/max_power) as value from market_dispatch ud join power_plant_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by variable, market_id",
+            ]
 
         try:
+            dfs = []
             for query in queries:
                 df = pd.read_sql(query, self.db)
                 dfs.append(df)
@@ -372,13 +373,10 @@ class WriteOutput(Role):
                 with self.db.begin() as db:
                     df.to_sql("kpis", self.db, if_exists="append", index=None)
         except ProgrammingError as e:
-            self.db.rollback()
+            # self.db.rollback() not working, no rollback function
             logger.error(f"No scenario run Yet {e}")
 
     def learning_queries(self):
-        if not self.learning_mode:
-            return []
-
         queries = [
             f"SELECT 'sum_reward' as variable, simulation as ident, sum(reward) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
             f"SELECT 'sum_regret' as variable, simulation as ident, sum(regret) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
