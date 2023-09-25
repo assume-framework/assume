@@ -114,6 +114,15 @@ def test_output_market_dispatch():
     meta = {"sender_id": None}
     content = {"context": "write_results", "type": "market_dispatch", "data": []}
     output_writer.handle_message(content, meta)
+    # empty dfs are discarded
+    assert len(output_writer.write_dfs["market_dispatch"]) == 0, "market_dispatch"
+
+    content = {
+        "context": "write_results",
+        "type": "market_dispatch",
+        "data": [[start, 90, "EOM", "TestUnit"]],
+    }
+    output_writer.handle_message(content, meta)
     assert len(output_writer.write_dfs["market_dispatch"]) == 1, "market_dispatch"
 
 

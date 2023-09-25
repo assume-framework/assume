@@ -318,8 +318,8 @@ class WriteOutput(Role):
         :type data: any
         """
         df = pd.DataFrame(data, columns=["datetime", "power", "market_id", "unit_id"])
-        df["simulation"] = self.simulation_id
         if not df.empty:
+            df["simulation"] = self.simulation_id
             self.write_dfs["market_dispatch"].append(df)
 
     def write_unit_dispatch(self, data):
