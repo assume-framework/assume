@@ -373,7 +373,6 @@ class WriteOutput(Role):
                 with self.db.begin() as db:
                     df.to_sql("kpis", self.db, if_exists="append", index=None)
         except ProgrammingError as e:
-            # self.db.rollback() not working, no rollback function
             logger.error(f"No scenario run Yet {e}")
 
     def learning_queries(self):

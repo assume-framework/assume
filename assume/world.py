@@ -148,7 +148,10 @@ class World:
             # if self.same_process:
             # separate process does not support buffer and learning
             if True:
-                rl_agent = RoleAgent(self.container, suggested_aid="learning_agent")
+                self.learning_agent_addr = (self.addr, "learning_agent")
+                rl_agent = RoleAgent(
+                    self.container, suggested_aid=self.learning_agent_addr[1]
+                )
                 rl_agent.add_role(self.learning_role)
             else:
 
@@ -213,7 +216,12 @@ class World:
         unit_operator_agent._role_context.data_dict = {
             "output_agent_addr": self.output_agent_addr[0],
             "output_agent_id": self.output_agent_addr[1],
-            "learning_mode": self.learning_mode,
+            "learning_agent_addr": self.learning_agent_addr[0]
+            if self.learning_mode
+            else None,
+            "learning_agent_id": self.learning_agent_addr[1]
+            if self.learning_mode
+            else None,
         }
 
     async def async_add_unit(
@@ -304,9 +312,12 @@ class World:
 
         # after creation of an agent - we set additional context params
         market_operator_agent._role_context.data_dict = {
-            "output_agent_addr": self.output_agent_addr[0],
-            "output_agent_id": self.output_agent_addr[1],
-            "learning_mode": self.learning_mode,
+            "output_agent_addr": None
+            if self.learning_mode
+            else self.output_agent_addr[0],
+            "output_agent_id": None
+            if self.learning_mode
+            else self.output_agent_addr[1],
         }
         self.market_operators[id] = market_operator_agent
 

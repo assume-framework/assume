@@ -86,7 +86,7 @@ class UnitsOperator(Role):
         """
         self.units[unit.id] = unit
 
-        if not self.context.data_dict.get("learning_mode"):
+        if self.context.data_dict.get("learning_agent_addr") is None:
             db_aid = self.context.data_dict.get("output_agent_id")
             db_addr = self.context.data_dict.get("output_agent_addr")
             if db_aid and db_addr:
@@ -236,7 +236,7 @@ class UnitsOperator(Role):
             filter(lambda x: x["end_time"] >= now, self.valid_orders)
         )
 
-        if not self.context.data_dict.get("learning_mode"):
+        if self.context.data_dict.get("learning_agent_addr") is None:
             db_aid = self.context.data_dict.get("output_agent_id")
             db_addr = self.context.data_dict.get("output_agent_addr")
             if db_aid and db_addr:
@@ -397,7 +397,7 @@ class UnitsOperator(Role):
 
                 output_agent_list.append(output_dict)
 
-        if self.context.data_dict.get("learning_mode"):
+        if self.context.data_dict.get("learning_agent_addr"):
             db_aid = self.context.data_dict.get("output_agent_id")
             db_addr = self.context.data_dict.get("output_agent_addr")
             if db_aid and db_addr:
@@ -420,9 +420,6 @@ class UnitsOperator(Role):
         device: str,
         learning_unit_count: int,
     ):
-        learning_role_id = "learning_agent"
-        learning_role_addr = self.context.addr
-
         all_observations = []
         all_rewards = []
         try:
@@ -452,6 +449,9 @@ class UnitsOperator(Role):
         all_actions = all_actions.squeeze().cpu().numpy()
         all_rewards = np.array(all_rewards)
         rl_agent_data = (np.array(all_observations), all_actions, all_rewards)
+
+        learning_role_id = self.context.data_dict.get("learning_agent_id")
+        learning_role_addr = self.context.data_dict.get("learning_agent_addr")
 
         self.context.schedule_instant_acl_message(
             receiver_id=learning_role_id,
