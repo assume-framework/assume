@@ -357,8 +357,10 @@ class WriteOutput(Role):
         for query in queries:
             try:
                 df = pd.read_sql(query, self.db)
-            except Exception as e:
+            except (OperationalError, ProgrammingError):
                 continue
+            except Exception as e:
+                raise e
 
             dfs.append(df)
 
