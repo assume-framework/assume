@@ -329,11 +329,13 @@ def test_execute_dispatch(storage_unit):
     )
     storage_unit.outputs["energy"][start] = 100
     storage_unit.outputs["soc"][start] = 0.05
+    storage_unit.outputs["soc"][start] = 0.05
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert math.isclose(
         dispatched_energy.iloc[0], 50 * storage_unit.efficiency_discharge, abs_tol=0.1
     )
     storage_unit.outputs["energy"][start] = -100
+    storage_unit.outputs["soc"][start] = 0.95
     storage_unit.outputs["soc"][start] = 0.95
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert math.isclose(
