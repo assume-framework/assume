@@ -357,10 +357,13 @@ class WriteOutput(Role):
         for query in queries:
             try:
                 df = pd.read_sql(query, self.db)
-            except OperationalError:
+            except (OperationalError, ProgrammingError):
                 continue
 
             dfs.append(df)
+
+        if not dfs:
+            return
 
         df = pd.concat(dfs)
         df.reset_index()
