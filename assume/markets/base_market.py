@@ -154,28 +154,35 @@ class MarketRole(MarketMechanism, Role):
         for field in self.required_fields:
             assert field in self.marketconfig.additional_fields, "missing field"
 
-        def accept_orderbook(content: dict, meta):
+        def accept_orderbook(content: dict, meta: dict):
             if not isinstance(content, dict):
                 return False
+
+            if isinstance(meta["sender_addr"], list):
+                meta["sender_addr"] = tuple(meta["sender_addr"])
 
             return (
                 content.get("market") == self.marketconfig.name
                 and content.get("orderbook") is not None
-                and (tuple(meta["sender_addr"]), meta["sender_id"])
-                in self.registered_agents
+                and (meta["sender_addr"], meta["sender_id"]) in self.registered_agents
             )
 
-        def accept_registration(content: dict, meta):
+        def accept_registration(content: dict, meta: dict):
             if not isinstance(content, dict):
                 return False
+            if isinstance(meta["sender_addr"], list):
+                meta["sender_addr"] = tuple(meta["sender_addr"])
+
             return (
                 content.get("context") == "registration"
                 and content.get("market") == self.marketconfig.name
             )
 
-        def accept_get_unmatched(content: dict, meta):
+        def accept_get_unmatched(content: dict, meta: dict):
             if not isinstance(content, dict):
                 return False
+            if isinstance(meta["sender_addr"], list):
+                meta["sender_addr"] = tuple(meta["sender_addr"])
             return (
                 content.get("context") == "get_unmatched"
                 and content.get("market") == self.marketconfig.name
@@ -262,7 +269,7 @@ class MarketRole(MarketMechanism, Role):
         agent = meta["sender_id"]
         agent_addr = meta["sender_addr"]
         if self.validate_registration(meta):
-            self.registered_agents.append((tuple(agent_addr), agent))
+            self.registered_agents.append((agent_addr, agent))
 
     def handle_orderbook(self, content: dict, meta: dict):
         """
@@ -277,7 +284,7 @@ class MarketRole(MarketMechanism, Role):
         :raises AssertionError: If the order book is invalid
         """
         orderbook: Orderbook = content["orderbook"]
-        agent_addr = tuple(meta["sender_addr"])
+        agent_addr = meta["sender_addr"]
         agent_id = meta["sender_id"]
         try:
             self.validate_orderbook(orderbook, (agent_addr, agent_id))

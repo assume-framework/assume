@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 
 db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
-world = World(database_uri=db_uri, is_manager=True)
+world = World(database_uri=db_uri, addr=("0.0.0.0", 9099), multi_process_role=True)
 
 
 async def init():
@@ -24,6 +24,7 @@ async def init():
         freq="H",
     )
     sim_id = "handmade_simulation"
+    world.addresses.append(("0.0.0.0", 9098))
 
     await world.setup(
         start=start,
@@ -39,32 +40,30 @@ async def init():
             rr.rrule(rr.HOURLY, interval=24, dtstart=start, until=end),
             timedelta(hours=1),
             "pay_as_clear",
-            [MarketProduct(timedelta(hours=1), 24, timedelta(hours=1))],
+            [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
             additional_fields=["block_id", "link", "exclusive_id"],
         )
     ]
 
-    mo_id = "market_operator"
-    world.add_market_operator(id=mo_id)
     for market_config in marketdesign:
-        world.add_market(mo_id, market_config)
+        market_config.addr = ("0.0.0.0", "9098")
+        market_config.aid = "market_operator"
+        world.markets[f"{market_config.name}"] = market_config
 
-    world.add_unit_operator("my_operator")
-
-    nuclear_forecast = NaiveForecast(index, availability=1, fuel_price=3, co2_price=0.1)
+    world.add_unit_operator("my_demand")
     world.add_unit(
-        "nuclear1",
-        "power_plant",
-        "my_operator",
+        "demand1",
+        "demand",
+        "my_demand",
+        # the unit_params have no hints
         {
-            "min_power": 200,
+            "min_power": 0,
             "max_power": 1000,
             "bidding_strategies": {"energy": "naive"},
-            "technology": "nuclear",
+            "technology": "demand",
         },
-        nuclear_forecast,
+        NaiveForecast(index, demand=100),
     )
-    world.addresses.append(("localhost", 9098))
 
 
 world.loop.run_until_complete(init())

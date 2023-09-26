@@ -43,13 +43,13 @@ class World:
         database_uri: str = "",
         export_csv_path: str = "",
         log_level: str = "INFO",
-        is_manager: bool = False,
+        multi_process_role: bool = None,
     ):
         logging.getLogger("assume").setLevel(log_level)
         self.logger = logging.getLogger(__name__)
         self.addr = addr
         self.container = None
-        self.is_manager = is_manager
+        self.multi_process_role = multi_process_role
 
         self.export_csv_path = export_csv_path
         # intialize db connection at beginning of simulation
@@ -93,7 +93,7 @@ class World:
                 e,
             )
         self.clearing_mechanisms: dict[str, MarketRole] = clearing_mechanisms
-        self.addresses = [self.addr]
+        self.addresses = []
         nest_asyncio.apply()
         self.loop = asyncio.get_event_loop()
         asyncio.set_event_loop(self.loop)
@@ -105,7 +105,7 @@ class World:
         simulation_id: str,
         index: pd.Series,
         save_frequency_hours: int = 24,
-        same_process: bool = False,
+        same_process: bool = True,
         bidding_params: dict = {},
         learning_config: LearningConfig = {},
         forecaster: Forecaster = None,
@@ -141,15 +141,18 @@ class World:
             clock=self.clock,
         )
         self.learning_mode = self.learning_config.get("learning_mode", False)
-        if self.is_manager:
+        if self.multi_process_role is True:
+            await self.setup_learning()
+            await self.setup_output_agent(simulation_id, save_frequency_hours)
             self.clock_manager = DistributedClockManager(
                 self.container, receiver_clock_addresses=self.addresses
             )
+        elif self.multi_process_role is None:
             await self.setup_learning()
             await self.setup_output_agent(simulation_id, save_frequency_hours)
         else:
             self.clock_agent = DistributedClockAgent(self.container)
-            self.output_agent_addr = (("localhost", 9099), "export_agent_1")
+            self.output_agent_addr = (("0.0.0.0", 9099), "export_agent_1")
 
     async def setup_learning(self):
         self.bidding_params.update(self.learning_config)
@@ -202,6 +205,7 @@ class World:
             )
             output_agent.add_role(self.output_role)
         else:
+            self.addresses.append(self.addr)
 
             def creator(container):
                 agent = RoleAgent(container, suggested_aid=self.output_agent_addr[1])
@@ -377,19 +381,16 @@ class World:
         self.markets[f"{market_config.name}"] = market_config
 
     async def _step(self):
-        if self.same_process:
-            await tasks_complete_or_sleeping(self.container)
-            next_activity = self.clock.get_next_activity()
+        if self.multi_process_role:
+            next_activity = await self.clock_manager.distribute_time()
         else:
-            if self.is_manager:
-                next_activity = await self.clock_manager.distribute_time()
-            else:
-                next_activity = await self.clock.get_next_activity()
+            next_activity = self.clock.get_next_activity()
         if not next_activity:
             self.logger.info("simulation finished - no schedules left")
             return None
         delta = next_activity - self.clock.time
         self.clock.set_time(next_activity)
+        await tasks_complete_or_sleeping(self.container)
         return delta
 
     async def async_run(self, start_ts, end_ts):
@@ -404,6 +405,8 @@ class World:
 
         # allow registration before first opening
         self.clock.set_time(start_ts - 1)
+        if self.multi_process_role:
+            await self.clock_manager.broadcast(self.clock.time)
         while self.clock.time < end_ts:
             await asyncio.sleep(0)
             delta = await self._step()
