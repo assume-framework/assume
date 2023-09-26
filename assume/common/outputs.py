@@ -360,7 +360,8 @@ class WriteOutput(Role):
             except (OperationalError, ProgrammingError):
                 continue
             except Exception as e:
-                raise e
+                logger.error("could not read query: %s", e)
+                continue
 
             dfs.append(df)
 
