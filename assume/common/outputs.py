@@ -7,8 +7,9 @@ from pathlib import Path
 import pandas as pd
 from dateutil import rrule as rr
 from mango import Role
+from pandas.api.types import is_numeric_dtype
 from sqlalchemy import inspect, text
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import OperationalError, ProgrammingError
 
 logger = logging.getLogger(__name__)
 
@@ -40,14 +41,14 @@ class WriteOutput(Role):
         end: datetime,
         db_engine=None,
         export_csv_path: str = "",
-        save_frequency_hours: int = 24,
+        save_frequency_hours: int = None,
         learning_mode: bool = False,
     ):
         super().__init__()
 
         # store needed date
         self.simulation_id = simulation_id
-        self.save_frequency_hours = save_frequency_hours
+        self.save_frequency_hours = save_frequency_hours or (end - start).days * 24
 
         # make directory if not already present
         self.export_csv_path = export_csv_path
@@ -84,10 +85,10 @@ class WriteOutput(Role):
 
         # Loop throuph all database tables
         # Get list of table names in database
-        table_names = inspect(self.db.bind).get_table_names()
+        table_names = inspect(self.db).get_table_names()
         # Iterate through each table
         for table_name in table_names:
-            with self.db() as db:
+            with self.db.begin() as db:
                 # Read table into Pandas DataFrame
                 query = text(
                     f"delete from {table_name} where simulation = '{simulation_id}'"
@@ -101,7 +102,7 @@ class WriteOutput(Role):
         query = text("select distinct simulation from market_meta")
 
         try:
-            with self.db() as db:
+            with self.db.begin() as db:
                 simulations = db.execute(query).fetchall()
         except Exception:
             simulations = []
@@ -173,6 +174,7 @@ class WriteOutput(Role):
         if df.empty:
             return
         df["simulation"] = self.simulation_id
+        df["learning_mode"] = self.learning_mode
         # get characters after last "_" of simulation id string
         df["episode"] = self.episode
         self.write_dfs["rl_params"].append(df)
@@ -200,6 +202,7 @@ class WriteOutput(Role):
         for table in self.write_dfs.keys():
             if len(self.write_dfs[table]) == 0:
                 continue
+
             df = pd.concat(self.write_dfs[table], axis=0)
             df.reset_index()
             if df.empty:
@@ -212,8 +215,38 @@ class WriteOutput(Role):
                 df.to_csv(data_path, mode="a", header=not data_path.exists())
 
             if self.db is not None:
-                df.to_sql(table, self.db.bind, if_exists="append")
+                try:
+                    with self.db.begin() as db:
+                        df.to_sql(table, db, if_exists="append")
+                except ProgrammingError:
+                    self.check_columns(table, df)
+                    # now try again
+                    with self.db.begin() as db:
+                        df.to_sql(table, db, if_exists="append")
+
             self.write_dfs[table] = []
+
+    def check_columns(self, table: str, df: pd.DataFrame):
+        """
+        If a simulation before has been started which does not include an additional field
+        we try to add the field.
+        For now, this only works for float and text.
+        An alternative which finds the correct types would be to use
+        """
+        with self.db.begin() as db:
+            # Read table into Pandas DataFrame
+            query = f"select * from {table} where 1=0"
+            db_columns = pd.read_sql(query, db).columns
+        for column in df.columns:
+            if column not in db_columns:
+                try:
+                    # TODO this only works for float and text
+                    column_type = "float" if is_numeric_dtype(df[column]) else "text"
+                    query = f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"
+                    with self.db.begin() as db:
+                        db.execute(text(query))
+                except Exception:
+                    logger.exception("Error converting column")
 
     def check_for_tensors(self, data):
         """
@@ -285,8 +318,9 @@ class WriteOutput(Role):
         :type data: any
         """
         df = pd.DataFrame(data, columns=["datetime", "power", "market_id", "unit_id"])
-        df["simulation"] = self.simulation_id
-        self.write_dfs["market_dispatch"].append(df)
+        if not df.empty:
+            df["simulation"] = self.simulation_id
+            self.write_dfs["market_dispatch"].append(df)
 
     def write_unit_dispatch(self, data):
         """
@@ -305,51 +339,51 @@ class WriteOutput(Role):
 
         # insert left records into db
         await self.store_dfs()
+
         if self.db is None:
             return
+
         queries = [
             f"select 'avg_price' as variable, market_id as ident, avg(price) as value from market_meta where simulation = '{self.simulation_id}' group by market_id",
             f"select 'total_cost' as variable, market_id as ident, sum(price*demand_volume_energy) as value from market_meta where simulation = '{self.simulation_id}' group by market_id",
             f"select 'total_volume' as variable, market_id as ident, sum(demand_volume_energy) as value from market_meta where simulation = '{self.simulation_id}' group by market_id",
             f"select 'capacity_factor' as variable, market_id as ident, avg(power/max_power) as value from market_dispatch ud join power_plant_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by variable, market_id",
-        ]
-        dfs = []
-
-        learning_queries = self.learning_queries()
-        if learning_queries:
-            queries.extend(learning_queries)
-
-        try:
-            for query in queries:
-                df = pd.read_sql(query, self.db.bind)
-                dfs.append(df)
-            df = pd.concat(dfs)
-            df.reset_index()
-            df["simulation"] = self.simulation_id
-            if self.export_csv_path:
-                kpi_data_path = self.p.joinpath("kpis.csv")
-                df.to_csv(
-                    kpi_data_path,
-                    mode="a",
-                    header=not kpi_data_path.exists(),
-                    index=None,
-                )
-            if self.db is not None and not df.empty:
-                df.to_sql("kpis", self.db.bind, if_exists="append", index=None)
-        except ProgrammingError as e:
-            self.db.rollback()
-            logger.error(f"No scenario run Yet {e}")
-
-    def learning_queries(self):
-        if not self.learning_mode:
-            return []
-
-        queries = [
             f"SELECT 'sum_reward' as variable, simulation as ident, sum(reward) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
             f"SELECT 'sum_regret' as variable, simulation as ident, sum(regret) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
             f"SELECT 'sum_profit' as variable, simulation as ident, sum(profit) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
         ]
-        return queries
+
+        dfs = []
+        for query in queries:
+            try:
+                df = pd.read_sql(query, self.db)
+            except (OperationalError, ProgrammingError):
+                continue
+            except Exception as e:
+                logger.error("could not read query: %s", e)
+                continue
+
+            dfs.append(df)
+
+        if not dfs:
+            return
+
+        df = pd.concat(dfs)
+        df.reset_index()
+        df["simulation"] = self.simulation_id
+
+        if self.export_csv_path:
+            kpi_data_path = self.p.joinpath("kpis.csv")
+            df.to_csv(
+                kpi_data_path,
+                mode="a",
+                header=not kpi_data_path.exists(),
+                index=None,
+            )
+
+        if self.db is not None and not df.empty:
+            with self.db.begin() as db:
+                df.to_sql("kpis", self.db, if_exists="append", index=None)
 
     def get_sum_reward(self):
         query = text(
@@ -357,7 +391,7 @@ class WriteOutput(Role):
         )
 
         try:
-            with self.db() as db:
+            with self.db.begin() as db:
                 avg_reward = db.execute(query).fetchall()[0]
         except Exception:
             avg_reward = 0

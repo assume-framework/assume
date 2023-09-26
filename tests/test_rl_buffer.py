@@ -12,7 +12,12 @@ except ImportError:
 @pytest.mark.require_learning
 def test_replay_buffer_init():
     buffer = ReplayBuffer(
-        10, obs_dim=2, act_dim=3, n_rl_units=4, device=th.device("cpu")
+        10,
+        obs_dim=2,
+        act_dim=3,
+        n_rl_units=4,
+        device=th.device("cpu"),
+        float_type=th.float,
     )
 
     assert buffer.rewards.shape == (10, 4)
@@ -33,6 +38,7 @@ def test_replay_buffer_add():
         act_dim=act_dim,
         n_rl_units=n_rl_units,
         device=th.device("cpu"),
+        float_type=th.float,
     )
     obs = np.ones((n_rl_units, obs_dim))
     actions = np.ones((n_rl_units, act_dim))

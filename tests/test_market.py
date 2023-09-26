@@ -1,6 +1,7 @@
 import calendar
 from datetime import datetime
 
+import pandas as pd
 import pytest
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
@@ -44,18 +45,18 @@ async def test_market_init(market_role: MarketRole):
         "sender_addr": market_role.context.addr,
         "sender_id": market_role.context.aid,
     }
-
+    end = start + rd(hours=1)
     orderbook = [
         {
             "start_time": start,
-            "end_time": start + rd(hours=1),
+            "end_time": end,
             "volume": 120,
             "price": 120,
             "agent_id": "gen1",
             "only_hours": None,
         }
     ]
-
+    market_role.open_auctions |= {(start, end, None)}
     market_role.handle_orderbook(content={"orderbook": orderbook}, meta=meta)
     assert len(market_role.all_orders) == 1
 
@@ -77,6 +78,7 @@ async def test_market_tick(market_role: MarketRole):
             "only_hours": None,
         }
     ]
+    market_role.open_auctions |= {(start, end, None)}
     market_role.handle_orderbook(content={"orderbook": orderbook}, meta=meta)
     assert len(market_role.all_orders) == 1
     assert market_role.all_orders[0]["price"] == 1201
@@ -105,6 +107,7 @@ async def test_market_max(market_role: MarketRole):
     market_role.marketconfig.maximum_bid_price = 1000
     market_role.marketconfig.minimum_bid_price = -500
     market_role.marketconfig.maximum_bid_volume = 9090
+    market_role.open_auctions |= {(start, end, None)}
 
     orderbook = [
         {
@@ -164,6 +167,36 @@ async def test_market_max(market_role: MarketRole):
     assert market_role.all_orders[0]["volume"] == 9090
 
 
+async def test_market_for_BB(market_role: MarketRole):
+    meta = {
+        "sender_addr": market_role.context.addr,
+        "sender_id": market_role.context.aid,
+    }
+    market_role.marketconfig.maximum_bid_price = 1000
+    market_role.marketconfig.minimum_bid_price = -500
+    market_role.marketconfig.maximum_bid_volume = 9090
+
+    end = start + rd(hours=24)
+    time_range = pd.date_range(start, end - pd.Timedelta("1H"), freq="1H")
+    market_role.open_auctions |= {
+        (time, time + rd(hours=1), None) for time in time_range
+    }
+
+    orderbook = [
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": {time: 50 for time in time_range},
+            "price": {time: 1000 for time in time_range},
+            "agent_id": "gen1",
+            "only_hours": None,
+            "bid_type": "BB",
+        }
+    ]
+    market_role.handle_orderbook(content={"orderbook": orderbook}, meta=meta)
+    assert len(market_role.all_orders) == 1
+
+
 async def test_market_registration(market_role: MarketRole):
     meta = {
         "sender_addr": "test_address",
@@ -192,6 +225,7 @@ async def test_market_unmatched(market_role: MarketRole):
             "only_hours": None,
         }
     ]
+    market_role.open_auctions |= {(start, end, None)}
     market_role.handle_orderbook(content={"orderbook": orderbook}, meta=meta)
 
     content = {

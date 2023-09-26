@@ -82,7 +82,6 @@ class PayAsClearRole(MarketRole):
             for demand_order in demand_orders:
                 if not supply_orders:
                     # if no more generation - reject left over demand
-                    demand_order["accepted_volume"] = 0
                     rejected_orders.append(demand_order)
                     continue
 
@@ -100,7 +99,6 @@ class PayAsClearRole(MarketRole):
                         to_commit.append(supply_order)
                         gen_vol += supply_order["volume"]
                     else:
-                        supply_order["accepted_volume"] = 0
                         rejected_orders.append(supply_order)
                 # now we know which orders we need
                 # we only need to see how to arrange it.
@@ -118,7 +116,7 @@ class PayAsClearRole(MarketRole):
                     # generation left over - split last generation bid
                     supply_order = to_commit[-1]
                     split_supply_order = supply_order.copy()
-                    split_supply_order["accepted_volume"] = diff
+                    split_supply_order["volume"] = diff
                     supply_order["accepted_volume"] = supply_order["volume"] - diff
                     # changed supply_order is still part of to_commit and will be added
                     # only volume-diff can be sold for current price
@@ -132,6 +130,9 @@ class PayAsClearRole(MarketRole):
 
                 accepted_product_orders.append(demand_order)
                 accepted_product_orders.extend(to_commit)
+
+            for order in supply_orders:
+                rejected_orders.append(order)
 
             # set clearing price - merit order - uniform pricing
             accepted_supply_orders = [
@@ -204,7 +205,6 @@ class PayAsBidRole(MarketRole):
             for demand_order in demand_orders:
                 if not supply_orders:
                     # if no more generation - reject left over demand
-                    demand_order["accepted_volume"] = 0
                     rejected_orders.append(demand_order)
                     continue
 
@@ -218,7 +218,6 @@ class PayAsBidRole(MarketRole):
                         to_commit.append(supply_order)
                         gen_vol += supply_order["volume"]
                     else:
-                        supply_order["accepted_volume"] = 0
                         rejected_orders.append(supply_order)
                 # now we know which orders we need
                 # we only need to see how to arrange it.
@@ -236,8 +235,8 @@ class PayAsBidRole(MarketRole):
                     # generation left over - split generation
                     supply_order = to_commit[-1]
                     split_supply_order = supply_order.copy()
-                    split_supply_order["accepted_volume"] = diff
-                    supply_order["accepted_volume"] -= supply_order["volume"] - diff
+                    split_supply_order["volume"] = diff
+                    supply_order["accepted_volume"] = supply_order["volume"] - diff
                     # only volume-diff can be sold for current price
                     # add left over to supply_orders again
                     gen_vol -= diff
@@ -254,6 +253,9 @@ class PayAsBidRole(MarketRole):
 
                     demand_order["accepted_price"] = supply_order["price"]
                 accepted_product_orders.extend(to_commit)
+
+            for order in supply_orders:
+                rejected_orders.append(order)
 
             accepted_supply_orders = [
                 x for x in accepted_product_orders if x["accepted_volume"] > 0

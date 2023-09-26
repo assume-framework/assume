@@ -1,8 +1,8 @@
 base:
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-05 00:00
+  end_date: 2019-02-01 00:00
   time_step: 1h
-  save_frequency_hours: 24
+  save_frequency_hours: Null
 
   learning_config:
     observation_dimension: 50
@@ -14,7 +14,7 @@ base:
     algorithm: matd3
     learning_rate: 0.001
     training_episodes: 30
-    collecting_initial_experience: 2
+    episodes_collecting_initial_experience: 2
     train_freq: 24
     gradient_steps: -1
     batch_size: 128
@@ -58,8 +58,8 @@ tiny:
     learning_mode: True
     algorithm: matd3
     learning_rate: 0.001
-    training_episodes: 2
-    collecting_initial_experience: 1
+    training_episodes: 3
+    episodes_collecting_initial_experience: 1
     train_freq: 24
     gradient_steps: -1
     batch_size: 128
@@ -68,7 +68,7 @@ tiny:
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
-    validation_episodes_interval: 10
+    validation_episodes_interval: 1
 
   markets_config:
     EOM:

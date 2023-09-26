@@ -21,4 +21,5 @@ RUN chown -R admin /src /home/admin
 USER admin
 RUN pip install -e .
 ENV PYTHONUNBUFFERED=1
+EXPOSE 9099
 ENTRYPOINT ["assume"]

@@ -13,7 +13,6 @@ from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import scoped_session, sessionmaker
 from tqdm import tqdm
 
 from assume.common import (
@@ -39,8 +38,7 @@ logging.getLogger("mango").setLevel(logging.WARNING)
 class World:
     def __init__(
         self,
-        ifac_addr: str = "localhost",
-        port: int = 9099,
+        addr: tuple[str, int] | str = "world",
         database_uri: str = "",
         export_csv_path: str = "",
         log_level: str = "INFO",
@@ -48,19 +46,19 @@ class World:
     ):
         logging.getLogger("assume").setLevel(log_level)
         self.logger = logging.getLogger(__name__)
-        self.addr = (ifac_addr, port)
+        self.addr = addr
         self.container = None
 
         self.export_csv_path = export_csv_path
         # intialize db connection at beginning of simulation
         if database_uri:
-            self.db = scoped_session(sessionmaker(create_engine(database_uri)))
+            self.db = create_engine(database_uri)
             connected = False
             while not connected:
                 try:
-                    self.db.connection()
-                    connected = True
-                    self.logger.info("connected to db")
+                    with self.db.connect():
+                        connected = True
+                        self.logger.info("connected to db")
                 except OperationalError as e:
                     self.logger.error(
                         f"could not connect to {database_uri}, trying again"
@@ -117,8 +115,18 @@ class World:
             await self.container.shutdown()
 
         # create new container
+        if self.addr == "world":
+            connection_type = "external_connection"
+        elif isinstance(self.addr, tuple):
+            connection_type = "tcp"
+        else:
+            connection_type = "mqtt"
+
         self.container = await create_container(
-            addr=self.addr, clock=self.clock, codec=mango_codec_factory()
+            connection_type=connection_type,
+            codec=mango_codec_factory(),
+            addr=self.addr,
+            clock=self.clock,
         )
         await self.setup_learning()
         await self.setup_output_agent(simulation_id, save_frequency_hours)
@@ -139,7 +147,10 @@ class World:
             # if self.same_process:
             # separate process does not support buffer and learning
             if True:
-                rl_agent = RoleAgent(self.container, suggested_aid="learning_agent")
+                self.learning_agent_addr = (self.addr, "learning_agent")
+                rl_agent = RoleAgent(
+                    self.container, suggested_aid=self.learning_agent_addr[1]
+                )
                 rl_agent.add_role(self.learning_role)
             else:
 
@@ -201,10 +212,21 @@ class World:
         self.unit_operators[id] = units_operator
 
         # after creation of an agent - we set additional context params
-        unit_operator_agent._role_context.data_dict = {
-            "output_agent_addr": self.output_agent_addr[0],
-            "output_agent_id": self.output_agent_addr[1],
-        }
+        unit_operator_agent._role_context.data_dict = {}
+        if self.learning_mode:
+            unit_operator_agent._role_context.data_dict = {
+                "learning_output_agent_addr": self.output_agent_addr[0],
+                "learning_output_agent_id": self.output_agent_addr[1],
+                "learning_agent_addr": self.learning_agent_addr[0],
+                "learning_agent_id": self.learning_agent_addr[1],
+            }
+        else:
+            unit_operator_agent._role_context.data_dict = {
+                "output_agent_addr": self.output_agent_addr[0],
+                "output_agent_id": self.output_agent_addr[1],
+                "learning_output_agent_addr": self.output_agent_addr[0],
+                "learning_output_agent_id": self.output_agent_addr[1],
+            }
 
     async def async_add_unit(
         self,
@@ -294,8 +316,12 @@ class World:
 
         # after creation of an agent - we set additional context params
         market_operator_agent._role_context.data_dict = {
-            "output_agent_addr": self.output_agent_addr[0],
-            "output_agent_id": self.output_agent_addr[1],
+            "output_agent_addr": None
+            if self.learning_mode
+            else self.output_agent_addr[0],
+            "output_agent_id": None
+            if self.learning_mode
+            else self.output_agent_addr[1],
         }
         self.market_operators[id] = market_operator_agent
 
@@ -355,7 +381,8 @@ class World:
             if delta:
                 pbar.update(delta)
                 pbar.set_description(
-                    f"{datetime.utcfromtimestamp(self.clock.time)}", refresh=False
+                    f"{self.output_role.simulation_id} {datetime.utcfromtimestamp(self.clock.time)}",
+                    refresh=False,
                 )
             else:
                 self.clock.set_time(end_ts)

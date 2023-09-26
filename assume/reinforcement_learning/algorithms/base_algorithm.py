@@ -69,6 +69,6 @@ class RLAlgorithm:
         self.unique_obs_len = 8
 
     def update_policy(self):
-        self.logger.error(
+        logger.error(
             "No policy update function of the used Rl algorithm was defined. Please define how the policies should be updated in the specific algorithm you use"
         )

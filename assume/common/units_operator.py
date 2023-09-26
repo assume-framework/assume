@@ -231,6 +231,10 @@ class UnitsOperator(Role):
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
 
+        self.valid_orders = list(
+            filter(lambda x: x["end_time"] >= now, self.valid_orders)
+        )
+
         db_aid = self.context.data_dict.get("output_agent_id")
         db_addr = self.context.data_dict.get("output_agent_addr")
         if db_aid and db_addr:
@@ -254,10 +258,6 @@ class UnitsOperator(Role):
                         "data": unit_dispatch,
                     },
                 )
-
-        self.valid_orders = list(
-            filter(lambda x: x["end_time"] >= now, self.valid_orders)
-        )
 
     async def submit_bids(self, opening: OpeningMessage):
         """
@@ -384,7 +384,6 @@ class UnitsOperator(Role):
                     "profit": unit.outputs["profit"].loc[start],
                     "reward": unit.outputs["reward"].loc[start],
                     "regret": unit.outputs["regret"].loc[start],
-                    "learning_mode": unit.outputs["learning_mode"].loc[start],
                     "unit": unit_id,
                 }
                 noise_tuple = unit.outputs["rl_exploration_noise"].loc[start]
@@ -395,8 +394,10 @@ class UnitsOperator(Role):
                     output_dict[f"actions_{i}"] = action_tuple[i]
 
                 output_agent_list.append(output_dict)
-        db_aid = self.context.data_dict.get("output_agent_id")
-        db_addr = self.context.data_dict.get("output_agent_addr")
+
+        db_aid = self.context.data_dict.get("learning_output_agent_id")
+        db_addr = self.context.data_dict.get("learning_output_agent_addr")
+
         if db_aid and db_addr:
             self.context.schedule_instant_acl_message(
                 receiver_id=db_aid,
@@ -412,51 +413,54 @@ class UnitsOperator(Role):
         self,
         start: datetime,
         marketconfig: MarketConfig,
-        action_dimension: int,
+        obs_dim: int,
+        act_dim: int,
+        device: str,
         learning_unit_count: int,
     ):
-        learning_role_id = "learning_agent"
-        learning_role_addr = self.context.addr
-
         all_observations = []
         all_rewards = []
         try:
             import torch as th
 
-            all_actions = th.zeros(
-                (learning_unit_count, action_dimension), device="cpu"
-            )
         except ImportError:
             logger.error("tried writing learning_params, but torch is not installed")
-            all_actions = np.zeros((learning_unit_count, action_dimension))
+            return
+
+        all_observations = th.zeros((learning_unit_count, obs_dim), device=device)
+        all_actions = th.zeros((learning_unit_count, act_dim), device=device)
 
         i = 0
-        for unit_id, unit in self.units.items():
+        for unit in self.units.values():
             # rl only for energy market for now!
             if isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
                 LearningStrategy,
             ):
-                all_observations.append(
-                    np.array(unit.outputs["rl_observations"][start])
-                )
+                all_observations[i, :] = unit.outputs["rl_observations"][start]
                 all_actions[i, :] = unit.outputs["rl_actions"][start]
                 all_rewards.append(unit.outputs["reward"][start])
                 i += 1
+
         # convert all_actions list of tensor to numpy 2D array
+        all_observations = all_observations.squeeze().cpu().numpy()
         all_actions = all_actions.squeeze().cpu().numpy()
         all_rewards = np.array(all_rewards)
         rl_agent_data = (np.array(all_observations), all_actions, all_rewards)
 
-        self.context.schedule_instant_acl_message(
-            receiver_id=learning_role_id,
-            receiver_addr=learning_role_addr,
-            content={
-                "context": "rl_training",
-                "type": "replay_buffer",
-                "data": rl_agent_data,
-            },
-        )
+        learning_role_id = self.context.data_dict.get("learning_agent_id")
+        learning_role_addr = self.context.data_dict.get("learning_agent_addr")
+
+        if learning_role_id and learning_role_addr:
+            self.context.schedule_instant_acl_message(
+                receiver_id=learning_role_id,
+                receiver_addr=learning_role_addr,
+                content={
+                    "context": "rl_training",
+                    "type": "replay_buffer",
+                    "data": rl_agent_data,
+                },
+            )
 
     def write_learning_params(self, orderbook: Orderbook, marketconfig: MarketConfig):
         """
@@ -468,16 +472,18 @@ class UnitsOperator(Role):
         :type marketconfig: MarketConfig
         """
         learning_strategies = []
-        action_dimension = 0
+
         for unit in self.units.values():
             bidding_strategy = unit.bidding_strategies.get(marketconfig.product_type)
             if isinstance(bidding_strategy, LearningStrategy):
                 learning_strategies.append(bidding_strategy)
                 # should be the same across all strategies
-                action_dimension = bidding_strategy.act_dim
+                obs_dim = bidding_strategy.obs_dim
+                act_dim = bidding_strategy.act_dim
+                device = bidding_strategy.device
+
         # should write learning results if at least one bidding_strategy is a learning strategy
-        write_learning_results = len(learning_strategies) > 0 and orderbook
-        if write_learning_results:
+        if learning_strategies and orderbook:
             start = orderbook[0]["start_time"]
             # write learning output
             self.write_learning_to_output(start, marketconfig)
@@ -487,5 +493,10 @@ class UnitsOperator(Role):
             if learning_strategies[0].learning_mode:
                 # in learning mode we are sending data to learning
                 self.write_to_learning(
-                    start, marketconfig, action_dimension, len(learning_strategies)
+                    start=start,
+                    marketconfig=marketconfig,
+                    obs_dim=obs_dim,
+                    act_dim=act_dim,
+                    device=device,
+                    learning_unit_count=len(learning_strategies),
                 )

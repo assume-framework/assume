@@ -26,6 +26,7 @@ class ReplayBuffer:
         act_dim: int,
         n_rl_units: int,
         device: str,
+        float_type,
     ):
         self.buffer_size = buffer_size
         self.obs_dim = obs_dim
@@ -35,8 +36,10 @@ class ReplayBuffer:
         self.full = False
 
         self.device = device
-        self.np_float_type = np.float16 if self.device.type == "cuda" else np.float32
-        self.th_float_type = th.half if self.device.type == "cuda" else th.float
+
+        # future: use float16 for GPU
+        self.np_float_type = np.float16 if float_type == th.float16 else np.float32
+        self.th_float_type = float_type
 
         self.n_rl_units = n_rl_units
 

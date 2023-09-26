@@ -107,7 +107,20 @@ def market_clearing_opt(orders, market_products, mode):
 
     solver = SolverFactory(solvers[0])
 
-    options = {"eps": EPS} if solver.name == "gurobi" else {}
+    if solver.name == "gurobi":
+        options = {"cutoff": -1.0, "eps": EPS}
+    elif solver.name == "cplex":
+        options = {
+            "mip.tolerances.lowercutoff": -1.0,
+            "mip.tolerances.absmipgap": EPS,
+        }
+    elif solver.name == "cbc":
+        options = {"sec": 60, "ratio": 0.1}
+    # elif solver.name == "glpk":
+    #     options = {"tmlim": 60, "mipgap": 0.1}
+    else:
+        options = {}
+
     # Solve the model
     instance = model.create_instance()
     results = solver.solve(instance, options=options)
@@ -131,14 +144,18 @@ class ComplexClearingRole(MarketRole):
 
     def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> None:
         super().validate_orderbook(orderbook, agent_tuple)
+        max_volume = self.marketconfig.maximum_bid_volume
         for order in orderbook:
-            order["bid_type"] = (
-                "SB" if order.get("bid_type") is None else order["bid_type"]
-            )
+            order["bid_type"] = "SB" if order["bid_type"] is None else order["bid_type"]
             assert order["bid_type"] in [
                 "SB",
                 "BB",
             ], f"bid_type {order['bid_type']} not in ['SB', 'BB']"
+
+            if order["bid_type"] == "BB":
+                assert False not in [
+                    abs(volume) <= max_volume for _, volume in order["volume"].items()
+                ], f"max_volume {order['volume']}"
 
     def clear(
         self, orderbook: Orderbook, market_products
@@ -236,7 +253,7 @@ class ComplexClearingRole(MarketRole):
             # check if all orders have positive profit
             if all(order_profit >= 0 for order_profit in orders_profit):
                 break
-        self.all_orders = []
+
         return extract_results(
             model=instance,
             orders=orderbook,

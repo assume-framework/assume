@@ -12,4 +12,4 @@ build:
     python: mambaforge-4.10
 
 conda:
-  environment: environment_docs.yml
+  environment: environment_docs.yaml

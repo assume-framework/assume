@@ -248,7 +248,7 @@ async def load_scenario_folder_async(
 
     # load the config file
     path = f"{inputs_path}/{scenario}"
-    with open(f"{path}/config.yml", "r") as f:
+    with open(f"{path}/config.yaml", "r") as f:
         config = yaml.safe_load(f)
         if not study_case:
             study_case = list(config.keys())[0]
@@ -558,6 +558,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
         act_dim=world.learning_role.act_dim,
         n_rl_units=len(world.learning_role.rl_strats),
         device=world.learning_role.device,
+        float_type=world.learning_role.float_type,
     )
     actors_and_critics = None
     world.output_role.del_similar_runs()
@@ -573,7 +574,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
                 inputs_path,
                 scenario,
                 study_case,
-                episode=world.learning_role.episodes_done,
+                episode=episode,
                 disable_learning=False,
             )
         # give the newly created rl_agent the buffer that we stored from the beginning
@@ -583,7 +584,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
         world.learning_role.buffer = buffer
         world.learning_role.episodes_done = episode
 
-        if episode + 1 >= world.learning_role.episodes_collecting_initial_experience:
+        if episode + 1 > world.learning_role.episodes_collecting_initial_experience:
             world.learning_role.turn_off_initial_exploration()
 
         world.run()
@@ -592,7 +593,9 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
             world.learning_role.training_episodes,
             world.learning_config.get("validation_episodes_interval", 5),
         )
-        if (episode + 1) % validation_interval == 0:
+        if (episode + 1) % validation_interval == 0 and (
+            episode + 1
+        ) > world.learning_role.episodes_collecting_initial_experience:
             old_path = world.learning_config["load_learned_path"]
             new_path = f"{old_path}_eval"
             # save validation params in validation path
