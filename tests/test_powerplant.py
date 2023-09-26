@@ -24,7 +24,7 @@ def power_plant_1() -> PowerPlant:
         max_power=1000,
         min_power=200,
         efficiency=0.5,
-        fixed_cost=10,
+        variable_cost=10,
         fuel_type="lignite",
         emission_factor=0.5,
         forecaster=ff,
@@ -45,7 +45,7 @@ def power_plant_2() -> PowerPlant:
         max_power=1000,
         min_power=0,
         efficiency=0.5,
-        fixed_cost=10,
+        variable_cost=10,
         fuel_type="lignite",
         forecaster=ff,
         emission_factor=0.5,
@@ -66,7 +66,7 @@ def power_plant_3() -> PowerPlant:
         max_power=1000,
         min_power=0,
         efficiency=0.5,
-        fixed_cost=10,
+        variable_cost=10,
         fuel_type="lignite",
         emission_factor=0.5,
         forecaster=ff,
@@ -81,7 +81,7 @@ def test_init_function(power_plant_1, power_plant_2, power_plant_3):
     assert power_plant_1.max_power == 1000
     assert power_plant_1.min_power == 200
     assert power_plant_1.efficiency == 0.5
-    assert power_plant_1.fixed_cost == 10
+    assert power_plant_1.variable_cost == 10
     assert power_plant_1.fuel_type == "lignite"
     assert power_plant_1.emission_factor == 0.5
     assert power_plant_1.ramp_up == 1000

@@ -48,6 +48,9 @@ class flexableEOM(BaseStrategy):
         min_power, max_power = unit.calculate_min_max_power(start, end)
 
         bids = []
+        op_time = unit.get_operation_time(start)
+        avg_op_time, avg_down_time = unit.get_average_operation_times(start)
+
         for product in product_tuples:
             bid_quantity_inflex, bid_price_inflex = 0, 0
             bid_quantity_flex, bid_price_flex = 0, 0
@@ -83,17 +86,23 @@ class flexableEOM(BaseStrategy):
             # =============================================================================
             # Calculating possible price
             # =============================================================================
-            if unit.get_operation_time(start) > 0:
+            if op_time > 0:
                 bid_price_inflex = calculate_EOM_price_if_on(
                     unit,
                     start,
-                    marginal_cost_inflex,
+                    marginal_cost_flex,
                     bid_quantity_inflex,
                     self.foresight,
+                    avg_down_time,
                 )
             else:
                 bid_price_inflex = calculate_EOM_price_if_off(
-                    unit, start, marginal_cost_flex, bid_quantity_inflex
+                    unit,
+                    start,
+                    marginal_cost_flex,
+                    bid_quantity_inflex,
+                    op_time,
+                    avg_op_time,
                 )
 
             if unit.outputs["heat"][start] > 0:
@@ -104,10 +113,7 @@ class flexableEOM(BaseStrategy):
                 power_loss_ratio = 0.0
 
             # Flex-bid price formulation
-            if (
-                unit.get_operation_time(start) <= -unit.min_down_time
-                or unit.get_operation_time(start) > 0
-            ):
+            if op_time <= -unit.min_down_time or op_time > 0:
                 bid_quantity_flex = max_power[start] - bid_quantity_inflex
                 bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
 
@@ -131,8 +137,26 @@ class flexableEOM(BaseStrategy):
             )
             # calculate previous power with planned dispatch (bid_quantity)
             previous_power = bid_quantity_inflex + bid_quantity_flex + current_power
+            if previous_power > 0:
+                op_time = max(op_time, 0) + 1
+            else:
+                op_time = min(op_time, 0) - 1
 
         return bids
+
+    def calculate_reward(
+        self,
+        unit,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ):
+        # TODO: Calculate profits over all markets
+
+        calculate_reward_EOM(
+            unit=unit,
+            marketconfig=marketconfig,
+            orderbook=orderbook,
+        )
 
 
 class flexableEOMBlock(BaseStrategy):
@@ -178,6 +202,8 @@ class flexableEOMBlock(BaseStrategy):
         bids = []
         bid_quantity_block = {}
         bid_price_block = []
+        op_time = unit.get_operation_time(start)
+        avg_op_time, avg_down_time = unit.get_average_operation_times(start)
 
         for product in product_tuples:
             bid_quantity_flex, bid_price_flex = 0, 0
@@ -188,11 +214,11 @@ class flexableEOMBlock(BaseStrategy):
 
             current_power = unit.outputs["energy"].at[start]
 
-            # adjust for ramp down speed
+            # adjust for ramp speed
             max_power[start] = unit.calculate_ramp(
                 previous_power, max_power[start], current_power
             )
-            # adjust for ramp up speed
+            # adjust for ramp speed
             min_power[start] = unit.calculate_ramp(
                 previous_power, min_power[start], current_power
             )
@@ -214,17 +240,23 @@ class flexableEOMBlock(BaseStrategy):
             # =============================================================================
             # Calculating possible price
             # =============================================================================
-            if unit.get_operation_time(start) > 0:
+            if op_time > 0:
                 bid_price_inflex = calculate_EOM_price_if_on(
+                    unit,
+                    start,
+                    marginal_cost_flex,
+                    bid_quantity_inflex,
+                    self.foresight,
+                    avg_down_time,
+                )
+            else:
+                bid_price_inflex = calculate_EOM_price_if_off(
                     unit,
                     start,
                     marginal_cost_inflex,
                     bid_quantity_inflex,
-                    self.foresight,
-                )
-            else:
-                bid_price_inflex = calculate_EOM_price_if_off(
-                    unit, start, marginal_cost_flex, bid_quantity_inflex
+                    op_time,
+                    avg_op_time,
                 )
 
             if unit.outputs["heat"][start] > 0:
@@ -240,9 +272,7 @@ class flexableEOMBlock(BaseStrategy):
                 or unit.get_operation_time(start) > 0
             ):
                 bid_quantity_flex = max_power[start] - bid_quantity_inflex
-                bid_price_flex = (
-                    1 - power_loss_ratio
-                ) * marginal_cost_flex + bid_price_inflex  # hihger price than inflex
+                bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
 
             bid_quantity_block[product[0]] = bid_quantity_inflex
             bid_price_block.append(bid_price_inflex)
@@ -259,6 +289,10 @@ class flexableEOMBlock(BaseStrategy):
             )
             # calculate previous power with planned dispatch (bid_quantity)
             previous_power = bid_quantity_inflex + bid_quantity_flex + current_power
+            if previous_power > 0:
+                op_time = max(op_time, 0) + 1
+            else:
+                op_time = min(op_time, 0) - 1
 
         bids.append(
             {
@@ -274,6 +308,20 @@ class flexableEOMBlock(BaseStrategy):
         )
 
         return bids
+
+    def calculate_reward(
+        self,
+        unit,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ):
+        # TODO: Calculate profits over all markets
+
+        calculate_reward_EOM(
+            unit=unit,
+            marketconfig=marketconfig,
+            orderbook=orderbook,
+        )
 
 
 class flexablePosCRM(BaseStrategy):
@@ -477,6 +525,8 @@ def calculate_EOM_price_if_off(
     start,
     marginal_cost_inflex,
     bid_quantity_inflex,
+    op_time,
+    avg_op_time=1,
 ):
     """
     The powerplant is currently off and calculates a startup markup as an extra
@@ -492,17 +542,14 @@ def calculate_EOM_price_if_off(
     :return: The bid price of the unit
     :rtype: float
     """
-    av_operating_time = max((unit.outputs["energy"][:start] > 0).mean(), 1)
-    # 1 prevents division by 0
-    op_time = unit.get_operation_time(start)
     starting_cost = unit.get_starting_costs(op_time)
     # if we split starting_cost across av_operating_time
     # we are never adding the other parts of the cost to the following hours
 
     if bid_quantity_inflex == 0:
-        markup = starting_cost / av_operating_time
+        markup = starting_cost / avg_op_time
     else:
-        markup = starting_cost / av_operating_time / bid_quantity_inflex
+        markup = starting_cost / avg_op_time / bid_quantity_inflex
 
     bid_price_inflex = min(marginal_cost_inflex + markup, 3000.0)
 
@@ -512,12 +559,13 @@ def calculate_EOM_price_if_off(
 def calculate_EOM_price_if_on(
     unit: SupportsMinMax,
     start,
-    marginal_cost_inflex,
+    marginal_cost_flex,
     bid_quantity_inflex,
     foresight,
+    avg_down_time=1,
 ):
     """
-    Check the description provided by Thomas in last version, the average downtime is not available
+    Check the description provided by Thomas in last version, the average downtime is available here
     The powerplant is currently on
 
     :param unit: A unit that the unit operator manages
@@ -535,11 +583,11 @@ def calculate_EOM_price_if_on(
         return 0
 
     t = start
-    op_time = unit.get_operation_time(start)
-    # TODO is it correct to bill for cold, hot and warm starts in one start?
-    starting_cost = unit.get_starting_costs(op_time)
 
-    price_reduction_restart = starting_cost / unit.min_down_time / bid_quantity_inflex
+    # TODO is it correct to bill for cold, hot and warm starts in one start?
+    starting_cost = unit.get_starting_costs(-max(avg_down_time, 1))
+
+    price_reduction_restart = starting_cost / avg_down_time / bid_quantity_inflex
 
     if unit.outputs["heat"][t] > 0:
         heat_gen_cost = (
@@ -551,18 +599,15 @@ def calculate_EOM_price_if_on(
 
     possible_revenue = get_specific_revenue(
         unit=unit,
-        marginal_cost=marginal_cost_inflex,
+        marginal_cost=marginal_cost_flex,
         t=start,
         foresight=foresight,
     )
-    if (
-        possible_revenue >= 0
-        and unit.forecaster["price_forecast"][t] < marginal_cost_inflex
-    ):
-        marginal_cost_inflex = 0
+    if possible_revenue >= 0 and unit.forecaster["price_EOM"][t] < marginal_cost_flex:
+        marginal_cost_flex = 0
 
     bid_price_inflex = max(
-        -price_reduction_restart - heat_gen_cost + marginal_cost_inflex,
+        -price_reduction_restart - heat_gen_cost + marginal_cost_flex,
         -499.00,
     )
 
@@ -608,11 +653,47 @@ def get_specific_revenue(
     """
     price_forecast = []
 
-    if t + foresight > unit.forecaster["price_forecast"].index[-1]:
-        price_forecast = unit.forecaster["price_forecast"][t:]
+    if t + foresight > unit.forecaster["price_EOM"].index[-1]:
+        price_forecast = unit.forecaster["price_EOM"][t:]
     else:
-        price_forecast = unit.forecaster["price_forecast"][t : t + foresight]
+        price_forecast = unit.forecaster["price_EOM"][t : t + foresight]
 
     possible_revenue = (price_forecast - marginal_cost).sum()
 
     return possible_revenue
+
+
+def calculate_reward_EOM(
+    unit,
+    marketconfig: MarketConfig,
+    orderbook: Orderbook,
+):
+    """
+    Calculate reward (costs and profit)
+    :param unit: Unit to calculate reward for
+    :type unit: SupportsMinMax
+    :param marketconfig: Market configuration
+    :type marketconfig: MarketConfig
+    :param orderbook: Orderbook
+    :type orderbook: Orderbook
+    """
+    # TODO: Calculate profits over all markets
+    product_type = marketconfig.product_type
+
+    for order in orderbook:
+        start = order["start_time"]
+        end = order["end_time"]
+        end_excl = end - unit.index.freq
+        index = pd.date_range(start, end_excl, freq=unit.index.freq)
+        costs = pd.Series(unit.fixed_cost, index=index)
+        for start in index:
+            if unit.outputs[product_type][start] != 0:
+                op_time = unit.get_operation_time(start - unit.index.freq)
+                costs[start] += unit.get_starting_costs(op_time)
+                costs[start] += unit.outputs[product_type][
+                    start
+                ] * unit.calculate_marginal_cost(
+                    start, unit.outputs[product_type][start]
+                )
+
+        unit.outputs["total_costs"][index] = costs

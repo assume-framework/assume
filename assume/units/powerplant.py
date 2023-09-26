@@ -77,6 +77,7 @@ class PowerPlant(SupportsMinMax):
         min_power: float = 0.0,
         efficiency: float = 1.0,
         fixed_cost: float = 0.0,
+        variable_cost: float | pd.Series = 0.0,
         partial_load_eff: bool = False,
         fuel_type: str = "others",
         emission_factor: float = 0.0,
@@ -120,9 +121,12 @@ class PowerPlant(SupportsMinMax):
         self.downtime_hot_start = downtime_hot_start / (
             self.index.freq / timedelta(hours=1)
         )
-        self.downtime_warm_start = downtime_warm_start
+        self.downtime_warm_start = downtime_warm_start / (
+            self.index.freq / timedelta(hours=1)
+        )
 
         self.fixed_cost = fixed_cost
+        self.variable_cost = variable_cost
         self.hot_start_cost = hot_start_cost * max_power
         self.warm_start_cost = warm_start_cost * max_power
         self.cold_start_cost = cold_start_cost * max_power
@@ -147,6 +151,7 @@ class PowerPlant(SupportsMinMax):
     ):
         """
         Executes the current dispatch of the unit based on the provided timestamps.
+        The dispatch is only executed, if it is in the constraints given by the unit.
         Returns the volume of the unit within the given time range.
 
         :param start: the start time of the dispatch
@@ -158,14 +163,24 @@ class PowerPlant(SupportsMinMax):
         """
 
         end_excl = end - self.index.freq
-        # TODO ramp down and turn off only for relevant timesteps
-        if self.outputs["energy"][start:end_excl].mean() < self.min_power:
-            self.outputs["energy"].loc[start:end_excl] = 0
 
-        # TODO check if resulting power is < max_power
-        # if self.outputs["energy"][start:end_excl].max() > self.max_power:
-        #     max_pow = self.outputs["energy"][start:end_excl].max()
-        #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")
+        max_power = (
+            self.forecaster.get_availability(self.id)[start:end_excl] * self.max_power
+        )
+
+        for t in self.outputs["energy"][start:end_excl].index:
+            current_power = self.outputs["energy"][t]
+            previous_power = self.get_output_before(t)
+
+            max_power_t = self.calculate_ramp(previous_power, max_power[t])
+            min_power_t = self.calculate_ramp(previous_power, self.min_power)
+
+            if current_power > max_power_t:
+                self.outputs["energy"][t] = max_power_t
+
+            elif current_power < min_power_t and current_power > 0:
+                self.outputs["energy"][t] = 0
+
         return self.outputs["energy"].loc[start:end_excl]
 
     def calc_simple_marginal_cost(
@@ -182,7 +197,7 @@ class PowerPlant(SupportsMinMax):
         marginal_cost = (
             fuel_price / self.efficiency
             + self.forecaster.get_price("co2") * self.emission_factor / self.efficiency
-            + self.fixed_cost
+            + self.variable_cost
         )
 
         return marginal_cost
@@ -241,10 +256,16 @@ class PowerPlant(SupportsMinMax):
         efficiency = self.efficiency - eta_loss
         co2_price = self.forecaster.get_price("co2").at[timestep]
 
+        variable_cost = (
+            self.variable_cost
+            if isinstance(self.variable_cost, float)
+            else self.variable_cost[timestep]
+        )
+
         marginal_cost = (
             fuel_price / efficiency
             + co2_price * self.emission_factor / efficiency
-            + self.fixed_cost
+            + variable_cost
         )
 
         return marginal_cost
@@ -332,17 +353,3 @@ class PowerPlant(SupportsMinMax):
         )
 
         return unit_dict
-
-    def get_starting_costs(self, op_time):
-        """
-        op_time is hours running
-        """
-        if op_time > 0:
-            # unit is running
-            return 0
-        if -op_time < self.downtime_hot_start:
-            return self.hot_start_cost
-        elif -op_time < self.downtime_warm_start:
-            return self.warm_start_cost
-        else:
-            return self.cold_start_cost
