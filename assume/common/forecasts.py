@@ -78,8 +78,6 @@ class CsvForecaster(Forecaster):
         if column not in self.forecasts.columns:
             if "availability" in column:
                 return pd.Series(1, self.index)
-            elif column == "price_forecast":
-                return self.forecasts["price_EOM"]
             return pd.Series(0, self.index)
         return self.forecasts[column]
 
@@ -330,8 +328,6 @@ class NaiveForecast(Forecaster):
             value = self.fuel_price
         elif "demand" in column:
             value = self.demand
-        elif column == "price_forecast":
-            value = self.price_forecast
         elif column == "price_EOM":
             value = self.price_forecast
         else:

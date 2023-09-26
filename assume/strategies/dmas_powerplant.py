@@ -538,7 +538,7 @@ class DmasPowerplantStrategy(BaseStrategy):
         hour_count = len(product_tuples)
         hour_count2 = hour_count * 2
 
-        base_price = unit.forecaster["price_forecast"][
+        base_price = unit.forecaster["price_EOM"][
             start : start + timedelta(hours=hour_count2 - 1)
         ]
         e_price = unit.forecaster.get_price("co2")[
