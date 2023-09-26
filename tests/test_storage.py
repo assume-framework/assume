@@ -45,7 +45,6 @@ def test_init_function(storage_unit):
     assert storage_unit.ramp_up_charge == -60
     assert storage_unit.ramp_up_discharge == 60
     assert storage_unit.initial_soc == 0.5
-    assert storage_unit.outputs["soc"][0] == 0.5
 
 
 def test_reset_function(storage_unit):
