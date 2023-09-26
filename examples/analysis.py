@@ -54,7 +54,7 @@ availabe_examples = {
 
 # %%
 if __name__ == "__main__":
-    example = "complex_SB_2020"
+    example = "complex_BB_2020"
     data_format = "timescale"  # "local_db" or "timescale"
 
     if data_format == "local_db":

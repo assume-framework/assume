@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 4,
+  "id": 11,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -392,8 +392,7 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "  {simulation=\"2020_SB_dam\", unit_id=\"lignite_unit\"}",
-                  "MCP {simulation=\"2020_SB_dam\"}"
+                  "  {simulation=\"2020_BB_dam\", unit_id=\"Biomass\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -628,8 +627,7 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "  {simulation=\"2020_BB_dam\", unit_id=\"lignite_unit\"}",
-                  "  {simulation=\"2020_SB_dam\", unit_id=\"lignite_unit\"}"
+                  "  {simulation=\"2020_SB_dam\", unit_id=\"Wind onshore\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -897,7 +895,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT summary.simulation, summary.\"Total cost\",\nsummary.\"Total volume\",\norders.\"Social welfare producers\"\nFrom (\nSELECT\n  simulation,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_cost') as \"Total cost\",\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_volume') as \"Total volume\"\nFROM kpis\nwhere simulation in ($simulation)\ngroup by simulation\nORDER BY simulation) summary\njoin (\nSELECT\n  simulation,\n  sum(round(CAST((accepted_price - price) * accepted_volume AS numeric), 2)) filter(where accepted_volume>0) as \"Social welfare producers\"\nFROM market_orders\nwhere simulation in ($simulation)\ngroup by simulation\nORDER BY simulation) orders on orders.simulation = summary.simulation\n",
+          "rawSql": "SELECT summary.simulation, summary.\"Total cost\",\norders.\"Social welfare producers\",\nsummary.\"Total volume\"\nFrom (\nSELECT\n  simulation,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_cost') as \"Total cost\",\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_volume') as \"Total volume\"\nFROM kpis\nwhere simulation in ($simulation)\ngroup by simulation\nORDER BY simulation) summary\njoin (\nSELECT\n  simulation,\n  sum(round(CAST((accepted_price - price) * accepted_volume AS numeric), 2)) filter(where accepted_volume>0) as \"Social welfare producers\"\nFROM market_orders\nwhere simulation in ($simulation)\ngroup by simulation\nORDER BY simulation) orders on orders.simulation = summary.simulation\n",
           "refId": "Cost",
           "select": [
             [
@@ -1009,7 +1007,7 @@
           ],
           "show": false
         },
-        "frameIndex": 1,
+        "frameIndex": 0,
         "showHeader": true,
         "sortBy": [
           {
@@ -1337,7 +1335,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "total_volume"
+              "options": "total_power"
             },
             "properties": [
               {
@@ -1361,7 +1359,7 @@
         ]
       },
       "gridPos": {
-        "h": 6,
+        "h": 8,
         "w": 18,
         "x": 0,
         "y": 53
@@ -1396,7 +1394,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  simulation,\n  sum(round(CAST(costs AS numeric), 2)) as Total_costs,\n  sum(round(CAST(energy_cashflow AS numeric), 2)) as Total_revenues,\n  sum(round(CAST(profits AS numeric), 2)) as Total_profits,\n  sum(round(CAST(power AS numeric), 2)) as Total_power\nFROM unit_dispatch\nwhere \n  unit in ($Gen_Units) and\n  simulation in ($simulation)\nGROUP BY simulation\nORDER BY simulation",
+          "rawSql": "SELECT\n  concat(unit, '_', simulation) as \"unit\",\n  sum(round(CAST(costs AS numeric), 2)) as Total_costs,\n  sum(round(CAST(energy_cashflow AS numeric), 2)) as Total_revenues,\n  sum(round(CAST(profits AS numeric), 2)) as Total_profits,\n  sum(round(CAST(power AS numeric)*1000, 2)) as Total_power\nFROM unit_dispatch\nwhere \n  unit in ($Gen_Units) and\n  simulation in ($simulation)\nGROUP BY unit, simulation\nORDER BY unit",
           "refId": "C",
           "select": [
             [
@@ -1572,7 +1570,8 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "dispatch {simulation=\"2020_SB_dam\", unit=\"lignite_unit\"}",
+                  "dispatch {simulation=\"2020_BB_dam\", unit=\"combined_gas_unit\"}",
+                  "dispatch {simulation=\"2020_SB_dam\", unit=\"combined_gas_unit\"}",
                   "dispatch {simulation=\"2020_BB_dam\", unit=\"lignite_unit\"}"
                 ],
                 "prefix": "All except:",
@@ -1596,7 +1595,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 59
+        "y": 61
       },
       "id": 24,
       "options": {
@@ -1734,9 +1733,7 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "price {bid_type=\"SB\", simulation=\"2020_SB_dam\", unit_id=\"nuclear_unit\"}",
-                  "price {bid_type=\"BB\", simulation=\"2020_BB_dam\", unit_id=\"nuclear_unit\"}",
-                  "price {bid_type=\"SB\", simulation=\"2020_BB_dam\", unit_id=\"nuclear_unit\"}"
+                  "price {bid_type=\"SB\", simulation=\"2020_BB_dam\", unit_id=\"combined_gas_unit\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -1759,7 +1756,7 @@
         "h": 8,
         "w": 18,
         "x": 0,
-        "y": 68
+        "y": 70
       },
       "id": 70,
       "options": {
@@ -1876,6 +1873,148 @@
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
+      "description": "energy that has to be bought or sold addtionally",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "megwatt"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "unit_id"
+            },
+            "properties": []
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 6,
+        "x": 18,
+        "y": 76
+      },
+      "id": 90,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "9.2.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "table",
+          "group": [],
+          "hide": false,
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "Select abs(market_outcome.\"Accepted Volume\" - actual_dispatch.power) as \"mismatch\",\n  market_outcome.\"id\" as \"ID\",\n  actual_dispatch.\"time\",\n  market_outcome.unit_id\nFrom(\nSELECT\n  $__timeGroupAlias(index,$__interval),\n  power,\n  unit,\n  simulation,\n  concat(unit, '_', simulation) as \"id\"\nFROM unit_dispatch\nWHERE\n  $__timeFilter(index) AND\n  unit in ($Gen_Units) AND\n  simulation in ($simulation)\nGROUP BY 1, power, index, simulation, unit\nORDER BY 1) actual_dispatch\nleft join(\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  sum(accepted_volume) as \"Accepted Volume\",\n  simulation,\n  unit_id,\n  concat(unit_id, '_', simulation) as \"id\"\nFROM market_orders\nWhere\n  $__timeFilter(start_time) AND\n  unit_id in ($Gen_Units) AND\n  simulation in ($simulation)\nGROUP BY 1, unit_id, simulation, start_time\nORDER BY 1\n) market_outcome on (market_outcome.time = actual_dispatch.time AND\n  actual_dispatch.\"id\" = market_outcome.\"id\"\n)\nORDER BY market_outcome.\"id\"\n\n",
+          "refId": "Dispatch",
+          "select": [
+            [
+              {
+                "params": [
+                  "volume"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "demand_meta",
+          "timeColumn": "\"Timestamp\"",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Unitwise breaking constraints - Sum",
+      "transformations": [
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "ID": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "mismatch": {
+                "aggregations": [
+                  "sum"
+                ],
+                "operation": "aggregate"
+              },
+              "unit_id": {
+                "aggregations": []
+              }
+            }
+          }
+        }
+      ],
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
       "description": "Market outcome - actual dispatch respecting ramping unit constraints",
       "fieldConfig": {
         "defaults": {
@@ -1939,8 +2078,8 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "mismatch {simulation=\"2020_SB_dam\", unit_id=\"lignite_unit\"}",
-                  "mismatch {simulation=\"2020_BB_dam\", unit_id=\"lignite_unit\"}"
+                  "mismatch {simulation=\"2020_BB_dam\", unit_id=\"combined_gas_unit\"}",
+                  "mismatch {simulation=\"2020_SB_dam\", unit_id=\"combined_gas_unit\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -1963,7 +2102,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 76
+        "y": 78
       },
       "id": 88,
       "options": {
@@ -2054,21 +2193,9 @@
               }
             ]
           },
-          "unit": "MWh"
+          "unit": "kwatth"
         },
         "overrides": [
-          {
-            "matcher": {
-              "id": "byFrameRefID",
-              "options": "A"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "MWh"
-              }
-            ]
-          },
           {
             "matcher": {
               "id": "byName",
@@ -2105,7 +2232,7 @@
         "h": 13,
         "w": 11,
         "x": 0,
-        "y": 85
+        "y": 87
       },
       "id": 85,
       "options": {
@@ -2140,7 +2267,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  orders.\"id\",\n  orders.\"offered_volume\",\n  orders.\"accepted_volume\",\n  units.\"dispatched_volume\"\nfrom(\nSELECT\n  sum(round(CAST(volume AS numeric), 2)) as \"offered_volume\",\n  sum(round(CAST(accepted_volume AS numeric), 2)) as \"accepted_volume\",\n  simulation,\n  unit_id,\n  concat(unit_id, '_', simulation) as \"id\"\nFROM market_orders\nWHERE\n  simulation in ($simulation) AND\n  unit_id IN ($Gen_Units)\nGROUP BY unit_id, simulation) orders\njoin\n(\nSELECT\n  sum(round(CAST(power AS numeric), 2)) AS \"dispatched_volume\",\n  simulation,\n  unit,\n  concat(unit, '_', simulation) as \"id\"\nFROM unit_dispatch\nWHERE\n  simulation in ($simulation) AND\n  unit IN ($Gen_Units)\nGROUP BY unit, simulation\n) units on orders.\"id\" = units.\"id\"",
+          "rawSql": "SELECT\n  orders.\"id\",\n  orders.\"offered_volume\",\n  orders.\"accepted_volume\",\n  units.\"dispatched_volume\"\nfrom(\nSELECT\n  sum(round(CAST(volume AS numeric)*1000, 2)) as \"offered_volume\",\n  sum(round(CAST(accepted_volume AS numeric)*1000, 2)) as \"accepted_volume\",\n  simulation,\n  unit_id,\n  concat(unit_id, '_', simulation) as \"id\"\nFROM market_orders\nWHERE\n  simulation in ($simulation) AND\n  unit_id IN ($Gen_Units)\nGROUP BY unit_id, simulation) orders\njoin\n(\nSELECT\n  sum(round(CAST(power AS numeric)*1000, 2)) AS \"dispatched_volume\",\n  simulation,\n  unit,\n  concat(unit, '_', simulation) as \"id\"\nFROM unit_dispatch\nWHERE\n  simulation in ($simulation) AND\n  unit IN ($Gen_Units)\nGROUP BY unit, simulation\n) units on orders.\"id\" = units.\"id\"",
           "refId": "A",
           "select": [
             [
@@ -2169,12 +2296,196 @@
       "type": "barchart"
     },
     {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "Positive, if volume_BB > volume_SB",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "kwatth"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": []
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "accepted_volume (diff)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "offered_volume (diff)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 9,
+        "x": 11,
+        "y": 87
+      },
+      "id": 89,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "groupWidth": 0.8,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "horizontal",
+        "showValue": "always",
+        "stacking": "none",
+        "text": {
+          "valueSize": 1
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "unit_id",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "9.2.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "table",
+          "group": [],
+          "hide": false,
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  orders.\"id\",\n  orders.\"offered_volume\",\n  orders.\"accepted_volume\",\n  units.\"dispatched_volume\",\n  orders.unit_id\nfrom(\nSELECT\n  -sum(round(CAST(volume AS numeric)*1000, 2)) as \"offered_volume\",\n  -sum(round(CAST(accepted_volume AS numeric)*1000, 2)) as \"accepted_volume\",\n  simulation,\n  unit_id,\n  concat(unit_id, '_', simulation) as \"id\"\nFROM market_orders\nWHERE\n  simulation in ($simulation) AND\n  unit_id IN ($Gen_Units)\nGROUP BY unit_id, simulation) orders\njoin\n(\nSELECT\n  -sum(round(CAST(power AS numeric)*1000, 2)) AS \"dispatched_volume\",\n  simulation,\n  unit,\n  concat(unit, '_', simulation) as \"id\"\nFROM unit_dispatch\nWHERE\n  simulation in ($simulation) AND\n  unit IN ($Gen_Units)\nGROUP BY unit, simulation\n) units on orders.\"id\" = units.\"id\"",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "power"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "market_dispatch",
+          "timeColumn": "datetime",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Accepted volumes difference between $simulation",
+      "transformations": [
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "accepted_volume": {
+                "aggregations": [
+                  "diff"
+                ],
+                "operation": "aggregate"
+              },
+              "dispatched_volume": {
+                "aggregations": [
+                  "diff"
+                ],
+                "operation": "aggregate"
+              },
+              "id": {
+                "aggregations": []
+              },
+              "offered_volume": {
+                "aggregations": [
+                  "diff"
+                ],
+                "operation": "aggregate"
+              },
+              "unit_id": {
+                "aggregations": [],
+                "operation": "groupby"
+              }
+            }
+          }
+        }
+      ],
+      "type": "barchart"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 98
+        "y": 100
       },
       "id": 39,
       "panels": [],
@@ -2191,7 +2502,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 99
+        "y": 101
       },
       "id": 35,
       "options": {
@@ -2302,7 +2613,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 102
+        "y": 104
       },
       "id": 36,
       "options": {
@@ -2414,7 +2725,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 102
+        "y": 104
       },
       "id": 37,
       "options": {
@@ -2475,7 +2786,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 111
+        "y": 113
       },
       "id": 44,
       "panels": [],
@@ -2494,7 +2805,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 112
+        "y": 114
       },
       "id": 45,
       "options": {
@@ -2588,7 +2899,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2604,7 +2916,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 115
+        "y": 117
       },
       "id": 65,
       "options": {
@@ -2700,7 +3012,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2715,7 +3028,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 115
+        "y": 117
       },
       "id": 47,
       "options": {
@@ -2769,6 +3082,397 @@
       ],
       "title": "Chosen Unit Specifications",
       "type": "marcusolsson-dynamictext-panel"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "Bid prices of accepted bids per unit in the chosen market",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "currencyEUR"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "price .*"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "€/MW"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 126
+      },
+      "id": 92,
+      "options": {
+        "legend": {
+          "calcs": [
+            "min",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "9.2.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
+          "group": [
+            {
+              "params": [
+                "$__interval",
+                "none"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "unit_id"
+              ],
+              "type": "column"
+            }
+          ],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  accepted_price AS \"Accepted price:\",\r\n  price AS \"Bid price:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Storage_Units) AND\r\n  simulation in ($simulation)\r\nGROUP BY 1, unit_id, market_id, price, accepted_price, simulation\r\nORDER BY 1",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "original_price"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "avg"
+                ],
+                "type": "aggregate"
+              },
+              {
+                "params": [
+                  "price"
+                ],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": [
+                  "unit_id"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "unit_id"
+                ],
+                "type": "alias"
+              }
+            ]
+          ],
+          "table": "market_orders",
+          "timeColumn": "start_time",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            },
+            {
+              "datatype": "text",
+              "name": "",
+              "params": [
+                "market_id",
+                "=",
+                "'$market'"
+              ],
+              "type": "expression"
+            },
+            {
+              "datatype": "text",
+              "name": "",
+              "params": [
+                "simulation",
+                "=",
+                "'$simulation'"
+              ],
+              "type": "expression"
+            }
+          ]
+        }
+      ],
+      "title": "Bid Prices",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "megwatt"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume_acceptance_ratio"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Relative acceptance of bid volume"
+              },
+              {
+                "id": "unit"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 126
+      },
+      "id": 94,
+      "options": {
+        "legend": {
+          "calcs": [
+            "min",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_volume) AS \"Accepted volume:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Storage_Units) AND\r\n  simulation in ($simulation)\r\nGROUP BY 1, unit_id, market_id, simulation\r\nORDER BY 1\r\n",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "power"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "market_dispatch",
+          "timeColumn": "datetime",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
+          "group": [],
+          "hide": false,
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(volume) AS \"Bid volume:\",\r\n  unit_id\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Storage_Units) AND\r\n  simulation in ($simulation)\r\nGROUP BY 1, unit_id, simulation\r\nORDER BY 1",
+          "refId": "B",
+          "select": [
+            [
+              {
+                "params": [
+                  "power"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "market_dispatch",
+          "timeColumn": "datetime",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Bid volume",
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "alias": "volume_acceptance_ratio",
+            "binary": {
+              "left": "accepted_volume Unit 1",
+              "operator": "/",
+              "reducer": "sum",
+              "right": "bid_volume Unit 1"
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
+          }
+        }
+      ],
+      "type": "timeseries"
     }
   ],
   "refresh": false,
@@ -2917,13 +3621,13 @@
     ]
   },
   "time": {
-    "from": "2020-03-23T23:00:00.000Z",
-    "to": "2020-03-31T21:59:59.000Z"
+    "from": "2020-01-19T23:00:00.000Z",
+    "to": "2020-01-26T22:59:59.000Z"
   },
   "timepicker": {},
   "timezone": "",
   "title": "ASSUME Comparison Block Bids",
   "uid": "LlWPcjzSz",
-  "version": 19,
+  "version": 1,
   "weekStart": ""
 }
