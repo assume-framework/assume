@@ -234,6 +234,8 @@ class World:
             unit_operator_agent._role_context.data_dict = {
                 "output_agent_addr": self.output_agent_addr[0],
                 "output_agent_id": self.output_agent_addr[1],
+                "learning_output_agent_addr": self.output_agent_addr[0],
+                "learning_output_agent_id": self.output_agent_addr[1],
             }
 
     async def async_add_unit(
