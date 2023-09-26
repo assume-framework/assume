@@ -1,4 +1,5 @@
 name,technology,bidding_energy,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,fixed_cost,hot_start_cost,shut_down_cost,no_load_cost,unit_operator
-Unit 1,nuclear,learning_uc,uranium,0.0,2000,400,0.3,400,400,32,325000,28500,17000,Operator 1
-Unit 2,nuclear,learning_uc,uranium,0.0,1000.0,200.0,0.5,200,200,36,142500,18500,13755,Operator 2
-Unit 3,nuclear,learning_uc,uranium,0.0,1000.0,200.0,0.4,200,200,65,72000,14400,9930,Operator 3
+Unit 1,nuclear,naive,uranium,0.0,1000,200,0.5,400,400,32,325000,28500,17000,Operator 1
+Unit 2,nuclear,naive,uranium,0.0,1000.0,200.0,0.5,400,400,36,142500,18500,13755,Operator 2
+Unit 3,nuclear,learning_uc,uranium,0.0,1000.0,200.0,0.5,400,400,65,72000,14400,9930,Operator 3
+Unit 4,nuclear,naive,uranium,0.0,1000.0,200.0,0.5,400,400,85,55000,12000,9900,Operator 4
