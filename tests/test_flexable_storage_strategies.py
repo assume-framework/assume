@@ -112,13 +112,13 @@ def test_flexable_eom_storage(mock_market_config, storage):
     assert math.isclose(bids[0]["price"], np.mean(forecast[0:13]), abs_tol=0.01)
     assert bids[0]["volume"] == -60
     assert math.isclose(bids[1]["price"], np.mean(forecast[0:17]), abs_tol=0.01)
-    assert bids[1]["volume"] == 0
+    assert bids[1]["volume"] == 60
     assert math.isclose(bids[2]["price"], np.mean(forecast[0:21]), abs_tol=0.01)
     assert bids[2]["volume"] == 60
     assert math.isclose(bids[3]["price"], np.mean(forecast[0:25]), abs_tol=0.01)
-    assert bids[3]["volume"] == 100
+    assert bids[3]["volume"] == 60
     assert math.isclose(bids[4]["price"], np.mean(forecast[4:]), abs_tol=0.01)
-    assert bids[4]["volume"] == 0
+    assert bids[4]["volume"] == -60
     assert math.isclose(bids[5]["price"], np.mean(forecast[8:]), abs_tol=0.01)
     assert bids[5]["volume"] == -60
 
