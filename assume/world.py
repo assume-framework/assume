@@ -135,6 +135,8 @@ class World:
         self.bidding_params.update(self.learning_config)
         # initiate learning if the learning mode is on and hence we want to learn new strategies
         self.learning_mode = self.learning_config.get("learning_mode", False)
+        self.eval_mode = self.learning_config.get("evaluation_mode", False)
+
         if self.learning_mode:
             # if so, we initate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
@@ -172,6 +174,7 @@ class World:
             export_csv_path=self.export_csv_path,
             save_frequency_hours=save_frequency_hours,
             learning_mode=self.learning_mode,
+            evaluation_mode=self.eval_mode,
         )
         if self.same_process:
             output_agent = RoleAgent(

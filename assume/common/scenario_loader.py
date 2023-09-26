@@ -76,6 +76,13 @@ def load_file(
                 )
                 return None
 
+            # check if df.index contains index
+            if not index.isin(df.index).all():
+                logger.warning(
+                    f"{file_name}: simulation time line does not match the indexes from the dataframe. Returning None."
+                )
+                return None
+
             df.index.freq = df.index.inferred_freq
 
             if len(df.index) < len(index) and df.index.freq == index.freq:
@@ -232,6 +239,7 @@ async def load_scenario_folder_async(
     study_case: str,
     disable_learning: bool = False,
     episode: int = 0,
+    eval_episode: int = 0,
     load_learned_path: str = "",
 ):
     """Load a scenario from a given path. Raises: ValueError: If the scenario or study case is not found.
@@ -298,8 +306,9 @@ async def load_scenario_folder_async(
     learning_config: LearningConfig = config.get("learning_config", {})
     bidding_strategy_params = config.get("bidding_strategy_params", {})
 
-    if disable_learning:
+    if disable_learning and learning_config["learning_mode"] is True:
         learning_config["learning_mode"] = False
+        learning_config["evaluation_mode"] = True
 
     if load_learned_path:
         learning_config["load_learned_path"] = load_learned_path
@@ -310,6 +319,9 @@ async def load_scenario_folder_async(
 
     if learning_config.get("learning_mode", False):
         sim_id = f"{sim_id}_{episode}"
+
+    if learning_config.get("evaluation_mode", False):
+        sim_id = f"{sim_id}_eval_{eval_episode}"
 
     # add forecast provider
     logger.info("Adding forecast")
@@ -516,6 +528,7 @@ def load_scenario_folder(
     study_case: str,
     disable_learning: bool = False,
     episode: int = 0,
+    eval_episode: int = 0,
     load_learned_path="",
 ):
     """
@@ -538,6 +551,7 @@ def load_scenario_folder(
             study_case=study_case,
             disable_learning=disable_learning,
             episode=episode,
+            eval_episode=eval_episode,
             load_learned_path=load_learned_path,
         )
     )
@@ -563,6 +577,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
     actors_and_critics = None
     world.output_role.del_similar_runs()
 
+    eval_episode = 0
     for episode in tqdm(
         range(world.learning_role.training_episodes),
         desc="Training Episodes",
@@ -609,6 +624,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
                 scenario,
                 study_case,
                 disable_learning=True,
+                eval_episode=eval_episode,
                 load_learned_path=new_path,
             )
             world.run()
@@ -619,6 +635,9 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
                 # save new best params for simulation
                 best_reward = avg_reward
                 world.learning_role.save_params(directory=old_path)
+
+            eval_episode += 1
+
         world.reset()
 
         # in load_scenario_folder_async, we initiate new container and kill old if present

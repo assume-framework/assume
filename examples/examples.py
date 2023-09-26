@@ -6,7 +6,7 @@ from assume import World, load_scenario_folder, run_learning
 
 log = logging.getLogger(__name__)
 
-csv_path = ""
+csv_path = "examples/outputs"
 
 os.makedirs("./examples/local_db", exist_ok=True)
 
@@ -124,7 +124,7 @@ if __name__ == "__main__":
     # group by unit and iterate to get profit
     for unit, df in cashflows.groupby("unit"):
         profit = df["energy_cashflow"] - df["energy_marginal_costs"]
-        profits[f"{unit}_profit"] = round(profit / 1000, 0)
+        profits[f"{unit}_profit"] = profit
         # profits[f"{unit}_mc"] = (round(df["energy_marginal_costs"]/1000,0))
         # profits[f"{unit}_cf"] = (round(df["energy_cashflow"]/1000,0))
 
@@ -141,7 +141,7 @@ if __name__ == "__main__":
         labels={"index": "Unit", "Profit": "Profit [k€]"},
     )
     # renamy axis to profit in kEUR
-    fig.update_yaxes(title_text="Profit [k€]")
+    fig.update_yaxes(title_text="Profit [€]")
     # remove legend
     fig.update_layout(showlegend=False)
     fig.show()

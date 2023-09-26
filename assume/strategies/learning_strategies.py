@@ -6,7 +6,7 @@ import pandas as pd
 import torch as th
 
 from assume.common.base import LearningStrategy, SupportsMinMax
-from assume.common.market_objects import MarketConfig, Orderbook, Product
+from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 from assume.reinforcement_learning.learning_utils import Actor, NormalActionNoise
 
 
@@ -191,7 +191,6 @@ class RLStrategy(LearningStrategy):
                 # needs to be adjusted if observation space is changed, because only makes sense
                 # if the last dimension of the observation space are the marginal cost
                 curr_action = noise + base_bid.clone().detach()
-
             else:
                 # if we are not in the initial exploration phase we chose the action with the actor neuronal net
                 # and add noise to the action
@@ -437,3 +436,172 @@ class RLStrategy(LearningStrategy):
             self.actor_target.load_state_dict(params["actor_target"])
             self.actor_target.eval()
             self.actor.optimizer.load_state_dict(params["actor_optimizer"])
+
+
+class RlUCStrategy(RLStrategy):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.max_bid_multiplier = 2
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Calculate bids for a unit
+        :param unit: Unit to calculate bids for
+        :type unit: SupportsMinMax
+        :param market_config: Market configuration
+        :type market_config: MarketConfig
+        :param product_tuples: Product tuples
+        :type product_tuples: list[Product]
+        :return: Bids containing start time, end time, price and volume
+        :rtype: Orderbook
+        """
+        start = product_tuples[0][0]
+        end_all = product_tuples[-1][1]
+        end = product_tuples[0][1]
+
+        min_power, max_power = unit.calculate_min_max_power(start, end)
+        min_power = min_power[start]
+        max_power = max_power[start]
+
+        next_observation = self.create_observation(
+            unit=unit,
+            start=start,
+            end=end,
+        )
+        initial_output = unit.get_output_before(start)
+        marginal_cost = unit.calculate_marginal_cost(start, initial_output)
+        current_status = 1 if unit.get_operation_time(start) > 0 else 0
+
+        actions, noise = self.get_actions(next_observation)
+        # convert actions from -1 to 1 into 1 to k
+        actions = ((actions + 1) / 2) * (self.max_bid_multiplier - 1) + 1
+        bid_prices = actions * marginal_cost
+        price_profile = {
+            product[0]: bid_prices[i] for i, product in enumerate(product_tuples)
+        }
+
+        order: Order = {
+            "start_time": start,
+            "end_time": end_all,
+            "volume": -1,
+            "price": price_profile,
+            "min_power": unit.min_power,
+            "max_power": unit.max_power,
+            "ramp_up": unit.ramp_up,
+            "ramp_down": unit.ramp_down,
+            "no_load_cost": unit.no_load_cost,
+            "start_up_cost": unit.hot_start_cost,
+            "shut_down_cost": unit.shut_down_cost,
+            "initial_output": initial_output,
+            "initial_status": current_status,
+            "bid_type": "MPB",
+        }
+
+        bids = [order]
+
+        # store results in unit outputs which are written to database by unit operator
+        unit.outputs["rl_observations"][start] = next_observation
+        unit.outputs["rl_actions"][start] = actions
+        unit.outputs["rl_exploration_noise"][start] = noise
+
+        return bids
+
+    def calculate_reward(
+        self,
+        unit,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ):
+        """
+        Calculate reward
+        :param unit: Unit to calculate reward for
+        :type unit: SupportsMinMax
+        :param marketconfig: Market configuration
+        :type marketconfig: MarketConfig
+        :param orderbook: Orderbook
+        :type orderbook: Orderbook
+        """
+
+        product_type = marketconfig.product_type
+
+        profit = []
+        reward = 0
+        opportunity_cost = 0
+
+        # iterate over all orders in the orderbook, to calculate order specific profit
+        for order in orderbook:
+            start = order["start_time"]
+            end = order["end_time"]
+            end_excl = end - unit.index.freq
+
+            # depending on way the unit calaculates marginal costs we take costs
+
+            if unit.marginal_cost is not None:
+                marginal_cost = (
+                    unit.marginal_cost[start]
+                    if len(unit.marginal_cost) > 1
+                    else unit.marginal_cost
+                )
+            else:
+                marginal_cost = unit.calc_marginal_cost_with_partial_eff(
+                    power_output=unit.outputs[product_type].loc[start:end_excl],
+                    timestep=start,
+                )
+
+            # calculate profit as income - running_cost from this event
+            duration = (end - start) / timedelta(hours=1)
+            order_profit = (
+                order["accepted_price"][start]
+                * order["accepted_volume"][start]
+                * duration
+            )
+
+            # calculate opportunity cost
+            # as the loss of income we have because we are not running at full power
+            price_difference = order["price"][start] - marginal_cost
+
+            order_opportunity_cost = (
+                price_difference
+                * (
+                    unit.max_power - unit.outputs[product_type].loc[start:end_excl]
+                ).sum()
+                * duration
+            )
+
+            # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
+            order_opportunity_cost = max(order_opportunity_cost, 0)
+
+            # collect profit and opportunity cost for all orders
+            opportunity_cost += order_opportunity_cost
+
+            # consideration of start-up costs, which are evenly divided between the
+            # upward and downward regulation events
+            if (
+                unit.outputs[product_type].loc[start] != 0
+                and unit.outputs[product_type].loc[start - unit.index.freq] == 0
+            ):
+                order_profit -= unit.hot_start_cost
+            elif (
+                unit.outputs[product_type].loc[start] == 0
+                and unit.outputs[product_type].loc[start - unit.index.freq] != 0
+            ):
+                order_profit -= unit.shut_down_cost
+
+            profit.append(order_profit)
+
+            # store results in unit outputs which are written to database by unit operator
+            unit.outputs["profit"].loc[start:end_excl] += float(order_profit)
+            unit.outputs["regret"].loc[start:end_excl] = float(opportunity_cost)
+            unit.outputs["learning_mode"].loc[start:end_excl] = self.learning_mode
+
+        scaling = 0.01 / unit.max_power / len(profit)
+        regret_scale = 0.2
+        reward = float(sum(profit) - regret_scale * opportunity_cost) * scaling
+        unit.outputs["reward"].loc[start:end_excl] = reward
