@@ -359,6 +359,9 @@ class WriteOutput(Role):
                 df = pd.read_sql(query, self.db)
             except (OperationalError, ProgrammingError):
                 continue
+            except Exception as e:
+                logger.error("could not read query: %s", e)
+                continue
 
             dfs.append(df)
 

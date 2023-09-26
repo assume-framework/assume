@@ -397,6 +397,7 @@ class UnitsOperator(Role):
 
         db_aid = self.context.data_dict.get("learning_output_agent_id")
         db_addr = self.context.data_dict.get("learning_output_agent_addr")
+
         if db_aid and db_addr:
             self.context.schedule_instant_acl_message(
                 receiver_id=db_aid,
