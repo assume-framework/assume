@@ -579,14 +579,16 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
         range(1, world.learning_role.training_episodes + 1),
         desc="Training Episodes",
     ):
-        load_scenario_folder(
-            world,
-            inputs_path,
-            scenario,
-            study_case,
-            perform_learning=True,
-            episode=episode,
-        )
+        # TODO normally, loading twice should not create issues, somehow a scheduling issue is raised currently
+        if episode != 1:
+            load_scenario_folder(
+                world,
+                inputs_path,
+                scenario,
+                study_case,
+                perform_learning=True,
+                episode=episode,
+            )
 
         # give the newly created rl_agent the buffer that we stored from the beginning
         world.learning_role.create_actors_and_critics(

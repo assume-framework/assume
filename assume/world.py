@@ -329,13 +329,14 @@ class World:
         market_operator_agent.markets = []
 
         # after creation of an agent - we set additional context params
-        if self.learning_mode or self.evaluation_mode:
-            market_operator_agent._role_context.data_dict = {}
-        else:
-            market_operator_agent._role_context.data_dict = {
-                "output_agent_addr": self.output_agent_addr[0],
-                "output_agent_id": self.output_agent_addr[1],
-            }
+        market_operator_agent._role_context.data_dict = {}
+        if not self.learning_mode and not self.evaluation_mode:
+            market_operator_agent._role_context.data_dict.update(
+                {
+                    "output_agent_addr": self.output_agent_addr[0],
+                    "output_agent_id": self.output_agent_addr[1],
+                }
+            )
         self.market_operators[id] = market_operator_agent
 
     def add_market(
