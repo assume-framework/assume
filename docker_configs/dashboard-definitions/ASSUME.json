@@ -365,7 +365,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -381,7 +382,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 296
+        "y": 32
       },
       "id": 19,
       "options": {
@@ -558,7 +559,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 296
+        "y": 32
       },
       "id": 20,
       "options": {
@@ -678,7 +679,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 305
+        "y": 41
       },
       "id": 74,
       "panels": [],
@@ -767,7 +768,7 @@
         "h": 12,
         "w": 10,
         "x": 0,
-        "y": 306
+        "y": 42
       },
       "id": 72,
       "options": {
@@ -803,7 +804,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  simulation,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_cost') as \"Total cost\",\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_volume') as \"Total volume\"\nFROM kpis\ngroup by simulation\nORDER BY simulation",
+          "rawSql": "SELECT\n  simulation,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_cost') as \"Total cost\",\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_volume') as \"Total volume\"\nFROM kpis\nWHERE simulation = '$simulation'\ngroup by simulation",
           "refId": "Cost",
           "select": [
             [
@@ -901,7 +902,7 @@
         "h": 12,
         "w": 9,
         "x": 10,
-        "y": 306
+        "y": 42
       },
       "id": 76,
       "options": {
@@ -986,7 +987,7 @@
         "h": 12,
         "w": 5,
         "x": 19,
-        "y": 306
+        "y": 42
       },
       "id": 7,
       "options": {
@@ -1079,7 +1080,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 318
+        "y": 54
       },
       "id": 22,
       "options": {
@@ -1134,7 +1135,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 321
+        "y": 57
       },
       "id": 41,
       "panels": [],
@@ -1189,7 +1190,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1205,7 +1207,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 322
+        "y": 58
       },
       "id": 24,
       "options": {
@@ -1322,7 +1324,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 322
+        "y": 58
       },
       "id": 26,
       "options": {
@@ -1453,7 +1455,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 331
+        "y": 67
       },
       "id": 70,
       "options": {
@@ -1480,6 +1482,39 @@
             "uid": "P7B13B9DF907EC40C"
           },
           "format": "time_series",
+          "group": [],
+          "hide": false,
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_price::float) AS \"Accepted price:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id\r\nORDER BY 1\r\n",
+          "refId": "B",
+          "select": [
+            [
+              {
+                "params": [
+                  "power"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "market_dispatch",
+          "timeColumn": "datetime",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
           "group": [
             {
               "params": [
@@ -1497,7 +1532,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  accepted_price AS \"Accepted price:\",\r\n  price AS \"Bid price:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id, price, accepted_price\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  price AS \"Bid price:\",\r\n  unit_id as \"unit_id\",\r\n  bid_id as \"bid_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id, price, bid_id\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -1661,7 +1696,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 331
+        "y": 67
       },
       "id": 78,
       "options": {
@@ -1723,7 +1758,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(volume) AS \"Bid volume:\",\r\n  unit_id\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  volume AS \"Bid volume:\",\r\n  unit_id as \"unit_id\",\r\n  bid_id as \"bid_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id, volume, bid_id\r\nORDER BY 1",
           "refId": "B",
           "select": [
             [
@@ -1813,7 +1848,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1844,7 +1880,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 339
+        "y": 75
       },
       "id": 82,
       "options": {
@@ -1941,7 +1977,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 348
+        "y": 84
       },
       "id": 39,
       "panels": [],
@@ -1993,7 +2029,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2009,7 +2046,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 349
+        "y": 85
       },
       "id": 36,
       "options": {
@@ -2125,7 +2162,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 349
+        "y": 85
       },
       "id": 37,
       "options": {
@@ -2226,7 +2263,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2255,7 +2293,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 358
+        "y": 94
       },
       "id": 89,
       "options": {
@@ -2299,7 +2337,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  accepted_price AS \"Accepted price:\",\r\n  price AS \"Bid price:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Demand_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id, price, accepted_price\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_price::float) AS \"Accepted price:\",\r\n  price AS \"Bid price:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Demand_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id, price\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2463,7 +2501,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 358
+        "y": 94
       },
       "id": 90,
       "options": {
@@ -2615,7 +2653,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2647,7 +2686,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 367
+        "y": 103
       },
       "id": 86,
       "options": {
@@ -2743,7 +2782,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 376
+        "y": 112
       },
       "id": 44,
       "panels": [],
@@ -2795,7 +2834,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2811,7 +2851,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 377
+        "y": 113
       },
       "id": 65,
       "options": {
@@ -2927,7 +2967,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 377
+        "y": 113
       },
       "id": 47,
       "options": {
@@ -3027,7 +3067,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3043,7 +3084,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 386
+        "y": 122
       },
       "id": 80,
       "options": {
@@ -3163,7 +3204,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3192,7 +3234,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 395
+        "y": 131
       },
       "id": 91,
       "options": {
@@ -3400,7 +3442,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 395
+        "y": 131
       },
       "id": 92,
       "options": {
@@ -3552,7 +3594,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3584,7 +3627,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 404
+        "y": 140
       },
       "id": 84,
       "options": {
@@ -3684,21 +3727,21 @@
       {
         "current": {
           "selected": false,
-          "text": "example_01a_base",
-          "value": "example_01a_base"
+          "text": "example_01_rl_base",
+          "value": "example_01_rl_base"
         },
         "datasource": {
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "-- this construct is needed to execute a join query if rl_params exist\n-- else execute a query without a join on rl_params\nCREATE OR REPLACE FUNCTION get_simulation_data()\nRETURNS TABLE (\n  market_simulation TEXT\n) AS $$\nBEGIN\n  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'rl_params') THEN\n    -- Table rl_params exists, execute the join query\n    RETURN QUERY EXECUTE '\n      SELECT DISTINCT\n        m.simulation AS market_simulation\n      FROM \n        market_meta m\n      LEFT OUTER JOIN\n        rl_params o\n      ON\n        m.simulation = o.simulation\n      WHERE\n        o.learning_mode is not true\n    ';\n  ELSE\n    -- Table rl_params doesn't exist, execute the query for market_meta only\n    RETURN QUERY EXECUTE '\n      SELECT DISTINCT\n        simulation AS market_simulation\n      FROM \n        market_meta\n    ';\n  END IF;\nEND;\n$$ LANGUAGE plpgsql;\n\nSELECT * FROM get_simulation_data();\n",
+        "definition": "SELECT simulation\nFROM market_meta",
         "description": "Can choose which simulation we want to show ",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "simulation",
         "options": [],
-        "query": "-- this construct is needed to execute a join query if rl_params exist\n-- else execute a query without a join on rl_params\nCREATE OR REPLACE FUNCTION get_simulation_data()\nRETURNS TABLE (\n  market_simulation TEXT\n) AS $$\nBEGIN\n  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'rl_params') THEN\n    -- Table rl_params exists, execute the join query\n    RETURN QUERY EXECUTE '\n      SELECT DISTINCT\n        m.simulation AS market_simulation\n      FROM \n        market_meta m\n      LEFT OUTER JOIN\n        rl_params o\n      ON\n        m.simulation = o.simulation\n      WHERE\n        o.learning_mode is not true\n    ';\n  ELSE\n    -- Table rl_params doesn't exist, execute the query for market_meta only\n    RETURN QUERY EXECUTE '\n      SELECT DISTINCT\n        simulation AS market_simulation\n      FROM \n        market_meta\n    ';\n  END IF;\nEND;\n$$ LANGUAGE plpgsql;\n\nSELECT * FROM get_simulation_data();\n",
+        "query": "SELECT simulation\nFROM market_meta",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -3731,9 +3774,15 @@
       },
       {
         "current": {
-          "selected": false,
-          "text": "Unit 1",
-          "value": "Unit 1"
+          "selected": true,
+          "text": [
+            "Unit 1",
+            "Unit 3"
+          ],
+          "value": [
+            "Unit 1",
+            "Unit 3"
+          ]
         },
         "datasource": {
           "type": "postgres",
@@ -3813,21 +3862,16 @@
   },
   "timepicker": {
     "refresh_intervals": [
-      "5s",
-      "10s",
-      "30s",
       "1m",
       "5m",
       "15m",
       "30m",
-      "1h",
-      "2h",
-      "1d"
+      "1h"
     ]
   },
   "timezone": "",
-  "title": "ASSUME",
+  "title": "ASSUME: Main overview",
   "uid": "mQ3Lvkr4k",
-  "version": 12,
+  "version": 6,
   "weekStart": ""
 }

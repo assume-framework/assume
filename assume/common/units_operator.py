@@ -232,6 +232,10 @@ class UnitsOperator(Role):
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
 
+        self.valid_orders = list(
+            filter(lambda x: x["end_time"] >= now, self.valid_orders)
+        )
+
         db_aid = self.context.data_dict.get("output_agent_id")
         db_addr = self.context.data_dict.get("output_agent_addr")
         if db_aid and db_addr:
@@ -255,10 +259,6 @@ class UnitsOperator(Role):
                         "data": unit_dispatch,
                     },
                 )
-
-        self.valid_orders = list(
-            filter(lambda x: x["end_time"] >= now, self.valid_orders)
-        )
 
     async def submit_bids(self, opening: OpeningMessage):
         """
@@ -395,8 +395,10 @@ class UnitsOperator(Role):
                     output_dict[f"actions_{i}"] = action_tuple[i]
 
                 output_agent_list.append(output_dict)
-        db_aid = self.context.data_dict.get("output_agent_id")
-        db_addr = self.context.data_dict.get("output_agent_addr")
+
+        db_aid = self.context.data_dict.get("learning_output_agent_id")
+        db_addr = self.context.data_dict.get("learning_output_agent_addr")
+
         if db_aid and db_addr:
             self.context.schedule_instant_acl_message(
                 receiver_id=db_aid,
@@ -417,9 +419,6 @@ class UnitsOperator(Role):
         device: str,
         learning_unit_count: int,
     ):
-        learning_role_id = "learning_agent"
-        learning_role_addr = self.context.addr
-
         all_observations = []
         all_rewards = []
         try:
@@ -427,7 +426,6 @@ class UnitsOperator(Role):
 
         except ImportError:
             logger.error("tried writing learning_params, but torch is not installed")
-            all_actions = np.zeros((learning_unit_count, act_dim))
             return
 
         all_observations = th.zeros((learning_unit_count, obs_dim), device=device)
@@ -451,15 +449,19 @@ class UnitsOperator(Role):
         all_rewards = np.array(all_rewards)
         rl_agent_data = (np.array(all_observations), all_actions, all_rewards)
 
-        self.context.schedule_instant_acl_message(
-            receiver_id=learning_role_id,
-            receiver_addr=learning_role_addr,
-            content={
-                "context": "rl_training",
-                "type": "replay_buffer",
-                "data": rl_agent_data,
-            },
-        )
+        learning_role_id = self.context.data_dict.get("learning_agent_id")
+        learning_role_addr = self.context.data_dict.get("learning_agent_addr")
+
+        if learning_role_id and learning_role_addr:
+            self.context.schedule_instant_acl_message(
+                receiver_id=learning_role_id,
+                receiver_addr=learning_role_addr,
+                content={
+                    "context": "rl_training",
+                    "type": "replay_buffer",
+                    "data": rl_agent_data,
+                },
+            )
 
     def write_learning_params(self, orderbook: Orderbook, marketconfig: MarketConfig):
         """
