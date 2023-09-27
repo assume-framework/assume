@@ -9,7 +9,7 @@ from dateutil import rrule as rr
 from mango import Role
 from pandas.api.types import is_numeric_dtype
 from sqlalchemy import inspect, text
-from sqlalchemy.exc import OperationalError, ProgrammingError
+from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,7 @@ class WriteOutput(Role):
         export_csv_path: str = "",
         save_frequency_hours: int = None,
         learning_mode: bool = False,
+        evaluation_mode: bool = False,
     ):
         super().__init__()
 
@@ -56,15 +57,22 @@ class WriteOutput(Role):
             self.p = Path(self.export_csv_path, simulation_id)
             shutil.rmtree(self.p, ignore_errors=True)
             self.p.mkdir(parents=True)
-        self.db = db_engine
-        self.learning_mode = learning_mode
 
-        # learning
+        self.db = db_engine
+
+        self.learning_mode = learning_mode
+        self.evaluation_mode = evaluation_mode
+
+        # get episode number if in learning or evaluation mode
         self.episode = None
-        if self.learning_mode:
+        if self.learning_mode or self.evaluation_mode:
             episode = self.simulation_id.split("_")[-1]
             if episode.isdigit():
                 self.episode = int(episode)
+
+            # check if episode=0 and delete all similar runs
+            if self.episode == 0:
+                self.del_similar_runs()
 
         # contruct all timeframe under which hourly values are written to excel and db
         self.start = start
@@ -99,7 +107,7 @@ class WriteOutput(Role):
                 logger.debug("deleted %s rows from %s", rowcount, table_name)
 
     def del_similar_runs(self):
-        query = text("select distinct simulation from market_meta")
+        query = text("select distinct simulation from rl_params")
 
         try:
             with self.db.begin() as db:
@@ -173,10 +181,12 @@ class WriteOutput(Role):
         df = pd.DataFrame.from_records(rl_params, index="datetime")
         if df.empty:
             return
+
         df["simulation"] = self.simulation_id
         df["learning_mode"] = self.learning_mode
-        # get characters after last "_" of simulation id string
+        df["evaluation_mode"] = self.evaluation_mode
         df["episode"] = self.episode
+
         self.write_dfs["rl_params"].append(df)
 
     def write_market_results(self, market_meta):
@@ -362,7 +372,7 @@ class WriteOutput(Role):
         for query in queries:
             try:
                 df = pd.read_sql(query, self.db)
-            except (OperationalError, ProgrammingError):
+            except (OperationalError, DataError):
                 continue
             except Exception as e:
                 logger.error("could not read query: %s", e)
