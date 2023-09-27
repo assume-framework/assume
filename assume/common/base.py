@@ -783,8 +783,8 @@ class LearningConfig(TypedDict):
     :type noise_scale: int
     :param noise_dt: Determines how quickly the noise weakens over time.
     :type noise_dt: int
-    :param load_learned_path: The path to the learned model to load.
-    :type load_learned_path: str
+    :param trained_actors_path: The path to the learned model to load.
+    :type trained_actors_path: str
     """
 
     observation_dimension: int
@@ -805,4 +805,4 @@ class LearningConfig(TypedDict):
     noise_sigma: float
     noise_scale: int
     noise_dt: int
-    load_learned_path: str
+    trained_actors_path: str

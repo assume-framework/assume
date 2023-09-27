@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2,
+  "id": 1,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -217,6 +217,30 @@
                 "value": "EUR/MWh"
               }
             ]
+          },
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "Demand volume"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
           }
         ]
       },
@@ -382,7 +406,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 32
+        "y": 44
       },
       "id": 19,
       "options": {
@@ -553,13 +577,41 @@
           },
           "unit": "megwatt"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "  Unit 1_1",
+                  "  Unit 2_1",
+                  "  Unit 3_1",
+                  "  Unit 4_1"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 32
+        "y": 44
       },
       "id": 20,
       "options": {
@@ -679,7 +731,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 41
+        "y": 53
       },
       "id": 74,
       "panels": [],
@@ -768,7 +820,7 @@
         "h": 12,
         "w": 10,
         "x": 0,
-        "y": 42
+        "y": 54
       },
       "id": 72,
       "options": {
@@ -902,7 +954,7 @@
         "h": 12,
         "w": 9,
         "x": 10,
-        "y": 42
+        "y": 54
       },
       "id": 76,
       "options": {
@@ -987,7 +1039,7 @@
         "h": 12,
         "w": 5,
         "x": 19,
-        "y": 42
+        "y": 54
       },
       "id": 7,
       "options": {
@@ -1080,7 +1132,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 54
+        "y": 66
       },
       "id": 22,
       "options": {
@@ -1135,7 +1187,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 57
+        "y": 69
       },
       "id": 41,
       "panels": [],
@@ -1207,7 +1259,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 58
+        "y": 70
       },
       "id": 24,
       "options": {
@@ -1324,7 +1376,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 58
+        "y": 70
       },
       "id": 26,
       "options": {
@@ -1448,6 +1500,32 @@
                 "value": "€/MW"
               }
             ]
+          },
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "Bid price: {bid_id=\"Unit 4_1\", unit_id=\"Unit 4\"}",
+                  "Bid price: {bid_id=\"Unit 3_2\", unit_id=\"Unit 3\"}",
+                  "Bid price: {bid_id=\"Unit 3_1\", unit_id=\"Unit 3\"}"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
           }
         ]
       },
@@ -1455,7 +1533,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 67
+        "y": 79
       },
       "id": 70,
       "options": {
@@ -1689,6 +1767,30 @@
                 "id": "unit"
               }
             ]
+          },
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "Accepted volume: {unit_id=\"Unit 3 - EOM\"}"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
           }
         ]
       },
@@ -1696,7 +1798,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 67
+        "y": 79
       },
       "id": 78,
       "options": {
@@ -1725,7 +1827,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_volume) AS \"Accepted volume:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id\r\nORDER BY 1\r\n",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  sum(accepted_volume) AS \"Accepted volume:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id\r\nORDER BY 1\r\n",
           "refId": "A",
           "select": [
             [
@@ -1880,7 +1982,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 75
+        "y": 87
       },
       "id": 82,
       "options": {
@@ -1977,7 +2079,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 84
+        "y": 96
       },
       "id": 39,
       "panels": [],
@@ -2046,7 +2148,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 85
+        "y": 97
       },
       "id": 36,
       "options": {
@@ -2162,7 +2264,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 85
+        "y": 97
       },
       "id": 37,
       "options": {
@@ -2293,7 +2395,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 94
+        "y": 106
       },
       "id": 89,
       "options": {
@@ -2501,7 +2603,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 94
+        "y": 106
       },
       "id": 90,
       "options": {
@@ -2686,7 +2788,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 103
+        "y": 115
       },
       "id": 86,
       "options": {
@@ -2782,7 +2884,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 112
+        "y": 124
       },
       "id": 44,
       "panels": [],
@@ -2834,8 +2936,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2851,7 +2952,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 113
+        "y": 125
       },
       "id": 65,
       "options": {
@@ -2951,8 +3052,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2967,7 +3067,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 113
+        "y": 125
       },
       "id": 47,
       "options": {
@@ -3067,8 +3167,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3084,7 +3183,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 122
+        "y": 134
       },
       "id": 80,
       "options": {
@@ -3204,8 +3303,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3234,7 +3332,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 131
+        "y": 143
       },
       "id": 91,
       "options": {
@@ -3397,8 +3495,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3442,7 +3539,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 131
+        "y": 143
       },
       "id": 92,
       "options": {
@@ -3594,8 +3691,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3627,7 +3723,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 140
+        "y": 152
       },
       "id": 84,
       "options": {
@@ -3726,9 +3822,9 @@
     "list": [
       {
         "current": {
-          "selected": false,
-          "text": "example_01_rl_base",
-          "value": "example_01_rl_base"
+          "selected": true,
+          "text": "example_01a_base",
+          "value": "example_01a_base"
         },
         "datasource": {
           "type": "postgres",
@@ -3777,11 +3873,15 @@
           "selected": true,
           "text": [
             "Unit 1",
-            "Unit 3"
+            "Unit 2",
+            "Unit 3",
+            "Unit 4"
           ],
           "value": [
             "Unit 1",
-            "Unit 3"
+            "Unit 2",
+            "Unit 3",
+            "Unit 4"
           ]
         },
         "datasource": {
@@ -3805,9 +3905,13 @@
       },
       {
         "current": {
-          "selected": false,
-          "text": "demand_EOM",
-          "value": "demand_EOM"
+          "selected": true,
+          "text": [
+            "demand_EOM"
+          ],
+          "value": [
+            "demand_EOM"
+          ]
         },
         "datasource": {
           "type": "postgres",
@@ -3830,10 +3934,13 @@
       },
       {
         "current": {
-          "isNone": true,
-          "selected": false,
-          "text": "None",
-          "value": ""
+          "selected": true,
+          "text": [
+            "None"
+          ],
+          "value": [
+            ""
+          ]
         },
         "datasource": {
           "type": "postgres",
@@ -3858,7 +3965,7 @@
   },
   "time": {
     "from": "2018-12-31T23:00:00.000Z",
-    "to": "2019-01-31T22:59:59.000Z"
+    "to": "2019-01-10T22:59:59.000Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -3872,6 +3979,6 @@
   "timezone": "",
   "title": "ASSUME: Main overview",
   "uid": "mQ3Lvkr4k",
-  "version": 6,
+  "version": 3,
   "weekStart": ""
 }

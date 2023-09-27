@@ -234,7 +234,7 @@ async def load_scenario_folder_async(
     perform_evaluation: bool = False,
     episode: int = 0,
     eval_episode: int = 0,
-    load_learned_path: str = "",
+    trained_actors_path: str = "",
 ):
     """Load a scenario from a given path. Raises: ValueError: If the scenario or study case is not found.
 
@@ -304,12 +304,12 @@ async def load_scenario_folder_async(
     )
     learning_config["evaluation_mode"] = perform_evaluation
 
-    if "load_learned_path" not in learning_config.keys():
-        if load_learned_path:
-            learning_config["load_learned_path"] = load_learned_path
+    if "trained_actors_path" not in learning_config.keys():
+        if trained_actors_path:
+            learning_config["trained_actors_path"] = trained_actors_path
         else:
             learning_config[
-                "load_learned_path"
+                "trained_actors_path"
             ] = f"{inputs_path}/learned_strategies/{sim_id}"
 
     if learning_config.get("learning_mode", False):
@@ -451,6 +451,13 @@ async def load_scenario_folder_async(
         forecaster=forecaster,
     )
 
+    if (
+        world.learning_mode
+        and world.learning_role is not None
+        and len(world.learning_role.rl_strats) == 0
+    ):
+        raise ValueError("No RL units/strategies were provided!")
+
 
 async def async_load_custom_units(
     world: World,
@@ -523,9 +530,9 @@ def load_scenario_folder(
     study_case: str,
     perform_learning: bool = True,
     perform_evaluation: bool = False,
-    episode: int = 0,
-    eval_episode: int = 0,
-    load_learned_path="",
+    episode: int = 1,
+    eval_episode: int = 1,
+    trained_actors_path="",
 ):
     """
     Load a scenario from a given path.
@@ -549,7 +556,7 @@ def load_scenario_folder(
             perform_evaluation=perform_evaluation,
             episode=episode,
             eval_episode=eval_episode,
-            load_learned_path=load_learned_path,
+            trained_actors_path=trained_actors_path,
         )
     )
 
@@ -574,7 +581,13 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
     actors_and_critics = None
     world.output_role.del_similar_runs()
 
+    validation_interval = min(
+        world.learning_role.training_episodes,
+        world.learning_config.get("validation_episodes_interval", 5),
+    )
+
     eval_episode = 1
+
     for episode in tqdm(
         range(1, world.learning_role.training_episodes + 1),
         desc="Training Episodes",
@@ -601,17 +614,16 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
             world.learning_role.turn_off_initial_exploration()
 
         world.run()
+
         actors_and_critics = world.learning_role.extract_actors_and_critics()
-        validation_interval = min(
-            world.learning_role.training_episodes,
-            world.learning_config.get("validation_episodes_interval", 5),
-        )
+
         if (
             episode % validation_interval == 0
             and episode > world.learning_role.episodes_collecting_initial_experience
         ):
-            old_path = world.learning_config["load_learned_path"]
+            old_path = world.learning_config["trained_actors_path"]
             new_path = f"{old_path}_eval"
+
             # save validation params in validation path
             world.learning_role.save_params(directory=new_path)
             world.reset()
@@ -625,14 +637,16 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
                 perform_learning=False,
                 perform_evaluation=True,
                 eval_episode=eval_episode,
-                load_learned_path=new_path,
+                trained_actors_path=new_path,
             )
+
             world.run()
+
             avg_reward = world.output_role.get_sum_reward()
             # check reward improvement in validation run
-            world.learning_config["load_learned_path"] = old_path
-            if best_reward < avg_reward:
-                # save new best params for simulation
+            world.learning_config["trained_actors_path"] = old_path
+            if avg_reward > best_reward:
+                # update best reward
                 best_reward = avg_reward
                 world.learning_role.save_params(directory=old_path)
 

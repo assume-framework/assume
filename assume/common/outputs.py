@@ -290,12 +290,16 @@ class WriteOutput(Role):
         # check if market results list is empty and skip the funktion and raise a warning
         if not market_orders:
             return
+
         market_orders = separate_orders(market_orders)
         df = pd.DataFrame.from_records(market_orders, index="start_time")
+
         del df["only_hours"]
         del df["agent_id"]
+
         df["simulation"] = self.simulation_id
         df["market_id"] = market_id
+
         self.write_dfs["market_orders"].append(df)
 
     def write_units_definition(self, unit_info: dict):
@@ -380,6 +384,8 @@ class WriteOutput(Role):
 
             dfs.append(df)
 
+        # remove all empty dataframes
+        dfs = [df for df in dfs if not df.empty]
         if not dfs:
             return
 
@@ -402,13 +408,11 @@ class WriteOutput(Role):
 
     def get_sum_reward(self):
         query = text(
-            "select value from kpis where variable = 'sum_reward' and ident = '{self.simulation_id}'"
+            f"select reward FROM rl_params where simulation='{self.simulation_id}'"
         )
 
-        try:
-            with self.db.begin() as db:
-                avg_reward = db.execute(query).fetchall()[0]
-        except Exception:
-            avg_reward = 0
+        with self.db.begin() as db:
+            reward = db.execute(query).fetchall()
+            avg_reward = sum(r[0] for r in reward) / len(reward)
 
         return avg_reward

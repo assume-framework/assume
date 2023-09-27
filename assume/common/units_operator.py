@@ -164,11 +164,15 @@ class UnitsOperator(Role):
         :type meta: dict[str, str]
         """
         logger.debug(f"{self.id} got market result: {content}")
-        orderbook: Orderbook = content["orderbook"]
+        accepted_orders: Orderbook = content["accepted_orders"]
+        rejected_orders: Orderbook = content["rejected_orders"]
+        orderbook = accepted_orders + rejected_orders
+
         for order in orderbook:
             order["market_id"] = content["market_id"]
             # map bid id to unit id
             order["unit_id"] = self.bids_map[order["bid_id"]]
+
         self.valid_orders.extend(orderbook)
         marketconfig = self.registered_markets[content["market_id"]]
         self.set_unit_dispatch(orderbook, marketconfig)

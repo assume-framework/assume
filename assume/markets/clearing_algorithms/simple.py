@@ -112,20 +112,22 @@ class PayAsClearRole(MarketRole):
                     split_demand_order["accepted_volume"] = diff
                     demand_order["accepted_volume"] = demand_order["volume"] - diff
                     rejected_orders.append(split_demand_order)
+
                 elif diff > 0:
                     # generation left over - split last generation bid
                     supply_order = to_commit[-1]
                     split_supply_order = supply_order.copy()
                     split_supply_order["volume"] = diff
                     supply_order["accepted_volume"] = supply_order["volume"] - diff
+
                     # changed supply_order is still part of to_commit and will be added
                     # only volume-diff can be sold for current price
                     gen_vol -= diff
 
                     # add left over to supply_orders again
                     supply_orders.insert(0, split_supply_order)
+
                 else:
-                    # diff == 0 perfect match
                     demand_order["accepted_volume"] = demand_order["volume"]
 
                 accepted_product_orders.append(demand_order)
@@ -139,7 +141,9 @@ class PayAsClearRole(MarketRole):
                 x for x in accepted_product_orders if x["accepted_volume"] > 0
             ]
             if accepted_supply_orders:
-                clear_price = max(map(itemgetter("price"), accepted_supply_orders))
+                clear_price = float(
+                    max(map(itemgetter("price"), accepted_supply_orders))
+                )
             else:
                 clear_price = 0
 

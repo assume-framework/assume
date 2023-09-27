@@ -344,34 +344,34 @@ class MarketRole(MarketMechanism, Role):
         (
             accepted_orderbook,
             rejected_orderbook,
-            # pending_orderbook,
             market_meta,
         ) = self.clear(self.all_orders, market_products)
         self.all_orders = []
         for order in rejected_orderbook:
             order["accepted_volume"] = 0
-            order["accepted_price"] = 0
+            order["accepted_price"] = market_meta[0]["price"]
         self.open_auctions - set(market_products)
-        # self.all_orders = pending_orderbook
 
         accepted_orderbook.sort(key=itemgetter("agent_id"))
         rejected_orderbook.sort(key=itemgetter("agent_id"))
-        accepted_bids = {
+
+        accepted_orders = {
             agent: list(bids)
             for agent, bids in groupby(accepted_orderbook, itemgetter("agent_id"))
         }
-        rejected_bids = {
+        rejected_orders = {
             agent: list(bids)
             for agent, bids in groupby(rejected_orderbook, itemgetter("agent_id"))
         }
+
         for agent in self.registered_agents:
             addr, aid = agent
             meta = {"sender_addr": self.context.addr, "sender_id": self.context.aid}
             closing: ClearingMessage = {
                 "context": "clearing",
                 "market_id": self.marketconfig.name,
-                "orderbook": accepted_bids.get(agent, []),
-                "rejected": rejected_bids.get(agent, []),
+                "accepted_orders": accepted_orders.get(agent, []),
+                "rejected_orders": rejected_orders.get(agent, []),
             }
             await self.context.send_acl_message(
                 closing,
