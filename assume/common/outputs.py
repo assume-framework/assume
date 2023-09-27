@@ -372,7 +372,7 @@ class WriteOutput(Role):
         for query in queries:
             try:
                 df = pd.read_sql(query, self.db)
-            except (OperationalError, DataError):
+            except (ProgrammingError, OperationalError, DataError):
                 continue
             except Exception as e:
                 logger.error("could not read query: %s", e)
