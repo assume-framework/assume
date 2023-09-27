@@ -1,8 +1,9 @@
 base:
   start_date: 2019-01-01 00:00
-  end_date: 2019-02-01 00:00
+  end_date: 2019-01-10 00:00
   time_step: 1h
   save_frequency_hours: Null
+  learning_mode: True
 
   learning_config:
     observation_dimension: 50
@@ -10,7 +11,6 @@ base:
     continue_learning: False
     load_model_path: None
     max_bid_price: 100
-    learning_mode: True
     algorithm: matd3
     learning_rate: 0.001
     training_episodes: 30
@@ -23,7 +23,7 @@ base:
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
-    validation_episodes_interval: 10
+    validation_episodes_interval: 5
 
   markets_config:
     EOM:
@@ -48,6 +48,7 @@ tiny:
   end_date: 2019-01-02 00:00
   time_step: 1h
   save_frequency_hours: 24
+  learning_mode: True
 
   learning_config:
     observation_dimension: 50
@@ -55,7 +56,6 @@ tiny:
     continue_learning: False
     load_model_path: None
     max_bid_price: 100
-    learning_mode: True
     algorithm: matd3
     learning_rate: 0.001
     training_episodes: 3
