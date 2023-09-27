@@ -133,6 +133,7 @@ class Storage(SupportsMinMaxCharge):
         self.max_power_discharge = max_power_discharge
         self.min_power_discharge = min_power_discharge
         self.initial_soc = initial_soc
+        self.outputs["soc"] = pd.Series(self.initial_soc, index=self.index, dtype=float)
 
         self.soc_tick = soc_tick
 
@@ -179,7 +180,7 @@ class Storage(SupportsMinMaxCharge):
         # The downtime before hot start of the storage unit.
         self.downtime_hot_start = downtime_hot_start
         # The downtime before warm start of the storage unit.
-        self.warm_start_cost = downtime_warm_start
+        self.downtime_warm_start = downtime_warm_start
 
         self.fixed_cost = fixed_cost
 
@@ -200,45 +201,32 @@ class Storage(SupportsMinMaxCharge):
         :rtype: pd.Series
         """
         end_excl = end - self.index.freq
+        time_delta = self.index.freq / timedelta(hours=1)
 
         for t in self.outputs["energy"][start:end_excl].index:
             delta_soc = 0
-            soc = self.get_soc_before(t)
+            soc = self.outputs["soc"][t]
             if self.outputs["energy"][t] > self.max_power_discharge:
                 self.outputs["energy"][t] = self.max_power_discharge
-                logger.error(
-                    f"The energy dispatched is greater the maximum power to discharge, dispatched amount is adjusted."
-                )
             elif self.outputs["energy"][t] < self.max_power_charge:
                 self.outputs["energy"][t] = self.max_power_charge
-                logger.error(
-                    f"The energy dispatched is greater than the maximum power to charge, dispatched amount is adjusted."
-                )
             elif (
                 self.outputs["energy"][t] < self.min_power_discharge
                 and self.outputs["energy"][t] > self.min_power_charge
                 and self.outputs["energy"][t] != 0
             ):
                 self.outputs["energy"][t] = 0
-                logger.error(
-                    f"The energy dispatched is between min_power_charge and min_power_discharge, no energy is dispatched"
-                )
 
             # discharging
             if self.outputs["energy"][t] > 0:
                 max_soc_discharge = self.calculate_soc_max_discharge(soc)
 
                 if self.outputs["energy"][t] > max_soc_discharge:
-                    if abs(self.outputs["energy"][t] - max_soc_discharge) > EPS:
-                        logger.error(
-                            f"The energy dispatched exceeds the minimum SOC significantly, the dispatched amount is adjusted."
-                        )
                     self.outputs["energy"][t] = max_soc_discharge
 
                 delta_soc = (
                     -self.outputs["energy"][t]
-                    * self.index.freq
-                    / timedelta(hours=1)
+                    * time_delta
                     / self.efficiency_discharge
                     / self.max_volume
                 )
@@ -248,21 +236,16 @@ class Storage(SupportsMinMaxCharge):
                 max_soc_charge = self.calculate_soc_max_charge(soc)
 
                 if self.outputs["energy"][t] < max_soc_charge:
-                    if abs(self.outputs["energy"][t] - max_soc_charge) > EPS:
-                        logger.error(
-                            f"The energy dispatched exceeds the maximum SOC, the dispatched amount is adjusted."
-                        )
                     self.outputs["energy"][t] = max_soc_charge
 
                 delta_soc = (
                     -self.outputs["energy"][t]
-                    * self.index.freq
-                    / timedelta(hours=1)
+                    * time_delta
                     * self.efficiency_charge
                     / self.max_volume
                 )
 
-            self.outputs["soc"][t] = soc + delta_soc
+            self.outputs["soc"][t + self.index.freq :] = soc + delta_soc
 
         return self.outputs["energy"].loc[start:end_excl]
 
@@ -288,31 +271,9 @@ class Storage(SupportsMinMaxCharge):
             )
             efficiency = self.efficiency_charge
 
-        marginal_cost = variable_cost / efficiency + self.fixed_cost
+        marginal_cost = variable_cost / efficiency
 
         return marginal_cost
-
-    def as_dict(self) -> dict:
-        """
-        Return the storage unit's attributes as a dictionary, including specific attributes.
-
-        :return: the storage unit's attributes as a dictionary
-        :rtype: dict
-        """
-        unit_dict = super().as_dict()
-        unit_dict.update(
-            {
-                "max_power_charge": self.max_power_charge,
-                "max_power_discharge": self.max_power_discharge,
-                "min_power_charge": self.min_power_charge,
-                "min_power_discharge": self.min_power_discharge,
-                "efficiency_charge": self.efficiency_discharge,
-                "efficiency_discharge": self.efficiency_charge,
-                "unit_type": "storage",
-            }
-        )
-
-        return unit_dict
 
     def calculate_soc_max_discharge(self, soc) -> float:
         duration = self.index.freq / timedelta(hours=1)
@@ -383,7 +344,7 @@ class Storage(SupportsMinMaxCharge):
         )
 
         # restrict charging according to max_volume
-        max_soc_charge = self.calculate_soc_max_charge(self.get_soc_before(start))
+        max_soc_charge = self.calculate_soc_max_charge(self.outputs["soc"][start])
         max_power_charge = max_power_charge.clip(lower=max_soc_charge)
 
         return min_power_charge, max_power_charge
@@ -430,21 +391,21 @@ class Storage(SupportsMinMaxCharge):
         )
 
         # restrict according to min_volume
-        max_soc_discharge = self.calculate_soc_max_discharge(self.get_soc_before(start))
+        max_soc_discharge = self.calculate_soc_max_discharge(self.outputs["soc"][start])
         max_power_discharge = max_power_discharge.clip(upper=max_soc_discharge)
 
         return min_power_discharge, max_power_discharge
 
     def calculate_ramp_discharge(
         self,
-        previous_soc: float,
+        soc: float,
         previous_power: float,
         power_discharge: float,
         current_power: float = 0,
         min_power_discharge: float = 0,
     ) -> float:
         power_discharge = super().calculate_ramp_discharge(
-            previous_soc,
+            soc,
             previous_power,
             power_discharge,
             current_power,
@@ -452,9 +413,8 @@ class Storage(SupportsMinMaxCharge):
         )
         # restrict according to min_SOC
 
-        max_soc_discharge = self.calculate_soc_max_discharge(previous_soc)
-        if power_discharge > max_soc_discharge:
-            power_discharge = max_soc_discharge
+        max_soc_discharge = self.calculate_soc_max_discharge(soc)
+        power_discharge = min(power_discharge, max_soc_discharge)
         if power_discharge < min_power_discharge:
             power_discharge = 0
 
@@ -462,24 +422,23 @@ class Storage(SupportsMinMaxCharge):
 
     def calculate_ramp_charge(
         self,
-        previous_soc: float,
+        soc: float,
         previous_power: float,
         power_charge: float,
         current_power: float = 0,
         min_power_charge: float = 0,
     ) -> float:
         power_charge = super().calculate_ramp_charge(
-            previous_soc,
+            soc,
             previous_power,
             power_charge,
             current_power,
         )
 
         # restrict charging according to max_SOC
-        max_soc_charge = self.calculate_soc_max_charge(previous_soc)
+        max_soc_charge = self.calculate_soc_max_charge(soc)
 
-        if power_charge < max_soc_charge:
-            power_charge = max_soc_charge
+        power_charge = max(power_charge, max_soc_charge)
         if power_charge > min_power_charge:
             power_charge = 0
 
@@ -498,3 +457,25 @@ class Storage(SupportsMinMaxCharge):
             return self.warm_start_cost
         else:
             return self.cold_start_cost
+
+    def as_dict(self) -> dict:
+        """
+        Return the storage unit's attributes as a dictionary, including specific attributes.
+
+        :return: the storage unit's attributes as a dictionary
+        :rtype: dict
+        """
+        unit_dict = super().as_dict()
+        unit_dict.update(
+            {
+                "max_power_charge": self.max_power_charge,
+                "max_power_discharge": self.max_power_discharge,
+                "min_power_charge": self.min_power_charge,
+                "min_power_discharge": self.min_power_discharge,
+                "efficiency_charge": self.efficiency_discharge,
+                "efficiency_discharge": self.efficiency_charge,
+                "unit_type": "storage",
+            }
+        )
+
+        return unit_dict

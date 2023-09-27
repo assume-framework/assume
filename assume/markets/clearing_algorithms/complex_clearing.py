@@ -322,8 +322,8 @@ def extract_results(
         meta.append(
             {
                 "supply_volume": supply_volume,
-                "demand_volume": demand_volume,
-                "demand_volume_energy": demand_volume * duration_hours,
+                "demand_volume": -demand_volume,
+                "demand_volume_energy": -demand_volume * duration_hours,
                 "supply_volume_energy": supply_volume * duration_hours,
                 "price": clear_price,
                 "max_price": clear_price,
