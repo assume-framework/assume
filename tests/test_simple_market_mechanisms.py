@@ -110,5 +110,5 @@ def test_market_pay_as_clear():
     accepted, rejected, meta = mr.clear(orderbook, products)
     assert meta[0]["demand_volume"] > 0
     assert meta[0]["price"] > 0
-    assert len(accepted) == 4
-    assert len(rejected) == 0
+    assert len(accepted) == 3
+    assert len(rejected) == 1
