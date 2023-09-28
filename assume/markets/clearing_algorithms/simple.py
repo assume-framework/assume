@@ -123,7 +123,7 @@ class PayAsClearRole(MarketRole):
                     gen_vol -= diff
 
                     # add left over to supply_orders again
-                    supply_orders.insert(0, supply_order)
+                    # supply_orders.insert(0, supply_order)
                     demand_order["accepted_volume"] = demand_order["volume"]
                 else:
                     demand_order["accepted_volume"] = demand_order["volume"]
