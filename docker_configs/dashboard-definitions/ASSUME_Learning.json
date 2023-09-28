@@ -25,7 +25,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 3,
+  "id": 2,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -303,7 +303,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  episode,\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%'\nand learning_mode is true",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%'\nand learning_mode is true",
           "refId": "A",
           "select": [
             [
@@ -495,7 +495,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  episode,\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%'\nand evaluation_mode is true",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%'\nand evaluation_mode is true",
           "refId": "A",
           "select": [
             [
@@ -800,8 +800,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -913,8 +912,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1002,8 +1000,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1115,8 +1112,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1182,7 +1178,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  episode,\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit'",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit'",
           "refId": "A",
           "select": [
             [
@@ -1323,8 +1319,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1390,7 +1385,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  episode,\n  profit\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit'",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  profit\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit'",
           "refId": "A",
           "select": [
             [
@@ -1543,8 +1538,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1610,7 +1604,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  episode,\n  regret\nFROM rl_params\nwhere simulation like ${simulation} || '_%' AND\n      unit = '$rl_unit'",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  regret\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit'",
           "refId": "A",
           "select": [
             [
@@ -1770,8 +1764,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1884,8 +1877,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2196,14 +2188,14 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT DISTINCT\nSUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\nFROM rl_params m",
+        "definition": "SELECT DISTINCT\nSUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\nFROM rl_params m\nwhere learning_mode = True",
         "description": "Can choose which simulation we want to show ",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "simulation",
         "options": [],
-        "query": "SELECT DISTINCT\nSUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\nFROM rl_params m",
+        "query": "SELECT DISTINCT\nSUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\nFROM rl_params m\nwhere learning_mode = True",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -2254,6 +2246,6 @@
   "timezone": "",
   "title": "Assume: Training progress",
   "uid": "JKQzx0q4k",
-  "version": 7,
+  "version": 4,
   "weekStart": ""
 }

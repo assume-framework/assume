@@ -77,7 +77,6 @@ class PowerPlant(SupportsMinMax):
         min_power: float = 0.0,
         efficiency: float = 1.0,
         fixed_cost: float = 0.0,
-        variable_cost: float | pd.Series = 0.0,
         partial_load_eff: bool = False,
         fuel_type: str = "others",
         emission_factor: float = 0.0,
@@ -126,7 +125,6 @@ class PowerPlant(SupportsMinMax):
         )
 
         self.fixed_cost = fixed_cost
-        self.variable_cost = variable_cost
         self.hot_start_cost = hot_start_cost * max_power
         self.warm_start_cost = warm_start_cost * max_power
         self.cold_start_cost = cold_start_cost * max_power
@@ -197,7 +195,7 @@ class PowerPlant(SupportsMinMax):
         marginal_cost = (
             fuel_price / self.efficiency
             + self.forecaster.get_price("co2") * self.emission_factor / self.efficiency
-            + self.variable_cost
+            + self.fixed_cost
         )
 
         return marginal_cost
@@ -256,16 +254,10 @@ class PowerPlant(SupportsMinMax):
         efficiency = self.efficiency - eta_loss
         co2_price = self.forecaster.get_price("co2").at[timestep]
 
-        variable_cost = (
-            self.variable_cost
-            if isinstance(self.variable_cost, float)
-            else self.variable_cost[timestep]
-        )
-
         marginal_cost = (
             fuel_price / efficiency
             + co2_price * self.emission_factor / efficiency
-            + variable_cost
+            + self.fixed_cost
         )
 
         return marginal_cost

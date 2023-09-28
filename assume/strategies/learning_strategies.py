@@ -69,8 +69,8 @@ class RLStrategy(LearningStrategy):
                 dt=kwargs.get("noise_dt", 1.0),
             )
 
-        elif Path(load_path=kwargs["load_learned_path"]).is_dir():
-            self.load_actor_params(load_path=kwargs["load_learned_path"])
+        elif Path(load_path=kwargs["trained_actors_path"]).is_dir():
+            self.load_actor_params(load_path=kwargs["trained_actors_path"])
 
     def calculate_bids(
         self,
@@ -364,14 +364,14 @@ class RLStrategy(LearningStrategy):
                     timestep=start,
                 )
 
-            # calculate profit as income - running_cost from this event
             duration = (end - start) / timedelta(hours=1)
-            order_profit = order["price"] * order["volume"] * duration
+
+            # calculate profit as income - running_cost from this event
+            price_difference = order["accepted_price"] - marginal_cost
+            order_profit = price_difference * order["accepted_volume"] * duration
 
             # calculate opportunity cost
             # as the loss of income we have because we are not running at full power
-            price_difference = order["price"] - marginal_cost
-
             order_opportunity_cost = (
                 price_difference
                 * (
@@ -411,9 +411,9 @@ class RLStrategy(LearningStrategy):
         reward = float(profit - regret_scale * opportunity_cost) * scaling
 
         # store results in unit outputs which are written to database by unit operator
-        unit.outputs["profit"].loc[start:end_excl] += float(profit)
+        unit.outputs["profit"].loc[start:end_excl] += profit
         unit.outputs["reward"].loc[start:end_excl] = reward
-        unit.outputs["regret"].loc[start:end_excl] = float(opportunity_cost)
+        unit.outputs["regret"].loc[start:end_excl] = opportunity_cost
 
     def load_actor_params(self, load_path):
         """

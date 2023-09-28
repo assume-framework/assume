@@ -43,7 +43,7 @@ def extend_orderbook(
     products,
     volume,
     price,
-    orderbook=[],
+    orderbook=None,
     bid_type="SB",
     min_acceptance_ratio=None,
 ):
@@ -52,6 +52,8 @@ def extend_orderbook(
     with specified values for price and volume
     and appends the orderbook
     """
+    if not orderbook:
+        orderbook = []
     if volume == 0:
         return orderbook
 
@@ -94,7 +96,7 @@ def extend_orderbook(
                 "agent_id": agent_id,
                 "bid_id": f"bid_{len(orderbook)+1}",
                 "volume": volume,
-                "accepted_volume": None,
+                "accepted_volume": 0,
                 "price": price,
                 "accepted_price": None,
                 "only_hours": None,
