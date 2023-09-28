@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 11,
+  "id": 12,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -392,7 +392,7 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "  {simulation=\"2020_BB_dam\", unit_id=\"Biomass\"}"
+                  "  {simulation=\"2037_SB_dam\", unit_id=\"open_gas_unit\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -627,7 +627,12 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "  {simulation=\"2020_SB_dam\", unit_id=\"Wind onshore\"}"
+                  "  {simulation=\"2037_SB_dam\", unit_id=\"demand_EOM\"}",
+                  "  {simulation=\"2037_BB_dam\", unit_id=\"demand_EOM\"}",
+                  "  {simulation=\"2037_BB_dam\", unit_id=\"battery_unit\"}",
+                  "  {simulation=\"2037_SB_dam\", unit_id=\"battery_unit\"}",
+                  "  {simulation=\"2037_BB_dam\", unit_id=\"\"}",
+                  "  {simulation=\"2037_SB_dam\", unit_id=\"\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -1320,8 +1325,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1394,7 +1398,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  concat(unit, '_', simulation) as \"unit\",\n  sum(round(CAST(costs AS numeric), 2)) as Total_costs,\n  sum(round(CAST(energy_cashflow AS numeric), 2)) as Total_revenues,\n  sum(round(CAST(profits AS numeric), 2)) as Total_profits,\n  sum(round(CAST(power AS numeric)*1000, 2)) as Total_power\nFROM unit_dispatch\nwhere \n  unit in ($Gen_Units) and\n  simulation in ($simulation)\nGROUP BY unit, simulation\nORDER BY unit",
+          "rawSql": "SELECT\n  concat(unit, '_', simulation) as \"unit\",\n  sum(round(CAST(costs AS numeric), 2)) as Total_costs,\n  sum(round(CAST(energy_cashflow AS numeric), 2)) as Total_revenues,\n  sum(round(CAST(profits AS numeric), 2)) as Total_profits,\n  sum(round(CAST(power AS numeric)*1000, 2)) as Total_power\nFROM unit_dispatch\nwhere \n  (unit in ($Gen_Units) or unit in ($Storage_Units) or unit in ($Demand_Units)) and\n  simulation in ($simulation)\nGROUP BY unit, simulation\nORDER BY unit",
           "refId": "C",
           "select": [
             [
@@ -1432,8 +1436,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1551,8 +1554,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1570,9 +1572,8 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "dispatch {simulation=\"2020_BB_dam\", unit=\"combined_gas_unit\"}",
-                  "dispatch {simulation=\"2020_SB_dam\", unit=\"combined_gas_unit\"}",
-                  "dispatch {simulation=\"2020_BB_dam\", unit=\"lignite_unit\"}"
+                  "dispatch {simulation=\"2020_BB_dam\", unit=\"coal_unit\"}",
+                  "dispatch {simulation=\"2020_SB_dam\", unit=\"coal_unit\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -1694,8 +1695,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1733,7 +1733,8 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "price {bid_type=\"SB\", simulation=\"2020_BB_dam\", unit_id=\"combined_gas_unit\"}"
+                  "price {bid_type=\"SB\", simulation=\"2020_BB_dam\", unit_id=\"coal_unit\"}",
+                  "price {bid_type=\"SB\", simulation=\"2020_SB_dam\", unit_id=\"coal_unit\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -1901,8 +1902,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1912,15 +1912,7 @@
           },
           "unit": "megwatt"
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "unit_id"
-            },
-            "properties": []
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 11,
@@ -2059,8 +2051,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2078,8 +2069,8 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "mismatch {simulation=\"2020_BB_dam\", unit_id=\"combined_gas_unit\"}",
-                  "mismatch {simulation=\"2020_SB_dam\", unit_id=\"combined_gas_unit\"}"
+                  "mismatch {simulation=\"2020_SB_dam\", unit_id=\"combined_gas_unit\"}",
+                  "mismatch {simulation=\"2020_BB_dam\", unit_id=\"combined_gas_unit\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -2188,8 +2179,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -2328,21 +2318,13 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
           "unit": "kwatth"
         },
         "overrides": [
-          {
-            "matcher": {
-              "id": "byFrameRefID",
-              "options": "A"
-            },
-            "properties": []
-          },
           {
             "matcher": {
               "id": "byName",
@@ -2596,8 +2578,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2607,7 +2588,32 @@
           },
           "unit": "megwatt"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "power {simulation=\"2037_SB_dam\", unit_id=\"demand_EOM\"}"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 9,
@@ -2709,8 +2715,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2899,8 +2904,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2910,7 +2914,33 @@
           },
           "unit": "megwatt"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "power {simulation=\"2037_BB_dam\", unit_id=\"battery_unit\"}",
+                  "power {simulation=\"2037_SB_dam\", unit_id=\"battery_unit\"}"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 9,
@@ -3012,8 +3042,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3129,8 +3158,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3322,8 +3350,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3485,29 +3512,17 @@
         "current": {
           "selected": true,
           "text": [
-            "Biomass",
             "Hydro",
             "Solar",
             "Wind offshore",
             "Wind onshore",
-            "coal_unit",
-            "combined_gas_unit",
-            "lignite_unit",
-            "nuclear_unit",
-            "oil_unit",
             "open_gas_unit"
           ],
           "value": [
-            "Biomass",
             "Hydro",
             "Solar",
             "Wind offshore",
             "Wind onshore",
-            "coal_unit",
-            "combined_gas_unit",
-            "lignite_unit",
-            "nuclear_unit",
-            "oil_unit",
             "open_gas_unit"
           ]
         },
@@ -3563,9 +3578,11 @@
         "current": {
           "selected": true,
           "text": [
+            "battery_unit",
             "storage_unit"
           ],
           "value": [
+            "battery_unit",
             "storage_unit"
           ]
         },
@@ -3592,12 +3609,12 @@
         "current": {
           "selected": true,
           "text": [
-            "2020_BB_dam",
-            "2020_SB_dam"
+            "2037_SB_dam",
+            "2037_BB_dam"
           ],
           "value": [
-            "2020_BB_dam",
-            "2020_SB_dam"
+            "2037_SB_dam",
+            "2037_BB_dam"
           ]
         },
         "datasource": {
@@ -3621,13 +3638,13 @@
     ]
   },
   "time": {
-    "from": "2020-01-19T23:00:00.000Z",
-    "to": "2020-01-26T22:59:59.000Z"
+    "from": "2037-01-19T23:00:00.000Z",
+    "to": "2037-01-26T22:59:59.000Z"
   },
   "timepicker": {},
   "timezone": "",
   "title": "ASSUME Comparison Block Bids",
   "uid": "LlWPcjzSz",
-  "version": 1,
+  "version": 3,
   "weekStart": ""
 }

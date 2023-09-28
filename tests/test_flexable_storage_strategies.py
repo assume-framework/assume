@@ -112,13 +112,13 @@ def test_flexable_eom_storage(mock_market_config, storage):
     assert math.isclose(bids[0]["price"], np.mean(forecast[0:13]), abs_tol=0.01)
     assert bids[0]["volume"] == -60
     assert math.isclose(bids[1]["price"], np.mean(forecast[0:17]), abs_tol=0.01)
-    assert bids[1]["volume"] == 0
+    assert bids[1]["volume"] == 60
     assert math.isclose(bids[2]["price"], np.mean(forecast[0:21]), abs_tol=0.01)
     assert bids[2]["volume"] == 60
     assert math.isclose(bids[3]["price"], np.mean(forecast[0:25]), abs_tol=0.01)
-    assert bids[3]["volume"] == 100
+    assert bids[3]["volume"] == 60
     assert math.isclose(bids[4]["price"], np.mean(forecast[4:]), abs_tol=0.01)
-    assert bids[4]["volume"] == 0
+    assert bids[4]["volume"] == -60
     assert math.isclose(bids[5]["price"], np.mean(forecast[8:]), abs_tol=0.01)
     assert bids[5]["volume"] == -60
 
@@ -132,7 +132,7 @@ def test_flexable_pos_crm_storage(mock_market_config, storage):
     product_tuples = [(start, end, None)]
 
     # constant price of 50
-    specific_revenue = (50 - (4 / 0.95 + 1)) * 360 / (0.36 * 1000)
+    specific_revenue = (50 - (4 / 0.95)) * 360 / (0.36 * 1000)
 
     storage.forecaster = NaiveForecast(index, availability=1, price_forecast=50)
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
@@ -148,9 +148,7 @@ def test_flexable_pos_crm_storage(mock_market_config, storage):
     assert bids[0]["volume"] == 60
 
     # specific revenue < 0
-    storage.forecaster = NaiveForecast(
-        index, availability=1, price_forecast=[5, 5, 5, 5]
-    )
+    storage.forecaster = NaiveForecast(index, availability=1, price_forecast=3)
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     assert len(bids) == 1
     assert bids[0]["price"] == 0

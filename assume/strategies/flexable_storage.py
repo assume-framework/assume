@@ -288,7 +288,6 @@ class flexablePosCRMStorage(BaseStrategy):
                 )
                 theoretic_SOC += delta_soc
                 previous_power = bid_quantity + current_power
-
             else:
                 previous_power = current_power
                 raise ValueError(
@@ -341,6 +340,7 @@ class flexableNegCRMStorage(BaseStrategy):
             current_power = unit.outputs["energy"].at[start]
             bid_quantity = unit.calculate_ramp_charge(
                 theoretic_SOC,
+                theoretic_SOC,
                 previous_power,
                 max_power_charge[start],
                 current_power,
@@ -348,6 +348,7 @@ class flexableNegCRMStorage(BaseStrategy):
 
             # if bid_quantity >= min_bid_volume  --> not checked here
             if bid_quantity == 0:
+                previous_power = current_power
                 continue
 
             if market_config.product_type == "capacity_neg":
@@ -381,7 +382,6 @@ class flexableNegCRMStorage(BaseStrategy):
                 )
                 theoretic_SOC += delta_soc
                 previous_power = bid_quantity + current_power
-
             else:
                 previous_power = current_power
                 raise ValueError(
@@ -446,13 +446,13 @@ def get_specific_revenue(unit, marginal_cost, current_time, foresight, price_for
         )
 
     possible_revenue = 0
-    soc = unit.get_soc_before(current_time)
+    soc = unit.outputs["soc"][t]
     theoretic_SOC = soc
 
     previous_power = unit.get_output_before(t)
     for i, market_price in enumerate(price_forecast):
         theoretic_power_discharge = unit.calculate_ramp_discharge(
-            soc,
+            theoretic_SOC,
             previous_power=previous_power,
             power_discharge=max_power_discharge.iloc[i],
         )

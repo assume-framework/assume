@@ -229,12 +229,10 @@ class BaseUnit:
         """
         op_time is hours running from get_operation_time
         returns the costs if start_up is planned
-
         :param op_time: operation time
         :type op_time: int
         :return: start_costs
         :rtype: float
-
         """
         return 0
 
@@ -384,7 +382,6 @@ class SupportsMinMax(BaseUnit):
     def get_average_operation_times(self, start: datetime):
         """
         calculates the average uninterupted operation time
-
         :param start: the current time
         :type start: datetime
         :return: avg_op_time
@@ -431,12 +428,10 @@ class SupportsMinMax(BaseUnit):
         """
         op_time is hours running from get_operation_time
         returns the costs if start_up is planned
-
         :param op_time: operation time
         :type op_time: int
         :return: start_costs
         :rtype: float
-
         """
         if op_time > 0:
             # unit is running
@@ -578,7 +573,7 @@ class SupportsMinMaxCharge(BaseUnit):
 
     def calculate_ramp_discharge(
         self,
-        previous_soc: float,
+        soc: float,
         previous_power: float,
         power_discharge: float,
         current_power: float = 0,
@@ -624,7 +619,7 @@ class SupportsMinMaxCharge(BaseUnit):
 
     def calculate_ramp_charge(
         self,
-        previous_soc: float,
+        soc: float,
         previous_power: float,
         power_charge: float,
         current_power: float = 0,
@@ -788,8 +783,8 @@ class LearningConfig(TypedDict):
     :type noise_scale: int
     :param noise_dt: Determines how quickly the noise weakens over time.
     :type noise_dt: int
-    :param load_learned_path: The path to the learned model to load.
-    :type load_learned_path: str
+    :param trained_actors_path: The path to the learned model to load.
+    :type trained_actors_path: str
     """
 
     observation_dimension: int
@@ -810,4 +805,4 @@ class LearningConfig(TypedDict):
     noise_sigma: float
     noise_scale: int
     noise_dt: int
-    load_learned_path: str
+    trained_actors_path: str

@@ -122,7 +122,7 @@ class PowerPlant(SupportsMinMax):
             self.index.freq / timedelta(hours=1)
         )
         self.downtime_warm_start = downtime_warm_start / (
-            self.index.freq.delta.total_seconds() / 3600
+            self.index.freq / timedelta(hours=1)
         )
 
         self.fixed_cost = fixed_cost
@@ -151,6 +151,7 @@ class PowerPlant(SupportsMinMax):
     ):
         """
         Executes the current dispatch of the unit based on the provided timestamps.
+        The dispatch is only executed, if it is in the constraints given by the unit.
         Returns the volume of the unit within the given time range.
 
         :param start: the start time of the dispatch

@@ -164,11 +164,15 @@ class UnitsOperator(Role):
         :type meta: dict[str, str]
         """
         logger.debug(f"{self.id} got market result: {content}")
-        orderbook: Orderbook = content["orderbook"]
+        accepted_orders: Orderbook = content["accepted_orders"]
+        rejected_orders: Orderbook = content["rejected_orders"]
+        orderbook = accepted_orders + rejected_orders
+
         for order in orderbook:
             order["market_id"] = content["market_id"]
             # map bid id to unit id
             order["unit_id"] = self.bids_map[order["bid_id"]]
+
         self.valid_orders.extend(orderbook)
         marketconfig = self.registered_markets[content["market_id"]]
         self.set_unit_dispatch(orderbook, marketconfig)
@@ -222,11 +226,19 @@ class UnitsOperator(Role):
             data["soc"] = unit.outputs["soc"][start:end]
             data["profits"] = unit.outputs["profits"][start:end]
             for key in unit.outputs.keys():
-                if "cashflow" in key or "costs" or "marginal_cost" in key:
+                if "cashflow" in key:
+                    data[key] = unit.outputs[key][start:end]
+                if "marginal_costs" in key:
+                    data[key] = unit.outputs[key][start:end]
+                if "total_costs" in key:
                     data[key] = unit.outputs[key][start:end]
 
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
+
+        self.valid_orders = list(
+            filter(lambda x: x["end_time"] >= now, self.valid_orders)
+        )
 
         db_aid = self.context.data_dict.get("output_agent_id")
         db_addr = self.context.data_dict.get("output_agent_addr")
@@ -251,10 +263,6 @@ class UnitsOperator(Role):
                         "data": unit_dispatch,
                     },
                 )
-
-        self.valid_orders = list(
-            filter(lambda x: x["end_time"] >= now, self.valid_orders)
-        )
 
     async def submit_bids(self, opening: OpeningMessage):
         """
@@ -391,9 +399,11 @@ class UnitsOperator(Role):
                     output_dict[f"actions_{i}"] = action_tuple[i]
 
                 output_agent_list.append(output_dict)
-        db_aid = self.context.data_dict.get("output_agent_id")
-        db_addr = self.context.data_dict.get("output_agent_addr")
-        if db_aid and db_addr:
+
+        db_aid = self.context.data_dict.get("learning_output_agent_id")
+        db_addr = self.context.data_dict.get("learning_output_agent_addr")
+
+        if db_aid and db_addr and output_agent_list:
             self.context.schedule_instant_acl_message(
                 receiver_id=db_aid,
                 receiver_addr=db_addr,
@@ -413,9 +423,6 @@ class UnitsOperator(Role):
         device: str,
         learning_unit_count: int,
     ):
-        learning_role_id = "learning_agent"
-        learning_role_addr = self.context.addr
-
         all_observations = []
         all_rewards = []
         try:
@@ -423,7 +430,6 @@ class UnitsOperator(Role):
 
         except ImportError:
             logger.error("tried writing learning_params, but torch is not installed")
-            all_actions = np.zeros((learning_unit_count, act_dim))
             return
 
         all_observations = th.zeros((learning_unit_count, obs_dim), device=device)
@@ -447,15 +453,19 @@ class UnitsOperator(Role):
         all_rewards = np.array(all_rewards)
         rl_agent_data = (np.array(all_observations), all_actions, all_rewards)
 
-        self.context.schedule_instant_acl_message(
-            receiver_id=learning_role_id,
-            receiver_addr=learning_role_addr,
-            content={
-                "context": "rl_training",
-                "type": "replay_buffer",
-                "data": rl_agent_data,
-            },
-        )
+        learning_role_id = self.context.data_dict.get("learning_agent_id")
+        learning_role_addr = self.context.data_dict.get("learning_agent_addr")
+
+        if learning_role_id and learning_role_addr:
+            self.context.schedule_instant_acl_message(
+                receiver_id=learning_role_id,
+                receiver_addr=learning_role_addr,
+                content={
+                    "context": "rl_training",
+                    "type": "replay_buffer",
+                    "data": rl_agent_data,
+                },
+            )
 
     def write_learning_params(self, orderbook: Orderbook, marketconfig: MarketConfig):
         """

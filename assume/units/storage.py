@@ -202,6 +202,7 @@ class Storage(SupportsMinMaxCharge):
         :rtype: pd.Series
         """
         end_excl = end - self.index.freq
+        time_delta = self.index.freq / timedelta(hours=1)
 
         for t in self.outputs["energy"][start:end_excl].index:
             delta_soc = 0
@@ -417,14 +418,14 @@ class Storage(SupportsMinMaxCharge):
 
     def calculate_ramp_discharge(
         self,
-        previous_soc: float,
+        soc: float,
         previous_power: float,
         power_discharge: float,
         current_power: float = 0,
         min_power_discharge: float = 0,
     ) -> float:
         power_discharge = super().calculate_ramp_discharge(
-            previous_soc,
+            soc,
             previous_power,
             power_discharge,
             current_power,
@@ -432,7 +433,7 @@ class Storage(SupportsMinMaxCharge):
         )
         # restrict according to min_SOC
 
-        max_soc_discharge = self.calculate_soc_max_discharge(previous_soc)
+        max_soc_discharge = self.calculate_soc_max_discharge(soc)
         power_discharge = min(power_discharge, max_soc_discharge)
         if power_discharge < min_power_discharge:
             power_discharge = 0
@@ -441,21 +442,21 @@ class Storage(SupportsMinMaxCharge):
 
     def calculate_ramp_charge(
         self,
-        previous_soc: float,
+        soc: float,
         previous_power: float,
         power_charge: float,
         current_power: float = 0,
         min_power_charge: float = 0,
     ) -> float:
         power_charge = super().calculate_ramp_charge(
-            previous_soc,
+            soc,
             previous_power,
             power_charge,
             current_power,
         )
 
         # restrict charging according to max_SOC
-        max_soc_charge = self.calculate_soc_max_charge(previous_soc)
+        max_soc_charge = self.calculate_soc_max_charge(soc)
 
         power_charge = max(power_charge, max_soc_charge)
         if power_charge > min_power_charge:

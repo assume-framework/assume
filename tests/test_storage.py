@@ -81,7 +81,7 @@ def test_calculate_operational_window(storage_unit):
 
     assert min_power_discharge[start] == 0
     assert max_power_discharge[start] == 100
-    assert cost_discharge == 4 / 0.95 + 1
+    assert cost_discharge == 4 / 0.95
 
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end, product_type="energy"
@@ -90,7 +90,7 @@ def test_calculate_operational_window(storage_unit):
 
     assert min_power_charge[start] == 0
     assert max_power_charge[start] == -100
-    assert math.isclose(cost_charge, 3 / 0.9 + 1)
+    assert math.isclose(cost_charge, 3 / 0.9)
 
     assert storage_unit.outputs["energy"].at[start] == 0
 
@@ -340,7 +340,7 @@ def test_execute_dispatch(storage_unit):
     assert math.isclose(
         dispatched_energy.iloc[0], -50 / storage_unit.efficiency_charge, abs_tol=0.1
     )
-    assert math.isclose(storage_unit.outputs["soc"][end], 1, abs_tol=0.1)
+    assert math.isclose(storage_unit.outputs["soc"][end], 1, abs_tol=0.001)
 
     # step into the next hour
     start = start + storage_unit.index.freq
@@ -348,7 +348,7 @@ def test_execute_dispatch(storage_unit):
     storage_unit.outputs["energy"][start] = -100
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy.iloc[0] == 0
-    assert math.isclose(storage_unit.outputs["soc"][end], 1, abs_tol=0.1)
+    assert math.isclose(storage_unit.outputs["soc"][end], 1, abs_tol=0.001)
 
 
 if __name__ == "__main__":

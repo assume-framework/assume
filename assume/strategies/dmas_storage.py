@@ -188,12 +188,12 @@ class DmasStorageStrategy(BaseStrategy):
             )
         abs_difference = [self.model.plus[t] + self.model.minus[t] for t in time_range]
         costs = [
-            abs_difference[t] * np.abs(unit.forecaster["price_forecast"][t] * 2)
+            abs_difference[t] * np.abs(unit.forecaster["price_EOM"][t] * 2)
             for t in time_range
         ]
 
         profit = [
-            -self.power[t] * unit.forecaster["price_forecast"][t] - costs[t]
+            -self.power[t] * unit.forecaster["price_EOM"][t] - costs[t]
             for t in time_range
         ]
         self.model.obj = Objective(
@@ -223,7 +223,7 @@ class DmasStorageStrategy(BaseStrategy):
         opt_results = {key: np.zeros(hour_count) for key in PRICE_FUNCS.keys()}
         time_range = range(hour_count)
 
-        base_price = unit.forecaster["price_forecast"][
+        base_price = unit.forecaster["price_EOM"][
             start : start + timedelta(hours=hour_count)
         ]
 
@@ -286,7 +286,7 @@ class DmasStorageStrategy(BaseStrategy):
         opt_results = self.optimize(unit, start, hour_count)
         total_orders = {}
         block_id = 0
-        power_prices = unit.forecaster["price_forecast"][
+        power_prices = unit.forecaster["price_EOM"][
             start : start + timedelta(hours=hour_count)
         ]
         for key, power in opt_results.items():

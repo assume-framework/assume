@@ -37,6 +37,16 @@ availabe_examples = {
         "scenario": "2020_BB",
         "study_case": "dam",
     },
+    "complex_SB_2037": {
+        # merit order clearing for 24 hours
+        "scenario": "2037_SB",
+        "study_case": "dam",
+    },
+    "complex_BB_2037": {
+        # complex clearing with naive strategies - no blocks
+        "scenario": "2037_BB",
+        "study_case": "dam",
+    },
     "complex_clearing_blocks": {
         # complex clearing with dam naive strategies - with profile blocks in PPs
         "scenario": "analysis_02",
