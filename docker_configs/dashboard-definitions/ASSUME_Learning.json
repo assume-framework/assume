@@ -107,7 +107,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "#### Introduction\n\nHere we visualize the results of the reinforcment learning process for the specified units that us a learning strategy. Reinforcement Learning is a machine learning paradigm where an agent learns to make a sequence of decisions in an environment to maximize a reward signal. The agent explores the environment, takes actions, and receives feedback in the form of rewards. The goal is to learn a strategy (policy) that guides the agent to make actions that lead to the highest cumulative reward over time. To better understand the agent's learning process, we use visualizations that illustrate key aspects of its journey.",
+        "content": "#### Introduction\n\nHere we visualize the results of the reinforcement learning process for the specified units that use a learning strategy. \nReinforcement Learning is a machine learning paradigm where an agent learns to make a sequence of decisions in an environment to maximize a reward signal. \nThe agent explores the environment, takes actions, and receives feedback in the form of rewards. \nThe goal is to learn a strategy (policy) that guides the agent to make actions that lead to the highest cumulative reward over time. \nTo better understand the agent's learning process, we use visualizations that illustrate key aspects of its journey.",
         "mode": "markdown"
       },
       "pluginVersion": "9.2.15",
@@ -167,7 +167,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "#### How to use the dashboard\n\nThis interactive tool is designed to help you gain insights into the learning journey of our reinforcement learning (RL) agent. \nTo understand the dashboard take note of the following three points:\n\n##### 1. Division of the Dashboard:\nThe dashboard is divided into two parts. The upper part summarizes the results for all learning units over all simulated episodes. The lower part focuses the results on speicifc units and episodes, which you can select according to the second point.\n\n\n##### 2. Selection of Metrics and Simulation Subsets:\nThe dashboard is devided in system wide plots and plots spefically for certain episodes, timeframes and learning units.\nOn the top of the dashboard, you'll find a list of available choices for the episode of the simualtiona and a list of RL units. \nChoose the ones you're interested in by selecting on their names in the list. The selected metrics will be displayed on the Choice specific visualization area.\n\n\n##### 3. Interaction with Plots:\nThe plots are interactive. You can zoom in and out, click on data points to view specific details etc.\n\n\nIf you need some guidance for interpreting the results, you can orient yourself on the follwing steps:\n\n1. Understand Learning Trends: Observe how reward, exploration, and other metrics change over time. Look for trends such as increasing rewards, decreasing episode length, and changes in exploration patterns.\n2. Examine Policy and Action Patterns: Visualize the agent's learned policy and action distribution. Darker shades indicate preferred actions, while lighter shades show less preferred ones.\n3. Monitor Learning Curve and Loss: Keep an eye on the learning curve to see how the agent's performance evolves. If applicable, check the loss curve to understand the convergence of the learning algorithm.\n4. Track Success Rate: If success/failure in an auction is relevant, track the success rate plot to gauge the agent's success in completing a trade. Note that sometimes the circumstances might not allow a successfull trade.\n5. Compare Different Strategies: If multiple algorithms or learning parameter sets are available, use the comparison plot to assess their performance. Select the ones you want to compare, and observe how their learning trajectories differ.\n6. Experiment and Learn: Use this tool to experiment with different settings and learn about RL agent behavior. It's a great way to develop a deeper understanding of reinforcement learning concepts.",
+        "content": "#### How to use the dashboard\n\nThis interactive tool is designed to help you gain insights into the learning journey of our reinforcement learning (RL) agent. \nTo understand the dashboard take note of the following three points:\n\n##### 1. Division of the Dashboard:\nThe dashboard is divided into two parts. \nThe upper part summarizes the results for all learning units over all simulated episodes. \nThe lower part focuses the results on specific units and episodes, which you can select according to the second point.\n\n\n##### 2. Selection of Metrics and Simulation Subsets:\nThe dashboard is devided in system wide plots and specific plots for certain episodes, timeframes and learning units.\nOn the top of the dashboard, you'll find a list of available choices for the episode of the simualtion and a list of RL units. \nChoose the ones you're interested in by selecting their names in the list. The selected metrics will be displayed on the choice-specific visualization area.\n\n\n##### 3. Interaction with Plots:\nThe plots are interactive. You can zoom in and out, click on data points to view specific details etc.\nIn the upper left corner of each plot you find additional information about the depicted data.\n\nIf you need some guidance for interpreting the results, you can orient yourself on the follwing steps:\n\n1. Understand Learning Trends: \nObserve how reward, exploration, and other metrics change over time. \nLook for trends such as increasing rewards, decreasing episode length, and changes in exploration patterns.\n2. Examine Policy and Action Patterns: \nVisualize the agent's learned policy and action distribution. \nDarker shades indicate preferred actions, while lighter shades show less preferred ones.\n3. Monitor Learning Curve and Loss: \nKeep an eye on the learning curve to see how the agent's performance evolves. \nIf applicable, check the loss curve to understand the convergence of the learning algorithm.\n4. Track Success Rate: \nIf success/failure in an auction is relevant, track the success rate plot to gauge the agent's success in completing a trade. \nNote that sometimes the circumstances might not allow a successfull trade.\n5. Compare Different Strategies: \nIf multiple algorithms or learning parameter sets are available, use the comparison plot to assess their performance. \nSelect the ones you want to compare, and observe how their learning trajectories differ.\n6. Experiment and Learn: \nUse this tool to experiment with different settings and learn about RL agent behavior. \nIt's a great way to develop a deeper understanding of reinforcement learning concepts.",
         "mode": "markdown"
       },
       "pluginVersion": "9.2.15",
@@ -225,6 +225,7 @@
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
+      "description": "The reward is a measure for the learning agent to determine how desirable (reward > 0) or undesirable (reward < 0) the chosen actions are. This plot shows the rewards averaged over all learning units for each episode. ",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -417,6 +418,7 @@
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
+      "description": "The evaluation reward is the reward for evaluation episodes which are calculated with unseen data.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -873,6 +875,7 @@
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
+      "description": "The accepted volume ratio is the ratio between the accepted volume and the offered volume.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1012,7 +1015,104 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "learning_mode"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "evaluation_mode"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 126
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "profit"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 119
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "reward"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 112
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "unit"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 73
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "actions_1"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 112
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "actions_0"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 111
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "regret"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 124
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 9,
@@ -1067,7 +1167,7 @@
           ]
         }
       ],
-      "title": "Examplary Subset of RL Parameteres",
+      "title": "Exemplary Subset of RL Parameters",
       "type": "table"
     },
     {
@@ -1448,7 +1548,7 @@
           ]
         }
       ],
-      "title": "Arg. regret of unit $rl_unit",
+      "title": "Avg. regret of unit $rl_unit",
       "transformations": [
         {
           "id": "calculateField",
@@ -2102,7 +2202,32 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "noisy_action_Pinflex"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -2449,7 +2574,7 @@
   },
   "time": {
     "from": "2018-12-31T23:00:00.000Z",
-    "to": "2019-01-31T22:59:59.000Z"
+    "to": "2019-01-15T22:59:59.000Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -2464,6 +2589,6 @@
   "timezone": "",
   "title": "Assume: Training progress",
   "uid": "JKQzx0q4k",
-  "version": 2,
+  "version": 16,
   "weekStart": ""
 }
