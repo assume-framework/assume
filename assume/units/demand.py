@@ -109,7 +109,8 @@ class Demand(SupportsMinMax):
         :return: the bid volume as both the minimum and maximum power output of the unit
         :rtype: tuple[pd.Series, pd.Series]
         """
-        bid_volume = (self.volume - self.outputs[product_type]).loc[start:end]
+        end_excl = end - self.index.freq
+        bid_volume = (self.volume - self.outputs[product_type]).loc[start:end_excl]
         return bid_volume, bid_volume
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:

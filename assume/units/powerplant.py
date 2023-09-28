@@ -5,7 +5,6 @@ from functools import lru_cache
 import pandas as pd
 
 from assume.common.base import SupportsMinMax
-from assume.common.market_objects import Orderbook
 
 logger = logging.getLogger(__name__)
 
@@ -86,8 +85,6 @@ class PowerPlant(SupportsMinMax):
         hot_start_cost: float = 0,
         warm_start_cost: float = 0,
         cold_start_cost: float = 0,
-        shut_down_cost: float = 0,
-        no_load_cost: float = 0,
         min_operating_time: float = 0,
         min_down_time: float = 0,
         downtime_hot_start: int = 8,  # hours
@@ -123,22 +120,19 @@ class PowerPlant(SupportsMinMax):
         self.downtime_hot_start = downtime_hot_start / (
             self.index.freq / timedelta(hours=1)
         )
-        self.downtime_warm_start = downtime_warm_start
+        self.downtime_warm_start = downtime_warm_start / (
+            self.index.freq / timedelta(hours=1)
+        )
 
         self.fixed_cost = fixed_cost
-        self.no_load_cost = no_load_cost
-
-        self.hot_start_cost = hot_start_cost
-        self.warm_start_cost = warm_start_cost
-        self.cold_start_cost = cold_start_cost
-        self.shut_down_cost = shut_down_cost
+        self.hot_start_cost = hot_start_cost * max_power
+        self.warm_start_cost = warm_start_cost * max_power
+        self.cold_start_cost = cold_start_cost * max_power
 
         self.heat_extraction = heat_extraction
         self.max_heat_extraction = max_heat_extraction
 
         self.location = location
-
-        self.current_status = 1
 
         self.init_marginal_cost()
 
@@ -155,6 +149,7 @@ class PowerPlant(SupportsMinMax):
     ):
         """
         Executes the current dispatch of the unit based on the provided timestamps.
+        The dispatch is only executed, if it is in the constraints given by the unit.
         Returns the volume of the unit within the given time range.
 
         :param start: the start time of the dispatch
@@ -166,14 +161,24 @@ class PowerPlant(SupportsMinMax):
         """
 
         end_excl = end - self.index.freq
-        # TODO ramp down and turn off only for relevant timesteps
-        if self.outputs["energy"][start:end_excl].mean() < self.min_power:
-            self.outputs["energy"].loc[start:end_excl] = 0
 
-        # TODO check if resulting power is < max_power
-        # if self.outputs["energy"][start:end_excl].max() > self.max_power:
-        #     max_pow = self.outputs["energy"][start:end_excl].max()
-        #     logger.error(f"{max_pow} greater than {self.max_power} - bidding twice?")
+        max_power = (
+            self.forecaster.get_availability(self.id)[start:end_excl] * self.max_power
+        )
+
+        for t in self.outputs["energy"][start:end_excl].index:
+            current_power = self.outputs["energy"][t]
+            previous_power = self.get_output_before(t)
+
+            max_power_t = self.calculate_ramp(previous_power, max_power[t])
+            min_power_t = self.calculate_ramp(previous_power, self.min_power)
+
+            if current_power > max_power_t:
+                self.outputs["energy"][t] = max_power_t
+
+            elif current_power < min_power_t and current_power > 0:
+                self.outputs["energy"][t] = 0
+
         return self.outputs["energy"].loc[start:end_excl]
 
     def calc_simple_marginal_cost(
@@ -340,64 +345,3 @@ class PowerPlant(SupportsMinMax):
         )
 
         return unit_dict
-
-    def get_starting_costs(self, op_time):
-        """
-        op_time is hours running
-        """
-        if op_time > 0:
-            # unit is running
-            return 0
-        if -op_time < self.downtime_hot_start:
-            return self.hot_start_cost
-        elif -op_time < self.downtime_warm_start:
-            return self.warm_start_cost
-        else:
-            return self.cold_start_cost
-
-    def calculate_cashflow(self, product_type: str, orderbook: Orderbook):
-        """
-        calculates the cashflow for the given product_type
-
-        :param product_type: the product type
-        :type product_type: str
-        :param orderbook: The orderbook.
-        :type orderbook: Orderbook
-        """
-        for order in orderbook:
-            start = order["start_time"]
-            end = order["end_time"]
-            end_excl = end - self.index.freq
-
-            if isinstance(order["accepted_volume"], dict):
-                cashflow = [
-                    float(order["accepted_price"][i] * order["accepted_volume"][i])
-                    for i in order["accepted_volume"].keys()
-                ]
-                self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
-                    cashflow * self.index.freq.n
-                )
-
-                for i in order["accepted_volume"].keys():
-                    if (
-                        order["accepted_volume"][i] != 0
-                        and self.outputs[product_type].loc[i - self.index.freq] == 0
-                        and i - self.index.freq != self.index[0]
-                    ):
-                        self.outputs[f"{product_type}_cashflow"].loc[
-                            i
-                        ] -= self.hot_start_cost
-                    elif (
-                        order["accepted_volume"][i] == 0
-                        and self.outputs[product_type].loc[i - self.index.freq] != 0
-                    ):
-                        self.outputs[f"{product_type}_cashflow"].loc[
-                            i
-                        ] -= self.shut_down_cost
-
-            else:
-                cashflow = float(order["accepted_price"] * order["accepted_volume"])
-                hours = (end - start) / timedelta(hours=1)
-                self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
-                    cashflow * hours
-                )

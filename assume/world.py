@@ -80,6 +80,16 @@ class World:
         }
 
         self.bidding_strategies = bidding_strategies
+
+        try:
+            from assume.strategies.learning_strategies import RLStrategy
+
+            self.bidding_strategies["learning"] = RLStrategy
+        except ImportError as e:
+            self.logger.info(
+                "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",
+                e,
+            )
         self.clearing_mechanisms: dict[str, MarketRole] = clearing_mechanisms
         self.clearing_mechanisms.update(additional_clearing_mechanisms)
         nest_asyncio.apply()
@@ -133,9 +143,10 @@ class World:
 
     async def setup_learning(self):
         self.bidding_params.update(self.learning_config)
+
         # initiate learning if the learning mode is on and hence we want to learn new strategies
         self.learning_mode = self.learning_config.get("learning_mode", False)
-        self.eval_mode = self.learning_config.get("evaluation_mode", False)
+        self.evaluation_mode = self.learning_config.get("evaluation_mode", False)
 
         if self.learning_mode:
             # if so, we initate the rl learning role with parameters
@@ -174,7 +185,7 @@ class World:
             export_csv_path=self.export_csv_path,
             save_frequency_hours=save_frequency_hours,
             learning_mode=self.learning_mode,
-            evaluation_mode=self.eval_mode,
+            evaluation_mode=self.evaluation_mode,
         )
         if self.same_process:
             output_agent = RoleAgent(
@@ -318,14 +329,14 @@ class World:
         market_operator_agent.markets = []
 
         # after creation of an agent - we set additional context params
-        market_operator_agent._role_context.data_dict = {
-            "output_agent_addr": None
-            if self.learning_mode
-            else self.output_agent_addr[0],
-            "output_agent_id": None
-            if self.learning_mode
-            else self.output_agent_addr[1],
-        }
+        market_operator_agent._role_context.data_dict = {}
+        if not self.learning_mode and not self.evaluation_mode:
+            market_operator_agent._role_context.data_dict.update(
+                {
+                    "output_agent_addr": self.output_agent_addr[0],
+                    "output_agent_id": self.output_agent_addr[1],
+                }
+            )
         self.market_operators[id] = market_operator_agent
 
     def add_market(

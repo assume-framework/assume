@@ -76,13 +76,6 @@ def load_file(
                 )
                 return None
 
-            # check if df.index contains index
-            if not index.isin(df.index).all():
-                logger.warning(
-                    f"{file_name}: simulation time line does not match the indexes from the dataframe. Returning None."
-                )
-                return None
-
             df.index.freq = df.index.inferred_freq
 
             if len(df.index) < len(index) and df.index.freq == index.freq:
@@ -237,10 +230,11 @@ async def load_scenario_folder_async(
     inputs_path: str,
     scenario: str,
     study_case: str,
-    disable_learning: bool = False,
+    perform_learning: bool = True,
+    perform_evaluation: bool = False,
     episode: int = 0,
     eval_episode: int = 0,
-    load_learned_path: str = "",
+    trained_actors_path: str = "",
 ):
     """Load a scenario from a given path. Raises: ValueError: If the scenario or study case is not found.
 
@@ -256,11 +250,10 @@ async def load_scenario_folder_async(
 
     # load the config file
     path = f"{inputs_path}/{scenario}"
-    with open(f"{path}/config.yaml", "r") as f:
-        config = yaml.safe_load(f)
-        if not study_case:
-            study_case = list(config.keys())[0]
-        config = config[study_case]
+    config = yaml.safe_load(open(f"{path}/config.yaml", "r"))
+    if not study_case:
+        study_case = list(config.keys())[0]
+    config = config[study_case]
     logger.info(f"Starting Scenario {scenario}/{study_case} from {inputs_path}")
 
     world.reset()
@@ -306,16 +299,18 @@ async def load_scenario_folder_async(
     learning_config: LearningConfig = config.get("learning_config", {})
     bidding_strategy_params = config.get("bidding_strategy_params", {})
 
-    if disable_learning and learning_config["learning_mode"] is True:
-        learning_config["learning_mode"] = False
-        learning_config["evaluation_mode"] = True
+    learning_config["learning_mode"] = (
+        config.get("learning_mode", False) and perform_learning
+    )
+    learning_config["evaluation_mode"] = perform_evaluation
 
-    if load_learned_path:
-        learning_config["load_learned_path"] = load_learned_path
-    elif learning_config.get("load_learned_path") is None:
-        learning_config[
-            "load_learned_path"
-        ] = f"{inputs_path}/learned_strategies/{sim_id}"
+    if "trained_actors_path" not in learning_config.keys():
+        if trained_actors_path:
+            learning_config["trained_actors_path"] = trained_actors_path
+        else:
+            learning_config[
+                "trained_actors_path"
+            ] = f"{inputs_path}/learned_strategies/{sim_id}"
 
     if learning_config.get("learning_mode", False):
         sim_id = f"{sim_id}_{episode}"
@@ -456,6 +451,13 @@ async def load_scenario_folder_async(
         forecaster=forecaster,
     )
 
+    if (
+        world.learning_mode
+        and world.learning_role is not None
+        and len(world.learning_role.rl_strats) == 0
+    ):
+        raise ValueError("No RL units/strategies were provided!")
+
 
 async def async_load_custom_units(
     world: World,
@@ -526,10 +528,11 @@ def load_scenario_folder(
     inputs_path: str,
     scenario: str,
     study_case: str,
-    disable_learning: bool = False,
-    episode: int = 0,
-    eval_episode: int = 0,
-    load_learned_path="",
+    perform_learning: bool = True,
+    perform_evaluation: bool = False,
+    episode: int = 1,
+    eval_episode: int = 1,
+    trained_actors_path="",
 ):
     """
     Load a scenario from a given path.
@@ -549,10 +552,11 @@ def load_scenario_folder(
             inputs_path=inputs_path,
             scenario=scenario,
             study_case=study_case,
-            disable_learning=disable_learning,
+            perform_learning=perform_learning,
+            perform_evaluation=perform_evaluation,
             episode=episode,
             eval_episode=eval_episode,
-            load_learned_path=load_learned_path,
+            trained_actors_path=trained_actors_path,
         )
     )
 
@@ -577,21 +581,28 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
     actors_and_critics = None
     world.output_role.del_similar_runs()
 
-    eval_episode = 0
+    validation_interval = min(
+        world.learning_role.training_episodes,
+        world.learning_config.get("validation_episodes_interval", 5),
+    )
+
+    eval_episode = 1
+
     for episode in tqdm(
-        range(world.learning_role.training_episodes),
+        range(1, world.learning_role.training_episodes + 1),
         desc="Training Episodes",
     ):
         # TODO normally, loading twice should not create issues, somehow a scheduling issue is raised currently
-        if episode:
+        if episode != 1:
             load_scenario_folder(
                 world,
                 inputs_path,
                 scenario,
                 study_case,
+                perform_learning=True,
                 episode=episode,
-                disable_learning=False,
             )
+
         # give the newly created rl_agent the buffer that we stored from the beginning
         world.learning_role.create_actors_and_critics(
             actors_and_critics=actors_and_critics
@@ -599,20 +610,20 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
         world.learning_role.buffer = buffer
         world.learning_role.episodes_done = episode
 
-        if episode + 1 > world.learning_role.episodes_collecting_initial_experience:
+        if episode > world.learning_role.episodes_collecting_initial_experience:
             world.learning_role.turn_off_initial_exploration()
 
         world.run()
+
         actors_and_critics = world.learning_role.extract_actors_and_critics()
-        validation_interval = min(
-            world.learning_role.training_episodes,
-            world.learning_config.get("validation_episodes_interval", 5),
-        )
-        if (episode + 1) % validation_interval == 0 and (
-            episode + 1
-        ) > world.learning_role.episodes_collecting_initial_experience:
-            old_path = world.learning_config["load_learned_path"]
+
+        if (
+            episode % validation_interval == 0
+            and episode > world.learning_role.episodes_collecting_initial_experience
+        ):
+            old_path = world.learning_config["trained_actors_path"]
             new_path = f"{old_path}_eval"
+
             # save validation params in validation path
             world.learning_role.save_params(directory=new_path)
             world.reset()
@@ -623,16 +634,19 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
                 inputs_path,
                 scenario,
                 study_case,
-                disable_learning=True,
+                perform_learning=False,
+                perform_evaluation=True,
                 eval_episode=eval_episode,
-                load_learned_path=new_path,
+                trained_actors_path=new_path,
             )
+
             world.run()
+
             avg_reward = world.output_role.get_sum_reward()
             # check reward improvement in validation run
-            world.learning_config["load_learned_path"] = old_path
-            if best_reward < avg_reward:
-                # save new best params for simulation
+            world.learning_config["trained_actors_path"] = old_path
+            if avg_reward > best_reward:
+                # update best reward
                 best_reward = avg_reward
                 world.learning_role.save_params(directory=old_path)
 
@@ -644,7 +658,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
         # as long as we do not skip setup container should be handled correctly
         # if enough initial experience was collected according to specifications in learning config
         # turn off initial exploration and go into full learning mode
-        if episode + 1 >= world.learning_role.episodes_collecting_initial_experience:
+        if episode >= world.learning_role.episodes_collecting_initial_experience:
             world.learning_role.turn_off_initial_exploration()
 
         # container shutdown implicitly with new initialisation
@@ -658,5 +672,5 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
         inputs_path,
         scenario,
         study_case,
-        disable_learning=True,
+        perform_learning=False,
     )

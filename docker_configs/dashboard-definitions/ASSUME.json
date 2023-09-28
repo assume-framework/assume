@@ -217,6 +217,30 @@
                 "value": "EUR/MWh"
               }
             ]
+          },
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "Demand volume"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
           }
         ]
       },
@@ -553,7 +577,35 @@
           },
           "unit": "megwatt"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "  Unit 1_1",
+                  "  Unit 2_1",
+                  "  Unit 3_1",
+                  "  Unit 4_1"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 9,
@@ -1448,6 +1500,32 @@
                 "value": "€/MW"
               }
             ]
+          },
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "Bid price: {bid_id=\"Unit 4_1\", unit_id=\"Unit 4\"}",
+                  "Bid price: {bid_id=\"Unit 3_2\", unit_id=\"Unit 3\"}",
+                  "Bid price: {bid_id=\"Unit 3_1\", unit_id=\"Unit 3\"}"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
           }
         ]
       },
@@ -1689,6 +1767,30 @@
                 "id": "unit"
               }
             ]
+          },
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "Accepted volume: {unit_id=\"Unit 3 - EOM\"}"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
           }
         ]
       },
@@ -1725,7 +1827,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_volume) AS \"Accepted volume:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id\r\nORDER BY 1\r\n",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  sum(accepted_volume) AS \"Accepted volume:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id\r\nORDER BY 1\r\n",
           "refId": "A",
           "select": [
             [
@@ -1907,7 +2009,7 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
-          "format": "table",
+          "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
@@ -3727,8 +3829,8 @@
       {
         "current": {
           "selected": false,
-          "text": "example_01_rl_base",
-          "value": "example_01_rl_base"
+          "text": "example_01a_base",
+          "value": "example_01a_base"
         },
         "datasource": {
           "type": "postgres",
@@ -3777,11 +3879,15 @@
           "selected": true,
           "text": [
             "Unit 1",
-            "Unit 3"
+            "Unit 2",
+            "Unit 3",
+            "Unit 4"
           ],
           "value": [
             "Unit 1",
-            "Unit 3"
+            "Unit 2",
+            "Unit 3",
+            "Unit 4"
           ]
         },
         "datasource": {
@@ -3805,9 +3911,13 @@
       },
       {
         "current": {
-          "selected": false,
-          "text": "demand_EOM",
-          "value": "demand_EOM"
+          "selected": true,
+          "text": [
+            "demand_EOM"
+          ],
+          "value": [
+            "demand_EOM"
+          ]
         },
         "datasource": {
           "type": "postgres",
@@ -3830,10 +3940,13 @@
       },
       {
         "current": {
-          "isNone": true,
-          "selected": false,
-          "text": "None",
-          "value": ""
+          "selected": true,
+          "text": [
+            "None"
+          ],
+          "value": [
+            ""
+          ]
         },
         "datasource": {
           "type": "postgres",
@@ -3858,7 +3971,7 @@
   },
   "time": {
     "from": "2018-12-31T23:00:00.000Z",
-    "to": "2019-01-31T22:59:59.000Z"
+    "to": "2019-01-10T22:59:59.000Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -3872,6 +3985,6 @@
   "timezone": "",
   "title": "ASSUME: Main overview",
   "uid": "mQ3Lvkr4k",
-  "version": 6,
+  "version": 2,
   "weekStart": ""
 }

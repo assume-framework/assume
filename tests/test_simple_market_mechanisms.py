@@ -45,9 +45,6 @@ def test_market():
     orderbook = extend_orderbook(products, 1000, 100, orderbook)
     orderbook = extend_orderbook(products, 900, 50, orderbook)
 
-    simple_dayahead_auction_config.market_mechanism = clearing_mechanisms[
-        simple_dayahead_auction_config.market_mechanism
-    ]
     mr = PayAsClearRole(simple_dayahead_auction_config)
     accepted, rejected, meta = mr.clear(orderbook, products)
     assert meta[0]["demand_volume"] > 0
@@ -89,3 +86,29 @@ def test_simple_market_mechanism():
         # print(meta)
 
     # return mr.all_orders, meta
+
+
+def test_market_pay_as_clear():
+    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
+    products = get_available_products(
+        simple_dayahead_auction_config.market_products, next_opening
+    )
+    assert len(products) == 1
+
+    """
+    Create Orderbook with constant order volumes and prices:
+        - dem1: volume = -1000, price = 3000
+        - gen1: volume = 1000, price = 100
+        - gen2: volume = 900, price = 50
+    """
+    orderbook = extend_orderbook(products, -400, 3000)
+    orderbook = extend_orderbook(products, -100, 3000, orderbook)
+    orderbook = extend_orderbook(products, 300, 100, orderbook)
+    orderbook = extend_orderbook(products, 200, 50, orderbook)
+
+    mr = PayAsClearRole(simple_dayahead_auction_config)
+    accepted, rejected, meta = mr.clear(orderbook, products)
+    assert meta[0]["demand_volume"] > 0
+    assert meta[0]["price"] > 0
+    assert len(accepted) == 3
+    assert len(rejected) == 1

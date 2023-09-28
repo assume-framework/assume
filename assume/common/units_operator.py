@@ -164,11 +164,15 @@ class UnitsOperator(Role):
         :type meta: dict[str, str]
         """
         logger.debug(f"{self.id} got market result: {content}")
-        orderbook: Orderbook = content["orderbook"]
+        accepted_orders: Orderbook = content["accepted_orders"]
+        rejected_orders: Orderbook = content["rejected_orders"]
+        orderbook = accepted_orders + rejected_orders
+
         for order in orderbook:
             order["market_id"] = content["market_id"]
             # map bid id to unit id
             order["unit_id"] = self.bids_map[order["bid_id"]]
+
         self.valid_orders.extend(orderbook)
         marketconfig = self.registered_markets[content["market_id"]]
         self.set_unit_dispatch(orderbook, marketconfig)
@@ -220,12 +224,13 @@ class UnitsOperator(Role):
             current_dispatch.name = "power"
             data = pd.DataFrame(current_dispatch)
             data["soc"] = unit.outputs["soc"][start:end]
-            # TODO make that right for all products
-            for key in unit.outputs.keys():
-                if "energy_cashflow" in key:
-                    data[key] = unit.outputs[key][start:end]
 
-                if "energy_marginal_costs" in key:
+            for key in unit.outputs.keys():
+                if "cashflow" in key:
+                    data[key] = unit.outputs[key][start:end]
+                if "marginal_costs" in key:
+                    data[key] = unit.outputs[key][start:end]
+                if "total_costs" in key:
                     data[key] = unit.outputs[key][start:end]
 
             data["unit"] = unit_id
@@ -398,7 +403,7 @@ class UnitsOperator(Role):
         db_aid = self.context.data_dict.get("learning_output_agent_id")
         db_addr = self.context.data_dict.get("learning_output_agent_addr")
 
-        if db_aid and db_addr:
+        if db_aid and db_addr and output_agent_list:
             self.context.schedule_instant_acl_message(
                 receiver_id=db_aid,
                 receiver_addr=db_addr,

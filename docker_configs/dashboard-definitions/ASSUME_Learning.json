@@ -107,7 +107,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "#### Introduction\n\nHere we visualize the results of the reinforcment learning process for the specified units that us a learning strategy. Reinforcement Learning is a machine learning paradigm where an agent learns to make a sequence of decisions in an environment to maximize a reward signal. The agent explores the environment, takes actions, and receives feedback in the form of rewards. The goal is to learn a strategy (policy) that guides the agent to make actions that lead to the highest cumulative reward over time. To better understand the agent's learning process, we use visualizations that illustrate key aspects of its journey.",
+        "content": "#### Introduction\n\nHere we visualize the results of the reinforcement learning process for the specified units that use a learning strategy. \nReinforcement Learning is a machine learning paradigm where an agent learns to make a sequence of decisions in an environment to maximize a reward signal. \nThe agent explores the environment, takes actions, and receives feedback in the form of rewards. \nThe goal is to learn a strategy (policy) that guides the agent to make actions that lead to the highest cumulative reward over time. \nTo better understand the agent's learning process, we use visualizations that illustrate key aspects of its journey.",
         "mode": "markdown"
       },
       "pluginVersion": "9.2.15",
@@ -167,7 +167,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "#### How to use the dashboard\n\nThis interactive tool is designed to help you gain insights into the learning journey of our reinforcement learning (RL) agent. \nTo understand the dashboard take note of the following three points:\n\n##### 1. Division of the Dashboard:\nThe dashboard is divided into two parts. The upper part summarizes the results for all learning units over all simulated episodes. The lower part focuses the results on speicifc units and episodes, which you can select according to the second point.\n\n\n##### 2. Selection of Metrics and Simulation Subsets:\nThe dashboard is devided in system wide plots and plots spefically for certain episodes, timeframes and learning units.\nOn the top of the dashboard, you'll find a list of available choices for the episode of the simualtiona and a list of RL units. \nChoose the ones you're interested in by selecting on their names in the list. The selected metrics will be displayed on the Choice specific visualization area.\n\n\n##### 3. Interaction with Plots:\nThe plots are interactive. You can zoom in and out, click on data points to view specific details etc.\n\n\nIf you need some guidance for interpreting the results, you can orient yourself on the follwing steps:\n\n1. Understand Learning Trends: Observe how reward, exploration, and other metrics change over time. Look for trends such as increasing rewards, decreasing episode length, and changes in exploration patterns.\n2. Examine Policy and Action Patterns: Visualize the agent's learned policy and action distribution. Darker shades indicate preferred actions, while lighter shades show less preferred ones.\n3. Monitor Learning Curve and Loss: Keep an eye on the learning curve to see how the agent's performance evolves. If applicable, check the loss curve to understand the convergence of the learning algorithm.\n4. Track Success Rate: If success/failure in an auction is relevant, track the success rate plot to gauge the agent's success in completing a trade. Note that sometimes the circumstances might not allow a successfull trade.\n5. Compare Different Strategies: If multiple algorithms or learning parameter sets are available, use the comparison plot to assess their performance. Select the ones you want to compare, and observe how their learning trajectories differ.\n6. Experiment and Learn: Use this tool to experiment with different settings and learn about RL agent behavior. It's a great way to develop a deeper understanding of reinforcement learning concepts.",
+        "content": "#### How to use the dashboard\n\nThis interactive tool is designed to help you gain insights into the learning journey of our reinforcement learning (RL) agent. \nTo understand the dashboard take note of the following three points:\n\n##### 1. Division of the Dashboard:\nThe dashboard is divided into two parts. \nThe upper part summarizes the results for all learning units over all simulated episodes. \nThe lower part focuses the results on specific units and episodes, which you can select according to the second point.\n\n\n##### 2. Selection of Metrics and Simulation Subsets:\nThe dashboard is devided in system wide plots and specific plots for certain episodes, timeframes and learning units.\nOn the top of the dashboard, you'll find a list of available choices for the episode of the simualtion and a list of RL units. \nChoose the ones you're interested in by selecting their names in the list. The selected metrics will be displayed on the choice-specific visualization area.\n\n\n##### 3. Interaction with Plots:\nThe plots are interactive. You can zoom in and out, click on data points to view specific details etc.\nIn the upper left corner of each plot you find additional information about the depicted data.\n\nIf you need some guidance for interpreting the results, you can orient yourself on the follwing steps:\n\n1. Understand Learning Trends: \nObserve how reward, exploration, and other metrics change over time. \nLook for trends such as increasing rewards, decreasing episode length, and changes in exploration patterns.\n2. Examine Policy and Action Patterns: \nVisualize the agent's learned policy and action distribution. \nDarker shades indicate preferred actions, while lighter shades show less preferred ones.\n3. Monitor Learning Curve and Loss: \nKeep an eye on the learning curve to see how the agent's performance evolves. \nIf applicable, check the loss curve to understand the convergence of the learning algorithm.\n4. Track Success Rate: \nIf success/failure in an auction is relevant, track the success rate plot to gauge the agent's success in completing a trade. \nNote that sometimes the circumstances might not allow a successfull trade.\n5. Compare Different Strategies: \nIf multiple algorithms or learning parameter sets are available, use the comparison plot to assess their performance. \nSelect the ones you want to compare, and observe how their learning trajectories differ.\n6. Experiment and Learn: \nUse this tool to experiment with different settings and learn about RL agent behavior. \nIt's a great way to develop a deeper understanding of reinforcement learning concepts.",
         "mode": "markdown"
       },
       "pluginVersion": "9.2.15",
@@ -225,6 +225,7 @@
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
+      "description": "The reward is a measure for the learning agent to determine how desirable (reward > 0) or undesirable (reward < 0) the chosen actions are. This plot shows the rewards averaged over all learning units for each episode. ",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -303,7 +304,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  episode,\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%'\nand learning_mode is true",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%'\nand learning_mode is true",
           "refId": "A",
           "select": [
             [
@@ -361,7 +362,200 @@
           ]
         }
       ],
-      "title": "Average Reward of all RL Unit ",
+      "title": "Average reward of all learning units",
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "binary": {
+              "left": "index",
+              "reducer": "sum",
+              "right": "episode"
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
+          }
+        },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "episode": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "index  episode": {
+                "aggregations": [],
+                "operation": "aggregate"
+              },
+              "reward": {
+                "aggregations": [
+                  "mean"
+                ],
+                "operation": "aggregate"
+              }
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "episode"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "The evaluation reward is the reward for evaluation episodes which are calculated with unseen data.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "id": 35,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "episode",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 100
+      },
+      "pluginVersion": "9.2.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "table",
+          "group": [],
+          "metricColumn": "simulation",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%'\nand evaluation_mode is true",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "reward"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "avg",
+                  "24"
+                ],
+                "type": "moving_window"
+              },
+              {
+                "params": [
+                  "avg_reward"
+                ],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": [
+                  "reward"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "avg",
+                  "24"
+                ],
+                "type": "moving_window"
+              },
+              {
+                "params": [
+                  "avg_reward"
+                ],
+                "type": "alias"
+              }
+            ]
+          ],
+          "table": "rl_params",
+          "timeColumn": "index",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Average evaluation reward of all learning units",
       "transformations": [
         {
           "id": "calculateField",
@@ -506,7 +700,7 @@
         "h": 15,
         "w": 24,
         "x": 0,
-        "y": 21
+        "y": 29
       },
       "id": 14,
       "options": {
@@ -624,7 +818,7 @@
         "h": 11,
         "w": 24,
         "x": 0,
-        "y": 36
+        "y": 44
       },
       "id": 22,
       "options": {
@@ -681,6 +875,7 @@
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
+      "description": "The accepted volume ratio is the ratio between the accepted volume and the offered volume.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -737,7 +932,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 47
+        "y": 55
       },
       "id": 24,
       "options": {
@@ -820,13 +1015,110 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "learning_mode"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "evaluation_mode"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 126
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "profit"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 119
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "reward"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 112
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "unit"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 73
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "actions_1"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 112
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "actions_0"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 111
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "regret"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 124
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 55
+        "y": 63
       },
       "id": 6,
       "options": {
@@ -875,7 +1167,7 @@
           ]
         }
       ],
-      "title": "Examplary Subset of RL Parameteres",
+      "title": "Exemplary Subset of RL Parameters",
       "type": "table"
     },
     {
@@ -884,7 +1176,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 64
+        "y": 72
       },
       "id": 16,
       "panels": [],
@@ -955,7 +1247,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 65
+        "y": 73
       },
       "id": 31,
       "options": {
@@ -990,7 +1282,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  episode,\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit'",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit'",
           "refId": "A",
           "select": [
             [
@@ -1145,6 +1437,428 @@
           {
             "matcher": {
               "id": "byName",
+              "options": "regret (mean)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 73
+      },
+      "id": 32,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "episode",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 100
+      },
+      "pluginVersion": "9.2.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "table",
+          "group": [],
+          "metricColumn": "simulation",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  regret\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit'",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "reward"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "avg",
+                  "24"
+                ],
+                "type": "moving_window"
+              },
+              {
+                "params": [
+                  "avg_reward"
+                ],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": [
+                  "reward"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "avg",
+                  "24"
+                ],
+                "type": "moving_window"
+              },
+              {
+                "params": [
+                  "avg_reward"
+                ],
+                "type": "alias"
+              }
+            ]
+          ],
+          "table": "rl_params",
+          "timeColumn": "index",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Avg. regret of unit $rl_unit",
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "binary": {
+              "left": "index",
+              "reducer": "sum",
+              "right": "episode"
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
+          }
+        },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "episode": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "index  episode": {
+                "aggregations": [],
+                "operation": "aggregate"
+              },
+              "regret": {
+                "aggregations": [
+                  "mean"
+                ],
+                "operation": "aggregate"
+              },
+              "reward": {
+                "aggregations": [
+                  "mean"
+                ],
+                "operation": "aggregate"
+              }
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "episode"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "reward (mean)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 81
+      },
+      "id": 36,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "episode",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 100
+      },
+      "pluginVersion": "9.2.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "table",
+          "group": [],
+          "metricColumn": "simulation",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit' and evaluation_mode is True",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "reward"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "avg",
+                  "24"
+                ],
+                "type": "moving_window"
+              },
+              {
+                "params": [
+                  "avg_reward"
+                ],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": [
+                  "reward"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "avg",
+                  "24"
+                ],
+                "type": "moving_window"
+              },
+              {
+                "params": [
+                  "avg_reward"
+                ],
+                "type": "alias"
+              }
+            ]
+          ],
+          "table": "rl_params",
+          "timeColumn": "index",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Avg.evaluation  reward of unit $rl_unit",
+      "transformations": [
+        {
+          "id": "calculateField",
+          "options": {
+            "binary": {
+              "left": "index",
+              "reducer": "sum",
+              "right": "episode"
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
+          }
+        },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "episode": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "index  episode": {
+                "aggregations": [],
+                "operation": "aggregate"
+              },
+              "reward": {
+                "aggregations": [
+                  "mean"
+                ],
+                "operation": "aggregate"
+              }
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "fields": {},
+            "sort": [
+              {
+                "field": "episode"
+              }
+            ]
+          }
+        }
+      ],
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
               "options": "profit (sum)"
             },
             "properties": [
@@ -1160,10 +1874,10 @@
         ]
       },
       "gridPos": {
-        "h": 16,
+        "h": 8,
         "w": 12,
         "x": 12,
-        "y": 65
+        "y": 81
       },
       "id": 33,
       "options": {
@@ -1198,7 +1912,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  episode,\n  profit\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit'",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  profit\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit'",
           "refId": "A",
           "select": [
             [
@@ -1327,220 +2041,6 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "regret (mean)"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "purple",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 73
-      },
-      "id": 32,
-      "options": {
-        "barRadius": 0,
-        "barWidth": 0.97,
-        "groupWidth": 0.7,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "orientation": "auto",
-        "showValue": "always",
-        "stacking": "none",
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        },
-        "xField": "episode",
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 100
-      },
-      "pluginVersion": "9.2.15",
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "format": "table",
-          "group": [],
-          "metricColumn": "simulation",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  episode,\n  regret\nFROM rl_params\nwhere simulation like ${simulation} || '_%' AND\n      unit = '$rl_unit'",
-          "refId": "A",
-          "select": [
-            [
-              {
-                "params": [
-                  "reward"
-                ],
-                "type": "column"
-              },
-              {
-                "params": [
-                  "avg",
-                  "24"
-                ],
-                "type": "moving_window"
-              },
-              {
-                "params": [
-                  "avg_reward"
-                ],
-                "type": "alias"
-              }
-            ],
-            [
-              {
-                "params": [
-                  "reward"
-                ],
-                "type": "column"
-              },
-              {
-                "params": [
-                  "avg",
-                  "24"
-                ],
-                "type": "moving_window"
-              },
-              {
-                "params": [
-                  "avg_reward"
-                ],
-                "type": "alias"
-              }
-            ]
-          ],
-          "table": "rl_params",
-          "timeColumn": "index",
-          "timeColumnType": "timestamp",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        }
-      ],
-      "title": "Arg. regret of unit $rl_unit",
-      "transformations": [
-        {
-          "id": "calculateField",
-          "options": {
-            "binary": {
-              "left": "index",
-              "reducer": "sum",
-              "right": "episode"
-            },
-            "mode": "binary",
-            "reduce": {
-              "reducer": "sum"
-            }
-          }
-        },
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "episode": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "index  episode": {
-                "aggregations": [],
-                "operation": "aggregate"
-              },
-              "regret": {
-                "aggregations": [
-                  "mean"
-                ],
-                "operation": "aggregate"
-              },
-              "reward": {
-                "aggregations": [
-                  "mean"
-                ],
-                "operation": "aggregate"
-              }
-            }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "field": "episode"
-              }
-            ]
-          }
-        }
-      ],
-      "type": "barchart"
-    },
-    {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
             "mode": "palette-classic"
           },
           "custom": {
@@ -1594,7 +2094,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 81
+        "y": 89
       },
       "id": 29,
       "options": {
@@ -1671,6 +2171,145 @@
               "tooltip": false,
               "viz": false
             },
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "noisy_action_Pinflex"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 89
+      },
+      "id": 26,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  actions_0 AS \"action_Pinflex\",\n  actions_0+exploration_noise_0 AS \"noisy_action_Pinflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit = '$rl_unit'\n\nORDER BY 1",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "power"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "market_dispatch",
+          "timeColumn": "datetime",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Normalized Action values - P_inflex",
+      "transformations": [],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -1707,8 +2346,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 81
+        "x": 0,
+        "y": 97
       },
       "id": 34,
       "options": {
@@ -1821,122 +2460,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 89
-      },
-      "id": 26,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "format": "time_series",
-          "group": [],
-          "metricColumn": "none",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  actions_0 AS \"action_Pinflex\",\n  actions_0+exploration_noise_0 AS \"noisy_action_Pinflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit = '$rl_unit'\n\nORDER BY 1",
-          "refId": "A",
-          "select": [
-            [
-              {
-                "params": [
-                  "power"
-                ],
-                "type": "column"
-              }
-            ]
-          ],
-          "table": "market_dispatch",
-          "timeColumn": "datetime",
-          "timeColumnType": "timestamp",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        }
-      ],
-      "title": "Normalized Action values - P_inflex",
-      "transformations": [],
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "stepAfter",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 12,
-        "y": 89
+        "y": 97
       },
       "id": 30,
       "options": {
@@ -1998,26 +2523,22 @@
     "list": [
       {
         "current": {
-          "selected": true,
-          "text": [
-            "example_01_rl_base"
-          ],
-          "value": [
-            "example_01_rl_base"
-          ]
+          "selected": false,
+          "text": "example_01_rl_base",
+          "value": "example_01_rl_base"
         },
         "datasource": {
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT DISTINCT\n        SUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\n      FROM \n        rl_params m",
+        "definition": "SELECT DISTINCT\nSUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\nFROM rl_params m\nwhere learning_mode is True",
         "description": "Can choose which simulation we want to show ",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "simulation",
         "options": [],
-        "query": "SELECT DISTINCT\n        SUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\n      FROM \n        rl_params m",
+        "query": "SELECT DISTINCT\nSUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\nFROM rl_params m\nwhere learning_mode is True",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -2034,7 +2555,7 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT distinct unit\nFROM rl_params\nwhere simulation like ${simulation} || '_%'",
+        "definition": "SELECT DISTINCT unit\nFROM rl_params\nwhere simulation like '${simulation}' || '_%'",
         "description": "All units that have an reinforcment learning strategy and hence have the Rl specific parameteres logged",
         "hide": 0,
         "includeAll": false,
@@ -2042,7 +2563,7 @@
         "multi": false,
         "name": "rl_unit",
         "options": [],
-        "query": "SELECT distinct unit\nFROM rl_params\nwhere simulation like ${simulation} || '_%'",
+        "query": "SELECT DISTINCT unit\nFROM rl_params\nwhere simulation like '${simulation}' || '_%'",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -2053,7 +2574,7 @@
   },
   "time": {
     "from": "2018-12-31T23:00:00.000Z",
-    "to": "2019-01-05T22:59:59.000Z"
+    "to": "2019-01-15T22:59:59.000Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -2068,6 +2589,6 @@
   "timezone": "",
   "title": "Assume: Training progress",
   "uid": "JKQzx0q4k",
-  "version": 6,
+  "version": 16,
   "weekStart": ""
 }

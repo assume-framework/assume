@@ -57,7 +57,7 @@ def test_complex_clearing():
     accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
 
     assert math.isclose(meta[0]["supply_volume"], 1000, abs_tol=eps)
-    assert math.isclose(meta[0]["demand_volume"], -1000, abs_tol=eps)
+    assert math.isclose(meta[0]["demand_volume"], 1000, abs_tol=eps)
     assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
     assert rejected_orders == []
     assert accepted_orders[0]["agent_id"] == "dem1"
