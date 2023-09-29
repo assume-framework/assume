@@ -4,6 +4,7 @@ import logging
 import sys
 import time
 from datetime import datetime
+from sys import platform
 
 import nest_asyncio
 import pandas as pd
@@ -105,7 +106,6 @@ class World:
         simulation_id: str,
         index: pd.Series,
         save_frequency_hours: int = 24,
-        same_process: bool = True,
         bidding_params: dict = {},
         learning_config: LearningConfig = {},
         forecaster: Forecaster = None,
@@ -120,7 +120,6 @@ class World:
 
         self.bidding_params = bidding_params
         self.index = index
-        self.same_process = same_process
 
         # kill old container if exists
         if isinstance(self.container, Container) and self.container.running:
@@ -169,7 +168,6 @@ class World:
                 start=self.start,
                 end=self.end,
             )
-            # if self.same_process:
             # separate process does not support buffer and learning
             if True:
                 self.learning_agent_addr = (self.addr, "learning_agent")
@@ -199,12 +197,8 @@ class World:
             learning_mode=self.learning_mode,
             evaluation_mode=self.evaluation_mode,
         )
-        if self.same_process:
-            output_agent = RoleAgent(
-                self.container, suggested_aid=self.output_agent_addr[1]
-            )
-            output_agent.add_role(self.output_role)
-        else:
+
+        if platform == "linux":
             self.addresses.append(self.addr)
 
             def creator(container):
@@ -213,6 +207,11 @@ class World:
                 clock_agent = DistributedClockAgent(container)
 
             await self.container.as_agent_process(agent_creator=creator)
+        else:
+            output_agent = RoleAgent(
+                self.container, suggested_aid=self.output_agent_addr[1]
+            )
+            output_agent.add_role(self.output_role)
 
     def add_unit_operator(
         self,
