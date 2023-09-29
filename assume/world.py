@@ -1,6 +1,7 @@
 import asyncio
 import calendar
 import logging
+import socket
 import sys
 import time
 from datetime import datetime
@@ -38,7 +39,8 @@ logging.getLogger("mango").setLevel(logging.WARNING)
 class World:
     def __init__(
         self,
-        addr: tuple[str, int] | str = "world",
+        ifac_addr: str = "0.0.0.0",
+        port: int = 9099,
         database_uri: str = "",
         export_csv_path: str = "",
         log_level: str = "INFO",
@@ -46,7 +48,7 @@ class World:
     ):
         logging.getLogger("assume").setLevel(log_level)
         self.logger = logging.getLogger(__name__)
-        self.addr = addr
+        self.addr = (ifac_addr, port)
         self.container = None
 
         self.export_csv_path = export_csv_path
@@ -124,20 +126,16 @@ class World:
         if isinstance(self.container, Container) and self.container.running:
             await self.container.shutdown()
 
-        # create new container
-        if self.addr == "world":
-            connection_type = "external_connection"
-        elif isinstance(self.addr, tuple):
-            connection_type = "tcp"
-        else:
-            connection_type = "mqtt"
+        # check if self.addr is already in use and increase port by one if true
+        while (
+            socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect_ex(self.addr) == 0
+        ):
+            self.addr = (self.addr[0], self.addr[1] + 1)
 
         self.container = await create_container(
-            connection_type=connection_type,
-            codec=mango_codec_factory(),
-            addr=self.addr,
-            clock=self.clock,
+            addr=self.addr, clock=self.clock, codec=mango_codec_factory()
         )
+
         await self.setup_learning()
         await self.setup_output_agent(simulation_id, save_frequency_hours)
 
