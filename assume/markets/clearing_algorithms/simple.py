@@ -123,7 +123,7 @@ class PayAsClearRole(MarketRole):
                     gen_vol -= diff
 
                     # add left over to supply_orders again
-                    # supply_orders.insert(0, supply_order)
+                    supply_orders.insert(0, supply_order)
                     demand_order["accepted_volume"] = demand_order["volume"]
                 else:
                     demand_order["accepted_volume"] = demand_order["volume"]
@@ -131,7 +131,9 @@ class PayAsClearRole(MarketRole):
                 accepted_demand_orders.append(demand_order)
 
             for order in supply_orders:
-                rejected_orders.append(order)
+                # if the order was not accepted partially, it is rejected
+                if not order.get("accepted_volume"):
+                    rejected_orders.append(order)
 
             # set clearing price - merit order - uniform pricing
             if accepted_supply_orders:
