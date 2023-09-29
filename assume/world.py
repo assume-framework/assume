@@ -114,6 +114,8 @@ class World:
         self.start = start
         self.end = end
         self.learning_config = learning_config
+        # initiate learning if the learning mode is on and hence we want to learn new strategies
+        self.evaluation_mode = self.learning_config.get("evaluation_mode", False)
 
         # forecaster is used only when loading custom unit types
         self.forecaster = forecaster
@@ -156,9 +158,6 @@ class World:
     async def setup_learning(self):
         self.bidding_params.update(self.learning_config)
 
-        # initiate learning if the learning mode is on and hence we want to learn new strategies
-        self.evaluation_mode = self.learning_config.get("evaluation_mode", False)
-
         if self.learning_mode:
             # if so, we initate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
@@ -169,19 +168,11 @@ class World:
                 end=self.end,
             )
             # separate process does not support buffer and learning
-            if True:
-                self.learning_agent_addr = (self.addr, "learning_agent")
-                rl_agent = RoleAgent(
-                    self.container, suggested_aid=self.learning_agent_addr[1]
-                )
-                rl_agent.add_role(self.learning_role)
-            else:
-
-                def creator(container):
-                    agent = RoleAgent(container, suggested_aid="learning_agent")
-                    agent.add_role(self.learning_role)
-
-                await self.container.as_agent_process(agent_creator=creator)
+            self.learning_agent_addr = (self.addr, "learning_agent")
+            rl_agent = RoleAgent(
+                self.container, suggested_aid=self.learning_agent_addr[1]
+            )
+            rl_agent.add_role(self.learning_role)
 
     async def setup_output_agent(self, simulation_id: str, save_frequency_hours: int):
         self.output_agent_addr = (self.addr, "export_agent_1")
