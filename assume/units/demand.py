@@ -45,6 +45,7 @@ class Demand(SupportsMinMax):
         index: pd.DatetimeIndex,
         max_power: float,
         min_power: float,
+        init_power: float = -1,
         node: str = "bus0",
         price: float | pd.Series = 3000.0,
         location: tuple[float, float] = (0.0, 0.0),
@@ -62,6 +63,7 @@ class Demand(SupportsMinMax):
         """Create a demand unit."""
         self.max_power = max_power
         self.min_power = min_power
+        self.init_power = init_power
         if max_power > 0 and min_power <= 0:
             self.max_power = min_power
             self.min_power = -max_power

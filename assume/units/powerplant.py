@@ -75,6 +75,7 @@ class PowerPlant(SupportsMinMax):
         index: pd.DatetimeIndex,
         max_power: float,
         min_power: float = 0.0,
+        init_power: float = -1,
         efficiency: float = 1.0,
         fixed_cost: float = 0.0,
         partial_load_eff: bool = False,
@@ -82,9 +83,11 @@ class PowerPlant(SupportsMinMax):
         emission_factor: float = 0.0,
         ramp_up: float | None = None,
         ramp_down: float | None = None,
+        no_load_cost: float = 0,
         hot_start_cost: float = 0,
         warm_start_cost: float = 0,
         cold_start_cost: float = 0,
+        shut_down_cost: float = 0,
         min_operating_time: float = 0,
         min_down_time: float = 0,
         downtime_hot_start: int = 8,  # hours
@@ -107,6 +110,7 @@ class PowerPlant(SupportsMinMax):
 
         self.max_power = max_power
         self.min_power = min_power
+        self.init_power = init_power
         self.efficiency = efficiency
         self.partial_load_eff = partial_load_eff
         self.fuel_type = fuel_type
@@ -125,9 +129,11 @@ class PowerPlant(SupportsMinMax):
         )
 
         self.fixed_cost = fixed_cost
-        self.hot_start_cost = hot_start_cost * max_power
-        self.warm_start_cost = warm_start_cost * max_power
-        self.cold_start_cost = cold_start_cost * max_power
+        self.no_load_cost = no_load_cost
+        self.hot_start_cost = hot_start_cost
+        self.warm_start_cost = warm_start_cost
+        self.cold_start_cost = cold_start_cost
+        self.shut_down_cost = shut_down_cost
 
         self.heat_extraction = heat_extraction
         self.max_heat_extraction = max_heat_extraction

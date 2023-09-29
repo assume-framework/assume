@@ -178,7 +178,7 @@ class BaseUnit:
         :rtype: float
         """
         if dt - self.index.freq < self.index[1]:
-            return self.min_power + (self.max_power - self.min_power) / 2
+            return self.min_power if self.init_power == -1 else self.init_power
         else:
             return self.outputs["energy"].at[dt - self.index.freq]
 

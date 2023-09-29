@@ -347,9 +347,7 @@ class MarketRole(MarketMechanism, Role):
             market_meta,
         ) = self.clear(self.all_orders, market_products)
         self.all_orders = []
-        for order in rejected_orderbook:
-            order["accepted_volume"] = 0
-            order["accepted_price"] = market_meta[0]["price"]
+
         self.open_auctions - set(market_products)
 
         accepted_orderbook.sort(key=itemgetter("agent_id"))

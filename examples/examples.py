@@ -113,12 +113,27 @@ if __name__ == "__main__":
     import pandas as pd
     import plotly.express as px
 
+    market_orders = pd.read_csv(
+        "outputs/example_01_uc_dam_with_uc_clearing_rl/market_orders.csv",
+        index_col=0,
+        parse_dates=True,
+    )
+    market_orders = market_orders.loc["2019-03-02"]
+    unit_id = "Unit 3"
+    market_orders = market_orders[market_orders["unit_id"] == unit_id]
+    marginal_cost = 65
+
+    unit_profits = pd.Series(index=market_orders.index)
+    unit_profits = market_orders["accepted_volume"] * (
+        market_orders["accepted_price"] - marginal_cost
+    )
+
     cashflows = pd.read_csv(
         "outputs/example_01_uc_dam_with_uc_clearing_rl/unit_dispatch.csv",
         index_col=0,
         parse_dates=True,
     )
-    cashflows = cashflows.loc["2019-03-01"]
+    cashflows = cashflows.loc["2019-03-02"]
 
     profits = pd.DataFrame(index=cashflows.index.unique())
     # group by unit and iterate to get profit

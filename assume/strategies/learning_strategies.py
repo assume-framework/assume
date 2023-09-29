@@ -528,77 +528,73 @@ class RlUCStrategy(RLStrategy):
 
         product_type = marketconfig.product_type
 
-        profit = []
-        reward = 0
+        profit = 0
         opportunity_cost = 0
+        reward = 0
+
+        scaling = 0.01 / unit.max_power / len(orderbook)
 
         # iterate over all orders in the orderbook, to calculate order specific profit
         for order in orderbook:
-            start = order["start_time"]
-            end = order["end_time"]
-            end_excl = end - unit.index.freq
+            order_start = order["start_time"]
+            for start, volume in order["accepted_volume"].items():
+                end = start + unit.index.freq
+                end_excl = end - unit.index.freq
 
-            # depending on way the unit calaculates marginal costs we take costs
+                # depending on way the unit calaculates marginal costs we take costs
+                if unit.marginal_cost is not None:
+                    marginal_cost = (
+                        unit.marginal_cost[start]
+                        if len(unit.marginal_cost) > 1
+                        else unit.marginal_cost
+                    )
+                else:
+                    marginal_cost = unit.calc_marginal_cost_with_partial_eff(
+                        power_output=unit.outputs[product_type].loc[start:end_excl],
+                        timestep=start,
+                    )
 
-            if unit.marginal_cost is not None:
-                marginal_cost = (
-                    unit.marginal_cost[start]
-                    if len(unit.marginal_cost) > 1
-                    else unit.marginal_cost
+                # calculate profit as income - running_cost from this event
+                duration = (end - start) / timedelta(hours=1)
+
+                price_difference = order["accepted_price"][start] - marginal_cost
+
+                order_profit = price_difference * volume * duration
+
+                order_opportunity_cost = (
+                    price_difference
+                    * (
+                        unit.max_power - unit.outputs[product_type].loc[start:end_excl]
+                    ).sum()
+                    * duration
                 )
-            else:
-                marginal_cost = unit.calc_marginal_cost_with_partial_eff(
-                    power_output=unit.outputs[product_type].loc[start:end_excl],
-                    timestep=start,
-                )
+                # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
+                order_opportunity_cost = max(order_opportunity_cost, 0)
+                # collect profit and opportunity cost for all orders
+                opportunity_cost += order_opportunity_cost
 
-            # calculate profit as income - running_cost from this event
-            duration = (end - start) / timedelta(hours=1)
-            order_profit = (
-                order["accepted_price"][start]
-                * order["accepted_volume"][start]
-                * duration
-            )
+                # consideration of start-up costs, which are evenly divided between the
+                # upward and downward regulation events
+                if start == unit.index[1] and unit.init_power > 0:
+                    order_profit = order_profit
+                elif (
+                    unit.outputs[product_type].loc[start] != 0
+                    and unit.outputs[product_type].loc[start - unit.index.freq] == 0
+                ):
+                    order_profit -= unit.hot_start_cost
+                elif (
+                    unit.outputs[product_type].loc[start] == 0
+                    and unit.outputs[product_type].loc[start - unit.index.freq] != 0
+                ):
+                    order_profit -= unit.shut_down_cost
 
-            # calculate opportunity cost
-            # as the loss of income we have because we are not running at full power
-            price_difference = order["price"][start] - marginal_cost
+                profit += order_profit
 
-            order_opportunity_cost = (
-                price_difference
-                * (
-                    unit.max_power - unit.outputs[product_type].loc[start:end_excl]
-                ).sum()
-                * duration
-            )
+                regret_scale = 0.2
+                reward += (
+                    order_profit - regret_scale * order_opportunity_cost
+                ) * scaling
 
-            # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
-            order_opportunity_cost = max(order_opportunity_cost, 0)
-
-            # collect profit and opportunity cost for all orders
-            opportunity_cost += order_opportunity_cost
-
-            # consideration of start-up costs, which are evenly divided between the
-            # upward and downward regulation events
-            if (
-                unit.outputs[product_type].loc[start] != 0
-                and unit.outputs[product_type].loc[start - unit.index.freq] == 0
-            ):
-                order_profit -= unit.hot_start_cost
-            elif (
-                unit.outputs[product_type].loc[start] == 0
-                and unit.outputs[product_type].loc[start - unit.index.freq] != 0
-            ):
-                order_profit -= unit.shut_down_cost
-
-            profit.append(order_profit)
-
-            # store results in unit outputs which are written to database by unit operator
-            unit.outputs["profit"].loc[start:end_excl] += float(order_profit)
-            unit.outputs["regret"].loc[start:end_excl] = float(opportunity_cost)
-            unit.outputs["learning_mode"].loc[start:end_excl] = self.learning_mode
-
-        scaling = 0.01 / unit.max_power / len(profit)
-        regret_scale = 0.2
-        reward = float(sum(profit) - regret_scale * opportunity_cost) * scaling
-        unit.outputs["reward"].loc[start:end_excl] = reward
+            unit.outputs["profit"].loc[order_start] = float(profit)
+            unit.outputs["regret"].loc[order_start] = opportunity_cost
+            unit.outputs["reward"].loc[order_start] = reward

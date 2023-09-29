@@ -197,6 +197,7 @@ def market_clearing_opt(orders, market_products):
         for t in instance.T:
             status_value = instance.status[bid_id, t].value
             status_value = 0 if status_value < EPS else status_value
+            status_value = 1 if status_value > 1 - EPS else status_value
             instance.status[bid_id, t].fix(status_value)
 
     # resolve the model
