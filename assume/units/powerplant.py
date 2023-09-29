@@ -160,13 +160,11 @@ class PowerPlant(SupportsMinMax):
         :rtype: float
         """
 
-        end_excl = end - self.index.freq
-
         max_power = (
-            self.forecaster.get_availability(self.id)[start:end_excl] * self.max_power
+            self.forecaster.get_availability(self.id)[start:end] * self.max_power
         )
 
-        for t in self.outputs["energy"][start:end_excl].index:
+        for t in self.outputs["energy"][start:end].index:
             current_power = self.outputs["energy"][t]
             previous_power = self.get_output_before(t)
 
@@ -179,7 +177,7 @@ class PowerPlant(SupportsMinMax):
             elif current_power < min_power_t and current_power > 0:
                 self.outputs["energy"][t] = 0
 
-        return self.outputs["energy"].loc[start:end_excl]
+        return self.outputs["energy"].loc[start:end]
 
     def calc_simple_marginal_cost(
         self,
