@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 12,
+  "id": 5,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -1325,7 +1325,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1436,7 +1437,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1554,7 +1556,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1695,7 +1698,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1902,7 +1906,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2051,7 +2056,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2179,7 +2185,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -2318,7 +2325,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               }
             ]
           },
@@ -2578,7 +2586,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2715,7 +2724,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2883,14 +2893,14 @@
               "tooltip": false,
               "viz": false
             },
-            "lineInterpolation": "stepAfter",
-            "lineWidth": 2,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "always",
-            "spanNulls": true,
+            "showPoints": "auto",
+            "spanNulls": false,
             "stacking": {
               "group": "A",
               "mode": "none"
@@ -2904,51 +2914,25 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
                 "value": 80
               }
             ]
-          },
-          "unit": "megwatt"
-        },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "power {simulation=\"2037_BB_dam\", unit_id=\"battery_unit\"}",
-                  "power {simulation=\"2037_SB_dam\", unit_id=\"battery_unit\"}"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
           }
-        ]
+        },
+        "overrides": []
       },
       "gridPos": {
-        "h": 9,
+        "h": 8,
         "w": 18,
         "x": 0,
         "y": 117
       },
-      "id": 65,
+      "id": 102,
       "options": {
         "legend": {
           "calcs": [],
@@ -2957,8 +2941,8 @@
           "showLegend": true
         },
         "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+          "mode": "single",
+          "sort": "none"
         }
       },
       "targets": [
@@ -2971,20 +2955,20 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"power\",\n  unit_id,\n  simulation\nFROM market_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation in ($simulation) AND\n  unit_id in ($Storage_Units)\nGROUP BY 1, unit_id, power, simulation\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"Market dispatch\",\n  unit_id\nFROM market_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation in ($simulation) AND\n  unit_id in ($Storage_Units)\nGROUP BY 1, unit_id, power, simulation\nORDER BY 1",
           "refId": "A",
           "select": [
             [
               {
                 "params": [
-                  "volume"
+                  "power"
                 ],
                 "type": "column"
               }
             ]
           ],
-          "table": "demand_meta",
-          "timeColumn": "\"Timestamp\"",
+          "table": "market_dispatch",
+          "timeColumn": "datetime",
           "timeColumnType": "timestamp",
           "where": [
             {
@@ -3004,7 +2988,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(index,$__interval),\n  power AS \"dispatch\",\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(index) AND\n  simulation = '$simulation_comp' AND\n  unit in ($Storage_Units)\nGROUP BY 1, unit, power\nORDER BY 1\n",
+          "rawSql": "SELECT\n  $__timeGroupAlias(index,$__interval),\n  power AS \"Actual dispatch\",\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(index) AND\n  simulation in ($simulation) AND\n  unit in ($Storage_Units)\nGROUP BY 1, unit, power, simulation\nORDER BY 1",
           "refId": "B",
           "select": [
             [
@@ -3028,7 +3012,7 @@
           ]
         }
       ],
-      "title": "Storage Dispatch Difference",
+      "title": "Storage dispatch",
       "type": "timeseries"
     },
     {
@@ -3042,7 +3026,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3054,7 +3039,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 9,
+        "h": 8,
         "w": 6,
         "x": 18,
         "y": 117
@@ -3158,7 +3143,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3187,7 +3173,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 126
+        "y": 125
       },
       "id": 92,
       "options": {
@@ -3350,7 +3336,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3394,7 +3381,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 126
+        "y": 125
       },
       "id": 94,
       "options": {
@@ -3499,6 +3486,119 @@
           }
         }
       ],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 134
+      },
+      "id": 111,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  $__timeGroupAlias(index,$__interval),\n  soc as \"State of Charge\",\n  unit,\n  simulation\nFROM unit_dispatch\nWHERE\n  $__timeFilter(index) AND\n  unit in ($Storage_Units) AND\n  simulation in ($simulation)\nGROUP By soc, unit, simulation, index\nORDER BY 1",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "power"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "market_dispatch",
+          "timeColumn": "datetime",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "State of Charge",
       "type": "timeseries"
     }
   ],
@@ -3609,12 +3709,10 @@
         "current": {
           "selected": true,
           "text": [
-            "2037_SB_dam",
-            "2037_BB_dam"
+            "2020_BB_dam"
           ],
           "value": [
-            "2037_SB_dam",
-            "2037_BB_dam"
+            "2020_BB_dam"
           ]
         },
         "datasource": {
@@ -3638,13 +3736,13 @@
     ]
   },
   "time": {
-    "from": "2037-01-19T23:00:00.000Z",
-    "to": "2037-01-26T22:59:59.000Z"
+    "from": "2020-01-12T23:00:00.000Z",
+    "to": "2020-01-19T22:59:59.000Z"
   },
   "timepicker": {},
   "timezone": "",
   "title": "ASSUME Comparison Block Bids",
   "uid": "LlWPcjzSz",
-  "version": 3,
+  "version": 1,
   "weekStart": ""
 }

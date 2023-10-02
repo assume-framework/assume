@@ -43,7 +43,6 @@ class flexableEOM(BaseStrategy):
         """
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
-        first_delivery = unit.index[0] + market_config.market_products[0].first_delivery
 
         previous_power = unit.get_output_before(start)
         min_power, max_power = unit.calculate_min_max_power(start, end)
@@ -196,7 +195,6 @@ class flexableEOMBlock(BaseStrategy):
         """
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
-        first_delivery = unit.index[0] + market_config.market_products[0].first_delivery
 
         previous_power = unit.get_output_before(start)
         min_power, max_power = unit.calculate_min_max_power(start, end)
@@ -214,12 +212,12 @@ class flexableEOMBlock(BaseStrategy):
         avg_op_time, avg_down_time = unit.get_average_operation_times(start)
 
         for product in product_tuples:
+            start = product[0]
+            end = product[1]
+
             bid_quantity_flex, bid_price_flex = 0, 0
             bid_price_inflex = 0
             bid_quantity_inflex = min_power[start]
-
-            start = product[0]
-            end = product[1]
 
             current_power = unit.outputs["energy"].at[start]
 
@@ -566,7 +564,7 @@ def calculate_EOM_price_if_on(
     marginal_cost_flex,
     bid_quantity_inflex,
     foresight,
-    avg_down_time=1,
+    avg_down_time=-1,
 ):
     """
     Check the description provided by Thomas in last version, the average downtime is available here
@@ -589,9 +587,9 @@ def calculate_EOM_price_if_on(
     t = start
 
     # TODO is it correct to bill for cold, hot and warm starts in one start?
-    starting_cost = unit.get_starting_costs(-max(avg_down_time, 1))
+    starting_cost = unit.get_starting_costs(avg_down_time)
 
-    price_reduction_restart = starting_cost / avg_down_time / bid_quantity_inflex
+    price_reduction_restart = starting_cost / -avg_down_time / bid_quantity_inflex
 
     if unit.outputs["heat"][t] > 0:
         heat_gen_cost = (

@@ -340,7 +340,6 @@ class flexableNegCRMStorage(BaseStrategy):
             current_power = unit.outputs["energy"].at[start]
             bid_quantity = unit.calculate_ramp_charge(
                 theoretic_SOC,
-                theoretic_SOC,
                 previous_power,
                 max_power_charge[start],
                 current_power,

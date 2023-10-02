@@ -363,7 +363,7 @@ class SupportsMinMax(BaseUnit):
 
         """
         before = start - self.index.freq
-        # before = start
+
         max_time = max(self.min_operating_time, self.min_down_time)
         begin = before - self.index.freq * max_time
         end = before
@@ -396,7 +396,7 @@ class SupportsMinMax(BaseUnit):
 
         if len(arr) < 1:
             # before start of index
-            return self.min_operating_time, self.min_down_time
+            return max(self.min_operating_time, 1), min(-self.min_down_time, -1)
 
         op_series = []
         status = arr.iloc[0]
@@ -422,7 +422,9 @@ class SupportsMinMax(BaseUnit):
         else:
             avg_down_time = abs(sum(down_times) / len(down_times))
 
-        return max(1, avg_op_time), max(1, avg_down_time)
+        return max(1, avg_op_time, self.min_operating_time), min(
+            -1, avg_down_time, -self.min_down_time
+        )
 
     def get_starting_costs(self, op_time: int):
         """
