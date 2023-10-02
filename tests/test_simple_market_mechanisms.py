@@ -112,3 +112,69 @@ def test_market_pay_as_clear():
     assert meta[0]["price"] > 0
     assert len(accepted) == 4
     assert len(rejected) == 0
+    assert meta[0]["supply_volume"] == 500
+    assert meta[0]["demand_volume"] == 500
+    assert meta[0]["price"] == 100
+    for bid in accepted:
+        assert bid["volume"] == bid["accepted_volume"]
+
+
+def test_market_pay_as_clears_single_demand():
+    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
+    products = get_available_products(
+        simple_dayahead_auction_config.market_products, next_opening
+    )
+    assert len(products) == 1
+
+    """
+    Create Orderbook with constant order volumes and prices:
+        - dem1: volume = -1000, price = 3000
+        - gen1: volume = 1000, price = 100
+        - gen2: volume = 900, price = 50
+    """
+    orderbook = extend_orderbook(products, -700, 3000)
+    orderbook = extend_orderbook(products, 300, 100, orderbook)
+    orderbook = extend_orderbook(products, 200, 50, orderbook)
+
+    mr = PayAsClearRole(simple_dayahead_auction_config)
+    accepted, rejected, meta = mr.clear(orderbook, products)
+    assert meta[0]["demand_volume"] > 0
+    assert meta[0]["price"] > 0
+    assert len(accepted) == 3
+    assert len(rejected) == 0
+    assert meta[0]["supply_volume"] == 500
+    assert meta[0]["demand_volume"] == 500
+    assert meta[0]["price"] == 100
+    assert accepted[0]["volume"] == -700
+    assert accepted[0]["accepted_volume"] == -500
+
+
+def test_market_pay_as_clears_single_demand_more_generation():
+    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
+    products = get_available_products(
+        simple_dayahead_auction_config.market_products, next_opening
+    )
+    assert len(products) == 1
+
+    """
+    Create Orderbook with constant order volumes and prices:
+        - dem1: volume = -1000, price = 3000
+        - gen1: volume = 1000, price = 100
+        - gen2: volume = 900, price = 50
+    """
+    orderbook = extend_orderbook(products, -400, 3000)
+    orderbook = extend_orderbook(products, 300, 100, orderbook)
+    orderbook = extend_orderbook(products, 200, 50, orderbook)
+    orderbook = extend_orderbook(products, 230, 60, orderbook)
+
+    mr = PayAsClearRole(simple_dayahead_auction_config)
+    accepted, rejected, meta = mr.clear(orderbook, products)
+    assert meta[0]["demand_volume"] > 0
+    assert meta[0]["price"] > 0
+    assert len(accepted) == 3
+    assert len(rejected) == 1
+    assert meta[0]["supply_volume"] == 400
+    assert meta[0]["demand_volume"] == 400
+    assert meta[0]["price"] == 60
+    assert accepted[0]["volume"] == -400
+    assert accepted[0]["accepted_volume"] == -400
