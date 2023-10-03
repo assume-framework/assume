@@ -8,4 +8,5 @@ pp_6,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.60,4.0,Ope
 pp_7,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.60,4.0,Operator 1
 pp_8,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.60,4.0,Operator 1
 pp_9,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.60,4.0,Operator 1
-pp_10,combined cycle gas turbine,naive,natural gas,0.201,5000,1,0.60,34.0,Operator 1
+pp_10,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.60,4.0,Operator 1
+pp_11,combined cycle gas turbine,naive,natural gas,0.201,5000,1,0.60,34.0,Operator 1
