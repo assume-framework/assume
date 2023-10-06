@@ -161,8 +161,7 @@ class BaseUnit:
         :return: the volume of the unit within the given time range
         :rtype: pd.Series
         """
-        end_excl = end - self.index.freq
-        energy = self.outputs["energy"][start:end_excl]
+        energy = self.outputs["energy"][start:end]
         return energy
 
     def get_output_before(self, dt: datetime, product_type: str = "energy") -> float:
@@ -268,8 +267,8 @@ class SupportsMinMax(BaseUnit):
     ramp_up: float
     efficiency: float
     emission_factor: float
-    min_operating_time: int
-    min_down_time: int
+    min_operating_time: int = 0
+    min_down_time: int = 0
 
     def calculate_min_max_power(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
@@ -302,20 +301,32 @@ class SupportsMinMax(BaseUnit):
         pass
 
     def calculate_ramp(
-        self, previous_power: float, power: float, current_power: float = 0
+        self,
+        op_time: int,
+        previous_power: float,
+        power: float,
+        current_power: float = 0,
     ) -> float:
         """
         Calculates the ramp for the given power
 
         :param previous_power: the previous power output of the unit
         :type previous_power: float
-        :param power: the power output of the unit
+        :param power: the desired power output of the unit
         :type power: float
         :param current_power: the current power output of the unit
         :type current_power: float
         :return: the ramp for the given power
         :rtype: float
         """
+        # op_time_befor = self.get_operation_time(start)
+        # was off before, but should be on now and min_down_time is not reached
+        if power > 0 and op_time < 0 and op_time > -self.min_down_time:
+            power = 0
+        # was on before, but should be off now and min_operating_time is not reached
+        elif power == 0 and op_time > 0 and op_time < self.min_operating_time:
+            power = self.min_power
+
         if power == 0:
             # if less than min_power is required, we run min_power
             # we could also split at self.min_power/2
@@ -365,7 +376,7 @@ class SupportsMinMax(BaseUnit):
         before = start - self.index.freq
 
         max_time = max(self.min_operating_time, self.min_down_time)
-        begin = before - self.index.freq * max_time
+        begin = start - self.index.freq * max_time
         end = before
         arr = self.outputs["energy"][begin:end][::-1] > 0
         if len(arr) < 1:
@@ -406,7 +417,7 @@ class SupportsMinMax(BaseUnit):
                 runn += 1
             else:
                 op_series.append(-((-1) ** status) * runn)
-                runn = 0
+                runn = 1
                 status = val
         op_series.append(-((-1) ** status) * runn)
 
@@ -420,7 +431,7 @@ class SupportsMinMax(BaseUnit):
         if down_times == []:
             avg_down_time = self.min_down_time
         else:
-            avg_down_time = abs(sum(down_times) / len(down_times))
+            avg_down_time = sum(down_times) / len(down_times)
 
         return max(1, avg_op_time, self.min_operating_time), min(
             -1, avg_down_time, -self.min_down_time

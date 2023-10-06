@@ -62,11 +62,11 @@ class flexableEOM(BaseStrategy):
 
             # adjust for ramp down speed
             max_power[start] = unit.calculate_ramp(
-                previous_power, max_power[start], current_power
+                op_time, previous_power, max_power[start], current_power
             )
             # adjust for ramp up speed
             min_power[start] = unit.calculate_ramp(
-                previous_power, min_power[start], current_power
+                op_time, previous_power, min_power[start], current_power
             )
 
             bid_quantity_inflex = min_power[start]
@@ -99,7 +99,7 @@ class flexableEOM(BaseStrategy):
                 bid_price_inflex = calculate_EOM_price_if_off(
                     unit,
                     start,
-                    marginal_cost_flex,
+                    marginal_cost_inflex,
                     bid_quantity_inflex,
                     op_time,
                     avg_op_time,
@@ -116,6 +116,10 @@ class flexableEOM(BaseStrategy):
             if op_time <= -unit.min_down_time or op_time > 0:
                 bid_quantity_flex = max_power[start] - bid_quantity_inflex
                 bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
+
+            # TODO: find a better strategy for this
+            # if bid_price_flex < bid_price_inflex and bid_quantity_flex > 0:
+            #    bid_price_flex = bid_price_inflex * 1.1
 
             bids.append(
                 {
@@ -199,12 +203,6 @@ class flexableEOMBlock(BaseStrategy):
         previous_power = unit.get_output_before(start)
         min_power, max_power = unit.calculate_min_max_power(start, end)
 
-        current_power = unit.outputs["energy"].at[start]
-        # adjust for ramp speed
-        min_power[start] = unit.calculate_ramp(
-            previous_power, min_power[start], current_power
-        )
-
         bids = []
         bid_quantity_block = {}
         bid_price_block = []
@@ -216,23 +214,28 @@ class flexableEOMBlock(BaseStrategy):
             end = product[1]
 
             bid_quantity_flex, bid_price_flex = 0, 0
-            bid_price_inflex = 0
-            bid_quantity_inflex = min_power[start]
+            bid_price_inflex, bid_quantity_inflex = 0, 0
 
             current_power = unit.outputs["energy"].at[start]
-
-            # adjust for ramp speed
-            max_power[start] = unit.calculate_ramp(
-                previous_power, max_power[start], current_power
-            )
-            # adjust for ramp speed
-            min_power[start] = unit.calculate_ramp(
-                previous_power, min_power[start], current_power
-            )
 
             # =============================================================================
             # Powerplant is either on, or is able to turn on
             # Calculating possible bid amount and cost
+            # =============================================================================
+
+            # adjust for ramp speed
+            max_power[start] = unit.calculate_ramp(
+                op_time, previous_power, max_power[start], current_power
+            )
+            # adjust for ramp speed
+            min_power[start] = unit.calculate_ramp(
+                op_time, previous_power, min_power[start], current_power
+            )
+
+            bid_quantity_inflex = min_power[start]
+
+            # =============================================================================
+            # Calculating possible price
             # =============================================================================
 
             marginal_cost_inflex = unit.calculate_marginal_cost(
@@ -242,9 +245,6 @@ class flexableEOMBlock(BaseStrategy):
                 start, current_power + max_power[start]
             )
 
-            # =============================================================================
-            # Calculating possible price
-            # =============================================================================
             if op_time > 0:
                 bid_price_inflex = calculate_EOM_price_if_on(
                     unit,
@@ -277,7 +277,8 @@ class flexableEOMBlock(BaseStrategy):
                 bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
 
             bid_quantity_block[product[0]] = bid_quantity_inflex
-            bid_price_block.append(bid_price_inflex)
+            if bid_quantity_inflex > 0:
+                bid_price_block.append(bid_price_inflex)
 
             bids.append(
                 {
@@ -370,12 +371,13 @@ class flexablePosCRM(BaseStrategy):
         bids = []
         for product in product_tuples:
             start = product[0]
+            op_time = unit.get_operation_time(start)
 
             # calculate pos reserve volume
             current_power = unit.outputs["energy"].at[start]
             # max_power + current_power < previous_power + unit.ramp_up
             bid_quantity = unit.calculate_ramp(
-                previous_power, max_power[start], current_power
+                op_time, previous_power, max_power[start], current_power
             )
 
             if bid_quantity == 0:
@@ -466,11 +468,12 @@ class flexableNegCRM(BaseStrategy):
         bids = []
         for product in product_tuples:
             start = product[0]
+            op_time = unit.get_operation_time(start)
             current_power = unit.outputs["energy"].at[start]
 
             # min_power + current_power > previous_power - unit.ramp_down
             min_power[start] = unit.calculate_ramp(
-                previous_power, min_power[start], current_power
+                op_time, previous_power, min_power[start], current_power
             )
             bid_quantity = min_power[start] - previous_power
             if bid_quantity >= 0:
@@ -685,4 +688,4 @@ def calculate_reward_EOM(
         unit.outputs["profits"][index] = (
             unit.outputs[f"{product_type}_cashflow"][index] - costs
         )
-        unit.outputs["costs"][index] = costs
+        unit.outputs["total_costs"][index] = costs

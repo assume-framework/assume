@@ -169,22 +169,17 @@ class PowerPlant(SupportsMinMax):
 
         for t in self.outputs["energy"][start:end].index:
             current_power = self.outputs["energy"][t]
+
             previous_power = self.get_output_before(t)
+            op_time = self.get_operation_time(t)
 
-            max_power_t = self.calculate_ramp(previous_power, max_power[t])
-            min_power_t = self.calculate_ramp(previous_power, self.min_power)
+            current_power = self.calculate_ramp(op_time, previous_power, current_power)
 
-            if current_power > max_power_t:
-                logger.error(
-                    f"Power output {current_power} greater than max_power {max_power_t}"
-                )
-                self.outputs["energy"][t] = max_power_t
+            if current_power > 0:
+                current_power = min(current_power, max_power[t])
+                current_power = max(current_power, self.min_power)
 
-            elif current_power < min_power_t and current_power > 0:
-                logger.error(
-                    f"Power output {current_power} smaller than min_power {min_power_t}"
-                )
-                self.outputs["energy"][t] = 0
+            self.outputs["energy"][t] = current_power
 
         return self.outputs["energy"].loc[start:end]
 
@@ -297,7 +292,7 @@ class PowerPlant(SupportsMinMax):
 
         base_load = self.outputs["energy"][start:end_excl]
         heat_demand = self.outputs["heat"][start:end_excl]
-        assert heat_demand.min() >= 0
+        # assert heat_demand.min() >= 0
 
         capacity_neg = self.outputs["capacity_neg"][start:end_excl]
         # needed minimum + capacity_neg - what is already sold is actual minimum

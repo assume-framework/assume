@@ -177,7 +177,7 @@ class UnitsOperator(Role):
         marketconfig = self.registered_markets[content["market_id"]]
         self.set_unit_dispatch(orderbook, marketconfig)
         self.write_learning_params(orderbook, marketconfig)
-        self.write_actual_dispatch()
+        self.write_actual_dispatch(marketconfig)
 
     def set_unit_dispatch(self, orderbook: Orderbook, marketconfig: MarketConfig):
         """
@@ -198,7 +198,7 @@ class UnitsOperator(Role):
                 orderbook=orderbook,
             )
 
-    def write_actual_dispatch(self):
+    def write_actual_dispatch(self, marketconfig: MarketConfig):
         """
         sends the actual aggregated dispatch curve
         works across multiple markets
@@ -212,26 +212,32 @@ class UnitsOperator(Role):
         self.last_sent_dispatch = self.context.current_timestamp
 
         now = datetime.utcfromtimestamp(self.context.current_timestamp)
-        start = datetime.utcfromtimestamp(last)
+        # start = datetime.utcfromtimestamp(last)
+        start = now
+        end = (
+            start
+            + marketconfig.market_products[0].duration
+            * marketconfig.market_products[0].count
+        )
 
         market_dispatch = aggregate_step_amount(
             self.valid_orders, start, now, groupby=["market_id", "unit_id"]
         )
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
-            current_dispatch = unit.execute_current_dispatch(start, now)
-            end = now - unit.index.freq
+            end_excl = end - unit.index.freq
+            current_dispatch = unit.execute_current_dispatch(start, end_excl)
             current_dispatch.name = "power"
             data = pd.DataFrame(current_dispatch)
-            data["soc"] = unit.outputs["soc"][start:end]
-            data["profits"] = unit.outputs["profits"][start:end]
+            data["soc"] = unit.outputs["soc"][start:end_excl]
+            data["profits"] = unit.outputs["profits"][start:end_excl]
             for key in unit.outputs.keys():
                 if "cashflow" in key:
-                    data[key] = unit.outputs[key][start:end]
+                    data[key] = unit.outputs[key][start:end_excl]
                 if "marginal_costs" in key:
-                    data[key] = unit.outputs[key][start:end]
+                    data[key] = unit.outputs[key][start:end_excl]
                 if "total_costs" in key:
-                    data[key] = unit.outputs[key][start:end]
+                    data[key] = unit.outputs[key][start:end_excl]
 
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
