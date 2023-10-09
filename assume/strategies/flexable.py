@@ -245,6 +245,9 @@ class flexableEOMBlock(BaseStrategy):
                 start, current_power + max_power[start]
             )
 
+            # =============================================================================
+            # Calculating possible price
+            # =============================================================================
             if op_time > 0:
                 bid_price_inflex = calculate_EOM_price_if_on(
                     unit,

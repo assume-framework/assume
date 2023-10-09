@@ -208,23 +208,14 @@ class Storage(SupportsMinMaxCharge):
             soc = self.outputs["soc"][t]
             if self.outputs["energy"][t] > self.max_power_discharge:
                 self.outputs["energy"][t] = self.max_power_discharge
-                logger.error(
-                    "The energy dispatched is greater the maximum power to discharge, dispatched amount is adjusted."
-                )
             elif self.outputs["energy"][t] < self.max_power_charge:
                 self.outputs["energy"][t] = self.max_power_charge
-                logger.error(
-                    "The energy dispatched is greater than the maximum power to charge, dispatched amount is adjusted."
-                )
             elif (
                 self.outputs["energy"][t] < self.min_power_discharge
                 and self.outputs["energy"][t] > self.min_power_charge
                 and self.outputs["energy"][t] != 0
             ):
                 self.outputs["energy"][t] = 0
-                logger.error(
-                    "The energy dispatched is between min_power_charge and min_power_discharge, no energy is dispatched"
-                )
 
             # discharging
             if self.outputs["energy"][t] > 0:

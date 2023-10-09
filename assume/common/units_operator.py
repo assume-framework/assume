@@ -243,7 +243,7 @@ class UnitsOperator(Role):
             unit_dispatch_dfs.append(data)
 
         self.valid_orders = list(
-            filter(lambda x: x["end_time"] >= now, self.valid_orders)
+            filter(lambda x: x["end_time"] > now, self.valid_orders)
         )
 
         db_aid = self.context.data_dict.get("output_agent_id")

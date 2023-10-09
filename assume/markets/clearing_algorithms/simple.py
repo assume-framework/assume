@@ -131,7 +131,9 @@ class PayAsClearRole(MarketRole):
                 accepted_demand_orders.append(demand_order)
 
             for order in supply_orders:
-                rejected_orders.append(order)
+                # if the order was not accepted partially, it is rejected
+                if not order.get("accepted_volume"):
+                    rejected_orders.append(order)
 
             # set clearing price - merit order - uniform pricing
             if accepted_supply_orders:
