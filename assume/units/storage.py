@@ -231,10 +231,6 @@ class Storage(SupportsMinMaxCharge):
                 max_soc_discharge = self.calculate_soc_max_discharge(soc)
 
                 if self.outputs["energy"][t] > max_soc_discharge:
-                    if abs(self.outputs["energy"][t] - max_soc_discharge) > EPS:
-                        logger.error(
-                            "The energy dispatched exceeds the minimum SOC significantly, the dispatched amount is adjusted."
-                        )
                     self.outputs["energy"][t] = max_soc_discharge
 
                 time_delta = self.index.freq / timedelta(hours=1)
@@ -250,10 +246,6 @@ class Storage(SupportsMinMaxCharge):
                 max_soc_charge = self.calculate_soc_max_charge(soc)
 
                 if self.outputs["energy"][t] < max_soc_charge:
-                    if abs(self.outputs["energy"][t] - max_soc_charge) > EPS:
-                        logger.error(
-                            "The energy dispatched exceeds the maximum SOC, the dispatched amount is adjusted."
-                        )
                     self.outputs["energy"][t] = max_soc_charge
 
                 time_delta = self.index.freq / timedelta(hours=1)

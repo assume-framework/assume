@@ -392,10 +392,8 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "MCP {simulation=\"2020_BB_dam\"}",
-                  "MCP {simulation=\"2020_SB_dam\"}",
-                  "  {simulation=\"2020_BB_dam\", unit_id=\"open_gas_unit\"}",
-                  "  {simulation=\"2020_SB_dam\", unit_id=\"open_gas_unit\"}"
+                  "MCP {simulation=\"2037_SB_dam\"}",
+                  "  {simulation=\"2037_SB_dam\", unit_id=\"demand_EOM\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -630,8 +628,7 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "  {simulation=\"2020_SB_dam\", unit_id=\"oil_unit\"}",
-                  "  {simulation=\"2020_SB_dam\", unit_id=\"open_gas_unit\"}"
+                  "  {simulation=\"2037_SB_dam\", unit_id=\"demand_EOM\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -964,6 +961,10 @@
               {
                 "id": "unit",
                 "value": "kwatth"
+              },
+              {
+                "id": "custom.width",
+                "value": 105
               }
             ]
           },
@@ -979,6 +980,10 @@
               {
                 "id": "unit",
                 "value": "currencyEUR"
+              },
+              {
+                "id": "custom.width",
+                "value": 85
               }
             ]
           },
@@ -991,6 +996,94 @@
               {
                 "id": "unit",
                 "value": "percent"
+              },
+              {
+                "id": "custom.width",
+                "value": 82
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "avg_price"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "welfare_producers"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "social_welfare"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 108
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "simulation"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 106
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "welfare_consumers"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 101
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "welfare_prod"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 104
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "welfare_cons"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 105
               }
             ]
           }
@@ -1011,7 +1104,7 @@
           ],
           "show": false
         },
-        "frameIndex": 0,
+        "frameIndex": 1,
         "showHeader": true,
         "sortBy": [
           {
@@ -1032,7 +1125,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  simulation,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'avg_price') as avg_price,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_cost') as total_cost,\n  sum(round(CAST(value AS numeric), 2)*1000)  FILTER (WHERE variable = 'total_volume') as total_volume\n  \nFROM kpis\nwhere variable in ('total_cost', 'total_volume', 'avg_price')\ngroup by simulation\nORDER BY simulation",
+          "rawSql": "SELECT\n  simulation,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'avg_price') as avg_price,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_cost') as total_cost,\n  sum(round(CAST(value AS numeric), 2)*1000)  FILTER (WHERE variable = 'total_volume') as total_volume\n  \nFROM kpis\nwhere variable in ('total_cost', 'total_volume', 'avg_price') and\n  simulation in ($simulation)\ngroup by simulation\nORDER BY simulation",
           "refId": "A",
           "select": [
             [
@@ -1065,7 +1158,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  simulation,\n  sum(round(CAST((accepted_price - price) * accepted_volume AS numeric), 2)) filter(where accepted_volume > 0) as welfare_producers,\n  -sum(round(CAST((accepted_price - price) * accepted_volume AS numeric), 2)) filter(where accepted_volume < 0) as welfare_consumers,\n  -sum(round(CAST(price * accepted_volume AS numeric), 2)) as social_welfare,\n  (sum(round(CAST(accepted_volume AS numeric), 2)) filter(where unit_id in ('Wind onshore', 'Wind offshore', 'Solar', 'Hydro', 'Biomass'))\n  /\n  sum(round(CAST(accepted_volume AS numeric), 2)) filter(where accepted_volume > 0)) as ren_share\nFROM market_orders\nGROUP BY simulation\nORDER BY simulation",
+          "rawSql": "SELECT\n  simulation,\n  sum(round(CAST((accepted_price - price) * accepted_volume AS numeric), 2)) filter(where accepted_volume > 0) as welfare_prod,\n  -sum(round(CAST((accepted_price - price) * accepted_volume AS numeric), 2)) filter(where accepted_volume < 0) as welfare_cons,\n  -sum(round(CAST(price * accepted_volume AS numeric), 2)) as social_welfare,\n  (sum(round(CAST(accepted_volume AS numeric), 2)) filter(where unit_id in ('Wind onshore', 'Wind offshore', 'Solar', 'Hydro', 'Biomass'))\n  /\n  sum(round(CAST(accepted_volume AS numeric), 2)) filter(where accepted_volume > 0))*100 as ren_share\nFROM market_orders\nwhere simulation in ($simulation)\nGROUP BY simulation\nORDER BY simulation",
           "refId": "B",
           "select": [
             [
@@ -1098,7 +1191,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  simulation,\n  stddev(round(CAST(price AS numeric), 2)) as MCP_std\nFROM market_meta\nGROUP BY simulation\nORDER BY simulation",
+          "rawSql": "SELECT\n  simulation,\n  stddev(round(CAST(price AS numeric), 2)) as MCP_std\nFROM market_meta\nwhere simulation in ($simulation)\nGROUP BY simulation\nORDER BY simulation",
           "refId": "C",
           "select": [
             [
@@ -1123,6 +1216,15 @@
         }
       ],
       "title": "Key indicators",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "simulation",
+            "mode": "outer"
+          }
+        }
+      ],
       "type": "table"
     },
     {
@@ -1574,8 +1676,10 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "dispatch {simulation=\"2020_BB_dam\", unit=\"lignite_unit\"}",
-                  "accepted_volume {simulation=\"2020_BB_dam\", unit_id=\"lignite_unit\"}"
+                  "accepted_volume {simulation=\"2020_SB_dam\", unit_id=\"coal_unit\"}",
+                  "accepted_volume {simulation=\"2020_BB_dam\", unit_id=\"coal_unit\"}",
+                  "accepted_volume {simulation=\"2020_SB_dam\", unit_id=\"combined_gas_unit\"}",
+                  "accepted_volume {simulation=\"2020_BB_dam\", unit_id=\"combined_gas_unit\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -1769,7 +1873,23 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "inflex price oil_unit_SB_2020_SB_dam"
+                  "flex volume {id=\"combined_gas_unit_1_SB_2037_SB_dam\"}",
+                  "flex volume {id=\"Wind onshore_SB_2037_SB_dam\"}",
+                  "flex volume {id=\"Solar_SB_2037_SB_dam\"}",
+                  "flex volume {id=\"Wind offshore_SB_2037_SB_dam\"}",
+                  "sum offered volume {simulation=\"2037_SB_dam\"}",
+                  "flex volume {id=\"open_gas_unit_SB_2037_SB_dam\"}",
+                  "inflex volume {id=\"Biomass_SB_2037_SB_dam\"}",
+                  "inflex volume {id=\"Hydro_SB_2037_SB_dam\"}",
+                  "flex volume {id=\"combined_gas_unit_2_SB_2037_SB_dam\"}",
+                  "inflex volume {id=\"Solar_SB_2037_SB_dam\"}",
+                  "inflex volume {id=\"Wind offshore_SB_2037_SB_dam\"}",
+                  "inflex volume {id=\"Wind onshore_SB_2037_SB_dam\"}",
+                  "inflex volume {id=\"combined_gas_unit_1_SB_2037_SB_dam\"}",
+                  "inflex volume {id=\"combined_gas_unit_2_SB_2037_SB_dam\"}",
+                  "inflex volume {id=\"open_gas_unit_SB_2037_SB_dam\"}",
+                  "flex volume {id=\"Hydro_SB_2037_SB_dam\"}",
+                  "flex volume {id=\"Biomass_SB_2037_SB_dam\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -1897,6 +2017,39 @@
                 "'$simulation'"
               ],
               "type": "expression"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
+          "group": [],
+          "hide": false,
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  sum(round(CAST(volume as numeric), 2)) AS \"sum offered volume\",\n  max(price) as \"max offered price\",\n  simulation\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  unit_id in ($Gen_Units) AND\n  simulation in ($simulation)\nGROUP BY 1, simulation\nOrder by 1",
+          "refId": "B",
+          "select": [
+            [
+              {
+                "params": [
+                  "power"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "market_dispatch",
+          "timeColumn": "datetime",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
             }
           ]
         }
@@ -2106,7 +2259,8 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "mismatch {simulation=\"2020_BB_dam\", unit_id=\"coal_unit\"}"
+                  "mismatch {simulation=\"2020_BB_dam\", unit_id=\"coal_unit\"}",
+                  "mismatch {simulation=\"2020_SB_dam\", unit_id=\"coal_unit\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -3148,7 +3302,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3340,7 +3495,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3536,7 +3692,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3614,30 +3771,10 @@
         "current": {
           "selected": true,
           "text": [
-            "Biomass",
-            "Hydro",
-            "Solar",
-            "Wind offshore",
-            "Wind onshore",
-            "coal_unit",
-            "combined_gas_unit",
-            "lignite_unit",
-            "nuclear_unit",
-            "oil_unit",
-            "open_gas_unit"
+            "coal_unit"
           ],
           "value": [
-            "Biomass",
-            "Hydro",
-            "Solar",
-            "Wind offshore",
-            "Wind onshore",
-            "coal_unit",
-            "combined_gas_unit",
-            "lignite_unit",
-            "nuclear_unit",
-            "oil_unit",
-            "open_gas_unit"
+            "coal_unit"
           ]
         },
         "datasource": {
@@ -3661,13 +3798,9 @@
       },
       {
         "current": {
-          "selected": true,
-          "text": [
-            "demand_EOM"
-          ],
-          "value": [
-            "demand_EOM"
-          ]
+          "selected": false,
+          "text": "demand_EOM",
+          "value": "demand_EOM"
         },
         "datasource": {
           "type": "postgres",
@@ -3752,13 +3885,13 @@
     ]
   },
   "time": {
-    "from": "2020-01-07T23:00:00.000Z",
-    "to": "2020-01-20T22:59:59.000Z"
+    "from": "2020-01-19T23:00:00.000Z",
+    "to": "2020-01-26T22:59:59.000Z"
   },
   "timepicker": {},
   "timezone": "",
   "title": "ASSUME Comparison Block Bids",
   "uid": "LlWPcjzSz",
-  "version": 5,
+  "version": 9,
   "weekStart": ""
 }
