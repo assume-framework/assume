@@ -44,6 +44,7 @@ availabe_examples = {
         "study_case": "dam_case_2019",
     },
     "rl": {"scenario": "example_01_rl", "study_case": "base"},
+    "rl_dam": {"scenario": "example_02_rl", "study_case": "dam"},
 }
 
 # %%
@@ -54,7 +55,7 @@ if __name__ == "__main__":
     - timescale: with database and grafana (note: you need docker installed)
     """
     data_format = "timescale"  # "local_db" or "timescale"
-    example = "small_with_vre_and_storage"
+    example = "rl_dam"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"

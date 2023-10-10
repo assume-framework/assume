@@ -361,3 +361,28 @@ def separate_orders(orderbook):
         orderbook.remove(order)
 
     return orderbook
+
+
+def get_products_index(orderbook, marketconfig):
+    """
+    creates an index containing all start times of orders in orderbook
+    :param orderbook: the orderbook of the market
+    :type orderbook: Orderbook
+    :param marketconfig: the market configuration
+    :type marketconfig: MarketConfig
+    :return index_products: the index containing all start times of orders in orderbook and all inbetween
+    """
+    start = orderbook[0]["start_time"]
+    end = orderbook[0]["end_time"]
+    for order in orderbook:
+        if order["start_time"] < start:
+            start = order["start_time"]
+        if order["end_time"] > end:
+            end = order["end_time"]
+
+    index_products = pd.date_range(
+        start,
+        end - marketconfig.market_products[0].duration,
+        freq=marketconfig.market_products[0].duration,
+    )
+    return index_products

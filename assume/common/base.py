@@ -6,6 +6,7 @@ import pandas as pd
 
 from assume.common.forecasts import Forecaster
 from assume.common.market_objects import MarketConfig, Orderbook, Product
+from assume.common.utils import get_products_index
 
 
 class BaseStrategy:
@@ -115,6 +116,7 @@ class BaseUnit:
         :param orderbook: The orderbook.
         :type orderbook: Orderbook
         """
+        products_index = get_products_index(orderbook, marketconfig)
         product_type = marketconfig.product_type
         for order in orderbook:
             start = order["start_time"]
@@ -132,10 +134,13 @@ class BaseUnit:
 
         self.calculate_cashflow(product_type, orderbook)
 
-        self.outputs[product_type + "_marginal_costs"].loc[start:end_excl] = (
-            self.calculate_marginal_cost(start, self.outputs[product_type].loc[start])
-            * self.outputs[product_type].loc[start:end_excl]
-        )
+        for start in products_index:
+            self.outputs[product_type + "marginal_costs"].loc[start] = (
+                self.calculate_marginal_cost(
+                    start, self.outputs[product_type].loc[start]
+                )
+                * self.outputs[product_type].loc[start]
+            )
 
         self.bidding_strategies[product_type].calculate_reward(
             unit=self,
@@ -234,6 +239,19 @@ class BaseUnit:
         """
         return 0
 
+    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
+        """
+        Calculates the marginal cost for the given power
+
+        :param start: the start time of the dispatch
+        :type start: pd.Timestamp
+        :param power: the power output of the unit
+        :type power: float
+        :return: the marginal cost for the given power
+        :rtype: float
+        """
+        pass
+
 
 class SupportsMinMax(BaseUnit):
     """
@@ -283,19 +301,6 @@ class SupportsMinMax(BaseUnit):
         :type product_type: str
         :return: the min and max power for the given time period
         :rtype: tuple[pd.Series, pd.Series]
-        """
-        pass
-
-    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
-        """
-        Calculates the marginal cost for the given power
-
-        :param start: the start time of the dispatch
-        :type start: pd.Timestamp
-        :param power: the power output of the unit
-        :type power: float
-        :return: the marginal cost for the given power
-        :rtype: float
         """
         pass
 

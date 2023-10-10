@@ -14,8 +14,8 @@ from assume.common.market_objects import (
     OpeningMessage,
     Orderbook,
 )
-from assume.common.utils import aggregate_step_amount
-from assume.strategies import BaseStrategy, LearningStrategy
+from assume.common.utils import aggregate_step_amount, get_products_index
+from assume.strategies import BaseStrategy, LearningStrategy, RLdamStrategy
 from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
@@ -382,11 +382,34 @@ class UnitsOperator(Role):
 
         return orderbook
 
-    def write_learning_to_output(self, start: datetime, marketconfig: MarketConfig):
+    def write_learning_to_output(
+        self, products_index: pd.DatetimeIndex, marketconfig: MarketConfig
+    ):
         output_agent_list = []
+        start = products_index[0]
         for unit_id, unit in self.units.items():
             # rl only for energy market for now!
             if isinstance(
+                unit.bidding_strategies.get(marketconfig.product_type),
+                RLdamStrategy,
+            ):
+                output_dict = {
+                    "datetime": start,
+                    "profit": sum(unit.outputs["profit"].loc[products_index]),
+                    "reward": sum(unit.outputs["reward"].loc[products_index]),
+                    "regret": sum(unit.outputs["regret"].loc[products_index]),
+                    "unit": unit_id,
+                }
+                noise_tuple = unit.outputs["rl_exploration_noise"].loc[start]
+                action_tuple = unit.outputs["rl_actions"].loc[start]
+                action_dim = len(action_tuple)
+                for i in range(action_dim):
+                    output_dict[f"exploration_noise_{i}"] = noise_tuple[i]
+                    output_dict[f"actions_{i}"] = action_tuple[i]
+
+                output_agent_list.append(output_dict)
+
+            elif isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
                 LearningStrategy,
             ):
@@ -422,7 +445,7 @@ class UnitsOperator(Role):
 
     def write_to_learning(
         self,
-        start: datetime,
+        products_index: pd.DatetimeIndex,
         marketconfig: MarketConfig,
         obs_dim: int,
         act_dim: int,
@@ -431,6 +454,7 @@ class UnitsOperator(Role):
     ):
         all_observations = []
         all_rewards = []
+        start = products_index[0]
         try:
             import torch as th
 
@@ -445,6 +469,17 @@ class UnitsOperator(Role):
         for unit in self.units.values():
             # rl only for energy market for now!
             if isinstance(
+                unit.bidding_strategies.get(marketconfig.product_type),
+                RLdamStrategy,
+            ):
+                if len(unit.outputs["rl_observations"][start]) > 97:
+                    print("stop here")
+                all_observations[i, :] = unit.outputs["rl_observations"][start]
+                all_actions[i, :] = unit.outputs["rl_actions"][start]
+                all_rewards.append(sum(unit.outputs["reward"][products_index]))
+                i += 1
+
+            elif isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
                 LearningStrategy,
             ):
@@ -483,6 +518,7 @@ class UnitsOperator(Role):
         :type marketconfig: MarketConfig
         """
         learning_strategies = []
+        products_index = get_products_index(orderbook, marketconfig)
 
         for unit in self.units.values():
             bidding_strategy = unit.bidding_strategies.get(marketconfig.product_type)
@@ -495,16 +531,15 @@ class UnitsOperator(Role):
 
         # should write learning results if at least one bidding_strategy is a learning strategy
         if learning_strategies and orderbook:
-            start = orderbook[0]["start_time"]
             # write learning output
-            self.write_learning_to_output(start, marketconfig)
+            self.write_learning_to_output(products_index, marketconfig)
 
             # we are using the first learning_strategy to check learning_mode
             # as this should be the same value for all strategies
             if learning_strategies[0].learning_mode:
                 # in learning mode we are sending data to learning
                 self.write_to_learning(
-                    start=start,
+                    products_index=products_index,
                     marketconfig=marketconfig,
                     obs_dim=obs_dim,
                     act_dim=act_dim,
