@@ -7,17 +7,17 @@ dam:
 
   learning_config:
     observation_dimension: 97
-    action_dimension: 2
+    action_dimension: 3
     continue_learning: False
     load_model_path: None
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.0001
-    training_episodes: 30
-    episodes_collecting_initial_experience: 5
+    training_episodes: 60
+    episodes_collecting_initial_experience: 10
     train_freq: 24
     gradient_steps: -1
-    batch_size: 64
+    batch_size: 128
     gamma: 0.99
     device: cpu
     noise_sigma: 0.1

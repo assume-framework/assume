@@ -487,12 +487,20 @@ class RLdamStrategy(RLStrategy):
         # =============================================================================
         # 3. Transform Actions into bids
         # =============================================================================
-        # actions are in the range [0,1], we need to transform them into actual bids
+        # actions are in the range [-1,1], we need to transform them into actual bids
         # we can use our domain knowledge to guide the bid formulation
-        bid_prices = actions * self.max_bid_price
 
-        bid_price_inflex = min(bid_prices).item()
-        bid_price_flex = max(bid_prices).item()
+        # first parameter decides whether to use BB or SB for inflexible part of bid
+        if actions[0] >= 0:
+            bid_type = "BB"
+        else:
+            bid_type = "SB"
+
+        bid_price_1 = actions[1] * self.max_bid_price
+        bid_price_2 = actions[2] * self.max_bid_price
+
+        bid_price_inflex = min(bid_price_1, bid_price_2).item()
+        bid_price_flex = max(bid_price_1, bid_price_2).item()
 
         # calculate the quantities and transform the bids into orderbook format
         bids = []
@@ -541,6 +549,17 @@ class RLdamStrategy(RLStrategy):
                     "bid_type": "SB",
                 },
             )
+            if bid_type == "SB":
+                bids.append(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": None,
+                        "price": bid_price_inflex,
+                        "volume": bid_quantity_inflex,
+                        "bid_type": "SB",
+                    },
+                )
 
             # calculate previous power with planned dispatch (bid_quantity)
             previous_power = bid_quantity_inflex + bid_quantity_flex + current_power
@@ -554,18 +573,19 @@ class RLdamStrategy(RLStrategy):
             unit.outputs["rl_actions"][start] = actions
             unit.outputs["rl_exploration_noise"][start] = noise
 
-        bids.append(
-            {
-                "start_time": product_tuples[0][0],
-                "end_time": product_tuples[-1][1],
-                "only_hours": product_tuples[0][2],
-                "price": bid_price_inflex,
-                "volume": bid_quantity_block,
-                "bid_type": "BB",
-                "min_acceptance_ratio": 1,
-                "accepted_volume": {product[0]: 0 for product in product_tuples},
-            }
-        )
+        if bid_type == "BB":
+            bids.append(
+                {
+                    "start_time": product_tuples[0][0],
+                    "end_time": product_tuples[-1][1],
+                    "only_hours": product_tuples[0][2],
+                    "price": bid_price_inflex,
+                    "volume": bid_quantity_block,
+                    "bid_type": "BB",
+                    "min_acceptance_ratio": 1,
+                    "accepted_volume": {product[0]: 0 for product in product_tuples},
+                }
+            )
 
         return bids
 
@@ -795,3 +815,56 @@ class RLdamStrategy(RLStrategy):
         unit.outputs["profit"].loc[products_index] += profit
         unit.outputs["reward"].loc[products_index] = reward
         unit.outputs["regret"].loc[products_index] = opportunity_cost
+
+    def get_actions(self, next_observation):
+        """
+        Get actions
+
+        :param next_observation: Next observation
+        :type next_observation: torch.Tensor
+        :return: Actions
+        :rtype: torch.Tensor
+        """
+
+        # distinction wethere we are in learning mode or not to handle exploration realised with noise
+        if self.learning_mode:
+            # if we are in learning mode the first x episodes we want to explore the entire action space
+            # to get a good initial experience, in the area around the costs of the agent
+            if self.collect_initial_experience_mode:
+                # define current action as soley noise
+                noise = (
+                    th.normal(
+                        mean=0.0, std=0.2, size=(1, self.act_dim), dtype=self.float_type
+                    )
+                    .to(self.device)
+                    .squeeze()
+                )
+
+                # =============================================================================
+                # 2.1 Get Actions and handle exploration
+                # =============================================================================
+                base_bid = next_observation[-1]
+
+                # add noise to the last dimension of the observation
+                # needs to be adjusted if observation space is changed, because only makes sense
+                # if the last dimension of the observation space are the marginal cost
+                curr_action = noise + base_bid.clone().detach()
+                curr_action[0] = curr_action[0] - base_bid.clone().detach()
+
+            else:
+                # if we are not in the initial exploration phase we chose the action with the actor neuronal net
+                # and add noise to the action
+                curr_action = self.actor(next_observation).detach()
+                noise = th.tensor(
+                    self.action_noise.noise(), device=self.device, dtype=self.float_type
+                )
+                curr_action += noise
+        else:
+            # if we are not in learning mode we just use the actor neuronal net to get the action without adding noise
+
+            curr_action = self.actor(next_observation).detach()
+            noise = tuple(0 for _ in range(self.act_dim))
+
+        curr_action = curr_action.clamp(-1, 1)
+
+        return curr_action, noise
