@@ -392,8 +392,7 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "MCP {simulation=\"2037_SB_dam\"}",
-                  "  {simulation=\"2037_SB_dam\", unit_id=\"demand_EOM\"}"
+                  "  {simulation=\"2020_RL_SB_dam\", unit_id=\"Biomass\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -1500,7 +1499,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  concat(unit, '_', simulation) as \"unit\",\n  sum(round(CAST(total_costs AS numeric), 2)) as Total_costs,\n  sum(round(CAST(energy_cashflow AS numeric), 2)) as Total_revenues,\n  sum(round(CAST(profits AS numeric), 2)) as Total_profits,\n  sum(round(CAST(power AS numeric)*1000, 2)) as Total_power\nFROM unit_dispatch\nwhere \n  (unit in ($Gen_Units) or unit in ($Storage_Units) or unit in ($Demand_Units)) and\n  simulation in ($simulation)\nGROUP BY unit, simulation\nORDER BY unit",
+          "rawSql": "SELECT\n  concat(unit, '_', simulation) as \"unit\",\n  sum(round(CAST(total_costs AS numeric), 2)) as Total_costs,\n  sum(round(CAST(energy_cashflow AS numeric), 2)) as Total_revenues,\n  sum(round(CAST(profits AS numeric), 2)) as Total_profits,\n  sum(round(CAST(abs(power) AS numeric)*1000, 2)) as Total_power\nFROM unit_dispatch\nwhere \n  (unit in ($Gen_Units) or unit in ($Storage_Units) or unit in ($Demand_Units)) and\n  simulation in ($simulation)\nGROUP BY unit, simulation\nORDER BY unit",
           "refId": "C",
           "select": [
             [
@@ -1676,10 +1675,8 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "accepted_volume {simulation=\"2020_SB_dam\", unit_id=\"coal_unit\"}",
-                  "accepted_volume {simulation=\"2020_BB_dam\", unit_id=\"coal_unit\"}",
-                  "accepted_volume {simulation=\"2020_SB_dam\", unit_id=\"combined_gas_unit\"}",
-                  "accepted_volume {simulation=\"2020_BB_dam\", unit_id=\"combined_gas_unit\"}"
+                  "accepted_volume {simulation=\"2020_RL_SB_dam\", unit_id=\"open_gas_unit\"}",
+                  "accepted_volume {simulation=\"2020_SB_dam\", unit_id=\"open_gas_unit\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -1873,23 +1870,7 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "flex volume {id=\"combined_gas_unit_1_SB_2037_SB_dam\"}",
-                  "flex volume {id=\"Wind onshore_SB_2037_SB_dam\"}",
-                  "flex volume {id=\"Solar_SB_2037_SB_dam\"}",
-                  "flex volume {id=\"Wind offshore_SB_2037_SB_dam\"}",
-                  "sum offered volume {simulation=\"2037_SB_dam\"}",
-                  "flex volume {id=\"open_gas_unit_SB_2037_SB_dam\"}",
-                  "inflex volume {id=\"Biomass_SB_2037_SB_dam\"}",
-                  "inflex volume {id=\"Hydro_SB_2037_SB_dam\"}",
-                  "flex volume {id=\"combined_gas_unit_2_SB_2037_SB_dam\"}",
-                  "inflex volume {id=\"Solar_SB_2037_SB_dam\"}",
-                  "inflex volume {id=\"Wind offshore_SB_2037_SB_dam\"}",
-                  "inflex volume {id=\"Wind onshore_SB_2037_SB_dam\"}",
-                  "inflex volume {id=\"combined_gas_unit_1_SB_2037_SB_dam\"}",
-                  "inflex volume {id=\"combined_gas_unit_2_SB_2037_SB_dam\"}",
-                  "inflex volume {id=\"open_gas_unit_SB_2037_SB_dam\"}",
-                  "flex volume {id=\"Hydro_SB_2037_SB_dam\"}",
-                  "flex volume {id=\"Biomass_SB_2037_SB_dam\"}"
+                  "inflex price {id=\"open_gas_unit__2020_RL_SB_dam\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -3052,13 +3033,13 @@
               "tooltip": false,
               "viz": false
             },
-            "lineInterpolation": "linear",
+            "lineInterpolation": "stepAfter",
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "auto",
+            "showPoints": "always",
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -3069,6 +3050,7 @@
             }
           },
           "mappings": [],
+          "noValue": "0",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -3083,7 +3065,33 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "Actual dispatch {simulation=\"2020_BB_dam\", unit=\"battery_unit\"}",
+                  "Market dispatch {simulation=\"2020_BB_dam\", unit_id=\"battery_unit\"}"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 8,
@@ -3114,7 +3122,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"Market dispatch\",\n  unit_id\nFROM market_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation in ($simulation) AND\n  unit_id in ($Storage_Units)\nGROUP BY 1, unit_id, power, simulation\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  accepted_volume AS \"Market dispatch\",\n  unit_id,\n  simulation\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  simulation in ($simulation) AND\n  unit_id in ($Storage_Units)\nGROUP BY 1, unit_id, accepted_volume, simulation\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -3147,7 +3155,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(index,$__interval),\n  power AS \"Actual dispatch\",\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(index) AND\n  simulation in ($simulation) AND\n  unit in ($Storage_Units)\nGROUP BY 1, unit, power, simulation\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(index,$__interval),\n  power AS \"Actual dispatch\",\n  unit,\n  simulation\nFROM unit_dispatch\nWHERE\n  $__timeFilter(index) AND\n  simulation in ($simulation) AND\n  unit in ($Storage_Units)\nGROUP BY 1, unit, power, simulation\nORDER BY 1",
           "refId": "B",
           "select": [
             [
@@ -3281,7 +3289,7 @@
               "tooltip": false,
               "viz": false
             },
-            "lineInterpolation": "linear",
+            "lineInterpolation": "stepAfter",
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
@@ -3323,6 +3331,31 @@
               {
                 "id": "unit",
                 "value": "€/MW"
+              }
+            ]
+          },
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "Bid price: {simulation=\"2020_BB_dam\", unit_id=\"battery_unit - EOM\"}",
+                  "Bid price: {simulation=\"2020_SB_dam\", unit_id=\"battery_unit - EOM\"}"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
               }
             ]
           }
@@ -3376,7 +3409,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  accepted_price AS \"Accepted price:\",\r\n  price AS \"Bid price:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Storage_Units) AND\r\n  simulation in ($simulation)\r\nGROUP BY 1, unit_id, market_id, price, accepted_price, simulation\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  accepted_price AS \"Accepted price:\",\r\n  price AS \"Bid price:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\",\r\n  simulation\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Storage_Units) AND\r\n  simulation in ($simulation)\r\nGROUP BY 1, unit_id, market_id, price, accepted_price, simulation\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -3474,7 +3507,7 @@
               "tooltip": false,
               "viz": false
             },
-            "lineInterpolation": "linear",
+            "lineInterpolation": "stepAfter",
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
@@ -3569,7 +3602,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_volume) AS \"Accepted volume:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Storage_Units) AND\r\n  simulation in ($simulation)\r\nGROUP BY 1, unit_id, market_id, simulation\r\nORDER BY 1\r\n",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_volume) AS \"Accepted volume:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\",\r\n  simulation\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Storage_Units) AND\r\n  simulation in ($simulation)\r\nGROUP BY 1, unit_id, market_id, simulation\r\nORDER BY 1\r\n",
           "refId": "A",
           "select": [
             [
@@ -3602,7 +3635,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(volume) AS \"Bid volume:\",\r\n  unit_id\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Storage_Units) AND\r\n  simulation in ($simulation)\r\nGROUP BY 1, unit_id, simulation\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(volume) AS \"Bid volume:\",\r\n  unit_id,\r\n  simulation\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Storage_Units) AND\r\n  simulation in ($simulation)\r\nGROUP BY 1, unit_id, simulation\r\nORDER BY 1",
           "refId": "B",
           "select": [
             [
@@ -3892,6 +3925,6 @@
   "timezone": "",
   "title": "ASSUME Comparison Block Bids",
   "uid": "LlWPcjzSz",
-  "version": 9,
+  "version": 12,
   "weekStart": ""
 }

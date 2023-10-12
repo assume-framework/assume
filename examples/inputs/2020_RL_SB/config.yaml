@@ -1,6 +1,6 @@
 dam:
-  start_date: 2019-01-01 00:00
-  end_date: 2019-01-15 23:00
+  start_date: 2020-01-01 00:00
+  end_date: 2020-01-15 23:00
   time_step: 1h
   save_frequency_hours: Null
   learning_mode: True
@@ -24,6 +24,7 @@ dam:
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 5
+    order_types: ["SB"]
 
   markets_config:
     EOM:
@@ -44,7 +45,6 @@ dam:
       additional_fields:
         - bid_type
         - min_acceptance_ratio
-
 
 tiny:
   start_date: 2019-01-01 00:00

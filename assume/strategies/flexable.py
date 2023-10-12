@@ -5,6 +5,7 @@ import pandas as pd
 
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
+from assume.common.utils import get_products_index
 
 
 class flexableEOM(BaseStrategy):
@@ -671,24 +672,71 @@ def calculate_reward_EOM(
     """
     # TODO: Calculate profits over all markets
     product_type = marketconfig.product_type
+    products_index = get_products_index(orderbook, marketconfig)
+
+    profit = pd.Series(0, index=products_index)
+    reward = pd.Series(0, index=products_index)
+    opportunity_cost = pd.Series(0, index=products_index)
+    costs = pd.Series(0, index=products_index)
 
     for order in orderbook:
         start = order["start_time"]
         end = order["end_time"]
         end_excl = end - unit.index.freq
-        index = pd.date_range(start, end_excl, freq=unit.index.freq)
-        costs = pd.Series(unit.fixed_cost, index=index)
-        for start in index:
-            if unit.outputs[product_type][start] != 0:
-                op_time = unit.get_operation_time(start - unit.index.freq)
-                costs[start] += unit.get_starting_costs(op_time)
-                costs[start] += unit.outputs[product_type][
-                    start
-                ] * unit.calculate_marginal_cost(
-                    start, unit.outputs[product_type][start]
-                )
 
-        unit.outputs["profits"][index] = (
-            unit.outputs[f"{product_type}_cashflow"][index] - costs
-        )
-        unit.outputs["total_costs"][index] = costs
+        order_times = pd.date_range(start, end_excl, freq=unit.index.freq)
+
+        marginal_cost = pd.Series(0, index=order_times)
+
+        price_difference = pd.Series(0, index=order_times)
+        order_profit = pd.Series(0, index=order_times)
+        order_opportunity_cost = pd.Series(0, index=order_times)
+
+        for start in order_times:
+            marginal_cost[start] = unit.calculate_marginal_cost(
+                start, unit.outputs[product_type].loc[start]
+            )
+
+            if isinstance(order["accepted_volume"], dict):
+                accepted_volume = order["accepted_volume"][start]
+            else:
+                accepted_volume = order["accepted_volume"]
+
+            if isinstance(order["accepted_price"], dict):
+                accepted_price = order["accepted_price"][start]
+            else:
+                accepted_price = order["accepted_price"]
+
+            price_difference[start] = accepted_price - marginal_cost[start]
+            costs[start] = marginal_cost[start] * accepted_volume
+            order_profit[start] = price_difference[start] * accepted_volume
+
+            # calculate opportunity cost
+            # as the loss of income we have because we are not running at full power
+            order_opportunity_cost[start] = price_difference[start] * (
+                unit.max_power - unit.outputs[product_type].loc[start]
+            )
+            # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
+            order_opportunity_cost[start] = max(order_opportunity_cost[start], 0)
+
+            # don't consider opportunity_cost more than once! Always the same for one timestep and one market
+            opportunity_cost[start] = order_opportunity_cost[start]
+            profit[start] += order_profit[start]
+
+    # consideration of start-up costs
+    for start in products_index:
+        op_time = unit.get_operation_time(start)
+        if unit.outputs[product_type].loc[start] != 0 and op_time < 0:
+            start_up_cost = unit.get_starting_costs(op_time)
+            profit[start] += -start_up_cost
+            costs[start] += start_up_cost
+
+    scaling = 0.1 / unit.max_power
+    regret_scale = 0.2
+    reward = (profit - regret_scale * opportunity_cost) * scaling
+
+    # store results in unit outputs which are written to database by unit operator
+    unit.outputs["profit"].loc[products_index] += profit
+    unit.outputs["reward"].loc[products_index] = reward
+    unit.outputs["regret"].loc[products_index] = opportunity_cost
+    unit.outputs["total_costs"].loc[products_index] = costs

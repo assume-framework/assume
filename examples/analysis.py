@@ -2,7 +2,7 @@
 import logging
 import os
 
-from assume import World, load_scenario_folder
+from assume import World, load_scenario_folder, run_learning
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +37,16 @@ availabe_examples = {
         "scenario": "2020_BB",
         "study_case": "dam",
     },
+    "simple_RL_2020": {
+        # merit order clearing with RL strategies
+        "scenario": "2020_RL_SB",
+        "study_case": "dam",
+    },
+    "complex_RL_2020": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL_BB",
+        "study_case": "dam",
+    },
     "complex_SB_2037": {
         # merit order clearing for 24 hours
         "scenario": "2037_SB",
@@ -64,7 +74,7 @@ availabe_examples = {
 
 # %%
 if __name__ == "__main__":
-    example = "complex_BB_2020"
+    example = "simple_RL_2020"
     data_format = "timescale"  # "local_db" or "timescale"
 
     if data_format == "local_db":
@@ -79,4 +89,13 @@ if __name__ == "__main__":
         scenario=availabe_examples[example]["scenario"],
         study_case=availabe_examples[example]["study_case"],
     )
+    if world.learning_config.get("learning_mode", False):
+        # run learning if learning mode is enabled
+        run_learning(
+            world,
+            inputs_path="examples/inputs",
+            scenario=availabe_examples[example]["scenario"],
+            study_case=availabe_examples[example]["study_case"],
+        )
+
     world.run()

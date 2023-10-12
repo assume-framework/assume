@@ -181,6 +181,8 @@ class PowerPlant(SupportsMinMax):
 
             self.outputs["energy"][t] = current_power
 
+            # TODO: calculate total dispatch costs
+
         return self.outputs["energy"].loc[start:end]
 
     def calc_simple_marginal_cost(
@@ -326,7 +328,11 @@ class PowerPlant(SupportsMinMax):
         """
         # if marginal costs already exists, return it
         if self.marginal_cost is not None:
-            return self.marginal_cost[start]
+            return (
+                self.marginal_cost[start]
+                if len(self.marginal_cost) > 1
+                else self.marginal_cost
+            )
         # if not, calculate it
         else:
             return self.calc_marginal_cost_with_partial_eff(

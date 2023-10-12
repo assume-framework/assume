@@ -372,6 +372,9 @@ def get_products_index(orderbook, marketconfig):
     :type marketconfig: MarketConfig
     :return index_products: the index containing all start times of orders in orderbook and all inbetween
     """
+    if orderbook == []:
+        return []
+
     start = orderbook[0]["start_time"]
     end = orderbook[0]["end_time"]
     for order in orderbook:

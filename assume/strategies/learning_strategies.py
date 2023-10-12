@@ -56,6 +56,9 @@ class RLStrategy(LearningStrategy):
         # for definition of observation space
         self.foresight = kwargs.get("foresight", 24)
 
+        # define used order types
+        self.order_types = kwargs.get("order_types", ["SB"])
+
         if self.learning_mode:
             self.learning_role = None
             self.collect_initial_experience_mode = kwargs.get(
@@ -492,9 +495,9 @@ class RLdamStrategy(RLStrategy):
 
         # first parameter decides whether to use BB or SB for inflexible part of bid
         if actions[0] >= 0:
-            bid_type = "BB"
-        else:
             bid_type = "SB"
+        else:
+            bid_type = "BB"
 
         bid_price_1 = actions[1] * self.max_bid_price
         bid_price_2 = actions[2] * self.max_bid_price
@@ -661,7 +664,9 @@ class RLdamStrategy(RLStrategy):
 
         # get last accepted bid volume and the current marginal costs of the unit
         current_volume = unit.get_output_before(start)
-        current_costs = unit.calc_marginal_cost_with_partial_eff(current_volume, start)
+        current_costs = unit.calc_marginal_cost_with_partial_eff(
+            power_output=current_volume, timestep=start
+        )
 
         # scale unit outpus
         scaled_total_capacity = current_volume / scaling_factor_total_capacity
@@ -728,6 +733,7 @@ class RLdamStrategy(RLStrategy):
         profit = pd.Series(0, index=products_index)
         reward = pd.Series(0, index=products_index)
         opportunity_cost = pd.Series(0, index=products_index)
+        costs = pd.Series(0, index=products_index)
 
         # iterate over all orders in the orderbook, to calculate order specific profit
         for order in orderbook:
@@ -737,30 +743,17 @@ class RLdamStrategy(RLStrategy):
 
             order_times = pd.date_range(start, end_excl, freq=unit.index.freq)
 
-            # depending on way the unit calculates marginal costs we take costs
-            if unit.marginal_cost is not None:
-                marginal_cost = (
-                    unit.marginal_cost[start:end_excl]
-                    if len(unit.marginal_cost) > 1
-                    else unit.marginal_cost
-                )
-
-            else:
-                marginal_cost = [
-                    unit.calc_marginal_cost_with_partial_eff(
-                        power_output=unit.outputs[product_type].loc[start],
-                        timestep=start,
-                    )
-                    for start in order_times
-                ]
+            marginal_cost = pd.Series(0, index=order_times)
 
             # calculate profit as income - running_cost from this event
-
             price_difference = pd.Series(0, index=order_times)
             order_profit = pd.Series(0, index=order_times)
             order_opportunity_cost = pd.Series(0, index=order_times)
 
             for start in order_times:
+                marginal_cost[start] = unit.calculate_marginal_cost(
+                    start, unit.outputs[product_type].loc[start]
+                )
                 if isinstance(order["accepted_volume"], dict):
                     accepted_volume = order["accepted_volume"][start]
                 else:
@@ -776,9 +769,8 @@ class RLdamStrategy(RLStrategy):
 
                 # calculate opportunity cost
                 # as the loss of income we have because we are not running at full power
-                order_opportunity_cost[start] = (
-                    price_difference[start] * unit.max_power
-                    - unit.outputs[product_type].loc[start]
+                order_opportunity_cost[start] = price_difference[start] * (
+                    unit.max_power - unit.outputs[product_type].loc[start]
                 )
                 # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
                 order_opportunity_cost[start] = max(order_opportunity_cost[start], 0)
@@ -786,20 +778,16 @@ class RLdamStrategy(RLStrategy):
                 # don't consider opportunity_cost more than once! Always the same for one timestep and one market
                 opportunity_cost[start] = order_opportunity_cost[start]
                 profit[start] += order_profit[start]
+                costs[start] = marginal_cost[start] * accepted_volume
 
         # consideration of start-up costs, which are evenly divided between the
         # upward and downward regulation events
         for start in products_index:
-            if (
-                unit.outputs[product_type].loc[start] != 0
-                and unit.outputs[product_type].loc[start - unit.index.freq] == 0
-            ):
-                profit[start] = profit[start] - unit.hot_start_cost / 2
-            elif (
-                unit.outputs[product_type].loc[start] == 0
-                and unit.outputs[product_type].loc[start - unit.index.freq] != 0
-            ):
-                profit[start] = profit[start] - unit.hot_start_cost / 2
+            op_time = unit.get_operation_time(start)
+            if unit.outputs[product_type].loc[start] != 0 and op_time < 0:
+                start_up_cost = unit.get_starting_costs(op_time)
+                profit[start] += -start_up_cost
+                costs[start] += start_up_cost
 
         # ---------------------------
         # 4.1 Calculate Reward
@@ -815,6 +803,7 @@ class RLdamStrategy(RLStrategy):
         unit.outputs["profit"].loc[products_index] += profit
         unit.outputs["reward"].loc[products_index] = reward
         unit.outputs["regret"].loc[products_index] = opportunity_cost
+        unit.outputs["total_costs"].loc[products_index] = costs
 
     def get_actions(self, next_observation):
         """
@@ -866,5 +855,9 @@ class RLdamStrategy(RLStrategy):
             noise = tuple(0 for _ in range(self.act_dim))
 
         curr_action = curr_action.clamp(-1, 1)
+
+        # set action[0] to positive value, if only SB allowed
+        if ["SB"] == self.order_types:
+            curr_action[0] = abs(curr_action[0])
 
         return curr_action, noise
