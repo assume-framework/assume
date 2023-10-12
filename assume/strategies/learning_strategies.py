@@ -803,7 +803,7 @@ class RLdamStrategy(RLStrategy):
         unit.outputs["profit"].loc[products_index] += profit
         unit.outputs["reward"].loc[products_index] = reward
         unit.outputs["regret"].loc[products_index] = opportunity_cost
-        unit.outputs["total_costs"].loc[products_index] = costs
+        unit.outputs["total_cost"].loc[products_index] = costs
 
     def get_actions(self, next_observation):
         """

@@ -230,13 +230,13 @@ class UnitsOperator(Role):
             current_dispatch.name = "power"
             data = pd.DataFrame(current_dispatch)
             data["soc"] = unit.outputs["soc"][start:end_excl]
-            data["profits"] = unit.outputs["profits"][start:end_excl]
+            data["profit"] = unit.outputs["profit"][start:end_excl]
             for key in unit.outputs.keys():
                 if "cashflow" in key:
                     data[key] = unit.outputs[key][start:end_excl]
                 if "marginal_costs" in key:
                     data[key] = unit.outputs[key][start:end_excl]
-                if "total_costs" in key:
+                if "total_cost" in key:
                     data[key] = unit.outputs[key][start:end_excl]
 
             data["unit"] = unit_id

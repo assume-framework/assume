@@ -176,10 +176,10 @@ class flexableEOMStorage(BaseStrategy):
                         start, unit.outputs[product_type][start]
                     )
 
-            unit.outputs["profits"][index] = (
+            unit.outputs["profit"][index] = (
                 unit.outputs[f"{product_type}_cashflow"][index] - costs
             )
-            unit.outputs["total_costs"][index] = costs
+            unit.outputs["total_cost"][index] = costs
 
 
 class flexablePosCRMStorage(BaseStrategy):
