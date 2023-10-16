@@ -374,14 +374,25 @@ def get_products_index(orderbook, marketconfig):
     """
     if orderbook == []:
         return []
+    # TODO: works only for dam with multiple of hours, not quarter hourly ect.
+    market_first_delivery = (
+        marketconfig.opening_hours._dtstart
+        + marketconfig.market_products[0].first_delivery
+    )
+    product_len = (
+        marketconfig.market_products[0].duration * marketconfig.market_products[0].count
+    )
 
-    start = orderbook[0]["start_time"]
-    end = orderbook[0]["end_time"]
+    diff = (orderbook[0]["start_time"] - market_first_delivery).components.hours
+
+    start = orderbook[0]["start_time"] - pd.Timedelta(hours=diff)
+    end = start + product_len
+
     for order in orderbook:
         if order["start_time"] < start:
-            start = order["start_time"]
+            print("order outside market opening hours")
         if order["end_time"] > end:
-            end = order["end_time"]
+            print("order outside market opening hours")
 
     index_products = pd.date_range(
         start,

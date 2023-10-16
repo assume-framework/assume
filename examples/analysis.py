@@ -47,6 +47,11 @@ availabe_examples = {
         "scenario": "2020_RL_BB",
         "study_case": "dam",
     },
+    "complex_all_RL_2020": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_all_RL_BB",
+        "study_case": "dam",
+    },
     "complex_SB_2037": {
         # merit order clearing for 24 hours
         "scenario": "2037_SB",
@@ -56,6 +61,16 @@ availabe_examples = {
         # complex clearing with naive strategies - no blocks
         "scenario": "2037_BB",
         "study_case": "dam",
+    },
+    "complex_RL_2037": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2037_RL_BB",
+        "study_case": "dam",
+    },
+    "tiny_RL_2020": {
+        # complex clearing with naive strategies - no blocks
+        "scenario": "2020_RL_BB",
+        "study_case": "tiny",
     },
     "complex_clearing_blocks": {
         # complex clearing with dam naive strategies - with profile blocks in PPs
@@ -74,7 +89,7 @@ availabe_examples = {
 
 # %%
 if __name__ == "__main__":
-    example = "simple_RL_2020"
+    example = "complex_RL_2037"
     data_format = "timescale"  # "local_db" or "timescale"
 
     if data_format == "local_db":

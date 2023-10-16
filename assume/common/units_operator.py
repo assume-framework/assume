@@ -472,8 +472,6 @@ class UnitsOperator(Role):
                 unit.bidding_strategies.get(marketconfig.product_type),
                 RLdamStrategy,
             ):
-                if len(unit.outputs["rl_observations"][start]) > 97:
-                    print("stop here")
                 all_observations[i, :] = unit.outputs["rl_observations"][start]
                 all_actions[i, :] = unit.outputs["rl_actions"][start]
                 all_rewards.append(sum(unit.outputs["reward"][products_index]))

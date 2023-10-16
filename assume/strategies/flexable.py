@@ -686,14 +686,11 @@ def calculate_reward_EOM(
 
         order_times = pd.date_range(start, end_excl, freq=unit.index.freq)
 
-        marginal_cost = pd.Series(0, index=order_times)
-
-        price_difference = pd.Series(0, index=order_times)
         order_profit = pd.Series(0, index=order_times)
         order_opportunity_cost = pd.Series(0, index=order_times)
 
         for start in order_times:
-            marginal_cost[start] = unit.calculate_marginal_cost(
+            marginal_cost = unit.calculate_marginal_cost(
                 start, unit.outputs[product_type].loc[start]
             )
 
@@ -707,13 +704,13 @@ def calculate_reward_EOM(
             else:
                 accepted_price = order["accepted_price"]
 
-            price_difference[start] = accepted_price - marginal_cost[start]
-            costs[start] = marginal_cost[start] * accepted_volume
-            order_profit[start] = price_difference[start] * accepted_volume
+            price_difference = accepted_price - marginal_cost
+            costs[start] = marginal_cost * accepted_volume
+            order_profit[start] = price_difference * accepted_volume
 
             # calculate opportunity cost
             # as the loss of income we have because we are not running at full power
-            order_opportunity_cost[start] = price_difference[start] * (
+            order_opportunity_cost[start] = price_difference * (
                 unit.max_power - unit.outputs[product_type].loc[start]
             )
             # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0

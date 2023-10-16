@@ -296,7 +296,7 @@ class RLStrategy(LearningStrategy):
 
         # get last accapted bid volume and the current marginal costs of the unit
         current_volume = unit.get_output_before(start)
-        current_costs = unit.calc_marginal_cost_with_partial_eff(current_volume, start)
+        current_costs = unit.calculate_marginal_cost(start, current_volume)
 
         # scale unit outpus
         scaled_total_capacity = current_volume / scaling_factor_total_capacity
@@ -356,17 +356,9 @@ class RLStrategy(LearningStrategy):
             end_excl = end - unit.index.freq
 
             # depending on way the unit calculates marginal costs we take costs
-            if unit.marginal_cost is not None:
-                marginal_cost = (
-                    unit.marginal_cost[start]
-                    if len(unit.marginal_cost) > 1
-                    else unit.marginal_cost
-                )
-            else:
-                marginal_cost = unit.calc_marginal_cost_with_partial_eff(
-                    power_output=unit.outputs[product_type].loc[start:end_excl],
-                    timestep=start,
-                )
+            marginal_cost = unit.calculate_marginal_cost(
+                start, unit.outputs[product_type].loc[start]
+            )
 
             duration = (end - start) / timedelta(hours=1)
 
@@ -443,9 +435,70 @@ class RLStrategy(LearningStrategy):
             self.actor.optimizer.load_state_dict(params["actor_optimizer"])
 
 
-class RLdamStrategy(RLStrategy):
+class RLdamStrategy(LearningStrategy):
+    """
+    Reinforcement Learning Strategy
+
+    :param foresight: Number of time steps to look ahead. Default 24.
+    :type foresight: int
+    :param max_bid_price: Maximum bid price
+    :type max_bid_price: float
+    :param max_demand: Maximum demand
+    :type max_demand: float
+    :param device: Device to run on
+    :type device: str
+    :param float_type: Float type to use
+    :type float_type: str
+    :param learning_mode: Whether to use learning mode
+    :type learning_mode: bool
+    :param actor: Actor network
+    :type actor: torch.nn.Module
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self.unit_id = kwargs["unit_id"]
+
+        # defines bounds of actions space
+        self.max_bid_price = kwargs.get("max_bid_price", 100)
+        self.max_demand = kwargs.get("max_demand", 10e3)
+
+        # tells us whether we are training the agents or just executing per-learnind stategies
+        self.learning_mode = kwargs.get("learning_mode", False)
+
+        # sets the devide of the actor network
+        device = kwargs.get("device", "cpu")
+        self.device = th.device(device if th.cuda.is_available() else "cpu")
+        if not self.learning_mode:
+            self.device = th.device("cpu")
+
+        # future: add option to choose between float16 and float32
+        # float_type = kwargs.get("float_type", "float32")
+        self.float_type = th.float
+
+        # for definition of observation space
+        self.foresight = kwargs.get("foresight", 24)
+
+        # define used order types
+        self.order_types = kwargs.get("order_types", ["SB"])
+
+        if self.learning_mode:
+            self.learning_role = None
+            self.collect_initial_experience_mode = kwargs.get(
+                "episodes_collecting_initial_experience", True
+            )
+
+            self.action_noise = NormalActionNoise(
+                mu=0.0,
+                sigma=kwargs.get("noise_sigma", 0.1),
+                action_dimension=self.act_dim,
+                scale=kwargs.get("noise_scale", 1.0),
+                dt=kwargs.get("noise_dt", 1.0),
+            )
+
+        elif Path(load_path=kwargs["trained_actors_path"]).is_dir():
+            self.load_actor_params(load_path=kwargs["trained_actors_path"])
 
     def calculate_bids(
         self,
@@ -664,12 +717,11 @@ class RLdamStrategy(RLStrategy):
 
         # get last accepted bid volume and the current marginal costs of the unit
         current_volume = unit.get_output_before(start)
-        current_costs = unit.calc_marginal_cost_with_partial_eff(
-            power_output=current_volume, timestep=start
-        )
+
+        current_costs = unit.calculate_marginal_cost(start, current_volume)
 
         # scale unit outpus
-        scaled_total_capacity = current_volume / scaling_factor_total_capacity
+        scaled_max_power = current_volume / scaling_factor_total_capacity
         scaled_marginal_cost = current_costs / scaling_factor_marginal_cost
 
         # calculate the time the unit has to continue to run or be down
@@ -688,7 +740,7 @@ class RLdamStrategy(RLStrategy):
                 scaled_res_load_forecast,
                 scaled_price_forecast,
                 np.array(
-                    [scaled_must_run_time, scaled_total_capacity, scaled_marginal_cost]
+                    [scaled_must_run_time, scaled_max_power, scaled_marginal_cost]
                 ),
             ]
         )
@@ -699,8 +751,6 @@ class RLdamStrategy(RLStrategy):
             .to(self.device, non_blocking=True)
             .view(-1)
         )
-        if len(observation) > self.obs_dim:
-            print("observation too long")
 
         return observation.detach().clone()
 
@@ -743,15 +793,12 @@ class RLdamStrategy(RLStrategy):
 
             order_times = pd.date_range(start, end_excl, freq=unit.index.freq)
 
-            marginal_cost = pd.Series(0, index=order_times)
-
             # calculate profit as income - running_cost from this event
-            price_difference = pd.Series(0, index=order_times)
             order_profit = pd.Series(0, index=order_times)
             order_opportunity_cost = pd.Series(0, index=order_times)
 
             for start in order_times:
-                marginal_cost[start] = unit.calculate_marginal_cost(
+                marginal_cost = unit.calculate_marginal_cost(
                     start, unit.outputs[product_type].loc[start]
                 )
                 if isinstance(order["accepted_volume"], dict):
@@ -764,21 +811,25 @@ class RLdamStrategy(RLStrategy):
                 else:
                     accepted_price = order["accepted_price"]
 
-                price_difference[start] = accepted_price - marginal_cost[start]
-                order_profit[start] = price_difference[start] * accepted_volume
+                price_difference = accepted_price - marginal_cost
+                order_profit[start] = price_difference * accepted_volume
 
                 # calculate opportunity cost
                 # as the loss of income we have because we are not running at full power
-                order_opportunity_cost[start] = price_difference[start] * (
-                    unit.max_power - unit.outputs[product_type].loc[start]
+                marginal_cost_max_power = unit.calculate_marginal_cost(
+                    start, unit.max_power
                 )
+
+                order_opportunity_cost[start] = (
+                    accepted_price - marginal_cost_max_power
+                ) * (unit.max_power - unit.outputs[product_type].loc[start])
                 # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
                 order_opportunity_cost[start] = max(order_opportunity_cost[start], 0)
 
                 # don't consider opportunity_cost more than once! Always the same for one timestep and one market
                 opportunity_cost[start] = order_opportunity_cost[start]
                 profit[start] += order_profit[start]
-                costs[start] = marginal_cost[start] * accepted_volume
+                costs[start] = marginal_cost * accepted_volume
 
         # consideration of start-up costs, which are evenly divided between the
         # upward and downward regulation events
@@ -861,3 +912,23 @@ class RLdamStrategy(RLStrategy):
             curr_action[0] = abs(curr_action[0])
 
         return curr_action, noise
+
+    def load_actor_params(self, load_path):
+        """
+        Load actor parameters
+
+        :param simulation_id: Simulation ID
+        :type simulation_id: str
+        """
+        directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
+
+        params = th.load(directory, map_location=self.device)
+
+        self.actor = Actor(self.obs_dim, self.act_dim, self.float_type)
+        self.actor.load_state_dict(params["actor"])
+
+        if self.learning_mode:
+            self.actor_target = Actor(self.obs_dim, self.act_dim, self.float_type)
+            self.actor_target.load_state_dict(params["actor_target"])
+            self.actor_target.eval()
+            self.actor.optimizer.load_state_dict(params["actor_optimizer"])

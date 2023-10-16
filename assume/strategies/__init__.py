@@ -34,5 +34,4 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "flexable_eom_storage": flexableEOMStorage,
     "flexable_neg_crm_storage": flexableNegCRMStorage,
     "flexable_pos_crm_storage": flexablePosCRMStorage,
-    "learning_dam": RLdamStrategy,
 }
