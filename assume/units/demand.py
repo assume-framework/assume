@@ -92,8 +92,7 @@ class Demand(SupportsMinMax):
         :return: the volume of the unit within the given time range
         :rtype: pd.Series
         """
-        end_excl = end - self.index.freq
-        return self.volume[start:end_excl]
+        return self.volume[start:end]
 
     def calculate_min_max_power(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"

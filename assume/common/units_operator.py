@@ -220,7 +220,7 @@ class UnitsOperator(Role):
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
             current_dispatch = unit.execute_current_dispatch(start, now)
-            end = now - unit.index.freq
+            end = now
             current_dispatch.name = "power"
             data = pd.DataFrame(current_dispatch)
             data["soc"] = unit.outputs["soc"][start:end]
@@ -237,7 +237,7 @@ class UnitsOperator(Role):
             unit_dispatch_dfs.append(data)
 
         self.valid_orders = list(
-            filter(lambda x: x["end_time"] >= now, self.valid_orders)
+            filter(lambda x: x["end_time"] > now, self.valid_orders)
         )
 
         db_aid = self.context.data_dict.get("output_agent_id")

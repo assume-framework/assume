@@ -423,7 +423,7 @@ class RLStrategy(LearningStrategy):
         """
         directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
 
-        params = th.load(directory)
+        params = th.load(directory, map_location=self.device)
 
         self.actor = Actor(self.obs_dim, self.act_dim, self.float_type)
         self.actor.load_state_dict(params["actor"])

@@ -200,10 +200,9 @@ class Storage(SupportsMinMaxCharge):
         :return: The dispatched energy in MWh.
         :rtype: pd.Series
         """
-        end_excl = end - self.index.freq
         time_delta = self.index.freq / timedelta(hours=1)
 
-        for t in self.outputs["energy"][start:end_excl].index:
+        for t in self.outputs["energy"][start:end].index:
             delta_soc = 0
             soc = self.outputs["soc"][t]
             if self.outputs["energy"][t] > self.max_power_discharge:
@@ -247,7 +246,7 @@ class Storage(SupportsMinMaxCharge):
 
             self.outputs["soc"][t + self.index.freq :] = soc + delta_soc
 
-        return self.outputs["energy"].loc[start:end_excl]
+        return self.outputs["energy"].loc[start:end]
 
     @lru_cache(maxsize=256)
     def calculate_marginal_cost(

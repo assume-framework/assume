@@ -25,7 +25,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 3,
+  "id": 1,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -693,6 +693,31 @@
                 "value": "Development over all modelled episodes"
               }
             ]
+          },
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "reward episode 44",
+                  "reward episode 1"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
           }
         ]
       },
@@ -812,7 +837,33 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "profit episode 1",
+                  "profit episode 45"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 11,
@@ -868,121 +919,6 @@
         }
       ],
       "title": "Cumulative avergage PROFIT over all Units per episode",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
-      },
-      "description": "The accepted volume ratio is the ratio between the accepted volume and the offered volume.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 55
-      },
-      "id": 24,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "format": "time_series",
-          "group": [],
-          "hide": false,
-          "metricColumn": "none",
-          "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_volume/volume) AS \"accepted_volume\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time)\r\n  and simulation = '$simulation'\r\nGROUP BY 1, start_time\r\nORDER BY 1",
-          "refId": "B",
-          "select": [
-            [
-              {
-                "params": [
-                  "power"
-                ],
-                "type": "column"
-              }
-            ]
-          ],
-          "table": "market_dispatch",
-          "timeColumn": "datetime",
-          "timeColumnType": "timestamp",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        }
-      ],
-      "title": "Average Accepted Volume Ratio for all Units  ",
       "type": "timeseries"
     },
     {
@@ -1118,7 +1054,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 63
+        "y": 55
       },
       "id": 6,
       "options": {
@@ -1176,7 +1112,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 72
+        "y": 64
       },
       "id": 16,
       "panels": [],
@@ -1247,7 +1183,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 73
+        "y": 65
       },
       "id": 31,
       "options": {
@@ -1455,7 +1391,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 73
+        "y": 65
       },
       "id": 32,
       "options": {
@@ -1669,7 +1605,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 81
+        "y": 73
       },
       "id": 36,
       "options": {
@@ -1877,7 +1813,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 81
+        "y": 73
       },
       "id": 33,
       "options": {
@@ -2057,7 +1993,7 @@
               "tooltip": false,
               "viz": false
             },
-            "lineInterpolation": "linear",
+            "lineInterpolation": "stepAfter",
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
@@ -2088,15 +2024,40 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "action_Pinflex learning_scenario_1_base_1"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
-        "h": 8,
+        "h": 12,
         "w": 12,
         "x": 0,
-        "y": 89
+        "y": 81
       },
-      "id": 29,
+      "id": 26,
       "options": {
         "legend": {
           "calcs": [],
@@ -2109,7 +2070,6 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "9.2.15",
       "targets": [
         {
           "datasource": {
@@ -2120,19 +2080,19 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  price AS \"Bid price:\",\r\n  bid_id as \"bid_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  simulation = '$simulation'\r\n  AND unit_id = '$rl_unit'\r\nGROUP BY 1, unit_id, price, bid_id\r\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  actions_0 AS \"action_Pinflex\",\n  actions_0+exploration_noise_0 AS \"noisy_action_Pinflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime)\n  and simulation like '${simulation}' || '_%' AND\n  unit = '$rl_unit'\nORDER BY 1",
           "refId": "A",
           "select": [
             [
               {
                 "params": [
-                  "price"
+                  "power"
                 ],
                 "type": "column"
               }
             ]
           ],
-          "table": "market_orders",
+          "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
           "where": [
@@ -2144,7 +2104,8 @@
           ]
         }
       ],
-      "title": "Bid price",
+      "title": "Normalized Action values - P_inflex",
+      "transformations": [],
       "type": "timeseries"
     },
     {
@@ -2210,7 +2171,8 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "noisy_action_Pinflex"
+                  "action_Pflex learning_scenario_1_base_1",
+                  "noisy_action_Pflex learning_scenario_1_base_1"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -2230,12 +2192,12 @@
         ]
       },
       "gridPos": {
-        "h": 8,
+        "h": 12,
         "w": 12,
         "x": 12,
-        "y": 89
+        "y": 81
       },
-      "id": 26,
+      "id": 30,
       "options": {
         "legend": {
           "calcs": [],
@@ -2258,7 +2220,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  actions_0 AS \"action_Pinflex\",\n  actions_0+exploration_noise_0 AS \"noisy_action_Pinflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit = '$rl_unit'\n\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  actions_1 AS \"action_Pflex\",\n  actions_1+exploration_noise_1 AS \"noisy_action_Pflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime)\n  and simulation like '${simulation}' || '_%' AND\n  unit = '$rl_unit'\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2282,8 +2244,123 @@
           ]
         }
       ],
-      "title": "Normalized Action values - P_inflex",
+      "title": "Normalized Action values - P_flex",
       "transformations": [],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "The accepted volume ratio is the ratio between the accepted volume and the offered volume.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 2,
+        "x": 0,
+        "y": 93
+      },
+      "id": 24,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
+          "group": [],
+          "hide": false,
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_volume/volume) AS \"accepted_volume\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time)\r\n  and simulation = '$simulation'\r\nGROUP BY 1, start_time\r\nORDER BY 1",
+          "refId": "B",
+          "select": [
+            [
+              {
+                "params": [
+                  "power"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "market_dispatch",
+          "timeColumn": "datetime",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "[iP] Average Accepted Volume Ratio for all Units  ",
       "type": "timeseries"
     },
     {
@@ -2344,10 +2421,124 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 97
+        "h": 4,
+        "w": 2,
+        "x": 2,
+        "y": 93
+      },
+      "id": 29,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "9.2.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  price AS \"Bid price:\",\r\n  bid_id as \"bid_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  simulation = '$simulation'\r\n  AND unit_id = '$rl_unit'\r\nGROUP BY 1, unit_id, price, bid_id\r\nORDER BY 1",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "price"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "market_orders",
+          "timeColumn": "datetime",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "[iP] Bid price",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 2,
+        "x": 4,
+        "y": 93
       },
       "id": 34,
       "options": {
@@ -2397,121 +2588,7 @@
           ]
         }
       ],
-      "title": "Bid volume",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "stepAfter",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 97
-      },
-      "id": 30,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "format": "time_series",
-          "group": [],
-          "metricColumn": "none",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  actions_1 AS \"action_Pflex\",\n  actions_1+exploration_noise_1 AS \"noisy_action_Pflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit = '$rl_unit'\n\nORDER BY 1",
-          "refId": "A",
-          "select": [
-            [
-              {
-                "params": [
-                  "power"
-                ],
-                "type": "column"
-              }
-            ]
-          ],
-          "table": "market_dispatch",
-          "timeColumn": "datetime",
-          "timeColumnType": "timestamp",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        }
-      ],
-      "title": "Normalized Action values - P_flex",
-      "transformations": [],
+      "title": "[iP] Bid volume",
       "type": "timeseries"
     }
   ],
@@ -2524,8 +2601,8 @@
       {
         "current": {
           "selected": false,
-          "text": "example_01_rl_base",
-          "value": "example_01_rl_base"
+          "text": "learning_scenario_1_base",
+          "value": "learning_scenario_1_base"
         },
         "datasource": {
           "type": "postgres",
@@ -2548,8 +2625,8 @@
       {
         "current": {
           "selected": false,
-          "text": "Unit 3",
-          "value": "Unit 3"
+          "text": "pp_6",
+          "value": "pp_6"
         },
         "datasource": {
           "type": "postgres",
@@ -2573,8 +2650,8 @@
     ]
   },
   "time": {
-    "from": "2018-12-31T23:00:00.000Z",
-    "to": "2019-01-15T22:59:59.000Z"
+    "from": "2019-03-10T22:06:13.914Z",
+    "to": "2019-03-11T20:17:49.579Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -2589,6 +2666,6 @@
   "timezone": "",
   "title": "Assume: Training progress",
   "uid": "JKQzx0q4k",
-  "version": 16,
+  "version": 2,
   "weekStart": ""
 }

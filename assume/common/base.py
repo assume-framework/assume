@@ -161,9 +161,7 @@ class BaseUnit:
         :return: the volume of the unit within the given time range
         :rtype: pd.Series
         """
-        end_excl = end - self.index.freq
-        energy = self.outputs["energy"][start:end_excl]
-        return energy
+        return self.outputs["energy"][start:end]
 
     def get_output_before(self, dt: datetime, product_type: str = "energy") -> float:
         """
