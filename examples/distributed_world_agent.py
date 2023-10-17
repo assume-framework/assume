@@ -12,7 +12,12 @@ log = logging.getLogger(__name__)
 
 db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
-world = World(database_uri=db_uri, addr=("0.0.0.0", 9098), multi_process_role=False)
+manager_addr = ("0.0.0.0", 9099)
+agent_adress = [("0.0.0.0", 9098)]
+manager_addr = "manager"
+agent_adress = "agent"
+
+world = World(database_uri=db_uri, addr=agent_adress, distributed_role=False)
 
 
 async def worker():
@@ -31,6 +36,7 @@ async def worker():
         save_frequency_hours=48,
         simulation_id=sim_id,
         index=index,
+        manager_address=manager_addr,
     )
 
     marketdesign = [

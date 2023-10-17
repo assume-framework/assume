@@ -44,13 +44,13 @@ class World:
         database_uri: str = "",
         export_csv_path: str = "",
         log_level: str = "INFO",
-        multi_process_role: bool = None,
+        distributed_role: bool = None,
     ):
         logging.getLogger("assume").setLevel(log_level)
         self.logger = logging.getLogger(__name__)
         self.addr = addr
         self.container = None
-        self.multi_process_role = multi_process_role
+        self.distributed_role = distributed_role
 
         self.export_csv_path = export_csv_path
         # intialize db connection at beginning of simulation
@@ -109,6 +109,7 @@ class World:
         bidding_params: dict = {},
         learning_config: LearningConfig = {},
         forecaster: Forecaster = None,
+        manager_address=None,
     ):
         self.clock = ExternalClock(0)
         self.start = start
@@ -128,32 +129,39 @@ class World:
             await self.container.shutdown()
 
         # create new container
+        container_kwargs = {}
         if self.addr == "world":
             connection_type = "external_connection"
         elif isinstance(self.addr, tuple):
             connection_type = "tcp"
         else:
             connection_type = "mqtt"
+            container_kwargs["mqtt_kwargs"] = {
+                "broker_addr": "localhost",
+                "client_id": self.addr,
+            }
 
         self.container = await create_container(
             connection_type=connection_type,
             codec=mango_codec_factory(),
             addr=self.addr,
             clock=self.clock,
+            **container_kwargs,
         )
         self.learning_mode = self.learning_config.get("learning_mode", False)
-        if self.multi_process_role is True:
+        self.output_agent_addr = (self.addr, "export_agent_1")
+        if self.distributed_role is True:
             await self.setup_learning()
             await self.setup_output_agent(simulation_id, save_frequency_hours)
             self.clock_manager = DistributedClockManager(
                 self.container, receiver_clock_addresses=self.addresses
             )
-        elif self.multi_process_role is None:
+        elif self.distributed_role is None:
             await self.setup_learning()
             await self.setup_output_agent(simulation_id, save_frequency_hours)
         else:
             self.clock_agent = DistributedClockAgent(self.container)
-            self.output_agent_addr = (("0.0.0.0", 9099), "export_agent_1")
+            self.output_agent_addr = (manager_address, "export_agent_1")
 
     async def setup_learning(self):
         self.bidding_params.update(self.learning_config)
@@ -175,7 +183,6 @@ class World:
             rl_agent.add_role(self.learning_role)
 
     async def setup_output_agent(self, simulation_id: str, save_frequency_hours: int):
-        self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to world
         self.logger.debug(f"creating output agent {self.db=} {self.export_csv_path=}")
         self.output_role = WriteOutput(
@@ -189,7 +196,9 @@ class World:
             evaluation_mode=self.evaluation_mode,
         )
 
-        if platform == "linux":
+        # mango multiprocessing is currently only supported on linux
+        # with single
+        if platform == "linux" and self.distributed_role is None:
             self.addresses.append(self.addr)
 
             def creator(container):
@@ -371,7 +380,7 @@ class World:
         self.markets[f"{market_config.name}"] = market_config
 
     async def _step(self):
-        if self.multi_process_role:
+        if self.distributed_role:
             next_activity = await self.clock_manager.distribute_time()
         else:
             next_activity = self.clock.get_next_activity()
@@ -395,7 +404,7 @@ class World:
 
         # allow registration before first opening
         self.clock.set_time(start_ts - 1)
-        if self.multi_process_role:
+        if self.distributed_role:
             await self.clock_manager.broadcast(self.clock.time)
         while self.clock.time < end_ts:
             await asyncio.sleep(0)

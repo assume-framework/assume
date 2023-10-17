@@ -168,7 +168,7 @@ class RLStrategy(LearningStrategy):
         :rtype: torch.Tensor
         """
 
-        # distinction whetere we are in learning mode or not to handle exploration realised with noise
+        # distinction whether we are in learning mode or not to handle exploration realised with noise
         if self.learning_mode:
             # if we are in learning mode the first x episodes we want to explore the entire action space
             # to get a good initial experience, in the area around the costs of the agent

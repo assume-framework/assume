@@ -12,7 +12,12 @@ log = logging.getLogger(__name__)
 
 db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
-world = World(database_uri=db_uri, addr=("0.0.0.0", 9099), multi_process_role=True)
+manager_addr = ("0.0.0.0", 9099)
+agent_adresses = [("0.0.0.0", 9098)]
+manager_addr = "manager"
+agent_adresses = ["agent"]
+
+world = World(database_uri=db_uri, addr=manager_addr, distributed_role=True)
 
 
 async def init():
@@ -24,7 +29,7 @@ async def init():
         freq="H",
     )
     sim_id = "handmade_simulation"
-    world.addresses.append(("0.0.0.0", 9098))
+    world.addresses.extend(agent_adresses)
 
     await world.setup(
         start=start,
@@ -46,7 +51,7 @@ async def init():
     ]
 
     for market_config in marketdesign:
-        market_config.addr = ("0.0.0.0", "9098")
+        market_config.addr = agent_adresses[0]
         market_config.aid = "market_operator"
         world.markets[f"{market_config.name}"] = market_config
 
