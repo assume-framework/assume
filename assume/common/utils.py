@@ -348,10 +348,10 @@ def separate_orders(orderbook):
                             "end_time": start + duration,
                         }
                     )
-                    if "bid_id" in single_order.keys():
-                        single_order[
-                            "bid_id"
-                        ] = f"{order['bid_id']}_{order['bid_type']}{i}"
+                    # if "bid_id" in single_order.keys():
+                    #     single_order[
+                    #         "bid_id"
+                    #     ] = f"{order['bid_id']}_{order['bid_type']}{i}"
 
                 orderbook.append(single_order)
                 i += 1
