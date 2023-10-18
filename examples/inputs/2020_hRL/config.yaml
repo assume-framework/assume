@@ -96,8 +96,8 @@ dam_SB:
         - min_acceptance_ratio
 
 tiny:
-  start_date: 2037-01-01 00:00
-  end_date: 2037-01-03 23:00
+  start_date: 2020-01-01 00:00
+  end_date: 2020-01-03 23:00
   time_step: 1h
   save_frequency_hours: 24
   learning_mode: True

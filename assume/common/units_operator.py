@@ -15,7 +15,12 @@ from assume.common.market_objects import (
     Orderbook,
 )
 from assume.common.utils import aggregate_step_amount, get_products_index
-from assume.strategies import BaseStrategy, LearningStrategy, RLdamStrategy
+from assume.strategies import (
+    BaseStrategy,
+    LearningStrategy,
+    RLdamStrategy,
+    hourlyRLdamStrategy,
+)
 from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
@@ -392,12 +397,15 @@ class UnitsOperator(Role):
             if isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
                 RLdamStrategy,
+            ) or isinstance(
+                unit.bidding_strategies.get(marketconfig.product_type),
+                hourlyRLdamStrategy,
             ):
                 output_dict = {
                     "datetime": start,
-                    "profit": sum(unit.outputs["profit"].loc[products_index]),
-                    "reward": sum(unit.outputs["reward"].loc[products_index]),
-                    "regret": sum(unit.outputs["regret"].loc[products_index]),
+                    "profit": unit.outputs["profit"].loc[products_index].sum(),
+                    "reward": unit.outputs["reward"].loc[products_index].sum(),
+                    "regret": unit.outputs["regret"].loc[products_index].sum(),
                     "unit": unit_id,
                 }
                 noise_tuple = unit.outputs["rl_exploration_noise"].loc[start]
@@ -471,6 +479,9 @@ class UnitsOperator(Role):
             if isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
                 RLdamStrategy,
+            ) or isinstance(
+                unit.bidding_strategies.get(marketconfig.product_type),
+                hourlyRLdamStrategy,
             ):
                 all_observations[i, :] = unit.outputs["rl_observations"][start]
                 all_actions[i, :] = unit.outputs["rl_actions"][start]

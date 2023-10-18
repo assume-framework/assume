@@ -47,6 +47,11 @@ availabe_examples = {
         "scenario": "2020_hRL",
         "study_case": "dam_BB",
     },
+    "2020_hRL_tiny": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_hRL",
+        "study_case": "tiny",
+    },
     "2037_RL_SB": {
         # merit order clearing with RL strategies
         "scenario": "2037_RL",
@@ -86,7 +91,7 @@ availabe_examples = {
 
 # %%
 if __name__ == "__main__":
-    example = "2020_hRL_BB"
+    example = "2020_hRL_tiny"
     data_format = "timescale"  # "local_db" or "timescale"
 
     if data_format == "local_db":
