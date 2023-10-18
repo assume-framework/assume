@@ -76,6 +76,8 @@ services:
     profiles: ["mqtt"]
     ports:
       - "1883:1883/tcp"
+    volumes:
+      - ./docker_configs/mqtt.conf:/mosquitto/config/mosquitto.conf
     healthcheck:
       test: "mosquitto_sub -t '$$SYS/#' -C 1 | grep -v Error || exit 1"
       interval: 45s
@@ -90,6 +92,9 @@ services:
     depends_on:
       - assume_db
       - mqtt-broker
+    environment:
+      DB_URI: "postgresql://assume:assume@assume_db:5432/assume"
+      MQTT_BROKER: mqtt-broker
     entrypoint: python3 ./examples/distributed_world_manager.py
 
   simulation_client01:
@@ -97,6 +102,9 @@ services:
     image: ghcr.io/assume-framework/assume:latest
     profiles: ["mqtt"]
     build: .
+    environment:
+      DB_URI: "postgresql://assume:assume@assume_db:5432/assume"
+      MQTT_BROKER: mqtt-broker
     depends_on:
       - assume_db
       - mqtt-broker

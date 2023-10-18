@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -10,12 +11,13 @@ from assume.common.market_objects import MarketConfig, MarketProduct
 
 log = logging.getLogger(__name__)
 
-db_uri = "postgresql://assume:assume@localhost:5432/assume"
+db_uri = os.getenv("DB_URI", "postgresql://assume:assume@localhost:5432/assume")
 
 manager_addr = ("0.0.0.0", 9099)
 agent_adresses = [("0.0.0.0", 9098)]
 manager_addr = "manager"
 agent_adresses = ["agent"]
+broker_addr = os.getenv("MQTT_BROKER", "0.0.0.0")
 
 world = World(database_uri=db_uri, addr=manager_addr, distributed_role=True)
 
@@ -37,6 +39,7 @@ async def init():
         save_frequency_hours=48,
         simulation_id=sim_id,
         index=index,
+        broker_addr=broker_addr,
     )
 
     marketdesign = [

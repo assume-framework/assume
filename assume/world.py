@@ -110,6 +110,7 @@ class World:
         learning_config: LearningConfig = {},
         forecaster: Forecaster = None,
         manager_address=None,
+        **kwargs,
     ):
         self.clock = ExternalClock(0)
         self.start = start
@@ -140,6 +141,7 @@ class World:
                 "broker_addr": "localhost",
                 "client_id": self.addr,
             }
+            container_kwargs["mqtt_kwargs"].update(**kwargs)
 
         self.container = await create_container(
             connection_type=connection_type,
