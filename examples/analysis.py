@@ -12,84 +12,81 @@ os.makedirs(csv_path, exist_ok=True)
 os.makedirs("./examples/local_db", exist_ok=True)
 
 availabe_examples = {
-    "base_2019": {
-        # merit order clearing for 24 hours
-        "scenario": "2019_SB",
-        "study_case": "dam_simple",
-    },
-    "complex_SB_2019": {
-        # merit order clearing for 24 hours
-        "scenario": "2019_SB",
-        "study_case": "dam",
-    },
-    "complex_BB_2019": {
-        # complex clearing with naive strategies - no blocks
-        "scenario": "2019_BB",
-        "study_case": "dam",
-    },
-    "complex_SB_2020": {
+    "2020_rule_SB": {
         # merit order clearing for 24 hours
         "scenario": "2020_SB",
         "study_case": "dam",
     },
-    "complex_BB_2020": {
+    "2020_rule_BB": {
         # complex clearing with naive strategies - no blocks
         "scenario": "2020_BB",
         "study_case": "dam",
     },
-    "simple_RL_2020": {
+    "2020_RL_SB": {
         # merit order clearing with RL strategies
-        "scenario": "2020_RL_SB",
-        "study_case": "dam",
+        "scenario": "2020_RL",
+        "study_case": "dam_SB",
     },
-    "complex_RL_2020": {
+    "2020_RL_BB": {
         # complex clearing with RL strategies and BB
-        "scenario": "2020_RL_BB",
-        "study_case": "dam",
+        "scenario": "2020_RL",
+        "study_case": "dam_BB",
     },
-    "complex_all_RL_2020": {
+    "2020_RL_tiny": {
+        # complex clearing with naive strategies - no blocks
+        "scenario": "2020_RL",
+        "study_case": "tiny",
+    },
+    "2020_hRL_SB": {
         # complex clearing with RL strategies and BB
-        "scenario": "2020_all_RL_BB",
-        "study_case": "dam",
+        "scenario": "2020_hRL",
+        "study_case": "dam_SB",
     },
-    "complex_SB_2037": {
+    "2020_hRL_BB": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_hRL",
+        "study_case": "dam_BB",
+    },
+    "2037_RL_SB": {
+        # merit order clearing with RL strategies
+        "scenario": "2037_RL",
+        "study_case": "dam_SB",
+    },
+    "2037_RL_BB": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2037_RL",
+        "study_case": "dam_BB",
+    },
+    "2037_rule_SB": {
         # merit order clearing for 24 hours
         "scenario": "2037_SB",
         "study_case": "dam",
     },
-    "complex_BB_2037": {
+    "2037_rule_BB": {
         # complex clearing with naive strategies - no blocks
         "scenario": "2037_BB",
         "study_case": "dam",
     },
-    "complex_RL_2037": {
+    "2037_hRL_tiny": {
         # complex clearing with RL strategies and BB
-        "scenario": "2037_RL_BB",
-        "study_case": "dam",
-    },
-    "tiny_RL_2020": {
-        # complex clearing with naive strategies - no blocks
-        "scenario": "2020_RL_BB",
+        "scenario": "2037_hRL",
         "study_case": "tiny",
     },
-    "complex_clearing_blocks": {
-        # complex clearing with dam naive strategies - with profile blocks in PPs
-        "scenario": "analysis_02",
-        "study_case": "dam_complex_clearing",
+    "2037_hRL_SB": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2037_hRL",
+        "study_case": "dam_SB",
     },
-    "minimal_base": {
-        "scenario": "minimal_SB",
-        "study_case": "dam_case_2019",
-    },
-    "minimal_complex": {
-        "scenario": "minimal_BB",
-        "study_case": "dam_complex_clearing",
+    "2037_hRL_BB": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2037_hRL",
+        "study_case": "dam_BB",
     },
 }
 
 # %%
 if __name__ == "__main__":
-    example = "complex_RL_2037"
+    example = "2020_hRL_BB"
     data_format = "timescale"  # "local_db" or "timescale"
 
     if data_format == "local_db":
