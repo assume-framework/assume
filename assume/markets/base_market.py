@@ -44,7 +44,7 @@ class MarketMechanism:
         """
         return True
 
-    def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> None:
+    def validate_orderbook(self, orderbook: Orderbook, agent_tuple: tuple) -> None:
         """
         method to validate a given orderbook
         This is needed to check if all required fields for this mechanism are present
@@ -154,9 +154,12 @@ class MarketRole(MarketMechanism, Role):
         for field in self.required_fields:
             assert field in self.marketconfig.additional_fields, "missing field"
 
-        def accept_orderbook(content: dict, meta):
+        def accept_orderbook(content: dict, meta: dict):
             if not isinstance(content, dict):
                 return False
+
+            if isinstance(meta["sender_addr"], list):
+                meta["sender_addr"] = tuple(meta["sender_addr"])
 
             return (
                 content.get("market") == self.marketconfig.name
@@ -164,17 +167,22 @@ class MarketRole(MarketMechanism, Role):
                 and (meta["sender_addr"], meta["sender_id"]) in self.registered_agents
             )
 
-        def accept_registration(content: dict, meta):
+        def accept_registration(content: dict, meta: dict):
             if not isinstance(content, dict):
                 return False
+            if isinstance(meta["sender_addr"], list):
+                meta["sender_addr"] = tuple(meta["sender_addr"])
+
             return (
                 content.get("context") == "registration"
                 and content.get("market") == self.marketconfig.name
             )
 
-        def accept_get_unmatched(content: dict, meta):
+        def accept_get_unmatched(content: dict, meta: dict):
             if not isinstance(content, dict):
                 return False
+            if isinstance(meta["sender_addr"], list):
+                meta["sender_addr"] = tuple(meta["sender_addr"])
             return (
                 content.get("context") == "get_unmatched"
                 and content.get("market") == self.marketconfig.name
@@ -225,7 +233,7 @@ class MarketRole(MarketMechanism, Role):
             agent_addr, agent_id = agent
             await self.context.send_acl_message(
                 opening_message,
-                agent_addr,
+                receiver_addr=agent_addr,
                 receiver_id=agent_id,
                 acl_metadata={
                     "sender_addr": self.context.addr,

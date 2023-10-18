@@ -125,7 +125,7 @@ class UnitsOperator(Role):
         self.context.schedule_timestamp_task(
             self.context.send_acl_message(
                 {"context": "registration", "market": market.name},
-                market.addr,
+                receiver_addr=market.addr,
                 receiver_id=market.aid,
                 acl_metadata={
                     "sender_addr": self.context.addr,
