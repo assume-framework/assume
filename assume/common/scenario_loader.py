@@ -294,7 +294,7 @@ async def load_scenario_folder_async(
         raise ValueError("No power plant or no demand units were provided!")
 
     save_frequency_hours = config.get("save_frequency_hours", 48)
-    sim_id = f"{scenario}_{study_case}"
+    sim_id = config.get("sim_id", None) or f"{scenario}_{study_case}"
 
     learning_config: LearningConfig = config.get("learning_config", {})
     bidding_strategy_params = config.get("bidding_strategy_params", {})

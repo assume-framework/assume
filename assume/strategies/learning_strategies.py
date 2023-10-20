@@ -533,6 +533,7 @@ class RlUCStrategy(RLStrategy):
         reward = 0
 
         scaling = 0.01 / unit.max_power / len(orderbook)
+        regret_scale = 0.3
 
         # iterate over all orders in the orderbook, to calculate order specific profit
         for order in orderbook:
@@ -590,7 +591,6 @@ class RlUCStrategy(RLStrategy):
 
                 profit += order_profit
 
-                regret_scale = 0.2
                 reward += (
                     order_profit - regret_scale * order_opportunity_cost
                 ) * scaling

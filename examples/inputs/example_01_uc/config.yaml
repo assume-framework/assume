@@ -21,8 +21,9 @@ base:
       market_mechanism: pay_as_clear
 
 dam_with_uc_clearing_rl:
+  sim_id: "uc_unit_all"
   start_date: 2019-03-01 22:00
-  end_date: 2019-03-06 00:00
+  end_date: 2019-03-05 00:00
   time_step: 1h
   save_frequency_hours: Null
   learning_mode: True
@@ -39,7 +40,7 @@ dam_with_uc_clearing_rl:
     episodes_collecting_initial_experience: 5
     train_freq: 24
     gradient_steps: -1
-    batch_size: 64
+    batch_size: 32
     gamma: 0.99
     device: cpu
     noise_sigma: 0.1
