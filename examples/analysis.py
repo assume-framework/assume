@@ -91,7 +91,7 @@ availabe_examples = {
 
 # %%
 if __name__ == "__main__":
-    example = "2037_rule_SB"
+    example = "2037_RL_BB"
     data_format = "timescale"  # "local_db" or "timescale"
 
     if data_format == "local_db":
@@ -99,20 +99,20 @@ if __name__ == "__main__":
     elif data_format == "timescale":
         db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
-    world = World(database_uri=db_uri, export_csv_path=csv_path)
-    load_scenario_folder(
-        world,
-        inputs_path="examples/inputs",
-        scenario=availabe_examples[example]["scenario"],
-        study_case=availabe_examples[example]["study_case"],
-    )
-    if world.learning_config.get("learning_mode", False):
-        # run learning if learning mode is enabled
-        run_learning(
+        world = World(database_uri=db_uri, export_csv_path=csv_path)
+        load_scenario_folder(
             world,
             inputs_path="examples/inputs",
             scenario=availabe_examples[example]["scenario"],
             study_case=availabe_examples[example]["study_case"],
         )
+        if world.learning_config.get("learning_mode", False):
+            # run learning if learning mode is enabled
+            run_learning(
+                world,
+                inputs_path="examples/inputs",
+                scenario=availabe_examples[example]["scenario"],
+                study_case=availabe_examples[example]["study_case"],
+            )
 
-    world.run()
+        world.run()
