@@ -43,7 +43,8 @@ availabe_examples = {
         "scenario": "example_02",
         "study_case": "dam_case_2019",
     },
-    "rl": {"scenario": "example_01_rl", "study_case": "base"},
+    "learning_small": {"scenario": "example_02a", "study_case": "base"},
+    "learning_medium": {"scenario": "example_02b", "study_case": "base"},
 }
 
 # %%
