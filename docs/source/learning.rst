@@ -2,9 +2,9 @@ Reinforcement Learning
 =====================
 
 One unique characteristic of ASSUME is the usage of Reinforcement Learning (RL) for the bidding of the agents.
-To enable this the architecture of the simulation is designed in a way to accomodate the learning process. In this part of
-the documentation we give a short introduction into reinforcement learning in general and then pin point you to the
-relevant parts of the code. If you want an hands-on introduction check out the prepared tutorial in Colab: https://colab.research.google.com/drive/1LISiM1QvDIMXU68pJH-NqrMw5w7Awb24?usp=sharing
+To enable this the architecture of the simulation is designed in a way to accommodate the learning process. In this part of
+the documentation, we give a short introduction to reinforcement learning in general and then pinpoint you to the
+relevant parts of the code. If you want a hands-on introduction check out the prepared tutorial in Colab: https://colab.research.google.com/drive/1LISiM1QvDIMXU68pJH-NqrMw5w7Awb24?usp=sharing
 
 The Basics of Reinforcement Learning
 ---------------------------
@@ -12,7 +12,7 @@ The Basics of Reinforcement Learning
 In general RL and deep reinforcement learning (DRL), in particular, open new prospects for agent-based electricity market modeling.
 Such algorithms offer the potential for agents to learn bidding strategies in the interplay between market participants.
 In contrast to traditional rule-based approaches, DRL allows for a faster adaptation of the bidding strategies to a changing market
-environment, which is impossible with fixed strategies that a market modeler explicitly formulates. Hence, DRL algorithms offer the
+environment, which is impossible with fixed strategies that a market modeller explicitly formulates. Hence, DRL algorithms offer the
 potential for simulated electricity market agents to develop bidding strategies for future markets and test emerging markets' mechanisms
 before their introduction into real-world systems.
 
@@ -92,15 +92,15 @@ The actor is updated similarly using only one critic network $Q_{θ1}$. These ch
 
 
 
-The Leanring Implementation in ASSUME
+The Learning Implementation in ASSUME
 ---------------------------
-Based on the described multi-agent RL approach we integrated these functionialities in ASSUME. In general we only need to make adjustments in the bidding strategy of the power plants.
-The rest of the learning capabilities are implemented in the learning role, whihc only needs to be adjusted in advanced case studies with ASSUME.
+Based on the described multi-agent RL approach we integrated these functionalities in ASSUME. In general, we only need to make adjustments in the bidding strategy of the power plants.
+The rest of the learning capabilities are implemented in the learning role, which only needs to be adjusted in advanced case studies with ASSUME.
 
 ##### **The Actor**
 We will explain the way learning works in ASSUME starting from the interface to the simulation, namely the bidding strategy of the power plants.
-The bidding strategy, per definition in ASSUME, defines the way we formulate bids based on the technical restricitons of the unit.
-In a learning setting this is done by the actor network. Which maps the observation to an action. The observation thereby os managed and collected by the units operator as
+The bidding strategy, per definition in ASSUME, defines the way we formulate bids based on the technical restrictions of the unit.
+In a learning setting, this is done by the actor network. Which maps the observation to an action. The observation thereby is managed and collected by the units operator as
 summarized in the following picture.
 
 .. image:: img/ActorTask.jpg
@@ -113,27 +113,27 @@ After the bids are formulated in the bidding strategy they are sent to the marke
     :align: center
     :width: 500px
 
-In the case you are eager to integrate differen leanring bidding strategies or equip a new unit with learning,
+In the case you are eager to integrate different learning bidding strategies or equip a new unit with learning,
 you need to touch these methods. To enable an easy start with the use of reinforcement learning in ASSUME we provide a tutorial in colab on github.
 
 
 ##### **The Critic**
-The critic is used to calculate the loss of the actor. It constantly learn to evaluate the actions chosen by the actor
-based on global information. The following graph show the information flow.
+The critic is used to calculate the loss of the actor. It constantly learns to evaluate the actions chosen by the actor
+based on global information. The following graph shows the information flow.
 
 .. image:: img/CriticTask.jpg
     :align: center
     :width: 500px
 
 ##### **The Learning Role**
-The learning role orchestrates the learning process. It initializes the training process and manages the expierences gained in a buffer.
-Furthermore it shedules the policy updates and, hence, brings the critic and the actor together during the learning process.
-Particularly this means, that at the beginning of the simulation we shedule recurrent policy updates, where the output of the critic is used as a loss
+The learning role orchestrates the learning process. It initializes the training process and manages the experiences gained in a buffer.
+Furthermore, it schedules the policy updates and, hence, brings the critic and the actor together during the learning process.
+Particularly this means, that at the beginning of the simulation, we schedule recurrent policy updates, where the output of the critic is used as a loss
 of the actor, which then updates its weights using backward propagation.
 
-With the learning role we can also chose which RL algorithm should be used. The algorithm and the buffer have base classes and can be customized if needed.
-But without touching the code there are easy adjustments to the algorithmen that can and evantually need to be done in the config file.
-The following table shows the options that can be adjusted and gives a short explanination. As the algorithm is based on stabel baselines 3, you can also look up more explanantions in their doku.
+With the learning role, we can also choose which RL algorithm should be used. The algorithm and the buffer have base classes and can be customized if needed.
+But without touching the code there are easy adjustments to the algorithms that can and eventually need to be done in the config file.
+The following table shows the options that can be adjusted and gives a short explanation. As the algorithm is based on stable baselines 3, you can also look up more explanations in their doku.
 
 
 
@@ -143,19 +143,19 @@ The following table shows the options that can be adjusted and gives a short exp
   observation_dimension                   The dimension of the observations given to the actor in the bidding strategy.
   action_dimension                        The dimension of the actors made by the actor, which equals the output neurons of the actor neuronal net.
   continue_learning                       Whether to use pre-learned strategies and then continue learning.
-  load_model_path                         If pre-learned strategies should be used, where are they stored.
+  load_model_path                         If pre-learned strategies should be used, where are they stored?
   max_bid_price                           The maximum bid price which limits the action of the actor to this price.
   learning_mode                           Should we use learning mode at all? If not, the learning bidding strategy is overwritten with a default strategy.
-  algorithm                               Specifies which algorithm to use. Currently only MATD§ implemented.
-  learning_rate                           The learning rate, also know as step size, which specifies how much the new policy should be considered in the update.
+  algorithm                               Specifies which algorithm to use. Currently, only MATD3 is implemented.
+  learning_rate                           The learning rate, also known as step size, which specifies how much the new policy should be considered in the update.
   training_episodes                       The number of training episodes, whereby one episode is the entire simulation horizon specified in the general config.
   episodes_collecting_initial_experience  The number of episodes collecting initial experience, whereby this means that random actions are chosen instead of using the actor network
   train_freq                              Defines the frequency in time steps at which the actor and critic are updated.
   gradient_steps                          The number of gradient steps.
-  batch_size                              The batch size of expirience considered from the buffer for an update.
-  gamma                                   The discount factor, with which future expected rewards are considered in the decision making.
+  batch_size                              The batch size of experience considered from the buffer for an update.
+  gamma                                   The discount factor, with which future expected rewards are considered in the decision-making.
   device                                  The device to use.
-  noise_sigma                             The standard deviation of the distribution used to drwa the noise, which is added to the actions and forces exploration.  noise_scale
+  noise_sigma                             The standard deviation of the distribution used to draw the noise, which is added to the actions and forces exploration.  noise_scale
   noise_dt                                Determines how quickly the noise weakens over time.
-  noise_scale                             The scale of the noise, which is multiplied with the noise drawn from the distribution.
+  noise_scale                             The scale of the noise, which is multiplied by the noise drawn from the distribution.
  ============================= =====================================================
