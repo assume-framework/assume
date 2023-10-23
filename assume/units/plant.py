@@ -46,8 +46,8 @@ class Plant(BaseUnit):
         # self.storage_units = {}
 
         self.hydrogen_demand = self.forecaster[f"{self.id}_hydrogen"]
+        self.electricity_price = self.forecaster["price_EOM"]
         self.hydrogen_price = hydrogen_price
-        self.electricity_price = self.forecaster.get_electricity_price(EOM="EOM")
         self.objective = objective
 
         self.location = location
@@ -102,10 +102,10 @@ class Plant(BaseUnit):
         self.model.hydrogen_demand = pyo.Param(
             self.model.time_steps, initialize=dict(enumerate(self.hydrogen_demand))
         )
-        self.model.electricity_price = pyo.Param(
-            self.model.time_steps,
-            initialize=dict(enumerate(self.electricity_price)),
-        )
+        # self.model.electricity_price = pyo.Param(
+        #     self.model.time_steps,
+        #     initialize=dict(enumerate(self.electricity_price)),
+        # )
         self.model.hydrogen_price = pyo.Param(initialize=self.hydrogen_price)
 
     def define_variables(self):
@@ -121,8 +121,6 @@ class Plant(BaseUnit):
         self.model.revenue = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
         )
-
-
 
     def define_constraints(self):
         @self.model.Constraint(self.model.time_steps)

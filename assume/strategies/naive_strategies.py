@@ -182,13 +182,15 @@ class NaiveDAplantStrategy(BaseStrategy):
         start = product_tuples[0][0]
         end_all = product_tuples[-1][1]
 
+        electricity_price = unit.forecaster["price_EOM"].loc[start]
+
         # Populate product_tuples with optimized demand values
         product_tuples = [(t, optimized_demand[t]) for t in unit.model.time_steps]
 
         # Calculate the marginal cost based on the optimized demand
 
         marginal_cost = (
-            optimized_demand[t] * unit.forecaster.get_electricity_price("EOM")[t]
+            optimized_demand[t] * electricity_price
         )
 
         # Calculate the revenues based on the optimized demand
