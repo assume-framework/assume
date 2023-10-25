@@ -59,6 +59,9 @@ This will launch a container for TimescaleDB and Grafana with preconfigured dash
 
 If you intend to use the reinforcement learning capabilities of ASSUME and train your agents, make sure to install Torch. Detailed installation instructions can be found [here](https://pytorch.org/get-started/locally/).
 
+An introductorz tutorial into the learning functionalities, can be found here [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1LISiM1QvDIMXU68pJH-NqrMw5w7Awb24?usp=sharing)
+
+
 ## Trying out the Examples
 
 To explore the provided examples, follow these steps:
