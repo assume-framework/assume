@@ -59,10 +59,25 @@ This will launch a container for TimescaleDB and Grafana with preconfigured dash
 
 If you intend to use the reinforcement learning capabilities of ASSUME and train your agents, make sure to install Torch. Detailed installation instructions can be found [here](https://pytorch.org/get-started/locally/).
 
-An introductorz tutorial into the learning functionalities, can be found here [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1LISiM1QvDIMXU68pJH-NqrMw5w7Awb24?usp=sharing)
 
 
-## Trying out the Examples
+## Trying out ASSUME and the provided Examples
+
+To ease your way into ASSUME we provided some examples and tutorials. The former are helpful if you would like to get an impression of how ASSUME works and the latter introduce you into the development of ASSUME.
+
+### The Tutorials
+
+The tutorials work completly detached from your own machine on google colab. They provide code snippets and task that show you, how you can work with the software package one your own. We have two tutorials prepared, one for introducing a new unit and one for getting reinforcement learning ready on ASSUME.
+
+How to configure a new unit in ASSUME?
+<Coming Soon>
+
+How to intorduce reinforcement learning to ASSUME?
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1LISiM1QvDIMXU68pJH-NqrMw5w7Awb24?usp=sharing)
+
+
+
+### The Examples
 
 To explore the provided examples, follow these steps:
 
