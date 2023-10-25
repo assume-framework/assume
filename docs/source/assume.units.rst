@@ -12,22 +12,6 @@ assume.units.demand module
    :undoc-members:
    :show-inheritance:
 
-assume.units.electrolyser module
---------------------------------
-
-.. automodule:: assume.units.electrolyser
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-assume.units.heatpump module
-----------------------------
-
-.. automodule:: assume.units.heatpump
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 assume.units.powerplant module
 ------------------------------
 
