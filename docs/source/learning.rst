@@ -1,11 +1,12 @@
-################
+######################
 Reinforcement Learning
-################
+######################
 
 One unique characteristic of ASSUME is the usage of Reinforcement Learning (RL) for the bidding of the agents.
 To enable this the architecture of the simulation is designed in a way to accommodate the learning process. In this part of
 the documentation, we give a short introduction to reinforcement learning in general and then pinpoint you to the
 relevant parts of the code. If you want a hands-on introduction check out the prepared tutorial in Colab: https://colab.research.google.com/drive/1LISiM1QvDIMXU68pJH-NqrMw5w7Awb24?usp=sharing
+
 
 The Basics of Reinforcement Learning
 =====================================
@@ -74,7 +75,7 @@ estimated value function, and the value function is updated based on the.
 
 
 1.2 Multi-Agent Learning
-----------------------
+------------------------
 
 In a single-agent setup, the state transition and respective reward depend only on the actions of a single agent. However, in a
 multi-agent setup, the state transitions and rewards depend on the actions of all learning agents. This makes the environment
@@ -115,7 +116,7 @@ Based on the described multi-agent RL approach we integrated these functionaliti
 The rest of the learning capabilities are implemented in the learning role, which only needs to be adjusted in advanced case studies with ASSUME.
 
 The Actor
-*********
+---------
 
 We will explain the way learning works in ASSUME starting from the interface to the simulation, namely the bidding strategy of the power plants.
 The bidding strategy, per definition in ASSUME, defines the way we formulate bids based on the technical restrictions of the unit.
@@ -136,7 +137,7 @@ In the case you are eager to integrate different learning bidding strategies or 
 you need to touch these methods. To enable an easy start with the use of reinforcement learning in ASSUME we provide a tutorial in colab on github.
 
 The Critic
-**********
+----------
 
 The critic is used to calculate the loss of the actor. It constantly learns to evaluate the actions chosen by the actor
 based on global information. The following graph shows the information flow.
@@ -146,7 +147,7 @@ based on global information. The following graph shows the information flow.
     :width: 500px
 
 The Learning Role
-*****************
+-----------------
 
 The learning role orchestrates the learning process. It initializes the training process and manages the experiences gained in a buffer.
 Furthermore, it schedules the policy updates and, hence, brings the critic and the actor together during the learning process.
@@ -158,9 +159,9 @@ But without touching the code there are easy adjustments to the algorithms that 
 The following table shows the options that can be adjusted and gives a short explanation. As the algorithm is based on stable baselines 3, you can also look up more explanations in their doku.
 
 
- ============================= =====================================================
-  learning config item            description
- ============================= =====================================================
+ ======================================== ==========================================================================================================
+  learning config item                    description
+ ======================================== ==========================================================================================================
   observation_dimension                   The dimension of the observations given to the actor in the bidding strategy.
   action_dimension                        The dimension of the actors made by the actor, which equals the output neurons of the actor neuronal net.
   continue_learning                       Whether to use pre-learned strategies and then continue learning.
@@ -179,4 +180,4 @@ The following table shows the options that can be adjusted and gives a short exp
   noise_sigma                             The standard deviation of the distribution used to draw the noise, which is added to the actions and forces exploration.  noise_scale
   noise_dt                                Determines how quickly the noise weakens over time.
   noise_scale                             The scale of the noise, which is multiplied by the noise drawn from the distribution.
- ============================= =====================================================
+ ======================================== ==========================================================================================================

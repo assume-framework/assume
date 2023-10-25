@@ -3,6 +3,7 @@
 ![Lint Status](https://github.com/assume-framework/assume/actions/workflows/lint-pytest.yaml/badge.svg)
 [![Code Coverage](https://codecov.io/gh/assume-framework/assume/branch/main/graph/badge.svg?token=CZ4FO7P57H)](https://codecov.io/gh/assume-framework/assume)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8088760.svg)](https://doi.org/10.5281/zenodo.8088760)
+[![Open Tutorials In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1LISiM1QvDIMXU68pJH-NqrMw5w7Awb24?usp=sharing)
 
 **ASSUME** is an open-source toolbox for agent-based simulations of European electricity markets, with a primary focus on the German market setup. Developed as an open-source model, its primary objectives are to ensure usability and customizability for a wide range of users and use cases in the energy system modeling community.
 
@@ -70,9 +71,10 @@ To ease your way into ASSUME we provided some examples and tutorials. The former
 The tutorials work completly detached from your own machine on google colab. They provide code snippets and task that show you, how you can work with the software package one your own. We have two tutorials prepared, one for introducing a new unit and one for getting reinforcement learning ready on ASSUME.
 
 How to configure a new unit in ASSUME?
-<Coming Soon>
+**Coming Soon**
 
 How to intorduce reinforcement learning to ASSUME?
+
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1LISiM1QvDIMXU68pJH-NqrMw5w7Awb24?usp=sharing)
 
 
