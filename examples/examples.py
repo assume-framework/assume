@@ -65,6 +65,11 @@ if __name__ == "__main__":
     # create world
     world = World(database_uri=db_uri, export_csv_path=csv_path)
 
+    # you can also add custom bidding strategies as follows:
+    from assume.strategies.learning_strategies import RLStrategy
+
+    world.bidding_strategies["pp_learning"] = RLStrategy
+
     # load scenario
     load_scenario_folder(
         world,
@@ -77,10 +82,6 @@ if __name__ == "__main__":
     # and add it to the world as follows:
     # from custom_unit import CustomUnit
     # world.unit_types["custom_unit"] = CustomUnit
-
-    # you can also add custom bidding strategies as follows:
-    # from custom_strategy import CustomStrategy
-    # world.bidding_types["custom_strategy"] = CustomStrategy
 
     # next you need to load and add the custom units to the scenario
     # from assume import load_custom_units
