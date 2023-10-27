@@ -3,6 +3,12 @@
 ![Lint Status](https://github.com/assume-framework/assume/actions/workflows/lint-pytest.yaml/badge.svg)
 [![Code Coverage](https://codecov.io/gh/assume-framework/assume/branch/main/graph/badge.svg?token=CZ4FO7P57H)](https://codecov.io/gh/assume-framework/assume)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8088760.svg)](https://doi.org/10.5281/zenodo.8088760)
+
+[![](https://img.shields.io/pypi/v/assume-framework.svg)](https://pypi.org/pypi/assume-framework/)
+[![](https://img.shields.io/pypi/pyversions/assume-framework.svg)](https://pypi.org/pypi/assume-framework/)
+[![](https://img.shields.io/pypi/l/assume-framework.svg)](https://pypi.org/pypi/assume-framework/)
+[![](https://img.shields.io/pypi/status/assume-framework.svg)](https://pypi.org/pypi/assume-framework/)
+
 [![Open Tutorials In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1LISiM1QvDIMXU68pJH-NqrMw5w7Awb24?usp=sharing)
 
 **ASSUME** is an open-source toolbox for agent-based simulations of European electricity markets, with a primary focus on the German market setup. Developed as an open-source model, its primary objectives are to ensure usability and customizability for a wide range of users and use cases in the energy system modeling community.
