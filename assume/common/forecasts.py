@@ -230,8 +230,11 @@ class CsvForecaster(Forecaster):
         fuel_cost = fuel_price / pp_series["efficiency"]
         emissions_cost = co2_price * emission_factor / pp_series["efficiency"]
         fixed_cost = pp_series["fixed_cost"] if "fixed_cost" in pp_series else 0.0
+        variable_cost = (
+            pp_series["variable_cost"] if "variable_cost" in pp_series else 0.0
+        )
 
-        marginal_cost = fuel_cost + emissions_cost + fixed_cost
+        marginal_cost = fuel_cost + emissions_cost + fixed_cost + variable_cost
 
         return marginal_cost
 
