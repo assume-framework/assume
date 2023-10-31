@@ -301,12 +301,20 @@ class flexableEOMBlock(BaseStrategy):
             else:
                 op_time = min(op_time, 0) - 1
 
+        # calculate weighted average of prices
+        volume = 0
+        price = 0
+        for i in range(len(bid_price_block)):
+            price += bid_price_block[i] * bid_quantity_block.values[i]
+            volume += bid_quantity_block.values[i]
+        mean_price = price / volume
+
         bids.append(
             {
                 "start_time": product_tuples[0][0],
                 "end_time": product_tuples[-1][1],
                 "only_hours": product_tuples[0][2],
-                "price": np.mean(bid_price_block),
+                "price": mean_price,
                 "volume": bid_quantity_block,
                 "bid_type": "BB",
                 "min_acceptance_ratio": 1,
