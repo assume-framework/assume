@@ -87,32 +87,53 @@ availabe_examples = {
         "scenario": "2037_hRL",
         "study_case": "dam_BB",
     },
+    "2020_RL_BB_1": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_BB_winter_batch32",
+    },
+    "2020_RL_BB_2": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_BB_winter_batch16",
+    },
+    "2020_RL_BB_3": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_BB_summer_batch32",
+    },
+    "2020_RL_BB_4": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_BB_summer_batch16",
+    },
 }
 
 # %%
 if __name__ == "__main__":
-    example = "2037_RL_BB"
+    examples = ["2020_RL_tiny"]
     data_format = "timescale"  # "local_db" or "timescale"
 
-    if data_format == "local_db":
-        db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
-    elif data_format == "timescale":
-        db_uri = "postgresql://assume:assume@localhost:5432/assume"
+    for example in examples:
+        if data_format == "local_db":
+            db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
+        elif data_format == "timescale":
+            db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
-        world = World(database_uri=db_uri, export_csv_path=csv_path)
-        load_scenario_folder(
-            world,
-            inputs_path="examples/inputs",
-            scenario=availabe_examples[example]["scenario"],
-            study_case=availabe_examples[example]["study_case"],
-        )
-        if world.learning_config.get("learning_mode", False):
-            # run learning if learning mode is enabled
-            run_learning(
+            world = World(database_uri=db_uri, export_csv_path=csv_path)
+            load_scenario_folder(
                 world,
                 inputs_path="examples/inputs",
                 scenario=availabe_examples[example]["scenario"],
                 study_case=availabe_examples[example]["study_case"],
             )
+            if world.learning_config.get("learning_mode", False):
+                # run learning if learning mode is enabled
+                run_learning(
+                    world,
+                    inputs_path="examples/inputs",
+                    scenario=availabe_examples[example]["scenario"],
+                    study_case=availabe_examples[example]["study_case"],
+                )
 
-        world.run()
+            world.run()

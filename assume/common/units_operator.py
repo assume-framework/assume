@@ -397,10 +397,11 @@ class UnitsOperator(Role):
             if isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
                 RLdamStrategy,
-            ) or isinstance(
-                unit.bidding_strategies.get(marketconfig.product_type),
-                hourlyRLdamStrategy,
+                # ') or isinstance(
+                #     unit.bidding_strategies.get(marketconfig.product_type),
+                #     hourlyRLdamStrategy,'
             ):
+                # TODO: check whether to split the reward, profit and regret to different lines
                 output_dict = {
                     "datetime": start,
                     "profit": unit.outputs["profit"].loc[products_index].sum(),
@@ -416,6 +417,27 @@ class UnitsOperator(Role):
                     output_dict[f"actions_{i}"] = action_tuple[i]
 
                 output_agent_list.append(output_dict)
+
+            elif isinstance(
+                unit.bidding_strategies.get(marketconfig.product_type),
+                hourlyRLdamStrategy,
+            ):
+                for start in products_index:
+                    output_dict = {
+                        "datetime": start,
+                        "profit": unit.outputs["profit"].loc[products_index].sum(),
+                        "reward": unit.outputs["reward"].loc[products_index].sum(),
+                        "regret": unit.outputs["regret"].loc[products_index].sum(),
+                        "unit": unit_id,
+                    }
+                    noise_tuple = unit.outputs["rl_exploration_noise"].loc[start]
+                    action_tuple = unit.outputs["rl_actions"].loc[start]
+                    action_dim = len(action_tuple)
+                    for i in range(action_dim):
+                        output_dict[f"exploration_noise_{i}"] = noise_tuple[i]
+                        output_dict[f"actions_{i}"] = action_tuple[i]
+
+                    output_agent_list.append(output_dict)
 
             elif isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
@@ -479,14 +501,24 @@ class UnitsOperator(Role):
             if isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
                 RLdamStrategy,
-            ) or isinstance(
-                unit.bidding_strategies.get(marketconfig.product_type),
-                hourlyRLdamStrategy,
+                # ) or isinstance(
+                #     unit.bidding_strategies.get(marketconfig.product_type),
+                #     hourlyRLdamStrategy,
             ):
                 all_observations[i, :] = unit.outputs["rl_observations"][start]
                 all_actions[i, :] = unit.outputs["rl_actions"][start]
                 all_rewards.append(sum(unit.outputs["reward"][products_index]))
                 i += 1
+
+            elif isinstance(
+                unit.bidding_strategies.get(marketconfig.product_type),
+                hourlyRLdamStrategy,
+            ):
+                for start in products_index:
+                    all_observations[i, :] = unit.outputs["rl_observations"][start]
+                    all_actions[i, :] = unit.outputs["rl_actions"][start]
+                    all_rewards.append(sum(unit.outputs["reward"][products_index]))
+                    i += 1
 
             elif isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),

@@ -584,7 +584,10 @@ class RLdamStrategy(LearningStrategy):
 
             # 3.1 formulate the bids for Pmin
             # Pmin, the minium run capacity is the inflexible part of the bid, which should always be accepted
-            bid_quantity_inflex = min_power[start]
+            if unit.fuel_type == "renewable":
+                bid_quantity_inflex = max_power[start] * abs(actions[0]).item()
+            else:
+                bid_quantity_inflex = min_power[start]
 
             # 3.1 formulate the bids for Pmax - Pmin
             # Pmin, the minium run capacity is the inflexible part of the bid, which should always be accepted
@@ -592,7 +595,7 @@ class RLdamStrategy(LearningStrategy):
             if op_time <= -unit.min_down_time or op_time > 0:
                 bid_quantity_flex = max_power[start] - bid_quantity_inflex
 
-            bid_quantity_block[product[0]] = bid_quantity_inflex
+            bid_quantity_block[start] = bid_quantity_inflex
 
             # actually formulate bids in orderbook format
             bids.append(
@@ -780,6 +783,7 @@ class RLdamStrategy(LearningStrategy):
         product_type = marketconfig.product_type
         products_index = get_products_index(orderbook, marketconfig)
 
+        constraints_cost = pd.Series(0, index=products_index)
         profit = pd.Series(0, index=products_index)
         reward = pd.Series(0, index=products_index)
         opportunity_cost = pd.Series(0, index=products_index)
@@ -826,6 +830,15 @@ class RLdamStrategy(LearningStrategy):
                 # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
                 order_opportunity_cost[start] = max(order_opportunity_cost[start], 0)
 
+                # if unit.min_power is not supplied, add costs for overproduction
+                if (
+                    unit.outputs[product_type].loc[start] < unit.min_power
+                    and unit.outputs[product_type].loc[start] > 0
+                ):
+                    constraints_cost[start] = (
+                        accepted_price - marginal_cost_max_power
+                    ) * (unit.min_power - unit.outputs[product_type].loc[start])
+
                 # don't consider opportunity_cost more than once! Always the same for one timestep and one market
                 opportunity_cost[start] = order_opportunity_cost[start]
                 profit[start] += order_profit[start]
@@ -848,7 +861,9 @@ class RLdamStrategy(LearningStrategy):
 
         scaling = 0.1 / unit.max_power
         regret_scale = 0.2
-        reward = (profit - regret_scale * opportunity_cost) * scaling
+        reward = (
+            profit - regret_scale * (opportunity_cost + constraints_cost)
+        ) * scaling
 
         # store results in unit outputs which are written to database by unit operator
         unit.outputs["profit"].loc[products_index] += profit
@@ -1025,35 +1040,6 @@ class hourlyRLdamStrategy(LearningStrategy):
         previous_power = unit.get_output_before(start)
         min_power, max_power = unit.calculate_min_max_power(start, end)
 
-        # =============================================================================
-        # 1. Get the Observations, which are the basis of the action decision
-        # =============================================================================
-        next_observation = self.create_observation(
-            unit=unit,
-            start=start,
-            end=end,
-        )
-
-        # =============================================================================
-        # 2. Get the Actions, based on the observations
-        # =============================================================================
-
-        actions, noise = self.get_actions(next_observation)
-
-        # =============================================================================
-        # 3. Transform Actions into bids
-        # =============================================================================
-        # actions are in the range [-1,1], we need to transform them into actual bids
-        # we can use our domain knowledge to guide the bid formulation
-        # first 24 actions define inflexible bid and the sign defines, whether it is a block bid or not
-        inflex_power = actions[0:24] * unit.max_power
-        # boolean to decide whether to use block bid or not
-        bid_as_block = [power.item() < 0 for power in inflex_power]
-        # second 24 actions define the price of the inflexible bid
-        prices_1 = actions[24:48] * self.max_bid_price
-        # third 24 actions define the price of the flexible bid
-        prices_2 = actions[48:72] * self.max_bid_price
-
         # calculate the quantities and transform the bids into orderbook format
         bids = []
         bid_quantity_block = {}
@@ -1061,15 +1047,46 @@ class hourlyRLdamStrategy(LearningStrategy):
         op_time = unit.get_operation_time(start)
         is_block_bid = True
 
-        for i, product in enumerate(product_tuples):
+        for product in product_tuples:
             start = product[0]
             end = product[1]
+
+            # =============================================================================
+            # 1. Get the Observations, which are the basis of the action decision
+            # =============================================================================
+            next_observation = self.create_observation(
+                unit=unit,
+                start=start,
+                end=end,
+                current_volume=previous_power,
+                op_time=op_time,
+            )
+
+            # =============================================================================
+            # 2. Get the Actions, based on the observations
+            # =============================================================================
+
+            actions, noise = self.get_actions(next_observation)
+
+            # =============================================================================
+            # 3. Transform Actions into bids
+            # =============================================================================
+            # actions are in the range [-1,1], we need to transform them into actual bids
+            # we can use our domain knowledge to guide the bid formulation
+            # first 24 actions define inflexible bid and the sign defines, whether it is a block bid or not
+            inflex_power = abs(actions[0]) * unit.max_power
+            # boolean to decide whether to use block bid or not
+            bid_as_block = actions[0] < 0
+            # second 24 actions define the price of the inflexible bid
+            price_1 = actions[1] * self.max_bid_price
+            # third 24 actions define the price of the flexible bid
+            price_2 = actions[2] * self.max_bid_price
 
             bid_quantity_inflex = 0
             bid_quantity_flex = 0
 
-            bid_price_inflex = min(prices_1[i], prices_2[i]).item()
-            bid_price_flex = max(prices_1[i], prices_2[i]).item()
+            bid_price_inflex = min(price_1, price_2).item()
+            bid_price_flex = max(price_1, price_2).item()
 
             current_power = unit.outputs["energy"].at[start]
 
@@ -1085,7 +1102,7 @@ class hourlyRLdamStrategy(LearningStrategy):
 
             # 3.1 formulate the bids for Pmin
             # Pmin, the minium run capacity is the inflexible part of the bid, which should always be accepted
-            bid_quantity_inflex = abs(inflex_power[i]).item()
+            bid_quantity_inflex = abs(inflex_power).item()
 
             if op_time <= -unit.min_down_time or op_time > 0:
                 bid_quantity_flex = max_power[start] - bid_quantity_inflex
@@ -1101,7 +1118,7 @@ class hourlyRLdamStrategy(LearningStrategy):
                     },
                 )
 
-            if inflex_power[i] < 0:
+            if inflex_power < 0:
                 bid_quantity_block[product[0]] = bid_quantity_inflex
                 bid_price_block.append(bid_price_inflex)
 
@@ -1117,7 +1134,8 @@ class hourlyRLdamStrategy(LearningStrategy):
                         "bid_type": "SB",
                     },
                 )
-            if is_block_bid != bid_as_block[i] and bid_quantity_block != {}:
+            if is_block_bid != bid_as_block and bid_quantity_block != {}:
+                # formulate block bid
                 bids.append(
                     {
                         "start_time": min(bid_quantity_block.keys()),
@@ -1151,7 +1169,7 @@ class hourlyRLdamStrategy(LearningStrategy):
                 start
             ] = noise  # th.tensor([noise[i], noise[i+24], noise[i+48]])
 
-        if bid_as_block[-1]:
+        if bid_as_block:
             bids.append(
                 {
                     "start_time": min(bid_quantity_block.keys()),
@@ -1172,6 +1190,8 @@ class hourlyRLdamStrategy(LearningStrategy):
         unit: SupportsMinMax,
         start: datetime,
         end: datetime,
+        current_volume: float = 0.0,
+        op_time: int = 0,
     ):
         """
         Create observation
@@ -1238,7 +1258,8 @@ class hourlyRLdamStrategy(LearningStrategy):
             )
 
         # get last accepted bid volume and the current marginal costs of the unit
-        current_volume = unit.get_output_before(start)
+        if current_volume == 0.0:
+            current_volume = unit.get_output_before(start)
 
         current_costs = unit.calculate_marginal_cost(start, current_volume)
 
@@ -1247,11 +1268,13 @@ class hourlyRLdamStrategy(LearningStrategy):
         scaled_marginal_cost = current_costs / scaling_factor_marginal_cost
 
         # calculate the time the unit has to continue to run or be down
-        op_time = unit.get_operation_time(start)
+        if op_time == 0:
+            op_time = unit.get_operation_time(start)
+
         if op_time > 0:
-            must_run_time = max(op_time - unit.min_operating_time, 0)
+            must_run_time = max(unit.min_operating_time - op_time, 0)
         elif op_time < 0:
-            must_run_time = min(op_time + unit.min_down_time, 0)
+            must_run_time = min(-op_time - unit.min_down_time, 0)
         scaling_factor_must_run_time = max(unit.min_operating_time, unit.min_down_time)
 
         scaled_must_run_time = must_run_time / scaling_factor_must_run_time

@@ -6,8 +6,8 @@ dam_BB:
   learning_mode: True
 
   learning_config:
-    observation_dimension: 97
-    action_dimension: 72
+    observation_dimension: 51
+    action_dimension: 3
     continue_learning: False
     load_model_path: None
     max_bid_price: 250
@@ -55,8 +55,8 @@ dam_SB:
   learning_mode: True
 
   learning_config:
-    observation_dimension: 97
-    action_dimension: 72
+    observation_dimension: 51
+    action_dimension: 3
     continue_learning: False
     load_model_path: None
     max_bid_price: 250
@@ -103,8 +103,8 @@ tiny:
   learning_mode: True
 
   learning_config:
-    observation_dimension: 97
-    action_dimension: 72
+    observation_dimension: 51
+    action_dimension: 3
     continue_learning: False
     load_model_path: None
     max_bid_price: 250
