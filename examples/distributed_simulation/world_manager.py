@@ -1,4 +1,4 @@
-from distributed_config import (
+from config import (
     agent_adress,
     agent_adresses,
     db_uri,
