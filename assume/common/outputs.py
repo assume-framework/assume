@@ -411,8 +411,10 @@ class WriteOutput(Role):
             f"select reward FROM rl_params where simulation='{self.simulation_id}'"
         )
 
+        avg_reward = 0
         with self.db.begin() as db:
             reward = db.execute(query).fetchall()
+        if len(reward):
             avg_reward = sum(r[0] for r in reward) / len(reward)
 
         return avg_reward

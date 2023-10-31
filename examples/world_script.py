@@ -23,7 +23,7 @@ async def init():
         end=end + timedelta(hours=24),
         freq="H",
     )
-    sim_id = "handmade_simulation"
+    sim_id = "world_script_simulation"
 
     await world.setup(
         start=start,

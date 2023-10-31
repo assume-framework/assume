@@ -110,6 +110,7 @@ class World:
         learning_config: LearningConfig = {},
         forecaster: Forecaster = None,
         manager_address=None,
+        **kwargs,
     ):
         self.clock = ExternalClock(0)
         self.start = start
@@ -140,6 +141,7 @@ class World:
                 "broker_addr": "localhost",
                 "client_id": self.addr,
             }
+            container_kwargs["mqtt_kwargs"].update(**kwargs)
 
         self.container = await create_container(
             connection_type=connection_type,
@@ -150,18 +152,15 @@ class World:
         )
         self.learning_mode = self.learning_config.get("learning_mode", False)
         self.output_agent_addr = (self.addr, "export_agent_1")
-        if self.distributed_role is True:
+        if self.distributed_role is False:
+            self.clock_agent = DistributedClockAgent(self.container)
+            self.output_agent_addr = (manager_address, "export_agent_1")
+        else:
             await self.setup_learning()
             await self.setup_output_agent(simulation_id, save_frequency_hours)
             self.clock_manager = DistributedClockManager(
                 self.container, receiver_clock_addresses=self.addresses
             )
-        elif self.distributed_role is None:
-            await self.setup_learning()
-            await self.setup_output_agent(simulation_id, save_frequency_hours)
-        else:
-            self.clock_agent = DistributedClockAgent(self.container)
-            self.output_agent_addr = (manager_address, "export_agent_1")
 
     async def setup_learning(self):
         self.bidding_params.update(self.learning_config)
@@ -198,7 +197,7 @@ class World:
 
         # mango multiprocessing is currently only supported on linux
         # with single
-        if platform == "linux" and self.distributed_role is None:
+        if platform == "linux":
             self.addresses.append(self.addr)
 
             def creator(container):
@@ -380,7 +379,7 @@ class World:
         self.markets[f"{market_config.name}"] = market_config
 
     async def _step(self):
-        if self.distributed_role:
+        if self.distributed_role is not False:
             next_activity = await self.clock_manager.distribute_time()
         else:
             next_activity = self.clock.get_next_activity()
@@ -404,7 +403,7 @@ class World:
 
         # allow registration before first opening
         self.clock.set_time(start_ts - 1)
-        if self.distributed_role:
+        if self.distributed_role is not False:
             await self.clock_manager.broadcast(self.clock.time)
         while self.clock.time < end_ts:
             await asyncio.sleep(0)

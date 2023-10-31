@@ -397,7 +397,10 @@ class MarketRole(MarketMechanism, Role):
 
         for meta in market_meta:
             logger.debug(
-                f'clearing price for {self.marketconfig.name} is {meta["price"]:.2f}, volume: {meta["demand_volume"]}'
+                "clearing price for %s is %.2f, volume: %f",
+                self.marketconfig.name,
+                meta["price"],
+                meta["demand_volume"],
             )
             meta["market_id"] = self.marketconfig.name
             meta["time"] = meta["product_start"]
