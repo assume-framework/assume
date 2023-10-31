@@ -4,6 +4,14 @@
 [![Code Coverage](https://codecov.io/gh/assume-framework/assume/branch/main/graph/badge.svg?token=CZ4FO7P57H)](https://codecov.io/gh/assume-framework/assume)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8088760.svg)](https://doi.org/10.5281/zenodo.8088760)
 
+[![](https://img.shields.io/pypi/v/assume-framework.svg)](https://pypi.org/pypi/assume-framework/)
+[![](https://img.shields.io/pypi/pyversions/assume-framework.svg)](https://pypi.org/pypi/assume-framework/)
+[![](https://img.shields.io/pypi/l/assume-framework.svg)](https://pypi.org/pypi/assume-framework/)
+[![](https://img.shields.io/pypi/status/assume-framework.svg)](https://pypi.org/pypi/assume-framework/)
+[![](https://img.shields.io/readthedocs/assume)](https://assume.readthedocs.io/)
+
+[![Open Tutorials In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1LISiM1QvDIMXU68pJH-NqrMw5w7Awb24?usp=sharing)
+
 **ASSUME** is an open-source toolbox for agent-based simulations of European electricity markets, with a primary focus on the German market setup. Developed as an open-source model, its primary objectives are to ensure usability and customizability for a wide range of users and use cases in the energy system modeling community.
 
 ## Introduction
@@ -59,7 +67,26 @@ This will launch a container for TimescaleDB and Grafana with preconfigured dash
 
 If you intend to use the reinforcement learning capabilities of ASSUME and train your agents, make sure to install Torch. Detailed installation instructions can be found [here](https://pytorch.org/get-started/locally/).
 
-## Trying out the Examples
+
+
+## Trying out ASSUME and the provided Examples
+
+To ease your way into ASSUME we provided some examples and tutorials. The former are helpful if you would like to get an impression of how ASSUME works and the latter introduce you into the development of ASSUME.
+
+### The Tutorials
+
+The tutorials work completly detached from your own machine on google colab. They provide code snippets and task that show you, how you can work with the software package one your own. We have two tutorials prepared, one for introducing a new unit and one for getting reinforcement learning ready on ASSUME.
+
+How to configure a new unit in ASSUME?
+**Coming Soon**
+
+How to intorduce reinforcement learning to ASSUME?
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1LISiM1QvDIMXU68pJH-NqrMw5w7Awb24?usp=sharing)
+
+
+
+### The Examples
 
 To explore the provided examples, follow these steps:
 

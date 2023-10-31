@@ -43,7 +43,8 @@ availabe_examples = {
         "scenario": "example_02",
         "study_case": "dam_case_2019",
     },
-    "rl": {"scenario": "example_01_rl", "study_case": "base"},
+    "learning_small": {"scenario": "example_02a", "study_case": "base"},
+    "learning_medium": {"scenario": "example_02b", "study_case": "base"},
 }
 
 # %%
@@ -53,8 +54,8 @@ if __name__ == "__main__":
     - local_db: without database and grafana
     - timescale: with database and grafana (note: you need docker installed)
     """
-    data_format = "local_db"  # "local_db" or "timescale"
-    example = "small"
+    data_format = "timescale"  # "local_db" or "timescale"
+    example = "learning_small"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
@@ -63,6 +64,11 @@ if __name__ == "__main__":
 
     # create world
     world = World(database_uri=db_uri, export_csv_path=csv_path)
+
+    # you can also add custom bidding strategies as follows:
+    from assume.strategies.learning_strategies import RLStrategy
+
+    world.bidding_strategies["pp_learning"] = RLStrategy
 
     # load scenario
     load_scenario_folder(
@@ -76,10 +82,6 @@ if __name__ == "__main__":
     # and add it to the world as follows:
     # from custom_unit import CustomUnit
     # world.unit_types["custom_unit"] = CustomUnit
-
-    # you can also add custom bidding strategies as follows:
-    # from custom_strategy import CustomStrategy
-    # world.bidding_types["custom_strategy"] = CustomStrategy
 
     # next you need to load and add the custom units to the scenario
     # from assume import load_custom_units

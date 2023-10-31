@@ -1,4 +1,6 @@
 name: assume-doc
+channels:
+  - conda-forge
 dependencies:
 - python>=3.11
 - pip
@@ -7,6 +9,8 @@ dependencies:
 - numpy
 - tqdm
 - SQLAlchemy
+- pytorch
+- pyomo
 
 - pip:
   - .
@@ -15,5 +19,3 @@ dependencies:
   - nbsphinx
   - nbsphinx_link
   - sphinxcontrib-mermaid
-  - pyomo
-  - torch

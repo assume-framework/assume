@@ -45,6 +45,8 @@ Documentation
 * :doc:`market_config`
 * :doc:`market_mechanism`
 * :doc:`bidding_agents`
+* :doc:`learning`
+* :doc:`example_simulations`
 * :doc:`assume`
 
 .. toctree::
@@ -58,6 +60,8 @@ Documentation
    market_config
    market_mechanism
    bidding_agents
+   example_simulations
+   learning
    assume
 
 Indices and tables

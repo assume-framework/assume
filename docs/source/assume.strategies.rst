@@ -44,13 +44,6 @@ assume.strategies.naive\_strategies module
    :undoc-members:
    :show-inheritance:
 
-assume.strategies.storage\_strategies module
---------------------------------------------
-
-.. automodule:: assume.strategies.storage_strategies
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
 Module contents
 ---------------
