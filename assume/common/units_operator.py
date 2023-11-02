@@ -405,7 +405,7 @@ class UnitsOperator(Role):
                 output_dict = {
                     "datetime": start,
                     "profit": unit.outputs["profit"].loc[products_index].sum(),
-                    "reward": unit.outputs["reward"].loc[products_index].sum(),
+                    "reward": unit.outputs["reward"].loc[products_index].sum() / 24,
                     "regret": unit.outputs["regret"].loc[products_index].sum(),
                     "unit": unit_id,
                 }
