@@ -90,28 +90,57 @@ availabe_examples = {
     "2020_RL_BB_1": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
-        "study_case": "dam_BB_winter_batch32",
+        "study_case": "dam_BB_winter",
     },
     "2020_RL_BB_2": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
-        "study_case": "dam_BB_winter_batch16",
+        "study_case": "dam_BB_winter_gradient5",
     },
     "2020_RL_BB_3": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
-        "study_case": "dam_BB_summer_batch32",
+        "study_case": "dam_BB_winter_gradient10",
     },
     "2020_RL_BB_4": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
-        "study_case": "dam_BB_summer_batch16",
+        "study_case": "dam_BB_winter_gradient15",
+    },
+    "2020_RL_BB_5": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_BB_summer",
+    },
+    "2020_RL_BB_6": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_BB_summer_gradient5",
+    },
+    "2020_RL_BB_7": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_BB_summer_gradient10",
+    },
+    "2020_RL_BB_8": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_BB_summer_gradient15",
     },
 }
 
 # %%
 if __name__ == "__main__":
-    examples = ["2037_rule_SB"]
+    examples = [
+        "2020_RL_BB_1",
+        "2020_RL_BB_2",
+        "2020_RL_BB_3",
+        "2020_RL_BB_4",
+        "2020_RL_BB_5",
+        "2020_RL_BB_6",
+        "2020_RL_BB_7",
+        "2020_RL_BB_8",
+    ]
     data_format = "timescale"  # "local_db" or "timescale"
 
     for example in examples:
@@ -137,3 +166,6 @@ if __name__ == "__main__":
                 )
 
             world.run()
+
+        # delete examples/inputs/2020_RL/forecasts_df.csv
+        os.remove("examples/inputs/2020_RL/forecasts_df.csv")

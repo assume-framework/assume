@@ -584,10 +584,14 @@ class RLdamStrategy(LearningStrategy):
 
             # 3.1 formulate the bids for Pmin
             # Pmin, the minium run capacity is the inflexible part of the bid, which should always be accepted
-            if unit.fuel_type == "renewable":
-                bid_quantity_inflex = max_power[start] * abs(actions[0]).item()
-            else:
-                bid_quantity_inflex = min_power[start]
+            # if unit.fuel_type == "renewable":
+            #     bid_quantity_inflex = max_power[start] * abs(actions[0]).item()
+            # else:
+            #     bid_quantity_inflex = min_power[start]
+
+            bid_quantity_inflex = max(
+                max_power[start] * abs(actions[0]).item(), min_power[start]
+            )
 
             # 3.1 formulate the bids for Pmax - Pmin
             # Pmin, the minium run capacity is the inflexible part of the bid, which should always be accepted
@@ -904,7 +908,11 @@ class RLdamStrategy(LearningStrategy):
                 # needs to be adjusted if observation space is changed, because only makes sense
                 # if the last dimension of the observation space are the marginal cost
                 curr_action = noise + base_bid.clone().detach()
-                curr_action[0] = curr_action[0] - base_bid.clone().detach()
+                curr_action[0] = (
+                    th.normal(mean=0.0, std=1, size=(1, 1), dtype=self.float_type)
+                    .to(self.device)
+                    .squeeze()
+                )
 
             else:
                 # if we are not in the initial exploration phase we chose the action with the actor neuronal net
