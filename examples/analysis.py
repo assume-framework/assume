@@ -132,18 +132,15 @@ availabe_examples = {
 # %%
 if __name__ == "__main__":
     examples = [
-        "2020_RL_BB_1",
-        "2020_RL_BB_2",
-        "2020_RL_BB_3",
-        "2020_RL_BB_4",
-        "2020_RL_BB_5",
-        "2020_RL_BB_6",
-        "2020_RL_BB_7",
-        "2020_RL_BB_8",
+        "2037_rule_BB",
     ]
     data_format = "timescale"  # "local_db" or "timescale"
 
     for example in examples:
+        # delete examples/inputs/2020_RL/forecasts_df.csv
+        if os.path.exists("examples/inputs/2020_RL/forecasts_df.csv"):
+            os.remove("examples/inputs/2020_RL/forecasts_df.csv")
+
         if data_format == "local_db":
             db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
         elif data_format == "timescale":
@@ -166,6 +163,3 @@ if __name__ == "__main__":
                 )
 
             world.run()
-
-        # delete examples/inputs/2020_RL/forecasts_df.csv
-        os.remove("examples/inputs/2020_RL/forecasts_df.csv")

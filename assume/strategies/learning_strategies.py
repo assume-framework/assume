@@ -844,7 +844,7 @@ class RLdamStrategy(LearningStrategy):
                 # don't consider opportunity_cost more than once! Always the same for one timestep and one market
                 opportunity_cost[start] = order_opportunity_cost[start]
                 profit[start] += order_profit[start]
-                costs[start] = marginal_cost * accepted_volume
+                costs[start] += marginal_cost * accepted_volume
 
         # consideration of start-up costs, which are evenly divided between the
         # upward and downward regulation events

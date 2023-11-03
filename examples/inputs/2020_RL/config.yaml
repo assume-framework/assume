@@ -13,7 +13,7 @@ dam_BB_winter:
     max_bid_price: 200
     algorithm: matd3
     learning_rate: 0.001
-    training_episodes: 100
+    training_episodes: 50
     episodes_collecting_initial_experience: 5
     train_freq: 24
     gradient_steps: -1
@@ -61,7 +61,7 @@ dam_BB_winter_gradient5:
     max_bid_price: 200
     algorithm: matd3
     learning_rate: 0.001
-    training_episodes: 100
+    training_episodes: 50
     episodes_collecting_initial_experience: 5
     train_freq: 24
     gradient_steps: 5
@@ -109,7 +109,7 @@ dam_BB_winter_gradient10:
     max_bid_price: 200
     algorithm: matd3
     learning_rate: 0.001
-    training_episodes: 100
+    training_episodes: 50
     episodes_collecting_initial_experience: 5
     train_freq: 24
     gradient_steps: 10
@@ -205,7 +205,7 @@ dam_BB_summer:
     max_bid_price: 200
     algorithm: matd3
     learning_rate: 0.001
-    training_episodes: 100
+    training_episodes: 50
     episodes_collecting_initial_experience: 5
     train_freq: 24
     gradient_steps: -1
@@ -253,7 +253,7 @@ dam_BB_summer_gradient5:
     max_bid_price: 200
     algorithm: matd3
     learning_rate: 0.001
-    training_episodes: 100
+    training_episodes: 50
     episodes_collecting_initial_experience: 5
     train_freq: 24
     gradient_steps: 5
@@ -301,7 +301,7 @@ dam_BB_summer_gradient10:
     max_bid_price: 200
     algorithm: matd3
     learning_rate: 0.001
-    training_episodes: 100
+    training_episodes: 50
     episodes_collecting_initial_experience: 5
     train_freq: 24
     gradient_steps: 10
@@ -350,7 +350,7 @@ dam_BB_summer_gradient15:
     max_bid_price: 200
     algorithm: matd3
     learning_rate: 0.001
-    training_episodes: 100
+    training_episodes: 50
     episodes_collecting_initial_experience: 5
     train_freq: 24
     gradient_steps: 15

@@ -305,8 +305,8 @@ class flexableEOMBlock(BaseStrategy):
         volume = 0
         price = 0
         for i in range(len(bid_price_block)):
-            price += bid_price_block[i] * bid_quantity_block.values[i]
-            volume += bid_quantity_block.values[i]
+            price += bid_price_block[i] * list(bid_quantity_block.values())[i]
+            volume += list(bid_quantity_block.values())[i]
         mean_price = price / volume
 
         bids.append(
