@@ -30,6 +30,10 @@ jobs:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
         cache-dependency-path: '**/pyproject.toml'
+    - name: Check reuse compliance
+      run: |
+        pip install reuse
+        reuse lint
     - name: Install dependencies
       run: |
         sudo apt-get update && sudo apt-get install --no-install-recommends -y coinor-cbc gcc g++ libglpk-dev glpk-utils && sudo rm -rf /var/lib/apt/lists/*
