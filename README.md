@@ -9,6 +9,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 ![Lint Status](https://github.com/assume-framework/assume/actions/workflows/lint-pytest.yaml/badge.svg)
 [![Code Coverage](https://codecov.io/gh/assume-framework/assume/branch/main/graph/badge.svg?token=CZ4FO7P57H)](https://codecov.io/gh/assume-framework/assume)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8088760.svg)](https://doi.org/10.5281/zenodo.8088760)
+[![REUSE status](https://api.reuse.software/badge/github.com/assume-framework/assume)](https://api.reuse.software/info/github.com/assume-framework/assume)
 
 [![](https://img.shields.io/pypi/v/assume-framework.svg)](https://pypi.org/pypi/assume-framework/)
 [![](https://img.shields.io/pypi/pyversions/assume-framework.svg)](https://pypi.org/pypi/assume-framework/)
