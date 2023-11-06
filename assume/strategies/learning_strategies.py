@@ -547,10 +547,7 @@ class RLdamStrategy(LearningStrategy):
         # we can use our domain knowledge to guide the bid formulation
 
         # first parameter decides whether to use BB or SB for inflexible part of bid
-        if actions[0] >= 0:
-            bid_type = "SB"
-        else:
-            bid_type = "BB"
+        bid_type = "SB" if actions[0] >= 0 else "BB"
 
         bid_price_1 = actions[1] * self.max_bid_price
         bid_price_2 = actions[2] * self.max_bid_price
@@ -624,11 +621,7 @@ class RLdamStrategy(LearningStrategy):
 
             # calculate previous power with planned dispatch (bid_quantity)
             previous_power = bid_quantity_inflex + bid_quantity_flex + current_power
-            if previous_power > 0:
-                op_time = max(op_time, 0) + 1
-            else:
-                op_time = min(op_time, 0) - 1
-
+            op_time = max(op_time, 0) + 1 if previous_power > 0 else min(op_time, 0) - 1
             # store results in unit outputs which are written to database by unit operator
             unit.outputs["rl_observations"][start] = next_observation
             unit.outputs["rl_actions"][start] = actions
@@ -785,11 +778,11 @@ class RLdamStrategy(LearningStrategy):
         product_type = marketconfig.product_type
         products_index = get_products_index(orderbook, marketconfig)
 
-        constraints_cost = pd.Series(0, index=products_index)
-        profit = pd.Series(0, index=products_index)
-        reward = pd.Series(0, index=products_index)
-        opportunity_cost = pd.Series(0, index=products_index)
-        costs = pd.Series(0, index=products_index)
+        constraints_cost = pd.Series(0.0, index=products_index)
+        profit = pd.Series(0.0, index=products_index)
+        reward = pd.Series(0.0, index=products_index)
+        opportunity_cost = pd.Series(0.0, index=products_index)
+        costs = pd.Series(0.0, index=products_index)
 
         # iterate over all orders in the orderbook, to calculate order specific profit
         for order in orderbook:
@@ -800,8 +793,8 @@ class RLdamStrategy(LearningStrategy):
             order_times = pd.date_range(start, end_excl, freq=unit.index.freq)
 
             # calculate profit as income - running_cost from this event
-            order_profit = pd.Series(0, index=order_times)
-            order_opportunity_cost = pd.Series(0, index=order_times)
+            order_profit = pd.Series(0.0, index=order_times)
+            order_opportunity_cost = pd.Series(0.0, index=order_times)
 
             for start in order_times:
                 marginal_cost = unit.calculate_marginal_cost(
@@ -837,9 +830,10 @@ class RLdamStrategy(LearningStrategy):
                     unit.outputs[product_type].loc[start] < unit.min_power
                     and unit.outputs[product_type].loc[start] > 0
                 ):
-                    constraints_cost[start] = (
+                    constraints_cost[start] = max((
                         accepted_price - marginal_cost_max_power
                     ) * (unit.min_power - unit.outputs[product_type].loc[start])
+                    , 0)
 
                 # don't consider opportunity_cost more than once! Always the same for one timestep and one market
                 opportunity_cost[start] = order_opportunity_cost[start]
@@ -1157,11 +1151,7 @@ class hourlyRLdamStrategy(LearningStrategy):
 
             # calculate previous power with planned dispatch (bid_quantity)
             previous_power = bid_quantity_inflex + bid_quantity_flex + current_power
-            if previous_power > 0:
-                op_time = max(op_time, 0) + 1
-            else:
-                op_time = min(op_time, 0) - 1
-
+            op_time = max(op_time, 0) + 1 if previous_power > 0 else min(op_time, 0) - 1
             # store results in unit outputs which are written to database by unit operator
             unit.outputs["rl_observations"][start] = next_observation
             unit.outputs["rl_actions"][
@@ -1327,11 +1317,11 @@ class hourlyRLdamStrategy(LearningStrategy):
         product_type = marketconfig.product_type
         products_index = get_products_index(orderbook, marketconfig)
 
-        constraints_cost = pd.Series(0, index=products_index)
-        profit = pd.Series(0, index=products_index)
-        reward = pd.Series(0, index=products_index)
-        opportunity_cost = pd.Series(0, index=products_index)
-        costs = pd.Series(0, index=products_index)
+        constraints_cost = pd.Series(0.0, index=products_index)
+        profit = pd.Series(0.0, index=products_index)
+        reward = pd.Series(0.0, index=products_index)
+        opportunity_cost = pd.Series(0.0, index=products_index)
+        costs = pd.Series(0.0, index=products_index)
 
         # iterate over all orders in the orderbook, to calculate order specific profit
         for order in orderbook:
@@ -1342,7 +1332,7 @@ class hourlyRLdamStrategy(LearningStrategy):
             order_times = pd.date_range(start, end_excl, freq=unit.index.freq)
 
             # calculate profit as income - running_cost from this event
-            order_profit = pd.Series(0, index=order_times)
+            order_profit = pd.Series(0.0, index=order_times)
 
             for start in order_times:
                 marginal_cost = unit.calculate_marginal_cost(
@@ -1445,7 +1435,7 @@ class hourlyRLdamStrategy(LearningStrategy):
                 # needs to be adjusted if observation space is changed, because only makes sense
                 # if the last dimension of the observation space are the marginal cost
                 curr_action = noise + base_bid.clone().detach()
-                curr_action[0:23] = curr_action[0:23] - base_bid.clone().detach()
+                curr_action[:23] = curr_action[:23] - base_bid.clone().detach()
 
             else:
                 # if we are not in the initial exploration phase we chose the action with the actor neuronal net
@@ -1465,7 +1455,7 @@ class hourlyRLdamStrategy(LearningStrategy):
 
         # set action[0] to positive value, if only SB allowed
         if ["SB"] == self.order_types:
-            curr_action[0:23] = abs(curr_action[0:23])
+            curr_action[:23] = abs(curr_action[:23])
 
         return curr_action, noise
 

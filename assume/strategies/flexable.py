@@ -118,10 +118,6 @@ class flexableEOM(BaseStrategy):
                 bid_quantity_flex = max_power[start] - bid_quantity_inflex
                 bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
 
-            # TODO: find a better strategy for this
-            # if bid_price_flex < bid_price_inflex and bid_quantity_flex > 0:
-            #    bid_price_flex = bid_price_inflex * 1.1
-
             bids.append(
                 {
                     "start_time": start,
@@ -142,10 +138,7 @@ class flexableEOM(BaseStrategy):
             )
             # calculate previous power with planned dispatch (bid_quantity)
             previous_power = bid_quantity_inflex + bid_quantity_flex + current_power
-            if previous_power > 0:
-                op_time = max(op_time, 0) + 1
-            else:
-                op_time = min(op_time, 0) - 1
+            op_time = max(op_time, 0) + 1 if previous_power > 0 else min(op_time, 0) - 1
 
         return bids
 
@@ -296,10 +289,7 @@ class flexableEOMBlock(BaseStrategy):
             )
             # calculate previous power with planned dispatch (bid_quantity)
             previous_power = bid_quantity_inflex + bid_quantity_flex + current_power
-            if previous_power > 0:
-                op_time = max(op_time, 0) + 1
-            else:
-                op_time = min(op_time, 0) - 1
+            op_time = max(op_time, 0) + 1 if previous_power > 0 else min(op_time, 0) - 1
 
         # calculate weighted average of prices
         volume = 0
@@ -682,10 +672,10 @@ def calculate_reward_EOM(
     product_type = marketconfig.product_type
     products_index = get_products_index(orderbook, marketconfig)
 
-    profit = pd.Series(0, index=products_index)
-    reward = pd.Series(0, index=products_index)
-    opportunity_cost = pd.Series(0, index=products_index)
-    costs = pd.Series(0, index=products_index)
+    profit = pd.Series(0.0, index=products_index)
+    reward = pd.Series(0.0, index=products_index)
+    opportunity_cost = pd.Series(0.0, index=products_index)
+    costs = pd.Series(0.0, index=products_index)
 
     for order in orderbook:
         start = order["start_time"]
@@ -694,8 +684,8 @@ def calculate_reward_EOM(
 
         order_times = pd.date_range(start, end_excl, freq=unit.index.freq)
 
-        order_profit = pd.Series(0, index=order_times)
-        order_opportunity_cost = pd.Series(0, index=order_times)
+        order_profit = pd.Series(0.0, index=order_times)
+        order_opportunity_cost = pd.Series(0.0, index=order_times)
 
         for start in order_times:
             marginal_cost = unit.calculate_marginal_cost(

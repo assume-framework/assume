@@ -27,7 +27,7 @@ class Forecaster:
         :return: the forecast
         :rtype: pd.Series
         """
-        return pd.Series(0, self.index)
+        return pd.Series(0.0, self.index)
 
     def get_availability(self, unit: str):
         """
@@ -78,7 +78,7 @@ class CsvForecaster(Forecaster):
         if column not in self.forecasts.columns:
             if "availability" in column:
                 return pd.Series(1, self.index)
-            return pd.Series(0, self.index)
+            return pd.Series(0.0, self.index)
         elif column == "price_forecast":
             return self.forecasts["price_EOM"]
 
@@ -222,7 +222,7 @@ class CsvForecaster(Forecaster):
         if fp_column in self.forecasts.columns:
             fuel_price = self.forecasts[fp_column]
         else:
-            fuel_price = pd.Series(0, index=self.index)
+            fuel_price = pd.Series(0.0, index=self.index)
 
         emission_factor = pp_series["emission_factor"]
         co2_price = self.forecasts["fuel_price_co2"]
@@ -281,7 +281,7 @@ class RandomForecaster(CsvForecaster):
 
     def __getitem__(self, column: str) -> pd.Series:
         if column not in self.forecasts.columns:
-            return pd.Series(0, self.index)
+            return pd.Series(0.0, self.index)
         noise = np.random.normal(0, self.sigma, len(self.index))
         return self.forecasts[column] * noise
 
