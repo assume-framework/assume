@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 FROM python:3.11-bookworm
 
 RUN useradd -m -s /bin/bash admin

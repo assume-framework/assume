@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: ASSUME Developers
+
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
 # ASSUME: Agent-Based Electricity Markets Simulation Toolbox
 
 ![Lint Status](https://github.com/assume-framework/assume/actions/workflows/lint-pytest.yaml/badge.svg)

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import TypedDict
