@@ -3,6 +3,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 repos:
+  - repo: https://github.com/fsfe/reuse-tool
+    rev: v2.1.0
+    hooks:
+      - id: reuse
+        args: ["annotate", "--license", "AGPL-3.0-or-later", "--recursive", "--copyright", "ASSUME Developers", "--exclude-year", "--skip-unrecognised", "."]
+
   - repo: https://github.com/pycqa/isort
     rev: 5.12.0
     hooks:
