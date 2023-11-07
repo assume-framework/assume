@@ -263,13 +263,15 @@ class ComplexClearingRole(MarketRole):
                         # add the child linked bids
                         for child_order in child_orders:
                             if child_order["parent_bid_id"] == order["bid_id"]:
-                                order_profit += (
+                                child_profit = (
                                     sum(
                                         market_clearing_prices[t] * v
                                         for t, v in child_order["volume"].items()
                                     )
                                     - child_order["price"] * bid_volume
                                 ) * pyo.value(instance.xb[child_order["bid_id"]])
+                                if child_profit > 0:
+                                    order_profit += child_profit
 
                 # correct rounding
                 if order_profit != 0 and abs(order_profit) < EPS:

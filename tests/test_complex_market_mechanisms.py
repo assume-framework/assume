@@ -290,10 +290,27 @@ def test_complex_clearing_LB():
 
     mr = ComplexClearingRole(market_config)
     accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
-    # accept block order and part of cheaper simple order
+
     assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
     assert rejected_orders[0]["agent_id"] == "block_gen6"
     assert accepted_orders[2]["agent_id"] == "block_gen5"
+
+    # add second level of child bids
+    orderbook = extend_orderbook(
+        products,
+        100,
+        50,
+        orderbook,
+        bid_type="BB",
+        min_acceptance_ratio=1,
+        parent_bid_id=orderbook[3]["bid_id"],
+    )
+
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+
+    assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
+    assert rejected_orders == []
 
 
 if __name__ == "__main__":
