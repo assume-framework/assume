@@ -91,6 +91,14 @@ def market_clearing_opt(orders, market_products, mode):
 
     model.energy_balance = pyo.Constraint(model.T, rule=energy_balance_rule)
 
+    model.linked_bid_constr = pyo.ConstraintList()
+    for order in orders:
+        if order["parent_bid_id"] is not None:
+            parent_bid_id = order["parent_bid_id"]
+            model.linked_bid_constr.add(
+                model.xb[order["bid_id"]] <= model.xb[parent_bid_id]
+            )
+
     obj_expr = 0
     for order in orders:
         if order["bid_type"] == "SB":
@@ -176,9 +184,22 @@ class ComplexClearingRole(MarketRole):
         market_getter = itemgetter("start_time", "end_time", "only_hours")
         orderbook.sort(key=market_getter)
 
+        child_orders = []
         for order in orderbook:
             order["accepted_price"] = {}
             order["accepted_volume"] = {}
+            # get child linked bids
+            if order["parent_bid_id"] is not None:
+                # check whether the parent bid is in the orderbook
+                parent_bid_id = order["parent_bid_id"]
+                parent_bid = next(
+                    (bid for bid in orderbook if bid["bid_id"] == parent_bid_id), None
+                )
+                if parent_bid is None:
+                    order["parent_bid_id"] = None
+                    log.warning(f"Parent bid {parent_bid_id} not in orderbook")
+                else:
+                    child_orders.append(order)
 
         rejected_orders: Orderbook = []
 
@@ -239,6 +260,16 @@ class ComplexClearingRole(MarketRole):
                             )
                             - order["price"] * bid_volume
                         ) * pyo.value(instance.xb[order["bid_id"]])
+                        # add the child linked bids
+                        for child_order in child_orders:
+                            if child_order["parent_bid_id"] == order["bid_id"]:
+                                order_profit += (
+                                    sum(
+                                        market_clearing_prices[t] * v
+                                        for t, v in child_order["volume"].items()
+                                    )
+                                    - child_order["price"] * bid_volume
+                                ) * pyo.value(instance.xb[child_order["bid_id"]])
 
                 # correct rounding
                 if order_profit != 0 and abs(order_profit) < EPS:

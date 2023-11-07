@@ -380,8 +380,8 @@ class UnitsOperator(Role):
                     order["volume"] = round(order["volume"] / market.volume_tick)
                 if market.price_tick:
                     order["price"] = round(order["price"] / market.price_tick)
-
-                order["bid_id"] = f"{unit_id}_{i+1}"
+                if order["bid_id"] is None:
+                    order["bid_id"] = f"{unit_id}_{i+1}"
                 orderbook.append(order)
                 self.bids_map[order["bid_id"]] = unit_id
 

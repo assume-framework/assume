@@ -46,6 +46,7 @@ def extend_orderbook(
     orderbook=None,
     bid_type="SB",
     min_acceptance_ratio=None,
+    parent_bid_id=None,
 ):
     """
     Creates constant bids over the time span of all products
@@ -65,7 +66,7 @@ def extend_orderbook(
 
         order: Order = {
             "start_time": products[0][0],
-            "end_time": products[0][1],
+            "end_time": products[-1][1],
             "agent_id": agent_id,
             "bid_id": f"bid_{len(orderbook)+1}",
             "volume": {product[0]: volume for product in products},
@@ -74,6 +75,7 @@ def extend_orderbook(
             "accepted_price": {},
             "only_hours": None,
             "bid_type": bid_type,
+            "parent_bid_id": parent_bid_id,
         }
 
         if min_acceptance_ratio is not None:
@@ -101,6 +103,7 @@ def extend_orderbook(
                 "accepted_price": None,
                 "only_hours": None,
                 "bid_type": bid_type,
+                "parent_bid_id": parent_bid_id,
             }
 
             if min_acceptance_ratio is not None:
