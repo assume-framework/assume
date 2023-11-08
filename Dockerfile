@@ -8,7 +8,7 @@ RUN useradd -m -s /bin/bash admin
 
 RUN mkdir /src
 WORKDIR /src
-COPY README.md LICENSE pyproject.toml .
+COPY README.md pyproject.toml .
 #RUN python -m pip install --upgrade pip
 # thats needed to use create the requirements.txt only
 RUN pip install pip-tools
