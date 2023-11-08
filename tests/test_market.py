@@ -207,10 +207,13 @@ async def test_market_registration(market_role: MarketRole):
         "sender_id": "test_aid",
     }
 
-    assert market_role.registered_agents == []
-    market_role.handle_registration({}, meta=meta)
-    assert len(market_role.registered_agents) == 1
-    assert market_role.registered_agents[0] == tuple(meta.values())
+    assert market_role.registered_agents == {}
+    info = [{"technology": "nuclear", "max_power": 2}]
+    market_role.handle_registration(
+        {"market_id": market_role.marketconfig.name, "information": info}, meta=meta
+    )
+    assert len(market_role.registered_agents.keys()) == 1
+    assert market_role.registered_agents[tuple(meta.values())] == info
 
 
 async def test_market_unmatched(market_role: MarketRole):

@@ -17,6 +17,7 @@ from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 
 logger = logging.getLogger(__name__)
 
+from assume.common.market_objects import MetaDict
 from assume.common.utils import separate_orders
 
 
@@ -145,7 +146,7 @@ class WriteOutput(Role):
         )
         self.context.schedule_recurrent_task(self.store_dfs, recurrency_task)
 
-    def handle_message(self, content, meta):
+    def handle_message(self, content, meta: MetaDict):
         """
         Handles the incoming messages and performs corresponding actions.
 
@@ -157,7 +158,7 @@ class WriteOutput(Role):
         """
 
         if content.get("type") == "store_order_book":
-            self.write_market_orders(content.get("data"), content.get("sender"))
+            self.write_market_orders(content.get("data"), content.get("market_id"))
 
         elif content.get("type") == "store_market_results":
             self.write_market_results(content.get("data"))
@@ -232,7 +233,7 @@ class WriteOutput(Role):
                 try:
                     with self.db.begin() as db:
                         df.to_sql(table, db, if_exists="append")
-                except ProgrammingError:
+                except (ProgrammingError, OperationalError, DataError):
                     self.check_columns(table, df)
                     # now try again
                     with self.db.begin() as db:
