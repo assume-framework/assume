@@ -15,8 +15,11 @@ from mango.messages.message import Performatives
 from assume.common.market_objects import (
     ClearingMessage,
     MarketConfig,
+    MetaDict,
     OpeningMessage,
     Orderbook,
+    OrderBookMessage,
+    RegistrationMessage,
 )
 from assume.common.utils import aggregate_step_amount
 from assume.strategies import BaseStrategy, LearningStrategy
@@ -73,10 +76,18 @@ class UnitsOperator(Role):
             lambda content, meta: content.get("context") == "clearing",
         )
 
+        self.context.subscribe_message(
+            self,
+            self.handle_registration_feedback,
+            lambda content, meta: content.get("context") == "registration",
+        )
+
         for market in self.available_markets:
             if self.participate(market):
-                self.register_market(market)
-                self.registered_markets[market.name] = market
+                self.context.schedule_timestamp_task(
+                    self.register_market(market),
+                    1,  # register after time was updated for the first time
+                )
 
     async def add_unit(
         self,
@@ -119,28 +130,30 @@ class UnitsOperator(Role):
         """
         return True
 
-    def register_market(self, market: MarketConfig):
+    async def register_market(self, market: MarketConfig):
         """
         Register a market.
 
         :param market: the market to register
         :type market: MarketConfig
         """
-        self.context.schedule_timestamp_task(
-            self.context.send_acl_message(
-                {"context": "registration", "market": market.name},
-                receiver_addr=market.addr,
-                receiver_id=market.aid,
-                acl_metadata={
-                    "sender_addr": self.context.addr,
-                    "sender_id": self.context.aid,
-                },
-            ),
-            1,  # register after time was updated for the first time
-        )
-        logger.debug(f"{self.id} tried to register at market {market.name}")
 
-    def handle_opening(self, opening: OpeningMessage, meta: dict[str, str]):
+        await self.context.send_acl_message(
+            {
+                "context": "registration",
+                "market_id": market.name,
+                "information": [u.as_dict() for u in self.units.values()],
+            },
+            receiver_addr=market.addr,
+            receiver_id=market.aid,
+            acl_metadata={
+                "sender_addr": self.context.addr,
+                "sender_id": self.context.aid,
+            },
+        ),
+        logger.debug(f"{self.id} sent market registration to {market.name}")
+
+    def handle_opening(self, opening: OpeningMessage, meta: MetaDict):
         """
         When we receive an opening from the market, we schedule sending back
         our list of orders as a response
@@ -148,14 +161,14 @@ class UnitsOperator(Role):
         :param opening: the opening message
         :type opening: OpeningMessage
         :param meta: the meta data of the market
-        :type meta: dict[str, str]
+        :type meta: MetaDict
         """
         logger.debug(
             f'{self.id} received opening from: {opening["market_id"]} {opening["start"]} until: {opening["stop"]}.'
         )
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
 
-    def handle_market_feedback(self, content: ClearingMessage, meta: dict[str, str]):
+    def handle_market_feedback(self, content: ClearingMessage, meta: MetaDict):
         """
         handles the feedback which is received from a market we did bid at
         stores accepted orders, sets the received power
@@ -165,7 +178,7 @@ class UnitsOperator(Role):
         :param content: the content of the clearing message
         :type content: ClearingMessage
         :param meta: the meta data of the market
-        :type meta: dict[str, str]
+        :type meta: MetaDict
         """
         logger.debug(f"{self.id} got market result: {content}")
         accepted_orders: Orderbook = content["accepted_orders"]
@@ -182,6 +195,24 @@ class UnitsOperator(Role):
         self.set_unit_dispatch(orderbook, marketconfig)
         self.write_learning_params(orderbook, marketconfig)
         self.write_actual_dispatch()
+
+    def handle_registration_feedback(
+        self, content: RegistrationMessage, meta: MetaDict
+    ):
+        logger.debug("Market %s accepted our registration", content["market_id"])
+        if content["accepted"]:
+            found = False
+            for market in self.available_markets:
+                if content["market_id"] == market.name:
+                    self.registered_markets[market.name] = market
+                    found = True
+                    break
+            if not found:
+                logger.error(
+                    "Market %s sent registation but is unknown", content["market_id"]
+                )
+        else:
+            logger.error("Market %s did not accept registration", meta["sender_id"])
 
     def set_unit_dispatch(self, orderbook: Orderbook, marketconfig: MarketConfig):
         """
@@ -305,7 +336,7 @@ class UnitsOperator(Role):
         await self.context.send_acl_message(
             content={
                 "context": "submit_bids",
-                "market": market.name,
+                "market_id": market.name,
                 "orderbook": orderbook,
             },
             receiver_addr=market.addr,

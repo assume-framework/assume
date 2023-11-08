@@ -181,7 +181,7 @@ class MarketConfig:
 
 class OpeningMessage(TypedDict):
     """
-    Message which is sent to the market to open a market
+    Message which is sent from the market to participating agent to open a market
 
     :param context: the context of the message
     :type context: str
@@ -204,7 +204,7 @@ class OpeningMessage(TypedDict):
 
 class ClearingMessage(TypedDict):
     """
-    Message which is sent to the market to clear a market
+    Message which is sent from the market to agents to clear a market
 
     :param context: the context of the message
     :type context: str
@@ -217,6 +217,44 @@ class ClearingMessage(TypedDict):
     context: str
     market_id: str
     orderbook: Orderbook
+
+
+class OrderBookMessage(TypedDict):
+    context: str
+    market_id: str
+    orderbook: Orderbook
+
+
+class RegistrationMessage(TypedDict):
+    context: str
+    market_id: str
+    information: dict
+
+
+class RegistrationReplyMessage(TypedDict):
+    context: str
+    market_id: str
+    accepted: bool
+
+
+class MetaDict(TypedDict):
+    """
+    Message Meta of a FIPA ACL Message
+    http://www.fipa.org/specs/fipa00061/SC00061G.html#_Toc26669700
+    """
+
+    sender_addr: str | list
+    sender_id: str
+    reply_to: str  # to which agent follow up messages should be sent
+    conversation_id: str
+    performative: str
+    protocol: str
+    language: str
+    encoding: str
+    ontology: str
+    reply_with: str  # what the answer should contain as in_reply_to
+    in_reply_to: str  # str used to reference an earlier action
+    reply_by: str  # latest time to accept replies
 
 
 # Class for a Smart Contract which can contain something like:
