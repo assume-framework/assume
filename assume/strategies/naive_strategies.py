@@ -242,7 +242,6 @@ class NaiveUCStrategy(BaseStrategy):
             "max_power": unit.max_power,
             "ramp_up": unit.ramp_up,
             "ramp_down": unit.ramp_down,
-            "no_load_cost": unit.no_load_cost,
             "start_up_cost": unit.hot_start_cost,
             "shut_down_cost": unit.shut_down_cost,
             "initial_output": initial_output,

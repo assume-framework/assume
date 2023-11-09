@@ -94,8 +94,6 @@ def market_clearing_opt(orders, market_products):
             for start_time, price in order["price"].items():
                 obj_expr += price * model.gen_b[order["bid_id"], start_time]
                 obj_expr += (
-                    order["no_load_cost"] * model.status[order["bid_id"], start_time]
-                ) + (
                     model.c_up[order["bid_id"], start_time]
                     + model.c_down[order["bid_id"], start_time]
                 )

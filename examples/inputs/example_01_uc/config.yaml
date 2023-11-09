@@ -21,7 +21,7 @@ base:
       market_mechanism: pay_as_clear
 
 dam_with_uc_clearing_rl:
-  sim_id: "uc_unit_all"
+  sim_id: "uc_unit_1"
   start_date: 2019-03-01 22:00
   end_date: 2019-03-05 00:00
   time_step: 1h

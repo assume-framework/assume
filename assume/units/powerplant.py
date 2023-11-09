@@ -83,7 +83,6 @@ class PowerPlant(SupportsMinMax):
         emission_factor: float = 0.0,
         ramp_up: float | None = None,
         ramp_down: float | None = None,
-        no_load_cost: float = 0,
         hot_start_cost: float = 0,
         warm_start_cost: float = 0,
         cold_start_cost: float = 0,
@@ -129,7 +128,6 @@ class PowerPlant(SupportsMinMax):
         )
 
         self.fixed_cost = fixed_cost
-        self.no_load_cost = no_load_cost
         self.hot_start_cost = hot_start_cost
         self.warm_start_cost = warm_start_cost
         self.cold_start_cost = cold_start_cost
