@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -612,23 +616,6 @@ def calculate_EOM_price_if_on(
     )
 
     return bid_price_inflex
-
-
-def get_starting_costs(time, unit):
-    """
-    Calculates the starting costs of a unit
-
-    :return: The starting costs of the unit
-    :rtype: float
-    """
-    if time < unit.downtime_hot_start:
-        return unit.hot_start_cost
-
-    elif time < unit.downtime_warm_start:
-        return unit.warm_start_cost
-
-    else:
-        return unit.cold_start_cost
 
 
 def get_specific_revenue(

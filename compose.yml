@@ -1,8 +1,12 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 version: "3.9"
 services:
   assume_db:
-    container_name: assume_db
     image: timescale/timescaledb:latest-pg15
+    container_name: assume_db
     restart: always
     environment:
       - POSTGRES_USER=assume
@@ -48,18 +52,64 @@ services:
       placement:
         constraints: [node.role == manager]
 
+  # to enable rendering png screenshots directly from grafana
+  # for example to embed them in an iframe, you can use this
   renderer:
     image: grafana/grafana-image-renderer:latest
-    profiles: ["enable-renderer"]
+    container_name: renderer
+    profiles: ["renderer"]
     ports:
       - 8081
 
 
+  # to run a single simulation in
   simulation:
     container_name: simulation
     image: ghcr.io/assume-framework/assume:latest
-    profiles: ["cli-only"]
+    profiles: ["simulation"]
     build: .
     depends_on:
       - assume_db
     command: -s example_02 -db "postgresql://assume:assume@assume_db:5432/assume"
+
+  # to run the simulation distributed with MQTT
+  mqtt-broker:
+    container_name: mqtt-broker
+    image: eclipse-mosquitto:2
+    restart: always
+    profiles: ["mqtt"]
+    ports:
+      - "1883:1883/tcp"
+    volumes:
+      - ./docker_configs/mqtt.conf:/mosquitto/config/mosquitto.conf
+    healthcheck:
+      test: "mosquitto_sub -t '$$SYS/#' -C 1 | grep -v Error || exit 1"
+      interval: 45s
+      timeout: 5s
+      retries: 5
+
+  # to run a distributed simulation with docker compose
+  simulation_mgr:
+    container_name: simulation_mgr
+    image: ghcr.io/assume-framework/assume:latest
+    profiles: ["mqtt"]
+    depends_on:
+      - assume_db
+      - mqtt-broker
+    environment:
+      DB_URI: "postgresql://assume:assume@assume_db:5432/assume"
+      MQTT_BROKER: mqtt-broker
+    entrypoint: python3 ./examples/distributed_world_manager.py
+
+  simulation_client01:
+    container_name: simulation_client01
+    image: ghcr.io/assume-framework/assume:latest
+    profiles: ["mqtt"]
+    build: .
+    environment:
+      DB_URI: "postgresql://assume:assume@assume_db:5432/assume"
+      MQTT_BROKER: mqtt-broker
+    depends_on:
+      - assume_db
+      - mqtt-broker
+    entrypoint: python3 ./examples/distributed_world_agent.py

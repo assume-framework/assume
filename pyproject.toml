@@ -1,9 +1,13 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 [tool.poetry]
 name = "assume-framework"
-version = "0.2.0"
+version = "0.2.1"
 description = "ASSUME - Agent-Based Electricity Markets Simulation Toolbox"
 authors = ["ASSUME Developers <contact@assume-project.de>"]
-license = "LICENSE"
+license = "AGPL-3.0-or-later"
 readme = "README.md"
 
 homepage = "https://assume.readthedocs.io"
@@ -12,9 +16,8 @@ repository = "https://github.com/assume-framework/assume"
 keywords = ["agent based simulation", "energy market", "reinforcement learning", "market simulation", "simulation"]
 
 classifiers=[
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     "Operating System :: OS Independent",
     "Framework :: AsyncIO",
     "Topic :: Scientific/Engineering",

@@ -1,3 +1,7 @@
+.. SPDX-FileCopyrightText: ASSUME Developers
+..
+.. SPDX-License-Identifier: AGPL-3.0-or-later
+
 assume.units package
 ====================
 
@@ -8,22 +12,6 @@ assume.units.demand module
 --------------------------
 
 .. automodule:: assume.units.demand
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-assume.units.electrolyser module
---------------------------------
-
-.. automodule:: assume.units.electrolyser
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-assume.units.heatpump module
-----------------------------
-
-.. automodule:: assume.units.heatpump
    :members:
    :undoc-members:
    :show-inheritance:

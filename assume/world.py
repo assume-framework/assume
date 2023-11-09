@@ -1,15 +1,21 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import asyncio
 import calendar
 import logging
 import sys
 import time
 from datetime import datetime
+from sys import platform
 
 import nest_asyncio
 import pandas as pd
 from mango import RoleAgent, create_container
 from mango.container.core import Container
 from mango.util.clock import ExternalClock
+from mango.util.distributed_clock import DistributedClockAgent, DistributedClockManager
 from mango.util.termination_detection import tasks_complete_or_sleeping
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
@@ -42,12 +48,13 @@ class World:
         database_uri: str = "",
         export_csv_path: str = "",
         log_level: str = "INFO",
-        additional_clearing_mechanisms: dict = {},
+        distributed_role: bool = None,
     ):
         logging.getLogger("assume").setLevel(log_level)
         self.logger = logging.getLogger(__name__)
         self.addr = addr
         self.container = None
+        self.distributed_role = distributed_role
 
         self.export_csv_path = export_csv_path
         # intialize db connection at beginning of simulation
@@ -91,7 +98,7 @@ class World:
                 e,
             )
         self.clearing_mechanisms: dict[str, MarketRole] = clearing_mechanisms
-        self.clearing_mechanisms.update(additional_clearing_mechanisms)
+        self.addresses = []
         nest_asyncio.apply()
         self.loop = asyncio.get_event_loop()
         asyncio.set_event_loop(self.loop)
@@ -103,50 +110,64 @@ class World:
         simulation_id: str,
         index: pd.Series,
         save_frequency_hours: int = 24,
-        same_process: bool = True,
         bidding_params: dict = {},
         learning_config: LearningConfig = {},
         forecaster: Forecaster = None,
+        manager_address=None,
+        **kwargs,
     ):
         self.clock = ExternalClock(0)
         self.start = start
         self.end = end
         self.learning_config = learning_config
+        # initiate learning if the learning mode is on and hence we want to learn new strategies
+        self.evaluation_mode = self.learning_config.get("evaluation_mode", False)
 
         # forecaster is used only when loading custom unit types
         self.forecaster = forecaster
 
         self.bidding_params = bidding_params
         self.index = index
-        self.same_process = same_process
 
         # kill old container if exists
         if isinstance(self.container, Container) and self.container.running:
             await self.container.shutdown()
 
         # create new container
+        container_kwargs = {}
         if self.addr == "world":
             connection_type = "external_connection"
         elif isinstance(self.addr, tuple):
             connection_type = "tcp"
         else:
             connection_type = "mqtt"
+            container_kwargs["mqtt_kwargs"] = {
+                "broker_addr": "localhost",
+                "client_id": self.addr,
+            }
+            container_kwargs["mqtt_kwargs"].update(**kwargs)
 
         self.container = await create_container(
             connection_type=connection_type,
             codec=mango_codec_factory(),
             addr=self.addr,
             clock=self.clock,
+            **container_kwargs,
         )
-        await self.setup_learning()
-        await self.setup_output_agent(simulation_id, save_frequency_hours)
+        self.learning_mode = self.learning_config.get("learning_mode", False)
+        self.output_agent_addr = (self.addr, "export_agent_1")
+        if self.distributed_role is False:
+            self.clock_agent = DistributedClockAgent(self.container)
+            self.output_agent_addr = (manager_address, "export_agent_1")
+        else:
+            await self.setup_learning()
+            await self.setup_output_agent(simulation_id, save_frequency_hours)
+            self.clock_manager = DistributedClockManager(
+                self.container, receiver_clock_addresses=self.addresses
+            )
 
     async def setup_learning(self):
         self.bidding_params.update(self.learning_config)
-
-        # initiate learning if the learning mode is on and hence we want to learn new strategies
-        self.learning_mode = self.learning_config.get("learning_mode", False)
-        self.evaluation_mode = self.learning_config.get("evaluation_mode", False)
 
         if self.learning_mode:
             # if so, we initate the rl learning role with parameters
@@ -157,24 +178,14 @@ class World:
                 start=self.start,
                 end=self.end,
             )
-            # if self.same_process:
             # separate process does not support buffer and learning
-            if True:
-                self.learning_agent_addr = (self.addr, "learning_agent")
-                rl_agent = RoleAgent(
-                    self.container, suggested_aid=self.learning_agent_addr[1]
-                )
-                rl_agent.add_role(self.learning_role)
-            else:
-
-                def creator(container):
-                    agent = RoleAgent(container, suggested_aid="learning_agent")
-                    agent.add_role(self.learning_role)
-
-                await self.container.as_agent_process(agent_creator=creator)
+            self.learning_agent_addr = (self.addr, "learning_agent")
+            rl_agent = RoleAgent(
+                self.container, suggested_aid=self.learning_agent_addr[1]
+            )
+            rl_agent.add_role(self.learning_role)
 
     async def setup_output_agent(self, simulation_id: str, save_frequency_hours: int):
-        self.output_agent_addr = (self.addr, "export_agent_1")
         # Add output agent to world
         self.logger.debug(f"creating output agent {self.db=} {self.export_csv_path=}")
         self.output_role = WriteOutput(
@@ -187,20 +198,23 @@ class World:
             learning_mode=self.learning_mode,
             evaluation_mode=self.evaluation_mode,
         )
-        if self.same_process:
+
+        # mango multiprocessing is currently only supported on linux
+        # with single
+        if platform == "linux":
+            self.addresses.append(self.addr)
+
+            def creator(container):
+                agent = RoleAgent(container, suggested_aid=self.output_agent_addr[1])
+                agent.add_role(self.output_role)
+                clock_agent = DistributedClockAgent(container)
+
+            await self.container.as_agent_process(agent_creator=creator)
+        else:
             output_agent = RoleAgent(
                 self.container, suggested_aid=self.output_agent_addr[1]
             )
             output_agent.add_role(self.output_role)
-        else:
-            # this does not set the clock in output_agent correctly yet
-            # see https://gitlab.com/mango-agents/mango/-/issues/59
-            # but still improves performance
-            def creator(container):
-                agent = RoleAgent(container, suggested_aid=self.output_agent_addr[1])
-                agent.add_role(self.output_role)
-
-            await self.container.as_agent_process(agent_creator=creator)
 
     def add_unit_operator(
         self,
@@ -369,12 +383,16 @@ class World:
         self.markets[f"{market_config.name}"] = market_config
 
     async def _step(self):
-        next_activity = self.clock.get_next_activity()
+        if self.distributed_role is not False:
+            next_activity = await self.clock_manager.distribute_time()
+        else:
+            next_activity = self.clock.get_next_activity()
         if not next_activity:
             self.logger.info("simulation finished - no schedules left")
             return None
         delta = next_activity - self.clock.time
         self.clock.set_time(next_activity)
+        await tasks_complete_or_sleeping(self.container)
         return delta
 
     async def async_run(self, start_ts, end_ts):
@@ -389,6 +407,8 @@ class World:
 
         # allow registration before first opening
         self.clock.set_time(start_ts - 1)
+        if self.distributed_role is not False:
+            await self.clock_manager.broadcast(self.clock.time)
         while self.clock.time < end_ts:
             await asyncio.sleep(0)
             delta = await self._step()
@@ -400,8 +420,6 @@ class World:
                 )
             else:
                 self.clock.set_time(end_ts)
-
-            await tasks_complete_or_sleeping(self.container)
         pbar.close()
         await self.container.shutdown()
 

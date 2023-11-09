@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import logging
 from datetime import datetime, timedelta
 
@@ -23,7 +27,7 @@ async def init():
         end=end + timedelta(hours=24),
         freq="H",
     )
-    sim_id = "handmade_simulation"
+    sim_id = "world_script_simulation"
 
     await world.setup(
         start=start,

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # This workflow will install Python dependencies, run tests and lint with a variety of Python versions
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
@@ -26,6 +30,10 @@ jobs:
         python-version: ${{ matrix.python-version }}
         cache: 'pip'
         cache-dependency-path: '**/pyproject.toml'
+    - name: Check reuse compliance
+      run: |
+        pip install reuse
+        reuse lint
     - name: Install dependencies
       run: |
         sudo apt-get update && sudo apt-get install --no-install-recommends -y coinor-cbc gcc g++ libglpk-dev glpk-utils && sudo rm -rf /var/lib/apt/lists/*

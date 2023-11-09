@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import TypedDict
@@ -132,7 +136,7 @@ class BaseUnit:
 
         self.calculate_cashflow(product_type, orderbook)
 
-        self.outputs[product_type + "_marginal_costs"].loc[start:end_excl] = (
+        self.outputs[product_type + "_marginal_costs"].loc[start:end_excl] += (
             self.calculate_marginal_cost(start, self.outputs[product_type].loc[start])
             * self.outputs[product_type].loc[start:end_excl]
         )
@@ -191,6 +195,7 @@ class BaseUnit:
             "id": self.id,
             "technology": self.technology,
             "unit_operator": self.unit_operator,
+            "node": self.node,
             "unit_type": "base_unit",
         }
 
