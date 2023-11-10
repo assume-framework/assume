@@ -5,6 +5,7 @@ from assume.strategies.extended import OTCStrategy
 from assume.strategies.flexable import (
     flexableEOM,
     flexableEOMBlock,
+    flexableEOMLinked,
     flexableNegCRM,
     flexablePosCRM,
 )
@@ -29,6 +30,7 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "otc_strategy": OTCStrategy,
     "flexable_eom": flexableEOM,
     "flexable_eom_block": flexableEOMBlock,
+    "flexable_eom_linked": flexableEOMLinked,
     "flexable_neg_crm": flexableNegCRM,
     "flexable_pos_crm": flexablePosCRM,
     "flexable_eom_storage": flexableEOMStorage,

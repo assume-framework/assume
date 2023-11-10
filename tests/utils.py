@@ -58,7 +58,7 @@ def extend_orderbook(
     if volume == 0:
         return orderbook
 
-    if bid_type == "BB":
+    if bid_type == "BB" or bid_type == "LB":
         if volume < 0:
             agent_id = f"block_dem{len(orderbook)+1}"
         else:

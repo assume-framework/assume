@@ -27,7 +27,11 @@ def market_clearing_opt(orders, market_products, mode):
         doc="simple_bids",
     )
     model.bBids = pyo.Set(
-        initialize=[order["bid_id"] for order in orders if order["bid_type"] == "BB"],
+        initialize=[
+            order["bid_id"]
+            for order in orders
+            if order["bid_type"] == "BB" or order["bid_type"] == "LB"
+        ],
         doc="block_bids",
     )
 
@@ -67,7 +71,7 @@ def market_clearing_opt(orders, market_products, mode):
                     model.xs[order["bid_id"]] <= model.x[order["bid_id"]]
                 )
 
-            elif order["bid_type"] == "BB":
+            elif order["bid_type"] == "BB" or order["bid_type"] == "LB":
                 model.mar_constr.add(
                     model.xb[order["bid_id"]]
                     >= order["min_acceptance_ratio"] * model.x[order["bid_id"]]
@@ -82,7 +86,7 @@ def market_clearing_opt(orders, market_products, mode):
             balance_expr[order["start_time"]] += (
                 order["volume"] * model.xs[order["bid_id"]]
             )
-        elif order["bid_type"] == "BB":
+        elif order["bid_type"] == "BB" or order["bid_type"] == "LB":
             for start_time, volume in order["volume"].items():
                 balance_expr[start_time] += volume * model.xb[order["bid_id"]]
 
@@ -93,7 +97,7 @@ def market_clearing_opt(orders, market_products, mode):
 
     model.linked_bid_constr = pyo.ConstraintList()
     for order in orders:
-        if order["parent_bid_id"] is not None:
+        if "parent_bid_id" in order.keys() and order["parent_bid_id"] is not None:
             parent_bid_id = order["parent_bid_id"]
             model.linked_bid_constr.add(
                 model.xb[order["bid_id"]] <= model.xb[parent_bid_id]
@@ -103,7 +107,7 @@ def market_clearing_opt(orders, market_products, mode):
     for order in orders:
         if order["bid_type"] == "SB":
             obj_expr += order["price"] * order["volume"] * model.xs[order["bid_id"]]
-        elif order["bid_type"] == "BB":
+        elif order["bid_type"] == "BB" or order["bid_type"] == "LB":
             for start_time, volume in order["volume"].items():
                 obj_expr += order["price"] * volume * model.xb[order["bid_id"]]
 
@@ -158,9 +162,10 @@ class ComplexClearingRole(MarketRole):
             assert order["bid_type"] in [
                 "SB",
                 "BB",
-            ], f"bid_type {order['bid_type']} not in ['SB', 'BB']"
+                "LB",
+            ], f"bid_type {order['bid_type']} not in ['SB', 'BB', 'LB']"
 
-            if order["bid_type"] == "BB":
+            if order["bid_type"] == "BB" or order["bid_type"] == "LB":
                 assert False not in [
                     abs(volume) <= max_volume for _, volume in order["volume"].items()
                 ], f"max_volume {order['volume']}"
@@ -189,7 +194,7 @@ class ComplexClearingRole(MarketRole):
             order["accepted_price"] = {}
             order["accepted_volume"] = {}
             # get child linked bids
-            if order["parent_bid_id"] is not None:
+            if "parent_bid_id" in order.keys() and order["parent_bid_id"] is not None:
                 # check whether the parent bid is in the orderbook
                 parent_bid_id = order["parent_bid_id"]
                 parent_bid = next(
@@ -225,6 +230,7 @@ class ComplexClearingRole(MarketRole):
             # check the profit of each order and remove those with negative profit
             orders_profit = []
             for order in orderbook:
+                children = []
                 if order["bid_type"] == "SB":
                     # order rejected
                     if pyo.value(instance.xs[order["bid_id"]]) < EPS:
@@ -247,7 +253,7 @@ class ComplexClearingRole(MarketRole):
                             * pyo.value(instance.xs[order["bid_id"]])
                         )
 
-                elif order["bid_type"] == "BB":
+                elif order["bid_type"] == "BB" or order["bid_type"] == "LB":
                     # order rejected
                     if pyo.value(instance.xb[order["bid_id"]]) < EPS:
                         order_profit = 0
@@ -272,6 +278,7 @@ class ComplexClearingRole(MarketRole):
                                 ) * pyo.value(instance.xb[child_order["bid_id"]])
                                 if child_profit > 0:
                                     order_profit += child_profit
+                                children.append(child_order)
 
                 # correct rounding
                 if order_profit != 0 and abs(order_profit) < EPS:
@@ -282,6 +289,9 @@ class ComplexClearingRole(MarketRole):
                 if order_profit < 0:
                     rejected_orders.append(order)
                     orderbook.remove(order)
+                    for child in children:
+                        rejected_orders.append(child)
+                        orderbook.remove(child)
 
             # check if all orders have positive profit
             if all(order_profit >= 0 for order_profit in orders_profit):
@@ -321,7 +331,7 @@ def extract_results(
             else:
                 demand_volume_dict[order["start_time"]] += order["accepted_volume"]
 
-        elif order["bid_type"] == "BB":
+        elif order["bid_type"] == "BB" or order["bid_type"] == "LB":
             acceptance = model.xb[order["bid_id"]].value
             acceptance = 0 if acceptance < EPS else acceptance
 

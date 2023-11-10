@@ -18,8 +18,13 @@ availabe_examples = {
         "study_case": "dam",
     },
     "2020_rule_BB": {
-        # complex clearing with naive strategies - no blocks
+        # complex clearing with block bids
         "scenario": "2020_BB",
+        "study_case": "dam",
+    },
+    "2020_rule_LB": {
+        # complex clearing with linked bids
+        "scenario": "2020_LB",
         "study_case": "dam",
     },
     "2020_RL_SB": {
@@ -132,7 +137,7 @@ availabe_examples = {
 # %%
 if __name__ == "__main__":
     examples = [
-        "2037_rule_BB",
+        "2020_rule_LB",
     ]
     data_format = "timescale"  # "local_db" or "timescale"
 

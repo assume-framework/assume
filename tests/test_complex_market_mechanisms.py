@@ -248,7 +248,7 @@ def test_complex_clearing_LB():
         100,
         75,
         orderbook,
-        bid_type="BB",
+        bid_type="LB",
         min_acceptance_ratio=1,
         parent_bid_id=orderbook[-1]["bid_id"],
     )
@@ -301,7 +301,7 @@ def test_complex_clearing_LB():
         100,
         50,
         orderbook,
-        bid_type="BB",
+        bid_type="LB",
         min_acceptance_ratio=1,
         parent_bid_id=orderbook[3]["bid_id"],
     )

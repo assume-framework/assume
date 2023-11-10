@@ -25,7 +25,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 12,
+  "id": 5,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -1161,6 +1161,18 @@
                 "value": 124
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "simulation"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 149
+              }
+            ]
           }
         ]
       },
@@ -1180,7 +1192,12 @@
           "show": false
         },
         "showHeader": true,
-        "sortBy": []
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "simulation"
+          }
+        ]
       },
       "pluginVersion": "9.2.15",
       "targets": [
@@ -1193,7 +1210,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT \r\n*\r\nFROM rl_params\r\nlimit 50;\r\n  \r\n",
+          "rawSql": "SELECT \r\n*\r\nFROM rl_params\r\nwhere simulation like '$simulation'\r\nlimit 50;\r\n  \r\n",
           "refId": "A",
           "select": [
             [
@@ -1221,12 +1238,122 @@
       "type": "table"
     },
     {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 72
+      },
+      "id": 138,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "9.2.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "table",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  unit_id,\r\n  ((sum(accepted_volume) filter(Where bid_type = 'BB')) / NULLIF(sum(accepted_volume), 0)) *100 as \"block bid share\"\r\nFROM market_orders\r\nWHERE\r\n  simulation = '$simulation'\r\n  AND unit_id in ($rl_unit)\r\nGROUP BY unit_id\r\nORDER BY 1",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "power"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "market_dispatch",
+          "timeColumn": "datetime",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Bid volume",
+      "type": "barchart"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 72
+        "y": 80
       },
       "id": 16,
       "panels": [],
@@ -1299,7 +1426,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 73
+        "y": 81
       },
       "id": 31,
       "options": {
@@ -1483,7 +1610,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "currencyEUR"
         },
         "overrides": [
           {
@@ -1507,7 +1635,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 73
+        "y": 81
       },
       "id": 32,
       "options": {
@@ -1721,7 +1849,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 81
+        "y": 89
       },
       "id": 36,
       "options": {
@@ -1905,7 +2033,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "currencyEUR"
         },
         "overrides": [
           {
@@ -1929,7 +2058,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 81
+        "y": 89
       },
       "id": 33,
       "options": {
@@ -2146,7 +2275,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 89
+        "y": 97
       },
       "id": 29,
       "options": {
@@ -2261,7 +2390,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 89
+        "y": 97
       },
       "id": 26,
       "options": {
@@ -2375,7 +2504,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 97
+        "y": 105
       },
       "id": 34,
       "options": {
@@ -2489,7 +2618,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 97
+        "y": 105
       },
       "id": 30,
       "options": {
@@ -2603,7 +2732,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 105
+        "y": 113
       },
       "id": 37,
       "options": {
@@ -2665,9 +2794,9 @@
     "list": [
       {
         "current": {
-          "selected": false,
-          "text": "2020_RL_dam_BB_winter",
-          "value": "2020_RL_dam_BB_winter"
+          "selected": true,
+          "text": "2020_RL_dam_BB_winter_trainfreq24",
+          "value": "2020_RL_dam_BB_winter_trainfreq24"
         },
         "datasource": {
           "type": "postgres",
@@ -2691,30 +2820,30 @@
         "current": {
           "selected": true,
           "text": [
-            "combined_gas_unit",
-            "open_gas_unit",
-            "Hydro",
-            "Wind onshore",
-            "oil_unit",
-            "lignite_unit",
-            "Solar",
-            "coal_unit",
-            "nuclear_unit",
             "Biomass",
-            "Wind offshore"
+            "Hydro",
+            "Solar",
+            "Wind offshore",
+            "Wind onshore",
+            "coal_unit",
+            "combined_gas_unit",
+            "lignite_unit",
+            "nuclear_unit",
+            "oil_unit",
+            "open_gas_unit"
           ],
           "value": [
-            "combined_gas_unit",
-            "open_gas_unit",
-            "Hydro",
-            "Wind onshore",
-            "oil_unit",
-            "lignite_unit",
-            "Solar",
-            "coal_unit",
-            "nuclear_unit",
             "Biomass",
-            "Wind offshore"
+            "Hydro",
+            "Solar",
+            "Wind offshore",
+            "Wind onshore",
+            "coal_unit",
+            "combined_gas_unit",
+            "lignite_unit",
+            "nuclear_unit",
+            "oil_unit",
+            "open_gas_unit"
           ]
         },
         "datasource": {
@@ -2755,6 +2884,6 @@
   "timezone": "",
   "title": "Assume: Training progress Block bids",
   "uid": "awGnwWnSz",
-  "version": 3,
+  "version": 4,
   "weekStart": ""
 }
