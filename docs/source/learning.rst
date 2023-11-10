@@ -9,7 +9,10 @@ Reinforcement Learning
 One unique characteristic of ASSUME is the usage of Reinforcement Learning (RL) for the bidding of the agents.
 To enable this the architecture of the simulation is designed in a way to accommodate the learning process. In this part of
 the documentation, we give a short introduction to reinforcement learning in general and then pinpoint you to the
-relevant parts of the code. If you want a hands-on introduction check out the prepared tutorial in Colab: https://colab.research.google.com/drive/1LISiM1QvDIMXU68pJH-NqrMw5w7Awb24?usp=sharing
+relevant parts of the code. the descriptions are mostly based on the following paper
+Harder, Nick & Qussous, Ramiz & Weidlich, Anke. (2023). Fit for purpose: Modeling wholesale electricity markets realistically with multi-agent deep reinforcement learning. Energy and AI. 14. 100295. 10.1016/j.egyai.2023.100295.
+
+If you want a hands-on introduction check out the prepared tutorial in Colab: https://colab.research.google.com/drive/1LISiM1QvDIMXU68pJH-NqrMw5w7Awb24?usp=sharing
 
 
 The Basics of Reinforcement Learning
@@ -81,10 +84,10 @@ where L is the loss function.
 
 The actor and critic networks are trained simultaneously using the actor-critic algorithm, which updates the weights of
 both networks at each time step. The actor-critic algorithm is a form of policy iteration, where the policy is updated based on the
-estimated value function, and the value function is updated based on the.
+estimated value function, and the value function is updated based on the critic.
 
 
-1.2 Multi-Agent Learning
+Multi-Agent Learning
 ------------------------
 
 In a single-agent setup, the state transition and respective reward depend only on the actions of a single agent. However, in a
