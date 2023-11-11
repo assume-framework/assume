@@ -82,6 +82,7 @@ class World:
         self.bidding_strategies = bidding_strategies
 
         try:
+            from assume.strategies.learning_block_strategies import RLStrategyBlocks
             from assume.strategies.learning_strategies import (
                 RLdamStrategy,
                 RLStrategy,
@@ -91,6 +92,8 @@ class World:
             self.bidding_strategies["learning"] = RLStrategy
             self.bidding_strategies["learning_dam"] = RLdamStrategy
             self.bidding_strategies["hourly_learning_dam"] = hourlyRLdamStrategy
+            self.bidding_strategies["learning_blocks"] = RLStrategyBlocks
+
         except ImportError as e:
             self.logger.info(
                 "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",

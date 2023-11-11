@@ -137,7 +137,7 @@ availabe_examples = {
 # %%
 if __name__ == "__main__":
     examples = [
-        "2020_rule_LB",
+        "2020_RL_tiny",
     ]
     data_format = "timescale"  # "local_db" or "timescale"
 

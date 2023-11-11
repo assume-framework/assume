@@ -14,6 +14,7 @@ from assume.strategies.flexable_storage import (
     flexableNegCRMStorage,
     flexablePosCRMStorage,
 )
+from assume.strategies.learning_block_strategies import RLStrategyBlocks
 from assume.strategies.learning_strategies import RLdamStrategy, hourlyRLdamStrategy
 from assume.strategies.naive_strategies import (
     NaiveDAStrategy,
