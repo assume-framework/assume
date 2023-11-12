@@ -75,6 +75,22 @@ To install with testing capabilities::
 
     pip install assume-framework[test]
 
+Install Tab-Completion
+-----------------
+
+ASSUME uses `argcomplete` for argument completion on the CLI.
+
+On Windows, one needs to run:
+
+`register-python-argcomplete --shell powershell assume | Out-String | Invoke-Expression`
+
+in the used conda environment, to install tab completions.
+
+On Bash or zsh (Linux and Mac) run the following in the correct conda environment with assume and argcomplete installed:
+
+`eval "$(register-python-argcomplete assume)"`
+
+
 Install using Docker
 =========================================
 
