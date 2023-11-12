@@ -48,7 +48,6 @@ class UnitsOperator(Role):
     ):
         super().__init__()
 
-        self.bids_map = {}
         self.available_markets = available_markets
         self.registered_markets: dict[str, MarketConfig] = {}
         self.last_sent_dispatch = 0
@@ -197,8 +196,6 @@ class UnitsOperator(Role):
 
         for order in orderbook:
             order["market_id"] = content["market_id"]
-            # map bid id to unit id
-            order["unit_id"] = self.bids_map[order["bid_id"]]
 
         marketconfig = self.registered_markets[content["market_id"]]
         self.valid_orders[marketconfig.product_type].extend(orderbook)
@@ -448,8 +445,8 @@ class UnitsOperator(Role):
                     order["price"] = round(order["price"] / market.price_tick)
 
                 order["bid_id"] = f"{unit_id}_{i+1}"
+                order["unit_id"] = unit_id
                 orderbook.append(order)
-                self.bids_map[order["bid_id"]] = unit_id
 
         return orderbook
 
