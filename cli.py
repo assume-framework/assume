@@ -103,7 +103,7 @@ def cli(args=None):
         default="INFO",
         type=str,
         metavar="LOGLEVEL",
-        choices=set(logging.getLevelNamesMapping().keys()),
+        choices=set(logging._nameToLevel.keys()),
     )
 
     argcomplete.autocomplete(parser)
