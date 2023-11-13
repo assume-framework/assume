@@ -56,7 +56,7 @@ class MarketMechanism:
         Used to check if a participant is eligible to bid on this market
         """
 
-        # simple check that 1 MW can be bid at least
+        # simple check that 1 MW can be bid at least by  powerplants
         def requirement(unit: dict):
             return unit.get("unit_type") != "power_plant" or abs(unit["max_power"]) >= 1
 
