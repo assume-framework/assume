@@ -57,8 +57,8 @@ class MarketMechanism:
         """
 
         # simple check that 1 MW can be bid at least
-        def requirement(unit):
-            return unit["unit_type"] != "power_plant" or abs(unit["max_power"]) >= 1
+        def requirement(unit: dict):
+            return unit.get("unit_type") != "power_plant" or abs(unit["max_power"]) >= 1
 
         return all([requirement(info) for info in content["information"]])
 
