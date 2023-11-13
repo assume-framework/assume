@@ -142,13 +142,6 @@ class BaseUnit:
             else:
                 added_volume = order["accepted_volume"]
             self.outputs[product_type].loc[start:end_excl] += added_volume
-
-            self.outputs[product_type + "_marginal_costs"].loc[start:end_excl] = (
-                self.calculate_marginal_cost(
-                    start, self.outputs[product_type].loc[start]
-                )
-                * self.outputs[product_type].loc[start:end_excl]
-            )
         self.calculate_cashflow(product_type, orderbook)
 
         self.bidding_strategies[product_type].calculate_reward(
@@ -156,6 +149,21 @@ class BaseUnit:
             marketconfig=marketconfig,
             orderbook=orderbook,
         )
+
+    def calculate_generation_cost(
+        self,
+        start: datetime,
+        end: datetime,
+        product_type: str,
+    ):
+        if start not in self.index:
+            return
+        product_type_mc = product_type + "_marginal_costs"
+        for t in self.outputs[product_type_mc][start:end].index:
+            mc = self.calculate_marginal_cost(
+                start, self.outputs[product_type].loc[start]
+            )
+            self.outputs[product_type_mc][t] = mc * self.outputs[product_type][start]
 
     def execute_current_dispatch(
         self,
