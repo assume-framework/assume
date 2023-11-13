@@ -254,7 +254,8 @@ async def load_scenario_folder_async(
 
     # load the config file
     path = f"{inputs_path}/{scenario}"
-    config = yaml.safe_load(open(f"{path}/config.yaml", "r"))
+    with open(f"{path}/config.yaml", "r") as f:
+        config = yaml.safe_load(f)
     if not study_case:
         study_case = list(config.keys())[0]
     config = config[study_case]

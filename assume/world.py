@@ -17,7 +17,7 @@ from mango.container.core import Container
 from mango.util.clock import ExternalClock
 from mango.util.distributed_clock import DistributedClockAgent, DistributedClockManager
 from mango.util.termination_detection import tasks_complete_or_sleeping
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, make_url
 from sqlalchemy.exc import OperationalError
 from tqdm import tqdm
 
@@ -59,7 +59,7 @@ class World:
         self.export_csv_path = export_csv_path
         # intialize db connection at beginning of simulation
         if database_uri:
-            self.db = create_engine(database_uri)
+            self.db = create_engine(make_url(database_uri))
             connected = False
             while not connected:
                 try:
