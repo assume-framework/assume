@@ -258,15 +258,13 @@ class UnitsOperator(Role):
             end = now
             current_dispatch.name = "power"
             data = pd.DataFrame(current_dispatch)
-            data["soc"] = unit.outputs["soc"][start:end]
+            unit.calculate_generation_cost(start, now, "energy")
+            valid_outputs = ["soc", "cashflow", "marginal_costs", "total_costs"]
 
             for key in unit.outputs.keys():
-                if "cashflow" in key:
-                    data[key] = unit.outputs[key][start:end]
-                if "marginal_costs" in key:
-                    data[key] = unit.outputs[key][start:end]
-                if "total_costs" in key:
-                    data[key] = unit.outputs[key][start:end]
+                for output in valid_outputs:
+                    if output in key:
+                        data[key] = unit.outputs[key][start:end]
 
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)

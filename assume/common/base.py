@@ -106,6 +106,19 @@ class BaseUnit:
 
         return bids
 
+    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
+        """
+        calculates the marginal cost for the given power
+
+        :param start: the start time of the dispatch
+        :type start: pd.Timestamp
+        :param power: the power output of the unit
+        :type power: float
+        :return: the marginal cost for the given power
+        :rtype: float
+        """
+        return 0
+
     def set_dispatch_plan(
         self,
         marketconfig: MarketConfig,
@@ -125,27 +138,32 @@ class BaseUnit:
             end = order["end_time"]
             end_excl = end - self.index.freq
             if isinstance(order["accepted_volume"], dict):
-                self.outputs[product_type].loc[start:end_excl] += [
-                    order["accepted_volume"][key]
-                    for key in order["accepted_volume"].keys()
-                ]
+                added_volume = list(order["accepted_volume"].values())
             else:
-                self.outputs[product_type].loc[start:end_excl] += order[
-                    "accepted_volume"
-                ]
-
+                added_volume = order["accepted_volume"]
+            self.outputs[product_type].loc[start:end_excl] += added_volume
         self.calculate_cashflow(product_type, orderbook)
-
-        self.outputs[product_type + "_marginal_costs"].loc[start:end_excl] += (
-            self.calculate_marginal_cost(start, self.outputs[product_type].loc[start])
-            * self.outputs[product_type].loc[start:end_excl]
-        )
 
         self.bidding_strategies[product_type].calculate_reward(
             unit=self,
             marketconfig=marketconfig,
             orderbook=orderbook,
         )
+
+    def calculate_generation_cost(
+        self,
+        start: datetime,
+        end: datetime,
+        product_type: str,
+    ):
+        if start not in self.index:
+            return
+        product_type_mc = product_type + "_marginal_costs"
+        for t in self.outputs[product_type_mc][start:end].index:
+            mc = self.calculate_marginal_cost(
+                start, self.outputs[product_type].loc[start]
+            )
+            self.outputs[product_type_mc][t] = mc * self.outputs[product_type][start]
 
     def execute_current_dispatch(
         self,
@@ -182,7 +200,7 @@ class BaseUnit:
         if dt - self.index.freq < self.index[0]:
             return 0
         else:
-            return self.outputs["energy"].at[dt - self.index.freq]
+            return self.outputs[product_type].at[dt - self.index.freq]
 
     def as_dict(self) -> dict:
         """
@@ -288,19 +306,6 @@ class SupportsMinMax(BaseUnit):
         :type product_type: str
         :return: the min and max power for the given time period
         :rtype: tuple[pd.Series, pd.Series]
-        """
-        pass
-
-    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
-        """
-        Calculates the marginal cost for the given power
-
-        :param start: the start time of the dispatch
-        :type start: pd.Timestamp
-        :param power: the power output of the unit
-        :type power: float
-        :return: the marginal cost for the given power
-        :rtype: float
         """
         pass
 
@@ -532,19 +537,6 @@ class SupportsMinMaxCharge(BaseUnit):
         """
         pass
 
-    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
-        """
-        calculates the marginal cost for the given power
-
-        :param start: the start time of the dispatch
-        :type start: pd.Timestamp
-        :param power: the power output of the unit
-        :type power: float
-        :return: the marginal cost for the given power
-        :rtype: float
-        """
-        pass
-
     def get_soc_before(self, dt: datetime) -> float:
         """
         return SoC before the given datetime.
@@ -720,8 +712,7 @@ class BaseStrategy:
         :param orderbook: The orderbook.
         :type orderbook: Orderbook
         """
-
-    pass
+        pass
 
 
 class LearningStrategy(BaseStrategy):
