@@ -52,7 +52,7 @@ def config_case_completer(prefix, parsed_args, **kwargs):
         with open(str(config_file), "r") as f:
             config = yaml.safe_load(f)
         return list(config.keys())
-    return ["hallo"]
+    return [""]
 
 
 def cli(args=None):
