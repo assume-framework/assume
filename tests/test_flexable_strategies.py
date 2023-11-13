@@ -38,7 +38,7 @@ def power_plant() -> PowerPlant:
 
 
 def test_flexable_eom(mock_market_config, power_plant):
-    end = datetime(2023, 7, 1, 1, 0, 0)
+    end = datetime(2023, 7, 1, 1)
     strategy = flexableEOM()
     mc = mock_market_config
     product_tuples = [(start, end, None)]

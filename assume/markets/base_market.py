@@ -52,8 +52,11 @@ class MarketMechanism:
         method to validate a given registration.
         Used to check if a participant is eligible to bid on this market
         """
-        # simple check that 1 MW can be bid at least
-        requirement = lambda unit: unit["max_power"] >= 1 or unit["min_power"] <= -1
+
+        # simple check that 1 MW can be bid at least by  powerplants
+        def requirement(unit: dict):
+            return unit.get("unit_type") != "power_plant" or abs(unit["max_power"]) >= 1
+
         return all([requirement(info) for info in content["information"]])
 
     def validate_orderbook(self, orderbook: Orderbook, agent_tuple: tuple) -> None:
