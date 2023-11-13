@@ -16,10 +16,10 @@ tiny:
     training_episodes: 10
     episodes_collecting_initial_experience: 3
     train_freq: 24
-    gradient_steps: -1
+    gradient_steps: 1
     batch_size: 256
     gamma: 0.99
-    device: cuda
+    device: cuda:0
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
@@ -47,7 +47,7 @@ tiny:
         - min_acceptance_ratio
         - parent_bid_id
 
-dam_SB_winter:
+dam_SB_winter_gradient2:
   start_date: 2020-01-01 00:00
   end_date: 2020-01-31 23:00
   time_step: 1h
@@ -63,12 +63,12 @@ dam_SB_winter:
     algorithm: matd3
     learning_rate: 0.001
     training_episodes: 80
-    episodes_collecting_initial_experience: 5
+    episodes_collecting_initial_experience: 3
     train_freq: 24
-    gradient_steps: -1
+    gradient_steps: 2
     batch_size: 128
     gamma: 0.99
-    device: cuda
+    device: cuda:0
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
@@ -95,7 +95,7 @@ dam_SB_winter:
         - bid_type
         - min_acceptance_ratio
 
-dam_BB_winter:
+dam_SB_winter_gradient3:
   start_date: 2020-01-01 00:00
   end_date: 2020-01-31 23:00
   time_step: 1h
@@ -111,12 +111,253 @@ dam_BB_winter:
     algorithm: matd3
     learning_rate: 0.001
     training_episodes: 80
-    episodes_collecting_initial_experience: 5
+    episodes_collecting_initial_experience: 3
     train_freq: 24
-    gradient_steps: -1
+    gradient_steps: 3
     batch_size: 128
     gamma: 0.99
-    device: cuda
+    device: cuda:0
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+    order_types: ["SB"]
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear_complex
+      additional_fields:
+        - bid_type
+        - min_acceptance_ratio
+
+dam_SB_winter_gradient4:
+  start_date: 2020-01-01 00:00
+  end_date: 2020-01-31 23:00
+  time_step: 1h
+  save_frequency_hours: Null
+  learning_mode: True
+
+  learning_config:
+    observation_dimension: 97
+    action_dimension: 2
+    continue_learning: False
+    load_model_path: None
+    max_bid_price: 200
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 80
+    episodes_collecting_initial_experience: 3
+    train_freq: 24
+    gradient_steps: 4
+    batch_size: 128
+    gamma: 0.99
+    device: cuda:0
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+    order_types: ["SB"]
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear_complex
+      additional_fields:
+        - bid_type
+        - min_acceptance_ratio
+
+dam_SB_summer_gradient2:
+  start_date: 2020-07-01 00:00
+  end_date: 2020-07-31 23:00
+  time_step: 1h
+  save_frequency_hours: Null
+  learning_mode: True
+
+  learning_config:
+    observation_dimension: 97
+    action_dimension: 2
+    continue_learning: False
+    load_model_path: None
+    max_bid_price: 200
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 80
+    episodes_collecting_initial_experience: 3
+    train_freq: 24
+    gradient_steps: 2
+    batch_size: 128
+    gamma: 0.99
+    device: cuda:0
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+    order_types: ["SB"]
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear_complex
+      additional_fields:
+        - bid_type
+        - min_acceptance_ratio
+
+dam_SB_summer_gradient3:
+  start_date: 2020-07-01 00:00
+  end_date: 2020-07-31 23:00
+  time_step: 1h
+  save_frequency_hours: Null
+  learning_mode: True
+
+  learning_config:
+    observation_dimension: 97
+    action_dimension: 2
+    continue_learning: False
+    load_model_path: None
+    max_bid_price: 200
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 80
+    episodes_collecting_initial_experience: 3
+    train_freq: 24
+    gradient_steps: 3
+    batch_size: 128
+    gamma: 0.99
+    device: cuda:0
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+    order_types: ["SB"]
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear_complex
+      additional_fields:
+        - bid_type
+        - min_acceptance_ratio
+
+dam_SB_summer_gradient4:
+  start_date: 2020-07-01 00:00
+  end_date: 2020-07-31 23:00
+  time_step: 1h
+  save_frequency_hours: Null
+  learning_mode: True
+
+  learning_config:
+    observation_dimension: 97
+    action_dimension: 2
+    continue_learning: False
+    load_model_path: None
+    max_bid_price: 200
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 80
+    episodes_collecting_initial_experience: 3
+    train_freq: 24
+    gradient_steps: 4
+    batch_size: 128
+    gamma: 0.99
+    device: cuda:0
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+    order_types: ["SB"]
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear_complex
+      additional_fields:
+        - bid_type
+        - min_acceptance_ratio
+
+
+dam_BB_winter_gradient2:
+  start_date: 2020-01-01 00:00
+  end_date: 2020-01-31 23:00
+  time_step: 1h
+  save_frequency_hours: Null
+  learning_mode: True
+
+  learning_config:
+    observation_dimension: 97
+    action_dimension: 2
+    continue_learning: False
+    load_model_path: None
+    max_bid_price: 200
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 80
+    episodes_collecting_initial_experience: 3
+    train_freq: 24
+    gradient_steps: 2
+    batch_size: 128
+    gamma: 0.99
+    device: cuda:0
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
@@ -143,7 +384,7 @@ dam_BB_winter:
         - bid_type
         - min_acceptance_ratio
 
-dam_LB_winter:
+dam_BB_winter_gradient3:
   start_date: 2020-01-01 00:00
   end_date: 2020-01-31 23:00
   time_step: 1h
@@ -159,12 +400,498 @@ dam_LB_winter:
     algorithm: matd3
     learning_rate: 0.001
     training_episodes: 80
-    episodes_collecting_initial_experience: 5
+    episodes_collecting_initial_experience: 3
     train_freq: 24
-    gradient_steps: -1
+    gradient_steps: 3
     batch_size: 128
     gamma: 0.99
-    device: cuda
+    device: cuda:0
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+    order_types: ["SB", "BB"]
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear_complex
+      additional_fields:
+        - bid_type
+        - min_acceptance_ratio
+
+dam_BB_winter_gradient4:
+  start_date: 2020-01-01 00:00
+  end_date: 2020-01-31 23:00
+  time_step: 1h
+  save_frequency_hours: Null
+  learning_mode: True
+
+  learning_config:
+    observation_dimension: 97
+    action_dimension: 2
+    continue_learning: False
+    load_model_path: None
+    max_bid_price: 200
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 80
+    episodes_collecting_initial_experience: 3
+    train_freq: 24
+    gradient_steps: 4
+    batch_size: 128
+    gamma: 0.99
+    device: cuda:0
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+    order_types: ["SB", "BB"]
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear_complex
+      additional_fields:
+        - bid_type
+        - min_acceptance_ratio
+
+
+dam_BB_summer_gradient2:
+  start_date: 2020-07-01 00:00
+  end_date: 2020-07-31 23:00
+  time_step: 1h
+  save_frequency_hours: Null
+  learning_mode: True
+
+  learning_config:
+    observation_dimension: 97
+    action_dimension: 2
+    continue_learning: False
+    load_model_path: None
+    max_bid_price: 200
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 80
+    episodes_collecting_initial_experience: 3
+    train_freq: 24
+    gradient_steps: 2
+    batch_size: 128
+    gamma: 0.99
+    device: cuda:0
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+    order_types: ["SB", "BB"]
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear_complex
+      additional_fields:
+        - bid_type
+        - min_acceptance_ratio
+
+dam_BB_summer_gradient3:
+  start_date: 2020-07-01 00:00
+  end_date: 2020-07-31 23:00
+  time_step: 1h
+  save_frequency_hours: Null
+  learning_mode: True
+
+  learning_config:
+    observation_dimension: 97
+    action_dimension: 2
+    continue_learning: False
+    load_model_path: None
+    max_bid_price: 200
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 80
+    episodes_collecting_initial_experience: 3
+    train_freq: 24
+    gradient_steps: 3
+    batch_size: 128
+    gamma: 0.99
+    device: cuda:0
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+    order_types: ["SB", "BB"]
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear_complex
+      additional_fields:
+        - bid_type
+        - min_acceptance_ratio
+
+dam_BB_summer_gradient4:
+  start_date: 2020-07-01 00:00
+  end_date: 2020-07-31 23:00
+  time_step: 1h
+  save_frequency_hours: Null
+  learning_mode: True
+
+  learning_config:
+    observation_dimension: 97
+    action_dimension: 2
+    continue_learning: False
+    load_model_path: None
+    max_bid_price: 200
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 80
+    episodes_collecting_initial_experience: 3
+    train_freq: 24
+    gradient_steps: 4
+    batch_size: 128
+    gamma: 0.99
+    device: cuda:0
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+    order_types: ["SB", "BB"]
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear_complex
+      additional_fields:
+        - bid_type
+        - min_acceptance_ratio
+
+dam_LB_winter_gradient2:
+  start_date: 2020-01-01 00:00
+  end_date: 2020-01-31 23:00
+  time_step: 1h
+  save_frequency_hours: Null
+  learning_mode: True
+
+  learning_config:
+    observation_dimension: 97
+    action_dimension: 2
+    continue_learning: False
+    load_model_path: None
+    max_bid_price: 200
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 80
+    episodes_collecting_initial_experience: 3
+    train_freq: 24
+    gradient_steps: 2
+    batch_size: 128
+    gamma: 0.99
+    device: cuda:0
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+    order_types: ["SB", "BB", "LB"]
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear_complex
+      additional_fields:
+        - bid_type
+        - min_acceptance_ratio
+        - parent_bid_id
+
+dam_LB_winter_gradient3:
+  start_date: 2020-01-01 00:00
+  end_date: 2020-01-31 23:00
+  time_step: 1h
+  save_frequency_hours: Null
+  learning_mode: True
+
+  learning_config:
+    observation_dimension: 97
+    action_dimension: 2
+    continue_learning: False
+    load_model_path: None
+    max_bid_price: 200
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 80
+    episodes_collecting_initial_experience: 3
+    train_freq: 24
+    gradient_steps: 3
+    batch_size: 128
+    gamma: 0.99
+    device: cuda:0
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+    order_types: ["SB", "BB", "LB"]
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear_complex
+      additional_fields:
+        - bid_type
+        - min_acceptance_ratio
+        - parent_bid_id
+
+dam_LB_winter_gradient4:
+  start_date: 2020-01-01 00:00
+  end_date: 2020-01-31 23:00
+  time_step: 1h
+  save_frequency_hours: Null
+  learning_mode: True
+
+  learning_config:
+    observation_dimension: 97
+    action_dimension: 2
+    continue_learning: False
+    load_model_path: None
+    max_bid_price: 200
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 80
+    episodes_collecting_initial_experience: 3
+    train_freq: 24
+    gradient_steps: 4
+    batch_size: 128
+    gamma: 0.99
+    device: cuda:0
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+    order_types: ["SB", "BB", "LB"]
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear_complex
+      additional_fields:
+        - bid_type
+        - min_acceptance_ratio
+        - parent_bid_id
+
+dam_LB_summer_gradient2:
+  start_date: 2020-07-01 00:00
+  end_date: 2020-07-31 23:00
+  time_step: 1h
+  save_frequency_hours: Null
+  learning_mode: True
+
+  learning_config:
+    observation_dimension: 97
+    action_dimension: 2
+    continue_learning: False
+    load_model_path: None
+    max_bid_price: 200
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 80
+    episodes_collecting_initial_experience: 3
+    train_freq: 24
+    gradient_steps: 2
+    batch_size: 128
+    gamma: 0.99
+    device: cuda:0
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+    order_types: ["SB", "BB", "LB"]
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear_complex
+      additional_fields:
+        - bid_type
+        - min_acceptance_ratio
+        - parent_bid_id
+
+dam_LB_summer_gradient3:
+  start_date: 2020-07-01 00:00
+  end_date: 2020-07-31 23:00
+  time_step: 1h
+  save_frequency_hours: Null
+  learning_mode: True
+
+  learning_config:
+    observation_dimension: 97
+    action_dimension: 2
+    continue_learning: False
+    load_model_path: None
+    max_bid_price: 200
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 80
+    episodes_collecting_initial_experience: 3
+    train_freq: 24
+    gradient_steps: 3
+    batch_size: 128
+    gamma: 0.99
+    device: cuda:0
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+    order_types: ["SB", "BB", "LB"]
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear_complex
+      additional_fields:
+        - bid_type
+        - min_acceptance_ratio
+        - parent_bid_id
+
+dam_LB_summer_gradient4:
+  start_date: 2020-07-01 00:00
+  end_date: 2020-07-31 23:00
+  time_step: 1h
+  save_frequency_hours: Null
+  learning_mode: True
+
+  learning_config:
+    observation_dimension: 97
+    action_dimension: 2
+    continue_learning: False
+    load_model_path: None
+    max_bid_price: 200
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 80
+    episodes_collecting_initial_experience: 3
+    train_freq: 24
+    gradient_steps: 4
+    batch_size: 128
+    gamma: 0.99
+    device: cuda:0
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
@@ -209,12 +936,12 @@ dam_SB_summer:
     algorithm: matd3
     learning_rate: 0.001
     training_episodes: 80
-    episodes_collecting_initial_experience: 5
+    episodes_collecting_initial_experience: 3
     train_freq: 24
-    gradient_steps: -1
+    gradient_steps: 1
     batch_size: 128
     gamma: 0.99
-    device: cuda
+    device: cuda:0
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
@@ -257,12 +984,12 @@ dam_BB_summer:
     algorithm: matd3
     learning_rate: 0.001
     training_episodes: 80
-    episodes_collecting_initial_experience: 5
+    episodes_collecting_initial_experience: 3
     train_freq: 24
-    gradient_steps: -1
+    gradient_steps: 1
     batch_size: 128
     gamma: 0.99
-    device: cuda
+    device: cuda:0
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
@@ -305,12 +1032,12 @@ dam_LB_summer:
     algorithm: matd3
     learning_rate: 0.001
     training_episodes: 80
-    episodes_collecting_initial_experience: 5
+    episodes_collecting_initial_experience: 3
     train_freq: 24
-    gradient_steps: -1
+    gradient_steps: 1
     batch_size: 128
     gamma: 0.99
-    device: cuda
+    device: cuda:0
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1

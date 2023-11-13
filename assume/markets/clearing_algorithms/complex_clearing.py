@@ -247,11 +247,10 @@ class ComplexClearingRole(MarketRole):
                 orders_profit.append(order_profit)
 
                 if order_profit < 0:
-                    rejected_orders.extend(order)
+                    rejected_orders.append(order)
                     orderbook.remove(order)
                     rejected_orders.extend(children)
                     for child in children:
-                        #rejected_orders.append(child)
                         orderbook.remove(child)
 
             # check if all orders have positive profit

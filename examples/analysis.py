@@ -95,45 +95,118 @@ availabe_examples = {
     "2020_RL_1": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
-        "study_case": "dam_SB_winter",
+        "study_case": "dam_SB_winter_gradient2",
     },
     "2020_RL_2": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
-        "study_case": "dam_BB_winter",
+        "study_case": "dam_SB_winter_gradient3",
     },
     "2020_RL_3": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
-        "study_case": "dam_LB_winter",
+        "study_case": "dam_SB_winter_gradient4",
     },
     "2020_RL_4": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
-        "study_case": "dam_SB_summer",
+        "study_case": "dam_SB_summer_gradient2",
     },
     "2020_RL_5": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
-        "study_case": "dam_BB_summer",
+        "study_case": "dam_SB_summer_gradient3",
     },
     "2020_RL_6": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
-        "study_case": "dam_LB_summer",
+        "study_case": "dam_SB_summer_gradient4",
+    },
+    "2020_RL_7": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_BB_winter_gradient2",
+    },
+    "2020_RL_8": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_BB_winter_gradient3",
+    },
+    "2020_RL_9": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_BB_winter_gradient4",
+    },
+    "2020_RL_10": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_BB_summer_gradient2",
+    },
+    "2020_RL_11": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_BB_summer_gradient3",
+    },
+    "2020_RL_12": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_BB_summer_gradient4",
+    },
+    "2020_RL_13": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_LB_winter_gradient2",
+    },
+    "2020_RL_14": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_LB_winter_gradient3",
+    },
+    "2020_RL_15": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_LB_winter_gradient4",
+    },
+    "2020_RL_16": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_LB_summer_gradient2",
+    },
+    "2020_RL_17": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_LB_summer_gradient3",
+    },
+    "2020_RL_18": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_LB_summer_gradient4",
     },
 }
 
 # %%
 if __name__ == "__main__":
     examples = [
-        "2020_RL_3",
-        "2020_RL_2",
         "2020_RL_1",
+        "2020_RL_2",
+        "2020_RL_3",
         "2020_RL_4",
         "2020_RL_5",
         "2020_RL_6",
+        "2020_RL_7",
+        "2020_RL_8",
+        "2020_RL_9",
+        "2020_RL_10",
+        "2020_RL_11",
+        "2020_RL_12",
+        "2020_RL_13",
+        "2020_RL_14",
+        "2020_RL_15",
+        "2020_RL_16",
+        "2020_RL_17",
+        "2020_RL_18",
     ]
+
     data_format = "timescale"  # "local_db" or "timescale"
 
     for example in examples:

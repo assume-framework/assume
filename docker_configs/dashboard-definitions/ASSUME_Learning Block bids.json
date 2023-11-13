@@ -2301,7 +2301,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(price_data.\"time\", $__interval),\r\n  price_data.\"min_price\" AS \"price_inflex\",\r\n  CASE\r\n    WHEN \"min_price\" IS NULL OR \"max_price\" = \"min_price\" THEN NULL\r\n    ELSE \"max_price\"\r\n  END AS \"price_flex\",\r\n  bid_type\r\nFROM\r\n(\r\n  SELECT\r\n    start_time as \"time\",\r\n    MIN(price) AS \"min_price\",\r\n    MAX(price) AS \"max_price\",\r\n    bid_type\r\n  FROM market_orders\r\n  WHERE\r\n    $__timeFilter(start_time) AND\r\n    simulation = '$simulation' AND\r\n    unit_id in ($rl_unit)\r\n  GROUP BY 1, bid_type\r\n) price_data\r\nORDER BY 1, bid_type",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(price_data.\"time\", $__interval),\r\n  price_data.\"min_price\" AS \"price_inflex\",\r\n  price_data.\"max_price\" AS \"price_flex\",\r\n  bid_type\r\nFROM\r\n(\r\n  SELECT\r\n    start_time as \"time\",\r\n    MIN(price) AS \"min_price\",\r\n    MAX(price) AS \"max_price\",\r\n    bid_type\r\n  FROM market_orders\r\n  WHERE\r\n    $__timeFilter(start_time) AND\r\n    simulation = '$simulation' AND\r\n    unit_id in ($rl_unit)\r\n  GROUP BY 1, bid_type\r\n) price_data\r\nORDER BY 1, bid_type",
           "refId": "A",
           "select": [
             [
@@ -2415,7 +2415,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  actions_1 AS \"action_Pinflex\",\n  actions_1+exploration_noise_1 AS \"noisy_action_Pinflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit in ($rl_unit)\n\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  actions_0 AS \"action_Pinflex\",\n  actions_0+exploration_noise_0 AS \"noisy_action_Pinflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit in ($rl_unit)\n\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2643,7 +2643,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  round(CAST(actions_2 AS numeric), 2) AS \"action_Pflex\",\n  round(CAST(actions_2 AS numeric), 2)+round(CAST(exploration_noise_2 AS numeric), 2) AS \"noisy_action_Pflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit in ($rl_unit)\n\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  round(CAST(actions_1 AS numeric), 2) AS \"action_Pflex\",\n  round(CAST(actions_1 AS numeric), 2)+round(CAST(exploration_noise_1 AS numeric), 2) AS \"noisy_action_Pflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit in ($rl_unit)\n\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2670,120 +2670,6 @@
       "title": "Normalized Action values - P_flex",
       "transformations": [],
       "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "stepAfter",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 113
-      },
-      "id": 37,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "format": "time_series",
-          "group": [],
-          "metricColumn": "none",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  sum(round(CAST(actions_0 AS numeric), 2)) filter(where actions_0 < 0) AS \"action_BB\",\n  sum(round(CAST(actions_0 AS numeric), 2)) filter(where actions_0 >= 0) AS \"action_SB\",\n  sum(round(CAST(actions_0 AS numeric), 2))+sum(round(CAST(exploration_noise_0 AS numeric), 2)) AS \"noisy_action_Pflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit in ($rl_unit)\nGroup by 1, simulation\nORDER BY 1",
-          "refId": "A",
-          "select": [
-            [
-              {
-                "params": [
-                  "power"
-                ],
-                "type": "column"
-              }
-            ]
-          ],
-          "table": "market_dispatch",
-          "timeColumn": "datetime",
-          "timeColumnType": "timestamp",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        }
-      ],
-      "title": "bid_type",
-      "transformations": [],
-      "type": "timeseries"
     }
   ],
   "refresh": false,
@@ -2795,8 +2681,8 @@
       {
         "current": {
           "selected": true,
-          "text": "2020_RL_dam_BB_winter_trainfreq24",
-          "value": "2020_RL_dam_BB_winter_trainfreq24"
+          "text": "2020_RL_dam_LB_summer",
+          "value": "2020_RL_dam_LB_summer"
         },
         "datasource": {
           "type": "postgres",
@@ -2868,8 +2754,8 @@
     ]
   },
   "time": {
-    "from": "2020-01-01T23:00:00.000Z",
-    "to": "2020-01-31T22:59:59.000Z"
+    "from": "2020-06-30T22:00:00.000Z",
+    "to": "2020-07-31T21:59:59.000Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -2884,6 +2770,6 @@
   "timezone": "",
   "title": "Assume: Training progress Block bids",
   "uid": "awGnwWnSz",
-  "version": 4,
+  "version": 10,
   "weekStart": ""
 }
