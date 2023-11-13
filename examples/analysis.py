@@ -92,52 +92,47 @@ availabe_examples = {
         "scenario": "2037_hRL",
         "study_case": "dam_BB",
     },
-    "2020_RL_BB_1": {
+    "2020_RL_1": {
+        # complex clearing with RL strategies and BB
+        "scenario": "2020_RL",
+        "study_case": "dam_SB_winter",
+    },
+    "2020_RL_2": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
         "study_case": "dam_BB_winter",
     },
-    "2020_RL_BB_2": {
+    "2020_RL_3": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
-        "study_case": "dam_BB_winter_gradient5",
+        "study_case": "dam_LB_winter",
     },
-    "2020_RL_BB_3": {
+    "2020_RL_4": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
-        "study_case": "dam_BB_winter_gradient10",
+        "study_case": "dam_SB_summer",
     },
-    "2020_RL_BB_4": {
-        # complex clearing with RL strategies and BB
-        "scenario": "2020_RL",
-        "study_case": "dam_BB_winter_gradient15",
-    },
-    "2020_RL_BB_5": {
+    "2020_RL_5": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
         "study_case": "dam_BB_summer",
     },
-    "2020_RL_BB_6": {
+    "2020_RL_6": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
-        "study_case": "dam_BB_summer_gradient5",
-    },
-    "2020_RL_BB_7": {
-        # complex clearing with RL strategies and BB
-        "scenario": "2020_RL",
-        "study_case": "dam_BB_summer_gradient10",
-    },
-    "2020_RL_BB_8": {
-        # complex clearing with RL strategies and BB
-        "scenario": "2020_RL",
-        "study_case": "dam_BB_summer_gradient15",
+        "study_case": "dam_LB_summer",
     },
 }
 
 # %%
 if __name__ == "__main__":
     examples = [
-        "2020_RL_tiny",
+        "2020_RL_3",
+        "2020_RL_2",
+        "2020_RL_1",
+        "2020_RL_4",
+        "2020_RL_5",
+        "2020_RL_6",
     ]
     data_format = "timescale"  # "local_db" or "timescale"
 
