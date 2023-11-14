@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+from collections import defaultdict
 from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
@@ -14,6 +15,7 @@ from mango.messages.message import Performatives
 
 from assume.common.market_objects import (
     ClearingMessage,
+    DataRequestMessage,
     MarketConfig,
     MetaDict,
     OpeningMessage,
@@ -46,7 +48,6 @@ class UnitsOperator(Role):
     ):
         super().__init__()
 
-        self.bids_map = {}
         self.available_markets = available_markets
         self.registered_markets: dict[str, MarketConfig] = {}
         self.last_sent_dispatch = 0
@@ -58,11 +59,12 @@ class UnitsOperator(Role):
             self.use_portfolio_opt = opt_portfolio[0]
             self.portfolio_strategy = opt_portfolio[1]
 
-        # should be a list per product_type
-        self.valid_orders = []
+        # valid_orders per product_type
+        self.valid_orders = defaultdict(list)
         self.units: dict[str, BaseUnit] = {}
 
     def setup(self):
+        super().setup()
         self.id = self.context.aid
         self.context.subscribe_message(
             self,
@@ -80,6 +82,12 @@ class UnitsOperator(Role):
             self,
             self.handle_registration_feedback,
             lambda content, meta: content.get("context") == "registration",
+        )
+
+        self.context.subscribe_message(
+            self,
+            self.handle_data_request,
+            lambda content, meta: content.get("context") == "data_request",
         )
 
         for market in self.available_markets:
@@ -149,6 +157,7 @@ class UnitsOperator(Role):
             acl_metadata={
                 "sender_addr": self.context.addr,
                 "sender_id": self.context.aid,
+                "reply_with": market.name,
             },
         ),
         logger.debug(f"{self.id} sent market registration to {market.name}")
@@ -164,9 +173,9 @@ class UnitsOperator(Role):
         :type meta: MetaDict
         """
         logger.debug(
-            f'{self.id} received opening from: {opening["market_id"]} {opening["start"]} until: {opening["stop"]}.'
+            f'{self.id} received opening from: {opening["market_id"]} {opening["start_time"]} until: {opening["end_time"]}.'
         )
-        self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
+        self.context.schedule_instant_task(coroutine=self.submit_bids(opening, meta))
 
     def handle_market_feedback(self, content: ClearingMessage, meta: MetaDict):
         """
@@ -187,14 +196,12 @@ class UnitsOperator(Role):
 
         for order in orderbook:
             order["market_id"] = content["market_id"]
-            # map bid id to unit id
-            order["unit_id"] = self.bids_map[order["bid_id"]]
 
-        self.valid_orders.extend(orderbook)
         marketconfig = self.registered_markets[content["market_id"]]
+        self.valid_orders[marketconfig.product_type].extend(orderbook)
         self.set_unit_dispatch(orderbook, marketconfig)
         self.write_learning_params(orderbook, marketconfig)
-        self.write_actual_dispatch()
+        self.write_actual_dispatch(marketconfig.product_type)
 
     def handle_registration_feedback(
         self, content: RegistrationMessage, meta: MetaDict
@@ -213,6 +220,31 @@ class UnitsOperator(Role):
                 )
         else:
             logger.error("Market %s did not accept registration", meta["sender_id"])
+
+    def handle_data_request(self, content: DataRequestMessage, meta: MetaDict):
+        unit = content["unit"]
+        metric_type = content["metric"]
+        start = content["start_time"]
+        end = content["end_time"]
+
+        data = []
+        try:
+            data = self.units[unit].outputs[metric_type][start:end]
+        except Exception:
+            logger.exception("error handling data request")
+        self.context.schedule_instant_acl_message(
+            content={
+                "context": "data_response",
+                "data": data,
+            },
+            receiver_addr=meta["sender_addr"],
+            receiver_id=meta["sender_id"],
+            acl_metadata={
+                "sender_addr": self.context.addr,
+                "sender_id": self.context.aid,
+                "in_reply_to": meta.get("reply_with"),
+            },
+        )
 
     def set_unit_dispatch(self, orderbook: Orderbook, marketconfig: MarketConfig):
         """
@@ -233,7 +265,7 @@ class UnitsOperator(Role):
                 orderbook=orderbook,
             )
 
-    def write_actual_dispatch(self):
+    def write_actual_dispatch(self, product_type: str):
         """
         sends the actual aggregated dispatch curve
         works across multiple markets
@@ -250,7 +282,10 @@ class UnitsOperator(Role):
         start = datetime.utcfromtimestamp(last)
 
         market_dispatch = aggregate_step_amount(
-            self.valid_orders, start, now, groupby=["market_id", "unit_id"]
+            self.valid_orders[product_type],
+            start,
+            now,
+            groupby=["market_id", "unit_id"],
         )
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
@@ -269,8 +304,11 @@ class UnitsOperator(Role):
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
 
-        self.valid_orders = list(
-            filter(lambda x: x["end_time"] > now, self.valid_orders)
+        self.valid_orders[product_type] = list(
+            filter(
+                lambda x: x["end_time"] > now,
+                self.valid_orders[product_type],
+            )
         )
 
         db_aid = self.context.data_dict.get("output_agent_id")
@@ -297,7 +335,7 @@ class UnitsOperator(Role):
                     },
                 )
 
-    async def submit_bids(self, opening: OpeningMessage):
+    async def submit_bids(self, opening: OpeningMessage, meta: MetaDict):
         """
         formulates an orderbook and sends it to the market.
         This will handle optional portfolio processing
@@ -330,6 +368,7 @@ class UnitsOperator(Role):
             "sender_id": self.context.aid,
             "sender_addr": self.context.addr,
             "conversation_id": "conversation01",
+            "in_reply_to": meta.get("reply_with"),
         }
         await self.context.send_acl_message(
             content={
@@ -404,8 +443,8 @@ class UnitsOperator(Role):
                     order["price"] = round(order["price"] / market.price_tick)
 
                 order["bid_id"] = f"{unit_id}_{i+1}"
+                order["unit_id"] = unit_id
                 orderbook.append(order)
-                self.bids_map[order["bid_id"]] = unit_id
 
         return orderbook
 
