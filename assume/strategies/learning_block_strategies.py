@@ -122,11 +122,11 @@ class RLStrategyBlocks(LearningStrategy):
         # actions are in the range [-1,1], we need to transform them into actual bids
         # we can use our domain knowledge to guide the bid formulation
 
-        bid_price_1 = actions[0] * self.max_bid_price
-        bid_price_2 = actions[1] * self.max_bid_price
+        bid_price_1 = actions[0].item() * self.max_bid_price
+        bid_price_2 = actions[1].item() * self.max_bid_price
 
-        bid_price_inflex = min(bid_price_1, bid_price_2).item()
-        bid_price_flex = max(bid_price_1, bid_price_2).item()
+        bid_price_inflex = min(bid_price_1, bid_price_2)
+        bid_price_flex = max(bid_price_1, bid_price_2)
 
         # calculate the quantities and transform the bids into orderbook format
         bids = []
