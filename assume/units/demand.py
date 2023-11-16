@@ -51,7 +51,7 @@ class Demand(SupportsMinMax):
         min_power: float,
         init_power: float = -1,
         node: str = "bus0",
-        price: float | pd.Series = 3000.0,
+        price: float | pd.Series = 500.0,
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs
     ):

@@ -189,12 +189,12 @@ class RLStrategy(LearningStrategy):
                 # =============================================================================
                 # 2.1 Get Actions and handle exploration
                 # =============================================================================
-                base_bid = next_observation[-1]
+                # base_bid = next_observation[-1]
 
                 # add niose to the last dimension of the observation
                 # needs to be adjusted if observation space is changed, because only makes sense
                 # if the last dimension of the observation space are the marginal cost
-                curr_action = noise + base_bid.clone().detach()
+                curr_action = noise  # + base_bid.clone().detach()
             else:
                 # if we are not in the initial exploration phase we chose the action with the actor neuronal net
                 # and add noise to the action
@@ -376,7 +376,7 @@ class RLStrategy(LearningStrategy):
             # calculate opportunity cost
             # as the loss of income we have because we are not running at full power
             order_opportunity_cost = (
-                price_difference
+                (order["accepted_price"] - max(marginal_cost, order["price"]))
                 * (
                     unit.max_power - unit.outputs[product_type].loc[start:end_excl]
                 ).sum()
@@ -478,7 +478,7 @@ class RlUCStrategy(RLStrategy):
         )
         initial_output = unit.get_output_before(start)
         marginal_cost = unit.calculate_marginal_cost(start, initial_output)
-        current_status = 1 if unit.get_operation_time(start) > 0 else 0
+        current_status = 1 if initial_output > 0 else 0
 
         actions, noise = self.get_actions(next_observation)
         # convert actions from -1 to 1 into 1 to k
@@ -530,17 +530,15 @@ class RlUCStrategy(RLStrategy):
         """
 
         product_type = marketconfig.product_type
-
-        profit = 0
-        opportunity_cost = 0
-        reward = 0
-
-        scaling = 0.01 / unit.max_power / len(orderbook)
-        regret_scale = 0.3
+        regret_scale = 0.0
 
         # iterate over all orders in the orderbook, to calculate order specific profit
         for order in orderbook:
             order_start = order["start_time"]
+            order_profit = []
+            order_opportunity_cost = []
+            order_reward = []
+
             for start, volume in order["accepted_volume"].items():
                 end = start + unit.index.freq
                 end_excl = end - unit.index.freq
@@ -563,9 +561,26 @@ class RlUCStrategy(RLStrategy):
 
                 price_difference = order["accepted_price"][start] - marginal_cost
 
-                order_profit = price_difference * volume * duration
+                profit = price_difference * volume * duration
 
-                order_opportunity_cost = (
+                # consideration of start-up costs, which are evenly divided between the
+                # upward and downward regulation events
+                if start == unit.index[1] and unit.init_power > 0:
+                    profit = profit
+                elif (
+                    unit.outputs[product_type].loc[start] != 0
+                    and unit.outputs[product_type].loc[start - unit.index.freq] == 0
+                ):
+                    profit -= unit.hot_start_cost
+                elif (
+                    unit.outputs[product_type].loc[start] == 0
+                    and unit.outputs[product_type].loc[start - unit.index.freq] != 0
+                ):
+                    profit -= unit.shut_down_cost
+
+                order_profit.append(profit)
+
+                opportunity_cost = (
                     price_difference
                     * (
                         unit.max_power - unit.outputs[product_type].loc[start:end_excl]
@@ -573,31 +588,17 @@ class RlUCStrategy(RLStrategy):
                     * duration
                 )
                 # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
-                order_opportunity_cost = max(order_opportunity_cost, 0)
+                opportunity_cost = max(opportunity_cost, 0)
                 # collect profit and opportunity cost for all orders
-                opportunity_cost += order_opportunity_cost
+                order_opportunity_cost.append(opportunity_cost)
 
-                # consideration of start-up costs, which are evenly divided between the
-                # upward and downward regulation events
-                if start == unit.index[1] and unit.init_power > 0:
-                    order_profit = order_profit
-                elif (
-                    unit.outputs[product_type].loc[start] != 0
-                    and unit.outputs[product_type].loc[start - unit.index.freq] == 0
-                ):
-                    order_profit -= unit.hot_start_cost
-                elif (
-                    unit.outputs[product_type].loc[start] == 0
-                    and unit.outputs[product_type].loc[start - unit.index.freq] != 0
-                ):
-                    order_profit -= unit.shut_down_cost
+                reward = (
+                    (profit - regret_scale * opportunity_cost) / unit.max_power / 10
+                )
+                order_reward.append(reward)
 
-                profit += order_profit
-
-                reward += (
-                    order_profit - regret_scale * order_opportunity_cost
-                ) * scaling
-
-            unit.outputs["profit"].loc[order_start] = float(profit)
-            unit.outputs["regret"].loc[order_start] = opportunity_cost
-            unit.outputs["reward"].loc[order_start] = reward
+            unit.outputs["profit"].loc[order_start] = sum(order_profit)
+            unit.outputs["regret"].loc[order_start] = sum(order_opportunity_cost)
+            unit.outputs["reward"].loc[order_start] = sum(order_reward) / len(
+                order_reward
+            )

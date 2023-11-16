@@ -9,6 +9,8 @@ import os
 from assume import World, load_scenario_folder, run_learning
 
 log = logging.getLogger(__name__)
+# set log level to info
+log.setLevel(logging.INFO)
 
 csv_path = "examples/outputs"
 

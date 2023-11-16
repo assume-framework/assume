@@ -72,14 +72,12 @@ class TD3(RLAlgorithm):
         This function implements the TD3 algorithm's key step for policy improvement and exploration.
         """
 
-        logger.info(f"Updating Policy")
         n_rl_agents = len(self.learning_role.rl_strats.keys())
         for _ in range(self.gradient_steps):
             self.n_updates += 1
-            i = 0
             strategy: LearningStrategy
 
-            for u_id, strategy in self.learning_role.rl_strats.items():
+            for i, (u_id, strategy) in enumerate(self.learning_role.rl_strats.items()):
                 critic_target = self.learning_role.target_critics[u_id]
                 critic = self.learning_role.critics[u_id]
                 actor = self.learning_role.rl_strats[u_id].actor
@@ -144,11 +142,7 @@ class TD3(RLAlgorithm):
                     for current_q in current_Q_values
                 )
 
-                # Optimize the critics
-                critic.optimizer.zero_grad()
-                critic_loss.backward()
-                critic.optimizer.step()
-
+                self._extracted_from_update_policy_110(critic, critic_loss)
                 # Delayed policy updates
                 if self.n_updates % self.policy_delay == 0:
                     # Compute actor loss
@@ -163,10 +157,7 @@ class TD3(RLAlgorithm):
                         all_states, all_actions_clone
                     ).mean()
 
-                    actor.optimizer.zero_grad()
-                    actor_loss.backward()
-                    actor.optimizer.step()
-
+                    self._extracted_from_update_policy_110(actor, actor_loss)
                     polyak_update(
                         critic.parameters(), critic_target.parameters(), self.tau
                     )
@@ -174,4 +165,8 @@ class TD3(RLAlgorithm):
                         actor.parameters(), actor_target.parameters(), self.tau
                     )
 
-                i += 1
+    # TODO Rename this here and in `update_policy`
+    def _extracted_from_update_policy_110(self, arg0, arg1):
+        arg0.optimizer.zero_grad()
+        arg1.backward()
+        arg0.optimizer.step()

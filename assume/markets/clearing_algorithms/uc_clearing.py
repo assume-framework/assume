@@ -25,7 +25,6 @@ def market_clearing_opt(orders, market_products):
     }
 
     model = pyo.ConcreteModel()
-    model.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT_EXPORT)
 
     model.T = pyo.Set(
         initialize=[market_product[0] for market_product in market_products],
@@ -192,20 +191,18 @@ def market_clearing_opt(orders, market_products):
 
     # Solve the model
     instance = model.create_instance()
-    results = solver.solve(instance, options=options)
+    solver.solve(instance, options=options)
 
-    # fix the status variables
+    # make new instance with fixed u
+    instance_fixed_u = model.create_instance()
+    instance_fixed_u.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT)
     for bid_id in instance.bBids:
         for t in instance.T:
-            status_value = instance.status[bid_id, t].value
-            status_value = 0 if status_value < EPS else status_value
-            status_value = 1 if status_value > 1 - EPS else status_value
-            instance.status[bid_id, t].fix(status_value)
+            instance_fixed_u.status[bid_id, t].fix(instance.status[bid_id, t].value)
 
-    # resolve the model
-    results = solver.solve(instance)
+    results = solver.solve(instance_fixed_u, options=options)
 
-    return instance, results
+    return instance_fixed_u, results
 
 
 class UCClearingRole(MarketRole):

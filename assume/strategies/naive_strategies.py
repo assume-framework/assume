@@ -235,7 +235,7 @@ class NaiveUCStrategy(BaseStrategy):
 
         initial_output = unit.get_output_before(start)
         marginal_cost = unit.calculate_marginal_cost(start, initial_output)
-        current_status = 1 if unit.get_operation_time(start) > 0 else 0
+        current_status = 1 if initial_output > 0 else 0
 
         order: Order = {
             "start_time": start,

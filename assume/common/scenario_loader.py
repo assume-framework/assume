@@ -572,7 +572,6 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
     # remove csv path so that nothing is written while learning
     temp_csv_path = world.export_csv_path
     world.export_csv_path = ""
-    best_reward = -1e10
 
     buffer = ReplayBuffer(
         buffer_size=int(5e5),
@@ -591,6 +590,10 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
     )
 
     eval_episode = 1
+    best_reward = -1e10
+    eval_rewards = []
+    no_improvement_counter = 0
+    last_total_rewards = None
 
     for episode in tqdm(
         range(1, world.learning_role.training_episodes + 1),
@@ -646,15 +649,42 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
 
             world.run()
 
-            avg_reward = world.output_role.get_sum_reward()
+            total_rewards = world.output_role.get_sum_reward()
+            eval_rewards.append(np.mean(total_rewards))
+
             # check reward improvement in validation run
             world.learning_config["trained_actors_path"] = old_path
-            if avg_reward > best_reward:
+            if eval_rewards[-1] > best_reward:
                 # update best reward
-                best_reward = avg_reward
+                best_reward = eval_rewards[-1]
                 world.learning_role.save_params(directory=old_path)
 
+            # keep track of total rewards and compare them to each other
+            # and if the rewrads for all agents are the same for 10 episodes in a row
+            # stop training
+            if eval_episode > 10:
+                if (0.95 * last_total_rewards <= total_rewards).all() and (
+                    total_rewards <= 1.05 * last_total_rewards
+                ).all():
+                    no_improvement_counter += 1
+                else:
+                    no_improvement_counter = 0
+
+                if no_improvement_counter > 5:
+                    logger.info(
+                        "No changes in training for 10 episodes. Stopping training."
+                    )
+                    # save policies
+                    world.learning_role.save_params(directory=f"{old_path}_converged")
+                    break
+
+            last_total_rewards = total_rewards
+
             eval_episode += 1
+
+            # save also at the end of the training
+            if episode == world.learning_role.training_episodes:
+                world.learning_role.save_params(directory=f"{old_path}_final")
 
         world.reset()
 
