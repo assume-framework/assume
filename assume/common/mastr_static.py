@@ -9,10 +9,10 @@ fuel_translation = {
     "Braunkohle": "lignite",
     "Biomasse": "biomass",
     "Geothermie": "geothermal",
-    "Grubengas": "landfill_gas",
-    "andere Gase": "landfill_gas",
+    "Grubengas": "landfill gas",
+    "andere Gase": "landfill gas",
     "nicht biogener Abfall": "waste",
-    "Steinkohle": "coal",
+    "Steinkohle": "hard coal",
     "Erdgas": "gas",
     "Mineralölprodukte": "oil",
     "Kernenergie": "nuclear",
@@ -86,7 +86,7 @@ mastr_storage = {
 # chi in [t CO2/MWh therm.]
 # Set technical parameter corresponding to the type (0, 2000, 2018)
 technical_parameter = {
-    "coal": {
+    "hard coal": {
         0: {
             "maxPower": 100,
             "minPower": 40,
