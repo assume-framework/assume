@@ -131,8 +131,8 @@ class InfrastructureInterface:
                 )  # only append the aggregated row!
             else:
                 cchp = cchps[cchps["generatorID"] == 0]
-                cchp["turbineTyp"] = "Closed Cycle Heat Power"
-                cchp["fuel"] = "gas_combined"
+                cchp.at[0, "turbineTyp"] = "Closed Cycle Heat Power"
+                cchp.at[0, "fuel"] = "gas_combined"
                 for line in range(len(cchp)):
                     new_cchps.append(cchp.iloc[line])  # append all rows
 
@@ -189,6 +189,7 @@ class InfrastructureInterface:
             df["kwkPowerElec"] = df["kwkPowerElec"].fillna(0)
         else:
             df["kwkPowerElec"] = 0
+        return df
 
     def get_power_plant_in_area(self, area=52353, fuel_type="lignite"):
         if isinstance(area, str) and area.startswith("DE"):
@@ -242,7 +243,7 @@ class InfrastructureInterface:
             return df
 
         df["fuel"] = fuel_type  # current fuel typ
-        self.set_default_params(df)
+        df = self.set_default_params(df)
 
         # for all gas turbines check if they are used in a combination of gas and steam turbine
         if fuel_type == "gas":
@@ -253,7 +254,7 @@ class InfrastructureInterface:
             if fuel_type in technical_parameter:
                 tech_params = technical_parameter[fuel_type][type_year]
             else:
-                tech_params = technical_parameter["gas_combined"]
+                tech_params = technical_parameter["gas_combined"][0]
 
             df.at[line, "minPower"] = (
                 df.at[line, "maxPower"] * tech_params.get("minPower", 0) / 100
@@ -739,6 +740,8 @@ class InfrastructureInterface:
             end,
             area,
         )
+        # convert from J/m^2 to Wh/m^2
+        weather_df["ghi"] /= 3600
         weather_df["zenith"] = sun_position["zenith"]
         weather_df["azimuth"] = sun_position["azimuth"]
         # calculate ghi and zenith
@@ -799,8 +802,7 @@ def get_wind_series(wind_systems: pd.DataFrame, weather_df: pd.DataFrame):
         if diameter <= 0:
             diameter = height
         if diameter / 2 > height:
-            print(row)
-            height = diameter // 2
+            diameter = height
         p_curve = std_curve.copy()
         p_curve["value"] = std_curve["value"] * max_power
         wt = WindTurbine(
@@ -819,15 +821,10 @@ def get_solar_series(solar_systems: pd.DataFrame, weather_df: pd.DataFrame):
     systems = []
     solar_power = 0
     battery_power = 0
-    # create PVSystems for each line in solar
-    # for line, row in tqdm(solar.iterrows(), total=len(solar)):
-    #     maxPower = row["maxPower"]
-    #     azimuth = int(row["azimuth"])
-    #     tilt = int(row["tilt"])
     for info, group in tqdm(solar_systems.groupby(["azimuth", "tilt"])):
         azimuth = int(info[0])
         tilt = int(info[1])
-        maxPower = group["maxPower"].sum()
+        maxPower = group["maxPower"].sum()  # in kW
 
         if "batPower" in group.columns:
             battery_power += group["batPower"].sum()
@@ -845,7 +842,8 @@ def get_solar_series(solar_systems: pd.DataFrame, weather_df: pd.DataFrame):
             ghi=weather_df["ghi"],
             dhi=weather_df["dhi"],
         )
-        solar_power += ir["poa_global"] * maxPower / 1e6  # kW
+        solar_power += ir["poa_global"] * maxPower
+    solar_power /= 1e3  # W -> kW
     return solar_power, battery_power
 
 
@@ -854,7 +852,7 @@ def get_pwp_agents(interface, areas):
     for area in areas:
         print(area)
         plants = False
-        for fuel in ["lignite", "gas", "hard coal", "nuclear"]:
+        for fuel in ["lignite", "gas", "oil", "hard coal", "nuclear"]:
             df = interface.get_power_plant_in_area(area=area, fuel_type=fuel)
             if not df.empty:
                 plants = True
