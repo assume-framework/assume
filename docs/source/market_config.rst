@@ -35,14 +35,22 @@ A full list of configurations and explanation is given here.
 Here, a description of all options and the usage is given.
 
 The `opening_hours` is a recurrence rule which defines when the market is open.
+
 The `opening_duration` is a timedelta which defines how long the market is open. This can be used to leave time for negotiation in the agents.
+
 The `market_mechanism` is the name of the clearing method used for this market, and is mapped to the actual clearing_function in the initialization.
+
 The `minimum_bid_price`, `maximum_bid_price` and `maximum_bid_volume` are constraints for bids. All Bids of the sent orderbook are rejected and not considered for clearing if one or more are not in these bounds.
 An agent receives a "Rejected" message if this is the case.
+
 The `additional_fields` is a list of additional fields which are used to base the bid on.
+
 The `price_tick` and `volume_tick` is the step increment of volume, which ensures that only integers are used for calculation.
+
 The `price_unit` and `volume_unit` are strings for visualization of price.
+
 The `supports_get_unmatched` is a boolean which defines if the market supports the handle_get_unmatched method, which allows agents to look into the current market orderbook, as it is the case, mostly on continuous markets.
+
 The `maximum_gradient` is the maximum allowed change between bids from one hour to the next one - only relevant if the count of market products is greater than 1.
 
 Most important, the `market_products` are a list of MarketProduct objects.

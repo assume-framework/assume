@@ -41,31 +41,59 @@ how to :doc:`installation` the project.
 
 Documentation
 =============
+
 **Getting Started**
 
 * :doc:`introduction`
 * :doc:`installation`
 * :doc:`quick_start`
-* :doc:`market_config`
-* :doc:`market_mechanism`
-* :doc:`bidding_agents`
-* :doc:`learning`
-* :doc:`example_simulations`
-* :doc:`assume`
 
 .. toctree::
    :hidden:
-   :maxdepth: 4
-   :caption: Contents
+   :maxdepth: 1
+   :caption: Getting Started
 
    introduction
    installation
    quick_start
+
+**User Guide**
+
+* :doc:`market_config`
+* :doc:`market_mechanism`
+* :doc:`units`
+* :doc:`bidding_agents`
+* :doc:`learning`
+
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: Contents
+
    market_config
    market_mechanism
+   units
    bidding_agents
-   example_simulations
    learning
+
+**Examples**
+* :doc:`example_simulations`
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+   :caption: Examples
+
+   example_simulations
+
+**API Reference**
+* :doc:`assume`
+
+.. toctree::
+   :hidden:
+   :maxdepth: 1
+   :caption: API Reference
+
    assume
 
 Indices and tables
