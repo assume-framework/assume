@@ -77,7 +77,7 @@ class WriteOutput(Role):
                 self.episode = int(episode)
 
             # check if episode=0 and delete all similar runs
-            if self.episode == 0:
+            if self.episode == 1:
                 self.del_similar_runs()
 
         # contruct all timeframe under which hourly values are written to excel and db
@@ -122,9 +122,15 @@ class WriteOutput(Role):
             simulations = []
         simulations = [s[0] for s in simulations]
 
+        # get current simulation id by removing last part
+        curr_sim_id = "_".join(self.simulation_id.split("_")[:-1])
+
         for simulation_id in simulations:
-            # delete all simulation_id which are similar to my simulation_id
-            if simulation_id.startswith(self.simulation_id[:-1]):
+            # delete all simulation_id which start with my simulation_id and end with a number
+            if (
+                simulation_id.startswith(curr_sim_id)
+                and simulation_id.split("_")[-1].isdigit()
+            ):
                 self.delete_db_scenario(simulation_id)
 
     def setup(self):

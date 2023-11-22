@@ -102,7 +102,7 @@ class Actor(nn.Module):
     def forward(self, obs):
         x = F.relu(self.LN1(self.FC1(obs)))
         x = F.relu(self.LN2(self.FC2(x)))
-        x = th.tanh(self.FC3(x))
+        x = F.softsign(self.FC3(x))
 
         return x
 

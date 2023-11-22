@@ -582,7 +582,6 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
         float_type=world.learning_role.float_type,
     )
     actors_and_critics = None
-    world.output_role.del_similar_runs()
 
     validation_interval = min(
         world.learning_role.training_episodes,
@@ -670,7 +669,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
                 else:
                     no_improvement_counter = 0
 
-                if no_improvement_counter > 5:
+                if no_improvement_counter > 10:
                     logger.info(
                         "No changes in training for 10 episodes. Stopping training."
                     )

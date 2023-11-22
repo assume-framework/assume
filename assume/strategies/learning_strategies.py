@@ -482,8 +482,8 @@ class RlUCStrategy(RLStrategy):
 
         actions, noise = self.get_actions(next_observation)
         # convert actions from -1 to 1 into 1 to k
-        actions = ((actions + 1) / 2) * (self.max_bid_multiplier - 1) + 1
-        bid_prices = actions * marginal_cost
+        mc_multipliers = ((actions + 1) / 2) * (self.max_bid_multiplier - 1) + 1
+        bid_prices = mc_multipliers * marginal_cost
         price_profile = {
             product[0]: bid_prices[i] for i, product in enumerate(product_tuples)
         }

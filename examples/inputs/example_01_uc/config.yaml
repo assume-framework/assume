@@ -25,32 +25,32 @@ base:
       market_mechanism: pay_as_clear
 
 dam_with_uc_clearing_rl:
-  sim_id: "uc_unit_all"
-  start_date: 2019-03-01 22:00
-  end_date: 2019-03-03 22:00
+  sim_id: "uc_unit_all_conv"
+  start_date: 2019-03-01 23:00
+  end_date: 2019-03-02 23:00
   time_step: 1h
   save_frequency_hours: Null
-  learning_mode: True
+  # learning_mode: True
 
   learning_config:
-    # trained_actors_path: examples/inputs/learned_strategies/uc_unit_all_final
+    trained_actors_path: examples/inputs/learned_strategies/uc_unit_all_converged
     observation_dimension: 50
     action_dimension: 24
     continue_learning: False
     load_learned_path: null
     max_bid_price: 100
     algorithm: matd3
-    learning_rate: 0.0001
+    learning_rate: 0.001
     training_episodes: 500
     episodes_collecting_initial_experience: 2
     train_freq: 24
-    gradient_steps: 1
-    batch_size: 32
-    gamma: 0.9
+    gradient_steps: 2
+    batch_size: 16
+    gamma: 0.7
     device: cpu
     noise_sigma: 0.1
     noise_scale: 1
-    noise_dt: 0.9999
+    noise_dt: 1
     validation_episodes_interval: 5
 
   markets_config:

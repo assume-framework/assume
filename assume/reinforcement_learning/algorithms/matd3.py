@@ -142,7 +142,10 @@ class TD3(RLAlgorithm):
                     for current_q in current_Q_values
                 )
 
-                self._extracted_from_update_policy_110(critic, critic_loss)
+                critic.optimizer.zero_grad()
+                critic_loss.backward()
+                critic.optimizer.step()
+
                 # Delayed policy updates
                 if self.n_updates % self.policy_delay == 0:
                     # Compute actor loss
@@ -157,16 +160,13 @@ class TD3(RLAlgorithm):
                         all_states, all_actions_clone
                     ).mean()
 
-                    self._extracted_from_update_policy_110(actor, actor_loss)
+                    actor.optimizer.zero_grad()
+                    actor_loss.backward()
+                    actor.optimizer.step()
+
                     polyak_update(
                         critic.parameters(), critic_target.parameters(), self.tau
                     )
                     polyak_update(
                         actor.parameters(), actor_target.parameters(), self.tau
                     )
-
-    # TODO Rename this here and in `update_policy`
-    def _extracted_from_update_policy_110(self, arg0, arg1):
-        arg0.optimizer.zero_grad()
-        arg1.backward()
-        arg0.optimizer.step()
