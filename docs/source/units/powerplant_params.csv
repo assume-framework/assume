@@ -1,0 +1,27 @@
+Parameter,Type,Default Value,Description,Required/Optional
+id,str,n/a,"The ID of the power plant unit.",Required
+unit_operator,str,n/a,"The operator of the power plant unit.",Required
+technology,str,n/a,"The technology of the power plant unit.",Required
+bidding_strategies,dict,n/a,"The bidding strategies of the power plant unit.",Required
+index,pd.DatetimeIndex,n/a,"Pandas index object. Is added automatically by the framework",Required
+max_power,float,n/a,"The maximum power output capacity of the power plant in MW.",Required
+min_power,float,0.0,"The minimum power output capacity of the power plant in MW.",Optional
+efficiency,float,1.0,"The efficiency of the power plant in converting fuel to electricity.",Optional
+fixed_cost,float,0.0,"The fixed operating cost of the power plant, independent of the power output.",Optional
+partial_load_eff,bool,False,"Does the efficiency vary at part loads? If yes, uses partial efficiency estimations.",Optional
+fuel_type,str,"others","The type of fuel used by the power plant for power generation.",Optional
+emission_factor,float,0.0,"The emission factor associated with the power plant's fuel type, representing CO2 emissions per unit of energy produced.",Optional
+ramp_up,"float or None",n/a,"The ramp-up rate of the power plant, indicating how quickly it can increase power output. Default behavior - no ramping constraints.",Optional
+ramp_down,"float or None",n/a,"The ramp-down rate of the power plant, indicating how quickly it can decrease power output. Default behavior - no ramping constraints.",Optional
+hot_start_cost,float,0,"The cost of a hot start, where the power plant is restarted after a recent shutdown.",Optional
+warm_start_cost,float,0,"The cost of a warm start, where the power plant is restarted after a moderate downtime.",Optional
+cold_start_cost,float,0,"The cost of a cold start, where the power plant is restarted after a prolonged downtime.",Optional
+min_operating_time,float,0,"The minimum duration that the power plant must operate once started, in hours.",Optional
+min_down_time,float,0,"The minimum downtime required after a shutdown before the power plant can be restarted, in hours.",Optional
+downtime_hot_start,int,8,"The duration of downtime where a hot start is possible, in hours.",Optional
+downtime_warm_start,int,48,"The duration of downtime where a warm start is possible, in hours. Everything above this value results in a cold start.",Optional
+heat_extraction,bool,False,"A boolean indicating whether the power plant can extract heat for external purposes.",Optional
+max_heat_extraction,float,0,"The maximum amount of heat that the power plant can extract for external use, in MW thermal.",Optional
+location,"tuple[float, float]","(0.0, 0.0)","The geographical coordinates (latitude and longitude) of the power plant's location.",Optional
+node,str,"bus0","The identifier of the electrical bus or network node to which the power plant is connected.",Optional
+kwargs,dict,{},"Additional keyword arguments to be passed to the base class.",Optional

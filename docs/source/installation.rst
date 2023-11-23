@@ -17,7 +17,7 @@ ASSUME and train your agents, make sure to install Torch. Detailed
 installation instructions can be found `here <https://pytorch.org/get-started/locally/>`_.
 
 Using Pip/Python
-==============
+================
 
 In general most people use an environment manager for python.
 Here, Install instructions for Conda and Venv are given.
@@ -40,7 +40,7 @@ accept the installed packages and activate the newly created environment::
 Now you can proceed with the assume installation using pip below.
 
 With Venv
------------------
+----------
 
 Venvs are the python native way of handling environments using the same python version.
 To activate a venv, you have to be in the same folder where you created it.
@@ -76,7 +76,7 @@ To install with testing capabilities::
     pip install assume-framework[test]
 
 Install Tab-Completion
------------------
+-----------------------
 
 ASSUME uses `argcomplete` for argument completion on the CLI.
 

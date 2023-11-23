@@ -14,8 +14,10 @@ Alternatively, if you believe, that this particular unit type would be a good ad
 **Base Unit Types**
 
 * :doc:`units/base_unit`
+* :doc:`/units/powerplant`
 
 .. toctree::
    :maxdepth: 2
 
    units/base_unit
+   units/powerplant

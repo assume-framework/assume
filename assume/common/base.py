@@ -779,6 +779,7 @@ class LearningConfig(TypedDict):
     :type noise_dt: int
     :param trained_actors_path: The path to the learned model to load.
     :type trained_actors_path: str
+
     """
 
     observation_dimension: int

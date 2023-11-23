@@ -144,7 +144,11 @@ class PowerPlant(SupportsMinMax):
         """
         Initialize the marginal cost of the unit.
         """
-        self.marginal_cost = self.calc_simple_marginal_cost()
+
+        if not self.partial_load_eff:
+            self.marginal_cost = self.calc_simple_marginal_cost()
+        else:
+            self.marginal_cost = None
 
     def execute_current_dispatch(
         self,
