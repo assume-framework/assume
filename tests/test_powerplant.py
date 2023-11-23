@@ -100,7 +100,7 @@ def test_init_function(power_plant_1, power_plant_2, power_plant_3):
     )
 
     assert power_plant_2.marginal_cost.to_dict() == pd.Series(40, index).to_dict()
-    assert power_plant_3.marginal_cost.to_dict() == pd.Series(40, index).to_dict()
+    assert power_plant_3.marginal_cost is None
 
 
 def test_reset_function(power_plant_1):
