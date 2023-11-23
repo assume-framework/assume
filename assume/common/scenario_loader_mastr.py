@@ -21,10 +21,6 @@ db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
 world = World(database_uri=db_uri)
 
-config = ["DEA", "DEB", "DEC", "DED", "DEE", "DEF"]
-config = ["DEA27"]
-config = ["DEA"]
-
 
 async def init():
     year = 2019
@@ -35,13 +31,18 @@ async def init():
         end=end,
         freq="H",
     )
-    sim_id = "mastr_scenario"
+    sim_id = "mastr_scenario_DE"
     print("loading mastr scenario")
 
     database = os.getenv("INFRASTRUCTURE_SOURCE", "timescale.nowum.fh-aachen.de:5432")
     login = os.getenv("INFRASTRUCTURE_LOGIN", "readonly:readonly")
     infra_uri = f"postgresql://{login}@{database}"
     infra_interface = InfrastructureInterface("test", infra_uri)
+
+    config = ["DEA", "DEA", "DEB", "DEC", "DED", "DEE", "DEF"]
+    # config = ["DEA27"]
+    # config = ["DE"]
+    config = list(infra_interface.plz_nuts["nuts3"].unique())
 
     await world.setup(
         start=start,
@@ -112,10 +113,16 @@ async def init():
                 start,
                 end,
             )
-            config_path.mkdir(parents=True, exist_ok=True)
-            demand.to_csv(config_path / "demand.csv")
-            solar.to_csv(config_path / "solar.csv")
-            wind.to_csv(config_path / "wind.csv")
+            try:
+                config_path.mkdir(parents=True, exist_ok=True)
+                demand.to_csv(config_path / "demand.csv")
+                solar.to_csv(config_path / "solar.csv")
+                if isinstance(wind, float):
+                    print(wind, area, year)
+                wind.to_csv(config_path / "wind.csv")
+            except Exception:
+                import shutil
+                shutil.rmtree(config_path, ignore_errors=True)
         else:
             print(f"use existing local time series")
             demand = pd.read_csv(config_path / "demand.csv", index_col=0).squeeze()

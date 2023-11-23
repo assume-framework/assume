@@ -84,7 +84,7 @@ mastr_storage = {
 
 # start cost given in [€/MW]
 # chi in [t CO2/MWh therm.]
-# Set technical parameter corresponding to the type (0, 2000, 2018)
+# Set technical parameter corresponding to the type (0, 2000, 2024)
 technical_parameter = {
     "hard coal": {
         0: {
@@ -113,7 +113,7 @@ technical_parameter = {
             "on": 1,
             "off": 0,
         },
-        2018: {
+        2024: {
             "maxPower": 100,
             "minPower": 25,
             "gradP": 6,
@@ -154,7 +154,7 @@ technical_parameter = {
             "on": 1,
             "off": 0,
         },
-        2018: {
+        2024: {
             "maxPower": 100,
             "minPower": 40,
             "gradP": 8,
@@ -195,7 +195,7 @@ technical_parameter = {
             "on": 1,
             "off": 0,
         },
-        2018: {
+        2024: {
             "maxPower": 100,
             "minPower": 40,
             "gradP": 15,
@@ -236,7 +236,7 @@ technical_parameter = {
             "on": 1,
             "off": 0,
         },
-        2018: {
+        2024: {
             "maxPower": 100,
             "minPower": 40,
             "gradP": 4.0,
@@ -277,7 +277,7 @@ technical_parameter = {
             "on": 1,
             "off": 0,
         },
-        2018: {
+        2024: {
             "maxPower": 100,
             "minPower": 40,
             "gradP": 0.5,

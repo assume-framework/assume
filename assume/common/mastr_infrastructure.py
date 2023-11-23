@@ -97,6 +97,8 @@ class InfrastructureInterface:
         self.windhersteller = windhersteller.to_dict()["Wert"]
 
     def get_lat_lon(self, plz):
+        if not isinstance(plz, int):
+            raise ValueError(f"invalid plz {plz}")
         latitude, longitude = self.plz_nuts.loc[plz, ["latitude", "longitude"]]
         return latitude, longitude
 
@@ -177,7 +179,7 @@ class InfrastructureInterface:
         else:  # Add column for nuclear power plants
             df["combination"] = 0
 
-        type_years = np.asarray([0, 2000, 2018])  # technical setting typ
+        type_years = np.asarray([0, 2000, 2024])  # technical setting typ
         df["type"] = [type_years[type_years < x.year][-1] for x in df["startDate"]]
         df["generatorID"] = df["generatorID"].fillna(0)
         if "kwkPowerTherm" in df.columns:
@@ -248,6 +250,9 @@ class InfrastructureInterface:
         # for all gas turbines check if they are used in a combination of gas and steam turbine
         if fuel_type == "gas":
             df = self.aggregate_cchps(df)
+
+        # TODO this should not happen
+        df = df[~df.type.isna()]
 
         for line, row in df.iterrows():
             type_year = row["type"]
@@ -787,7 +792,7 @@ def get_wind_series(wind_systems: pd.DataFrame, weather_df: pd.DataFrame):
 
     wt = WindTurbine(82, turbine_type="E-82/2300")
     # todo get wind turbine types from database
-    wind_power = 0
+    wind_power = pd.Series()
     std_curve = wt.power_curve
     std_curve["value"] = std_curve["value"] / wt.power_curve["value"].max()
     for line, row in tqdm(wind_systems.iterrows(), total=len(wind_systems)):
@@ -819,8 +824,10 @@ def get_wind_series(wind_systems: pd.DataFrame, weather_df: pd.DataFrame):
 
 def get_solar_series(solar_systems: pd.DataFrame, weather_df: pd.DataFrame):
     systems = []
-    solar_power = 0
-    battery_power = 0
+    solar_power = pd.Series()
+    battery_power = pd.Series()
+    if solar_systems.empty:
+       return solar_power, battery_power 
     for info, group in tqdm(solar_systems.groupby(["azimuth", "tilt"])):
         azimuth = int(info[0])
         tilt = int(info[1])
