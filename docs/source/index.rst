@@ -68,7 +68,7 @@ Documentation
 .. toctree::
    :hidden:
    :maxdepth: 2
-   :caption: Contents
+   :caption: User Guide
 
    market_config
    market_mechanism

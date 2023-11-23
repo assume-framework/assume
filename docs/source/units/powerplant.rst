@@ -2,8 +2,8 @@
 ..
 .. SPDX-License-Identifier: AGPL-3.0-or-later
 
-Power Plant Class
-==================
+Power Plant
+===========
 
 Overview
 --------
