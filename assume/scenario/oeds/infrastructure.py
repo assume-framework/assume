@@ -17,7 +17,7 @@ from tqdm import tqdm
 # !pip install git+https://github.com/maurerle/windpowerlib@maurerle
 from windpowerlib import ModelChain, WindTurbine
 
-from assume.common.mastr_static import (
+from assume.scenario.oeds.static import (
     fuel_translation,
     mastr_solar_azimuth,
     mastr_solar_codes,
@@ -27,9 +27,7 @@ from assume.common.mastr_static import (
 
 WEATHER_PARAMS_ECMWF = [
     "temp_air",
-    "wind_meridional",
     "ghi",
-    "wind_zonal",
     "wind_speed",
 ]
 
@@ -159,15 +157,15 @@ class InfrastructureInterface:
         # df["maxPower"] is Rated Power [kW]
         df["minPower"] = df["maxPower"] * 0.5  # MinPower = 1/2 MaxPower
         df["P0"] = df["minPower"] + 0.1
-        df["gradP"] = 0.1 * df["maxPower"]  # 10% Change per hour
-        df["gradM"] = 0.1 * df["maxPower"]  # 10% Change per hour
-        df["stopTime"] = 5  # default stop time 5h
-        df["runTime"] = 5  # default run time 5h
+        df["ramp_up"] = 0.1 * df["maxPower"]  # 10% Change per hour
+        df["ramp_down"] = 0.1 * df["maxPower"]  # 10% Change per hour
+        df["min_down_time"] = 5  # default min stop time 5h
+        df["min_operating_time"] = 5  # default min run time 5h
         df["on"] = 1  # on counter --> Plant is on till 1 hour
         df["off"] = 0  # off counter --> Plant is on NOT off
         df["eta"] = 0.3  # efficiency
         df["chi"] = 1.0  # emission factor [t/MWh therm]
-        df["startCost"] = 100 * df["maxPower"]  # starting cost [€/kW Rated]
+        df["start_cost"] = 100 * df["maxPower"]  # starting cost [€/kW Rated]
 
         df["turbineTyp"] = df["turbineTyp"].replace(self.mastr_generation_codes)
 
@@ -265,23 +263,23 @@ class InfrastructureInterface:
                 df.at[line, "maxPower"] * tech_params.get("minPower", 0) / 100
             )
             df.at[line, "P0"] = df.at[line, "minPower"]
-            df.at[line, "gradP"] = np.round(
-                df.at[line, "maxPower"] * tech_params["gradP"] * 60 / 100,
+            df.at[line, "ramp_up"] = np.round(
+                df.at[line, "maxPower"] * tech_params["ramp_up"] * 60 / 100,
                 2,
             )
-            df.at[line, "gradM"] = np.round(
-                df.at[line, "maxPower"] * tech_params["gradM"] * 60 / 100,
+            df.at[line, "ramp_down"] = np.round(
+                df.at[line, "maxPower"] * tech_params["ramp_down"] * 60 / 100,
                 2,
             )
             df.at[line, "eta"] = tech_params["eta"] / 100  # convert to percentage
             df.at[line, "chi"] = (
                 tech_params["chi"] / 1e3
             )  # [t CO2/MWh therm.] -> [t CO2/kWh therm.]
-            df.at[line, "stopTime"] = tech_params["stopTime"]
-            df.at[line, "runTime"] = tech_params["runTime"]
+            df.at[line, "min_down_time"] = tech_params["min_down_time"]
+            df.at[line, "min_operating_time"] = tech_params["min_operating_time"]
 
-            start_cost = tech_params["startCost"] / 1e3  # [€/MW] -> [€/kW]
-            df.at[line, "startCost"] = (
+            start_cost = tech_params["start_cost"] / 1e3  # [€/MW] -> [€/kW]
+            df.at[line, "start_cost"] = (
                 df.at[line, "maxPower"] * start_cost * 2
             )  # multiply by 2 to respect heat demand
 
@@ -827,7 +825,7 @@ def get_solar_series(solar_systems: pd.DataFrame, weather_df: pd.DataFrame):
     solar_power = pd.Series()
     battery_power = pd.Series()
     if solar_systems.empty:
-       return solar_power, battery_power 
+        return solar_power, battery_power
     for info, group in tqdm(solar_systems.groupby(["azimuth", "tilt"])):
         azimuth = int(info[0])
         tilt = int(info[1])
@@ -904,6 +902,7 @@ def get_dem_agents(areas):
 
 
 if __name__ == "__main__":
+    import json
     import os
 
     x = os.getenv("INFRASTRUCTURE_SOURCE", "timescale.nowum.fh-aachen.de:5432")
@@ -917,8 +916,6 @@ if __name__ == "__main__":
     # z = interface.get_solar_storage_systems_in_area(area=415)
     # a = interface.get_run_river_systems_in_area(area='DE111')
     areas = interface.plz_nuts["nuts3"].unique()
-
-    import json
 
     create_agents = True
     if create_agents:
