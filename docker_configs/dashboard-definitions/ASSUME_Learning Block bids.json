@@ -25,7 +25,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 5,
+  "id": 2,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -729,7 +729,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "-- this query creates a cumulative sum of the reward until now\r\nSELECT \r\n  $__timeGroupAlias(datetime,$__interval),\r\n  'episode ' || episode AS \"episode\",\r\n  sum(sum(reward)) OVER (PARTITION BY episode ORDER BY datetime) AS \"reward\"\r\nFROM\r\n  rl_params\r\nWHERE\r\n  $__timeFilter(datetime) \r\n  and simulation like '${simulation}' || '_%'\r\nGROUP BY 1, datetime, episode\r\nORDER BY 1",
+          "rawSql": "-- this query creates a cumulative sum of the reward until now\r\nSELECT \r\n  datetime as \"time\",\r\n  'episode ' || episode AS \"episode\",\r\n  sum(sum(reward)) OVER (PARTITION BY episode ORDER BY datetime) AS \"reward\"\r\nFROM\r\n  rl_params\r\nWHERE\r\n  $__timeFilter(datetime) \r\n  and simulation like '${simulation}' || '_%'\r\nGROUP BY 1, datetime, episode\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -868,7 +868,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT \r\n  $__timeGroupAlias(datetime,$__interval),\r\n  'episode ' || episode AS \"episode\",\r\n  sum(sum(profit)) OVER (PARTITION BY episode ORDER BY datetime) AS \"profit\"\r\nFROM\r\n  rl_params\r\nWHERE\r\n  $__timeFilter(datetime)\r\n  and simulation like '${simulation}' || '_%'\r\nGROUP BY 1, datetime, episode\r\nORDER BY 1",
+          "rawSql": "SELECT \r\n  datetime as \"time\",\r\n  'episode ' || episode AS \"episode\",\r\n  sum(sum(profit)) OVER (PARTITION BY episode ORDER BY datetime) AS \"profit\"\r\nFROM\r\n  rl_params\r\nWHERE\r\n  $__timeFilter(datetime)\r\n  and simulation like '${simulation}' || '_%'\r\nGROUP BY 1, datetime, episode\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -1008,7 +1008,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_volume/volume) filter(where volume !=0) AS \"accepted_volume\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time)\r\n  and simulation = '$simulation'\r\nGROUP BY 1, start_time\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  start_time as \"time\",\r\n  avg(accepted_volume/volume) filter(where volume !=0) AS \"accepted_volume\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time)\r\n  and simulation = '$simulation'\r\nGROUP BY 1, start_time\r\nORDER BY 1",
           "refId": "B",
           "select": [
             [
@@ -2301,7 +2301,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time, $__interval),\r\n  round(cast(price as numeric),3) AS \"price\",\r\n  bid_type\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  simulation = '$simulation' AND\r\n  unit_id in ($rl_unit)\r\nGROUP BY 1, bid_type, price\r\nOrder by 1, bid_type",
+          "rawSql": "SELECT\r\n  start_time as \"time\",\r\n  round(cast(price as numeric),3) AS \"price\",\r\n  bid_type\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  simulation = '$simulation' AND\r\n  unit_id in ($rl_unit)\r\nGROUP BY 1, bid_type, price\r\nOrder by 1, bid_type",
           "refId": "A",
           "select": [
             [
@@ -2415,7 +2415,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  case\n    when actions_0 > actions_1 then actions_1\n    when actions_0 <= actions_1 then actions_0 \n  end as \"action_P_inflex\",\n  case\n    when actions_0+exploration_noise_0 > actions_1+exploration_noise_1 then actions_1\n    when actions_0+exploration_noise_0 <= actions_1+exploration_noise_1 then actions_0 \n  end as \"noisy_action_Pinflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit in ($rl_unit)\n\nORDER BY 1",
+          "rawSql": "SELECT\n  datetime as \"time\",\n  case\n    when actions_0 > actions_1 then actions_1\n    when actions_0 <= actions_1 then actions_0 \n  end as \"action_P_inflex\",\n  case\n    when actions_0+exploration_noise_0 > actions_1+exploration_noise_1 then actions_1\n    when actions_0+exploration_noise_0 <= actions_1+exploration_noise_1 then actions_0 \n  end as \"noisy_action_Pinflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit in ($rl_unit)\n\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2530,7 +2530,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  sum(volume) AS \"Bid volume:\",\r\n  bid_type\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  simulation = '$simulation'\r\n  AND unit_id in ($rl_unit)\r\nGROUP BY 1, unit_id, volume, bid_type\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  start_time as \"time\",\r\n  sum(volume) AS \"Bid volume:\",\r\n  bid_type\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  simulation = '$simulation'\r\n  AND unit_id in ($rl_unit)\r\nGROUP BY 1, unit_id, volume, bid_type\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2643,7 +2643,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  actions_1 as \"P_inflex\",\n  actions_1 + exploration_noise_1 as \"noisy_P_inflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit in ($rl_unit)\n\nORDER BY 1",
+          "rawSql": "SELECT\n  datetime as \"time\",\n  actions_1 as \"P_inflex\",\n  actions_1 + exploration_noise_1 as \"noisy_P_inflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit in ($rl_unit)\n\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2757,7 +2757,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  actions_0 as \"P_inflex\",\n  actions_0 + exploration_noise_0 as \"noisy_P_inflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit in ($rl_unit)\n\nORDER BY 1",
+          "rawSql": "SELECT\n  datetime as \"time\",\n  actions_0 as \"P_inflex\",\n  actions_0 + exploration_noise_0 as \"noisy_P_inflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit in ($rl_unit)\n\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2871,7 +2871,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  case\n    when actions_0 <= actions_1 then actions_1\n    when actions_0 > actions_1 then actions_0 \n  end as \"action_P_flex\",\n  case\n    when actions_0+exploration_noise_0 <= actions_1+exploration_noise_1 then actions_1\n    when actions_0+exploration_noise_0 > actions_1+exploration_noise_1 then actions_0 \n  end as \"noisy_action_P_flex\",\n  simulation as \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit in ($rl_unit)\n\nORDER BY 1",
+          "rawSql": "SELECT\n  datetime as \"time\",\n  case\n    when actions_0 <= actions_1 then actions_1\n    when actions_0 > actions_1 then actions_0 \n  end as \"action_P_flex\",\n  case\n    when actions_0+exploration_noise_0 <= actions_1+exploration_noise_1 then actions_1\n    when actions_0+exploration_noise_0 > actions_1+exploration_noise_1 then actions_0 \n  end as \"noisy_action_P_flex\",\n  simulation as \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit in ($rl_unit)\n\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2908,9 +2908,9 @@
     "list": [
       {
         "current": {
-          "selected": true,
-          "text": "2020_RL_dam_LB_winter_batch256",
-          "value": "2020_RL_dam_LB_winter_batch256"
+          "selected": false,
+          "text": "2020_RL_dam_LB_summer",
+          "value": "2020_RL_dam_LB_summer"
         },
         "datasource": {
           "type": "postgres",
@@ -2934,30 +2934,30 @@
         "current": {
           "selected": true,
           "text": [
-            "Biomass",
-            "Hydro",
-            "Solar",
-            "Wind offshore",
-            "Wind onshore",
-            "coal_unit",
             "combined_gas_unit",
-            "lignite_unit",
-            "nuclear_unit",
+            "open_gas_unit",
+            "Hydro",
+            "Wind onshore",
             "oil_unit",
-            "open_gas_unit"
+            "lignite_unit",
+            "Solar",
+            "coal_unit",
+            "nuclear_unit",
+            "Biomass",
+            "Wind offshore"
           ],
           "value": [
-            "Biomass",
-            "Hydro",
-            "Solar",
-            "Wind offshore",
-            "Wind onshore",
-            "coal_unit",
             "combined_gas_unit",
-            "lignite_unit",
-            "nuclear_unit",
+            "open_gas_unit",
+            "Hydro",
+            "Wind onshore",
             "oil_unit",
-            "open_gas_unit"
+            "lignite_unit",
+            "Solar",
+            "coal_unit",
+            "nuclear_unit",
+            "Biomass",
+            "Wind offshore"
           ]
         },
         "datasource": {
@@ -2982,8 +2982,8 @@
     ]
   },
   "time": {
-    "from": "2019-12-31T23:00:00.000Z",
-    "to": "2020-01-31T22:59:59.000Z"
+    "from": "2020-06-30T22:00:00.000Z",
+    "to": "2020-07-31T21:59:59.000Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -2998,6 +2998,6 @@
   "timezone": "",
   "title": "Assume: Training progress Block bids",
   "uid": "awGnwWnSz",
-  "version": 12,
+  "version": 1,
   "weekStart": ""
 }

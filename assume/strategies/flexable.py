@@ -851,6 +851,8 @@ def calculate_reward_EOM(
     product_type = marketconfig.product_type
     products_index = get_products_index(orderbook, marketconfig)
 
+    max_power = unit.forecaster.get_availability(unit.id)[products_index] * unit.max_power
+
     profit = pd.Series(0.0, index=products_index)
     reward = pd.Series(0.0, index=products_index)
     opportunity_cost = pd.Series(0.0, index=products_index)
@@ -862,9 +864,6 @@ def calculate_reward_EOM(
         end_excl = end - unit.index.freq
 
         order_times = pd.date_range(start, end_excl, freq=unit.index.freq)
-
-        order_profit = pd.Series(0.0, index=order_times)
-        order_opportunity_cost = pd.Series(0.0, index=order_times)
 
         for start in order_times:
             marginal_cost = unit.calculate_marginal_cost(
@@ -882,20 +881,17 @@ def calculate_reward_EOM(
                 accepted_price = order["accepted_price"]
 
             price_difference = accepted_price - marginal_cost
-            costs[start] = marginal_cost * accepted_volume
-            order_profit[start] = price_difference * accepted_volume
 
             # calculate opportunity cost
             # as the loss of income we have because we are not running at full power
-            order_opportunity_cost[start] = price_difference * (
-                unit.max_power - unit.outputs[product_type].loc[start]
+            order_opportunity_cost = price_difference * (
+                max_power[start] - unit.outputs[product_type].loc[start]
             )
             # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
-            order_opportunity_cost[start] = max(order_opportunity_cost[start], 0)
-
             # don't consider opportunity_cost more than once! Always the same for one timestep and one market
-            opportunity_cost[start] = order_opportunity_cost[start]
-            profit[start] += order_profit[start]
+            opportunity_cost[start] = max(order_opportunity_cost, 0)
+            profit[start] += price_difference * accepted_volume
+            costs[start] += marginal_cost * accepted_volume
 
     # consideration of start-up costs
     for start in products_index:
@@ -906,7 +902,7 @@ def calculate_reward_EOM(
             costs[start] += start_up_cost
 
     scaling = 0.1 / unit.max_power
-    regret_scale = 0.2
+    regret_scale = 0.0
     reward = (profit - regret_scale * opportunity_cost) * scaling
 
     # store results in unit outputs which are written to database by unit operator
@@ -914,3 +910,4 @@ def calculate_reward_EOM(
     unit.outputs["reward"].loc[products_index] = reward
     unit.outputs["regret"].loc[products_index] = opportunity_cost
     unit.outputs["total_cost"].loc[products_index] = costs
+    

@@ -27,6 +27,11 @@ availabe_examples = {
         "scenario": "2020_LB",
         "study_case": "dam",
     },
+    "2020_rule_tiny": {
+        # complex clearing with naive strategies - no blocks
+        "scenario": "2020_SB",
+        "study_case": "tiny",
+    },
     "2020_RL_SB": {
         # merit order clearing with RL strategies
         "scenario": "2020_RL",
@@ -77,6 +82,11 @@ availabe_examples = {
         "scenario": "2037_BB",
         "study_case": "dam",
     },
+    "2037_rule_LB": {
+        # complex clearing with naive strategies - no blocks
+        "scenario": "2037_LB",
+        "study_case": "dam",
+    },
     "2037_hRL_tiny": {
         # complex clearing with RL strategies and BB
         "scenario": "2037_hRL",
@@ -95,124 +105,82 @@ availabe_examples = {
     "2020_RL_1": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
-        "study_case": "dam_SB_winter_gradient2",
+        "study_case": "dam_LB_winter",
     },
     "2020_RL_2": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
-        "study_case": "dam_SB_winter_gradient3",
+        "study_case": "dam_LB_summer",
     },
     "2020_RL_3": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
-        "study_case": "dam_SB_winter_gradient4",
+        "study_case": "dam_BB_winter",
     },
     "2020_RL_4": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
-        "study_case": "dam_SB_summer_gradient2",
+        "study_case": "dam_BB_summer",
     },
     "2020_RL_5": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
-        "study_case": "dam_SB_summer_gradient3",
+        "study_case": "dam_SB_winter",
     },
     "2020_RL_6": {
         # complex clearing with RL strategies and BB
         "scenario": "2020_RL",
-        "study_case": "dam_SB_summer_gradient4",
+        "study_case": "dam_SB_summer_maxbid250",
     },
-    "2020_RL_7": {
+    "2037_RL_1": {
         # complex clearing with RL strategies and BB
-        "scenario": "2020_RL",
-        "study_case": "dam_BB_winter_gradient2",
+        "scenario": "2037_RL",
+        "study_case": "dam_LB_winter_maxbid250",
     },
-    "2020_RL_8": {
+    "2037_RL_2": {
         # complex clearing with RL strategies and BB
-        "scenario": "2020_RL",
-        "study_case": "dam_BB_winter_gradient3",
+        "scenario": "2037_RL",
+        "study_case": "dam_LB_summer_maxbid250",
     },
-    "2020_RL_9": {
+    "2037_RL_3": {
         # complex clearing with RL strategies and BB
-        "scenario": "2020_RL",
-        "study_case": "dam_BB_winter_gradient4",
+        "scenario": "2037_RL",
+        "study_case": "dam_BB_winter_maxbid250",
     },
-    "2020_RL_10": {
+    "2037_RL_4": {
         # complex clearing with RL strategies and BB
-        "scenario": "2020_RL",
-        "study_case": "dam_BB_summer_gradient2",
+        "scenario": "2037_RL",
+        "study_case": "dam_BB_summer_maxbid250",
     },
-    "2020_RL_11": {
+    "2037_RL_5": {
         # complex clearing with RL strategies and BB
-        "scenario": "2020_RL",
-        "study_case": "dam_BB_summer_gradient3",
+        "scenario": "2037_RL",
+        "study_case": "dam_SB_winter_maxbid250",
     },
-    "2020_RL_12": {
+    "2037_RL_6": {
         # complex clearing with RL strategies and BB
-        "scenario": "2020_RL",
-        "study_case": "dam_BB_summer_gradient4",
-    },
-    "2020_RL_13": {
-        # complex clearing with RL strategies and BB
-        "scenario": "2020_RL",
-        "study_case": "dam_LB_winter_gradient2",
-    },
-    "2020_RL_14": {
-        # complex clearing with RL strategies and BB
-        "scenario": "2020_RL",
-        "study_case": "dam_LB_winter_gradient3",
-    },
-    "2020_RL_15": {
-        # complex clearing with RL strategies and BB
-        "scenario": "2020_RL",
-        "study_case": "dam_LB_winter_gradient4",
-    },
-    "2020_RL_16": {
-        # complex clearing with RL strategies and BB
-        "scenario": "2020_RL",
-        "study_case": "dam_LB_summer_gradient2",
-    },
-    "2020_RL_17": {
-        # complex clearing with RL strategies and BB
-        "scenario": "2020_RL",
-        "study_case": "dam_LB_summer_gradient3",
-    },
-    "2020_RL_18": {
-        # complex clearing with RL strategies and BB
-        "scenario": "2020_RL",
-        "study_case": "dam_LB_summer_gradient4",
+        "scenario": "2037_RL",
+        "study_case": "dam_SB_summer_maxbid250",
     },
 }
 
 # %%
 if __name__ == "__main__":
     examples = [
-        "2020_RL_1",
-        "2020_RL_2",
-        "2020_RL_3",
-        "2020_RL_4",
-        "2020_RL_5",
-        "2020_RL_6",
-        "2020_RL_7",
-        "2020_RL_8",
-        "2020_RL_9",
-        "2020_RL_10",
-        "2020_RL_11",
-        "2020_RL_12",
-        "2020_RL_13",
-        "2020_RL_14",
-        "2020_RL_15",
-        "2020_RL_16",
-        "2020_RL_17",
-        "2020_RL_18",
+        "2037_RL_1",
+        "2037_RL_2",
+        "2037_RL_3",
+        "2037_RL_4",
+        "2037_RL_5",
+        "2037_RL_6",
     ]
 
     data_format = "timescale"  # "local_db" or "timescale"
 
     for example in examples:
         # delete examples/inputs/2020_RL/forecasts_df.csv
-        if os.path.exists("examples/inputs/2020_RL/forecasts_df.csv"):
-            os.remove("examples/inputs/2020_RL/forecasts_df.csv")
+        if os.path.exists("examples/inputs/2037_RL/forecasts_df.csv"):
+            os.remove("examples/inputs/2037_RL/forecasts_df.csv")
 
         if data_format == "local_db":
             db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"

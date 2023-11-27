@@ -453,7 +453,7 @@ class Learning(Role):
             unit_strategy.actor_target.train(mode=False)
 
             unit_strategy.actor.optimizer = Adam(
-                unit_strategy.actor.parameters(), lr=self.learning_rate
+                unit_strategy.actor.parameters(), lr=self.learning_rate, weight_decay=1e-2
             )
 
     def create_critics(self) -> None:
@@ -474,7 +474,7 @@ class Learning(Role):
             )
 
             self.critics[u_id].optimizer = Adam(
-                self.critics[u_id].parameters(), lr=self.learning_rate
+                self.critics[u_id].parameters(), lr=self.learning_rate, weight_decay=1e-2
             )
 
             self.target_critics[u_id].load_state_dict(self.critics[u_id].state_dict())

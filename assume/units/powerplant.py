@@ -5,6 +5,8 @@ from functools import lru_cache
 import pandas as pd
 
 from assume.common.base import SupportsMinMax
+from assume.common.utils import get_products_index
+from assume.common.market_objects import MarketConfig, Orderbook
 
 logger = logging.getLogger(__name__)
 
@@ -181,9 +183,74 @@ class PowerPlant(SupportsMinMax):
 
             self.outputs["energy"][t] = current_power
 
-            # TODO: calculate total dispatch costs
 
         return self.outputs["energy"].loc[start:end]
+    
+    def set_dispatch_plan(
+        self,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ) -> None:
+        
+        """
+        adds dispatch plan from current market result to total dispatch plan
+
+        :param marketconfig: The market configuration.
+        :type marketconfig: MarketConfig
+        :param orderbook: The orderbook.
+        :type orderbook: Orderbook
+        """
+        products_index = get_products_index(orderbook, marketconfig)
+        
+        max_power = (
+            self.forecaster.get_availability(self.id)[products_index] * self.max_power
+        )
+
+        product_type = marketconfig.product_type
+        for order in orderbook:
+            start = order["start_time"]
+            end = order["end_time"]
+            end_excl = end - self.index.freq
+            if isinstance(order["accepted_volume"], dict):
+                self.outputs[product_type].loc[start:end_excl] += [
+                    order["accepted_volume"][key]
+                    for key in order["accepted_volume"].keys()
+                ]
+            else:
+                self.outputs[product_type].loc[start:end_excl] += order[
+                    "accepted_volume"
+                ]
+
+        self.calculate_cashflow(product_type, orderbook)
+
+        for start in products_index:
+            
+            current_power = self.outputs[product_type][start]
+
+            previous_power = self.get_output_before(start)
+            op_time = self.get_operation_time(start)
+
+            current_power = self.calculate_ramp(op_time, previous_power, current_power)
+
+            if current_power > 0:
+                current_power = min(current_power, max_power[start])
+                current_power = max(current_power, self.min_power)
+
+            self.outputs[product_type][start] = current_power
+
+            self.outputs[product_type + "marginal_costs"].loc[start] = (
+                self.calculate_marginal_cost(
+                    start, self.outputs[product_type].loc[start]
+                )
+                #* self.outputs[product_type].loc[start]
+            )
+
+        self.bidding_strategies[product_type].calculate_reward(
+            unit=self,
+            marketconfig=marketconfig,
+            orderbook=orderbook,
+        )
+        
 
     def calc_simple_marginal_cost(
         self,

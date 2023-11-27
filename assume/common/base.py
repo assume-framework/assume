@@ -618,9 +618,8 @@ class SupportsMinMaxCharge(BaseUnit):
             )
         else:
             # Assuming the storage is not restricted by ramping charging down
-            if previous_power < 0:
-                previous_power = 0
-
+            previous_power = max(previous_power, 0)
+            
             power_discharge = min(
                 power_discharge,
                 max(0, previous_power + self.ramp_up_discharge - current_power),
@@ -663,9 +662,8 @@ class SupportsMinMaxCharge(BaseUnit):
                 previous_power - self.ramp_down_discharge - current_power, 0
             )
         else:
-            if previous_power > 0:
-                previous_power = 0
-
+            previous_power = min(previous_power, 0)
+            
             power_charge = max(
                 power_charge,
                 min(previous_power + self.ramp_up_charge - current_power, 0),
