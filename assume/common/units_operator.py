@@ -20,7 +20,6 @@ from assume.common.market_objects import (
     MetaDict,
     OpeningMessage,
     Orderbook,
-    OrderBookMessage,
     RegistrationMessage,
 )
 from assume.common.utils import aggregate_step_amount
@@ -523,7 +522,7 @@ class UnitsOperator(Role):
         all_observations = all_observations.squeeze().cpu().numpy()
         all_actions = all_actions.squeeze().cpu().numpy()
         all_rewards = np.array(all_rewards)
-        rl_agent_data = (np.array(all_observations), all_actions, all_rewards)
+        rl_agent_data = (all_observations, all_actions, all_rewards)
 
         learning_role_id = self.context.data_dict.get("learning_agent_id")
         learning_role_addr = self.context.data_dict.get("learning_agent_addr")

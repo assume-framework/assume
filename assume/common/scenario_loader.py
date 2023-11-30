@@ -647,7 +647,8 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
 
             world.run()
 
-            avg_reward = world.output_role.get_sum_reward()
+            total_rewards = world.output_role.get_sum_reward()
+            avg_reward = np.mean(total_rewards)
             # check reward improvement in validation run
             world.learning_config["trained_actors_path"] = old_path
             if avg_reward > best_reward:
