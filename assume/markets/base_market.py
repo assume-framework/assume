@@ -13,6 +13,7 @@ from mango import Role
 
 from assume.common.market_objects import (
     ClearingMessage,
+    DataRequestMessage,
     MarketConfig,
     MarketProduct,
     MetaDict,
@@ -41,9 +42,11 @@ class MarketMechanism:
     name: str
 
     def __init__(self, marketconfig: MarketConfig):
+        super().__init__()
         self.marketconfig = marketconfig
         self.open_auctions = set()
         self.all_orders = []
+        self.results = []
 
     def validate_registration(
         self, content: RegistrationMessage, meta: MetaDict
@@ -52,8 +55,11 @@ class MarketMechanism:
         method to validate a given registration.
         Used to check if a participant is eligible to bid on this market
         """
-        # simple check that 1 MW can be bid at least
-        requirement = lambda unit: unit["max_power"] >= 1 or unit["min_power"] <= -1
+
+        # simple check that 1 MW can be bid at least by  powerplants
+        def requirement(unit: dict):
+            return unit.get("unit_type") != "power_plant" or abs(unit["max_power"]) >= 1
+
         return all([requirement(info) for info in content["information"]])
 
     def validate_orderbook(self, orderbook: Orderbook, agent_tuple: tuple) -> None:
@@ -160,6 +166,7 @@ class MarketRole(MarketMechanism, Role):
 
         Schedules the opening() method to run at the next opening time of the market.
         """
+        super().setup()
         self.marketconfig.addr = self.context.addr
         self.marketconfig.aid = self.context.aid
 
@@ -201,6 +208,15 @@ class MarketRole(MarketMechanism, Role):
                 and content.get("market_id") == self.marketconfig.name
             )
 
+        def accept_data_request(content: dict, meta: MetaDict):
+            return (
+                content.get("context") == "data_request"
+                and content.get("market_id") == self.marketconfig.name
+            )
+
+        self.context.subscribe_message(
+            self, self.handle_data_request, accept_data_request
+        )
         self.context.subscribe_message(self, self.handle_orderbook, accept_orderbook)
         self.context.subscribe_message(
             self, self.handle_registration, accept_registration
@@ -235,8 +251,8 @@ class MarketRole(MarketMechanism, Role):
         opening_message: OpeningMessage = {
             "context": "opening",
             "market_id": self.marketconfig.name,
-            "start": market_open,
-            "stop": market_closing,
+            "start_time": market_open,
+            "end_time": market_closing,
             "products": products,
         }
 
@@ -251,6 +267,7 @@ class MarketRole(MarketMechanism, Role):
                 acl_metadata={
                     "sender_addr": self.context.addr,
                     "sender_id": self.context.aid,
+                    "reply_with": f"{self.marketconfig.name}_{market_open}",
                 },
             )
 
@@ -303,6 +320,7 @@ class MarketRole(MarketMechanism, Role):
             acl_metadata={
                 "sender_addr": self.context.addr,
                 "sender_id": self.context.aid,
+                "in_reply_to": meta.get("reply_with"),
             },
         )
 
@@ -334,9 +352,37 @@ class MarketRole(MarketMechanism, Role):
                 acl_metadata={
                     "sender_addr": self.context.addr,
                     "sender_id": self.context.aid,
-                    "in_reply_to": 1,
+                    "in_reply_to": meta.get("reply_with"),
                 },
             )
+
+    def handle_data_request(self, content: DataRequestMessage, meta: MetaDict):
+        metric_type = content["metric"]
+        start = content["start_time"]
+        end = content["end_time"]
+
+        data = []
+        try:
+            import pandas as pd
+
+            data = pd.DataFrame(self.results)
+            data.index = data["time"]
+            data = data[metric_type][start:end]
+        except Exception:
+            logger.exception("error handling data request")
+        self.context.schedule_instant_acl_message(
+            content={
+                "context": "data_response",
+                "data": data,
+            },
+            receiver_addr=meta["sender_addr"],
+            receiver_id=meta["sender_id"],
+            acl_metadata={
+                "sender_addr": self.context.addr,
+                "sender_id": self.context.aid,
+                "in_reply_to": meta.get("reply_with"),
+            },
+        )
 
     def handle_get_unmatched(self, content: dict, meta: MetaDict):
         """
@@ -437,6 +483,7 @@ class MarketRole(MarketMechanism, Role):
             )
             meta["market_id"] = self.marketconfig.name
             meta["time"] = meta["product_start"]
+            self.results.append(meta)
 
         await self.store_market_results(market_meta)
 

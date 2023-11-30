@@ -137,6 +137,7 @@ class WriteOutput(Role):
         """
         Sets up the WriteOutput instance by subscribing to messages and scheduling recurrent tasks of storing the data.
         """
+        super().setup()
 
         self.context.subscribe_message(
             self,
@@ -362,6 +363,7 @@ class WriteOutput(Role):
         """
         This function makes it possible to calculate Key Performance Indicators
         """
+        await super().on_stop()
 
         # insert left records into db
         await self.store_dfs()

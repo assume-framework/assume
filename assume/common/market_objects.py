@@ -36,9 +36,13 @@ class Order(TypedDict):
     :param end_time: the end time of the order
     :type end_time: datetime
     :param volume: the volume of the order
-    :type volume: int
+    :type volume: float
     :param price: the price of the order
-    :type price: int
+    :type price: float
+    :param accepted_volume: the accepted volume of the order
+    :type accepted_volume: float
+    :param accepted_price: the accepted price of the order
+    :type accepted_price: float
     :param only_hours: tuple of hours from which this order is available, on multi day products
     :type only_hours: OnlyHours | None
     :param agent_id: the id of the agent
@@ -187,18 +191,18 @@ class OpeningMessage(TypedDict):
     :type context: str
     :param market_id: the id of the market
     :type market_id: str
-    :param start: the start time of the market
-    :type start: float
-    :param stop: the stop time of the market
-    :type stop: float
+    :param start_time: the start time of the market
+    :type start_time: float
+    :param end_time: the stop time of the market
+    :type end_time: float
     :param products: list of products which are available at the market to be traded
     :type products: list[Product]
     """
 
     context: str
     market_id: str
-    start: float
-    stop: float
+    start_time: float
+    end_time: float
     products: list[Product]
 
 
@@ -210,13 +214,16 @@ class ClearingMessage(TypedDict):
     :type context: str
     :param market_id: the id of the market
     :type market_id: str
-    :param orderbook: the orderbook of the market
-    :type orderbook: Orderbook
+    :param accepted_orders: the orders accepted by the market
+    :type accepted_orders: Orderbook
+    :param rejected_orders: the orders rejected by the market
+    :type rejected_orders: Orderbook
     """
 
     context: str
     market_id: str
-    orderbook: Orderbook
+    accepted_orders: Orderbook
+    rejected_orders: Orderbook
 
 
 class OrderBookMessage(TypedDict):
@@ -235,6 +242,14 @@ class RegistrationReplyMessage(TypedDict):
     context: str
     market_id: str
     accepted: bool
+
+
+class DataRequestMessage(TypedDict):
+    context: str
+    market_id: str
+    metric: str
+    start_time: datetime
+    end_time: datetime
 
 
 class MetaDict(TypedDict):
