@@ -16,12 +16,6 @@ class Forecaster:
     Args:
     - index (pd.Series): The index of the forecasts.
 
-    Methods:
-    - __getitem__(self, column: str) -> pd.Series: Returns the forecast for a given column.
-    - get_availability(self, unit: str) -> pd.Series: Returns the availability of a given unit.
-    - get_price(self, fuel_type: str) -> pd.Series: Returns the price for a given fuel type or zeros if
-    the type does not exist.
-
     This class represents a forecaster that provides timeseries for forecasts derived from existing files,
     random noise, or actual forecast methods. It initializes with the provided index. It includes methods
     to retrieve forecasts for specific columns, availability of units, and prices of fuel types, returning
@@ -86,19 +80,9 @@ class CsvForecaster(Forecaster):
     - index (pd.Series): The index of the forecasts.
     - powerplants (dict[str, pd.Series]): The power plants.
 
-    Methods:
-    - __getitem__(self, column: str) -> pd.Series: Returns the forecast for a given column.
-    - set_forecast(self, data: pd.DataFrame | pd.Series | None, prefix=""): Sets the forecast for a given
-    column.
-    - calc_forecast_if_needed(self): Calculates the forecasts if they are not already calculated.
-    - get_registered_market_participants(self, market_id): Retrieves information about market participants
-    for accurate price forecast.
-    - calculate_residual_demand_forecast(self): Calculates the residual demand forecast.
-    - calculate_EOM_price_forecast(self): Calculates the merit order price forecast for the entire time
-    horizon at once.
-    - calculate_marginal_cost(self, pp_series: pd.Series): Calculates the marginal cost of a power plant
-    based on the fuel costs and efficiencies.
-    - save_forecasts(self, path): Saves the forecasts to a csv file.
+    This class represents a forecaster that provides timeseries for forecasts derived from existing files.
+    It initializes with the provided index. It includes methods to retrieve forecasts for specific columns,
+    availability of units, and prices of fuel types, returning the corresponding timeseries as pandas Series.
     """
 
     def __init__(
@@ -369,13 +353,9 @@ class RandomForecaster(CsvForecaster):
     - powerplants (dict[str, pd.Series]): The power plants.
     - sigma (float): The standard deviation of the noise.
 
-    Methods:
-    - __getitem__(self, column: str) -> pd.Series: Returns the forecast for a given column.
-
     This class represents a forecaster that generates forecasts using random noise. It inherits
     from the `CsvForecaster` class and initializes with the provided index, power plants, and
-    standard deviation of the noise. The `__getitem__` method returns the forecast for a given
-    column as a pandas Series modified by random noise based on the provided parameters.
+    standard deviation of the noise.
     """
 
     def __init__(
@@ -424,13 +404,9 @@ class NaiveForecast(Forecaster):
     - demand (float | list): The demand.
     - price_forecast (float | list): The price forecast.
 
-    Methods:
-    - __getitem__(self, column: str) -> pd.Series: Get the forecasted values for a specific column.
-
     This class represents a forecaster that generates forecasts using naive methods. It inherits
     from the `Forecaster` class and initializes with the provided index and optional parameters
-    for availability, fuel price, CO2 price, demand, and price forecast. The `__getitem__` method
-    allows retrieval of forecasted values for specific columns based on the provided parameters.
+    for availability, fuel price, CO2 price, demand, and price forecast.
     """
 
     def __init__(
