@@ -71,8 +71,6 @@ class Storage(SupportsMinMaxCharge):
         The minimum operating time of the storage unit in hours.
     min_down_time : float, optional
         The minimum down time of the storage unit in hours.
-    min_down_time : float, optional
-        The minimum down time of the storage unit in hours.
     is_active: bool
         Defines whether or not the unit bids itself or is portfolio optimized.
     bidding_startegy: str
