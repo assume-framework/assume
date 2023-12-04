@@ -75,7 +75,7 @@ nbsphinx_prolog = """
 .. note::
 
     You can `download <https://github.com/assume-framework/assume/tree/main/{{ docname }}>`_ this example as a Jupyter notebook
-    or open ir directly in `Google Colab <https://colab.research.google.com/github/assume-framework/assume/blob/main/{{ docname }}>`_.
+    or try it out directly in `Google Colab <https://colab.research.google.com/github/assume-framework/assume/blob/main/{{ docname }}>`_.
 """
 
 nbsphinx_allow_errors = True
