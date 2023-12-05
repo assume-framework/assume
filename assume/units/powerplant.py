@@ -240,7 +240,7 @@ class PowerPlant(SupportsMinMax):
 
             self.outputs[product_type + "marginal_costs"].loc[start] = (
                 self.calculate_marginal_cost(
-                    start, self.outputs[product_type].loc[start]
+                    start, current_power
                 )
                 #* self.outputs[product_type].loc[start]
             )

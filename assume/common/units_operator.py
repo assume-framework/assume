@@ -237,12 +237,11 @@ class UnitsOperator(Role):
             data = pd.DataFrame(current_dispatch)
             data["soc"] = unit.outputs["soc"][start:end_excl]
             data["profit"] = unit.outputs["profit"][start:end_excl]
+            data["total_cost"] = unit.outputs["total_cost"][start:end_excl]
             for key in unit.outputs.keys():
                 if "cashflow" in key:
                     data[key] = unit.outputs[key][start:end_excl]
                 if "marginal_costs" in key:
-                    data[key] = unit.outputs[key][start:end_excl]
-                if "total_cost" in key:
                     data[key] = unit.outputs[key][start:end_excl]
 
             data["unit"] = unit_id

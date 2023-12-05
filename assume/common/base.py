@@ -139,7 +139,7 @@ class BaseUnit:
                 self.calculate_marginal_cost(
                     start, self.outputs[product_type].loc[start]
                 )
-                * self.outputs[product_type].loc[start]
+                #* self.outputs[product_type].loc[start]
             )
 
         self.bidding_strategies[product_type].calculate_reward(

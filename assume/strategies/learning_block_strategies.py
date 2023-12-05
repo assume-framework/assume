@@ -458,17 +458,21 @@ class RLStrategyBlocks(LearningStrategy):
                 # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
                 # don't consider opportunity_cost more than once! Always the same for one timestep and one market
                 opportunity_cost[start] = max(order_opportunity_cost, 0)
-                profit[start] += price_difference * accepted_volume
-                costs[start] += marginal_cost * accepted_volume
+                profit[start] += accepted_price * accepted_volume
                 
 
         # consideration of start-up costs, which are evenly divided between the
         # upward and downward regulation events
         for start in products_index:
             op_time = unit.get_operation_time(start)
+            
+            marginal_cost = unit.calculate_marginal_cost(
+                start, unit.outputs[product_type].loc[start]
+            )
+            costs[start] += marginal_cost * unit.outputs[product_type].loc[start]
+
             if unit.outputs[product_type].loc[start] != 0 and op_time < 0:
                 start_up_cost = unit.get_starting_costs(op_time)
-                profit[start] += -start_up_cost
                 costs[start] += start_up_cost
 
         # ---------------------------
@@ -476,7 +480,8 @@ class RLStrategyBlocks(LearningStrategy):
         # The straight forward implemntation would be reward = profit, yet we would like to give the agent more guidance
         # in the learning process, so we add a regret term to the reward, which is the opportunity cost
         # define the reward and scale it
-
+        
+        profit += -costs
         scaling = 1 / (unit.max_power * self.max_bid_price)
         regret_scale = 0.0
         reward = (
@@ -484,7 +489,7 @@ class RLStrategyBlocks(LearningStrategy):
         ) * scaling
 
         # store results in unit outputs which are written to database by unit operator
-        unit.outputs["profit"].loc[products_index] += profit
+        unit.outputs["profit"].loc[products_index] = profit
         unit.outputs["reward"].loc[products_index] = reward
         unit.outputs["regret"].loc[products_index] = opportunity_cost
         unit.outputs["total_cost"].loc[products_index] = costs

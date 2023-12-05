@@ -48,7 +48,7 @@ tiny:
         - parent_bid_id
 
 
-dam_LB_winter_maxbid250:
+dam_LB_winter:
   start_date: 2037-01-01 00:00
   end_date: 2037-01-31 23:00
   time_step: 1h
@@ -60,7 +60,7 @@ dam_LB_winter_maxbid250:
     action_dimension: 2
     continue_learning: False
     load_model_path: None
-    max_bid_price: 250
+    max_bid_price: 200
     algorithm: matd3
     learning_rate: 0.001
     training_episodes: 60
@@ -97,7 +97,7 @@ dam_LB_winter_maxbid250:
         - min_acceptance_ratio
         - parent_bid_id
 
-dam_LB_summer_maxbid250:
+dam_LB_summer:
   start_date: 2037-07-01 00:00
   end_date: 2037-07-31 23:00
   time_step: 1h
@@ -109,7 +109,7 @@ dam_LB_summer_maxbid250:
     action_dimension: 2
     continue_learning: False
     load_model_path: None
-    max_bid_price: 250
+    max_bid_price: 200
     algorithm: matd3
     learning_rate: 0.001
     training_episodes: 60
@@ -146,7 +146,7 @@ dam_LB_summer_maxbid250:
         - min_acceptance_ratio
         - parent_bid_id
 
-dam_BB_winter_maxbid250:
+dam_BB_winter:
   start_date: 2037-01-01 00:00
   end_date: 2037-01-31 23:00
   time_step: 1h
@@ -158,7 +158,7 @@ dam_BB_winter_maxbid250:
     action_dimension: 2
     continue_learning: False
     load_model_path: None
-    max_bid_price: 250
+    max_bid_price: 200
     algorithm: matd3
     learning_rate: 0.001
     training_episodes: 60
@@ -195,7 +195,7 @@ dam_BB_winter_maxbid250:
         - min_acceptance_ratio
         - parent_bid_id
 
-dam_BB_summer_maxbid250:
+dam_BB_summer:
   start_date: 2037-07-01 00:00
   end_date: 2037-07-31 23:00
   time_step: 1h
@@ -207,7 +207,7 @@ dam_BB_summer_maxbid250:
     action_dimension: 2
     continue_learning: False
     load_model_path: None
-    max_bid_price: 250
+    max_bid_price: 200
     algorithm: matd3
     learning_rate: 0.001
     training_episodes: 60
@@ -244,7 +244,7 @@ dam_BB_summer_maxbid250:
         - min_acceptance_ratio
         - parent_bid_id
 
-dam_SB_winter_maxbid250:
+dam_SB_winter:
   start_date: 2037-01-01 00:00
   end_date: 2037-01-31 23:00
   time_step: 1h
@@ -256,7 +256,7 @@ dam_SB_winter_maxbid250:
     action_dimension: 2
     continue_learning: False
     load_model_path: None
-    max_bid_price: 250
+    max_bid_price: 200
     algorithm: matd3
     learning_rate: 0.001
     training_episodes: 60
@@ -293,7 +293,7 @@ dam_SB_winter_maxbid250:
         - min_acceptance_ratio
         - parent_bid_id
 
-dam_SB_summer_maxbid250:
+dam_SB_summer:
   start_date: 2037-07-01 00:00
   end_date: 2037-07-31 23:00
   time_step: 1h
@@ -305,7 +305,7 @@ dam_SB_summer_maxbid250:
     action_dimension: 2
     continue_learning: False
     load_model_path: None
-    max_bid_price: 250
+    max_bid_price: 200
     algorithm: matd3
     learning_rate: 0.001
     training_episodes: 60

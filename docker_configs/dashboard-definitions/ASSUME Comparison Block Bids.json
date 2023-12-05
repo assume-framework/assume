@@ -233,11 +233,9 @@
               "options": {
                 "mode": "exclude",
                 "names": [
+                  "Price 2020_RL_dam_BB_summer_newLearning",
                   "Price 2020_SB_dam",
-                  "Price 2020_BB_dam",
-                  "Price 2020_LB_dam",
-                  "Supply Volume 2020_LB_dam",
-                  "Supply Volume 2020_SB_dam"
+                  "Price 2020_RL_dam_LB_summer_newLearning"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -420,9 +418,51 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "MCP {simulation=\"2020_SB_dam\"}",
-                  "  {simulation=\"2020_SB_dam\", unit_id=\"Biomass\"}",
-                  "  {simulation=\"2020_SB_dam\", unit_id=\"coal_unit\"}"
+                  "  {simulation=\"2020_RL_dam_BB_winter_newLearning\", unit_id=\"Biomass\"}",
+                  "  {simulation=\"2020_RL_dam_LB_winter_newLearning\", unit_id=\"Biomass\"}",
+                  "  {simulation=\"2020_RL_dam_SB_winter_newLearning\", unit_id=\"Biomass\"}",
+                  "  {simulation=\"2020_RL_dam_BB_winter_newLearning\", unit_id=\"Hydro\"}",
+                  "  {simulation=\"2020_RL_dam_LB_winter_newLearning\", unit_id=\"Hydro\"}",
+                  "  {simulation=\"2020_RL_dam_SB_winter_newLearning\", unit_id=\"Hydro\"}",
+                  "  {simulation=\"2020_RL_dam_BB_winter_newLearning\", unit_id=\"Solar\"}",
+                  "  {simulation=\"2020_RL_dam_LB_winter_newLearning\", unit_id=\"Solar\"}",
+                  "  {simulation=\"2020_RL_dam_SB_winter_newLearning\", unit_id=\"Solar\"}",
+                  "  {simulation=\"2020_RL_dam_BB_winter_newLearning\", unit_id=\"Wind offshore\"}",
+                  "  {simulation=\"2020_RL_dam_LB_winter_newLearning\", unit_id=\"Wind offshore\"}",
+                  "  {simulation=\"2020_RL_dam_SB_winter_newLearning\", unit_id=\"Wind offshore\"}",
+                  "  {simulation=\"2020_RL_dam_BB_winter_newLearning\", unit_id=\"Wind onshore\"}",
+                  "  {simulation=\"2020_RL_dam_LB_winter_newLearning\", unit_id=\"Wind onshore\"}",
+                  "  {simulation=\"2020_RL_dam_SB_winter_newLearning\", unit_id=\"Wind onshore\"}",
+                  "  {simulation=\"2020_RL_dam_BB_winter_newLearning\", unit_id=\"battery_unit\"}",
+                  "  {simulation=\"2020_RL_dam_LB_winter_newLearning\", unit_id=\"battery_unit\"}",
+                  "  {simulation=\"2020_RL_dam_SB_winter_newLearning\", unit_id=\"battery_unit\"}",
+                  "  {simulation=\"2020_RL_dam_BB_winter_newLearning\", unit_id=\"coal_unit\"}",
+                  "  {simulation=\"2020_RL_dam_LB_winter_newLearning\", unit_id=\"coal_unit\"}",
+                  "  {simulation=\"2020_RL_dam_SB_winter_newLearning\", unit_id=\"coal_unit\"}",
+                  "  {simulation=\"2020_RL_dam_BB_winter_newLearning\", unit_id=\"combined_gas_unit\"}",
+                  "  {simulation=\"2020_RL_dam_LB_winter_newLearning\", unit_id=\"combined_gas_unit\"}",
+                  "  {simulation=\"2020_RL_dam_SB_winter_newLearning\", unit_id=\"combined_gas_unit\"}",
+                  "  {simulation=\"2020_RL_dam_BB_winter_newLearning\", unit_id=\"import_unit\"}",
+                  "  {simulation=\"2020_RL_dam_LB_winter_newLearning\", unit_id=\"import_unit\"}",
+                  "  {simulation=\"2020_RL_dam_SB_winter_newLearning\", unit_id=\"import_unit\"}",
+                  "  {simulation=\"2020_RL_dam_BB_winter_newLearning\", unit_id=\"lignite_unit\"}",
+                  "  {simulation=\"2020_RL_dam_LB_winter_newLearning\", unit_id=\"lignite_unit\"}",
+                  "  {simulation=\"2020_RL_dam_SB_winter_newLearning\", unit_id=\"lignite_unit\"}",
+                  "  {simulation=\"2020_RL_dam_BB_winter_newLearning\", unit_id=\"nuclear_unit\"}",
+                  "  {simulation=\"2020_RL_dam_LB_winter_newLearning\", unit_id=\"nuclear_unit\"}",
+                  "  {simulation=\"2020_RL_dam_SB_winter_newLearning\", unit_id=\"nuclear_unit\"}",
+                  "  {simulation=\"2020_RL_dam_BB_winter_newLearning\", unit_id=\"oil_unit\"}",
+                  "  {simulation=\"2020_RL_dam_LB_winter_newLearning\", unit_id=\"oil_unit\"}",
+                  "  {simulation=\"2020_RL_dam_SB_winter_newLearning\", unit_id=\"oil_unit\"}",
+                  "  {simulation=\"2020_RL_dam_BB_winter_newLearning\", unit_id=\"open_gas_unit\"}",
+                  "  {simulation=\"2020_RL_dam_LB_winter_newLearning\", unit_id=\"open_gas_unit\"}",
+                  "  {simulation=\"2020_RL_dam_SB_winter_newLearning\", unit_id=\"open_gas_unit\"}",
+                  "  {simulation=\"2020_RL_dam_BB_winter_newLearning\", unit_id=\"storage_unit\"}",
+                  "  {simulation=\"2020_RL_dam_LB_winter_newLearning\", unit_id=\"storage_unit\"}",
+                  "  {simulation=\"2020_RL_dam_SB_winter_newLearning\", unit_id=\"storage_unit\"}",
+                  "MCP {simulation=\"2020_RL_dam_BB_winter_newLearning\"}",
+                  "MCP {simulation=\"2020_RL_dam_LB_winter_newLearning\"}",
+                  "MCP {simulation=\"2020_RL_dam_SB_winter_newLearning\"}"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -690,7 +730,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  count(price) filter(where accepted_price = price)  AS \"price\",\n  unit_id AS \"unit_id\",\n  simulation as \"simulation\"\nFROM market_orders\nWHERE\n  simulation in ($simulation) AND\n  unit_id not in ('', ' ')\nGROUP BY unit_id, simulation\nORDER BY unit_id",
+          "rawSql": "SELECT\n  count(price) filter(where accepted_price = price and accepted_volume != 0)  AS \"price\",\n  unit_id AS \"unit_id\",\n  simulation as \"simulation\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  simulation in ($simulation) AND\n  unit_id not in ('', ' ')\nGROUP BY unit_id, simulation\nORDER BY unit_id",
           "refId": "A",
           "select": [
             [
@@ -1960,8 +2000,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2072,8 +2111,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2191,8 +2229,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2351,8 +2388,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2537,8 +2573,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2779,8 +2814,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2908,8 +2942,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4970,12 +5003,10 @@
           "selected": true,
           "text": [
             "2020_BB_dam",
-            "2020_LB_dam",
             "2020_SB_dam"
           ],
           "value": [
             "2020_BB_dam",
-            "2020_LB_dam",
             "2020_SB_dam"
           ]
         },
@@ -5007,6 +5038,6 @@
   "timezone": "",
   "title": "ASSUME Comparison Block Bids",
   "uid": "LlWPcjzSz",
-  "version": 5,
+  "version": 8,
   "weekStart": ""
 }
