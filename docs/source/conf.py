@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Configuration file for the Sphinx documentation builder.
 
 # -- Project information
@@ -6,8 +10,8 @@ project = "ASSUME"
 copyright = "2022-2023 ASSUME Developers"
 author = "ASSUME Developers"
 
-release = "0.1"
-version = "0.1.0"
+release = "0.2"
+version = "0.2.1"
 
 # -- General configuration
 
@@ -18,6 +22,12 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
     "sphinxcontrib.mermaid",
+    "sphinx.ext.todo",
+    "sphinx.ext.mathjax",
+    "sphinx.ext.napoleon",
+    "nbsphinx",
+    "nbsphinx_link",
+    "sphinx.ext.imgconverter",  # for SVG conversion
 ]
 
 intersphinx_mapping = {
@@ -57,3 +67,14 @@ html_static_path = ["_static"]
 
 # -- Options for EPUB output
 epub_show_urls = "footnote"
+
+# -- Options for nbsphinx -------------------------------------------------
+# nbsphinx_kernel_name = 'assume'
+nbsphinx_prolog = """
+{% set docname = env.doc2path(env.docname, base=None).replace("nblink", "ipynb").replace("examples/", "examples/notebooks/") %}
+.. note::
+
+    You can `download <https://github.com/assume-framework/assume/tree/main/{{ docname }}>`_ this example as a Jupyter notebook
+"""
+
+nbsphinx_allow_errors = True

@@ -1,4 +1,9 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import logging
+from collections import defaultdict
 from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
@@ -10,16 +15,19 @@ from mango.messages.message import Performatives
 
 from assume.common.market_objects import (
     ClearingMessage,
+    DataRequestMessage,
     MarketConfig,
+    MetaDict,
     OpeningMessage,
     Orderbook,
+    OrderBookMessage,
+    RegistrationMessage,
 )
 from assume.common.utils import aggregate_step_amount, get_products_index
 from assume.strategies import (
     BaseStrategy,
     LearningStrategy,
     RLdamStrategy,
-    hourlyRLdamStrategy,
     RLStrategyBlocks,
 )
 from assume.units import BaseUnit
@@ -45,7 +53,6 @@ class UnitsOperator(Role):
     ):
         super().__init__()
 
-        self.bids_map = {}
         self.available_markets = available_markets
         self.registered_markets: dict[str, MarketConfig] = {}
         self.last_sent_dispatch = 0
@@ -57,11 +64,12 @@ class UnitsOperator(Role):
             self.use_portfolio_opt = opt_portfolio[0]
             self.portfolio_strategy = opt_portfolio[1]
 
-        # should be a list per product_type
-        self.valid_orders = []
+        # valid_orders per product_type
+        self.valid_orders = defaultdict(list)
         self.units: dict[str, BaseUnit] = {}
 
     def setup(self):
+        super().setup()
         self.id = self.context.aid
         self.context.subscribe_message(
             self,
@@ -75,10 +83,24 @@ class UnitsOperator(Role):
             lambda content, meta: content.get("context") == "clearing",
         )
 
+        self.context.subscribe_message(
+            self,
+            self.handle_registration_feedback,
+            lambda content, meta: content.get("context") == "registration",
+        )
+
+        self.context.subscribe_message(
+            self,
+            self.handle_data_request,
+            lambda content, meta: content.get("context") == "data_request",
+        )
+
         for market in self.available_markets:
             if self.participate(market):
-                self.register_market(market)
-                self.registered_markets[market.name] = market
+                self.context.schedule_timestamp_task(
+                    self.register_market(market),
+                    1,  # register after time was updated for the first time
+                )
 
     async def add_unit(
         self,
@@ -121,28 +143,31 @@ class UnitsOperator(Role):
         """
         return True
 
-    def register_market(self, market: MarketConfig):
+    async def register_market(self, market: MarketConfig):
         """
         Register a market.
 
         :param market: the market to register
         :type market: MarketConfig
         """
-        self.context.schedule_timestamp_task(
-            self.context.send_acl_message(
-                {"context": "registration", "market": market.name},
-                market.addr,
-                receiver_id=market.aid,
-                acl_metadata={
-                    "sender_addr": self.context.addr,
-                    "sender_id": self.context.aid,
-                },
-            ),
-            1,  # register after time was updated for the first time
-        )
-        logger.debug(f"{self.id} tried to register at market {market.name}")
 
-    def handle_opening(self, opening: OpeningMessage, meta: dict[str, str]):
+        await self.context.send_acl_message(
+            {
+                "context": "registration",
+                "market_id": market.name,
+                "information": [u.as_dict() for u in self.units.values()],
+            },
+            receiver_addr=market.addr,
+            receiver_id=market.aid,
+            acl_metadata={
+                "sender_addr": self.context.addr,
+                "sender_id": self.context.aid,
+                "reply_with": market.name,
+            },
+        ),
+        logger.debug(f"{self.id} sent market registration to {market.name}")
+
+    def handle_opening(self, opening: OpeningMessage, meta: MetaDict):
         """
         When we receive an opening from the market, we schedule sending back
         our list of orders as a response
@@ -150,14 +175,14 @@ class UnitsOperator(Role):
         :param opening: the opening message
         :type opening: OpeningMessage
         :param meta: the meta data of the market
-        :type meta: dict[str, str]
+        :type meta: MetaDict
         """
         logger.debug(
-            f'{self.id} received opening from: {opening["market_id"]} {opening["start"]} until: {opening["stop"]}.'
+            f'{self.id} received opening from: {opening["market_id"]} {opening["start_time"]} until: {opening["end_time"]}.'
         )
-        self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
+        self.context.schedule_instant_task(coroutine=self.submit_bids(opening, meta))
 
-    def handle_market_feedback(self, content: ClearingMessage, meta: dict[str, str]):
+    def handle_market_feedback(self, content: ClearingMessage, meta: MetaDict):
         """
         handles the feedback which is received from a market we did bid at
         stores accepted orders, sets the received power
@@ -167,7 +192,7 @@ class UnitsOperator(Role):
         :param content: the content of the clearing message
         :type content: ClearingMessage
         :param meta: the meta data of the market
-        :type meta: dict[str, str]
+        :type meta: MetaDict
         """
         logger.debug(f"{self.id} got market result: {content}")
         accepted_orders: Orderbook = content["accepted_orders"]
@@ -176,14 +201,55 @@ class UnitsOperator(Role):
 
         for order in orderbook:
             order["market_id"] = content["market_id"]
-            # map bid id to unit id
-            order["unit_id"] = self.bids_map[order["bid_id"]]
 
-        self.valid_orders.extend(orderbook)
         marketconfig = self.registered_markets[content["market_id"]]
+        self.valid_orders[marketconfig.product_type].extend(orderbook)
         self.set_unit_dispatch(orderbook, marketconfig)
         self.write_learning_params(orderbook, marketconfig)
-        self.write_actual_dispatch(marketconfig)
+        self.write_actual_dispatch(marketconfig.product_type)
+
+    def handle_registration_feedback(
+        self, content: RegistrationMessage, meta: MetaDict
+    ):
+        logger.debug("Market %s accepted our registration", content["market_id"])
+        if content["accepted"]:
+            found = False
+            for market in self.available_markets:
+                if content["market_id"] == market.name:
+                    self.registered_markets[market.name] = market
+                    found = True
+                    break
+            if not found:
+                logger.error(
+                    "Market %s sent registation but is unknown", content["market_id"]
+                )
+        else:
+            logger.error("Market %s did not accept registration", meta["sender_id"])
+
+    def handle_data_request(self, content: DataRequestMessage, meta: MetaDict):
+        unit = content["unit"]
+        metric_type = content["metric"]
+        start = content["start_time"]
+        end = content["end_time"]
+
+        data = []
+        try:
+            data = self.units[unit].outputs[metric_type][start:end]
+        except Exception:
+            logger.exception("error handling data request")
+        self.context.schedule_instant_acl_message(
+            content={
+                "context": "data_response",
+                "data": data,
+            },
+            receiver_addr=meta["sender_addr"],
+            receiver_id=meta["sender_id"],
+            acl_metadata={
+                "sender_addr": self.context.addr,
+                "sender_id": self.context.aid,
+                "in_reply_to": meta.get("reply_with"),
+            },
+        )
 
     def set_unit_dispatch(self, orderbook: Orderbook, marketconfig: MarketConfig):
         """
@@ -204,7 +270,7 @@ class UnitsOperator(Role):
                 orderbook=orderbook,
             )
 
-    def write_actual_dispatch(self, marketconfig: MarketConfig):
+    def write_actual_dispatch(self, product_type: str):
         """
         sends the actual aggregated dispatch curve
         works across multiple markets
@@ -218,37 +284,36 @@ class UnitsOperator(Role):
         self.last_sent_dispatch = self.context.current_timestamp
 
         now = datetime.utcfromtimestamp(self.context.current_timestamp)
-        # start = datetime.utcfromtimestamp(last)
-        start = now
-        end = (
-            start
-            + marketconfig.market_products[0].duration
-            * marketconfig.market_products[0].count
-        )
+        start = datetime.utcfromtimestamp(last)
 
         market_dispatch = aggregate_step_amount(
-            self.valid_orders, start, now, groupby=["market_id", "unit_id"]
+            self.valid_orders[product_type],
+            start,
+            now,
+            groupby=["market_id", "unit_id"],
         )
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
-            end_excl = end - unit.index.freq
-            current_dispatch = unit.execute_current_dispatch(start, end_excl)
+            current_dispatch = unit.execute_current_dispatch(start, now)
+            end = now
             current_dispatch.name = "power"
             data = pd.DataFrame(current_dispatch)
-            data["soc"] = unit.outputs["soc"][start:end_excl]
-            data["profit"] = unit.outputs["profit"][start:end_excl]
-            data["total_cost"] = unit.outputs["total_cost"][start:end_excl]
+            unit.calculate_generation_cost(start, now, "energy")
+            valid_outputs = ["soc", "cashflow", "marginal_costs", "total_costs"]
+
             for key in unit.outputs.keys():
-                if "cashflow" in key:
-                    data[key] = unit.outputs[key][start:end_excl]
-                if "marginal_costs" in key:
-                    data[key] = unit.outputs[key][start:end_excl]
+                for output in valid_outputs:
+                    if output in key:
+                        data[key] = unit.outputs[key][start:end]
 
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
 
-        self.valid_orders = list(
-            filter(lambda x: x["end_time"] > now, self.valid_orders)
+        self.valid_orders[product_type] = list(
+            filter(
+                lambda x: x["end_time"] > now,
+                self.valid_orders[product_type],
+            )
         )
 
         db_aid = self.context.data_dict.get("output_agent_id")
@@ -275,7 +340,7 @@ class UnitsOperator(Role):
                     },
                 )
 
-    async def submit_bids(self, opening: OpeningMessage):
+    async def submit_bids(self, opening: OpeningMessage, meta: MetaDict):
         """
         formulates an orderbook and sends it to the market.
         This will handle optional portfolio processing
@@ -308,11 +373,12 @@ class UnitsOperator(Role):
             "sender_id": self.context.aid,
             "sender_addr": self.context.addr,
             "conversation_id": "conversation01",
+            "in_reply_to": meta.get("reply_with"),
         }
         await self.context.send_acl_message(
             content={
                 "context": "submit_bids",
-                "market": market.name,
+                "market_id": market.name,
                 "orderbook": orderbook,
             },
             receiver_addr=market.addr,
@@ -382,8 +448,8 @@ class UnitsOperator(Role):
                     order["price"] = round(order["price"] / market.price_tick)
                 if "bid_id" not in order.keys() or order["bid_id"] is None:
                     order["bid_id"] = f"{unit_id}_{i+1}"
+                order["unit_id"] = unit_id
                 orderbook.append(order)
-                self.bids_map[order["bid_id"]] = unit_id
 
         return orderbook
 
@@ -396,7 +462,7 @@ class UnitsOperator(Role):
             # rl only for energy market for now!
             if isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
-                (RLdamStrategy, RLStrategyBlocks)
+                (RLdamStrategy, RLStrategyBlocks),
             ):
                 # TODO: check whether to split the reward, profit and regret to different lines
                 output_dict = {
@@ -414,27 +480,6 @@ class UnitsOperator(Role):
                     output_dict[f"actions_{i}"] = action_tuple[i]
 
                 output_agent_list.append(output_dict)
-
-            elif isinstance(
-                unit.bidding_strategies.get(marketconfig.product_type),
-                hourlyRLdamStrategy,
-            ):
-                for start in products_index:
-                    output_dict = {
-                        "datetime": start,
-                        "profit": unit.outputs["profit"].loc[products_index].sum(),
-                        "reward": unit.outputs["reward"].loc[products_index].sum(),
-                        "regret": unit.outputs["regret"].loc[products_index].sum(),
-                        "unit": unit_id,
-                    }
-                    noise_tuple = unit.outputs["rl_exploration_noise"].loc[start]
-                    action_tuple = unit.outputs["rl_actions"].loc[start]
-                    action_dim = len(action_tuple)
-                    for i in range(action_dim):
-                        output_dict[f"exploration_noise_{i}"] = noise_tuple[i]
-                        output_dict[f"actions_{i}"] = action_tuple[i]
-
-                    output_agent_list.append(output_dict)
 
             elif isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
@@ -497,22 +542,12 @@ class UnitsOperator(Role):
             # rl only for energy market for now!
             if isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
-                (RLdamStrategy, RLStrategyBlocks)
+                (RLdamStrategy, RLStrategyBlocks),
             ):
                 all_observations[i, :] = unit.outputs["rl_observations"][start]
                 all_actions[i, :] = unit.outputs["rl_actions"][start]
                 all_rewards.append(sum(unit.outputs["reward"][products_index]))
                 i += 1
-
-            elif isinstance(
-                unit.bidding_strategies.get(marketconfig.product_type),
-                hourlyRLdamStrategy,
-            ):
-                for start in products_index:
-                    all_observations[i, :] = unit.outputs["rl_observations"][start]
-                    all_actions[i, :] = unit.outputs["rl_actions"][start]
-                    all_rewards.append(sum(unit.outputs["reward"][products_index]))
-                    i += 1
 
             elif isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
@@ -553,7 +588,7 @@ class UnitsOperator(Role):
         :type marketconfig: MarketConfig
         """
         learning_strategies = []
-        products_index = get_products_index(orderbook, marketconfig)
+        products_index = get_products_index(orderbook)
 
         for unit in self.units.values():
             bidding_strategy = unit.bidding_strategies.get(marketconfig.product_type)

@@ -1,17 +1,23 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import asyncio
 import calendar
 import logging
 import sys
 import time
 from datetime import datetime
+from sys import platform
 
 import nest_asyncio
 import pandas as pd
 from mango import RoleAgent, create_container
 from mango.container.core import Container
 from mango.util.clock import ExternalClock
+from mango.util.distributed_clock import DistributedClockAgent, DistributedClockManager
 from mango.util.termination_detection import tasks_complete_or_sleeping
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, make_url
 from sqlalchemy.exc import OperationalError
 from tqdm import tqdm
 
@@ -42,17 +48,39 @@ class World:
         database_uri: str = "",
         export_csv_path: str = "",
         log_level: str = "INFO",
-        additional_clearing_mechanisms: dict = {},
+        distributed_role: bool = None,
     ):
+        """
+        Initialize a World instance.
+
+        Args:
+        - addr (tuple[str, int] | str): The address of the world, represented as a tuple of string and int or a string.
+        - database_uri (str): The URI for the database connection.
+        - export_csv_path (str): The path for exporting CSV data.
+        - log_level (str): The logging level for the world instance.
+        - distributed_role (bool): A boolean indicating whether distributed roles are enabled.
+
+        Returns:
+        - None
+
+        This method initializes a World instance with the provided address, database URI,
+        export CSV path, log level, and distributed role settings. It establishes a database
+        connection if a database URI is provided. Additionally, it sets up various dictionaries
+        and attributes for market operators, markets, unit operators, unit types, bidding strategies,
+        and clearing mechanisms. If available, it imports learning strategies and handles any
+        potential import errors. Finally, it sets up the event loop for asynchronous operations.
+        """
+
         logging.getLogger("assume").setLevel(log_level)
         self.logger = logging.getLogger(__name__)
         self.addr = addr
         self.container = None
+        self.distributed_role = distributed_role
 
         self.export_csv_path = export_csv_path
         # intialize db connection at beginning of simulation
         if database_uri:
-            self.db = create_engine(database_uri)
+            self.db = create_engine(make_url(database_uri))
             connected = False
             while not connected:
                 try:
@@ -83,15 +111,10 @@ class World:
 
         try:
             from assume.strategies.learning_block_strategies import RLStrategyBlocks
-            from assume.strategies.learning_strategies import (
-                RLdamStrategy,
-                RLStrategy,
-                hourlyRLdamStrategy,
-            )
+            from assume.strategies.learning_strategies import RLdamStrategy, RLStrategy
 
             self.bidding_strategies["learning"] = RLStrategy
             self.bidding_strategies["learning_dam"] = RLdamStrategy
-            self.bidding_strategies["hourly_learning_dam"] = hourlyRLdamStrategy
             self.bidding_strategies["learning_blocks"] = RLStrategyBlocks
 
         except ImportError as e:
@@ -100,7 +123,7 @@ class World:
                 e,
             )
         self.clearing_mechanisms: dict[str, MarketRole] = clearing_mechanisms
-        self.clearing_mechanisms.update(additional_clearing_mechanisms)
+        self.addresses = []
         nest_asyncio.apply()
         self.loop = asyncio.get_event_loop()
         asyncio.set_event_loop(self.loop)
@@ -112,50 +135,105 @@ class World:
         simulation_id: str,
         index: pd.Series,
         save_frequency_hours: int = 24,
-        same_process: bool = True,
         bidding_params: dict = {},
         learning_config: LearningConfig = {},
         forecaster: Forecaster = None,
+        manager_address=None,
+        **kwargs,
     ):
+        """
+        Set up the environment for the simulation.
+
+        Args:
+        - self: The instance of the class.
+        - start (datetime): The start datetime for the simulation.
+        - end (datetime): The end datetime for the simulation.
+        - simulation_id (str): The unique identifier for the simulation.
+        - index (pd.Series): The index for the simulation.
+        - save_frequency_hours (int, optional): The frequency (in hours) at which to save simulation data. Defaults to 24.
+        - bidding_params (dict, optional): Parameters for bidding. Defaults to an empty dictionary.
+        - learning_config (LearningConfig, optional): Configuration for the learning process. Defaults to an empty configuration.
+        - forecaster (Forecaster, optional): The forecaster used for custom unit types. Defaults to None.
+        - manager_address: The address of the manager.
+
+        Other Parameters:
+        - kwargs: Additional keyword arguments.
+
+        Returns:
+        - None
+
+        This method sets up the environment for the simulation. It initializes various parameters and components
+        required for the simulation run, including the clock, learning configuration, forecaster, container,
+        connection type, and output agents. It also handles the setup for distributed roles if applicable.
+        """
+
         self.clock = ExternalClock(0)
         self.start = start
         self.end = end
         self.learning_config = learning_config
+        # initiate learning if the learning mode is on and hence we want to learn new strategies
+        self.evaluation_mode = self.learning_config.get("evaluation_mode", False)
 
         # forecaster is used only when loading custom unit types
         self.forecaster = forecaster
 
         self.bidding_params = bidding_params
         self.index = index
-        self.same_process = same_process
 
         # kill old container if exists
         if isinstance(self.container, Container) and self.container.running:
             await self.container.shutdown()
 
         # create new container
+        container_kwargs = {}
         if self.addr == "world":
             connection_type = "external_connection"
         elif isinstance(self.addr, tuple):
             connection_type = "tcp"
         else:
             connection_type = "mqtt"
+            container_kwargs["mqtt_kwargs"] = {
+                "broker_addr": "localhost",
+                "client_id": self.addr,
+            }
+            container_kwargs["mqtt_kwargs"].update(**kwargs)
 
         self.container = await create_container(
             connection_type=connection_type,
             codec=mango_codec_factory(),
             addr=self.addr,
             clock=self.clock,
+            **container_kwargs,
         )
-        await self.setup_learning()
-        await self.setup_output_agent(simulation_id, save_frequency_hours)
+        self.learning_mode = self.learning_config.get("learning_mode", False)
+        self.output_agent_addr = (self.addr, "export_agent_1")
+        if self.distributed_role is False:
+            self.clock_agent = DistributedClockAgent(self.container)
+            self.output_agent_addr = (manager_address, "export_agent_1")
+        else:
+            await self.setup_learning()
+            await self.setup_output_agent(simulation_id, save_frequency_hours)
+            self.clock_manager = DistributedClockManager(
+                self.container, receiver_clock_addresses=self.addresses
+            )
 
     async def setup_learning(self):
-        self.bidding_params.update(self.learning_config)
+        """
+        Set up the learning process for the simulation.
 
-        # initiate learning if the learning mode is on and hence we want to learn new strategies
-        self.learning_mode = self.learning_config.get("learning_mode", False)
-        self.evaluation_mode = self.learning_config.get("evaluation_mode", False)
+        Args:
+        - self: The instance of the class.
+
+        Returns:
+        - None
+
+        This method sets up the learning process for the simulation. It updates the bidding parameters
+        with the learning configuration and initializes the reinforcement learning (RL) learning role
+        with the specified parameters. It also sets up the RL agent and adds the learning role to it
+        for further processing.
+        """
+
+        self.bidding_params.update(self.learning_config)
 
         if self.learning_mode:
             # if so, we initate the rl learning role with parameters
@@ -166,25 +244,31 @@ class World:
                 start=self.start,
                 end=self.end,
             )
-            # if self.same_process:
             # separate process does not support buffer and learning
-            if True:
-                self.learning_agent_addr = (self.addr, "learning_agent")
-                rl_agent = RoleAgent(
-                    self.container, suggested_aid=self.learning_agent_addr[1]
-                )
-                rl_agent.add_role(self.learning_role)
-            else:
-
-                def creator(container):
-                    agent = RoleAgent(container, suggested_aid="learning_agent")
-                    agent.add_role(self.learning_role)
-
-                await self.container.as_agent_process(agent_creator=creator)
+            self.learning_agent_addr = (self.addr, "learning_agent")
+            rl_agent = RoleAgent(
+                self.container, suggested_aid=self.learning_agent_addr[1]
+            )
+            rl_agent.add_role(self.learning_role)
 
     async def setup_output_agent(self, simulation_id: str, save_frequency_hours: int):
-        self.output_agent_addr = (self.addr, "export_agent_1")
-        # Add output agent to world
+        """
+        Set up the output agent for the simulation.
+
+        Args:
+        - self: The instance of the class.
+        - simulation_id (str): The unique identifier for the simulation.
+        - save_frequency_hours (int): The frequency (in hours) at which to save simulation data.
+
+        Returns:
+        - None
+
+        This method sets up the output agent for the simulation. It creates an output role responsible
+        for writing simulation output, including data storage and export settings. Depending on the
+        platform (currently supported only on Linux), it adds the output agent to the container's
+        processes, or directly adds the output role to the output agent.
+        """
+
         self.logger.debug(f"creating output agent {self.db=} {self.export_csv_path=}")
         self.output_role = WriteOutput(
             simulation_id=simulation_id,
@@ -196,33 +280,44 @@ class World:
             learning_mode=self.learning_mode,
             evaluation_mode=self.evaluation_mode,
         )
-        if self.same_process:
+
+        # mango multiprocessing is currently only supported on linux
+        # with single
+        if platform == "linux":
+            self.addresses.append(self.addr)
+
+            def creator(container):
+                agent = RoleAgent(container, suggested_aid=self.output_agent_addr[1])
+                agent.add_role(self.output_role)
+                clock_agent = DistributedClockAgent(container)
+
+            await self.container.as_agent_process(agent_creator=creator)
+        else:
             output_agent = RoleAgent(
                 self.container, suggested_aid=self.output_agent_addr[1]
             )
             output_agent.add_role(self.output_role)
-        else:
-            # this does not set the clock in output_agent correctly yet
-            # see https://gitlab.com/mango-agents/mango/-/issues/59
-            # but still improves performance
-            def creator(container):
-                agent = RoleAgent(container, suggested_aid=self.output_agent_addr[1])
-                agent.add_role(self.output_role)
-
-            await self.container.as_agent_process(agent_creator=creator)
 
     def add_unit_operator(
         self,
         id: str,
     ) -> None:
         """
-        Create and add a new unit operator to the world.
+        Add a unit operator to the simulation.
 
-        Params
-        ------
-        id: str or int
+        Args:
+        - self: The instance of the class.
+        - id (str): The identifier for the unit operator.
 
+        Returns:
+        - None
+
+        This method adds a unit operator to the simulation. It creates a new role agent and
+        applies the role of a units operator to it. The unit operator is then added to the
+        list of operators currently existing. If in learning mode, additional context parameters
+        related to learning and output agents are set for the unit operator's role context.
         """
+
         if self.unit_operators.get(id):
             raise ValueError(f"Unit operator {id} already exists")
 
@@ -260,15 +355,23 @@ class World:
         forecaster: Forecaster,
     ) -> None:
         """
-        Create and add a new unit to the world.
+        Asynchronously add a unit to the simulation.
 
-        Params
-        ------
-        id: str
-        unit_type: str
-        unit_operator_id: str
-        unit_params: dict
+        Args:
+        - self: The instance of the class.
+        - id (str): The identifier for the unit.
+        - unit_type (str): The type of unit to be added.
+        - unit_operator_id (str): The identifier of the unit operator to which the unit will be added.
+        - unit_params (dict): Parameters for configuring the unit.
+        - forecaster (Forecaster): The forecaster used by the unit.
 
+        Returns:
+        - None
+
+        This method asynchronously adds a unit to the simulation. It checks if the unit operator
+        exists, verifies the unit type, and ensures that the unit operator does not already have a
+        unit with the same id. It then creates bidding strategies for the unit and creates the unit
+        within the associated unit operator.
         """
 
         # check if unit operator exists
@@ -320,15 +423,23 @@ class World:
     def add_market_operator(
         self,
         id: str,
-    ):
+    ) -> None:
         """
-        creates the market operator
+        Add a market operator to the simulation.
 
-        Params
-        ------
-        id = int
-             market operator id is associated with the market its participating
+        Args:
+        - self: The instance of the class.
+        - id (str): The identifier for the market operator.
+
+        Returns:
+        - None
+
+        This method adds a market operator to the simulation. It creates a new role agent for
+        the market operator and sets additional context parameters. If not in learning mode and
+        not in evaluation mode, it includes output agent address and ID in the role context data
+        dictionary.
         """
+
         if self.market_operators.get(id):
             raise ValueError(f"MarketOperator {id} already exists")
         market_operator_agent = RoleAgent(
@@ -352,17 +463,24 @@ class World:
         self,
         market_operator_id: str,
         market_config: MarketConfig,
-    ):
+    ) -> None:
         """
-        including the markets in the market container
+        Add a market to the simulation.
 
-        Params
-        ------
-        id = int
-             ID of the operator
-        marketconfig =
-             describes the configuration of a market
+        Args:
+        - self: The instance of the class.
+        - market_operator_id (str): The identifier of the market operator to which the market will be added.
+        - market_config (MarketConfig): The configuration for the market to be added.
+
+        Returns:
+        - None
+
+        This method adds a market to the simulation. It creates a market role based on the specified
+        market mechanism in the market configuration. It then adds this role to the specified market
+        operator and appends the market configuration to the list of markets within the market
+        operator. Additionally, it stores the market configuration in the simulation's markets dictionary.
         """
+
         if mm_class := self.clearing_mechanisms.get(market_config.market_mechanism):
             market_role = mm_class(market_config)
         else:
@@ -378,26 +496,45 @@ class World:
         self.markets[f"{market_config.name}"] = market_config
 
     async def _step(self):
-        next_activity = self.clock.get_next_activity()
+        if self.distributed_role is not False:
+            next_activity = await self.clock_manager.distribute_time()
+        else:
+            next_activity = self.clock.get_next_activity()
         if not next_activity:
             self.logger.info("simulation finished - no schedules left")
             return None
         delta = next_activity - self.clock.time
         self.clock.set_time(next_activity)
+        await tasks_complete_or_sleeping(self.container)
         return delta
 
     async def async_run(self, start_ts, end_ts):
         """
-        Run the simulation.
-        either in learning mode where we run multiple times or in normal mode
+        Run the simulation asynchronously.
+
+        Args:
+        - self: The instance of the class.
+        - start_ts: The start timestamp for the simulation run.
+        - end_ts: The end timestamp for the simulation run.
+
+        Returns:
+        - None
+
+        This method runs the simulation asynchronously. It progresses the simulation time from
+        the start timestamp to the end timestamp, allowing registration before the first opening.
+        If distributed roles are enabled, it broadcasts the simulation time. The method then iterates
+        through the simulation time, updating the progress bar and the simulation description. Once
+        the simulation time reaches the end timestamp, the method closes the progress bar and shuts
+        down the simulation container.
         """
 
         # agent is implicit added to self.container._agents
-
         pbar = tqdm(total=end_ts - start_ts)
 
         # allow registration before first opening
         self.clock.set_time(start_ts - 1)
+        if self.distributed_role is not False:
+            await self.clock_manager.broadcast(self.clock.time)
         while self.clock.time < end_ts:
             await asyncio.sleep(0)
             delta = await self._step()
@@ -409,12 +546,26 @@ class World:
                 )
             else:
                 self.clock.set_time(end_ts)
-
-            await tasks_complete_or_sleeping(self.container)
         pbar.close()
         await self.container.shutdown()
 
     def run(self):
+        """
+        Run the simulation.
+
+        Returns:
+        - None
+
+        This method converts the start and end timestamps to UTC time and then runs
+        the asynchronous simulation using the `async_run` method. It progresses the simulation time from
+        the start timestamp to the end timestamp, allowing registration before the first opening.
+        If distributed roles are enabled, it broadcasts the simulation time. The method then iterates
+        through the simulation time, updating the progress bar and the simulation description. Once
+        the simulation time reaches the end timestamp, the method closes the progress bar and shuts
+        down the simulation container.
+
+        """
+
         start_ts = calendar.timegm(self.start.utctimetuple())
         end_ts = calendar.timegm(self.end.utctimetuple())
 
@@ -426,6 +577,16 @@ class World:
             pass
 
     def reset(self):
+        """
+        Reset the World instance.
+
+        Returns:
+        - None
+
+        This method resets the market operators, markets, unit operators, and forecast
+        providers to empty dictionaries.
+        """
+
         self.market_operators = {}
         self.markets = {}
         self.unit_operators = {}
@@ -439,6 +600,25 @@ class World:
         unit_params: dict,
         forecaster: Forecaster,
     ) -> None:
+        """
+        Add a unit to the World instance.
+
+        Args:
+        - id (str): The identifier for the unit.
+        - unit_type (str): The type of the unit.
+        - unit_operator_id (str): The identifier of the unit operator.
+        - unit_params (dict): Parameters specific to the unit.
+        - forecaster (Forecaster): The forecaster associated with the unit.
+
+        Returns:
+        - None
+
+        This method adds a unit to the World instance. It checks if the unit operator
+        exists, verifies the unit type, and ensures that the unit operator does not already have a
+        unit with the same id. It then creates bidding strategies for the unit and creates the unit
+        within the associated unit operator.
+        """
+
         return self.loop.run_until_complete(
             self.async_add_unit(
                 id=id,

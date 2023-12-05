@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from numbers import Number
@@ -32,9 +36,13 @@ class Order(TypedDict):
     :param end_time: the end time of the order
     :type end_time: datetime
     :param volume: the volume of the order
-    :type volume: int
+    :type volume: float
     :param price: the price of the order
-    :type price: int
+    :type price: float
+    :param accepted_volume: the accepted volume of the order
+    :type accepted_volume: float
+    :param accepted_price: the accepted price of the order
+    :type accepted_price: float
     :param only_hours: tuple of hours from which this order is available, on multi day products
     :type only_hours: OnlyHours | None
     :param agent_id: the id of the agent
@@ -177,42 +185,91 @@ class MarketConfig:
 
 class OpeningMessage(TypedDict):
     """
-    Message which is sent to the market to open a market
+    Message which is sent from the market to participating agent to open a market
 
     :param context: the context of the message
     :type context: str
     :param market_id: the id of the market
     :type market_id: str
-    :param start: the start time of the market
-    :type start: float
-    :param stop: the stop time of the market
-    :type stop: float
+    :param start_time: the start time of the market
+    :type start_time: float
+    :param end_time: the stop time of the market
+    :type end_time: float
     :param products: list of products which are available at the market to be traded
     :type products: list[Product]
     """
 
     context: str
     market_id: str
-    start: float
-    stop: float
+    start_time: float
+    end_time: float
     products: list[Product]
 
 
 class ClearingMessage(TypedDict):
     """
-    Message which is sent to the market to clear a market
+    Message which is sent from the market to agents to clear a market
 
     :param context: the context of the message
     :type context: str
     :param market_id: the id of the market
     :type market_id: str
-    :param orderbook: the orderbook of the market
-    :type orderbook: Orderbook
+    :param accepted_orders: the orders accepted by the market
+    :type accepted_orders: Orderbook
+    :param rejected_orders: the orders rejected by the market
+    :type rejected_orders: Orderbook
     """
 
     context: str
     market_id: str
+    accepted_orders: Orderbook
+    rejected_orders: Orderbook
+
+
+class OrderBookMessage(TypedDict):
+    context: str
+    market_id: str
     orderbook: Orderbook
+
+
+class RegistrationMessage(TypedDict):
+    context: str
+    market_id: str
+    information: dict
+
+
+class RegistrationReplyMessage(TypedDict):
+    context: str
+    market_id: str
+    accepted: bool
+
+
+class DataRequestMessage(TypedDict):
+    context: str
+    market_id: str
+    metric: str
+    start_time: datetime
+    end_time: datetime
+
+
+class MetaDict(TypedDict):
+    """
+    Message Meta of a FIPA ACL Message
+    http://www.fipa.org/specs/fipa00061/SC00061G.html#_Toc26669700
+    """
+
+    sender_addr: str | list
+    sender_id: str
+    reply_to: str  # to which agent follow up messages should be sent
+    conversation_id: str
+    performative: str
+    protocol: str
+    language: str
+    encoding: str
+    ontology: str
+    reply_with: str  # what the answer should contain as in_reply_to
+    in_reply_to: str  # str used to reference an earlier action
+    reply_by: str  # latest time to accept replies
 
 
 # Class for a Smart Contract which can contain something like:

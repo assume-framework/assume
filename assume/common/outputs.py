@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import logging
 import shutil
 from collections import defaultdict
@@ -13,6 +17,7 @@ from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 
 logger = logging.getLogger(__name__)
 
+from assume.common.market_objects import MetaDict
 from assume.common.utils import separate_orders
 
 
@@ -125,6 +130,7 @@ class WriteOutput(Role):
         """
         Sets up the WriteOutput instance by subscribing to messages and scheduling recurrent tasks of storing the data.
         """
+        super().setup()
 
         self.context.subscribe_message(
             self,
@@ -141,7 +147,7 @@ class WriteOutput(Role):
         )
         self.context.schedule_recurrent_task(self.store_dfs, recurrency_task)
 
-    def handle_message(self, content, meta):
+    def handle_message(self, content, meta: MetaDict):
         """
         Handles the incoming messages and performs corresponding actions.
 
@@ -153,7 +159,7 @@ class WriteOutput(Role):
         """
 
         if content.get("type") == "store_order_book":
-            self.write_market_orders(content.get("data"), content.get("sender"))
+            self.write_market_orders(content.get("data"), content.get("market_id"))
 
         elif content.get("type") == "store_market_results":
             self.write_market_results(content.get("data"))
@@ -228,7 +234,7 @@ class WriteOutput(Role):
                 try:
                     with self.db.begin() as db:
                         df.to_sql(table, db, if_exists="append")
-                except ProgrammingError:
+                except (ProgrammingError, OperationalError, DataError):
                     self.check_columns(table, df)
                     # now try again
                     with self.db.begin() as db:
@@ -350,6 +356,7 @@ class WriteOutput(Role):
         """
         This function makes it possible to calculate Key Performance Indicators
         """
+        await super().on_stop()
 
         # insert left records into db
         await self.store_dfs()
@@ -411,8 +418,10 @@ class WriteOutput(Role):
             f"select reward FROM rl_params where simulation='{self.simulation_id}'"
         )
 
+        avg_reward = 0
         with self.db.begin() as db:
             reward = db.execute(query).fetchall()
+        if len(reward):
             avg_reward = sum(r[0] for r in reward) / len(reward)
 
         return avg_reward

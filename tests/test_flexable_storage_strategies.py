@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import math
 from datetime import datetime, timedelta
 
@@ -12,9 +16,6 @@ from assume.strategies import (
     flexablePosCRMStorage,
 )
 from assume.units import Storage
-
-start = datetime(2023, 7, 1)
-end = datetime(2023, 7, 2)
 
 
 @pytest.fixture
@@ -46,7 +47,8 @@ def storage() -> Storage:
 
 def test_flexable_eom_storage(mock_market_config, storage):
     index = pd.date_range("2023-07-01", periods=4, freq="H")
-    end = datetime(2023, 7, 1, 1, 0, 0)
+    start = datetime(2023, 7, 1)
+    end = datetime(2023, 7, 1, 1)
     strategy = flexableEOMStorage()
     mc = mock_market_config
     product_tuples = [(start, end, None)]
@@ -125,6 +127,7 @@ def test_flexable_eom_storage(mock_market_config, storage):
 
 def test_flexable_pos_crm_storage(mock_market_config, storage):
     index = pd.date_range("2023-07-01", periods=4, freq="H")
+    start = datetime(2023, 7, 1)
     end = datetime(2023, 7, 1, 4, 0, 0)
     strategy = flexablePosCRMStorage()
     mc = mock_market_config
@@ -165,6 +168,7 @@ def test_flexable_pos_crm_storage(mock_market_config, storage):
 
 def test_flexable_neg_crm_storage(mock_market_config, storage):
     index = pd.date_range("2023-07-01", periods=4, freq="H")
+    start = datetime(2023, 7, 1)
     end = datetime(2023, 7, 1, 4, 0, 0)
     strategy = flexableNegCRMStorage()
     mc = mock_market_config

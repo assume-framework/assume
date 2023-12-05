@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import math
 from datetime import datetime
 
@@ -40,7 +44,7 @@ def power_plant() -> PowerPlant:
 
 
 def test_flexable_eom(mock_market_config, power_plant):
-    end = datetime(2023, 7, 1, 1, 0, 0)
+    end = datetime(2023, 7, 1, 1)
     strategy = flexableEOM()
     mc = mock_market_config
     product_tuples = [(start, end, None)]

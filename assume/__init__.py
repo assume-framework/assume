@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 from assume.common import MarketConfig, MarketProduct
 from assume.common.scenario_loader import (
     load_custom_units,

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import logging
 from datetime import timedelta
 from functools import lru_cache
@@ -65,8 +69,6 @@ class Storage(SupportsMinMaxCharge):
         Definition of downtime before warm start in h.
     min_operating_time : float, optional
         The minimum operating time of the storage unit in hours.
-    min_down_time : float, optional
-        The minimum down time of the storage unit in hours.
     min_down_time : float, optional
         The minimum down time of the storage unit in hours.
     is_active: bool

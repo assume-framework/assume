@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import inspect
 import logging
 from collections import defaultdict
@@ -363,7 +367,7 @@ def separate_orders(orderbook):
     return orderbook
 
 
-def get_products_index(orderbook, marketconfig):
+def get_products_index(orderbook):
     """
     creates an index containing all start times of orders in orderbook
     :param orderbook: the orderbook of the market
@@ -374,29 +378,24 @@ def get_products_index(orderbook, marketconfig):
     """
     if orderbook == []:
         return []
-    # TODO: works only for dam with multiple of hours, not quarter hourly ect.
-    market_first_delivery = (
-        marketconfig.opening_hours._dtstart
-        + marketconfig.market_products[0].first_delivery
-    )
-    product_len = (
-        marketconfig.market_products[0].duration * marketconfig.market_products[0].count
-    )
 
-    diff = (orderbook[0]["start_time"] - market_first_delivery).components.hours
-
-    start = orderbook[0]["start_time"] - pd.Timedelta(hours=diff)
-    end = start + product_len
+    # get the minimum and maximum "start_time" for all orders in orderbook
+    start_time = orderbook[0]["start_time"]
+    end_time = orderbook[0]["start_time"]
+    duration = orderbook[0]["end_time"] - orderbook[0]["start_time"]
 
     for order in orderbook:
-        if order["start_time"] < start:
-            print("order outside market opening hours")
-        if order["end_time"] > end:
-            print("order outside market opening hours")
+        if order["start_time"] < start_time:
+            start_time = order["start_time"]
+        if order["end_time"] > end_time:
+            end_time = order["start_time"]
+        if order["end_time"] - order["start_time"] < duration:
+            duration = order["end_time"] - order["start_time"]
 
     index_products = pd.date_range(
-        start,
-        end - marketconfig.market_products[0].duration,
-        freq=marketconfig.market_products[0].duration,
+        start_time,
+        end_time,
+        freq=duration,
     )
+
     return index_products

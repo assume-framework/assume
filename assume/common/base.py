@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import TypedDict
@@ -6,7 +10,6 @@ import pandas as pd
 
 from assume.common.forecasts import Forecaster
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.common.utils import get_products_index
 
 
 class BaseStrategy:
@@ -103,6 +106,19 @@ class BaseUnit:
 
         return bids
 
+    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
+        """
+        calculates the marginal cost for the given power
+
+        :param start: the start time of the dispatch
+        :type start: pd.Timestamp
+        :param power: the power output of the unit
+        :type power: float
+        :return: the marginal cost for the given power
+        :rtype: float
+        """
+        return 0
+
     def set_dispatch_plan(
         self,
         marketconfig: MarketConfig,
@@ -116,37 +132,38 @@ class BaseUnit:
         :param orderbook: The orderbook.
         :type orderbook: Orderbook
         """
-        products_index = get_products_index(orderbook, marketconfig)
         product_type = marketconfig.product_type
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
             end_excl = end - self.index.freq
             if isinstance(order["accepted_volume"], dict):
-                self.outputs[product_type].loc[start:end_excl] += [
-                    order["accepted_volume"][key]
-                    for key in order["accepted_volume"].keys()
-                ]
+                added_volume = list(order["accepted_volume"].values())
             else:
-                self.outputs[product_type].loc[start:end_excl] += order[
-                    "accepted_volume"
-                ]
-
+                added_volume = order["accepted_volume"]
+            self.outputs[product_type].loc[start:end_excl] += added_volume
         self.calculate_cashflow(product_type, orderbook)
-
-        for start in products_index:
-            self.outputs[product_type + "marginal_costs"].loc[start] = (
-                self.calculate_marginal_cost(
-                    start, self.outputs[product_type].loc[start]
-                )
-                #* self.outputs[product_type].loc[start]
-            )
 
         self.bidding_strategies[product_type].calculate_reward(
             unit=self,
             marketconfig=marketconfig,
             orderbook=orderbook,
         )
+
+    def calculate_generation_cost(
+        self,
+        start: datetime,
+        end: datetime,
+        product_type: str,
+    ):
+        if start not in self.index:
+            start = self.index[0]
+        product_type_mc = product_type + "_marginal_costs"
+        for t in self.outputs[product_type_mc][start:end].index:
+            mc = self.calculate_marginal_cost(
+                start, self.outputs[product_type].loc[start]
+            )
+            self.outputs[product_type_mc][t] = mc * self.outputs[product_type][start]
 
     def execute_current_dispatch(
         self,
@@ -183,7 +200,7 @@ class BaseUnit:
         if dt - self.index.freq < self.index[0]:
             return 0
         else:
-            return self.outputs["energy"].at[dt - self.index.freq]
+            return self.outputs[product_type].at[dt - self.index.freq]
 
     def as_dict(self) -> dict:
         """
@@ -196,6 +213,7 @@ class BaseUnit:
             "id": self.id,
             "technology": self.technology,
             "unit_operator": self.unit_operator,
+            "node": self.node,
             "unit_type": "base_unit",
         }
 
@@ -546,19 +564,6 @@ class SupportsMinMaxCharge(BaseUnit):
         """
         pass
 
-    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
-        """
-        calculates the marginal cost for the given power
-
-        :param start: the start time of the dispatch
-        :type start: pd.Timestamp
-        :param power: the power output of the unit
-        :type power: float
-        :return: the marginal cost for the given power
-        :rtype: float
-        """
-        pass
-
     def get_soc_before(self, dt: datetime) -> float:
         """
         return SoC before the given datetime.
@@ -619,7 +624,7 @@ class SupportsMinMaxCharge(BaseUnit):
         else:
             # Assuming the storage is not restricted by ramping charging down
             previous_power = max(previous_power, 0)
-            
+
             power_discharge = min(
                 power_discharge,
                 max(0, previous_power + self.ramp_up_discharge - current_power),
@@ -663,7 +668,7 @@ class SupportsMinMaxCharge(BaseUnit):
             )
         else:
             previous_power = min(previous_power, 0)
-            
+
             power_charge = max(
                 power_charge,
                 min(previous_power + self.ramp_up_charge - current_power, 0),
@@ -732,8 +737,7 @@ class BaseStrategy:
         :param orderbook: The orderbook.
         :type orderbook: Orderbook
         """
-
-    pass
+        pass
 
 
 class LearningStrategy(BaseStrategy):
@@ -764,40 +768,58 @@ class LearningConfig(TypedDict):
 
     :param observation_dimension: The observation dimension.
     :type observation_dimension: int
+
     :param action_dimension: The action dimension.
     :type action_dimension: int
+
     :param continue_learning: Whether to continue learning.
     :type continue_learning: bool
+
     :param load_model_path: The path to the model to load.
     :type load_model_path: str
+
     :param max_bid_price: The maximum bid price.
     :type max_bid_price: float
+
     :param learning_mode: Whether to use learning mode.
     :type learning_mode: bool
+
     :param algorithm: The algorithm to use.
     :type algorithm: str
+
     :param learning_rate: The learning rate.
     :type learning_rate: float
+
     :param training_episodes: The number of training episodes.
     :type training_episodes: int
+
     :param episodes_collecting_initial_experience: The number of episodes collecting initial experience.
     :type episodes_collecting_initial_experience: int
+
     :param train_freq: The training frequency.
     :type train_freq: int
+
     :param gradient_steps: The number of gradient steps.
     :type gradient_steps: int
+
     :param batch_size: The batch size.
     :type batch_size: int
-    :param gamme: The discount factor.
+
+    :param gamma: The discount factor.
     :type gamma: float
+
     :param device: The device to use.
     :type device: str
+
     :param noise_sigma : The standard deviation of the noise.
     :type noise_sigma: float
+
     :param noise_scale: Controls the initial strength of the noise.
     :type noise_scale: int
+
     :param noise_dt: Determines how quickly the noise weakens over time.
     :type noise_dt: int
+
     :param trained_actors_path: The path to the learned model to load.
     :type trained_actors_path: str
     """

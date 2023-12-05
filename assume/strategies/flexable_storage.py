@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 from datetime import timedelta
 
 import numpy as np
@@ -179,7 +183,7 @@ class flexableEOMStorage(BaseStrategy):
             unit.outputs["profit"][index] = (
                 unit.outputs[f"{product_type}_cashflow"][index] - costs
             )
-            unit.outputs["total_cost"][index] = costs
+            unit.outputs["total_costs"][index] = costs
 
 
 class flexablePosCRMStorage(BaseStrategy):

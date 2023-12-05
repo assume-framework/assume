@@ -1,3 +1,7 @@
+.. SPDX-FileCopyrightText: ASSUME Developers
+..
+.. SPDX-License-Identifier: AGPL-3.0-or-later
+
 ################
  Installation
 ################
@@ -13,7 +17,7 @@ ASSUME and train your agents, make sure to install Torch. Detailed
 installation instructions can be found `here <https://pytorch.org/get-started/locally/>`_.
 
 Using Pip/Python
-==============
+================
 
 In general most people use an environment manager for python.
 Here, Install instructions for Conda and Venv are given.
@@ -70,6 +74,22 @@ To install with optimization capabilities::
 To install with testing capabilities::
 
     pip install assume-framework[test]
+
+Install Tab-Completion
+----------------------
+
+ASSUME uses `argcomplete` for argument completion on the CLI.
+
+On Windows, one needs to run:
+
+`register-python-argcomplete --shell powershell assume | Out-String | Invoke-Expression`
+
+in the used conda environment, to install tab completions.
+
+On Bash or zsh (Linux and Mac) run the following in the correct conda environment with assume and argcomplete installed:
+
+`eval "$(register-python-argcomplete assume)"`
+
 
 Install using Docker
 =========================================

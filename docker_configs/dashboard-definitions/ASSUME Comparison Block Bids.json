@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 5,
+  "id": 11,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -223,32 +223,6 @@
               {
                 "id": "custom.axisCenteredZero",
                 "value": false
-              }
-            ]
-          },
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "Price 2020_RL_dam_BB_summer_newLearning",
-                  "Price 2020_SB_dam",
-                  "Price 2020_RL_dam_LB_summer_newLearning"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
               }
             ]
           }
@@ -1212,7 +1186,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "total_cost"
+              "options": "total_costs"
             },
             "properties": [
               {
@@ -2000,7 +1974,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2073,7 +2048,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  concat(unit, '_', simulation) as \"unit\",\n  sum(round(CAST(total_cost AS numeric), 2)) as Total_cost,\n  sum(round(CAST(energy_cashflow AS numeric), 2)) as Total_revenues,\n  sum(round(CAST(profit AS numeric), 2)) as Total_profits,\n  sum(round(CAST(abs(power) AS numeric)*1000, 2)) as Total_power\nFROM unit_dispatch\nwhere \n  unit in ($Gen_Units) and\n  simulation in ($simulation)\nGROUP BY unit, simulation\nORDER BY unit",
+          "rawSql": "SELECT\n  concat(unit, '_', simulation) as \"unit\",\n  sum(round(CAST(total_costs AS numeric), 2)) as Total_cost,\n  sum(round(CAST(energy_cashflow AS numeric), 2)) as Total_revenues,\n  sum(round(CAST(energy_cashflow AS numeric), 2)) - sum(round(CAST(total_costs AS numeric), 2)) as Total_profits,\n  sum(round(CAST(abs(power) AS numeric)*1000, 2)) as Total_power\nFROM unit_dispatch\nwhere \n  unit in ($Gen_Units) and\n  simulation in ($simulation)\nGROUP BY unit, simulation\nORDER BY unit",
           "refId": "C",
           "select": [
             [
@@ -2111,7 +2086,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2130,6 +2106,7 @@
       },
       "id": 26,
       "options": {
+        "afterRender": "",
         "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
         "defaultContent": "The query didn't return any results.",
         "editor": {
@@ -2142,7 +2119,8 @@
         "externalScripts": [],
         "externalStyles": [],
         "helpers": "",
-        "styles": ""
+        "styles": "",
+        "wrap": true
       },
       "targets": [
         {
@@ -2229,7 +2207,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -5002,12 +4981,10 @@
         "current": {
           "selected": true,
           "text": [
-            "2020_BB_dam",
-            "2020_SB_dam"
+            "2020_RL_dam_LB_winter"
           ],
           "value": [
-            "2020_BB_dam",
-            "2020_SB_dam"
+            "2020_RL_dam_LB_winter"
           ]
         },
         "datasource": {
@@ -5038,6 +5015,6 @@
   "timezone": "",
   "title": "ASSUME Comparison Block Bids",
   "uid": "LlWPcjzSz",
-  "version": 8,
+  "version": 4,
   "weekStart": ""
 }

@@ -1,3 +1,7 @@
+.. SPDX-FileCopyrightText: ASSUME Developers
+..
+.. SPDX-License-Identifier: AGPL-3.0-or-later
+
 ASSUME: Agent-Based Electricity Markets Simulation Toolbox
 ===========================================================
 
@@ -37,28 +41,54 @@ how to :doc:`installation` the project.
 
 Documentation
 =============
+
 **Getting Started**
 
 * :doc:`introduction`
 * :doc:`installation`
 * :doc:`quick_start`
-* :doc:`market_config`
-* :doc:`market_mechanism`
-* :doc:`bidding_agents`
-* :doc:`assume`
 
 .. toctree::
    :hidden:
-   :maxdepth: 4
-   :caption: Contents
+   :maxdepth: 1
+   :caption: Getting Started
 
    introduction
    installation
    quick_start
+
+**Examples**
+
+* :doc:`examples_basic`
+* :doc:`example_simulations`
+
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: Examples
+
+   examples_basic
+   example_simulations
+
+**User Guide**
+
+* :doc:`market_config`
+* :doc:`market_mechanism`
+* :doc:`bidding_agents`
+* :doc:`learning`
+* :doc:`assume`
+
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: User Guide
+
    market_config
    market_mechanism
    bidding_agents
+   learning
    assume
+
 
 Indices and tables
 ==================

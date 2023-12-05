@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -849,9 +853,11 @@ def calculate_reward_EOM(
     """
     # TODO: Calculate profits over all markets
     product_type = marketconfig.product_type
-    products_index = get_products_index(orderbook, marketconfig)
+    products_index = get_products_index(orderbook)
 
-    max_power = unit.forecaster.get_availability(unit.id)[products_index] * unit.max_power
+    max_power = (
+        unit.forecaster.get_availability(unit.id)[products_index] * unit.max_power
+    )
 
     profit = pd.Series(0.0, index=products_index)
     reward = pd.Series(0.0, index=products_index)
@@ -895,7 +901,7 @@ def calculate_reward_EOM(
     # consideration of start-up costs
     for start in products_index:
         op_time = unit.get_operation_time(start)
-        
+
         marginal_cost = unit.calculate_marginal_cost(
             start, unit.outputs[product_type].loc[start]
         )
@@ -914,5 +920,4 @@ def calculate_reward_EOM(
     unit.outputs["profit"].loc[products_index] = profit
     unit.outputs["reward"].loc[products_index] = reward
     unit.outputs["regret"].loc[products_index] = opportunity_cost
-    unit.outputs["total_cost"].loc[products_index] = costs
-    
+    unit.outputs["total_costs"].loc[products_index] = costs

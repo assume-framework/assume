@@ -1,5 +1,9 @@
-assume.strategies package
-=========================
+.. SPDX-FileCopyrightText: ASSUME Developers
+..
+.. SPDX-License-Identifier: AGPL-3.0-or-later
+
+Bidding strategies
+===================
 
 Submodules
 ----------
@@ -44,13 +48,6 @@ assume.strategies.naive\_strategies module
    :undoc-members:
    :show-inheritance:
 
-assume.strategies.storage\_strategies module
---------------------------------------------
-
-.. automodule:: assume.strategies.storage_strategies
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
 Module contents
 ---------------

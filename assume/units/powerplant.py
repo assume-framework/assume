@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import logging
 from datetime import datetime, timedelta
 from functools import lru_cache
@@ -5,8 +9,8 @@ from functools import lru_cache
 import pandas as pd
 
 from assume.common.base import SupportsMinMax
-from assume.common.utils import get_products_index
 from assume.common.market_objects import MarketConfig, Orderbook
+from assume.common.utils import get_products_index
 
 logger = logging.getLogger(__name__)
 
@@ -183,15 +187,13 @@ class PowerPlant(SupportsMinMax):
 
             self.outputs["energy"][t] = current_power
 
-
         return self.outputs["energy"].loc[start:end]
-    
+
     def set_dispatch_plan(
         self,
         marketconfig: MarketConfig,
         orderbook: Orderbook,
     ) -> None:
-        
         """
         adds dispatch plan from current market result to total dispatch plan
 
@@ -200,8 +202,8 @@ class PowerPlant(SupportsMinMax):
         :param orderbook: The orderbook.
         :type orderbook: Orderbook
         """
-        products_index = get_products_index(orderbook, marketconfig)
-        
+        products_index = get_products_index(orderbook)
+
         max_power = (
             self.forecaster.get_availability(self.id)[products_index] * self.max_power
         )
@@ -224,7 +226,6 @@ class PowerPlant(SupportsMinMax):
         self.calculate_cashflow(product_type, orderbook)
 
         for start in products_index:
-            
             current_power = self.outputs[product_type][start]
 
             previous_power = self.get_output_before(start)
@@ -238,19 +239,11 @@ class PowerPlant(SupportsMinMax):
 
             self.outputs[product_type][start] = current_power
 
-            self.outputs[product_type + "marginal_costs"].loc[start] = (
-                self.calculate_marginal_cost(
-                    start, current_power
-                )
-                #* self.outputs[product_type].loc[start]
-            )
-
         self.bidding_strategies[product_type].calculate_reward(
             unit=self,
             marketconfig=marketconfig,
             orderbook=orderbook,
         )
-        
 
     def calc_simple_marginal_cost(
         self,

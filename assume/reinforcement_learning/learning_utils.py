@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 from datetime import datetime
 from typing import TypedDict
 
@@ -99,7 +103,7 @@ class Actor(nn.Module):
         x = F.relu(self.FC1(obs))
         x = F.relu(self.FC2(x))
         x = F.softsign(self.FC3(x))
-        #x = th.tanh(self.FC3(x))
+        # x = th.tanh(self.FC3(x))
 
         return x
 

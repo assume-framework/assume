@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -414,9 +418,11 @@ class RLStrategyBlocks(LearningStrategy):
         # so we can calculate the profit
 
         product_type = marketconfig.product_type
-        products_index = get_products_index(orderbook, marketconfig)
+        products_index = get_products_index(orderbook)
 
-        max_power = unit.forecaster.get_availability(unit.id)[products_index] * unit.max_power
+        max_power = (
+            unit.forecaster.get_availability(unit.id)[products_index] * unit.max_power
+        )
 
         constraints_cost = pd.Series(0.0, index=products_index)
         profit = pd.Series(0.0, index=products_index)
@@ -449,7 +455,7 @@ class RLStrategyBlocks(LearningStrategy):
                     accepted_price = order["accepted_price"]
 
                 price_difference = accepted_price - marginal_cost
-                
+
                 # calculate opportunity cost
                 # as the loss of income we have because we are not running at full power
                 order_opportunity_cost = price_difference * (
@@ -459,13 +465,12 @@ class RLStrategyBlocks(LearningStrategy):
                 # don't consider opportunity_cost more than once! Always the same for one timestep and one market
                 opportunity_cost[start] = max(order_opportunity_cost, 0)
                 profit[start] += accepted_price * accepted_volume
-                
 
         # consideration of start-up costs, which are evenly divided between the
         # upward and downward regulation events
         for start in products_index:
             op_time = unit.get_operation_time(start)
-            
+
             marginal_cost = unit.calculate_marginal_cost(
                 start, unit.outputs[product_type].loc[start]
             )
@@ -480,7 +485,7 @@ class RLStrategyBlocks(LearningStrategy):
         # The straight forward implemntation would be reward = profit, yet we would like to give the agent more guidance
         # in the learning process, so we add a regret term to the reward, which is the opportunity cost
         # define the reward and scale it
-        
+
         profit += -costs
         scaling = 1 / (unit.max_power * self.max_bid_price)
         regret_scale = 0.0
@@ -492,8 +497,7 @@ class RLStrategyBlocks(LearningStrategy):
         unit.outputs["profit"].loc[products_index] = profit
         unit.outputs["reward"].loc[products_index] = reward
         unit.outputs["regret"].loc[products_index] = opportunity_cost
-        unit.outputs["total_cost"].loc[products_index] = costs
-
+        unit.outputs["total_costs"].loc[products_index] = costs
 
     def load_actor_params(self, load_path):
         """

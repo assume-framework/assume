@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+import cProfile
 import logging
 from datetime import timedelta
 from operator import itemgetter
@@ -8,8 +13,6 @@ from pyomo.opt import SolverFactory, TerminationCondition, check_available_solve
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.markets.base_market import MarketRole
 
-import cProfile
-
 log = logging.getLogger(__name__)
 
 SOLVERS = ["gurobi", "glpk"]
@@ -17,8 +20,7 @@ EPS = 1e-4
 
 
 def market_clearing_opt(orders, market_products, mode, with_linked_bids):
-
-    #with cProfile.Profile() as pr:
+    # with cProfile.Profile() as pr:
     model = pyo.ConcreteModel()
     model.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT_EXPORT)
 
@@ -27,12 +29,14 @@ def market_clearing_opt(orders, market_products, mode, with_linked_bids):
         doc="timesteps",
     )
     model.sBids = pyo.Set(
-        initialize=[order["bid_id"] for order in orders if order["bid_type"] == "SB"], 
+        initialize=[order["bid_id"] for order in orders if order["bid_type"] == "SB"],
         doc="simple_bids",
     )
     model.bBids = pyo.Set(
-        initialize=[order["bid_id"] for order in orders if order["bid_type"] in ["BB", "LB"]], 
-        doc="block_bids"
+        initialize=[
+            order["bid_id"] for order in orders if order["bid_type"] in ["BB", "LB"]
+        ],
+        doc="block_bids",
     )
 
     model.xs = pyo.Var(
@@ -145,8 +149,8 @@ def market_clearing_opt(orders, market_products, mode, with_linked_bids):
 
         # resolve the model
         results = solver.solve(instance, options=options)
-    
-    #pr.print_stats(sort='cumulative')
+
+    # pr.print_stats(sort='cumulative')
 
     return instance, results
 
@@ -236,10 +240,16 @@ class ComplexClearingRole(MarketRole):
             for order in orderbook:
                 children = []
                 if with_linked_bids:
-                    children = [child for child in child_orders if child["parent_bid_id"] == order["bid_id"]]
-                
-                order_profit = calculate_order_profit(order, market_clearing_prices, instance, children)
-                
+                    children = [
+                        child
+                        for child in child_orders
+                        if child["parent_bid_id"] == order["bid_id"]
+                    ]
+
+                order_profit = calculate_order_profit(
+                    order, market_clearing_prices, instance, children
+                )
+
                 # correct rounding
                 if order_profit != 0 and abs(order_profit) < EPS:
                     order_profit = 0
@@ -255,7 +265,7 @@ class ComplexClearingRole(MarketRole):
 
             # check if all orders have positive profit
             if all(order_profit >= 0 for order_profit in orders_profit):
-                break      
+                break
 
         return extract_results(
             model=instance,
@@ -265,19 +275,21 @@ class ComplexClearingRole(MarketRole):
             market_clearing_prices=market_clearing_prices,
         )
 
+
 def calculate_order_profit(order, market_clearing_prices, instance, children):
     order_profit = 0
 
     if order["bid_type"] == "SB":
-        if pyo.value(instance.xs[order["bid_id"]]) < EPS or abs(
-                market_clearing_prices[order["start_time"]] - order["price"]
-        ) < EPS:
+        if (
+            pyo.value(instance.xs[order["bid_id"]]) < EPS
+            or abs(market_clearing_prices[order["start_time"]] - order["price"]) < EPS
+        ):
             order_profit = 0
         else:
             order_profit = (
-                    (market_clearing_prices[order["start_time"]] - order["price"])
-                    * order["volume"]
-                    * pyo.value(instance.xs[order["bid_id"]])
+                (market_clearing_prices[order["start_time"]] - order["price"])
+                * order["volume"]
+                * pyo.value(instance.xs[order["bid_id"]])
             )
     elif order["bid_type"] in ["BB", "LB"]:
         bid_volume = sum(order["volume"].values())
@@ -285,11 +297,8 @@ def calculate_order_profit(order, market_clearing_prices, instance, children):
             order_profit = 0
         else:
             order_profit = (
-                    sum(
-                        market_clearing_prices[t] * v
-                        for t, v in order["volume"].items()
-                    )
-                    - order["price"] * bid_volume
+                sum(market_clearing_prices[t] * v for t, v in order["volume"].items())
+                - order["price"] * bid_volume
             ) * pyo.value(instance.xb[order["bid_id"]])
 
         # add the child linked bids
@@ -303,12 +312,13 @@ def calculate_order_profit(order, market_clearing_prices, instance, children):
             ) * pyo.value(instance.xb[child_order["bid_id"]])
             if child_profit > 0:
                 order_profit += child_profit
-    
+
     # correct rounding
     if order_profit != 0 and abs(order_profit) < EPS:
         order_profit = 0
 
     return order_profit
+
 
 def extract_results(
     model,

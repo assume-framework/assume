@@ -1,8 +1,13 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # %%
 import logging
 import os
-import numpy as np
 import random as rd
+
+import numpy as np
 import torch as th
 
 from assume import World, load_scenario_folder, run_learning
@@ -145,15 +150,19 @@ availabe_examples = {
 # %%
 if __name__ == "__main__":
     examples = [
-        "2020_RL_2",
+        "2020_RL_1",
     ]
 
     data_format = "timescale"  # "local_db" or "timescale"
 
     for example in examples:
         # delete examples/inputs/2020_RL/forecasts_df.csv
-        if os.path.exists(f"examples/inputs/{availabe_examples[example]['scenario']}/forecasts_df.csv"):
-            os.remove(f"examples/inputs/{availabe_examples[example]['scenario']}/forecasts_df.csv")
+        if os.path.exists(
+            f"examples/inputs/{availabe_examples[example]['scenario']}/forecasts_df.csv"
+        ):
+            os.remove(
+                f"examples/inputs/{availabe_examples[example]['scenario']}/forecasts_df.csv"
+            )
 
         if data_format == "local_db":
             db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -133,9 +137,10 @@ dmypy.json
 .idea
 .vscode
 examples/inputs/learned_strategies
-workshop/
-
 examples/outputs
 examples/local_db/
+workshop/inputs/learned_strategies
+workshop/local_db/
+
 assume-db
 forecasts_df.csv

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 from assume.common.base import BaseStrategy, LearningStrategy
 from assume.strategies.dmas_powerplant import DmasPowerplantStrategy
 from assume.strategies.dmas_storage import DmasStorageStrategy
@@ -15,7 +19,7 @@ from assume.strategies.flexable_storage import (
     flexablePosCRMStorage,
 )
 from assume.strategies.learning_block_strategies import RLStrategyBlocks
-from assume.strategies.learning_strategies import RLdamStrategy, hourlyRLdamStrategy
+from assume.strategies.learning_strategies import RLdamStrategy
 from assume.strategies.naive_strategies import (
     NaiveDAStrategy,
     NaiveNegReserveStrategy,

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 from datetime import datetime
 
 import pandas as pd
@@ -155,4 +159,4 @@ def test_minmax_operationtime():
     mm.outputs["energy"][:] = 400
     mm.outputs["energy"][-1:] = 0
     runtime = mm.get_operation_time(datetime(2023, 7, 2))
-    assert runtime == 5
+    assert runtime == 4
