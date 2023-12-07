@@ -412,10 +412,10 @@ class WriteOutput(Role):
 
     def get_sum_reward(self):
         """
-        Retrieves the average reward of RL units from the database for the current simulation.
+        Retrieves the total reward for each learning unit.
 
         Returns:
-            float: The average reward.
+            np.array: The total reward for each learning unit.
         """
         query = text(
             f"select unit, SUM(reward) FROM rl_params where simulation='{self.simulation_id}' GROUP BY unit"
