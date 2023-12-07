@@ -18,6 +18,11 @@ class Forecaster:
     Args:
     - index (pd.Series): The index of the forecasts.
 
+    Example:
+        >>> forecaster = Forecaster(index=pd.Series([1, 2, 3]))
+        >>> forecast = forecaster['temperature']
+        >>> print(forecast)
+
     """
 
     def __init__(self, index: pd.Series):
@@ -34,13 +39,6 @@ class Forecaster:
         - pd.Series: The forecast.
 
         This method returns the forecast for a given column as a pandas Series based on the provided index.
-
-        Example:
-        ```python
-        forecaster = Forecaster(index=pd.Series([1, 2, 3]))
-        forecast = forecaster['temperature']
-        print(forecast)
-        ```
         """
 
         return pd.Series(0, self.index)
@@ -56,11 +54,9 @@ class Forecaster:
         - pd.Series: The availability of the unit.
 
         Example:
-        ```python
-        forecaster = Forecaster(index=pd.Series([1, 2, 3]))
-        availability = forecaster.get_availability('unit_1')
-        print(availability)
-        ```
+        >>> forecaster = Forecaster(index=pd.Series([1, 2, 3]))
+        >>> availability = forecaster.get_availability('unit_1')
+        >>> print(availability)
         """
 
         return self[f"availability_{unit}"]
@@ -77,11 +73,9 @@ class Forecaster:
         - pd.Series: The price of the fuel.
 
         Example:
-        ```python
-        forecaster = Forecaster(index=pd.Series([1, 2, 3]))
-        price = forecaster.get_price('lignite')
-        print(price)
-        ```
+            >>> forecaster = Forecaster(index=pd.Series([1, 2, 3]))
+            >>> price = forecaster.get_price('lignite')
+            >>> print(price)
         """
 
         return self[f"fuel_price_{fuel_type}"]
@@ -96,6 +90,11 @@ class CsvForecaster(Forecaster):
     Args:
     - index (pd.Series): The index of the forecasts.
     - powerplants (dict[str, pd.Series]): The power plants.
+
+    Example:
+        >>> forecaster = CsvForecaster(index=pd.Series([1, 2, 3]))
+        >>> forecast = forecaster['temperature']
+        >>> print(forecast)
 
     """
 
@@ -119,12 +118,6 @@ class CsvForecaster(Forecaster):
         Returns:
         - pd.Series: The forecast for the given column.
 
-        Example:
-        ```python
-        forecaster = CsvForecaster(index=pd.Series([1, 2, 3]))
-        forecast = forecaster['temperature']
-        print(forecast)
-        ```
         """
 
         if column not in self.forecasts.columns:
@@ -145,11 +138,9 @@ class CsvForecaster(Forecaster):
         - prefix (str): The prefix of the column.
 
         Example:
-        ```python
-        forecaster = CsvForecaster(index=pd.Series([1, 2, 3]))
-        forecaster.set_forecast(pd.Series([22, 25, 17], name='temperature'), prefix='location_1_')
-        print(forecaster['location_1_temperature'])
-        ```
+            >>> forecaster = CsvForecaster(index=pd.Series([1, 2, 3]))
+            >>> forecaster.set_forecast(pd.Series([22, 25, 17], name='temperature'), prefix='location_1_')
+            >>> print(forecaster['location_1_temperature'])
         """
 
         if data is None:
@@ -364,6 +355,11 @@ class RandomForecaster(CsvForecaster):
     - powerplants (dict[str, pd.Series]): The power plants.
     - sigma (float): The standard deviation of the noise.
 
+    Example:
+        >>> forecaster = RandomForecaster(index=pd.Series([1, 2, 3]))
+        >>> forecaster.set_forecast(pd.Series([22, 25, 17], name='temperature'), prefix='location_1_')
+        >>> print(forecaster['location_1_temperature'])
+
     """
 
     def __init__(
@@ -389,12 +385,6 @@ class RandomForecaster(CsvForecaster):
         Returns:
         - pd.Series: The forecast modified by random noise.
 
-        Example:
-        ```python
-        forecaster = RandomForecaster(index=pd.Series([1, 2, 3]))
-        forecaster.set_forecast(pd.Series([22, 25, 17], name='temperature'), prefix='location_1_')
-        print(forecaster['location_1_temperature'])
-        ```
         """
 
         if column not in self.forecasts.columns:
@@ -424,13 +414,11 @@ class NaiveForecast(Forecaster):
     - price_forecast (float | list): The price forecast.
 
     Example:
-    ```python
-    forecaster = NaiveForecast(demand=100, co2_price=10, fuel_price=10, availability=1, price_forecast=50)
-    print(forecaster['demand'])
+        >>> forecaster = NaiveForecast(demand=100, co2_price=10, fuel_price=10, availability=1, price_forecast=50)
+        >>> print(forecaster['demand'])
 
-    forecaster = NaiveForecast(index=pd.Series([1, 2, 3]), demand=[100, 200, 300], co2_price=[10, 20, 30])
-    print(forecaster["demand"][2])
-    ```
+        >>> forecaster = NaiveForecast(index=pd.Series([1, 2, 3]), demand=[100, 200, 300], co2_price=[10, 20, 30])
+        >>> print(forecaster["demand"][2])
     """
 
     def __init__(

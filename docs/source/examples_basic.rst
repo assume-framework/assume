@@ -14,4 +14,5 @@ Here you can find several tutorials on how to use ASSUME framework to get you st
    :maxdepth: 3
 
    examples/01_minimal_manual_example.ipynb
+   examples/02_automated_run_example.ipynb
    examples/04_Reinforcement_learning_example.ipynb

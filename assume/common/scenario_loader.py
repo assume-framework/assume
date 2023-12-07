@@ -510,20 +510,17 @@ def load_scenario_folder(
     ValueError: If the specified scenario or study case is not found in the provided inputs.
 
     Example:
-    ```python
-
-    load_scenario_folder(
-        world=world,
-        inputs_path="/path/to/inputs",
-        scenario="scenario_name",
-        study_case="case1",
-        perform_learning=True,
-        perform_evaluation=False,
-        episode=1,
-        eval_episode=0,
-        trained_actors_path="/path/to/trained_actors"
-    )
-    ```
+        >>> load_scenario_folder(
+            world=world,
+            inputs_path="/path/to/inputs",
+            scenario="scenario_name",
+            study_case="study_case_name",
+            perform_learning=True,
+            perform_evaluation=False,
+            episode=1,
+            eval_episode=1,
+            trained_actors_path="",
+        )
 
     Notes:
     - The function sets up the world environment based on the provided inputs and configuration files.
@@ -531,6 +528,7 @@ def load_scenario_folder(
     - If `perform_evaluation` is set to True, the function performs evaluation using the specified evaluation episode number.
     - The function utilizes the specified inputs to configure the simulation environment, including market parameters, unit operators, and forecasting data.
     - After calling this function, the world environment is prepared for further simulation and analysis.
+
     """
     world.loop.run_until_complete(
         load_scenario_folder_async(
@@ -610,15 +608,13 @@ def load_custom_units(
     unit_type (str): The type of the custom units to be loaded.
 
     Example:
-    ```python
-    load_custom_units(
-        world=world,
-        inputs_path="/path/to/inputs",
-        scenario="scenario_name",
-        file_name="custom_units.csv",
-        unit_type="custom_type"
-    )
-    ```
+        >>> load_custom_units(
+            world=world,
+            inputs_path="/path/to/inputs",
+            scenario="scenario_name",
+            file_name="custom_units.csv",
+            unit_type="custom_type"
+        )
 
     Notes:
     - The function loads custom units from the specified file within the given scenario and adds them to the world environment for simulation.
