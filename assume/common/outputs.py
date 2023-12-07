@@ -8,6 +8,7 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from dateutil import rrule as rr
 from mango import Role
@@ -417,13 +418,14 @@ class WriteOutput(Role):
             float: The average reward.
         """
         query = text(
-            f"select reward FROM rl_params where simulation='{self.simulation_id}'"
+            f"select unit, SUM(reward) FROM rl_params where simulation='{self.simulation_id}' GROUP BY unit"
         )
 
-        avg_reward = 0
         with self.db.begin() as db:
-            reward = db.execute(query).fetchall()
-        if len(reward):
-            avg_reward = sum(r[0] for r in reward) / len(reward)
+            rewards_by_unit = db.execute(query).fetchall()
 
-        return avg_reward
+        # convert into a numpy array
+        rewards_by_unit = [r[1] for r in rewards_by_unit]
+        rewards_by_unit = np.array(rewards_by_unit)
+
+        return rewards_by_unit
