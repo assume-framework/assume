@@ -99,8 +99,6 @@ class MarketConfig:
 
     Args:
         name (str): the name of the market
-        addr (str | None): the address of the market
-        aid (str | None): automatic id of the market
         opening_hours (rr.rrule): the opening hours of the market
         opening_duration (timedelta): the duration of the opening hours
         market_mechanism (str): name of method used for clearing
@@ -117,14 +115,14 @@ class MarketConfig:
         price_tick (float | None): step increments of price (e.g. 0.1)
         supports_get_unmatched (bool): whether the market supports get unmatched
         eligible_obligations_lambda (eligible_lambda): lambda function which determines if an agent is eligible to trade this product
+        addr (str): the address of the market
+        aid (str): automatic id of the market
     """
 
-    name: str
-    addr: str | None = None
-    aid: str | None = None
-    opening_hours: rr.rrule
-    opening_duration: timedelta
-    market_mechanism: str
+    name: str = "market"
+    opening_hours: rr.rrule = rr.rrule(rr.HOURLY)
+    opening_duration: timedelta = timedelta(hours=1)
+    market_mechanism: str = "pay_as_clear"
     market_products: list[MarketProduct] = field(default_factory=list)
     product_type: str = "energy"
     maximum_bid_volume: float | None = 2000.0
@@ -138,6 +136,9 @@ class MarketConfig:
     price_tick: float | None = None  # steps in which the price can be increased
     supports_get_unmatched: bool = False
     eligible_obligations_lambda: eligible_lambda = lambda x: True
+
+    addr: str = " "
+    aid: str = " "
 
 
 class OpeningMessage(TypedDict):
