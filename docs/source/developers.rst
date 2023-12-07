@@ -17,7 +17,7 @@ flexibility, and infrastructure modeling.
 The following people are the core development team of ASSUME Framework:
 
 * 2022 - present: Nick Harder (INATECH, Uni Freiburg)
-* 2022 - present: Kim Miskiw (IISM, KIT)
+* 2022 - present: Kim K. Miskiw (IISM, KIT)
 * 2022 - present: Florian Maurer (FH Aachen)
 * 2022 - present: Manish Khanra (Fraunhofer ISI)
 * 2023 - present: Patil Parag (Fraunhofer IEG)

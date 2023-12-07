@@ -75,6 +75,14 @@ class ReplayBuffer:
                 )
 
     def size(self):
+        # write docstring for this function
+        """
+        Return the current size of the buffer (i.e. number of transitions
+        stored in the buffer).
+
+        :return: The current size of the buffer
+
+        """
         return self.buffer_size if self.full else self.pos
 
     def to_torch(self, array: np.array, copy=True):
@@ -85,6 +93,7 @@ class ReplayBuffer:
         :param array:
         :param copy: Whether to copy or not the data
             (may be useful to avoid changing things be reference)
+
         :return:
         """
         if copy:

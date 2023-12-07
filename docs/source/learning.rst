@@ -2,9 +2,9 @@
 ..
 .. SPDX-License-Identifier: AGPL-3.0-or-later
 
-######################
-Reinforcement Learning
-######################
+###############################
+Reinforcement Learning Overview
+###############################
 
 One unique characteristic of ASSUME is the usage of Reinforcement Learning (RL) for the bidding of the agents.
 To enable this the architecture of the simulation is designed in a way to accommodate the learning process. In this part of
@@ -120,7 +120,9 @@ The actor policy of each agent is updated using the deterministic policy gradien
 
     ∇_a Q_i,θ_j(S_k, a_1,k, ..., a_N,k, π(o_i,k))|a_i,k=π(o_i,k) * ∇_θ π(o_i,k)
 
-The actor is updated similarly using only one critic network Q_{θ1}. These changes to the original DDPG algorithm allow increased stability and convergence of the TD3 algorithm. This is especially relevant when approaching a multi-agent RL setup, as discussed in the following section.
+The actor is updated similarly using only one critic network Q_{θ1}. These changes to the original DDPG algorithm allow increased stability and convergence of the TD3 algorithm. This is especially relevant when approaching a multi-agent RL setup, as discussed in the foregoing section.
+Please note that the actor and critics are updated by sampling expereience from the buffer where all intercations of the agents are stroed, namley the observations, actions and rewards. There are more complex buffers possible, like those that use importance sampling, but the default buffer is a simple replay buffer. You can find a documentation of the latter in :doc:`buffers.rst`
+
 
 The Learning Implementation in ASSUME
 =====================================
@@ -134,12 +136,15 @@ The Actor
 We will explain the way learning works in ASSUME starting from the interface to the simulation, namely the bidding strategy of the power plants.
 The bidding strategy, per definition in ASSUME, defines the way we formulate bids based on the technical restrictions of the unit.
 In a learning setting, this is done by the actor network. Which maps the observation to an action. The observation thereby is managed and collected by the units operator as
-summarized in the following picture.
+summarized in the following picture. As you can see in the current working version the observation space contains of a residula load forecast for the next 24 h and aprice forecast for 24 h as well as the
+the current capacity of the powerplant and its marginal costs.
 
 .. image:: img/ActorTask.jpg
     :align: center
     :width: 500px
 
+The action space is a continuous space, which means that the actor can choose any price between 0 and the maximum bid price defined in the code. It gives two prices for two different party of its capacity.
+One, namley :math:`p_inlfex` for the minimum capacity of the power plant and one for the rest ( :math:`p_flex`). The action space is defined in the config file and can be adjusted to your needs.
 After the bids are formulated in the bidding strategy they are sent to the market via the units operator.
 
 .. image:: img/ActorOutput.jpg
@@ -169,7 +174,8 @@ of the actor, which then updates its weights using backward propagation.
 
 With the learning role, we can also choose which RL algorithm should be used. The algorithm and the buffer have base classes and can be customized if needed.
 But without touching the code there are easy adjustments to the algorithms that can and eventually need to be done in the config file.
-The following table shows the options that can be adjusted and gives a short explanation. As the algorithm is based on stable baselines 3, you can also look up more explanations in their doku.
+The following table shows the options that can be adjusted and gives a short explanation. For more advanced users is the functionality of the algorithm also documented in xxx.
+ As the algorithm is based on stable baselines 3, you can also look up more explanations in their doku.
 
 
  ======================================== ==========================================================================================================
