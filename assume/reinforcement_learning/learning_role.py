@@ -26,14 +26,16 @@ class Learning(Role):
     neural networks, replay buffer, and learning hyperparameters. It handles both training and evaluation modes based on
     the provided learning configuration.
 
-    :param learning_config: The configuration for the learning process.
-    :type learning_config: dict
-    :param start: The start of the simulation.
-    :type start: datetime
-    :param end: The end of the simulation.
-    :type end: datetime
+    Attributes:
+        simulation_start (datetime): The start of the simulation.
+        simulation_end (datetime): The end of the simulation.
+        learning_config (LearningConfig): The configuration for the learning process.
 
-    TODO: ***Add missing documentation***
+    Args:
+        learning_config (LearningConfig): The configuration for the learning process.
+        start (datetime): The start of the simulation.
+        end (datetime): The end of the simulation.
+
     """
 
     def __init__(
@@ -168,8 +170,8 @@ class Learning(Role):
         This method creates and initializes the reinforcement learning algorithm based on the specified algorithm name. The algorithm
         is associated with the learning role and configured with relevant hyperparameters.
 
-        :param algorithm: The name of the reinforcement learning algorithm.
-        :type algorithm: str
+        Args:
+        algorithm (RLAlgorithm): The name of the reinforcement learning algorithm.
         """
         if algorithm == "matd3":
             self.rl_algorithm = TD3(
@@ -246,8 +248,8 @@ class Learning(Role):
         This method saves the parameters of both the actor and critic networks associated with the learning role. It organizes the
         saved parameters into separate directories for critics and actors within the specified base directory.
 
-        :param directory: The base directory for saving the parameters.
-        :type directory: str
+        Args:
+        algorithm (RLAlgorithm): The name of the reinforcement learning algorithm.
         """
         self.save_critic_params(directory=f"{directory}/critics")
         self.save_actor_params(directory=f"{directory}/actors")
@@ -260,8 +262,8 @@ class Learning(Role):
         and the critic's optimizer state_dict. It organizes the saved parameters into a directory structure specific to the critic
         associated with each learning strategy.
 
-        :param directory: The base directory for saving the parameters.
-        :type directory: str
+        Args:
+        directory (str): The base directory for saving the parameters.
         """
         os.makedirs(directory, exist_ok=True)
         for u_id in self.rl_strats.keys():
@@ -281,8 +283,8 @@ class Learning(Role):
         the actor's optimizer state_dict. It organizes the saved parameters into a directory structure specific to the actor
         associated with each learning strategy.
 
-        :param directory: The base directory for saving the parameters.
-        :type directory: str
+        Args:
+        directory (str): The base directory for saving the parameters.
         """
         os.makedirs(directory, exist_ok=True)
         for u_id in self.rl_strats.keys():
@@ -301,10 +303,11 @@ class Learning(Role):
         This method loads an object, typically saved as a checkpoint file, from the specified
         directory and returns it. It uses the `torch.load` function and specifies the device for loading.
 
-        :param directory: The directory from which the object should be loaded.
-        :type directory: str
-        :return: The loaded object.
-        :rtype: object
+        Args:
+            directory (str): The directory from which the object should be loaded.
+
+        Returns:
+            object: The loaded object.
         """
         return th.load(directory, map_location=self.device)
 
@@ -315,8 +318,8 @@ class Learning(Role):
         This method loads the parameters of both the actor and critic networks associated with the learning role from the specified
         directory. It uses the `load_critic_params` and `load_actor_params` methods to load the respective parameters.
 
-        :param directory: The directory from which the parameters should be loaded.
-        :type directory: str
+        Args:
+            directory (str): The directory from which the parameters should be loaded.
         """
         self.load_critic_params(directory)
         self.load_actor_params(directory)
@@ -329,8 +332,8 @@ class Learning(Role):
         the critic's optimizer state_dict, from the specified directory. It iterates through the learning strategies associated
         with the learning role, loads the respective parameters, and updates the critic and target critic networks accordingly.
 
-        :param directory: The directory from which the parameters should be loaded.
-        :type directory: str
+        Args:
+            directory (str): The directory from which the parameters should be loaded.
         """
         self.logger.info("Loading critic parameters...")
 
@@ -363,8 +366,8 @@ class Learning(Role):
         the actor's optimizer state_dict, from the specified directory. It iterates through the learning strategies associated
         with the learning role, loads the respective parameters, and updates the actor and target actor networks accordingly.
 
-        :param directory: The directory from which the parameters should be loaded.
-        :type directory: str
+        Args:
+            directory (str): The directory from which the parameters should be loaded.
         """
         self.logger.info("Loading actor parameters...")
         if not os.path.exists(directory):
@@ -396,8 +399,8 @@ class Learning(Role):
         dictionary structure. The extracted networks include actors, actor_targets, critics, and target_critics. The resulting
         dictionary is typically used for saving and sharing these networks.
 
-        :return: The extracted actor and critic networks.
-        :rtype: dict
+        Returns:
+            dict: The extracted actor and critic networks.
         """
         actors = {}
         actor_targets = {}
@@ -422,8 +425,9 @@ class Learning(Role):
         If `actors_and_critics` is None, this method creates new actor and critic networks.
         If `actors_and_critics` is provided, it assigns existing networks to the respective attributes.
 
-        :param actors_and_critics: The actor and critic networks to be assigned.
-        :type actors_and_critics: dict
+        Args:
+        actors_and_critics (dict): The actor and critic networks to be assigned.
+
         """
         if actors_and_critics is None:
             self.create_actors()
