@@ -24,29 +24,20 @@ class OnlyHours(NamedTuple):
     end_hour: int
 
 
-# describes an order which can be either generation (volume > 0) or demand (volume < 0)
 class Order(TypedDict):
     """
     Describes an order which can be either generation (volume > 0) or demand (volume < 0)
 
-    :param bid_id: the id of the bid
-    :type bid_id: str
-    :param start_time: the start time of the order
-    :type start_time: datetime
-    :param end_time: the end time of the order
-    :type end_time: datetime
-    :param volume: the volume of the order
-    :type volume: float
-    :param price: the price of the order
-    :type price: float
-    :param accepted_volume: the accepted volume of the order
-    :type accepted_volume: float
-    :param accepted_price: the accepted price of the order
-    :type accepted_price: float
-    :param only_hours: tuple of hours from which this order is available, on multi day products
-    :type only_hours: OnlyHours | None
-    :param agent_id: the id of the agent
-    :type agent_id: str
+    Args:
+        bid_id (str): the id of the bid
+        start_time (datetime): the start time of the order
+        end_time (datetime): the end time of the order
+        volume (Number | dict[datetime, Number]): the volume of the order (positive if generation)
+        accepted_volume (Number | dict[datetime, Number]): the accepted volume of the order
+        price (Number): the price of the order
+        accepted_price (Number | dict[datetime, Number]): the accepted price of the order
+        agent_id (str): the id of the agent
+        only_hours (OnlyHours | None): tuple of hours from which this order is available, on multi day products
     """
 
     bid_id: str
@@ -71,40 +62,29 @@ class MarketProduct:
     """
     Describes the configuration of a market product which is available at a market.
 
-    :param duration: the duration of the product
-    :type duration: rd | rr.rrule
-    :param count: how many future durations can be traded, must be >= 1
-    :type count: int
-    :param first_delivery: when does the first delivery begin, in relation to market start
-    :type first_delivery: rd
-    :param only_hours: tuple of hours from which this order is available, on multi day products
-    :type only_hours: OnlyHours | None
-    :param eligible_lambda_function: lambda function which determines if an agent is eligible to trade this product
-    :type eligible_lambda_function: eligible_lambda | None
+    Args:
+        duration (rd | rr.rrule): the duration of the product
+        count (int): how many future durations can be traded, must be >= 1
+        first_delivery (rd): when does the first delivery begin, in relation to market start
+        only_hours (OnlyHours | None): tuple of hours from which this order is available, on multi day products
+        eligible_lambda_function (eligible_lambda | None): lambda function which determines if an agent is eligible to trade this product
     """
 
-    duration: rd | rr.rrule  # quarter-hourly, half-hourly, hourly, 4hourly, daily, weekly, monthly, quarter-yearly, yearly
-    count: int  # how many future durations can be traded, must be >= 1
-    # count can also be given as a rrule with until
-    first_delivery: rd = (
-        rd()
-    )  # when does the first delivery begin, in relation to market start
-    # this should be a multiple of duration
+    duration: rd | rr.rrule
+    count: int
+    first_delivery: rd = rd()
     only_hours: OnlyHours | None = None
-    # e.g. (8,20) - for peak trade, (20, 8) for off-peak, none for base
     eligible_lambda_function: eligible_lambda | None = None
 
 
 class Product(NamedTuple):
     """
-    an actual product with start and end
+    An actual product with start and end.
 
-    :param start: the start time of the product
-    :type start: datetime
-    :param end: the end time of the product
-    :type end: datetime
-    :param only_hours: tuple of hours from which this order is available, on multi day products
-    :type only_hours: OnlyHours | None
+    Args:
+        start (datetime): the start time of the product
+        end (datetime): the end time of the product
+        only_hours (OnlyHours | None): tuple of hours from which this order is available, on multi day products
     """
 
     start: datetime
@@ -117,52 +97,32 @@ class MarketConfig:
     """
     Describes the configuration of a market.
 
-    :param name: the name of the market
-    :type name: str
-    :param addr: the address of the market
-    :type addr: str | None
-    :param aid: automatic id of the market
-    :type aid: str | None
-    :param opening_hours: the opening hours of the market
-    :type opening_hours: rr.rrule
-    :param opening_duration: the duration of the opening hours
-    :type opening_duration: timedelta
-    :param market_mechanism: name of method used for clearing
-    :type market_mechanism: str
-    :param market_products: list of available products to be traded at the market
-    :type market_products: list[MarketProduct]
-    :param product_type: energy or capacity or heat
-    :type product_type: str
-    :param maximum_bid_volume: the maximum valid bid volume of the market
-    :type maximum_bid_volume: float
-    :param maximum_bid_price: the maximum bid price of the market
-    :type maximum_bid_price: float
-    :param minimum_bid_price: the minimum bid price of the market
-    :type minimum_bid_price: float
-    :param maximum_gradient: max allowed change between bids
-    :type maximum_gradient: float | None
-    :param additional_fields: additional fields of the market
-    :type additional_fields: list[str]
-    :param volume_unit: the volume unit of the market (e.g. MW)
-    :type volume_unit: str
-    :param volume_tick: step increments of volume (e.g. 0.1)
-    :type volume_tick: float | None
-    :param price_unit: the price unit of the market (e.g. €/MWh)
-    :type price_unit: str
-    :param price_tick: step increments of price (e.g. 0.1)
-    :type price_tick: float | None
-    :param supports_get_unmatched: whether the market supports get unmatched
-    :type supports_get_unmatched: bool
-    :param eligible_obligations_lambda: lambda function which determines if an agent is eligible to trade this product
-    :type eligible_obligations_lambda: eligible_lambda | None
+    Args:
+        name (str): the name of the market
+        addr (str | None): the address of the market
+        aid (str | None): automatic id of the market
+        opening_hours (rr.rrule): the opening hours of the market
+        opening_duration (timedelta): the duration of the opening hours
+        market_mechanism (str): name of method used for clearing
+        market_products (list[MarketProduct]): list of available products to be traded at the market
+        product_type (str): energy or capacity or heat
+        maximum_bid_volume (float | None): the maximum valid bid volume of the market
+        maximum_bid_price (float | None): the maximum bid price of the market
+        minimum_bid_price (float): the minimum bid price of the market
+        maximum_gradient (float | None): max allowed change between bids
+        additional_fields (list[str]): additional fields of the market
+        volume_unit (str): the volume unit of the market (e.g. MW)
+        volume_tick (float | None): step increments of volume (e.g. 0.1)
+        price_unit (str): the price unit of the market (e.g. €/MWh)
+        price_tick (float | None): step increments of price (e.g. 0.1)
+        supports_get_unmatched (bool): whether the market supports get unmatched
+        eligible_obligations_lambda (eligible_lambda): lambda function which determines if an agent is eligible to trade this product
     """
 
     name: str
-    addr = None
-    aid = None
-
-    # continuous markets are clearing just very fast and keep unmatched orders between clearings
-    opening_hours: rr.rrule  # dtstart is start/introduction of market
+    addr: str | None = None
+    aid: str | None = None
+    opening_hours: rr.rrule
     opening_duration: timedelta
     market_mechanism: str
     market_products: list[MarketProduct] = field(default_factory=list)
@@ -170,7 +130,7 @@ class MarketConfig:
     maximum_bid_volume: float | None = 2000.0
     maximum_bid_price: float | None = 3000.0
     minimum_bid_price: float = -500.0
-    maximum_gradient: float = None  # very specific - should be in market clearing
+    maximum_gradient: float | None = None
     additional_fields: list[str] = field(default_factory=list)
     volume_unit: str = "MW"
     volume_tick: float | None = None  # steps in which the amount can be increased
@@ -178,25 +138,18 @@ class MarketConfig:
     price_tick: float | None = None  # steps in which the price can be increased
     supports_get_unmatched: bool = False
     eligible_obligations_lambda: eligible_lambda = lambda x: True
-    # lambda: agent.payed_fee
-    # obligation should be time-based
-    # only allowed to bid regelenergie if regelleistung was accepted in the same hour for this agent by the market
 
 
 class OpeningMessage(TypedDict):
     """
-    Message which is sent from the market to participating agent to open a market
+    Message which is sent from the market to participating agent to open a market.
 
-    :param context: the context of the message
-    :type context: str
-    :param market_id: the id of the market
-    :type market_id: str
-    :param start_time: the start time of the market
-    :type start_time: float
-    :param end_time: the stop time of the market
-    :type end_time: float
-    :param products: list of products which are available at the market to be traded
-    :type products: list[Product]
+    Args:
+        context (str): the context of the message
+        market_id (str): the id of the market
+        start_time (float): the start time of the market
+        end_time (float): the stop time of the market
+        products (list[Product]): list of products which are available at the market to be traded
     """
 
     context: str
@@ -208,16 +161,13 @@ class OpeningMessage(TypedDict):
 
 class ClearingMessage(TypedDict):
     """
-    Message which is sent from the market to agents to clear a market
+    Message which is sent from the market to agents to clear a market.
 
-    :param context: the context of the message
-    :type context: str
-    :param market_id: the id of the market
-    :type market_id: str
-    :param accepted_orders: the orders accepted by the market
-    :type accepted_orders: Orderbook
-    :param rejected_orders: the orders rejected by the market
-    :type rejected_orders: Orderbook
+    Args:
+        context (str): the context of the message
+        market_id (str): the id of the market
+        accepted_orders (Orderbook): the orders accepted by the market
+        rejected_orders (Orderbook): the orders rejected by the market
     """
 
     context: str
@@ -227,24 +177,62 @@ class ClearingMessage(TypedDict):
 
 
 class OrderBookMessage(TypedDict):
+    """
+    Message containing the order book of a market.
+
+    Args:
+        context (str): the context of the message
+        market_id (str): the id of the market
+        orderbook (Orderbook): the order book of the market
+    """
+
     context: str
     market_id: str
     orderbook: Orderbook
 
 
 class RegistrationMessage(TypedDict):
+    """
+    Message for agent registration at a market.
+
+    Args:
+        context (str): the context of the message
+        market_id (str): the id of the market
+        information (dict): additional information for registration
+    """
+
     context: str
     market_id: str
     information: dict
 
 
 class RegistrationReplyMessage(TypedDict):
+    """
+    Reply message for agent registration at a market.
+
+    Args:
+        context (str): the context of the message
+        market_id (str): the id of the market
+        accepted (bool): whether the registration is accepted
+    """
+
     context: str
     market_id: str
     accepted: bool
 
 
 class DataRequestMessage(TypedDict):
+    """
+    Message for requesting data from a market.
+
+    Args:
+        context (str): the context of the message
+        market_id (str): the id of the market
+        metric (str): the specific metric being requested
+        start_time (datetime): the start time of the data request
+        end_time (datetime): the end time of the data request
+    """
+
     context: str
     market_id: str
     metric: str
@@ -254,28 +242,36 @@ class DataRequestMessage(TypedDict):
 
 class MetaDict(TypedDict):
     """
-    Message Meta of a FIPA ACL Message
-    http://www.fipa.org/specs/fipa00061/SC00061G.html#_Toc26669700
+    Message Meta of a FIPA ACL Message.
+
+    Args:
+        sender_addr (str | list): the address of the sender
+        sender_id (str): the id of the sender
+        reply_to (str): to which agent follow up messages should be sent
+        conversation_id (str): the id of the conversation
+        performative (str): the performative of the message
+        protocol (str): the protocol used
+        language (str): the language used
+        encoding (str): the encoding used
+        ontology (str): the ontology used
+        reply_with (str): what the answer should contain as in_reply_to
+        in_reply_to (str): str used to reference an earlier action
+        reply_by (str): latest time to accept replies
     """
 
     sender_addr: str | list
     sender_id: str
-    reply_to: str  # to which agent follow up messages should be sent
+    reply_to: str
     conversation_id: str
     performative: str
     protocol: str
     language: str
     encoding: str
     ontology: str
-    reply_with: str  # what the answer should contain as in_reply_to
-    in_reply_to: str  # str used to reference an earlier action
-    reply_by: str  # latest time to accept replies
+    reply_with: str
+    in_reply_to: str
+    reply_by: str
 
 
-# Class for a Smart Contract which can contain something like:
-# - Contract for Differences (CfD) -> based on market result
-# - Market Subvention -> based on market result
-# - Power Purchase Agreements (PPA) -> A buys everything B generates for price x
-# - Swing Contract ->
 contract_type = Callable[[Agent, Agent], None]
 market_contract_type = Callable[[Agent, Agent, list], None]
