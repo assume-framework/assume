@@ -6,7 +6,7 @@
 Tutorials
 ##########
 
-
+The tutorials get increasingly complicated. We start if explaining the general concept of ASSUME in 01. If you are just starting to use ASSUME we advise you to use this one first {...} usw.  
 Here you can find several tutorials on how to use ASSUME framework to get you started:
 
 
