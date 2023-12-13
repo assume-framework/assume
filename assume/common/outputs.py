@@ -111,7 +111,7 @@ class WriteOutput(Role):
 
     def del_similar_runs(self):
         """
-        Deletes all similar runs from the database based on the simulation ID.
+        Deletes all similar runs from the database based on the simulation ID. This ensures that we overwrite simulations results when restarting one. Please note that a simulation which you also want to keep need to be assigned anew ID. 
         """
         query = text("select distinct simulation from rl_params")
 
