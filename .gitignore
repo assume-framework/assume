@@ -136,13 +136,12 @@ dmypy.json
 *.orig
 .idea
 .vscode
+
+local_db
+assume-db
+forecasts_df.csv
 examples/inputs/learned_strategies
 examples/outputs
-examples/local_db/
 
 examples/notebooks/inputs
 examples/notebooks/outputs
-examples/notebooks/local_db
-
-assume-db
-forecasts_df.csv
