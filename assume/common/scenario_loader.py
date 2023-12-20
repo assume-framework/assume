@@ -642,17 +642,17 @@ def run_learning(
     This function runs multiple episodes of simulation to train DRL agents, performs evaluation, and saves the best runs. It maintains the buffer and learned agents in memory to avoid resetting them with each new run.
 
     Args:
-    world (World): An instance of the World class representing the simulation environment.
-    inputs_path (str): The path to the folder containing input files necessary for the simulation.
-    scenario (str): The name of the scenario for the simulation.
-    study_case (str): The specific study case for the simulation.
+        world (World): An instance of the World class representing the simulation environment.
+        inputs_path (str): The path to the folder containing input files necessary for the simulation.
+        scenario (str): The name of the scenario for the simulation.
+        study_case (str): The specific study case for the simulation.
 
-    Notes:
-    - The function uses a ReplayBuffer to store experiences for training the DRL agents.
-    - It iterates through training episodes, updating the agents and evaluating their performance at regular intervals.
-    - Initial exploration is active at the beginning and is disabled after a certain number of episodes to improve the performance of DRL algorithms.
-    - Upon completion of training, the function performs an evaluation run using the best policy learned during training.
-    - The best policies are chosen based on the average reward obtained during the evaluation runs, and they are saved for future use.
+    Note:
+        - The function uses a ReplayBuffer to store experiences for training the DRL agents.
+        - It iterates through training episodes, updating the agents and evaluating their performance at regular intervals.
+        - Initial exploration is active at the beginning and is disabled after a certain number of episodes to improve the performance of DRL algorithms.
+        - Upon completion of training, the function performs an evaluation run using the best policy learned during training.
+        - The best policies are chosen based on the average reward obtained during the evaluation runs, and they are saved for future use.
     """
     from assume.reinforcement_learning.buffer import ReplayBuffer
 

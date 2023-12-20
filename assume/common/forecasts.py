@@ -245,17 +245,17 @@ class CsvForecaster(Forecaster):
         The method considers the infeed of renewables, residual demand, and the marginal costs of power plants to derive the price forecast.
 
         Returns:
-        - pd.Series: The merit order price forecast.
+            pd.Series: The merit order price forecast.
 
-        Notes:
-        1. Calculates the marginal costs for each power plant based on fuel costs, efficiencies, emissions, and fixed costs.
-        2. Sorts the power plants based on their marginal costs and availability.
-        3. Computes the cumulative power of available power plants.
-        4. Determines the price forecast by iterating through the sorted power plants, setting the price for times that can still be provided with a specific technology and cheaper ones.
+        Note:
+            1. Calculates the marginal costs for each power plant based on fuel costs, efficiencies, emissions, and fixed costs.
+            2. Sorts the power plants based on their marginal costs and availability.
+            3. Computes the cumulative power of available power plants.
+            4. Determines the price forecast by iterating through the sorted power plants, setting the price for times that can still be provided with a specific technology and cheaper ones.
 
         TODO:
-        - Extend price forecasts for all markets, not just specified for the DAM.
-        - Consider the inclusion of storages in the price forecast calculation.
+            Extend price forecasts for all markets, not just specified for the DAM.
+            Consider the inclusion of storages in the price forecast calculation.
 
         """
 
@@ -351,9 +351,9 @@ class RandomForecaster(CsvForecaster):
     standard deviation of the noise.
 
     Args:
-    - index (pd.Series): The index of the forecasts.
-    - powerplants (dict[str, pd.Series]): The power plants.
-    - sigma (float): The standard deviation of the noise.
+      index (pd.Series): The index of the forecasts.
+      powerplants (dict[str, pd.Series]): The power plants.
+      sigma (float): The standard deviation of the noise.
 
     Example:
         >>> forecaster = RandomForecaster(index=pd.Series([1, 2, 3]))
