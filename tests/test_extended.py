@@ -43,11 +43,11 @@ def test_otc_strategy_scaled(scale, mock_supports_minmax):
     strategy = OTCStrategy(scale_firm_power_capacity=scale)
 
     mc = MarketConfig(
-        "OTC",
-        rr.rrule(rr.HOURLY),
-        timedelta(hours=1),
-        "not needed",
-        [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+        name="OTC",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
     )
 
     unit = mock_supports_minmax

@@ -93,11 +93,13 @@ def test_dmas_calc(storage_unit):
     hour_count = len(storage_unit.index) // 2
 
     mc = MarketConfig(
-        "Test",
-        rr.rrule(rr.HOURLY),
-        timedelta(hours=1),
-        "not needed",
-        [MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))],
+        name="Test",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[
+            MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))
+        ],
         additional_fields=["exclusive_id"],
     )
     start = storage_unit.index[0]
@@ -116,11 +118,13 @@ def test_dmas_day(storage_day):
     assert hour_count == 24
 
     mc = MarketConfig(
-        "Test",
-        rr.rrule(rr.HOURLY),
-        timedelta(hours=1),
-        "not needed",
-        [MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))],
+        name="Test",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[
+            MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))
+        ],
         additional_fields=["exclusive_id"],
     )
     start = storage_day.index[0]
