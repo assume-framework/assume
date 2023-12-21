@@ -71,8 +71,6 @@ class Storage(SupportsMinMaxCharge):
         The minimum operating time of the storage unit in hours.
     min_down_time : float, optional
         The minimum down time of the storage unit in hours.
-    min_down_time : float, optional
-        The minimum down time of the storage unit in hours.
     is_active: bool
         Defines whether or not the unit bids itself or is portfolio optimized.
     bidding_startegy: str
@@ -408,11 +406,9 @@ class Storage(SupportsMinMaxCharge):
         min_power_discharge: float = 0,
     ) -> float:
         power_discharge = super().calculate_ramp_discharge(
-            soc,
             previous_power,
             power_discharge,
             current_power,
-            min_power_discharge,
         )
         # restrict according to min_SOC
 
@@ -432,7 +428,6 @@ class Storage(SupportsMinMaxCharge):
         min_power_charge: float = 0,
     ) -> float:
         power_charge = super().calculate_ramp_charge(
-            soc,
             previous_power,
             power_charge,
             current_power,

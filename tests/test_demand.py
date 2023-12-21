@@ -46,11 +46,11 @@ def test_demand():
     assert dem.calculate_marginal_cost(start, max_power.max()) == 2000
 
     mc = MarketConfig(
-        "Test",
-        rr.rrule(rr.HOURLY),
-        timedelta(hours=1),
-        "not needed",
-        [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+        name="Test",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
     )
 
     bids = dem.calculate_bids(mc, [product_tuple])
@@ -107,11 +107,11 @@ def test_demand_series():
     assert dem.calculate_marginal_cost(end, max_power) == 1000
 
     mc = MarketConfig(
-        "Test",
-        rr.rrule(rr.HOURLY),
-        timedelta(hours=1),
-        "not needed",
-        [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+        name="Test",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
     )
 
     bids = dem.calculate_bids(mc, [product_tuple])

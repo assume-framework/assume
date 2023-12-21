@@ -2,8 +2,8 @@
 ..
 .. SPDX-License-Identifier: AGPL-3.0-or-later
 
-assume.common package
-=====================
+Common components and methods
+=============================
 
 Submodules
 ----------

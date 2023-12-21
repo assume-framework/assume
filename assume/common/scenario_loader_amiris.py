@@ -89,11 +89,17 @@ def add_agent_to_world(
     match agent["Type"]:
         case "EnergyExchange":
             market_config = MarketConfig(
-                f"Market_{agent['Id']}",
-                rr.rrule(rr.HOURLY, interval=1, dtstart=world.start, until=world.end),
-                timedelta(hours=1),
-                translate_clearing[agent["Attributes"]["DistributionMethod"]],
-                [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+                name=f"Market_{agent['Id']}",
+                opening_hours=rr.rrule(
+                    rr.HOURLY, interval=1, dtstart=world.start, until=world.end
+                ),
+                opening_duration=timedelta(hours=1),
+                market_mechanism=translate_clearing[
+                    agent["Attributes"]["DistributionMethod"]
+                ],
+                market_products=[
+                    MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))
+                ],
                 maximum_bid_volume=99999,
             )
             world.add_market_operator(f"Market_{agent['Id']}")

@@ -2,8 +2,8 @@
 ..
 .. SPDX-License-Identifier: AGPL-3.0-or-later
 
-assume.markets.clearing\_algorithms package
-===========================================
+Market clearing algorithms
+==========================
 
 Submodules
 ----------

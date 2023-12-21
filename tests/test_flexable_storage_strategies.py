@@ -57,7 +57,9 @@ def test_flexable_eom_storage(mock_market_config, storage):
     storage.forecaster = NaiveForecast(index, availability=1, price_forecast=50)
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     # no change in price forecast -> no bidding
-    assert bids == []
+    assert len(bids) == 1
+    assert bids[0]["price"] == 50 / storage.efficiency_discharge
+    assert bids[0]["volume"] == 60
 
     # increase the current price forecast -> discharging
     storage.forecaster = NaiveForecast(
@@ -65,7 +67,7 @@ def test_flexable_eom_storage(mock_market_config, storage):
     )
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     assert len(bids) == 1
-    assert bids[0]["price"] == 52.5
+    assert bids[0]["price"] == 52.5 / storage.efficiency_discharge
     assert bids[0]["volume"] == 60
 
     # decrease current price forecast -> charging
@@ -74,7 +76,7 @@ def test_flexable_eom_storage(mock_market_config, storage):
     )
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     assert len(bids) == 1
-    assert bids[0]["price"] == 47.5
+    assert bids[0]["price"] == 47.5 * storage.efficiency_charge
     assert bids[0]["volume"] == -60
 
     # change to dam bidding
@@ -110,19 +112,61 @@ def test_flexable_eom_storage(mock_market_config, storage):
     ]
     storage.forecaster = NaiveForecast(index, availability=1, price_forecast=forecast)
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
-    assert len(bids) == 6
-    assert math.isclose(bids[0]["price"], np.mean(forecast[0:13]), abs_tol=0.01)
+    assert len(bids) == 24
+    assert math.isclose(
+        bids[0]["price"],
+        np.mean(forecast[0:13]) * storage.efficiency_charge,
+        abs_tol=0.01,
+    )
     assert bids[0]["volume"] == -60
-    assert math.isclose(bids[1]["price"], np.mean(forecast[0:17]), abs_tol=0.01)
-    assert bids[1]["volume"] == 60
-    assert math.isclose(bids[2]["price"], np.mean(forecast[0:21]), abs_tol=0.01)
-    assert bids[2]["volume"] == 60
-    assert math.isclose(bids[3]["price"], np.mean(forecast[0:25]), abs_tol=0.01)
-    assert bids[3]["volume"] == 60
-    assert math.isclose(bids[4]["price"], np.mean(forecast[4:]), abs_tol=0.01)
-    assert bids[4]["volume"] == -60
-    assert math.isclose(bids[5]["price"], np.mean(forecast[8:]), abs_tol=0.01)
-    assert bids[5]["volume"] == -60
+    assert math.isclose(
+        bids[1]["price"],
+        np.mean(forecast[0:14]) * storage.efficiency_charge,
+        abs_tol=0.01,
+    )
+    assert bids[1]["volume"] == -100
+    assert math.isclose(
+        bids[2]["price"],
+        np.mean(forecast[0:15]) * storage.efficiency_charge,
+        abs_tol=0.01,
+    )
+    assert bids[2]["volume"] == -100
+    assert math.isclose(
+        bids[3]["price"],
+        np.mean(forecast[0:16]) * storage.efficiency_charge,
+        abs_tol=0.01,
+    )
+    assert bids[3]["volume"] == -100
+    assert math.isclose(
+        bids[4]["price"],
+        np.mean(forecast[0:17]) / storage.efficiency_discharge,
+        abs_tol=0.01,
+    )
+    assert bids[4]["volume"] == 0
+    assert math.isclose(
+        bids[8]["price"],
+        np.mean(forecast[0:21]) / storage.efficiency_discharge,
+        abs_tol=0.01,
+    )
+    assert math.isclose(bids[8]["volume"], 14.444, abs_tol=0.01)
+    assert math.isclose(
+        bids[12]["price"],
+        np.mean(forecast[0:25]) / storage.efficiency_discharge,
+        abs_tol=0.01,
+    )
+    assert bids[12]["volume"] == 100
+    assert math.isclose(
+        bids[16]["price"],
+        np.mean(forecast[4:]) * storage.efficiency_charge,
+        abs_tol=0.01,
+    )
+    assert bids[16]["volume"] == -100
+    assert math.isclose(
+        bids[20]["price"],
+        np.mean(forecast[8:]) * storage.efficiency_charge,
+        abs_tol=0.01,
+    )
+    assert bids[20]["volume"] == 0
 
 
 def test_flexable_pos_crm_storage(mock_market_config, storage):
