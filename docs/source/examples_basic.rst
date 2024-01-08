@@ -16,4 +16,5 @@ Here you can find several tutorials on how to use ASSUME framework to get you st
 
    examples/01_minimal_manual_example.nblink
    examples/02_automated_run_example.nblink
+   examples/03_custom_unit_example.nblink
    examples/04_Reinforcement_learning_example.nblink
