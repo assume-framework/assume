@@ -6,12 +6,16 @@ import pyomo.environ as pyo
 from pyomo.opt import SolverFactory, SolverStatus, TerminationCondition
 
 from assume.common.base import BaseUnit
-from assume.units.dst_components import Electrolyser
+from assume.units.dst_components import Electrolyser, ShaftFurnace, ElectricArcFurnace
 
 logger = logging.getLogger(__name__)
 
+# SOLVERS = ["gurobi", "glpk"]
+
 dst_components = {
-    "electrolyser": Electrolyser
+    "electrolyser": Electrolyser,
+    "shaft_furnace": ShaftFurnace,
+    "electric_arc_furnace": ElectricArcFurnace
 }
 
 
@@ -45,9 +49,9 @@ class Plant(BaseUnit):
         self.components = {}
         # self.storage_units = {}
 
-        self.hydrogen_demand = self.forecaster[f"{self.id}_hydrogen"]
+        self.hydrogen_demand = self.forecaster[f"{self.id}_hydrogen_demand"]
         self.electricity_price = self.forecaster["price_EOM"]
-        self.hydrogen_price = hydrogen_price
+        self.hydrogen_price = self.forecaster["hydrogen_price"]
         self.objective = objective
 
         self.location = location
@@ -102,11 +106,15 @@ class Plant(BaseUnit):
         self.model.hydrogen_demand = pyo.Param(
             self.model.time_steps, initialize=dict(enumerate(self.hydrogen_demand))
         )
-        # self.model.electricity_price = pyo.Param(
-        #     self.model.time_steps,
-        #     initialize=dict(enumerate(self.electricity_price)),
-        # )
-        self.model.hydrogen_price = pyo.Param(initialize=self.hydrogen_price)
+        
+        self.model.electricity_price = pyo.Param(
+            self.model.time_steps,
+            initialize=dict(enumerate(self.electricity_price)),
+        )
+        self.model.hydrogen_price = pyo.Param(
+            self.model.time_steps,
+             initialize=dict(enumerate(self.hydrogen_price))
+        )
 
     def define_variables(self):
         self.model.aggregated_power_in = pyo.Var(
@@ -123,6 +131,7 @@ class Plant(BaseUnit):
         )
 
     def define_constraints(self):
+
         @self.model.Constraint(self.model.time_steps)
         def aggregate_power_in_constraint(m, t):
             return m.aggregated_power_in[t] == sum(
@@ -133,23 +142,24 @@ class Plant(BaseUnit):
         @self.model.Constraint(self.model.time_steps)
         def aggregate_hydrogen_production_constraint(m, t):
             return m.aggregated_hydrogen_production[t] == sum(
-                getattr(m, unit_name).hydrogen_production[t]
+                getattr(m, unit_name).hydrogen_output[t]
                 for unit_name in self.components.keys()
             )
-        @self.model.Constraint(self.model.time_steps)
-        def revenue_calculation(m, t):
-            return m.revenue[t] == m.aggregated_hydrogen_production[t] * m.hydrogen_price
 
         @self.model.Constraint(self.model.time_steps)
-        def aggregate_startup_cost_constraint(m, t):
-            return m.aggregated_startup_cost[t] == sum(
-                getattr(m, unit_name).startup_cost_incurred[t]
-                for unit_name in self.components.keys()
-            )
+        def revenue_calculation(m, t):
+            return m.revenue[t] == m.aggregated_hydrogen_production[t] * m.hydrogen_price[t]
+
+        # @self.model.Constraint(self.model.time_steps)
+        # def aggregate_startup_cost_constraint(m, t):
+        #     return m.aggregated_startup_cost[t] == sum(
+        #         getattr(m, unit_name).startup_cost_incurred[t]
+        #         for unit_name in self.components.keys()
+        #     )
 
         @self.model.Constraint(self.model.time_steps)
         def demand_integration(m, t):
-            return m.aggregated_hydrogen_production[t] == m.hydrogen_production_demand[t]
+            return m.aggregated_hydrogen_production[t] >= m.hydrogen_demand[t]
 
     def define_objective(self):
         if self.objective == "minimize_cost":

@@ -5,6 +5,7 @@ from assume.common.forecasts import CsvForecaster
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 from assume.units.building import Building
 from assume.units.plant import Plant
+from assume.units.steel_plant import SteelPlant
 
 
 class NaiveStrategy(BaseStrategy):
@@ -170,39 +171,37 @@ class NaiveDAplantStrategy(BaseStrategy):
         # Run the optimization for the building unit
         t = start
 
-        hydrogen_demand = unit.forecaster['hydrogen_demand']
-        print(hydrogen_demand)
-        unit.hydrogen_demand = hydrogen_demand
+        hydrogen_demand = unit.forecaster['DE6_hamburg_hydrogen_demand']
+        # unit.hydrogen_demand = hydrogen_demand
         unit.run_optimization()
 
         # Fetch the optimized demand (aggregated_power_in)
-        optimized_demand = unit.model.aggregated_power_in.get_values()
+        power_requirement = unit.model.aggregated_power_in.get_values()
         hydrogen_output = unit.model.aggregated_hydrogen_production.get_values()
 
         start = product_tuples[0][0]
         end_all = product_tuples[-1][1]
 
         electricity_price = unit.forecaster["price_EOM"].loc[start]
+        hydrogen_price = unit.forecaster["hydrogen_price"].loc[start]
 
-        # Populate product_tuples with optimized demand values
-        product_tuples = [(t, optimized_demand[t]) for t in unit.model.time_steps]
+        # Initialize the bid price
+        bid_price = 0
 
-        # Calculate the marginal cost based on the optimized demand
+        # Calculate bids for each product tuple
+        for t in unit.model.time_steps:
+            # Ensure t is a valid key for power_requirement and hydrogen_output
+            if t not in power_requirement or t not in hydrogen_output:
+                continue
 
-        marginal_cost = (
-            optimized_demand[t] * electricity_price
-        )
+            marginal_cost = power_requirement[t] * electricity_price
+            revenues = hydrogen_output[t] * hydrogen_price
+            possible_revenue = revenues - marginal_cost
 
-        # Calculate the revenues based on the optimized demand
-
-        revenues = hydrogen_output[t] * unit.hydrogen_price
-
-        possible_revenue = (revenues - marginal_cost).sum()
-
-        if possible_revenue >= 0:
-            bid_price = possible_revenue
-        else:
-            bid_price = possible_revenue + possible_revenue
+            if possible_revenue >= 0:
+                bid_price += possible_revenue
+            else:
+                bid_price += possible_revenue
         
 
         # Create the profile using optimized_demand
@@ -220,7 +219,41 @@ class NaiveDAplantStrategy(BaseStrategy):
 
         bids = [order]
         return bids
+    
+class NaiveDAsteelplantStrategy(BaseStrategy):
+    def calculate_bids(
+        self,
+        unit: SteelPlant,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+    
+        bids = []
+        for product in product_tuples:
+            start, end, only_hours = product
 
+            # Calculate the aggregated power and marginal cost for the product's time range
+            aggregated_power, marginal_cost = unit.calculate_min_max_power(start=start, end=end)
+
+            # The bid price is based on the marginal cost
+            bid_price = marginal_cost
+
+            # The volume of the bid is the negative of the aggregated power
+            bid_volume = -aggregated_power
+
+            # Create the bid order
+            order = {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": only_hours,
+                "price": bid_price,
+                "volume": bid_volume,
+            }
+
+            bids.append(order)
+
+        return bids
 
 class NaivePosReserveStrategy(BaseStrategy):
     """

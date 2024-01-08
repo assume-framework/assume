@@ -520,7 +520,7 @@ async def load_scenario_folder_async(
 
     add_dsm_units(
         units_df=dsm_units,
-        unit_type="plant",  # building
+        unit_type="steel_plant",  # building
         world=world,
         forecaster=forecaster,
     )

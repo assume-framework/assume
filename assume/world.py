@@ -27,7 +27,7 @@ from assume.common import (
 from assume.common.base import LearningConfig
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import LearningStrategy, bidding_strategies
-from assume.units import Building, Demand, PowerPlant, Storage, Plant
+from assume.units import Building, Demand, PowerPlant, Storage, SteelPlant
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
 stdout_handler = logging.StreamHandler(stream=sys.stdout)
@@ -79,7 +79,7 @@ class World:
         self.unit_types = {
             "power_plant": PowerPlant,
             "building": Building,
-            "plant": Plant,
+            "steel_plant": SteelPlant,
             "demand": Demand,
             "storage": Storage,
         }
