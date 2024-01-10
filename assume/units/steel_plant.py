@@ -26,6 +26,12 @@ technology_configurations = {
     'blastFurnace_basicOxygenFurnace': [
         ('blast_furnace', 'iron_output', 'basic_oxygen_furnace', 'iron_input')
     ],
+    'electrolyser_storage_shaftFurnace_EAF': [
+        ('electrolyser', 'hydrogen_output', 'hydrogen_storage', 'hydrogen_input'),
+        ('electrolyser', 'hydrogen_output', 'shaft_furnace', 'direct_hydrogen_input'),
+        ('hydrogen_storage', 'hydrogen_output', 'shaft_furnace', 'stored_hydrogen_input'),
+        ('shaft_furnace', 'dri_output', 'electric_arc_furnace', 'dri_input')
+    ],
     # Add other configurations as needed
 }
 
@@ -42,12 +48,12 @@ class SteelPlant(SupportsMinMax):
         components: Dict[str, Dict] = None,
         objective: str = "minimize_cost",
 
-        hydrogen_price: float = None,
-        electricity_price: float = None,
-        natural_gas_price: float = None,
-        iron_ore_price: float = None,
-        steel_price: float = None,
-        steel_demand: float = None,
+        # hydrogen_price: float = None,
+        # electricity_price: float = None,
+        # natural_gas_price: float = None,
+        # iron_ore_price: float = None,
+        # steel_price: float = None,
+        # steel_demand: float = None,
 
         **kwargs,
     ):
@@ -60,18 +66,21 @@ class SteelPlant(SupportsMinMax):
             node=node,
             **kwargs,
         )
-        self.components = {}
-        self.create_model()
-        self.objective = objective
-        self.location = location
 
-        # self.hydrogen_demand = self.forecaster[f"{self.id}_hydrogen_demand"]
+        self.hydrogen_demand = self.forecaster[f"{self.id}_hydrogen_demand"]
         self.hydrogen_price = self.forecaster["hydrogen_price"]
         self.electricity_price = self.forecaster["price_EOM"]
         self.natural_gas_price = self.forecaster["fuel_price_natural gas"]
         self.iron_ore_price = self.forecaster["iron_ore_price"]
         self.steel_price = self.forecaster["steel_price"]
         self.steel_demand = self.forecaster["steel_demand"]
+
+        self.objective = objective
+
+        self.components = {}
+        self.create_model()
+        
+        self.location = location
 
         # Initialize components based on the selected technology configuration
         self.initialize_components(components)
@@ -113,13 +122,21 @@ class SteelPlant(SupportsMinMax):
         for process_link in process_sequence:
             source_unit, source_output, target_unit, target_input = process_link
 
-            # Dynamically create constraints based on the process link
             @self.model.Constraint(self.model.time_steps)
             def process_flow_constraint(m, t):
-                return getattr(m.components[source_unit], source_output)[t] == getattr(m.components[target_unit], target_input)[t]
+                if target_unit == 'shaft_furnace' and source_unit == 'electrolyser':
+                    # Constraint for hydrogen flow from electrolyser to shaft furnace
+                    return m.shaft_furnace.hydrogen_input_from_electrolyser[t] == getattr(m.components[source_unit], source_output)[t] * m.use_hydrogen_from_electrolyser[t]
+                elif target_unit == 'shaft_furnace' and source_unit == 'hydrogen_storage':
+                    # Constraint for hydrogen flow from storage to shaft furnace
+                    return m.shaft_furnace.hydrogen_input_from_storage[t] == getattr(m.components[source_unit], source_output)[t] * m.use_hydrogen_from_storage[t]
+                else:
+                    # Standard process flow constraint
+                    return getattr(m.components[source_unit], source_output)[t] == getattr(m.components[target_unit], target_input)[t]
 
             constraint_name = f"flow_from_{source_unit}_to_{target_unit}"
             self.model.add_component(constraint_name, process_flow_constraint)
+
 
 
     def define_sets(self) -> None:
@@ -154,6 +171,11 @@ class SteelPlant(SupportsMinMax):
         
     def define_variables(self):
     # Variables for input usage in different units.
+        
+        # Binary decision variables for hydrogen source selection
+        self.model.use_hydrogen_from_electrolyser = pyo.Var(self.model.time_steps, within=pyo.Binary)
+        self.model.use_hydrogen_from_storage = pyo.Var(self.model.time_steps, within=pyo.Binary)
+
         self.model.power_in = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
         self.model.hydrogen_in = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
         self.model.natural_gas_in = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)

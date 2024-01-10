@@ -353,6 +353,10 @@ class ShaftFurnace:
         self.natural_gas_inlet = False
         self.hydrogen_inlet = False
 
+         # New attributes for dual hydrogen source handling
+        self.max_direct_hydrogen_input = max_hydrogen_input  # Maximum direct hydrogen input from electrolyser
+        self.max_stored_hydrogen_input = max_hydrogen_input  # Maximum stored hydrogen input from storage
+
     def add_to_model(self, unit_block, time_steps):
         self.component_block = unit_block
         self.define_parameters()
@@ -388,22 +392,49 @@ class ShaftFurnace:
         self.component_block.operational_status = Var(time_steps, within=Binary)
         self.component_block.dri_output = Var(time_steps, within=NonNegativeReals)
 
+        # Variables for hydrogen input from both electrolyser and storage
+        self.component_block.direct_hydrogen_in = Var(time_steps, within=NonNegativeReals)
+        self.component_block.stored_hydrogen_in = Var(time_steps, within=NonNegativeReals)
+        self.component_block.total_hydrogen_in = Var(time_steps, within=NonNegativeReals)
+
+    def function_of_hydrogen(self, hydrogen_input):
+        # Assuming a simple linear relationship
+        # Replace with more accurate representation as needed
+        efficiency_factor = self.dri_production_efficiency  # example efficiency factor
+        return hydrogen_input * efficiency_factor
+
     def define_constraints(self, time_steps):
+        # Constraint for iron ore throughput
         @self.component_block.Constraint(time_steps)
         def iron_ore_throughput_constraint(m, t):
             return m.iron_ore_in[t] <= m.max_iron_ore_throughput * m.operational_status[t]
 
+        # Constraint for natural gas input
         @self.component_block.Constraint(time_steps)
         def natural_gas_input_constraint(m, t):
             return m.natural_gas_in[t] <= m.max_natural_gas_input * m.operational_status[t]
 
+        # Constraint for direct hydrogen input from electrolyser
         @self.component_block.Constraint(time_steps)
-        def hydrogen_input_constraint(m, t):
-            return m.hydrogen_in[t] <= m.max_hydrogen_input * m.operational_status[t]
+        def direct_hydrogen_input_constraint(m, t):
+            return m.direct_hydrogen_in[t] <= m.max_direct_hydrogen_input * m.operational_status[t]
 
+        # Constraint for stored hydrogen input from hydrogen storage
+        @self.component_block.Constraint(time_steps)
+        def stored_hydrogen_input_constraint(m, t):
+            return m.stored_hydrogen_in[t] <= m.max_stored_hydrogen_input * m.operational_status[t]
+
+        # Constraint for total hydrogen input being the sum of direct and stored hydrogen inputs
+        @self.component_block.Constraint(time_steps)
+        def total_hydrogen_input_constraint(m, t):
+            return m.total_hydrogen_in[t] == m.direct_hydrogen_in[t] + m.stored_hydrogen_in[t]
+
+        # Constraint for DRI output
         @self.component_block.Constraint(time_steps)
         def dri_output_constraint(m, t):
-            return m.dri_output[t] == m.iron_ore_processed[t] * m.dri_production_efficiency
+            # Assuming a linear relationship between hydrogen input and DRI output
+            # Adjust the formula as needed to match your process characteristics
+            return m.dri_output[t] == m.iron_ore_in[t] * m.dri_production_efficiency * self.function_of_hydrogen(m.total_hydrogen_in[t])
 
 class ElectricArcFurnace:
     def __init__(self, 
