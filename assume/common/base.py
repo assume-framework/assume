@@ -4,7 +4,7 @@
 
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import TypedDict
+from typing import Dict, List, Tuple, TypedDict, Union
 
 import pandas as pd
 
@@ -18,25 +18,18 @@ class BaseStrategy:
 
 class BaseUnit:
     """
-    A base class for a unit.
+    A base class for a unit. This class is used as a foundation for all units.
 
-    :param id: The ID of the unit.
-    :type id: str
-    :param unit_operator: The operator of the unit.
-    :type unit_operator: str
-    :param technology: The technology of the unit.
-    :type technology: str
-    :param bidding_strategies: The bidding strategies of the unit.
-    :type bidding_strategies: dict[str, BaseStrategy]
-    :param index: The index of the unit.
-    :type index: pd.DatetimeIndex
-    :param outputs: The output of the unit.
-    :type outputs: dict[str, pd.Series]
-    :param forecaster: The forecast of the unit.
-    :type forecaster: Forecaster
+    Args:
+        id (str): The ID of the unit.
+        unit_operator (str): The operator of the unit.
+        technology (str): The technology of the unit.
+        bidding_strategies (dict[str, BaseStrategy]): The bidding strategies of the unit.
+        index (pd.DatetimeIndex): The index of the unit.
+        node (str, optional): The node of the unit. Defaults to "".
+        forecaster (Forecaster, optional): The forecast of the unit. Defaults to None.
+        **kwargs: Additional keyword arguments.
 
-    Methods
-    -------
     """
 
     def __init__(
@@ -73,17 +66,21 @@ class BaseUnit:
     def calculate_bids(
         self,
         market_config: MarketConfig,
-        product_tuples: list[tuple],
+        product_tuples: List[Tuple],
     ) -> Orderbook:
         """
         Calculate the bids for the next time step.
 
-        :param market_config: The market configuration.
-        :type market_config: MarketConfig
-        :param product_tuples: The product tuples.
-        :type product_tuples: list[tuple]
-        :return: The bids.
-        :rtype: Orderbook
+        Args:
+            market_config (MarketConfig): The market configuration.
+            product_tuples (List[Tuple]): The product tuples.
+
+        Returns:
+            Orderbook: The bids.
+
+        Raises:
+            KeyError: If the product type is not found in the bidding strategies.
+
         """
 
         if market_config.product_type not in self.bidding_strategies:
@@ -108,14 +105,15 @@ class BaseUnit:
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         """
-        calculates the marginal cost for the given power
+        Calculate the marginal cost for the given power.
 
-        :param start: the start time of the dispatch
-        :type start: pd.Timestamp
-        :param power: the power output of the unit
-        :type power: float
-        :return: the marginal cost for the given power
-        :rtype: float
+        Args:
+            start (pd.Timestamp): The start time of the dispatch.
+            power (float): The power output of the unit.
+
+        Returns:
+            float: The marginal cost for the given power.
+
         """
         return 0
 
@@ -125,13 +123,15 @@ class BaseUnit:
         orderbook: Orderbook,
     ) -> None:
         """
-        adds dispatch plan from current market result to total dispatch plan
+        The method iterates through the orderbook, adding the accepted volumes to the corresponding time slots
+        in the dispatch plan. It then calculates the cashflow and the reward for the bidding strategies.
 
-        :param marketconfig: The market configuration.
-        :type marketconfig: MarketConfig
-        :param orderbook: The orderbook.
-        :type orderbook: Orderbook
+        Args:
+            marketconfig (MarketConfig): The market configuration.
+            orderbook (Orderbook): The orderbook.
+
         """
+
         product_type = marketconfig.product_type
         for order in orderbook:
             start = order["start_time"]
@@ -155,7 +155,16 @@ class BaseUnit:
         start: datetime,
         end: datetime,
         product_type: str,
-    ):
+    ) -> None:
+        """
+        Calculate the generation cost for a specific product type within the given time range.
+
+        Args:
+        - start (datetime): The start time for the calculation.
+        - end (datetime): The end time for the calculation.
+        - product_type (str): The type of product for which the generation cost is to be calculated.
+
+        """
         if start not in self.index:
             start = self.index[0]
         product_type_mc = product_type + "_marginal_costs"
@@ -171,43 +180,44 @@ class BaseUnit:
         end: pd.Timestamp,
     ) -> pd.Series:
         """
-        check if the total dispatch plan is feasible
-        This checks if the market feedback is feasible for the given unit.
-        And sets the closest dispatch if not.
-        The end param should be inclusive.
+        Check if the total dispatch plan is feasible.
 
-        :param start: the start time of the dispatch
-        :type start: pd.Timestamp
-        :param end: the end time of the dispatch
-        :type end: pd.Timestamp
-        :return: the volume of the unit within the given time range
-        :rtype: pd.Series
+        This method checks if the market feedback is feasible for the given unit and sets the closest dispatch if not.
+        The end parameter should be inclusive.
+
+        Args:
+            start: The start time of the dispatch.
+            end: The end time of the dispatch.
+
+        Returns:
+            The volume of the unit within the given time range.
         """
         return self.outputs["energy"][start:end]
 
     def get_output_before(self, dt: datetime, product_type: str = "energy") -> float:
         """
-        return output before the given datetime.
-        If datetime is before the start of the index, 0 is returned.
+        Return output before the given datetime.
 
-        :param dt: the datetime
-        :type dt: datetime
-        :param product_type: the product type
-        :type product_type: str
-        :return: the output before the given datetime
-        :rtype: float
+        If the datetime is before the start of the index, 0 is returned.
+
+        Args:
+            dt: The datetime.
+            product_type: The product type (default is "energy").
+
+        Returns:
+            The output before the given datetime.
         """
         if dt - self.index.freq < self.index[0]:
             return 0
         else:
             return self.outputs[product_type].at[dt - self.index.freq]
 
-    def as_dict(self) -> dict:
+    def as_dict(self) -> Dict[str, Union[str, int]]:
         """
         Returns a dictionary representation of the unit.
 
-        :return: a dictionary representation of the unit
-        :rtype: dict
+        Returns:
+            A dictionary representation of the unit.
         """
         return {
             "id": self.id,
@@ -219,12 +229,11 @@ class BaseUnit:
 
     def calculate_cashflow(self, product_type: str, orderbook: Orderbook):
         """
-        calculates the cashflow for the given product_type
+        Calculates the cashflow for the given product_type.
 
-        :param product_type: the product type
-        :type product_type: str
-        :param orderbook: The orderbook.
-        :type orderbook: Orderbook
+        Args:
+            product_type: The product type.
+            orderbook: The orderbook.
         """
         for order in orderbook:
             start = order["start_time"]
@@ -246,14 +255,15 @@ class BaseUnit:
                     cashflow * hours
                 )
 
-    def get_starting_costs(self, op_time: int):
+    def get_starting_costs(self, op_time: int) -> float:
         """
-        op_time is hours running from get_operation_time
-        returns the costs if start_up is planned
-        :param op_time: operation time
-        :type op_time: int
-        :return: start_costs
-        :rtype: float
+        Returns the costs if start-up is planned.
+
+        Args:
+            op_time: Operation time in hours running from get_operation_time.
+
+        Returns:
+            Start-up costs.
         """
         return 0
 
@@ -273,24 +283,18 @@ class BaseUnit:
 
 class SupportsMinMax(BaseUnit):
     """
-    Base Class used for Powerplant derived classes
+    Base Class used for units supporting continuous dispatch and without energy storage.
+    This class is best to be used as foundation for classes of power plants and similar units.
 
-    :param min_power: The minimum power output of the unit.
-    :type min_power: float
-    :param max_power: The maximum power output of the unit.
-    :type max_power: float
-    :param ramp_down: How much power can be decreased in one time step.
-    :type ramp_down: float
-    :param ramp_up: How much power can be increased in one time step.
-    :type ramp_up: float
-    :param efficiency: The efficiency of the unit.
-    :type efficiency: float
-    :param emission_factor: The emission factor of the unit.
-    :type emission_factor: float
-    :param min_operating_time: The minimum time the unit has to be on.
-    :type min_operating_time: int
-    :param min_down_time: The minimum time the unit has to be off.
-    :type min_down_time: int
+    Args:
+        min_power (float): The minimum power output of the unit.
+        max_power (float): The maximum power output of the unit.
+        ramp_down (float): How much power can be decreased in one time step.
+        ramp_up (float): How much power can be increased in one time step.
+        efficiency (float): The efficiency of the unit.
+        emission_factor (float): The emission factor of the unit.
+        min_operating_time (int): The minimum time the unit has to be on.
+        min_down_time (int): The minimum time the unit has to be off.
 
     Methods
     -------
@@ -306,19 +310,18 @@ class SupportsMinMax(BaseUnit):
     min_down_time: int = 0
 
     def calculate_min_max_power(
-        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
+        self, start: pd.Timestamp, end: pd.Timestamp, product_type: str = "energy"
     ) -> tuple[pd.Series, pd.Series]:
         """
         Calculates the min and max power for the given time period
 
-        :param start: the start time of the dispatch
-        :type start: pd.Timestamp
-        :param end: the end time of the dispatch
-        :type end: pd.Timestamp
-        :param product_type: the product type of the unit
-        :type product_type: str
-        :return: the min and max power for the given time period
-        :rtype: tuple[pd.Series, pd.Series]
+        Args:
+            start (pd.Timestamp): the start time of the dispatch
+            end (pd.Timestamp): the end time of the dispatch
+            product_type (str): the product type of the unit
+
+        Returns:
+            tuple[pd.Series, pd.Series]: the min and max power for the given time period
         """
         pass
 
@@ -332,14 +335,14 @@ class SupportsMinMax(BaseUnit):
         """
         Calculates the ramp for the given power
 
-        :param previous_power: the previous power output of the unit
-        :type previous_power: float
-        :param power: the desired power output of the unit
-        :type power: float
-        :param current_power: the current power output of the unit
-        :type current_power: float
-        :return: the ramp for the given power
-        :rtype: float
+        Args:
+            op_time (int): the operation time
+            previous_power (float): the previous power output of the unit
+            power (float): the power output of the unit
+            current_power (float): the current power output of the unit
+
+        Returns:
+            float: the ramp for the given power
         """
         # op_time_befor = self.get_operation_time(start)
         # was off before, but should be on now and min_down_time is not reached
@@ -369,31 +372,29 @@ class SupportsMinMax(BaseUnit):
         )
         return power
 
-    def get_clean_spread(self, prices: pd.DataFrame):
+    def get_clean_spread(self, prices: pd.DataFrame) -> float:
         """
-        returns the clean spread for the given prices
+        Returns the clean spread for the given prices
 
-        :param prices: the prices
-        :type prices: pd.DataFrame
-        :return: the clean spread for the given prices
-        :rtype: float
+        Args:
+            prices (pd.DataFrame): the prices
+
+        Returns:
+            float: the clean spread for the given prices
         """
         emission_cost = self.emission_factor * prices["co"].mean()
         fuel_cost = prices[self.technology.replace("_combined", "")].mean()
         return (fuel_cost + emission_cost) / self.efficiency
 
-    def get_operation_time(self, start: datetime):
+    def get_operation_time(self, start: datetime) -> int:
         """
-        returns the operation time
-        if unit is on since 4 hours, it returns 4
-        if the unit is off since 4 hours, it returns -4
-        The value at start is not considered
+        Returns the operation time
 
-        :param start: the start time
-        :type start: datetime
-        :return: the operation time
-        :rtype: int
+        Args:
+            start (datetime): the start time
 
+        Returns:
+            int: the operation time
         """
         before = start - self.index.freq
 
@@ -412,15 +413,15 @@ class SupportsMinMax(BaseUnit):
             runn += 1
         return (-1) ** is_off * runn
 
-    def get_average_operation_times(self, start: datetime):
+    def get_average_operation_times(self, start: datetime) -> tuple[float, float]:
         """
-        calculates the average uninterupted operation time
-        :param start: the current time
-        :type start: datetime
-        :return: avg_op_time
-        :rtype: float
-        :return: avg_down_time
-        :rtype: float
+        Calculates the average uninterrupted operation time
+
+        Args:
+            start (datetime): the current time
+
+        Returns:
+            tuple[float, float]: avg_op_time, avg_down_time
         """
         op_series = []
 
@@ -459,14 +460,18 @@ class SupportsMinMax(BaseUnit):
             -1, avg_down_time, -self.min_down_time
         )
 
-    def get_starting_costs(self, op_time: int):
+    def get_starting_costs(self, op_time: int) -> float:
         """
-        op_time is hours running from get_operation_time
-        returns the costs if start_up is planned
-        :param op_time: operation time
-        :type op_time: int
-        :return: start_costs
-        :rtype: float
+        Returns the start-up cost for the given operation time.
+        If operation time is positive, the unit is running, so no start-up costs are returned.
+        If operation time is negative, the unit is not running, so start-up costs are returned
+        according to the start-up costs of the unit and the hot/warm/cold start times.
+
+        Args:
+            op_time (int): operation time
+
+        Returns:
+            float: start_costs
         """
         if op_time > 0:
             # unit is running
@@ -486,32 +491,21 @@ class SupportsMinMax(BaseUnit):
 
 class SupportsMinMaxCharge(BaseUnit):
     """
-    Base Class used for Storage derived classes
+    Base Class used for units with energy storage.
 
-    :param initial_soc: The initial state of charge of the storage.
-    :type initial_soc: float
-    :param min_power_charge: How much power must be charged at least in one time step.
-    :type min_power_charge: float
-    :param max_power_charge: How much power can be charged at most in one time step.
-    :type max_power_charge: float
-    :param min_power_discharge: How much power must be discharged at least in one time step.
-    :type min_power_discharge: float
-    :param max_power_discharge: How much power can be discharged at most in one time step.
-    :type max_power_discharge: float
-    :param ramp_up_discharge: How much power can be increased in discharging in one time step.
-    :type ramp_up_discharge: float
-    :param ramp_down_discharge: How much power can be decreased in discharging in one time step.
-    :type ramp_down_discharge: float
-    :param ramp_up_charge: How much power can be increased in charging in one time step.
-    :type ramp_up_charge: float
-    :param ramp_down_charge: How much power can be decreased in charging in one time step.
-    :type ramp_down_charge: float
-    :param max_volume: The maximum volume of the storage.
-    :type max_volume: float
-    :param efficiency_charge: The efficiency of charging.
-    :type efficiency_charge: float
-    :param efficiency_discharge: The efficiency of discharging.
-    :type efficiency_discharge: float
+    Args:
+        initial_soc (float): The initial state of charge of the storage.
+        min_power_charge (float): How much power must be charged at least in one time step.
+        max_power_charge (float): How much power can be charged at most in one time step.
+        min_power_discharge (float): How much power must be discharged at least in one time step.
+        max_power_discharge (float): How much power can be discharged at most in one time step.
+        ramp_up_discharge (float): How much power can be increased in discharging in one time step.
+        ramp_down_discharge (float): How much power can be decreased in discharging in one time step.
+        ramp_up_charge (float): How much power can be increased in charging in one time step.
+        ramp_down_charge (float): How much power can be decreased in charging in one time step.
+        max_volume (float): The maximum volume of the storage.
+        efficiency_charge (float): The efficiency of charging.
+        efficiency_discharge (float): The efficiency of discharging.
 
     Methods
     -------
@@ -532,18 +526,17 @@ class SupportsMinMaxCharge(BaseUnit):
 
     def calculate_min_max_charge(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
-    ) -> tuple[pd.Series, pd.Series]:
+    ) -> Tuple[pd.Series, pd.Series]:
         """
         calculates the min and max charging power for the given time period
 
-        :param start: the start time of the dispatch
-        :type start: pd.Timestamp
-        :param end: the end time of the dispatch
-        :type end: pd.Timestamp
-        :param product_type: the product type of the unit
-        :type product_type: str
-        :return: the min and max charging power for the given time period
-        :rtype: tuple[pd.Series, pd.Series]
+        Args:
+            start (pd.Timestamp): the start time of the dispatch
+            end (pd.Timestamp): the end time of the dispatch
+            product_type (str, optional): the product type of the unit. Defaults to "energy".
+
+        Returns:
+            Tuple[pd.Series, pd.Series]: the min and max charging power for the given time period
         """
         pass
 
@@ -566,28 +559,30 @@ class SupportsMinMaxCharge(BaseUnit):
 
     def get_soc_before(self, dt: datetime) -> float:
         """
-        return SoC before the given datetime.
+        This method returns the State of Charge (SoC) before the given datetime.
         If datetime is before the start of the index, the initial SoC is returned.
         The SoC is a float between 0 and 1.
 
-        :param dt: the datetime
-        :type dt: datetime
-        :return: the SoC before the given datetime
-        :rtype: float
+        Args:
+            dt (datetime): the datetime
+
+        Returns:
+            float: the SoC before the given datetime
         """
         if dt - self.index.freq <= self.index[0]:
             return self.initial_soc
         else:
             return self.outputs["soc"].at[dt - self.index.freq]
 
-    def get_clean_spread(self, prices: pd.DataFrame):
+    def get_clean_spread(self, prices: pd.DataFrame) -> float:
         """
-        returns the clean spread for the given prices
+        Return the clean spread for the given prices
 
-        :param prices: the prices
-        :type prices: pd.DataFrame
-        :return: the clean spread for the given prices
-        :rtype: float
+        Args:
+            prices (pd.DataFrame): the prices
+
+        Returns:
+            float: the clean spread for the given prices
         """
         emission_cost = self.emission_factor * prices["co"].mean()
         fuel_cost = prices[self.technology.replace("_combined", "")].mean()
@@ -595,23 +590,20 @@ class SupportsMinMaxCharge(BaseUnit):
 
     def calculate_ramp_discharge(
         self,
-        soc: float,
         previous_power: float,
         power_discharge: float,
         current_power: float = 0,
-        min_power_discharge: float = 0,
     ) -> float:
         """
-        calculates the ramp for the given discharging power
+        Adjusts the discharging power to the ramping constraints.
 
-        :param previous_power: the previous power output of the unit
-        :type previous_power: float
-        :param power_discharge: the discharging power output of the unit
-        :type power_discharge: float
-        :param current_power: the current power output of the unit
-        :type current_power: float
-        :return: the ramp for the given discharging power
-        :rtype: float
+        Args:
+            previous_power (float): the previous power output of the unit
+            power_discharge (float): the discharging power output of the unit
+            current_power (float, optional): the current power output of the unit. Defaults to 0.
+
+        Returns:
+            float: the ramp for the given discharging power
         """
         if power_discharge == 0:
             return power_discharge
@@ -640,23 +632,22 @@ class SupportsMinMaxCharge(BaseUnit):
 
     def calculate_ramp_charge(
         self,
-        soc: float,
         previous_power: float,
         power_charge: float,
         current_power: float = 0,
     ) -> float:
         """
-        calculates the ramp for the given charging power
+        Adjusts the charging power to the ramping constraints.
 
-        :param previous_power: the previous power output of the unit
-        :type previous_power: float
-        :param power_charge: the charging power output of the unit
-        :type power_charge: float
-        :param current_power: the current power output of the unit
-        :type current_power: float
-        :return: the ramp for the given charging power
-        :rtype: float
+        Args:
+            previous_power (float): the previous power output of the unit
+            power_charge (float): the charging power output of the unit
+            current_power (float, optional): the current power output of the unit. Defaults to 0.
+
+        Returns:
+            float: the ramp for the given charging power
         """
+
         if power_charge == 0:
             return power_charge
 
@@ -685,16 +676,12 @@ class SupportsMinMaxCharge(BaseUnit):
 
 
 class BaseStrategy:
-    """A base class for a bidding strategy.
+    """
+    A base class for a bidding strategy.
 
-    :param args: The arguments.
-    :type args: list
-    :param kwargs: The keyword arguments.
-    :type kwargs: dict
-
-    Methods
-    -------
-
+    Args:
+        args (list): The arguments.
+        kwargs (dict): The keyword arguments.
     """
 
     def __init__(self, *args, **kwargs):
@@ -704,38 +691,34 @@ class BaseStrategy:
         self,
         unit: BaseUnit,
         market_config: MarketConfig,
-        product_tuples: list[Product],
+        product_tuples: List[Product],
         **kwargs,
     ) -> Orderbook:
         """
         Calculates the bids for the next time step.
 
-        :param unit: The unit.
-        :type unit: BaseUnit
-        :param market_config: The market configuration.
-        :type market_config: MarketConfig
-        :param product_tuples: The product tuples.
-        :type product_tuples: list[Product]
-        :return: The bids
-        :rtype: Orderbook
+        Args:
+            unit (BaseUnit): The unit.
+            market_config (MarketConfig): The market configuration.
+            product_tuples (List[Product]): The product tuples.
+
+        Returns:
+            Orderbook: The bids
         """
-        raise NotImplementedError()
 
     def calculate_reward(
         self,
-        unit,
+        unit: BaseUnit,
         marketconfig: MarketConfig,
         orderbook: Orderbook,
     ):
         """
         Calculates the reward for the given unit
 
-        :param unit: the unit
-        :type unit: BaseUnit
-        :param marketconfig: The market configuration.
-        :type marketconfig: MarketConfig
-        :param orderbook: The orderbook.
-        :type orderbook: Orderbook
+        Args:
+            unit (BaseUnit): the unit
+            marketconfig (MarketConfig): The market configuration.
+            orderbook (Orderbook): The orderbook.
         """
         pass
 
@@ -744,13 +727,9 @@ class LearningStrategy(BaseStrategy):
     """
     A strategy which provides learning functionality, has a method to calculate the reward.
 
-    :param args: The arguments.
-    :type args: list
-    :param kwargs: The keyword arguments.
-    :type kwargs: dict
-
-    Methods
-    -------
+    Args:
+        args (list): The arguments.
+        kwargs (dict): The keyword arguments.
     """
 
     obs_dim: int
@@ -766,62 +745,26 @@ class LearningConfig(TypedDict):
     """
     A class for the learning configuration.
 
-    :param observation_dimension: The observation dimension.
-    :type observation_dimension: int
-
-    :param action_dimension: The action dimension.
-    :type action_dimension: int
-
-    :param continue_learning: Whether to continue learning.
-    :type continue_learning: bool
-
-    :param load_model_path: The path to the model to load.
-    :type load_model_path: str
-
-    :param max_bid_price: The maximum bid price.
-    :type max_bid_price: float
-
-    :param learning_mode: Whether to use learning mode.
-    :type learning_mode: bool
-
-    :param algorithm: The algorithm to use.
-    :type algorithm: str
-
-    :param learning_rate: The learning rate.
-    :type learning_rate: float
-
-    :param training_episodes: The number of training episodes.
-    :type training_episodes: int
-
-    :param episodes_collecting_initial_experience: The number of episodes collecting initial experience.
-    :type episodes_collecting_initial_experience: int
-
-    :param train_freq: The training frequency.
-    :type train_freq: int
-
-    :param gradient_steps: The number of gradient steps.
-    :type gradient_steps: int
-
-    :param batch_size: The batch size.
-    :type batch_size: int
-
-    :param gamma: The discount factor.
-    :type gamma: float
-
-    :param device: The device to use.
-    :type device: str
-
-    :param noise_sigma : The standard deviation of the noise.
-    :type noise_sigma: float
-
-    :param noise_scale: Controls the initial strength of the noise.
-    :type noise_scale: int
-
-    :param noise_dt: Determines how quickly the noise weakens over time.
-    :type noise_dt: int
-
-    :param trained_actors_path: The path to the learned model to load.
-    :type trained_actors_path: str
+    Args:
+        observation_dimension (int): The observation dimension.
+        action_dimension (int): The action dimension.
+        continue_learning (bool): Whether to continue learning.
+        load_model_path (str): The path to the model to load.
+        max_bid_price (float): The maximum bid price.
+        learning_mode (bool): Whether to use learning mode.
+        algorithm (str): The algorithm to use.
+        learning_rate (float): The learning rate.
+        training_episodes (int): The number of training episodes.
+        episodes_collecting_initial_experience (int): The number of episodes collecting initial experience.
+        train_freq (int): The training frequency.
+        gradient_steps (int): The number of gradient steps.
+        batch_size (int): The batch size.
+        gamma (float): The discount factor.
+        device (str): The device to use.
+        noise_sigma (float): The standard deviation of the noise.
+        noise_scale (int): Controls the initial strength of the noise.
+        noise_dt (int): Determines how quickly the noise weakens over time.
+        trained_actors_path (str): The path to the learned model to load.
     """
 
     observation_dimension: int

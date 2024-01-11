@@ -20,7 +20,6 @@ from assume.common.market_objects import (
     MetaDict,
     OpeningMessage,
     Orderbook,
-    OrderBookMessage,
     RegistrationMessage,
 )
 from assume.common.utils import aggregate_step_amount, get_products_index
@@ -40,10 +39,9 @@ class UnitsOperator(Role):
     The UnitsOperator is the agent that manages the units.
     It receives the opening hours of the market and sends back the bids for the market.
 
-    :param available_markets: the available markets
-    :type available_markets: list[MarketConfig]
-    :param opt_portfolio: optimized portfolio strategy
-    :type opt_portfolio: tuple[bool, BaseStrategy] | None
+    Args:
+        available_markets (list[MarketConfig]): The available markets.
+        opt_portfolio (tuple[bool, BaseStrategy] | None, optional): Optimized portfolio strategy. Defaults to None.
     """
 
     def __init__(
@@ -105,12 +103,12 @@ class UnitsOperator(Role):
     async def add_unit(
         self,
         unit: BaseUnit,
-    ):
+    ) -> None:
         """
         Create a unit.
 
-        :param unit: the unit to be added
-        :type unit: BaseUnit
+        Args:
+            unit (BaseUnit): The unit to be added.
         """
         self.units[unit.id] = unit
 
@@ -133,22 +131,25 @@ class UnitsOperator(Role):
                 },
             )
 
-    def participate(self, market: MarketConfig):
+    def participate(self, market: MarketConfig) -> bool:
         """
         Method which decides if we want to participate on a given Market.
-        This always returns true for now
+        This always returns true for now.
 
-        :param market: the market to participate in
-        :type market: MarketConfig
+        Args:
+            market (MarketConfig): The market to participate in.
+
+        Returns:
+            bool: True if participate, False otherwise.
         """
         return True
 
-    async def register_market(self, market: MarketConfig):
+    async def register_market(self, market: MarketConfig) -> None:
         """
         Register a market.
 
-        :param market: the market to register
-        :type market: MarketConfig
+        Args:
+            market (MarketConfig): The market to register.
         """
 
         await self.context.send_acl_message(
@@ -167,32 +168,26 @@ class UnitsOperator(Role):
         ),
         logger.debug(f"{self.id} sent market registration to {market.name}")
 
-    def handle_opening(self, opening: OpeningMessage, meta: MetaDict):
+    def handle_opening(self, opening: OpeningMessage, meta: MetaDict) -> None:
         """
-        When we receive an opening from the market, we schedule sending back
-        our list of orders as a response
+        When we receive an opening from the market, we schedule sending back our list of orders as a response.
 
-        :param opening: the opening message
-        :type opening: OpeningMessage
-        :param meta: the meta data of the market
-        :type meta: MetaDict
+        Args:
+            opening (OpeningMessage): The opening message.
+            meta (MetaDict): The meta data of the market.
         """
         logger.debug(
             f'{self.id} received opening from: {opening["market_id"]} {opening["start_time"]} until: {opening["end_time"]}.'
         )
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening, meta))
 
-    def handle_market_feedback(self, content: ClearingMessage, meta: MetaDict):
+    def handle_market_feedback(self, content: ClearingMessage, meta: MetaDict) -> None:
         """
-        handles the feedback which is received from a market we did bid at
-        stores accepted orders, sets the received power
-        writes result back for the learning
-        and executes the dispatch, including ramping for times in the past
+        Handles the feedback which is received from a market we did bid at.
 
-        :param content: the content of the clearing message
-        :type content: ClearingMessage
-        :param meta: the meta data of the market
-        :type meta: MetaDict
+        Args:
+            content (ClearingMessage): The content of the clearing message.
+            meta (MetaDict): The meta data of the market.
         """
         logger.debug(f"{self.id} got market result: {content}")
         accepted_orders: Orderbook = content["accepted_orders"]
@@ -210,7 +205,14 @@ class UnitsOperator(Role):
 
     def handle_registration_feedback(
         self, content: RegistrationMessage, meta: MetaDict
-    ):
+    ) -> None:
+        """
+        Handles the feedback received from a market regarding registration.
+
+        Args:
+            content (RegistrationMessage): The content of the registration message.
+            meta (MetaDict): The meta data of the market.
+        """
         logger.debug("Market %s accepted our registration", content["market_id"])
         if content["accepted"]:
             found = False
@@ -226,7 +228,14 @@ class UnitsOperator(Role):
         else:
             logger.error("Market %s did not accept registration", meta["sender_id"])
 
-    def handle_data_request(self, content: DataRequestMessage, meta: MetaDict):
+    def handle_data_request(self, content: DataRequestMessage, meta: MetaDict) -> None:
+        """
+        Handles the data request received from other agents.
+
+        Args:
+            content (DataRequestMessage): The content of the data request message.
+            meta (MetaDict): The meta data of the market.
+        """
         unit = content["unit"]
         metric_type = content["metric"]
         start = content["start_time"]
@@ -251,16 +260,15 @@ class UnitsOperator(Role):
             },
         )
 
-    def set_unit_dispatch(self, orderbook: Orderbook, marketconfig: MarketConfig):
+    def set_unit_dispatch(
+        self, orderbook: Orderbook, marketconfig: MarketConfig
+    ) -> None:
         """
-        feeds the current market result back to the units
-        this does not respect bids from multiple markets
-        for the same time period, as we only have access to the current orderbook here
+        Feeds the current market result back to the units.
 
-        :param orderbook: the orderbook of the market
-        :type orderbook: Orderbook
-        :param marketconfig: the market configuration
-        :type marketconfig: MarketConfig
+        Args:
+            orderbook (Orderbook): The orderbook of the market.
+            marketconfig (MarketConfig): The market configuration.
         """
         orderbook.sort(key=itemgetter("unit_id"))
         for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
@@ -270,11 +278,12 @@ class UnitsOperator(Role):
                 orderbook=orderbook,
             )
 
-    def write_actual_dispatch(self, product_type: str):
+    def write_actual_dispatch(self, product_type: str) -> None:
         """
-        sends the actual aggregated dispatch curve
-        works across multiple markets
-        sends dispatch at or after it actually happens
+        Sends the actual aggregated dispatch curve.
+
+        Args:
+            product_type (str): The type of the product.
         """
 
         last = self.last_sent_dispatch
@@ -340,13 +349,14 @@ class UnitsOperator(Role):
                     },
                 )
 
-    async def submit_bids(self, opening: OpeningMessage, meta: MetaDict):
+    async def submit_bids(self, opening: OpeningMessage, meta: MetaDict) -> None:
         """
-        formulates an orderbook and sends it to the market.
-        This will handle optional portfolio processing
+        Formulates an orderbook and sends it to the market.
+        This function will accomodate the portfolio optimization in the future.
 
-        :param opening: the opening message
-        :type opening: OpeningMessage
+        Args:
+            opening (OpeningMessage): The opening message.
+            meta (MetaDict): The meta data of the market.
         """
 
         products = opening["products"]
@@ -390,18 +400,15 @@ class UnitsOperator(Role):
         self, market: MarketConfig, products: list[tuple]
     ) -> Orderbook:
         """
-        Takes information from all units that the unit operator manages and
-        formulates the bid to the market from that according to the bidding strategy of the unit operator.
+        Formulates the bid to the market according to the bidding strategy of the unit operator.
+        Placeholder for future portfolio optimization.
 
-        This is the portfolio optimization version
+        Args:
+            market (MarketConfig): The market to formulate bids for.
+            products (list[tuple]): The products to formulate bids for.
 
-        :param market: the market to formulate bids for
-        :type market: MarketConfig
-        :param products: the products to formulate bids for
-        :type products: list[tuple]
-
-        :return: OrderBook that is submitted as a bid to the market
-        :rtype: OrderBook
+        Returns:
+            OrderBook: The orderbook that is submitted as a bid to the market.
         """
         orderbook: Orderbook = []
         # TODO sort units by priority
@@ -416,16 +423,14 @@ class UnitsOperator(Role):
         self, market: MarketConfig, products: list[tuple]
     ) -> Orderbook:
         """
-        Takes information from all units that the unit operator manages and
-        formulates the bid to the market from that according to the bidding strategy of the unit itself.
+        Formulates the bid to the market according to the bidding strategy of the each unit individually.
 
-        :param market: the market to formulate bids for
-        :type market: MarketConfig
-        :param products: the products to formulate bids for
-        :type products: list[tuple]
+        Args:
+            market (MarketConfig): The market to formulate bids for.
+            products (list[tuple]): The products to formulate bids for.
 
-        :return OrderBook that is submitted as a bid to the market
-        :rtype OrderBook
+        Returns:
+            OrderBook: The orderbook that is submitted as a bid to the market.
         """
 
         orderbook: Orderbook = []
@@ -455,7 +460,14 @@ class UnitsOperator(Role):
 
     def write_learning_to_output(
         self, products_index: pd.DatetimeIndex, marketconfig: MarketConfig
-    ):
+    ) -> None:
+        """
+        Sends the current rl_strategy update to the output agent.
+
+        Args:
+            products_index (pd.DatetimeIndex): The index of all products.
+            marketconfig (MarketConfig): The market configuration.
+        """
         output_agent_list = []
         start = products_index[0]
         for unit_id, unit in self.units.items():
@@ -523,7 +535,18 @@ class UnitsOperator(Role):
         act_dim: int,
         device: str,
         learning_unit_count: int,
-    ):
+    ) -> None:
+        """
+        Writes learning results to the learning agent.
+
+        Args:
+            start (datetime): The start time.
+            marketconfig (MarketConfig): The market configuration.
+            obs_dim (int): The observation dimension.
+            act_dim (int): The action dimension.
+            device (str): The device used for learning.
+            learning_unit_count (int): The count of learning units.
+        """
         all_observations = []
         all_rewards = []
         start = products_index[0]
@@ -562,7 +585,7 @@ class UnitsOperator(Role):
         all_observations = all_observations.squeeze().cpu().numpy()
         all_actions = all_actions.squeeze().cpu().numpy()
         all_rewards = np.array(all_rewards)
-        rl_agent_data = (np.array(all_observations), all_actions, all_rewards)
+        rl_agent_data = (all_observations, all_actions, all_rewards)
 
         learning_role_id = self.context.data_dict.get("learning_agent_id")
         learning_role_addr = self.context.data_dict.get("learning_agent_addr")
@@ -578,15 +601,17 @@ class UnitsOperator(Role):
                 },
             )
 
-    def write_learning_params(self, orderbook: Orderbook, marketconfig: MarketConfig):
+    def write_learning_params(
+        self, orderbook: Orderbook, marketconfig: MarketConfig
+    ) -> None:
         """
-        sends the current rl_strategy update to the output agent
+        Sends the current rl_strategy update to the output agent.
 
-        :param orderbook: the orderbook of the market
-        :type orderbook: Orderbook
-        :param marketconfig: the market configuration
-        :type marketconfig: MarketConfig
+        Args:
+            orderbook (Orderbook): The orderbook of the market.
+            marketconfig (MarketConfig): The market configuration.
         """
+
         learning_strategies = []
         products_index = get_products_index(orderbook)
 

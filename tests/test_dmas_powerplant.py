@@ -97,11 +97,13 @@ def test_dmas_calc(power_plant_1):
     hour_count = len(power_plant_1.index) // 2
 
     mc = MarketConfig(
-        "Test",
-        rr.rrule(rr.HOURLY),
-        timedelta(hours=1),
-        "not needed",
-        [MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))],
+        name="Test",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[
+            MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))
+        ],
         additional_fields=["link", "block_id"],
     )
     start = power_plant_1.index[0]
@@ -122,11 +124,13 @@ def test_dmas_day(power_plant_day):
     assert hour_count == 24
 
     mc = MarketConfig(
-        "Test",
-        rr.rrule(rr.HOURLY),
-        timedelta(hours=1),
-        "not needed",
-        [MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))],
+        name="Test",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[
+            MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))
+        ],
         additional_fields=["link", "block_id"],
     )
     start = power_plant_day.index[0]
@@ -155,11 +159,13 @@ def test_dmas_prevent_start(power_plant_day):
     power_plant_day.forecaster.price_forecast.iloc[10:11] = -10
 
     mc = MarketConfig(
-        "Test",
-        rr.rrule(rr.HOURLY),
-        timedelta(hours=1),
-        "not needed",
-        [MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))],
+        name="Test",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[
+            MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))
+        ],
         additional_fields=["link", "block_id"],
     )
     start = power_plant_day.index[0]
@@ -187,11 +193,13 @@ def test_dmas_prevent_start_end(power_plant_day):
     power_plant_day.forecaster.price_forecast.iloc[20:24] = -10
 
     mc = MarketConfig(
-        "Test",
-        rr.rrule(rr.HOURLY),
-        timedelta(hours=1),
-        "not needed",
-        [MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))],
+        name="Test",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[
+            MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))
+        ],
         additional_fields=["link", "block_id"],
     )
     start = power_plant_day.index[0]

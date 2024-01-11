@@ -24,11 +24,11 @@ end = datetime(2020, 12, 2)
 async def market_role() -> MarketRole:
     market_name = "Test"
     marketconfig = MarketConfig(
-        market_name,
-        rr.rrule(rr.HOURLY, dtstart=start, until=end),
-        rd(hours=1),
-        "pay_as_clear",
-        [MarketProduct(rd(hours=1), 1, rd(hours=1))],
+        name=market_name,
+        opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
+        opening_duration=rd(hours=1),
+        market_mechanism="pay_as_clear",
+        market_products=[MarketProduct(rd(hours=1), 1, rd(hours=1))],
     )
     clock = ExternalClock(0)
     container = await create_container(addr=("0.0.0.0", 9098), clock=clock)

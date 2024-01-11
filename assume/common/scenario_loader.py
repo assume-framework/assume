@@ -4,6 +4,7 @@
 
 import logging
 from datetime import datetime
+from typing import Optional, Tuple
 
 import dateutil.rrule as rr
 import numpy as np
@@ -30,21 +31,27 @@ def load_file(
     path: str,
     config: dict,
     file_name: str,
-    index: pd.DatetimeIndex = None,
+    index: Optional[pd.DatetimeIndex] = None,
 ) -> pd.DataFrame:
     """
-    This function loads a csv file from a given path and returns a dataframe.
+    Loads a csv file from the given path and returns a dataframe.
 
-    :param path: the path to the csv file
-    :type path: str
-    :param config: the config file
-    :type config: dict
-    :param file_name: the name of the csv file
-    :type file_name: str
-    :param index: the index of the dataframe
-    :type index: pd.DatetimeIndex
-    :return: the dataframe
-    :rtype: pd.DataFrame
+    The config file is used to check if the file name is specified in the config file,
+    otherwise defaults to the file name.
+
+    If the index is specified, the dataframe is resampled to the index, if possible. If not, None is returned.
+
+    Args:
+    path (str): The path to the csv file.
+    config (dict): The config file containing file mappings.
+    file_name (str): The name of the csv file.
+    index (pd.DatetimeIndex, optional): The index of the dataframe. Defaults to None.
+
+    Returns:
+    pd.DataFrame: The dataframe containing the loaded data.
+
+    Raises:
+    FileNotFoundError: If the specified file is not found, returns None.
     """
     df = None
 
@@ -105,15 +112,15 @@ def load_file(
         return None
 
 
-def convert_to_rrule_freq(string):
+def convert_to_rrule_freq(string: str) -> Tuple[int, int]:
     """
-    This function converts a string to a rrule frequency and interval.
-    The string should be in the format of "1h" or "1d" or "1w".
+    Convert a string to a rrule frequency and interval.
 
-    :param string: the string to be converted
-    :type string: str
-    :return: the rrule frequency and interval
-    :rtype: tuple[int, int]
+    Args:
+    string (str): The string to be converted. Should be in the format of "1h" or "1d" or "1w".
+
+    Returns:
+    Tuple[int, int]: The rrule frequency and interval.
     """
     freq = freq_map[string[-1]]
     interval = int(string[:-1])
@@ -125,20 +132,18 @@ def make_market_config(
     market_params: dict,
     world_start: datetime,
     world_end: datetime,
-):
+) -> MarketConfig:
     """
-    This function creates a market config from a given dictionary.
+    Create a market config from a given dictionary.
 
-    :param id: the id of the market
-    :type id: str
-    :param market_params: the market parameters
-    :type market_params: dict
-    :param world_start: the start time of the world
-    :type world_start: datetime
-    :param world_end: the end time of the world
-    :type world_end: datetime
-    :return: the market config
-    :rtype: MarketConfig
+    Args:
+    id (str): The id of the market.
+    market_params (dict): The market parameters.
+    world_start (datetime): The start time of the world.
+    world_end (datetime): The end time of the world.
+
+    Returns:
+    MarketConfig: The market config.
     """
     freq, interval = convert_to_rrule_freq(market_params["opening_frequency"])
     start = market_params.get("start_date")
@@ -191,19 +196,20 @@ def add_units(
     unit_type: str,
     world: World,
     forecaster: Forecaster,
-):
+) -> None:
     """
-    This function adds units to the world from a given dataframe.
+    Add units to the world from a given dataframe.
+
     The callback is used to adjust unit_params depending on the unit_type, before adding the unit to the world.
 
-    :param units_df: the dataframe containing the units
-    :type units_df: pd.DataFrame
-    :param unit_type: the type of the unit
-    :type unit_type: str
-    :param world: the world
-    :type world: World
-    :param forecaster: the forecaster
-    :type forecaster: Forecaster
+    Args:
+    units_df (pd.DataFrame): The dataframe containing the units.
+    unit_type (str): The type of the unit.
+    world (World): The world to which the units will be added.
+    forecaster (Forecaster): The forecaster used for adding the units.
+
+    Returns:
+    None
     """
     if units_df is None:
         return
@@ -239,17 +245,26 @@ async def load_scenario_folder_async(
     episode: int = 0,
     eval_episode: int = 0,
     trained_actors_path: str = "",
-):
-    """Load a scenario from a given path. Raises: ValueError: If the scenario or study case is not found.
+) -> None:
+    """
+    Load a scenario from a given path.
 
-    :param world: The world.
-    :type world: World
-    :param inputs_path: Path to the inputs folder.
-    :type inputs_path: str
-    :param scenario: Name of the scenario.
-    :type scenario: str
-    :param study_case: Name of the study case.
-    :type study_case: str
+    This function loads a scenario within a specified study case from a given path, setting up the world environment for simulation and learning.
+
+    Args:
+    world (World): An instance of the World class representing the simulation environment.
+    inputs_path (str): The path to the folder containing input files necessary for the scenario.
+    scenario (str): The name of the scenario to be loaded.
+    study_case (str): The specific study case within the scenario to be loaded.
+    perform_learning (bool, optional): A flag indicating whether learning should be performed. Defaults to True.
+    perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
+    episode (int, optional): The episode number for learning. Defaults to 0.
+    eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
+    trained_actors_path (str, optional): The path to the trained actors. Defaults to an empty string.
+
+    Raises:
+    ValueError: If the specified scenario or study case is not found in the provided inputs.
+
     """
 
     # load the config file
@@ -464,28 +479,91 @@ async def load_scenario_folder_async(
         raise ValueError("No RL units/strategies were provided!")
 
 
+def load_scenario_folder(
+    world: World,
+    inputs_path: str,
+    scenario: str,
+    study_case: str,
+    perform_learning: bool = True,
+    perform_evaluation: bool = False,
+    episode: int = 1,
+    eval_episode: int = 1,
+    trained_actors_path="",
+):
+    """
+    Load a scenario from a given path.
+
+    This function loads a scenario within a specified study case from a given path, setting up the world environment for simulation and learning.
+
+    Args:
+    world (World): An instance of the World class representing the simulation environment.
+    inputs_path (str): The path to the folder containing input files necessary for the scenario.
+    scenario (str): The name of the scenario to be loaded.
+    study_case (str): The specific study case within the scenario to be loaded.
+    perform_learning (bool, optional): A flag indicating whether learning should be performed. Defaults to True.
+    perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
+    episode (int, optional): The episode number for learning. Defaults to 0.
+    eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
+    trained_actors_path (str, optional): The path to the trained actors. Defaults to an empty string.
+
+    Raises:
+    ValueError: If the specified scenario or study case is not found in the provided inputs.
+
+    Example:
+        >>> load_scenario_folder(
+            world=world,
+            inputs_path="/path/to/inputs",
+            scenario="scenario_name",
+            study_case="study_case_name",
+            perform_learning=True,
+            perform_evaluation=False,
+            episode=1,
+            eval_episode=1,
+            trained_actors_path="",
+        )
+
+    Notes:
+    - The function sets up the world environment based on the provided inputs and configuration files.
+    - If `perform_learning` is set to True, the function initializes the learning mode with the specified episode number.
+    - If `perform_evaluation` is set to True, the function performs evaluation using the specified evaluation episode number.
+    - The function utilizes the specified inputs to configure the simulation environment, including market parameters, unit operators, and forecasting data.
+    - After calling this function, the world environment is prepared for further simulation and analysis.
+
+    """
+    world.loop.run_until_complete(
+        load_scenario_folder_async(
+            world=world,
+            inputs_path=inputs_path,
+            scenario=scenario,
+            study_case=study_case,
+            perform_learning=perform_learning,
+            perform_evaluation=perform_evaluation,
+            episode=episode,
+            eval_episode=eval_episode,
+            trained_actors_path=trained_actors_path,
+        )
+    )
+
+
 async def async_load_custom_units(
     world: World,
     inputs_path: str,
     scenario: str,
     file_name: str,
     unit_type: str,
-):
+) -> None:
     """
-    This function loads custom units from a given path.
+    Load custom units from a given path.
 
-    :param world: the world
-    :type world: World
-    :param inputs_path: the path to the inputs folder
-    :type inputs_path: str
-    :param scenario: the name of the scenario
-    :type scenario: str
-    :param file_name: the name of the file
-    :type file_name: str
-    :param unit_type: the type of the unit
-    :type unit_type: str
+    This function loads custom units of a specified type from a given path within a scenario, adding them to the world environment for simulation.
+
+    Args:
+    world (World): An instance of the World class representing the simulation environment.
+    inputs_path (str): The path to the folder containing input files necessary for the custom units.
+    scenario (str): The name of the scenario from which the custom units are to be loaded.
+    file_name (str): The name of the file containing the custom units.
+    unit_type (str): The type of the custom units to be loaded.
     """
-
     path = f"{inputs_path}/{scenario}"
 
     custom_units = load_file(
@@ -516,7 +594,34 @@ def load_custom_units(
     scenario: str,
     file_name: str,
     unit_type: str,
-):
+) -> None:
+    """
+    Load custom units from a given path.
+
+    This function loads custom units of a specified type from a given path within a scenario, adding them to the world environment for simulation.
+
+    Args:
+    world (World): An instance of the World class representing the simulation environment.
+    inputs_path (str): The path to the folder containing input files necessary for the custom units.
+    scenario (str): The name of the scenario from which the custom units are to be loaded.
+    file_name (str): The name of the file containing the custom units.
+    unit_type (str): The type of the custom units to be loaded.
+
+    Example:
+        >>> load_custom_units(
+            world=world,
+            inputs_path="/path/to/inputs",
+            scenario="scenario_name",
+            file_name="custom_units.csv",
+            unit_type="custom_type"
+        )
+
+    Notes:
+    - The function loads custom units from the specified file within the given scenario and adds them to the world environment for simulation.
+    - If the specified custom units file is not found, a warning is logged.
+    - Each unique unit operator in the custom units is added to the world's unit operators.
+    - The custom units are added to the world environment based on their type for use in simulations.
+    """
     world.loop.run_until_complete(
         async_load_custom_units(
             world=world,
@@ -528,46 +633,27 @@ def load_custom_units(
     )
 
 
-def load_scenario_folder(
-    world: World,
-    inputs_path: str,
-    scenario: str,
-    study_case: str,
-    perform_learning: bool = True,
-    perform_evaluation: bool = False,
-    episode: int = 1,
-    eval_episode: int = 1,
-    trained_actors_path="",
-):
+def run_learning(
+    world: World, inputs_path: str, scenario: str, study_case: str
+) -> None:
     """
-    Load a scenario from a given path.
+    Train Deep Reinforcement Learning (DRL) agents to act in a simulated market environment.
 
-    :param world: The world.
-    :type world: World
-    :param inputs_path: Path to the inputs folder.
-    :type inputs_path: str
-    :param scenario: Name of the scenario.
-    :type scenario: str
-    :param study_case: Name of the study case.
-    :type study_case: str
+    This function runs multiple episodes of simulation to train DRL agents, performs evaluation, and saves the best runs. It maintains the buffer and learned agents in memory to avoid resetting them with each new run.
+
+    Args:
+        world (World): An instance of the World class representing the simulation environment.
+        inputs_path (str): The path to the folder containing input files necessary for the simulation.
+        scenario (str): The name of the scenario for the simulation.
+        study_case (str): The specific study case for the simulation.
+
+    Note:
+        - The function uses a ReplayBuffer to store experiences for training the DRL agents.
+        - It iterates through training episodes, updating the agents and evaluating their performance at regular intervals.
+        - Initial exploration is active at the beginning and is disabled after a certain number of episodes to improve the performance of DRL algorithms.
+        - Upon completion of training, the function performs an evaluation run using the best policy learned during training.
+        - The best policies are chosen based on the average reward obtained during the evaluation runs, and they are saved for future use.
     """
-    world.loop.run_until_complete(
-        load_scenario_folder_async(
-            world=world,
-            inputs_path=inputs_path,
-            scenario=scenario,
-            study_case=study_case,
-            perform_learning=perform_learning,
-            perform_evaluation=perform_evaluation,
-            episode=episode,
-            eval_episode=eval_episode,
-            trained_actors_path=trained_actors_path,
-        )
-    )
-
-
-def run_learning(world: World, inputs_path: str, scenario: str, study_case: str):
-    # initiate buffer for rl agent
     from assume.reinforcement_learning.buffer import ReplayBuffer
 
     # remove csv path so that nothing is written while learning
@@ -576,7 +662,7 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
     best_reward = -1e10
 
     buffer = ReplayBuffer(
-        buffer_size=int(5e5),
+        buffer_size=int(world.learning_config.get("replay_buffer_size", 5e5)),
         obs_dim=world.learning_role.obs_dim,
         act_dim=world.learning_role.act_dim,
         n_rl_units=len(world.learning_role.rl_strats),
@@ -647,7 +733,8 @@ def run_learning(world: World, inputs_path: str, scenario: str, study_case: str)
 
             world.run()
 
-            avg_reward = world.output_role.get_sum_reward()
+            total_rewards = world.output_role.get_sum_reward()
+            avg_reward = np.mean(total_rewards)
             # check reward improvement in validation run
             world.learning_config["trained_actors_path"] = old_path
             if avg_reward > best_reward:

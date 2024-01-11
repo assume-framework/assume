@@ -48,6 +48,7 @@ html_theme_options = {
     "repository_url": "https://github.com/assume-framework/assume.git",
     "use_repository_button": True,
     "show_navbar_depth": 2,
+    "navigation_with_keys": False,
 }
 
 # The name for this set of Sphinx documents.  If None, it defaults to
@@ -75,6 +76,7 @@ nbsphinx_prolog = """
 .. note::
 
     You can `download <https://github.com/assume-framework/assume/tree/main/{{ docname }}>`_ this example as a Jupyter notebook
+    or try it out directly in `Google Colab <https://colab.research.google.com/github/assume-framework/assume/blob/main/{{ docname }}>`_.
 """
 
 nbsphinx_allow_errors = True

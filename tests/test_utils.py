@@ -41,11 +41,13 @@ def test_make_market_config():
     start = datetime(2020, 1, 1)
     end = datetime(2020, 12, 2)
     mc = MarketConfig(
-        market_name,
-        rr.rrule(rr.HOURLY, dtstart=start, until=end),
-        pd.Timedelta(hours=1),
-        "pay_as_clear",
-        [MarketProduct(pd.Timedelta(hours=1), 1, pd.Timedelta(hours=1))],
+        name=market_name,
+        opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
+        opening_duration=pd.Timedelta(hours=1),
+        market_mechanism="pay_as_clear",
+        market_products=[
+            MarketProduct(pd.Timedelta(hours=1), 1, pd.Timedelta(hours=1))
+        ],
     )
     market_params = {
         "operator": "EOM_operator",

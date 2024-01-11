@@ -22,13 +22,21 @@ logger = logging.getLogger(__name__)
 def initializer(func):
     """
     Automatically assigns the parameters.
-    >>> class process:
-    ...     @initializer
-    ...     def __init__(self, cmd, reachable=False, user='root'):
-    ...         pass
-    >>> p = process('halt', True)
-    >>> p.cmd, p.reachable, p.user
-    ('halt', True, 'root')
+
+    Args:
+        func (callable): The function to be initialized.
+
+    Returns:
+        callable: The wrapper function.
+
+    Examples:
+        >>> class process:
+        ...     @initializer
+        ...     def __init__(self, cmd, reachable=False, user='root'):
+        ...         pass
+        >>> p = process('halt', True)
+        >>> p.cmd, p.reachable, p.user
+        ('halt', True, 'root')
     """
     names, varargs, keywords, defaults, *_ = inspect.getfullargspec(func)
 
@@ -48,14 +56,14 @@ def initializer(func):
 
 def get_available_products(market_products: list[MarketProduct], startdate: datetime):
     """
-    Get all available products for a given startdate
+    Get all available products for a given startdate.
 
-    :param market_products: list of market products
-    :type market_products: list[MarketProduct]
-    :param startdate: the startdate
-    :type startdate: datetime
-    :return: list of available products
-    :rtype: list[MarketProduct]
+    Args:
+        market_products (list[MarketProduct]): List of market products.
+        startdate (datetime): The startdate.
+
+    Returns:
+        list[MarketProduct]: List of available products.
     """
     options = []
     for product in market_products:
@@ -76,15 +84,16 @@ def get_available_products(market_products: list[MarketProduct], startdate: date
 
 def plot_orderbook(orderbook: Orderbook, results: list[dict]):
     """
-    Plot the merit order of bids for each node in a separate subplot
+    Plot the merit order of bids for each node in a separate subplot.
 
-    :param orderbook: the orderbook
-    :type orderbook: Orderbook
-    :param results: the results of the clearing
-    :type results: list[dict]
-    :return: the figure and axes of the plot
-    :rtype: tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+    Args:
+        orderbook (Orderbook): The orderbook.
+        results (list[dict]): The results of the clearing.
+
+    Returns:
+        tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]: The figure and axes of the plot.
     """
+
     import matplotlib.pyplot as plt
     from matplotlib.lines import Line2D
 
@@ -197,11 +206,12 @@ def plot_orderbook(orderbook: Orderbook, results: list[dict]):
 
 def visualize_orderbook(order_book: Orderbook):
     """
-    Visualize the orderbook
+    Visualize the orderbook.
 
-    :param order_book: the orderbook
-    :type order_book: Orderbook
+    Args:
+        order_book (Orderbook): The orderbook.
     """
+
     import matplotlib.pyplot as plt
     from matplotlib.colors import ListedColormap
 
@@ -235,27 +245,21 @@ def visualize_orderbook(order_book: Orderbook):
 
 def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=None):
     """
-    step function with bought volume
-    allows setting timeframe through begin and end
-    and group by columns in groupby.
-    This allows to have separate time series per market and bid_id/unit_id.
-    The orderbook must contain all relevant orders.
-    E.g. to calculate the current volume from 01.06 to 02.06, a yearly base
-    order from 01.01-31.12 must also be given, to be considered.
+    Step function with bought volume, allows setting timeframe through begin and end, and group by columns in groupby.
 
-    If called without groupby, this returns the aggregated orderbook timeseries
+    Args:
+        orderbook (Orderbook): The orderbook.
+        begin (datetime, optional): The begin time. Defaults to None.
+        end (datetime, optional): The end time. Defaults to None.
+        groupby (list[str], optional): The columns to group by. Defaults to None.
 
-    :param orderbook: the orderbook
-    :type orderbook: Orderbook
-    :param begin: the begin time
-    :type begin: datetime | None
-    :param end: the end time
-    :type end: datetime | None
-    :param groupby: the columns to group by
-    :type groupby: list[str] | None
-    :return: the aggregated orderbook timeseries
-    :rtype: list[tuple[datetime, float, str, str]]
+    Returns:
+        list[tuple[datetime, float, str, str]]: The aggregated orderbook timeseries.
+
+    Examples:
+        If called without groupby, this returns the aggregated orderbook timeseries
     """
+
     if groupby is None:
         groupby = []
     deltas = []
@@ -318,6 +322,20 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=No
 
 
 def get_test_demand_orders(power: np.array):
+    """
+    Get test demand orders.
+
+    Args:
+        power (np.array): Power array.
+
+    Returns:
+        pd.DataFrame: DataFrame of demand orders.
+
+    Examples:
+        >>> power = np.array([100, 200, 150])
+        >>> get_test_demand_orders(power)
+    """
+
     order_book = {}
     for t in range(len(power)):
         order_book[t] = dict(
@@ -328,7 +346,20 @@ def get_test_demand_orders(power: np.array):
     return demand_order
 
 
-def separate_orders(orderbook):
+def separate_orders(orderbook: Orderbook):
+    """
+    Separate orders with several hours into single hour orders.
+
+    Args:
+        orderbook (Orderbook): The orderbook.
+
+    Returns:
+        list: The updated orderbook.
+
+    Notes:
+        This function separates orders with several hours into single hour orders and modifies the orderbook in place.
+    """
+
     # separate orders with several hours into single hour orders
     delete_orders = []
     for order in orderbook:
