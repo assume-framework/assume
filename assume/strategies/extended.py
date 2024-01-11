@@ -118,7 +118,7 @@ class MarkupStrategy(BaseStrategy):
                     "start_time": start,
                     "end_time": end,
                     "only_hours": product[2],
-                    "price": price*self.rel_markup+self.abs_markup,
+                    "price": price * self.rel_markup + self.abs_markup,
                     "volume": volume,
                 }
             )

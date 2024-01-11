@@ -16,8 +16,6 @@ from assume.common.base import LearningConfig
 from assume.common.forecasts import CsvForecaster, Forecaster, NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.world import World
-import yaml
-from yamlinclude import YamlIncludeConstructor
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +136,7 @@ def add_agent_to_world(
                 market_products=[
                     MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))
                 ],
-                maximum_bid_volume=99999,
+                maximum_bid_volume=1e6,
             )
             world.add_market_operator(f"Market_{agent['Id']}")
             world.add_market(f"Market_{agent['Id']}", market_config)
@@ -233,7 +231,7 @@ def add_agent_to_world(
         case "ConventionalTrader":
             world.add_unit_operator(f"Operator_{agent['Id']}")
             min_markup = agent["Attributes"]["minMarkup"]
-            max_markup = agent["Attributes"]["minMarkup"]
+            max_markup = agent["Attributes"]["maxMarkup"]
             markups[agent["Id"]] = (min_markup, max_markup)
         case "PredefinedPlantBuilder":
             # this is the actual powerplant
@@ -256,7 +254,7 @@ def add_agent_to_world(
             )
             # TODO UnplannedAvailabilityFactor is not respected
 
-            min_markup, max_markup = markups.get(raw_trader_id, (0,0))
+            min_markup, max_markup = markups.get(raw_trader_id, (0, 0))
             # Amiris interpolates blocks linearly
             interpolated_values = interpolate_blocksizes(
                 attr["InstalledPowerInMW"],
@@ -277,6 +275,7 @@ def add_agent_to_world(
                         # AMIRIS does not have min_power
                         "min_power": 0,
                         "max_power": power,
+                        "fixed_cost": markup,
                         "bidding_strategies": {"energy": "naive"},
                         "technology": translate_fuel_type[prototype["FuelType"]],
                         "fuel_type": translate_fuel_type[prototype["FuelType"]],
@@ -291,9 +290,17 @@ def add_agent_to_world(
             operator_id = f"Operator_{operator_id}"
             attr = agent["Attributes"]
             availability = attr.get("YieldProfile", attr.get("DispatchTimeSeries"))
+            max_power = attr["InstalledPowerInMW"]
             if isinstance(availability, str):
                 dispatch_profile = read_csv(base_path, availability)
                 availability = dispatch_profile.reindex(world.index).ffill().fillna(0)
+
+                if availability.max() > 1:
+                    scale_value = availability.max()
+                    availability /= scale_value
+                    max_power *= scale_value
+                    # availability above 1 does not make sense
+
             fuel_price = prices.get(translate_fuel_type[attr["EnergyCarrier"]], 0)
             fuel_price += attr.get("OpexVarInEURperMWH", 0)
             forecast = NaiveForecast(
@@ -309,7 +316,7 @@ def add_agent_to_world(
                 operator_id,
                 {
                     "min_power": 0,
-                    "max_power": attr["InstalledPowerInMW"],
+                    "max_power": max_power,
                     "bidding_strategies": {"energy": "naive"},
                     "technology": translate_fuel_type[attr["EnergyCarrier"]],
                     "fuel_type": translate_fuel_type[attr["EnergyCarrier"]],
@@ -339,6 +346,11 @@ async def load_amiris_async(
     amiris_scenario = read_amiris_yaml(base_path)
     # DeliveryIntervalInSteps = 3600
     # In practice - this seems to be a fixed number in AMIRIS
+    if study_case.lower() == "simple":
+        print("is simple - adjusting start time")
+        amiris_scenario["GeneralProperties"]["Simulation"][
+            "StartTime"
+        ] = "2020-12-31_23:58:00"
 
     start = amiris_scenario["GeneralProperties"]["Simulation"]["StartTime"]
     start = pd.to_datetime(start, format="%Y-%m-%d_%H:%M:%S")
@@ -347,7 +359,7 @@ async def load_amiris_async(
     # AMIRIS caveat: start and end is always two minutes before actual start
     start += timedelta(minutes=2)
     sim_id = f"{scenario}_{study_case}"
-    save_interval = amiris_scenario["GeneralProperties"]["Output"]["Interval"]//2
+    save_interval = amiris_scenario["GeneralProperties"]["Output"]["Interval"] // 2
     prices = {}
     index = pd.date_range(start=start, end=end, freq="1h", inclusive="left")
     await world.setup(
@@ -377,7 +389,9 @@ async def load_amiris_async(
         "MeritOrderForecaster",
         "SupportPolicy",
     ]
-    agents_sorted = sorted(amiris_scenario["Agents"], key= lambda agent: keyorder.index((agent["Type"])))
+    agents_sorted = sorted(
+        amiris_scenario["Agents"], key=lambda agent: keyorder.index((agent["Type"]))
+    )
     for agent in agents_sorted:
         add_agent_to_world(
             agent,
@@ -395,10 +409,9 @@ if __name__ == "__main__":
     # To use this with amiris run:
     # git clone https://gitlab.com/dlr-ve/esy/amiris/examples.git amiris-examples
     # next to the assume folder
-    scenario = "Germany2019"  # Germany2019 or Austria2019 or Simple
+    scenario = "Simple"  # Germany2019 or Austria2019 or Simple
     base_path = f"../amiris-examples/{scenario}/"
     amiris_scenario = read_amiris_yaml(base_path)
-    amiris_scenario["markups"] = {}
     sends, receives = get_send_receive_msgs_per_id(
         1000,
         amiris_scenario["Contracts"],
