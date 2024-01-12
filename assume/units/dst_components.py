@@ -275,7 +275,7 @@ class Electrolyser:
 
     def define_variables(self, time_steps):
         self.component_block.power_in = Var(time_steps, within=pyo.NonNegativeReals)
-        self.component_block.hydrogen_production = Var(time_steps, within=pyo.NonNegativeReals)
+        self.component_block.hydrogen_output = Var(time_steps, within=pyo.NonNegativeReals)
         self.component_block.operational_status = Var(time_steps, within=Binary)
 
     def define_constraints(self, time_steps):
@@ -303,20 +303,36 @@ class Electrolyser:
             return m.power_in[t-1] - m.power_in[t] <= m.ramp_down
 
         # Minimum operating time constraint
-        @self.component_block.Constraint(time_steps)
         def min_operating_time_constraint(m, t):
-            if t >= m.min_operating_time:
-                return sum(m.operational_status[i] for i in range(t-m.min_operating_time, t)) >= m.min_operating_time * m.operational_status[t]
-            else:
-                return Constraint.Skip
+            # Calculate the start time for the constraint
+            min_op_time_float = m.min_operating_time
+            start_time = t - int(min_op_time_float) if t >= int(min_op_time_float) else 0
+
+            # Accumulate operational status over the calculated range
+            operational_hours = sum(m.operational_status[i] for i in range(start_time, t))
+
+            # For fractional min_operating_time, add a weighted operational status of the preceding time step
+            if min_op_time_float % 1 > 0 and t > 0:
+                fractional_part = min_op_time_float % 1
+                operational_hours += fractional_part * m.operational_status[t - 1]
+
+            return operational_hours >= min_op_time_float * m.operational_status[t]
 
         # Minimum downtime constraint
-        @self.component_block.Constraint(time_steps)
         def min_down_time_constraint(m, t):
-            if t >= m.min_down_time:
-                return sum(1 - m.operational_status[i] for i in range(t-m.min_down_time, t)) >= m.min_down_time * (1 - m.operational_status[t])
-            else:
-                return Constraint.Skip
+            # Calculate the start time for the constraint
+            min_down_time_float = m.min_down_time
+            start_time = t - int(min_down_time_float) if t >= int(min_down_time_float) else 0
+
+            # Accumulate non-operational status over the calculated range
+            non_operational_hours = sum(1 - m.operational_status[i] for i in range(start_time, t))
+
+            # For fractional min_down_time, add a weighted non-operational status of the preceding time step
+            if min_down_time_float % 1 > 0 and t > 0:
+                fractional_part = min_down_time_float % 1
+                non_operational_hours += fractional_part * (1 - m.operational_status[t - 1])
+
+            return non_operational_hours >= min_down_time_float * (1 - m.operational_status[t])
 
         # Power consumption equation
         @self.component_block.Constraint(time_steps)
@@ -334,7 +350,8 @@ class ShaftFurnace:
                  ramp_down, 
                  downtime_hot_start, 
                  downtime_warm_start, 
-                 efficiency, 
+                 efficiency,
+                 dri_production_efficiency,
                  **kwargs):
         
         self.model = model
@@ -349,6 +366,7 @@ class ShaftFurnace:
         self.downtime_hot_start = downtime_hot_start
         self.downtime_warm_start = downtime_warm_start
         self.efficiency = efficiency
+        self.dri_production_efficiency = dri_production_efficiency
         # Reducing gas inlets
         self.natural_gas_inlet = False
         self.hydrogen_inlet = False
@@ -417,12 +435,15 @@ class ShaftFurnace:
         # Constraint for direct hydrogen input from electrolyser
         @self.component_block.Constraint(time_steps)
         def direct_hydrogen_input_constraint(m, t):
-            return m.direct_hydrogen_in[t] <= m.max_direct_hydrogen_input * m.operational_status[t]
+            return m.direct_hydrogen_in[t] <= m.max_hydrogen_input * m.operational_status[t]
+        # @self.component_block.Constraint(time_steps)
+        # def direct_hydrogen_input_constraint(m, t):
+        #     return m.direct_hydrogen_in[t] <= m.max_direct_hydrogen_input * m.operational_status[t]
 
-        # Constraint for stored hydrogen input from hydrogen storage
-        @self.component_block.Constraint(time_steps)
-        def stored_hydrogen_input_constraint(m, t):
-            return m.stored_hydrogen_in[t] <= m.max_stored_hydrogen_input * m.operational_status[t]
+        # # Constraint for stored hydrogen input from hydrogen storage
+        # @self.component_block.Constraint(time_steps)
+        # def stored_hydrogen_input_constraint(m, t):
+        #     return m.stored_hydrogen_in[t] <= m.max_stored_hydrogen_input * m.operational_status[t]
 
         # Constraint for total hydrogen input being the sum of direct and stored hydrogen inputs
         @self.component_block.Constraint(time_steps)
@@ -440,7 +461,7 @@ class ElectricArcFurnace:
     def __init__(self, 
                  model, 
                  id, 
-                 max_power_input, 
+                 max_power, 
                  max_dri_input, 
                  max_scrap_input, 
                  efficiency, 
@@ -453,7 +474,7 @@ class ElectricArcFurnace:
         self.model = model
         self.id = id
         # Operational parameters
-        self.max_power_input = max_power_input
+        self.max_power = max_power
         self.max_dri_input = max_dri_input
         self.max_scrap_input = max_scrap_input
         self.efficiency = efficiency
@@ -470,7 +491,7 @@ class ElectricArcFurnace:
         self.define_constraints(time_steps)
 
     def define_parameters(self):
-        self.component_block.max_power_input = Param(initialize=self.max_electricity_input)
+        self.component_block.max_power = Param(initialize=self.max_power)
         self.component_block.max_dri_input = Param(initialize=self.max_dri_input)
         self.component_block.max_scrap_input = Param(initialize=self.max_scrap_input)
         self.component_block.efficiency = Param(initialize=self.efficiency)
@@ -489,7 +510,7 @@ class ElectricArcFurnace:
     def define_constraints(self, time_steps):
         @self.component_block.Constraint(time_steps)
         def electricity_input_constraint(m, t):
-            return m.power_in[t] <= m.max_power_input * m.operational_status[t]
+            return m.power_in[t] <= m.max_power * m.operational_status[t]
 
         @self.component_block.Constraint(time_steps)
         def dri_input_constraint(m, t):

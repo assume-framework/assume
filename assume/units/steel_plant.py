@@ -42,11 +42,12 @@ class SteelPlant(SupportsMinMax):
         unit_operator: str,
         bidding_strategies: dict,
         technology: str = "steel_plant",
+        plant_type: str = 'electrolyser_shaftFurnace_EAF',
         node: str = "bus0",
         index: pd.DatetimeIndex = None,
         location: tuple[float, float] = (0.0, 0.0),
         components: Dict[str, Dict] = None,
-        objective: str = "minimize_cost",
+        objective: str = None,
 
         # hydrogen_price: float = None,
         # electricity_price: float = None,
@@ -75,16 +76,22 @@ class SteelPlant(SupportsMinMax):
         self.steel_price = self.forecaster["steel_price"]
         self.steel_demand = self.forecaster["steel_demand"]
 
+        self.location = location
+
         self.objective = objective
 
         self.components = {}
+
+        # Validate and set the plant_type attribute
+        if plant_type not in technology_configurations:
+            raise ValueError(f"Plant type '{plant_type}' is not recognized.")
+        self.plant_type = plant_type
+
         self.create_model()
         
-        self.location = location
-
         # Initialize components based on the selected technology configuration
         self.initialize_components(components)
-        self.initialize_process_sequence(technology)
+        self.initialize_process_sequence(plant_type)
         
         self.define_constraints()
 
@@ -105,14 +112,16 @@ class SteelPlant(SupportsMinMax):
                 raise ValueError(f"Component type '{component_type}' not recognized.")
 
             component_class = dst_components[component_type]
+            
             self.components[component_id] = component_class(self.model, component_id, **component_info)
-            self.components[component_id].add_to_model(self.model, self.index)
+            self.components[component_id].add_to_model(self.model, self.model.time_steps)
 
-    def initialize_process_sequence(self, technology_choice):
-        if technology_choice not in technology_configurations:
-            raise ValueError(f"Technology choice '{technology_choice}' is not recognized.")
+    def initialize_process_sequence(self, plant_type):
+        # Use plant_type to determine the process sequence
+        if plant_type not in technology_configurations:
+            raise ValueError(f"Plant type '{plant_type}' is not recognized.")
 
-        sequence = technology_configurations[technology_choice]
+        sequence = technology_configurations[plant_type]
         for unit_type in sequence:
             if unit_type in self.components:
                 self.initialize_unit_sequence(self.components[unit_type])
@@ -140,9 +149,10 @@ class SteelPlant(SupportsMinMax):
 
 
     def define_sets(self) -> None:
-        self.model.time_steps = pyo.Set(
-            initialize=[idx for idx, _ in enumerate(self.index)]
-        )
+        self.model.time_steps = pyo.Set(initialize=range(len(self.index)))
+        # self.model.time_steps = pyo.Set(
+        #     initialize=[idx for idx, _ in enumerate(self.index)]
+        # )
 
     def define_parameters(self):
         self.model.electricity_price = pyo.Param(self.model.time_steps, 
@@ -170,7 +180,6 @@ class SteelPlant(SupportsMinMax):
                                                              else self.steel_demand[t] for t in self.model.time_steps})
         
     def define_variables(self):
-    # Variables for input usage in different units.
         
         # Binary decision variables for hydrogen source selection
         self.model.use_hydrogen_from_electrolyser = pyo.Var(self.model.time_steps, within=pyo.Binary)

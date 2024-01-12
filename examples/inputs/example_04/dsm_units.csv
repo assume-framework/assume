@@ -1,4 +1,4 @@
-name,technology,bidding_energy,unit_operator,objective,max_power,min_power,ramp_up,ramp_down,min_operating_time,min_down_time,downtime_hot_start,downtime_warm_start,efficiency,compressor_power,maximim_iron_ore_throughput,max_natural_gas_input,max_hydrogen_input,max_power_input,max_dri_input,max_scrap_input
-Steelplant_DE6_hamburg,electrolyser,naive_da_steel_plant,dsm_operator_1,minimize_marginal_cost,100,20,10,10,1,0.5,0.25,0.1,0.75,5,,,,,,
-Steelplant_DE6_hamburg,shaft_furnace,naive_da_steel_plant,dsm_operator_1,minimize_marginal_cost,,,50,50,,,1,0.5,0.85,,500,300,200,,,
-Steelplant_DE6_hamburg,electric_arc_furnace,naive_da_steel_plant,dsm_operator_1,minimize_marginal_cost,,,40,40,,,1,0.5,0.8,,,,,200,400,300
+name,technology,plant_type,bidding_energy,unit_operator,objective,max_power,min_power,ramp_up,ramp_down,min_operating_time,min_down_time,downtime_hot_start,downtime_warm_start,efficiency,compressor_power,max_iron_ore_throughput,dri_production_efficiency,max_natural_gas_input,max_hydrogen_input,max_dri_input,max_scrap_input
+Steelplant_DE6_hamburg,electrolyser,electrolyser_shaftFurnace_EAF,naive_da_steel_plant,dsm_operator_1,minimize_marginal_cost,100,20,10,10,1,0.5,0.25,0.1,0.75,5,,,,,,
+Steelplant_DE6_hamburg,shaft_furnace,electrolyser_shaftFurnace_EAF,naive_da_steel_plant,dsm_operator_1,minimize_marginal_cost,,,50,50,,,1,0.5,0.85,,500,0.99,300,200,,
+Steelplant_DE6_hamburg,electric_arc_furnace,electrolyser_shaftFurnace_EAF,naive_da_steel_plant,dsm_operator_1,minimize_marginal_cost,200,,40,40,,,1,0.5,0.8,,,,,,400,300
