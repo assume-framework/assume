@@ -251,7 +251,9 @@ class BaseUnit:
                     cashflow * self.index.freq.n
                 )
             else:
-                cashflow = float(order["accepted_price"] * order["accepted_volume"])
+                cashflow = float(
+                    order.get("accepted_price", 0) * order.get("accepted_volume", 0)
+                )
                 hours = (end - start) / timedelta(hours=1)
                 self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
                     cashflow * hours
