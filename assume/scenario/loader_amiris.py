@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import yaml
 from tqdm import tqdm
+from yamlinclude import YamlIncludeConstructor
 
 from assume.common.base import LearningConfig
 from assume.common.forecasts import CsvForecaster, Forecaster, NaiveForecast
@@ -17,8 +18,6 @@ from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.world import World
 
 logger = logging.getLogger(__name__)
-import yaml
-from yamlinclude import YamlIncludeConstructor
 
 translate_clearing = {
     "SAME_SHARES": "pay_as_clear",
