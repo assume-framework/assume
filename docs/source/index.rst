@@ -74,6 +74,7 @@ Documentation
 
 * :doc:`market_config`
 * :doc:`market_mechanism`
+* :doc:`scenario_loader`
 * :doc:`bidding_agents`
 * :doc:`learning`
 * :doc:`assume`
@@ -85,6 +86,7 @@ Documentation
 
    market_config
    market_mechanism
+   scenario_loader
    bidding_agents
    learning
    assume

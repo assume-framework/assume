@@ -31,7 +31,7 @@ def power_plant_1() -> PowerPlant:
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
-        technology="coal",
+        technology="hard coal",
         bidding_strategies={"energy": DmasPowerplantStrategy()},
         index=index,
         max_power=1000,
@@ -61,7 +61,7 @@ def power_plant_day(fuel_type="lignite") -> PowerPlant:
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
-        technology="coal",
+        technology="hard coal",
         bidding_strategies={"energy": DmasPowerplantStrategy()},
         index=index,
         max_power=1000,
