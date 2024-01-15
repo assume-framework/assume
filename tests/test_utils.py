@@ -10,7 +10,6 @@ import pytest
 from dateutil import rrule as rr
 
 from assume.common.market_objects import MarketConfig, MarketProduct
-from assume.common.scenario_loader import convert_to_rrule_freq, make_market_config
 from assume.common.utils import (
     aggregate_step_amount,
     get_available_products,
@@ -19,6 +18,7 @@ from assume.common.utils import (
     separate_orders,
     visualize_orderbook,
 )
+from assume.scenario.loader_csv import convert_to_rrule_freq, make_market_config
 
 from .utils import create_orderbook
 

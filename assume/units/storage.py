@@ -111,7 +111,7 @@ class Storage(SupportsMinMaxCharge):
         downtime_hot_start: int = 8,  # hours
         downtime_warm_start: int = 48,  # hours
         index: pd.DatetimeIndex = None,
-        location: tuple[float, float] = None,
+        location: tuple[float, float] = (0, 0),
         node: str = None,
         **kwargs,
     ):
@@ -120,6 +120,7 @@ class Storage(SupportsMinMaxCharge):
             id=id,
             technology=technology,
             node=node,
+            location=location,
             bidding_strategies=bidding_strategies,
             index=index,
             unit_operator=unit_operator,
@@ -190,8 +191,6 @@ class Storage(SupportsMinMaxCharge):
         self.hot_start_cost = hot_start_cost * max_power_discharge
         self.warm_start_cost = warm_start_cost * max_power_discharge
         self.cold_start_cost = cold_start_cost * max_power_discharge
-
-        self.location = location
 
     def execute_current_dispatch(self, start: pd.Timestamp, end: pd.Timestamp):
         """

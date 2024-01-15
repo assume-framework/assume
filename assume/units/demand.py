@@ -61,6 +61,7 @@ class Demand(SupportsMinMax):
             bidding_strategies=bidding_strategies,
             index=index,
             node=node,
+            location=location,
             **kwargs,
         )
         """Create a demand unit."""
@@ -76,7 +77,6 @@ class Demand(SupportsMinMax):
         if isinstance(price, numbers.Real):
             price = pd.Series(price, index=self.index)
         self.price = price
-        self.location = location
 
     def execute_current_dispatch(
         self,

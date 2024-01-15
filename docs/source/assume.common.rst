@@ -56,14 +56,6 @@ assume.common.outputs module
    :undoc-members:
    :show-inheritance:
 
-assume.common.scenario\_loader module
--------------------------------------
-
-.. automodule:: assume.common.scenario_loader
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 assume.common.units\_operator module
 ------------------------------------
 
@@ -76,6 +68,14 @@ assume.common.utils module
 --------------------------
 
 .. automodule:: assume.common.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+assume.scenario.loader\_csv module
+-------------------------------------
+
+.. automodule:: assume.scenario.loader_csv
    :members:
    :undoc-members:
    :show-inheritance:
