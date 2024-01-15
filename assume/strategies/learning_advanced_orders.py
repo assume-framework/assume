@@ -17,7 +17,7 @@ from assume.reinforcement_learning.learning_utils import Actor, NormalActionNois
 
 class RLAdvancedOrderStrategy(LearningStrategy):
     """
-    Reinforcement Learning Strategy with block and linked orders
+    Reinforcement Learning Strategy with simple hourly, block and linked orders
 
     Args:
     - foresight (int): Number of time steps to look ahead. Default 24.
@@ -27,8 +27,19 @@ class RLAdvancedOrderStrategy(LearningStrategy):
     - float_type (str): Float type to use
     - learning_mode (bool): Whether to use learning mode
     - actor (torch.nn.Module): Actor network
-    - order_types (list[str]): List of order types to use
+    - order_types (list[str]): List of order types to use (SB, LB, BB)
     - episodes_collecting_initial_experience (int): Number of episodes to collect initial experience
+
+    Note:
+        This strategy is based on the strategy in flexable.py, but uses the actor network to determine the prices instead of the marginal costs.
+        The two prices for flexible and inflexible power are determined by the actor network, which is trained with the DDPG algorithm.
+        The maximum of those two prices is used for the flexible bid and the minimum for the inflexible bid.
+
+        The order structure depends on the allowed order types:
+        If only simple hourly orders (SB) are allowed, the strategy will only use SB for both inflexible and flexible power.
+        If SB and linked orders (LB) are allowed, the strategy will use SB for the inflexible power and LB for the flexible power.
+        If SB and block orders (BB) are allowed, the strategy will use BB for the inflexible power and SB for the flexible power.
+        If all three order types (SB, BB, LB) are allowed, the strategy will use BB for the inflexible power and LB for the flexible power, exept the inflexible power is 0, then it will use SB for the flexible power (as for VREs).
     """
 
     def __init__(self, *args, **kwargs):
@@ -40,7 +51,7 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         self.max_bid_price = kwargs.get("max_bid_price", 100)
         self.max_demand = kwargs.get("max_demand", 10e3)
 
-        # tells us whether we are training the agents or just executing per-learnind stategies
+        # tells us whether we are training the agents or just executing pre-learnd stategies
         self.learning_mode = kwargs.get("learning_mode", False)
 
         # sets the devide of the actor network
@@ -56,7 +67,7 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         # for definition of observation space
         self.foresight = kwargs.get("foresight", 24)
 
-        # define used order types
+        # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
 
         if self.learning_mode:
@@ -93,6 +104,7 @@ class RLAdvancedOrderStrategy(LearningStrategy):
 
         Returns:
         - Orderbook: Bids containing start time, end time, price, volume and bid type
+
         """
 
         start = product_tuples[0][0]
@@ -124,6 +136,7 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         bid_price_1 = actions[0].item() * self.max_bid_price
         bid_price_2 = actions[1].item() * self.max_bid_price
 
+        # use the higher price for the flexible bid and the lower price for the inflexible bid
         bid_price_inflex = min(bid_price_1, bid_price_2)
         bid_price_flex = max(bid_price_1, bid_price_2)
 
@@ -237,13 +250,20 @@ class RLAdvancedOrderStrategy(LearningStrategy):
 
     def get_actions(self, next_observation):
         """
-        Get actions
+        Get actions for a unit containing two bid prices depending on the observation
 
         Args:
         - next_observation (torch.Tensor): Next observation
 
         Returns:
         - Actions (torch.Tensor): Actions containing two bid prices
+
+        Note:
+            If the agent is in learning mode, the actions are chosen by the actor neuronal net and noise is added to the action
+            In the first x episodes the agent is in initial exploration mode, where the action is chosen by noise only to explore the entire action space.
+            X is defined by episodes_collecting_initial_experience.
+            If the agent is not in learning mode, the actions are chosen by the actor neuronal net without noise.
+
         """
 
         # distinction wethere we are in learning mode or not to handle exploration realised with noise
@@ -304,6 +324,14 @@ class RLAdvancedOrderStrategy(LearningStrategy):
 
         Returns:
         - Observation (torch.Tensor): Observation containing residual load forecast, price forecast, must run time, max power and marginal cost
+
+        Note:
+            The dimension of the observation space is defined by
+                2 * product_len (int): number of hours in the clearing horizon
+                + 2 * (foresight-1) (int): number of hours we look ahead
+                + 3 (int): must run time, max power and marginal cost
+            The observation space is scaled to the range [-1,1] to make it easier for the actor neuronal net to learn.
+            The scaling factors are defined by the maximum residual load, the maximum bid price and the maximum capacity of the unit.
         """
         end_excl = end - unit.index.freq
 
@@ -410,6 +438,9 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         - unit (SupportsMinMax): Unit to calculate reward for
         - marketconfig (MarketConfig): Market configuration
         - orderbook (Orderbook): Orderbook
+
+        Note:
+
         """
 
         # =============================================================================
@@ -425,7 +456,6 @@ class RLAdvancedOrderStrategy(LearningStrategy):
             unit.forecaster.get_availability(unit.id)[products_index] * unit.max_power
         )
 
-        constraints_cost = pd.Series(0.0, index=products_index)
         profit = pd.Series(0.0, index=products_index)
         reward = pd.Series(0.0, index=products_index)
         opportunity_cost = pd.Series(0.0, index=products_index)
@@ -490,9 +520,7 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         profit += -costs
         scaling = 1 / (unit.max_power * self.max_bid_price)
         regret_scale = 0.0
-        reward = (
-            profit - regret_scale * (opportunity_cost + constraints_cost)
-        ) * scaling
+        reward = (profit - regret_scale * opportunity_cost) * scaling
 
         # store results in unit outputs which are written to database by unit operator
         unit.outputs["profit"].loc[products_index] = profit

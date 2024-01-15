@@ -107,7 +107,6 @@ class flexableEOMBlock(BaseStrategy):
             else:
                 bid_price_inflex = calculate_EOM_price_if_off(
                     unit,
-                    start,
                     marginal_cost_inflex,
                     bid_quantity_inflex,
                     op_time,
@@ -279,7 +278,6 @@ class flexableEOMLinked(BaseStrategy):
             else:
                 bid_price_inflex = calculate_EOM_price_if_off(
                     unit,
-                    start,
                     marginal_cost_inflex,
                     bid_quantity_inflex,
                     op_time,
