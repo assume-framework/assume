@@ -26,8 +26,8 @@ from assume.common.utils import aggregate_step_amount, get_products_index
 from assume.strategies import (
     BaseStrategy,
     LearningStrategy,
+    RLAdvancedOrderStrategy,
     RLdamStrategy,
-    RLStrategyBlocks,
 )
 from assume.units import BaseUnit
 
@@ -474,7 +474,7 @@ class UnitsOperator(Role):
             # rl only for energy market for now!
             if isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
-                (RLdamStrategy, RLStrategyBlocks),
+                (RLdamStrategy, RLAdvancedOrderStrategy),
             ):
                 # TODO: check whether to split the reward, profit and regret to different lines
                 output_dict = {
@@ -565,7 +565,7 @@ class UnitsOperator(Role):
             # rl only for energy market for now!
             if isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
-                (RLdamStrategy, RLStrategyBlocks),
+                (RLdamStrategy, RLAdvancedOrderStrategy),
             ):
                 all_observations[i, :] = unit.outputs["rl_observations"][start]
                 all_actions[i, :] = unit.outputs["rl_actions"][start]

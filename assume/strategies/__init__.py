@@ -3,22 +3,17 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from assume.common.base import BaseStrategy, LearningStrategy
+from assume.strategies.advanced_orders import flexableEOMBlock, flexableEOMLinked
 from assume.strategies.dmas_powerplant import DmasPowerplantStrategy
 from assume.strategies.dmas_storage import DmasStorageStrategy
 from assume.strategies.extended import OTCStrategy
-from assume.strategies.flexable import (
-    flexableEOM,
-    flexableEOMBlock,
-    flexableEOMLinked,
-    flexableNegCRM,
-    flexablePosCRM,
-)
+from assume.strategies.flexable import flexableEOM, flexableNegCRM, flexablePosCRM
 from assume.strategies.flexable_storage import (
     flexableEOMStorage,
     flexableNegCRMStorage,
     flexablePosCRMStorage,
 )
-from assume.strategies.learning_block_strategies import RLStrategyBlocks
+from assume.strategies.learning_advanced_orders import RLAdvancedOrderStrategy
 from assume.strategies.learning_strategies import RLdamStrategy
 from assume.strategies.naive_strategies import (
     NaiveDAStrategy,

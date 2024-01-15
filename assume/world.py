@@ -108,12 +108,16 @@ class World:
         self.bidding_strategies = bidding_strategies
 
         try:
-            from assume.strategies.learning_block_strategies import RLStrategyBlocks
+            from assume.strategies.learning_advanced_orders import (
+                RLAdvancedOrderStrategy,
+            )
             from assume.strategies.learning_strategies import RLdamStrategy, RLStrategy
 
             self.bidding_strategies["learning"] = RLStrategy
             self.bidding_strategies["learning_dam"] = RLdamStrategy
-            self.bidding_strategies["learning_blocks"] = RLStrategyBlocks
+            self.bidding_strategies[
+                "learning_advanced_orders"
+            ] = RLAdvancedOrderStrategy
 
         except ImportError as e:
             self.logger.info(

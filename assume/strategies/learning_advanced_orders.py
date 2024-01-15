@@ -15,24 +15,20 @@ from assume.common.utils import get_products_index
 from assume.reinforcement_learning.learning_utils import Actor, NormalActionNoise
 
 
-class RLStrategyBlocks(LearningStrategy):
+class RLAdvancedOrderStrategy(LearningStrategy):
     """
-    Reinforcement Learning Strategy
+    Reinforcement Learning Strategy with block and linked orders
 
-    :param foresight: Number of time steps to look ahead. Default 24.
-    :type foresight: int
-    :param max_bid_price: Maximum bid price
-    :type max_bid_price: float
-    :param max_demand: Maximum demand
-    :type max_demand: float
-    :param device: Device to run on
-    :type device: str
-    :param float_type: Float type to use
-    :type float_type: str
-    :param learning_mode: Whether to use learning mode
-    :type learning_mode: bool
-    :param actor: Actor network
-    :type actor: torch.nn.Module
+    Args:
+    - foresight (int): Number of time steps to look ahead. Default 24.
+    - max_bid_price (float): Maximum bid price
+    - max_demand (float): Maximum demand
+    - device (str): Device to run on
+    - float_type (str): Float type to use
+    - learning_mode (bool): Whether to use learning mode
+    - actor (torch.nn.Module): Actor network
+    - order_types (list[str]): List of order types to use
+    - episodes_collecting_initial_experience (int): Number of episodes to collect initial experience
     """
 
     def __init__(self, *args, **kwargs):
@@ -90,14 +86,13 @@ class RLStrategyBlocks(LearningStrategy):
         """
         Calculate bids for a unit
 
-        :param unit: Unit to calculate bids for
-        :type unit: SupportsMinMax
-        :param market_config: Market configuration
-        :type market_config: MarketConfig
-        :param product_tuples: Product tuples
-        :type product_tuples: list[Product]
-        :return: Bids containing start time, end time, price and volume
-        :rtype: Orderbook
+        Args:
+        - unit (SupportsMinMax): Unit to calculate bids for
+        - market_config (MarketConfig): Market configuration
+        - product_tuples (list[Product]): Product tuples
+
+        Returns:
+        - Orderbook: Bids containing start time, end time, price, volume and bid type
         """
 
         start = product_tuples[0][0]
@@ -168,10 +163,27 @@ class RLStrategyBlocks(LearningStrategy):
             if "BB" in self.order_types:
                 bid_quantity_block[start] = bid_quantity_inflex
 
+            # if no BB in order_types, then add the inflex bid as SB
+            if "BB" not in self.order_types:
+                bids.append(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": None,
+                        "price": bid_price_inflex,
+                        "volume": bid_quantity_inflex,
+                        "bid_type": "SB",
+                        "bid_id": f"{unit.id}_{len(bids) + 1}",
+                    },
+                )
+
             # actually formulate bids in orderbook format
-            # if LB is in order_types, then formulate the linked bid depending on the block bid
-            # TODO:what if LB in order_types but not BB?
+            # if LB is in order_types, then formulate the linked bid depending on the block bid or simple bid
             if "LB" in self.order_types and bid_quantity_inflex != 0:
+                if "BB" in self.order_types:
+                    parent_bid_id = unit.id + "_block"
+                else:
+                    parent_bid_id = f"{unit.id}_{len(bids)}"
                 bids.append(
                     {
                         "start_time": start,
@@ -180,7 +192,8 @@ class RLStrategyBlocks(LearningStrategy):
                         "price": bid_price_flex,
                         "volume": {start: bid_quantity_flex},
                         "bid_type": "LB",
-                        "parent_bid_id": unit.id + "_block",
+                        "parent_bid_id": parent_bid_id,
+                        "bid_id": f"{unit.id}_{len(bids) + 1}",
                     },
                 )
             # otherwise just add the flex bid as SB
@@ -193,18 +206,7 @@ class RLStrategyBlocks(LearningStrategy):
                         "price": bid_price_flex,
                         "volume": bid_quantity_flex,
                         "bid_type": "SB",
-                    },
-                )
-            # if no BB in order_types, then also add the inflex bid as SB
-            if self.order_types == ["SB"]:
-                bids.append(
-                    {
-                        "start_time": start,
-                        "end_time": end,
-                        "only_hours": None,
-                        "price": bid_price_inflex,
-                        "volume": bid_quantity_inflex,
-                        "bid_type": "SB",
+                        "bid_id": f"{unit.id}_{len(bids) + 1}",
                     },
                 )
 
@@ -237,10 +239,11 @@ class RLStrategyBlocks(LearningStrategy):
         """
         Get actions
 
-        :param next_observation: Next observation
-        :type next_observation: torch.Tensor
-        :return: Actions
-        :rtype: torch.Tensor
+        Args:
+        - next_observation (torch.Tensor): Next observation
+
+        Returns:
+        - Actions (torch.Tensor): Actions containing two bid prices
         """
 
         # distinction wethere we are in learning mode or not to handle exploration realised with noise
@@ -294,14 +297,14 @@ class RLStrategyBlocks(LearningStrategy):
         """
         Create observation
 
-        :param unit: Unit to create observation for
-        :type unit: SupportsMinMax
-        :param start: Start time
-        :type start: datetime
-        :param end: End time
-        :type end: datetime
-        :return: Observation
-        :rtype: torch.Tensor"""
+        Args:
+        - unit (SupportsMinMax): Unit to create observation for
+        - start (datetime): Start time
+        - end (datetime): End time
+
+        Returns:
+        - Observation (torch.Tensor): Observation containing residual load forecast, price forecast, must run time, max power and marginal cost
+        """
         end_excl = end - unit.index.freq
 
         # get the forecast length depending on the time unit considered in the modelled unit
@@ -401,14 +404,12 @@ class RLStrategyBlocks(LearningStrategy):
         orderbook: Orderbook,
     ):
         """
-        Calculate reward
+        Calculate and write reward, profit and regret to unit outputs
 
-        :param unit: Unit to calculate reward for
-        :type unit: SupportsMinMax
-        :param marketconfig: Market configuration
-        :type marketconfig: MarketConfig
-        :param orderbook: Orderbook
-        :type orderbook: Orderbook
+        Args:
+        - unit (SupportsMinMax): Unit to calculate reward for
+        - marketconfig (MarketConfig): Market configuration
+        - orderbook (Orderbook): Orderbook
         """
 
         # =============================================================================
@@ -503,8 +504,8 @@ class RLStrategyBlocks(LearningStrategy):
         """
         Load actor parameters
 
-        :param simulation_id: Simulation ID
-        :type simulation_id: str
+        Args:
+        - load_path (str): Path to load parameters from
         """
         directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
 
