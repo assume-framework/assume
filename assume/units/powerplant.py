@@ -106,6 +106,7 @@ class PowerPlant(SupportsMinMax):
             bidding_strategies=bidding_strategies,
             index=index,
             node=node,
+            location=location,
             **kwargs,
         )
 
@@ -135,8 +136,6 @@ class PowerPlant(SupportsMinMax):
 
         self.heat_extraction = heat_extraction
         self.max_heat_extraction = max_heat_extraction
-
-        self.location = location
 
         self.init_marginal_cost()
 

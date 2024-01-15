@@ -22,7 +22,7 @@ def power_plant_1() -> PowerPlant:
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
-        technology="coal",
+        technology="hard coal",
         bidding_strategies={"energy": NaiveStrategy()},
         index=index,
         max_power=1000,
@@ -43,7 +43,7 @@ def power_plant_2() -> PowerPlant:
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
-        technology="coal",
+        technology="hard coal",
         bidding_strategies={"energy": NaiveStrategy()},
         index=index,
         max_power=1000,
@@ -64,7 +64,7 @@ def power_plant_3() -> PowerPlant:
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
-        technology="coal",
+        technology="hard coal",
         bidding_strategies={"energy": NaiveStrategy()},
         index=index,
         max_power=1000,
@@ -81,7 +81,7 @@ def power_plant_3() -> PowerPlant:
 def test_init_function(power_plant_1, power_plant_2, power_plant_3):
     assert power_plant_1.id == "test_pp"
     assert power_plant_1.unit_operator == "test_operator"
-    assert power_plant_1.technology == "coal"
+    assert power_plant_1.technology == "hard coal"
     assert power_plant_1.max_power == 1000
     assert power_plant_1.min_power == 200
     assert power_plant_1.efficiency == 0.5

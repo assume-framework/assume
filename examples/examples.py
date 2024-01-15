@@ -6,7 +6,8 @@
 import logging
 import os
 
-from assume import World, load_scenario_folder, run_learning
+from assume import World
+from assume.scenario.loader_csv import load_scenario_folder, run_learning
 
 log = logging.getLogger(__name__)
 
