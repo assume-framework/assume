@@ -111,10 +111,9 @@ class World:
             from assume.strategies.learning_advanced_orders import (
                 RLAdvancedOrderStrategy,
             )
-            from assume.strategies.learning_strategies import RLdamStrategy, RLStrategy
+            from assume.strategies.learning_strategies import RLStrategy
 
             self.bidding_strategies["learning"] = RLStrategy
-            self.bidding_strategies["learning_dam"] = RLdamStrategy
             self.bidding_strategies[
                 "learning_advanced_orders"
             ] = RLAdvancedOrderStrategy
