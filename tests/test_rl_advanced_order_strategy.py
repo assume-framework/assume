@@ -9,12 +9,11 @@ import pytest
 
 try:
     from assume.reinforcement_learning.learning_role import LearningConfig
-    from assume.reinforcement_learning.learning_utils import Actor, CriticTD3
+    from assume.strategies.learning_advanced_orders import RLAdvancedOrderStrategy
 except ImportError:
     pass
 
 from assume.common.forecasts import NaiveForecast
-from assume.strategies.learning_advanced_orders import RLAdvancedOrderStrategy
 from assume.units import PowerPlant
 
 start = datetime(2023, 7, 1)
