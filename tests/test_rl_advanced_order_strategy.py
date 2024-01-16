@@ -2,13 +2,10 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import random as rd
 from datetime import datetime
 
-import numpy as np
 import pandas as pd
 import pytest
-import torch as th
 
 try:
     from assume.reinforcement_learning.learning_role import LearningConfig
@@ -19,11 +16,6 @@ except ImportError:
 from assume.common.forecasts import NaiveForecast
 from assume.strategies.learning_advanced_orders import RLAdvancedOrderStrategy
 from assume.units import PowerPlant
-
-np.random.seed(0)
-rd.seed(0)
-th.manual_seed(0)
-th.use_deterministic_algorithms(True)
 
 start = datetime(2023, 7, 1)
 end = datetime(2023, 7, 2)
