@@ -23,12 +23,7 @@ from assume.common.market_objects import (
     RegistrationMessage,
 )
 from assume.common.utils import aggregate_step_amount, get_products_index
-from assume.strategies import (
-    BaseStrategy,
-    LearningStrategy,
-    RLAdvancedOrderStrategy,
-    RLdamStrategy,
-)
+from assume.strategies import BaseStrategy, LearningStrategy
 from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
@@ -468,6 +463,18 @@ class UnitsOperator(Role):
             products_index (pd.DatetimeIndex): The index of all products.
             marketconfig (MarketConfig): The market configuration.
         """
+        try:
+            from assume.strategies.learning_advanced_orders import (
+                RLAdvancedOrderStrategy,
+            )
+            from assume.strategies.learning_strategies import RLdamStrategy
+        except ImportError as e:
+            self.logger.info(
+                "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",
+                e,
+            )
+            return
+
         output_agent_list = []
         start = products_index[0]
         for unit_id, unit in self.units.items():
@@ -552,6 +559,11 @@ class UnitsOperator(Role):
         start = products_index[0]
         try:
             import torch as th
+
+            from assume.strategies.learning_advanced_orders import (
+                RLAdvancedOrderStrategy,
+            )
+            from assume.strategies.learning_strategies import RLdamStrategy
 
         except ImportError:
             logger.error("tried writing learning_params, but torch is not installed")
