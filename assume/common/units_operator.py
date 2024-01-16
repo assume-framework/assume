@@ -467,7 +467,6 @@ class UnitsOperator(Role):
             from assume.strategies.learning_advanced_orders import (
                 RLAdvancedOrderStrategy,
             )
-            from assume.strategies.learning_strategies import RLdamStrategy
         except ImportError as e:
             self.logger.info(
                 "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",
@@ -481,7 +480,7 @@ class UnitsOperator(Role):
             # rl only for energy market for now!
             if isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
-                (RLdamStrategy, RLAdvancedOrderStrategy),
+                (RLAdvancedOrderStrategy),
             ):
                 # TODO: check whether to split the reward, profit and regret to different lines
                 output_dict = {
@@ -563,8 +562,6 @@ class UnitsOperator(Role):
             from assume.strategies.learning_advanced_orders import (
                 RLAdvancedOrderStrategy,
             )
-            from assume.strategies.learning_strategies import RLdamStrategy
-
         except ImportError:
             logger.error("tried writing learning_params, but torch is not installed")
             return
@@ -577,7 +574,7 @@ class UnitsOperator(Role):
             # rl only for energy market for now!
             if isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
-                (RLdamStrategy, RLAdvancedOrderStrategy),
+                (RLAdvancedOrderStrategy),
             ):
                 all_observations[i, :] = unit.outputs["rl_observations"][start]
                 all_actions[i, :] = unit.outputs["rl_actions"][start]
