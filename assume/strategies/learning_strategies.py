@@ -17,7 +17,8 @@ from assume.reinforcement_learning.learning_utils import Actor, NormalActionNois
 
 class RLStrategy(LearningStrategy):
     """
-    Reinforcement Learning Strategy
+    Reinforcement Learning Strategy, that lets agent learn to bid on an Energy Only Makret
+    by submitting two price bids - one for the infelxible (P_min) and one for the flexible part (P_max-P_min) of ist capacity
 
     :param foresight: Number of time steps to look ahead. Default 24.
     :type foresight: int
@@ -88,16 +89,16 @@ class RLStrategy(LearningStrategy):
         **kwargs,
     ) -> Orderbook:
         """
-        Calculate bids for a unit
+        Calculate bids for a unit, based on the actions from the actor
 
-        :param unit: Unit to calculate bids for
-        :type unit: SupportsMinMax
-        :param market_config: Market configuration
-        :type market_config: MarketConfig
-        :param product_tuples: Product tuples
-        :type product_tuples: list[Product]
-        :return: Bids containing start time, end time, price and volume
-        :rtype: Orderbook
+        Args:
+        - unit (SupportsMinMax): Unit to calculate bids for
+        - market_config (MarketConfig): Market configuration
+        - product_tuples (list[Product]): Product tuples
+
+        Returns:
+        - Orderbook: Bids containing start time, end time, price, volume and bid type
+
         """
 
         bid_quantity_inflex, bid_price_inflex = 0, 0
@@ -168,12 +169,19 @@ class RLStrategy(LearningStrategy):
 
     def get_actions(self, next_observation):
         """
-        Get actions
+        Get actions for a unit containing two bid prices depending on the observation
 
-        :param next_observation: Next observation
-        :type next_observation: torch.Tensor
-        :return: Actions
-        :rtype: torch.Tensor
+        Args:
+        - next_observation (torch.Tensor): Next observation
+
+        Returns:
+        - Actions (torch.Tensor): Actions containing two bid prices
+
+        Note:
+            If the agent is in learning mode, the actions are chosen by the actor neuronal net and noise is added to the action
+            In the first x episodes the agent is in initial exploration mode, where the action is chosen by noise only to explore the entire action space.
+            X is defined by episodes_collecting_initial_experience.
+            If the agent is not in learning mode, the actions are chosen by the actor neuronal net without noise.
         """
 
         # distinction wethere we are in learning mode or not to handle exploration realised with noise
@@ -441,7 +449,9 @@ class RLStrategy(LearningStrategy):
 
 class RLdamStrategy(LearningStrategy):
     """
-    Reinforcement Learning Strategy
+    Reinforcement Learning Strategy, that lets agent learn to bid on an Energy Only Makret with block bids
+    by submitting two price bids - one for the infelxible (P_min) and one for the flexible part (P_max-P_min) of its capacity and one action deciding whether to use
+    simple bids (SB) or block bids (BB) for the inflexible part of the bid
 
     :param foresight: Number of time steps to look ahead. Default 24.
     :type foresight: int
@@ -457,6 +467,11 @@ class RLdamStrategy(LearningStrategy):
     :type learning_mode: bool
     :param actor: Actor network
     :type actor: torch.nn.Module
+
+    Note:
+        This strategy is based on the strategy in flexable.py, but uses the actor network to determine the prices instead of using the marginal costs
+        as in flexable.py. The two prices for flexible and inflexible power are determined by the actor network, which is trained with the MATD3 algorithm.
+        The maximum of those two prices is used for the flexible bid and the minimum for the inflexible bid.
     """
 
     def __init__(self, *args, **kwargs):

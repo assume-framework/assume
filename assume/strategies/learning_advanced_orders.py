@@ -17,7 +17,7 @@ from assume.reinforcement_learning.learning_utils import Actor, NormalActionNois
 
 class RLAdvancedOrderStrategy(LearningStrategy):
     """
-    Reinforcement Learning Strategy with simple hourly, block and linked orders
+    Reinforcement Learning Strategy for an Energy-Only-Market with simple hourly, block and linked orders
 
     Args:
     - foresight (int): Number of time steps to look ahead. Default 24.
@@ -31,11 +31,11 @@ class RLAdvancedOrderStrategy(LearningStrategy):
     - episodes_collecting_initial_experience (int): Number of episodes to collect initial experience
 
     Note:
-        This strategy is based on the strategy in flexable.py, but uses the actor network to determine the prices instead of the marginal costs.
-        The two prices for flexible and inflexible power are determined by the actor network, which is trained with the DDPG algorithm.
+        This strategy is based on the strategy in flexable.py, but uses the actor network to determine the prices instead of using the marginal costs
+        as in flexable.py. The two prices for flexible and inflexible power are determined by the actor network, which is trained with the MATD3 algorithm.
         The maximum of those two prices is used for the flexible bid and the minimum for the inflexible bid.
 
-        The order structure depends on the allowed order types:
+        The order type is set implicitly (not by the RL agent itself) and the structure depends on the allowed order types:
         If only simple hourly orders (SB) are allowed, the strategy will only use SB for both inflexible and flexible power.
         If SB and linked orders (LB) are allowed, the strategy will use SB for the inflexible power and LB for the flexible power.
         If SB and block orders (BB) are allowed, the strategy will use BB for the inflexible power and SB for the flexible power.
