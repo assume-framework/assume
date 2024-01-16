@@ -164,39 +164,21 @@ based on global information. The following graph shows the information flow.
     :align: center
     :width: 500px
 
-The Learning Role
------------------
 
-The learning role orchestrates the learning process. It initializes the training process and manages the experiences gained in a buffer.
-Furthermore, it schedules the policy updates and, hence, brings the critic and the actor together during the learning process.
-Particularly this means, that at the beginning of the simulation, we schedule recurrent policy updates, where the output of the critic is used as a loss
-of the actor, which then updates its weights using backward propagation.
+The learning role orchestrates this learning process. It initializes the training process, handels the algorithms and manages the experiences gained in a buffer.
+You can read more about the different algorithms and the learning role in :doc:`learning_algorithm`.
 
-With the learning role, we can also choose which RL algorithm should be used. The algorithm and the buffer have base classes and can be customized if needed.
-But without touching the code there are easy adjustments to the algorithms that can and eventually need to be done in the config file.
-The following table shows the options that can be adjusted and gives a short explanation. For more advanced users is the functionality of the algorithm also documented in xxx.
- As the algorithm is based on stable baselines 3, you can also look up more explanations in their doku.
+The Learning Results in ASSUME
+=====================================
 
+Similarly, to the other results, the learning progress is tracked in the database, either with postgresql or timescale. The latter, enables the usage of the
+predefined dashboards to track the leanring process in the "Assume:Training Process" dashboard. The following pictures show the learning process of a simple reinforcement learning setting.
+A more detailed description is given in the dashboard itsel.
 
- ======================================== ==========================================================================================================
-  learning config item                    description
- ======================================== ==========================================================================================================
-  observation_dimension                   The dimension of the observations given to the actor in the bidding strategy.
-  action_dimension                        The dimension of the actors made by the actor, which equals the output neurons of the actor neuronal net.
-  continue_learning                       Whether to use pre-learned strategies and then continue learning.
-  load_model_path                         If pre-learned strategies should be used, where are they stored?
-  max_bid_price                           The maximum bid price which limits the action of the actor to this price.
-  learning_mode                           Should we use learning mode at all? If not, the learning bidding strategy is overwritten with a default strategy.
-  algorithm                               Specifies which algorithm to use. Currently, only MATD3 is implemented.
-  learning_rate                           The learning rate, also known as step size, which specifies how much the new policy should be considered in the update.
-  training_episodes                       The number of training episodes, whereby one episode is the entire simulation horizon specified in the general config.
-  episodes_collecting_initial_experience  The number of episodes collecting initial experience, whereby this means that random actions are chosen instead of using the actor network
-  train_freq                              Defines the frequency in time steps at which the actor and critic are updated.
-  gradient_steps                          The number of gradient steps.
-  batch_size                              The batch size of experience considered from the buffer for an update.
-  gamma                                   The discount factor, with which future expected rewards are considered in the decision-making.
-  device                                  The device to use.
-  noise_sigma                             The standard deviation of the distribution used to draw the noise, which is added to the actions and forces exploration.  noise_scale
-  noise_dt                                Determines how quickly the noise weakens over time.
-  noise_scale                             The scale of the noise, which is multiplied by the noise drawn from the distribution.
- ======================================== ==========================================================================================================
+.. image:: img/Grafana_Learning_1.jpeg
+    :align: center
+    :width: 500px
+
+.. image:: img/Grafana_Learning_2.jpeg
+    :align: center
+    :width: 500px

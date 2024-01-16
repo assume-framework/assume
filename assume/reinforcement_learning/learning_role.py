@@ -32,9 +32,9 @@ class Learning(Role):
         learning_config (LearningConfig): The configuration for the learning process.
 
     Args:
-        learning_config (LearningConfig): The configuration for the learning process.
-        start (datetime): The start of the simulation.
-        end (datetime): The end of the simulation.
+    - learning_config (LearningConfig): The configuration for the learning process.
+    - start (datetime): The start of the simulation.
+    - end (datetime): The end of the simulation.
 
     """
 
@@ -115,6 +115,7 @@ class Learning(Role):
         """
         Set up the learning role for reinforcement learning training.
 
+        Notes:
         This method prepares the learning role for the reinforcement learning training process. It subscribes to relevant messages
         for handling the training process and schedules recurrent tasks for policy updates based on the specified training frequency.
         """
@@ -140,8 +141,8 @@ class Learning(Role):
         Handles the incoming messages and performs corresponding actions.
 
         Args:
-            content (dict): The content of the message.
-            meta: The metadata associated with the message. (not needed yet)
+        - content (dict): The content of the message.
+        - meta: The metadata associated with the message. (not needed yet)
         """
 
         if content.get("type") == "replay_buffer":
@@ -171,7 +172,7 @@ class Learning(Role):
         is associated with the learning role and configured with relevant hyperparameters.
 
         Args:
-        algorithm (RLAlgorithm): The name of the reinforcement learning algorithm.
+        - algorithm (RLAlgorithm): The name of the reinforcement learning algorithm.
         """
         if algorithm == "matd3":
             self.rl_algorithm = TD3(
@@ -193,7 +194,7 @@ class Learning(Role):
         the number of episodes completed is greater than the number of episodes required for initial experience collection. If so,
         it triggers the policy update process by calling the `update_policy` method of the associated reinforcement learning algorithm.
 
-        Note:
+        Notes:
         This method is typically scheduled to run periodically during training to continuously improve the agent's policy.
         """
         if self.episodes_done > self.episodes_collecting_initial_experience:
@@ -209,7 +210,7 @@ class Learning(Role):
         value with the previous best, and updates the best value if necessary. If an improvement is detected, it saves the policy
         and associated parameters.
 
-        Note:
+        Notes:
         This method is typically used during the evaluation phase to save policies that achieve superior performance.
         """
         modes = ["reward", "profit", "regret"]
@@ -249,7 +250,7 @@ class Learning(Role):
         saved parameters into separate directories for critics and actors within the specified base directory.
 
         Args:
-        algorithm (RLAlgorithm): The name of the reinforcement learning algorithm.
+        - directory (str): The base directory for saving the parameters.
         """
         self.save_critic_params(directory=f"{directory}/critics")
         self.save_actor_params(directory=f"{directory}/actors")
@@ -263,7 +264,7 @@ class Learning(Role):
         associated with each learning strategy.
 
         Args:
-        directory (str): The base directory for saving the parameters.
+        - directory (str): The base directory for saving the parameters.
         """
         os.makedirs(directory, exist_ok=True)
         for u_id in self.rl_strats.keys():
@@ -284,7 +285,7 @@ class Learning(Role):
         associated with each learning strategy.
 
         Args:
-        directory (str): The base directory for saving the parameters.
+        - directory (str): The base directory for saving the parameters.
         """
         os.makedirs(directory, exist_ok=True)
         for u_id in self.rl_strats.keys():
@@ -304,10 +305,10 @@ class Learning(Role):
         directory and returns it. It uses the `torch.load` function and specifies the device for loading.
 
         Args:
-            directory (str): The directory from which the object should be loaded.
+        - directory (str): The directory from which the object should be loaded.
 
         Returns:
-            object: The loaded object.
+        - object: The loaded object.
         """
         return th.load(directory, map_location=self.device)
 
@@ -319,7 +320,7 @@ class Learning(Role):
         directory. It uses the `load_critic_params` and `load_actor_params` methods to load the respective parameters.
 
         Args:
-            directory (str): The directory from which the parameters should be loaded.
+        - directory (str): The directory from which the parameters should be loaded.
         """
         self.load_critic_params(directory)
         self.load_actor_params(directory)
@@ -333,7 +334,7 @@ class Learning(Role):
         with the learning role, loads the respective parameters, and updates the critic and target critic networks accordingly.
 
         Args:
-            directory (str): The directory from which the parameters should be loaded.
+        - directory (str): The directory from which the parameters should be loaded.
         """
         self.logger.info("Loading critic parameters...")
 
@@ -367,7 +368,7 @@ class Learning(Role):
         with the learning role, loads the respective parameters, and updates the actor and target actor networks accordingly.
 
         Args:
-            directory (str): The directory from which the parameters should be loaded.
+        - directory (str): The directory from which the parameters should be loaded.
         """
         self.logger.info("Loading actor parameters...")
         if not os.path.exists(directory):
@@ -400,7 +401,7 @@ class Learning(Role):
         dictionary is typically used for saving and sharing these networks.
 
         Returns:
-            dict: The extracted actor and critic networks.
+        - dict: The extracted actor and critic networks.
         """
         actors = {}
         actor_targets = {}
@@ -426,7 +427,7 @@ class Learning(Role):
         If `actors_and_critics` is provided, it assigns existing networks to the respective attributes.
 
         Args:
-        actors_and_critics (dict): The actor and critic networks to be assigned.
+        - actors_and_critics (dict): The actor and critic networks to be assigned.
 
         """
         if actors_and_critics is None:
