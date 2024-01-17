@@ -50,7 +50,7 @@ availabe_examples = {
     },
     "learning_small": {"scenario": "example_02a", "study_case": "base"},
     "learning_medium": {"scenario": "example_02b", "study_case": "base"},
-    "learning_with_advanced_orders": {"scenario": "example_02_rl", "study_case": "dam"},
+    "learning_advanced_orders": {"scenario": "example_02c", "study_case": "dam"},
 }
 
 # %%
@@ -61,7 +61,7 @@ if __name__ == "__main__":
     - timescale: with database and grafana (note: you need docker installed)
     """
     data_format = "timescale"  # "local_db" or "timescale"
-    example = "learning_with_advanced_orders"
+    example = "small_with_BB_and_LB"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"

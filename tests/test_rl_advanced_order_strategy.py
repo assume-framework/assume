@@ -67,6 +67,8 @@ def test_learning_advanced_orders(mock_market_config, power_plant):
     assert len(bids) == 48
     assert bids[0]["bid_type"] == "SB"
     assert bids[0]["volume"] == 200
+    assert bids[0]["bid_id"] == "test_pp_SB_1"
+    assert bids[-1]["bid_id"] == "test_pp_SB_48"
 
     learning_config["order_types"] = ["SB", "BB"]
     strategy = RLAdvancedOrderStrategy(**learning_config)
@@ -75,6 +77,8 @@ def test_learning_advanced_orders(mock_market_config, power_plant):
     assert len(bids) == 25
     assert bids[0]["bid_type"] == "SB"
     assert bids[0]["volume"] == 800
+    assert bids[0]["bid_id"] == "test_pp_SB_1"
+    assert bids[-1]["bid_id"] == "test_pp_block"
 
     assert bids[-1]["bid_type"] == "BB"
     assert bids[-1]["volume"][product_tuples[0][0]] == 200
@@ -92,6 +96,9 @@ def test_learning_advanced_orders(mock_market_config, power_plant):
     assert bids[1]["volume"][product_tuples[0][0]] == 800
     assert bids[0]["price"] <= bids[1]["price"]
 
+    assert bids[0]["bid_id"] == "test_pp_SB_1"
+    assert bids[-1]["bid_id"] == "test_pp_LB_48"
+
     learning_config["order_types"] = ["SB", "BB", "LB"]
     strategy = RLAdvancedOrderStrategy(**learning_config)
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
@@ -103,3 +110,6 @@ def test_learning_advanced_orders(mock_market_config, power_plant):
     assert bids[-1]["bid_type"] == "BB"
     assert bids[-1]["volume"][product_tuples[0][0]] == 200
     assert bids[0]["price"] >= bids[-1]["price"]
+
+    assert bids[0]["bid_id"] == "test_pp_LB_1"
+    assert bids[-1]["bid_id"] == "test_pp_block"
