@@ -350,3 +350,10 @@ def separate_block_orders(orderbook):
             orderbook.remove(order)
 
     return orderbook
+
+def get_pyomo_value(pyomo_object):
+    """Returns the value of a Pyomo object if it's not a simple number."""
+    if isinstance(pyomo_object, (int, float, np.int64, np.float64)):
+        return pyomo_object
+    else:
+        return pyomo_object.value

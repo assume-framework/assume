@@ -20,16 +20,16 @@ dst_components = {
 # Define possible technology configurations
 technology_configurations = {
     'electrolyser_shaftFurnace_EAF': [
-        ('electrolyser', 'hydrogen_output', 'shaft_furnace', 'hydrogen_input'),
+        ('electrolyser', 'hydrogen_out', 'shaft_furnace', 'hydrogen_in'),
         ('shaft_furnace', 'dri_output', 'electric_arc_furnace', 'dri_input')
     ],
     'blastFurnace_basicOxygenFurnace': [
         ('blast_furnace', 'iron_output', 'basic_oxygen_furnace', 'iron_input')
     ],
     'electrolyser_storage_shaftFurnace_EAF': [
-        ('electrolyser', 'hydrogen_output', 'hydrogen_storage', 'hydrogen_input'),
-        ('electrolyser', 'hydrogen_output', 'shaft_furnace', 'direct_hydrogen_input'),
-        ('hydrogen_storage', 'hydrogen_output', 'shaft_furnace', 'stored_hydrogen_input'),
+        ('electrolyser', 'hydrogen_out', 'hydrogen_storage', 'hydrogen_in'),
+        ('electrolyser', 'hydrogen_out', 'shaft_furnace', 'direct_hydrogen_input'),
+        ('hydrogen_storage', 'hydrogen_out', 'shaft_furnace', 'stored_hydrogen_in'),
         ('shaft_furnace', 'dri_output', 'electric_arc_furnace', 'dri_input')
     ],
     # Add other configurations as needed
@@ -71,7 +71,7 @@ class SteelPlant(SupportsMinMax):
         self.hydrogen_demand = self.forecaster[f"{self.id}_hydrogen_demand"]
         self.hydrogen_price = self.forecaster["hydrogen_price"]
         self.electricity_price = self.forecaster["price_EOM"]
-        self.natural_gas_price = self.forecaster["fuel_price_natural gas"]
+        self.natural_gas_price = self.forecaster["fuel_price_naturalgas"]
         self.iron_ore_price = self.forecaster["iron_ore_price"]
         self.steel_price = self.forecaster["steel_price"]
         self.steel_demand = self.forecaster["steel_demand"]
@@ -149,10 +149,10 @@ class SteelPlant(SupportsMinMax):
 
 
     def define_sets(self) -> None:
-        self.model.time_steps = pyo.Set(initialize=range(len(self.index)))
-        # self.model.time_steps = pyo.Set(
-        #     initialize=[idx for idx, _ in enumerate(self.index)]
-        # )
+        # self.model.time_steps = pyo.Set(initialize=range(len(self.index)))
+        self.model.time_steps = pyo.Set(
+            initialize=[idx for idx, _ in enumerate(self.index)]
+        )
 
     def define_parameters(self):
         self.model.electricity_price = pyo.Param(self.model.time_steps, 
@@ -183,7 +183,12 @@ class SteelPlant(SupportsMinMax):
         
         # Binary decision variables for hydrogen source selection
         self.model.use_hydrogen_from_electrolyser = pyo.Var(self.model.time_steps, within=pyo.Binary)
+        # self.model.hydrogen_input_from_electrolyser = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
         self.model.use_hydrogen_from_storage = pyo.Var(self.model.time_steps, within=pyo.Binary)
+        # self.model.hydrogen_input_from_storage = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
+
+        self.model.hydrogen_input_from_electrolyser = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
+
 
         self.model.power_in = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
         self.model.hydrogen_in = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
@@ -206,6 +211,7 @@ class SteelPlant(SupportsMinMax):
 
 
     def define_constraints(self):
+
         # Check if steel demand is a scalar (float or int)
         if isinstance(self.steel_demand, (float, int)):
             # Constraint for scalar steel demand - total steel output should match total demand over all time steps
@@ -220,37 +226,53 @@ class SteelPlant(SupportsMinMax):
                 return m.steel_output[t] == m.steel_demand[t]
 
     def calculate_min_max_power(self, start: pd.Timestamp, end: pd.Timestamp):
-
         aggregated_power = 0
         total_cost = 0
 
         for t in pd.date_range(start=start, end=end, freq='H'):
+            hour_index = t.hour  # Convert timestamp to hour index
+
+            # print(f"Hour Index: {hour_index}")
+
             # Aggregating power input and calculating cost for Electrolyser
             if 'electrolyser' in self.components:
-                aggregated_power += self.components['electrolyser'].power_in[t]
-                electrolyser_cost = (self.components['electrolyser'].power_in[t] * self.model.electricity_price[t] +
-                                    self.components['electrolyser'].hydrogen_in[t] * self.model.hydrogen_price[t])
-                total_cost += electrolyser_cost
+                electrolyser_power_in = self.components['electrolyser'].component_block.power_in[hour_index].value
+                if electrolyser_power_in is not None:
+                    aggregated_power += electrolyser_power_in
+                    electrolyser_cost = (electrolyser_power_in * self.model.electricity_price[hour_index].value +
+                                        self.components['electrolyser'].component_block.hydrogen_in[hour_index].value * self.model.hydrogen_price[hour_index].value)
+                    total_cost += electrolyser_cost
+                # else:
+                #     print(f"Warning: electrolyser Power Input is None for hour {hour_index}")
 
             # Calculating cost for Shaft Furnace (assuming it doesn't use power_in)
             if 'shaft_furnace' in self.components:
-                shaft_furnace_cost = (self.components['shaft_furnace'].natural_gas_in[t] * self.model.natural_gas_price[t] +
-                                    self.components['shaft_furnace'].hydrogen_in[t] * self.model.hydrogen_price[t] +
-                                    self.components['shaft_furnace'].iron_ore_in[t] * self.model.iron_ore_price[t])
-                total_cost += shaft_furnace_cost
+                natural_gas_input = self.components['shaft_furnace'].component_block.natural_gas_in[hour_index]
+                if natural_gas_input.value is not None:
+                    shaft_furnace_cost = (natural_gas_input.value * self.model.natural_gas_price[hour_index].value +
+                                        self.components['shaft_furnace'].component_block.hydrogen_in[hour_index].value * self.model.hydrogen_price[hour_index].value +
+                                        self.components['shaft_furnace'].component_block.iron_ore_in[hour_index].value * self.model.iron_ore_price[hour_index].value)
+                    total_cost += shaft_furnace_cost
 
             # Aggregating power input and calculating cost for Electric Arc Furnace
             if 'electric_arc_furnace' in self.components:
-                aggregated_power += self.components['electric_arc_furnace'].power_in[t]
-                electric_arc_furnace_cost = self.components['electric_arc_furnace'].power_in[t] * self.model.electricity_price[t]
-                total_cost += electric_arc_furnace_cost
+                eaf_power_input = self.components['electric_arc_furnace'].component_block.power_in[hour_index]
+                if eaf_power_input.value is not None:
+                    eaf_power_in = eaf_power_input.value
+                    aggregated_power += eaf_power_in
+                    electric_arc_furnace_cost = eaf_power_in * self.model.electricity_price[hour_index].value
+                    total_cost += electric_arc_furnace_cost
 
             # Add other component power and cost calculations as needed
 
         # Calculate marginal cost (total cost divided by total power, if power is not zero)
-        marginal_cost = total_cost / aggregated_power if aggregated_power > 0 else 0
+        if aggregated_power > 0:
+            marginal_cost = total_cost / aggregated_power
+        else:
+            marginal_cost = 0
 
         return aggregated_power, marginal_cost
+
 
 
     def define_objective(self):
@@ -276,8 +298,19 @@ class SteelPlant(SupportsMinMax):
         # Create a solver
         solver = SolverFactory("gurobi")
 
+        print("Model Components Before Optimization:")
+        self.model.pprint()
+
+        for t in self.model.time_steps:
+            self.model.power_in[t] = 0  
+
+        for t in self.model.time_steps:
+            variable_name = f"power_in[{t}]"
+            variable_value = self.model.power_in[t].value
+            print(f"{variable_name} = {variable_value}")
+
         # Solve the model
-        solver.solve(self.model, tee=True)
+        # solver.solve(self.model, tee=True)
         results = solver.solve(self.model, tee=True)  # , tee=True
         # print(results)
         # self.model.display()
