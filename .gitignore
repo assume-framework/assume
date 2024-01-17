@@ -145,3 +145,7 @@ examples/outputs
 
 examples/notebooks/inputs
 examples/notebooks/outputs
+**/scenario/*.csv
+*.pb
+*.jar
+fameSetup.yaml

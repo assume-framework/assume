@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import yaml
 from tqdm import tqdm
+from yamlinclude import YamlIncludeConstructor
 
 from assume.common.base import LearningConfig
 from assume.common.forecasts import CsvForecaster, Forecaster, NaiveForecast
@@ -17,8 +18,6 @@ from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.world import World
 
 logger = logging.getLogger(__name__)
-import yaml
-from yamlinclude import YamlIncludeConstructor
 
 translate_clearing = {
     "SAME_SHARES": "pay_as_clear",
@@ -83,11 +82,48 @@ def get_matching_send_one_or_multi(agent_id: int, contract: dict):
     return contract["ReceiverId"][idx]
 
 
+def interpolate_blocksizes(
+    installed_power: float,
+    block_size_in_mw: float,
+    min_eff: float,
+    max_eff: float,
+    min_markup: float,
+    max_markup: float,
+):
+    """
+    This method interpolates efficiencies and markups for a given powerplant
+    The fist powerplant receives the highest markup and lowest efficiency.
+    The last one has lowest markup and highest efficiency.
+    """
+    full_blocks = int(installed_power // block_size_in_mw)
+    block_sizes = [block_size_in_mw for i in range(full_blocks)]
+    last_block = installed_power % block_size_in_mw
+    if last_block > 0:
+        block_sizes.append(last_block)
+
+    # interpolate
+    gradient_markup = (max_markup - min_markup) / (len(block_sizes) - 1)
+    gradient_eff = (max_eff - min_eff) / (len(block_sizes) - 1)
+    markups = []
+    efficiencies = []
+    for i, power in enumerate(block_sizes):
+        # markup is high to low
+        # efficiency is low to high
+        markups.append(max_markup - i * gradient_markup)
+        efficiencies.append(min_eff + i * gradient_eff)
+    return list(zip(block_sizes, markups, efficiencies))
+
+
 def add_agent_to_world(
-    agent: dict, world: World, prices: dict, contracts: list, base_path: str
+    agent: dict,
+    world: World,
+    prices: dict,
+    contracts: list,
+    base_path: str,
+    markups: dict = {},
 ):
     match agent["Type"]:
-        case "EnergyExchange":
+        case "EnergyExchange" | "DayAheadMarketSingleZone":
             market_config = MarketConfig(
                 name=f"Market_{agent['Id']}",
                 opening_hours=rr.rrule(
@@ -100,7 +136,7 @@ def add_agent_to_world(
                 market_products=[
                     MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))
                 ],
-                maximum_bid_volume=99999,
+                maximum_bid_volume=1e6,
             )
             world.add_market_operator(f"Market_{agent['Id']}")
             world.add_market(f"Market_{agent['Id']}", market_config)
@@ -142,7 +178,44 @@ def add_agent_to_world(
                 )
 
         case "StorageTrader":
-            world.add_unit_operator(f"Operator_{agent['Id']}")
+            operator_id = f"Operator_{agent['Id']}"
+            world.add_unit_operator(operator_id)
+            device = agent["Attributes"]["Device"]
+            strategy = agent["Attributes"]["Strategy"]
+            if strategy["StrategistType"] != "SINGLE_AGENT_MIN_SYSTEM_COST":
+                logger.warning(f"unknown strategy for storage trader: {strategy}")
+
+            forecast_price = prices.get("co2", 20)
+            # TODO forecast should be calculated using calculate_EOM_price_forecast
+            forecast = NaiveForecast(
+                world.index,
+                availability=1,
+                co2_price=prices.get("co2", 2),
+                # price_forecast is used for price_EOM
+                price_forecast=forecast_price,
+            )
+
+            max_volume = device["EnergyToPowerRatio"] * device["InstalledPowerInMW"]
+            initial_soc = 100 * device["InitialEnergyLevelInMWH"] / max_volume
+            # TODO device["SelfDischargeRatePerHour"]
+            world.add_unit(
+                f"StorageTrader_{agent['Id']}",
+                "storage",
+                operator_id,
+                {
+                    "max_power_charge": device["InstalledPowerInMW"],
+                    "max_power_discharge": device["InstalledPowerInMW"],
+                    "efficiency_charge": device["ChargingEfficiency"],
+                    "efficiency_discharge": device["DischargingEfficiency"],
+                    "initial_soc": initial_soc,
+                    "max_volume": max_volume,
+                    "bidding_strategies": {"energy": "flexable_eom_storage"},
+                    "technology": "hydro",  # PSPP? Pump-Storage Power Plant
+                    "emission_factor": 0,
+                },
+                forecast,
+            )
+
         case "RenewableTrader":
             world.add_unit_operator(f"Operator_{agent['Id']}")
             # send, receive = get_send_receive_msgs_per_id(agent["Id"], contracts)
@@ -153,21 +226,26 @@ def add_agent_to_world(
         case "SystemOperatorTrader":
             world.add_unit_operator(f"Operator_{agent['Id']}")
 
-        case "ConventionalPlantOperator" | "ConventionalTrader":
-            # this can be left out for now - we only use the actual plant
-            # TODO the conventional Trader sets markup for the according plantbuilder - we should respect that too
+        case "ConventionalPlantOperator":
             world.add_unit_operator(f"Operator_{agent['Id']}")
-            pass
+        case "ConventionalTrader":
+            world.add_unit_operator(f"Operator_{agent['Id']}")
+            min_markup = agent["Attributes"]["minMarkup"]
+            max_markup = agent["Attributes"]["maxMarkup"]
+            markups[agent["Id"]] = (min_markup, max_markup)
         case "PredefinedPlantBuilder":
             # this is the actual powerplant
             prototype = agent["Attributes"]["Prototype"]
             attr = agent["Attributes"]
             send, receive = get_send_receive_msgs_per_id(agent["Id"], contracts)
-            operator_id = get_matching_send_one_or_multi(agent["Id"], send[0])
-            operator_id = f"Operator_{operator_id}"
+            raw_operator_id = get_matching_send_one_or_multi(agent["Id"], send[0])
+            send_t, receive_t = get_send_receive_msgs_per_id(raw_operator_id, contracts)
+            raw_trader_id = get_matching_send_one_or_multi(raw_operator_id, send_t[2])
+            operator_id = f"Operator_{raw_operator_id}"
             fuel_price = prices.get(translate_fuel_type[prototype["FuelType"]], 0)
             fuel_price += prototype.get("OpexVarInEURperMWH", 0)
             # TODO CyclingCostInEURperMW
+            # costs due to plant start up
             forecast = NaiveForecast(
                 world.index,
                 availability=prototype["PlannedAvailability"],
@@ -175,31 +253,54 @@ def add_agent_to_world(
                 co2_price=prices.get("co2", 2),
             )
             # TODO UnplannedAvailabilityFactor is not respected
-            world.add_unit(
-                f"PredefinedPlantBuilder_{agent['Id']}",
-                "power_plant",
-                operator_id,
-                {
-                    # I think AMIRIS plans per block - so minimum is 1 block
-                    "min_power": attr["BlockSizeInMW"],
-                    "max_power": attr["InstalledPowerInMW"],
-                    "bidding_strategies": {"energy": "naive"},
-                    "technology": translate_fuel_type[prototype["FuelType"]],
-                    "fuel_type": translate_fuel_type[prototype["FuelType"]],
-                    "emission_factor": prototype["SpecificCo2EmissionsInTperMWH"],
-                    "efficiency": sum(attr["Efficiency"].values()) / 2,
-                },
-                forecast,
+
+            min_markup, max_markup = markups.get(raw_trader_id, (0, 0))
+            # Amiris interpolates blocks linearly
+            interpolated_values = interpolate_blocksizes(
+                attr["InstalledPowerInMW"],
+                attr["BlockSizeInMW"],
+                attr["Efficiency"]["Minimal"],
+                attr["Efficiency"]["Maximal"],
+                min_markup,
+                max_markup,
             )
+            # add a unit for each block
+            for i, values in enumerate(interpolated_values):
+                power, markup, efficiency = values
+                world.add_unit(
+                    f"PredefinedPlantBuilder_{agent['Id']}_{i}",
+                    "power_plant",
+                    operator_id,
+                    {
+                        # AMIRIS does not have min_power
+                        "min_power": 0,
+                        "max_power": power,
+                        "fixed_cost": markup,
+                        "bidding_strategies": {"energy": "naive"},
+                        "technology": translate_fuel_type[prototype["FuelType"]],
+                        "fuel_type": translate_fuel_type[prototype["FuelType"]],
+                        "emission_factor": prototype["SpecificCo2EmissionsInTperMWH"],
+                        "efficiency": efficiency,
+                    },
+                    forecast,
+                )
         case "VariableRenewableOperator" | "Biogas":
             send, receive = get_send_receive_msgs_per_id(agent["Id"], contracts)
             operator_id = get_matching_send_one_or_multi(agent["Id"], send[0])
             operator_id = f"Operator_{operator_id}"
             attr = agent["Attributes"]
             availability = attr.get("YieldProfile", attr.get("DispatchTimeSeries"))
+            max_power = attr["InstalledPowerInMW"]
             if isinstance(availability, str):
                 dispatch_profile = read_csv(base_path, availability)
                 availability = dispatch_profile.reindex(world.index).ffill().fillna(0)
+
+                if availability.max() > 1:
+                    scale_value = availability.max()
+                    availability /= scale_value
+                    max_power *= scale_value
+                    # availability above 1 does not make sense
+
             fuel_price = prices.get(translate_fuel_type[attr["EnergyCarrier"]], 0)
             fuel_price += attr.get("OpexVarInEURperMWH", 0)
             forecast = NaiveForecast(
@@ -215,7 +316,7 @@ def add_agent_to_world(
                 operator_id,
                 {
                     "min_power": 0,
-                    "max_power": attr["InstalledPowerInMW"],
+                    "max_power": max_power,
                     "bidding_strategies": {"energy": "naive"},
                     "technology": translate_fuel_type[attr["EnergyCarrier"]],
                     "fuel_type": translate_fuel_type[attr["EnergyCarrier"]],
@@ -242,10 +343,14 @@ async def load_amiris_async(
     study_case: str,
     base_path: str,
 ):
-    # In practice - this seems fixed in AMIRIS
-    DeliveryIntervalInSteps = 3600
-
     amiris_scenario = read_amiris_yaml(base_path)
+    # DeliveryIntervalInSteps = 3600
+    # In practice - this seems to be a fixed number in AMIRIS
+    if study_case.lower() == "simple":
+        print("is simple - adjusting start time")
+        amiris_scenario["GeneralProperties"]["Simulation"][
+            "StartTime"
+        ] = "2020-12-31_23:58:00"
 
     start = amiris_scenario["GeneralProperties"]["Simulation"]["StartTime"]
     start = pd.to_datetime(start, format="%Y-%m-%d_%H:%M:%S")
@@ -254,7 +359,7 @@ async def load_amiris_async(
     # AMIRIS caveat: start and end is always two minutes before actual start
     start += timedelta(minutes=2)
     sim_id = f"{scenario}_{study_case}"
-    save_interval = amiris_scenario["GeneralProperties"]["Output"]["Interval"]
+    save_interval = amiris_scenario["GeneralProperties"]["Output"]["Interval"] // 2
     prices = {}
     index = pd.date_range(start=start, end=end, freq="1h", inclusive="left")
     await world.setup(
@@ -264,20 +369,53 @@ async def load_amiris_async(
         simulation_id=sim_id,
         index=index,
     )
-    for agent in amiris_scenario["Agents"]:
+    # helper dict to map trader markups/markdowns to powerplants
+    markups = {}
+    keyorder = [
+        "EnergyExchange",
+        "DayAheadMarketSingleZone",
+        "CarbonMarket",
+        "FuelsMarket",
+        "DemandTrader",
+        "StorageTrader",
+        "RenewableTrader",
+        "NoSupportTrader",
+        "ConventionalTrader",
+        "SystemOperatorTrader",
+        "ConventionalPlantOperator",
+        "PredefinedPlantBuilder",
+        "VariableRenewableOperator",
+        "Biogas",
+        "MeritOrderForecaster",
+        "SupportPolicy",
+    ]
+    agents_sorted = sorted(
+        amiris_scenario["Agents"], key=lambda agent: keyorder.index((agent["Type"]))
+    )
+    for agent in agents_sorted:
         add_agent_to_world(
-            agent, world, prices, amiris_scenario["Contracts"], base_path
+            agent,
+            world,
+            prices,
+            amiris_scenario["Contracts"],
+            base_path,
+            markups,
         )
+    # calculate market price before simulation
+    world
 
 
 if __name__ == "__main__":
     # To use this with amiris run:
     # git clone https://gitlab.com/dlr-ve/esy/amiris/examples.git amiris-examples
     # next to the assume folder
-    scenario = "Germany2019"  # Germany2019 or Austria2019 or Simple
+    scenario = "Simple"  # Germany2019 or Austria2019 or Simple
     base_path = f"../amiris-examples/{scenario}/"
     amiris_scenario = read_amiris_yaml(base_path)
-    sends, receives = get_send_receive_msgs_per_id(1000, amiris_scenario["Contracts"])
+    sends, receives = get_send_receive_msgs_per_id(
+        1000,
+        amiris_scenario["Contracts"],
+    )
 
     demand_agent = amiris_scenario["Agents"][3]
     demand_series = read_csv(
@@ -294,4 +432,5 @@ if __name__ == "__main__":
             base_path,
         )
     )
+    print(f"did load {scenario} - now simulating")
     world.run()

@@ -41,12 +41,14 @@ class BaseUnit:
         index: pd.DatetimeIndex,
         node: str = "",
         forecaster: Forecaster = None,
+        location: tuple[float, float] = (0.0, 0.0),
         **kwargs,
     ):
         self.id = id
         self.unit_operator = unit_operator
         self.technology = technology
         self.node = node
+        self.location = location
         self.bidding_strategies: dict[str, BaseStrategy] = bidding_strategies
         self.index = index
         self.outputs = defaultdict(lambda: pd.Series(0.0, index=self.index))

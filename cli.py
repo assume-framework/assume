@@ -115,7 +115,10 @@ def cli(args=None):
         db_uri = f"sqlite:///./examples/local_db/{name}.db"
 
     try:
-        from assume import World, load_scenario_folder, run_learning
+        # import package after argcomplete.autocomplete
+        # to improve autocompletion speed
+        from assume import World
+        from assume.scenario.loader_csv import load_scenario_folder, run_learning
 
         world = World(
             database_uri=db_uri,
