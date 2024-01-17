@@ -2,14 +2,17 @@
 ..
 .. SPDX-License-Identifier: AGPL-3.0-or-later
 
-######################
-Reinforcement Learning
-######################
+###############################
+Reinforcement Learning Overview
+###############################
 
 One unique characteristic of ASSUME is the usage of Reinforcement Learning (RL) for the bidding of the agents.
 To enable this the architecture of the simulation is designed in a way to accommodate the learning process. In this part of
 the documentation, we give a short introduction to reinforcement learning in general and then pinpoint you to the
-relevant parts of the code. If you want a hands-on introduction check out the prepared tutorial in Colab: https://colab.research.google.com/drive/1LISiM1QvDIMXU68pJH-NqrMw5w7Awb24?usp=sharing
+relevant parts of the code. the descriptions are mostly based on the following paper
+Harder, Nick & Qussous, Ramiz & Weidlich, Anke. (2023). Fit for purpose: Modeling wholesale electricity markets realistically with multi-agent deep reinforcement learning. Energy and AI. 14. 100295. 10.1016/j.egyai.2023.100295.
+
+If you want a hands-on introduction check out the prepared tutorial in Colab: https://colab.research.google.com/drive/1LISiM1QvDIMXU68pJH-NqrMw5w7Awb24?usp=sharing
 
 
 The Basics of Reinforcement Learning
@@ -81,10 +84,10 @@ where L is the loss function.
 
 The actor and critic networks are trained simultaneously using the actor-critic algorithm, which updates the weights of
 both networks at each time step. The actor-critic algorithm is a form of policy iteration, where the policy is updated based on the
-estimated value function, and the value function is updated based on the.
+estimated value function, and the value function is updated based on the critic.
 
 
-1.2 Multi-Agent Learning
+Multi-Agent Learning
 ------------------------
 
 In a single-agent setup, the state transition and respective reward depend only on the actions of a single agent. However, in a
@@ -117,7 +120,9 @@ The actor policy of each agent is updated using the deterministic policy gradien
 
     ∇_a Q_i,θ_j(S_k, a_1,k, ..., a_N,k, π(o_i,k))|a_i,k=π(o_i,k) * ∇_θ π(o_i,k)
 
-The actor is updated similarly using only one critic network Q_{θ1}. These changes to the original DDPG algorithm allow increased stability and convergence of the TD3 algorithm. This is especially relevant when approaching a multi-agent RL setup, as discussed in the following section.
+The actor is updated similarly using only one critic network Q_{θ1}. These changes to the original DDPG algorithm allow increased stability and convergence of the TD3 algorithm. This is especially relevant when approaching a multi-agent RL setup, as discussed in the foregoing section.
+Please note that the actor and critics are updated by sampling expereience from the buffer where all intercations of the agents are stroed, namley the observations, actions and rewards. There are more complex buffers possible, like those that use importance sampling, but the default buffer is a simple replay buffer. You can find a documentation of the latter in :doc:`buffers.rst`
+
 
 The Learning Implementation in ASSUME
 =====================================
@@ -131,12 +136,15 @@ The Actor
 We will explain the way learning works in ASSUME starting from the interface to the simulation, namely the bidding strategy of the power plants.
 The bidding strategy, per definition in ASSUME, defines the way we formulate bids based on the technical restrictions of the unit.
 In a learning setting, this is done by the actor network. Which maps the observation to an action. The observation thereby is managed and collected by the units operator as
-summarized in the following picture.
+summarized in the following picture. As you can see in the current working version the observation space contains of a residula load forecast for the next 24 h and aprice forecast for 24 h as well as the
+the current capacity of the powerplant and its marginal costs.
 
 .. image:: img/ActorTask.jpg
     :align: center
     :width: 500px
 
+The action space is a continuous space, which means that the actor can choose any price between 0 and the maximum bid price defined in the code. It gives two prices for two different party of its capacity.
+One, namley :math:`p_inlfex` for the minimum capacity of the power plant and one for the rest ( :math:`p_flex`). The action space is defined in the config file and can be adjusted to your needs.
 After the bids are formulated in the bidding strategy they are sent to the market via the units operator.
 
 .. image:: img/ActorOutput.jpg
@@ -156,38 +164,21 @@ based on global information. The following graph shows the information flow.
     :align: center
     :width: 500px
 
-The Learning Role
------------------
 
-The learning role orchestrates the learning process. It initializes the training process and manages the experiences gained in a buffer.
-Furthermore, it schedules the policy updates and, hence, brings the critic and the actor together during the learning process.
-Particularly this means, that at the beginning of the simulation, we schedule recurrent policy updates, where the output of the critic is used as a loss
-of the actor, which then updates its weights using backward propagation.
+The learning role orchestrates this learning process. It initializes the training process, handels the algorithms and manages the experiences gained in a buffer.
+You can read more about the different algorithms and the learning role in :doc:`learning_algorithm`.
 
-With the learning role, we can also choose which RL algorithm should be used. The algorithm and the buffer have base classes and can be customized if needed.
-But without touching the code there are easy adjustments to the algorithms that can and eventually need to be done in the config file.
-The following table shows the options that can be adjusted and gives a short explanation. As the algorithm is based on stable baselines 3, you can also look up more explanations in their doku.
+The Learning Results in ASSUME
+=====================================
 
+Similarly, to the other results, the learning progress is tracked in the database, either with postgresql or timescale. The latter, enables the usage of the
+predefined dashboards to track the leanring process in the "Assume:Training Process" dashboard. The following pictures show the learning process of a simple reinforcement learning setting.
+A more detailed description is given in the dashboard itsel.
 
- ======================================== ==========================================================================================================
-  learning config item                    description
- ======================================== ==========================================================================================================
-  observation_dimension                   The dimension of the observations given to the actor in the bidding strategy.
-  action_dimension                        The dimension of the actors made by the actor, which equals the output neurons of the actor neuronal net.
-  continue_learning                       Whether to use pre-learned strategies and then continue learning.
-  load_model_path                         If pre-learned strategies should be used, where are they stored?
-  max_bid_price                           The maximum bid price which limits the action of the actor to this price.
-  learning_mode                           Should we use learning mode at all? If not, the learning bidding strategy is overwritten with a default strategy.
-  algorithm                               Specifies which algorithm to use. Currently, only MATD3 is implemented.
-  learning_rate                           The learning rate, also known as step size, which specifies how much the new policy should be considered in the update.
-  training_episodes                       The number of training episodes, whereby one episode is the entire simulation horizon specified in the general config.
-  episodes_collecting_initial_experience  The number of episodes collecting initial experience, whereby this means that random actions are chosen instead of using the actor network
-  train_freq                              Defines the frequency in time steps at which the actor and critic are updated.
-  gradient_steps                          The number of gradient steps.
-  batch_size                              The batch size of experience considered from the buffer for an update.
-  gamma                                   The discount factor, with which future expected rewards are considered in the decision-making.
-  device                                  The device to use.
-  noise_sigma                             The standard deviation of the distribution used to draw the noise, which is added to the actions and forces exploration.  noise_scale
-  noise_dt                                Determines how quickly the noise weakens over time.
-  noise_scale                             The scale of the noise, which is multiplied by the noise drawn from the distribution.
- ======================================== ==========================================================================================================
+.. image:: img/Grafana_Learning_1.jpeg
+    :align: center
+    :width: 500px
+
+.. image:: img/Grafana_Learning_2.jpeg
+    :align: center
+    :width: 500px
