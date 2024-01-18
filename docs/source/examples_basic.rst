@@ -17,4 +17,4 @@ Here you can find several tutorials on how to use ASSUME framework to get you st
    examples/01_minimal_manual_example.nblink
    examples/02_automated_run_example.nblink
    examples/04_reinforcement_learning_example.nblink
-   examples/05_market_comparison.nblink
+   examples/06_market_comparison.nblink
