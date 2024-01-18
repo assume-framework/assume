@@ -110,7 +110,7 @@ class World:
         try:
             from assume.strategies.learning_strategies import RLStrategy
 
-            self.bidding_strategies["learning"] = RLStrategy
+            self.bidding_strategies["pp_learning"] = RLStrategy
         except ImportError as e:
             self.logger.info(
                 "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",
