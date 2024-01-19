@@ -30,5 +30,5 @@ Portfolio Optimisation
 
 The main felxibility a unit oporator is, that we can process all the bids and technical constraints a the unit oporator gets from its technical units
 however we want, before sending them to the market. This allows us to implement a portfolio optimisation for the technical units assigned to the unit operator.
-A respective function is in place for that. Yet, it is not used in the current version of the unit operator. The function is called ::func:`assume.common.units_operator.formulate_bids_portfolio`.
+A respective function is in place for that. Yet, it is not used in the current version of the unit operator. The function is called :func:`assume.common.units_operator.UnitsOperator.formulate_bids`.
 For example, one could think of coordinating the bids of a battery and a PV unit to maximise the self-consumption of the PV unit under one unit operator.
