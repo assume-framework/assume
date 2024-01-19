@@ -24,9 +24,9 @@ class CriticTD3(nn.Module):
     """Initialize parameters and build model.
 
     Args:
-    - n_agents (int): Number of agents
-    - obs_dim (int): Dimension of each state
-    - act_dim (int): Dimension of each action
+        n_agents (int): Number of agents
+        obs_dim (int): Dimension of each state
+        act_dim (int): Dimension of each action
     """
 
     def __init__(self, n_agents, obs_dim, act_dim, float_type, unique_obs_len=16):
@@ -84,8 +84,8 @@ class CriticTD3(nn.Module):
         (e.g. when updating the policy in TD3).
 
         Args:
-        - obs (torch.Tensor): The observation
-        - actions (torch.Tensor): The action
+            obs (torch.Tensor): The observations
+            actions (torch.Tensor): The actions
 
         """
         x = th.cat([obs, actions], 1)
@@ -181,9 +181,9 @@ def polyak_update(params, target_params, tau):
     See https://github.com/DLR-RM/stable-baselines3/issues/93
 
     Args:
-    - param params: parameters to use to update the target params
-    - param target_params: parameters to update
-    - param tau: the soft update coefficient ("Polyak update", between 0 and 1)
+        params: parameters to use to update the target params
+        target_params: parameters to update
+        tau: the soft update coefficient ("Polyak update", between 0 and 1)
     """
     with th.no_grad():
         # zip does not raise an exception if length of parameters does not match.

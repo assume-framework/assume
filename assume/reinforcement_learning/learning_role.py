@@ -24,15 +24,10 @@ class Learning(Role):
     neural networks, replay buffer, and learning hyperparameters. It handles both training and evaluation modes based on
     the provided learning configuration.
 
-    Attributes:
+    Args:
         simulation_start (datetime): The start of the simulation.
         simulation_end (datetime): The end of the simulation.
         learning_config (LearningConfig): The configuration for the learning process.
-
-    Args:
-    - learning_config (LearningConfig): The configuration for the learning process.
-    - start (datetime): The start of the simulation.
-    - end (datetime): The end of the simulation.
 
     """
 
@@ -100,6 +95,15 @@ class Learning(Role):
         self.rl_eval_regrets = []
 
     def load_policies(self, load_directory) -> None:
+        """
+        Load the policies of the reinforcement learning agent.
+
+        This method loads the entire policies (actor and critics) of the reinforcement learning agent from the specified directory.
+        This is used if we want to continue learning from already learned strategies.
+
+        Args:
+            load_directory (str): The directory from which to load the policies.
+        """
         if load_directory is None:
             logger.warning(
                 "You have specified continue learning as True but no load_model_path was given!"
@@ -113,8 +117,8 @@ class Learning(Role):
         Set up the learning role for reinforcement learning training.
 
         Notes:
-        This method prepares the learning role for the reinforcement learning training process. It subscribes to relevant messages
-        for handling the training process and schedules recurrent tasks for policy updates based on the specified training frequency.
+            This method prepares the learning role for the reinforcement learning training process. It subscribes to relevant messages
+            for handling the training process and schedules recurrent tasks for policy updates based on the specified training frequency.
         """
         # subscribe to messages for handling the training process
         self.context.subscribe_message(

@@ -37,15 +37,15 @@ class ReplayBuffer:
         The replay buffer is implemented as a circular buffer, where the oldest experiences are discarded when the buffer is full.
 
         Args:
-        - buffer_size (int): The maximum size of the buffer.
-        - obs_dim (int): The dimension of the observation space.
-        - act_dim (int): The dimension of the action space.
-        - n_rl_units (int): The number of reinforcement learning units.
-        - device (str): The device to use for storing the data (e.g., 'cpu' or 'cuda').
-        - float_type (torch.dtype): The data type to use for the stored data.
-        - observations (np.array): The stored observations.
-        - actions (np.array): The stored actions.
-        - rewards (np.array): The stored rewards.
+            buffer_size (int): The maximum size of the buffer.
+            obs_dim (int): The dimension of the observation space.
+            act_dim (int): The dimension of the action space.
+            n_rl_units (int): The number of reinforcement learning units.
+            device (str): The device to use for storing the data (e.g., 'cpu' or 'cuda').
+            float_type (torch.dtype): The data type to use for the stored data.
+            observations (np.array): The stored observations.
+            actions (np.array): The stored actions.
+            rewards (np.array): The stored rewards.
         """
 
         self.buffer_size = buffer_size
@@ -97,7 +97,7 @@ class ReplayBuffer:
         stored in the buffer).
 
         Returns:
-        - buffer_size(int): The current size of the buffer
+            buffer_size(int): The current size of the buffer
 
         """
         return self.buffer_size if self.full else self.pos
@@ -107,12 +107,12 @@ class ReplayBuffer:
         Converts a numpy array to a PyTorch tensor. Note: it copies the data by default.
 
         Args:
-        - array (np.array): The numpy array to convert.
-        - copy (bool, optional): Whether to copy or not the data
+            array (np.array): The numpy array to convert.
+            copy (bool, optional): Whether to copy or not the data
                 (may be useful to avoid changing things by reference). Defaults to True.
 
         Returns:
-        - torch.Tensor: The converted PyTorch tensor.
+            torch.Tensor: The converted PyTorch tensor.
         """
 
         if copy:
@@ -130,9 +130,9 @@ class ReplayBuffer:
         Adds an observation, action, and reward of all agents to the replay buffer.
 
         Args:
-        - obs (np.array): The observation to add.
-        - actions (np.array): The actions to add.
-        - reward (np.array): The reward to add.
+            obs (np.array): The observation to add.
+            actions (np.array): The actions to add.
+            reward (np.array): The reward to add.
         """
         # copying all to avoid modification
         self.observations[self.pos] = obs.copy()
@@ -149,13 +149,13 @@ class ReplayBuffer:
         Samples a randome batch of experiences from the replay buffer.
 
         Args:
-        - batch_size (int): The number of experiences to sample.
+            batch_size (int): The number of experiences to sample.
 
         Returns:
-        - ReplayBufferSamples: A named tuple containing the sampled observations, actions, and rewards.
+            ReplayBufferSamples: A named tuple containing the sampled observations, actions, and rewards.
 
         Raises:
-        - Exception: If there are less than two entries in the buffer.
+            Exception: If there are less than two entries in the buffer.
         """
 
         upper_bound = self.buffer_size if self.full else self.pos
