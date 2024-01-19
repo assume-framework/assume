@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Tuple
 
 import dateutil.rrule as rr
@@ -283,7 +283,8 @@ async def load_scenario_folder_async(
 
     index = pd.date_range(
         start=start,
-        end=end,
+        # end time needs to be a little ahead for forecasts
+        end=end + timedelta(days=1),
         freq=config["time_step"],
     )
     # get extra parameters for bidding strategies

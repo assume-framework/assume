@@ -73,8 +73,6 @@ if __name__ == "__main__":
     # you can also add custom bidding strategies as follows:
     from assume.strategies.learning_strategies import RLStrategy
 
-    world.bidding_strategies["pp_learning"] = RLStrategy
-
     # load scenario
     load_scenario_folder(
         world,

@@ -269,7 +269,7 @@ class World:
 
         # mango multiprocessing is currently only supported on linux
         # with single
-        if platform == "linux":
+        if platform == "linux" and self.distributed_role is not None:
             self.addresses.append(self.addr)
 
             def creator(container):
