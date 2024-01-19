@@ -31,7 +31,7 @@ The following table shows the options that can be adjusted and gives a short exp
   observation_dimension                   The dimension of the observations given to the actor in the bidding strategy.
   action_dimension                        The dimension of the actors made by the actor, which equals the output neurons of the actor neuronal net.
   continue_learning                       Whether to use pre-learned strategies and then continue learning.
-  load_model_path                         If pre-learned strategies should be used, where are they stored?
+  trained_actors_path                         If pre-learned strategies should be used, where are they stored?
   max_bid_price                           The maximum bid price which limits the action of the actor to this price.
   learning_mode                           Should we use learning mode at all? If not, the learning bidding strategy is overwritten with a default strategy.
   algorithm                               Specifies which algorithm to use. Currently, only MATD3 is implemented.

@@ -106,7 +106,7 @@ class Learning(Role):
         """
         if load_directory is None:
             logger.warning(
-                "You have specified continue learning as True but no load_model_path was given!"
+                "You have specified continue learning as True but no trained_actors_path was given!"
             )
             logger.info("Continuing learning with randomly initialized values!")
         else:

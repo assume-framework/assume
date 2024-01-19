@@ -702,7 +702,7 @@ def run_learning(
         if world.learning_config.get("continue_learning", False) and episode == 1:
             # if we want to continue learning in the frist episode from pretrained actors and critics they need to be loaded
             world.learning_role.load_policies(
-                load_directory=world.learning_config.get("load_model_path")
+                load_directory=world.learning_config.get("trained_actors_path")
             )
 
         world.learning_role.buffer = buffer
