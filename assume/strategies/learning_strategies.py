@@ -73,7 +73,7 @@ class RLStrategy(LearningStrategy):
                 dt=kwargs.get("noise_dt", 1.0),
             )
 
-        elif Path(load_path=kwargs["trained_actors_path"]).is_dir():
+        elif Path(kwargs["trained_actors_path"]).is_dir():
             self.load_actor_params(load_path=kwargs["trained_actors_path"])
 
     def calculate_bids(
@@ -197,7 +197,7 @@ class RLStrategy(LearningStrategy):
                 curr_action = noise + base_bid.clone().detach()
 
             else:
-                # if we are not in the initial exploration phase we chose the action with the actor neuronal net
+                # if we are not in the initial exploration phase we chose the action with the actor neural net
                 # and add noise to the action
                 curr_action = self.actor(next_observation).detach()
                 noise = th.tensor(
@@ -205,7 +205,7 @@ class RLStrategy(LearningStrategy):
                 )
                 curr_action += noise
         else:
-            # if we are not in learning mode we just use the actor neuronal net to get the action without adding noise
+            # if we are not in learning mode we just use the actor neural net to get the action without adding noise
 
             curr_action = self.actor(next_observation).detach()
             noise = tuple(0 for _ in range(self.act_dim))

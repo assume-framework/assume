@@ -84,3 +84,9 @@ class RLAlgorithm:
             object: The loaded object.
         """
         return th.load(directory, map_location=self.device)
+
+    def load_params(self, directory: str) -> None:
+        """
+        Load learning params - abstract method to be implemented by the Learning Algorithm
+        """
+        pass

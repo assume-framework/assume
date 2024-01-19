@@ -228,6 +228,10 @@ class Learning(Role):
         for mode in modes:
             value = None
 
+            if not self.rl_eval_rewards:
+                # TODO?
+                return
+
             if mode == "reward" and self.rl_eval_rewards[-1] > self.max_eval_reward:
                 self.max_eval_reward = self.rl_eval_rewards[-1]
                 dir_name = "highest_reward"

@@ -29,7 +29,7 @@ The following table shows the options that can be adjusted and gives a short exp
   learning config item                    description
  ======================================== ==========================================================================================================
   observation_dimension                   The dimension of the observations given to the actor in the bidding strategy.
-  action_dimension                        The dimension of the actors made by the actor, which equals the output neurons of the actor neuronal net.
+  action_dimension                        The dimension of the actors made by the actor, which equals the output neurons of the actor neural net.
   continue_learning                       Whether to use pre-learned strategies and then continue learning.
   trained_actors_path                         If pre-learned strategies should be used, where are they stored?
   max_bid_price                           The maximum bid price which limits the action of the actor to this price.
