@@ -113,7 +113,7 @@ class World:
             )
             from assume.strategies.learning_strategies import RLStrategy
 
-            self.bidding_strategies["learning"] = RLStrategy
+            self.bidding_strategies["pp_learning"] = RLStrategy
             self.bidding_strategies[
                 "learning_advanced_orders"
             ] = RLAdvancedOrderStrategy
@@ -276,7 +276,7 @@ class World:
 
         # mango multiprocessing is currently only supported on linux
         # with single
-        if platform == "linux":
+        if platform == "linux" and self.distributed_role is not None:
             self.addresses.append(self.addr)
 
             def creator(container):
