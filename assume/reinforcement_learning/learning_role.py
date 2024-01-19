@@ -9,13 +9,11 @@ from datetime import datetime
 import torch as th
 from dateutil import rrule as rr
 from mango import Role
-from torch.optim import Adam
 
 from assume.common.base import LearningConfig, LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
-from assume.reinforcement_learning.learning_utils import Actor, CriticTD3
 
 logger = logging.getLogger(__name__)
 
@@ -101,15 +99,14 @@ class Learning(Role):
         self.rl_eval_profits = []
         self.rl_eval_regrets = []
 
-        if learning_config.get("continue_learning", False):
-            load_directory = learning_config.get("load_model_path")
-            if load_directory is not None:
-                self.logger.warning(
-                    "You have specified continue learning as True but no load_model_path was given!"
-                )
-                self.info("Continuing learning with randomly initialized values!")
-            else:
-                self.load_params(load_directory)
+    def load_policies(self, load_directory) -> None:
+        if load_directory is None:
+            logger.warning(
+                "You have specified continue learning as True but no load_model_path was given!"
+            )
+            logger.info("Continuing learning with randomly initialized values!")
+        else:
+            self.rl_algorithm.load_params(load_directory)
 
     def setup(self) -> None:
         """
@@ -141,8 +138,8 @@ class Learning(Role):
         Handles the incoming messages and performs corresponding actions.
 
         Args:
-        - content (dict): The content of the message.
-        - meta: The metadata associated with the message. (not needed yet)
+            content (dict): The content of the message.
+            meta (dict): The metadata associated with the message. (not needed yet)
         """
 
         if content.get("type") == "replay_buffer":
@@ -157,9 +154,10 @@ class Learning(Role):
         """
         Disable initial exploration mode for all learning strategies.
 
-        This method turns off the initial exploration mode for all learning strategies associated with the learning role. Initial
-        exploration is often used to collect initial experience before training begins. Disabling it can be useful when the agent
-        has collected sufficient initial data and is ready to focus on training.
+        Notes:
+            This method turns off the initial exploration mode for all learning strategies associated with the learning role. Initial
+            exploration is often used to collect initial experience before training begins. Disabling it can be useful when the agent
+            has collected sufficient initial data and is ready to focus on training.
         """
         for _, unit in self.rl_strats.items():
             unit.collect_initial_experience_mode = False
@@ -172,7 +170,7 @@ class Learning(Role):
         is associated with the learning role and configured with relevant hyperparameters.
 
         Args:
-        - algorithm (RLAlgorithm): The name of the reinforcement learning algorithm.
+            algorithm (RLAlgorithm): The name of the reinforcement learning algorithm.
         """
         if algorithm == "matd3":
             self.rl_algorithm = TD3(
@@ -184,7 +182,16 @@ class Learning(Role):
                 gamma=self.gamma,
             )
         else:
-            self.logger.error(f"Learning algorithm {algorithm} not implemented!")
+            logger.error(f"Learning algorithm {algorithm} not implemented!")
+
+    def initialize_policy(self) -> None:
+        """
+        Initialize the policy of the reinforcement learning agent considering the respective algorithm.
+
+        This method initializes the policy (actor) of the reinforcement learning agent. It iterates through all learning strategies
+        associated with the learning role and initializes their policies.
+        """
+        self.rl_algorithm.initialize_policy()
 
     async def update_policy(self) -> None:
         """
@@ -195,7 +202,7 @@ class Learning(Role):
         it triggers the policy update process by calling the `update_policy` method of the associated reinforcement learning algorithm.
 
         Notes:
-        This method is typically scheduled to run periodically during training to continuously improve the agent's policy.
+            This method is typically scheduled to run periodically during training to continuously improve the agent's policy.
         """
         if self.episodes_done > self.episodes_collecting_initial_experience:
             self.rl_algorithm.update_policy()
@@ -211,7 +218,7 @@ class Learning(Role):
         and associated parameters.
 
         Notes:
-        This method is typically used during the evaluation phase to save policies that achieve superior performance.
+            This method is typically used during the evaluation phase to save policies that achieve superior performance.
         """
         modes = ["reward", "profit", "regret"]
         for mode in modes:
@@ -240,254 +247,6 @@ class Learning(Role):
                     if unit.learning:
                         unit.save_params(dir_name=dir_name)
 
-                self.logger.info(
+                logger.info(
                     f"Policies saved, episode: {self.eval_episodes_done + 1}, mode: {mode}, value: {value:.2f}"
                 )
-
-    def save_params(self, directory):
-        """
-        This method saves the parameters of both the actor and critic networks associated with the learning role. It organizes the
-        saved parameters into separate directories for critics and actors within the specified base directory.
-
-        Args:
-        - directory (str): The base directory for saving the parameters.
-        """
-        self.save_critic_params(directory=f"{directory}/critics")
-        self.save_actor_params(directory=f"{directory}/actors")
-
-    def save_critic_params(self, directory):
-        """
-        Save the parameters of critic networks.
-
-        This method saves the parameters of the critic networks, including the critic's state_dict, critic_target's state_dict,
-        and the critic's optimizer state_dict. It organizes the saved parameters into a directory structure specific to the critic
-        associated with each learning strategy.
-
-        Args:
-        - directory (str): The base directory for saving the parameters.
-        """
-        os.makedirs(directory, exist_ok=True)
-        for u_id in self.rl_strats.keys():
-            obj = {
-                "critic": self.critics[u_id].state_dict(),
-                "critic_target": self.target_critics[u_id].state_dict(),
-                "critic_optimizer": self.critics[u_id].optimizer.state_dict(),
-            }
-            path = f"{directory}/critic_{u_id}.pt"
-            th.save(obj, path)
-
-    def save_actor_params(self, directory):
-        """
-        Save the parameters of actor networks.
-
-        This method saves the parameters of the actor networks, including the actor's state_dict, actor_target's state_dict, and
-        the actor's optimizer state_dict. It organizes the saved parameters into a directory structure specific to the actor
-        associated with each learning strategy.
-
-        Args:
-        - directory (str): The base directory for saving the parameters.
-        """
-        os.makedirs(directory, exist_ok=True)
-        for u_id in self.rl_strats.keys():
-            obj = {
-                "actor": self.rl_strats[u_id].actor.state_dict(),
-                "actor_target": self.rl_strats[u_id].actor_target.state_dict(),
-                "actor_optimizer": self.rl_strats[u_id].actor.optimizer.state_dict(),
-            }
-            path = f"{directory}/actor_{u_id}.pt"
-            th.save(obj, path)
-
-    def load_obj(self, directory: str):
-        """
-        Load an object from a specified directory.
-
-        This method loads an object, typically saved as a checkpoint file, from the specified
-        directory and returns it. It uses the `torch.load` function and specifies the device for loading.
-
-        Args:
-        - directory (str): The directory from which the object should be loaded.
-
-        Returns:
-        - object: The loaded object.
-        """
-        return th.load(directory, map_location=self.device)
-
-    def load_params(self, directory: str) -> None:
-        """
-        Load the parameters of both actor and critic networks.
-
-        This method loads the parameters of both the actor and critic networks associated with the learning role from the specified
-        directory. It uses the `load_critic_params` and `load_actor_params` methods to load the respective parameters.
-
-        Args:
-        - directory (str): The directory from which the parameters should be loaded.
-        """
-        self.load_critic_params(directory)
-        self.load_actor_params(directory)
-
-    def load_critic_params(self, directory: str) -> None:
-        """
-        Load the parameters of critic networks from a specified directory.
-
-        This method loads the parameters of critic networks, including the critic's state_dict, critic_target's state_dict, and
-        the critic's optimizer state_dict, from the specified directory. It iterates through the learning strategies associated
-        with the learning role, loads the respective parameters, and updates the critic and target critic networks accordingly.
-
-        Args:
-        - directory (str): The directory from which the parameters should be loaded.
-        """
-        self.logger.info("Loading critic parameters...")
-
-        if not os.path.exists(directory):
-            self.logger.warning(
-                "Specified directory for loading the critics does not exist! Starting with randomly initialized values!"
-            )
-            return
-
-        for u_id in self.rl_strats.keys():
-            try:
-                critic_params = self.load_obj(
-                    directory=f"{directory}/critics/critic_{str(u_id)}.pt"
-                )
-                self.critics[u_id].load_state_dict(critic_params["critic"])
-                self.target_critics[u_id].load_state_dict(
-                    critic_params["critic_target"]
-                )
-                self.critics[u_id].optimizer.load_state_dict(
-                    critic_params["critic_optimizer"]
-                )
-            except Exception:
-                self.logger.warning(f"No critic values loaded for agent {u_id}")
-
-    def load_actor_params(self, directory: str) -> None:
-        """
-        Load the parameters of actor networks from a specified directory.
-
-        This method loads the parameters of actor networks, including the actor's state_dict, actor_target's state_dict, and
-        the actor's optimizer state_dict, from the specified directory. It iterates through the learning strategies associated
-        with the learning role, loads the respective parameters, and updates the actor and target actor networks accordingly.
-
-        Args:
-        - directory (str): The directory from which the parameters should be loaded.
-        """
-        self.logger.info("Loading actor parameters...")
-        if not os.path.exists(directory):
-            self.logger.warning(
-                "Specified directory for loading the actors does not exist! Starting with randomly initialized values!"
-            )
-            return
-
-        for u_id in self.rl_strats.keys():
-            try:
-                actor_params = self.load_obj(
-                    directory=f"{directory}/actors/actor_{str(u_id)}.pt"
-                )
-                self.rl_strats[u_id].actor.load_state_dict(actor_params["actor"])
-                self.rl_strats[u_id].actor_target.load_state_dict(
-                    actor_params["actor_target"]
-                )
-                self.rl_strats[u_id].actor.optimizer.load_state_dict(
-                    actor_params["actor_optimizer"]
-                )
-            except Exception:
-                self.logger.warning(f"No actor values loaded for agent {u_id}")
-
-    def extract_actors_and_critics(self) -> dict:
-        """
-        Extract actor and critic networks.
-
-        This method extracts the actor and critic networks associated with each learning strategy and organizes them into a
-        dictionary structure. The extracted networks include actors, actor_targets, critics, and target_critics. The resulting
-        dictionary is typically used for saving and sharing these networks.
-
-        Returns:
-        - dict: The extracted actor and critic networks.
-        """
-        actors = {}
-        actor_targets = {}
-
-        for u_id, unit_strategy in self.rl_strats.items():
-            actors[u_id] = unit_strategy.actor
-            actor_targets[u_id] = unit_strategy.actor_target
-
-        actors_and_critics = {
-            "actors": actors,
-            "actor_targets": actor_targets,
-            "critics": self.critics,
-            "target_critics": self.target_critics,
-        }
-
-        return actors_and_critics
-
-    def create_actors_and_critics(self, actors_and_critics: dict = None) -> None:
-        """
-        Create actor and critic networks for reinforcement learning.
-
-        If `actors_and_critics` is None, this method creates new actor and critic networks.
-        If `actors_and_critics` is provided, it assigns existing networks to the respective attributes.
-
-        Args:
-        - actors_and_critics (dict): The actor and critic networks to be assigned.
-
-        """
-        if actors_and_critics is None:
-            self.create_actors()
-            self.create_critics()
-
-        else:
-            self.critics = actors_and_critics["critics"]
-            self.target_critics = actors_and_critics["target_critics"]
-            for u_id, unit_strategy in self.rl_strats.items():
-                unit_strategy.actor = actors_and_critics["actors"][u_id]
-                unit_strategy.actor_target = actors_and_critics["actor_targets"][u_id]
-
-    def create_actors(self) -> None:
-        """
-        Create actor networks for reinforcement learning for each unit strategy.
-
-        This method initializes actor networks and their corresponding target networks for each unit strategy.
-        The actors are designed to map observations to action probabilities in a reinforcement learning setting.
-
-        The created actor networks are associated with each unit strategy and stored as attributes.
-        """
-        for _, unit_strategy in self.rl_strats.items():
-            unit_strategy.actor = Actor(
-                obs_dim=self.obs_dim, act_dim=self.act_dim, float_type=self.float_type
-            ).to(self.device)
-
-            unit_strategy.actor_target = Actor(
-                obs_dim=self.obs_dim, act_dim=self.act_dim, float_type=self.float_type
-            ).to(self.device)
-            unit_strategy.actor_target.load_state_dict(unit_strategy.actor.state_dict())
-            unit_strategy.actor_target.train(mode=False)
-
-            unit_strategy.actor.optimizer = Adam(
-                unit_strategy.actor.parameters(), lr=self.learning_rate
-            )
-
-    def create_critics(self) -> None:
-        """
-        Create critic networks for reinforcement learning.
-
-        This method initializes critic networks for each agent in the reinforcement learning setup.
-        """
-        n_agents = len(self.rl_strats)
-        strategy: LearningStrategy
-
-        for u_id, strategy in self.rl_strats.items():
-            self.critics[u_id] = CriticTD3(
-                n_agents, strategy.obs_dim, strategy.act_dim, self.float_type
-            )
-            self.target_critics[u_id] = CriticTD3(
-                n_agents, strategy.obs_dim, strategy.act_dim, self.float_type
-            )
-
-            self.critics[u_id].optimizer = Adam(
-                self.critics[u_id].parameters(), lr=self.learning_rate
-            )
-
-            self.target_critics[u_id].load_state_dict(self.critics[u_id].state_dict())
-            self.target_critics[u_id].train(mode=False)
-
-            self.critics[u_id] = self.critics[u_id].to(self.device)
-            self.target_critics[u_id] = self.target_critics[u_id].to(self.device)

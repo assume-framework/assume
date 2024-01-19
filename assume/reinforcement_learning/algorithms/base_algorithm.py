@@ -4,6 +4,8 @@
 
 import logging
 
+import torch as th
+
 logger = logging.getLogger(__name__)
 
 
@@ -76,3 +78,18 @@ class RLAlgorithm:
         logger.error(
             "No policy update function of the used Rl algorithm was defined. Please define how the policies should be updated in the specific algorithm you use"
         )
+
+    def load_obj(self, directory: str):
+        """
+        Load an object from a specified directory.
+
+        This method loads an object, typically saved as a checkpoint file, from the specified
+        directory and returns it. It uses the `torch.load` function and specifies the device for loading.
+
+        Args:
+            directory (str): The directory from which the object should be loaded.
+
+        Returns:
+            object: The loaded object.
+        """
+        return th.load(directory, map_location=self.device)

@@ -12,12 +12,12 @@ base:
   learning_config:
     observation_dimension: 50
     action_dimension: 2
-    continue_learning: False
-    load_model_path: None
+    continue_learning: True
+    load_model_path: C:\Users\tg3533\assume\examples\inputs\learned_strategies\example_02a_base
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.001
-    training_episodes: 50
+    training_episodes: 10
     episodes_collecting_initial_experience: 5
     train_freq: 24
     gradient_steps: -1

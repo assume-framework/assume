@@ -695,9 +695,16 @@ def run_learning(
             )
 
         # give the newly created rl_agent the buffer that we stored from the beginning
-        world.learning_role.create_actors_and_critics(
+        world.learning_role.rl_algorithm.initialize_policy(
             actors_and_critics=actors_and_critics
         )
+
+        if world.learning_config.get("continue_learning", False) and episode == 1:
+            # if we want to continue learning in the frist episode from pretrained actors and critics they need to be loaded
+            world.learning_role.load_policies(
+                load_directory=world.learning_config.get("load_model_path")
+            )
+
         world.learning_role.buffer = buffer
         world.learning_role.episodes_done = episode
 
@@ -706,7 +713,7 @@ def run_learning(
 
         world.run()
 
-        actors_and_critics = world.learning_role.extract_actors_and_critics()
+        actors_and_critics = world.learning_role.rl_algorithm.extract_policy()
 
         if (
             episode % validation_interval == 0
