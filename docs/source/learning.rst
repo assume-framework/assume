@@ -12,7 +12,7 @@ the documentation, we give a short introduction to reinforcement learning in gen
 relevant parts of the code. the descriptions are mostly based on the following paper
 Harder, Nick & Qussous, Ramiz & Weidlich, Anke. (2023). Fit for purpose: Modeling wholesale electricity markets realistically with multi-agent deep reinforcement learning. Energy and AI. 14. 100295. 10.1016/j.egyai.2023.100295.
 
-If you want a hands-on introduction check out the prepared tutorial in Colab: https://github.com/assume-framework/assume/tree/main/examples/notebooks
+If you want a hands-on introduction check out the prepared tutorial in Colab: https://colab.research.google.com/github/assume-framework/assume
 
 
 The Basics of Reinforcement Learning
