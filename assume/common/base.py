@@ -162,9 +162,9 @@ class BaseUnit:
         Calculate the generation cost for a specific product type within the given time range.
 
         Args:
-        - start (datetime): The start time for the calculation.
-        - end (datetime): The end time for the calculation.
-        - product_type (str): The type of product for which the generation cost is to be calculated.
+            start (datetime): The start time for the calculation.
+            end (datetime): The end time for the calculation.
+            product_type (str): The type of product for which the generation cost is to be calculated.
 
         """
         if start not in self.index:
