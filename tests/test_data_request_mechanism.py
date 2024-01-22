@@ -127,5 +127,5 @@ async def test_request_messages():
     assert content["data"][index[1]] == 100
     assert content["data"][index[2]] == 0
     assert content["data"][index[3]] == 200
-    clock.set_time(end.timestamp()+1)
+    clock.set_time(end.timestamp() + 1)
     await container.shutdown()
