@@ -696,12 +696,6 @@ def run_learning(
             actors_and_critics=actors_and_critics
         )
 
-        if world.learning_config.get("continue_learning", False) and episode == 1:
-            # if we want to continue learning in the first episode from pretrained actors and critics they need to be loaded
-            world.learning_role.load_policies(
-                load_directory=world.learning_config.get("trained_actors_path")
-            )
-
         world.learning_role.buffer = buffer
         world.learning_role.episodes_done = episode
 
@@ -720,7 +714,7 @@ def run_learning(
             new_path = f"{old_path}_eval"
 
             # save validation params in validation path
-            world.learning_role.compare_and_save_policies()
+            world.learning_role.rl_algorithm.save_params(directory=new_path)
             world.reset()
 
             # load validation run
@@ -744,7 +738,7 @@ def run_learning(
             if avg_reward > best_reward:
                 # update best reward
                 best_reward = avg_reward
-                world.learning_role.compare_and_save_policies()
+                world.learning_role.rl_algorithm.save_params(directory=old_path)
 
             eval_episode += 1
 
