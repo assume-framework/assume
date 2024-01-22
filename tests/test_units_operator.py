@@ -16,8 +16,6 @@ from mango.util.termination_detection import tasks_complete_or_sleeping
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
-from assume.strategies.learning_advanced_orders import RLAdvancedOrderStrategy
-from assume.strategies.learning_strategies import RLStrategy
 from assume.strategies.naive_strategies import NaiveStrategy
 from assume.units.demand import Demand
 from assume.units.powerplant import PowerPlant
@@ -99,7 +97,14 @@ async def test_formulate_bids(units_operator: UnitsOperator):
     assert orderbook[0]["price"] == 3000
 
 
+@pytest.mark.require_learning
 async def test_write_learning_params(units_operator: UnitsOperator):
+    try:
+        from assume.strategies.learning_advanced_orders import RLAdvancedOrderStrategy
+        from assume.strategies.learning_strategies import RLStrategy
+    except ImportError:
+        pass
+
     marketconfig = units_operator.available_markets[0]
     start = datetime(2020, 1, 1)
     end = datetime(2020, 1, 2)
