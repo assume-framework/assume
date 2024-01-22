@@ -72,14 +72,6 @@ assume.common.utils module
    :undoc-members:
    :show-inheritance:
 
-assume.scenario.loader\_csv module
--------------------------------------
-
-.. automodule:: assume.scenario.loader_csv
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 Module contents
 ---------------
 

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Tuple
 
 import dateutil.rrule as rr
@@ -199,17 +199,13 @@ def add_units(
 ) -> None:
     """
     Add units to the world from a given dataframe.
-
     The callback is used to adjust unit_params depending on the unit_type, before adding the unit to the world.
 
     Args:
-    units_df (pd.DataFrame): The dataframe containing the units.
-    unit_type (str): The type of the unit.
-    world (World): The world to which the units will be added.
-    forecaster (Forecaster): The forecaster used for adding the units.
-
-    Returns:
-    None
+        units_df (pd.DataFrame): The dataframe containing the units.
+        unit_type (str): The type of the unit.
+        world (World): The world to which the units will be added.
+        forecaster (Forecaster): The forecaster used for adding the units.
     """
     if units_df is None:
         return
@@ -283,7 +279,8 @@ async def load_scenario_folder_async(
 
     index = pd.date_range(
         start=start,
-        end=end,
+        # end time needs to be a little ahead for forecasts
+        end=end + timedelta(days=1),
         freq=config["time_step"],
     )
     # get extra parameters for bidding strategies
