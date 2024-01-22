@@ -41,8 +41,6 @@ async def units_operator() -> UnitsOperator:
 
     index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 
-    units_role.context.data_dict = {}
-
     params_dict = {
         "bidding_strategies": {"energy": NaiveStrategy()},
         "technology": "energy",
