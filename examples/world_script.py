@@ -20,8 +20,8 @@ world = World(database_uri=db_uri)
 
 
 async def init():
-    start = datetime(2023, 10, 4)
-    end = datetime(2023, 12, 5)
+    start = datetime(2019, 1, 1)
+    end = datetime(2019, 3, 1)
     index = pd.date_range(
         start=start,
         end=end + timedelta(hours=24),

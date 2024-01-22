@@ -27,7 +27,7 @@ enhancing their robustness and performance by providing a diverse and non-correl
 
 
 How are they used in Assume?
-=======================
+============================
 In principal Assume allows for different buffers to be implemented. They just need to adhere to the structure presented in the base buffer. Here we will present the different buffers already implemented, which is only one, yet.
 
 

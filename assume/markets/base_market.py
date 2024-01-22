@@ -503,8 +503,8 @@ class MarketRole(MarketMechanism, Role):
         :type orderbook: Orderbook
         """
 
-        db_aid = self.context.data_dict.get("output_agent_id")
-        db_addr = self.context.data_dict.get("output_agent_addr")
+        db_aid = self.context.data.get("output_agent_id")
+        db_addr = self.context.data.get("output_agent_addr")
 
         if db_aid and db_addr:
             message = {
@@ -528,8 +528,8 @@ class MarketRole(MarketMechanism, Role):
         :type market_meta: any
         """
 
-        db_aid = self.context.data_dict.get("output_agent_id")
-        db_addr = self.context.data_dict.get("output_agent_addr")
+        db_aid = self.context.data.get("output_agent_id")
+        db_addr = self.context.data.get("output_agent_addr")
 
         if db_aid and db_addr:
             message = {

@@ -26,6 +26,13 @@ Units
 
    assume.units
 
+Scenario Loaders
+----------------
+.. toctree::
+   :maxdepth: 4
+
+   assume.scenario
+
 Bidding strategies
 ------------------
 .. toctree::
