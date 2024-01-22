@@ -107,8 +107,8 @@ class UnitsOperator(Role):
         """
         self.units[unit.id] = unit
 
-        db_aid = self.context.data_dict.get("output_agent_id")
-        db_addr = self.context.data_dict.get("output_agent_addr")
+        db_aid = self.context.data.get("output_agent_id")
+        db_addr = self.context.data.get("output_agent_addr")
         if db_aid and db_addr:
             # send unit data to db agent to store it
             message = {
@@ -320,8 +320,8 @@ class UnitsOperator(Role):
             )
         )
 
-        db_aid = self.context.data_dict.get("output_agent_id")
-        db_addr = self.context.data_dict.get("output_agent_addr")
+        db_aid = self.context.data.get("output_agent_id")
+        db_addr = self.context.data.get("output_agent_addr")
         if db_aid and db_addr:
             self.context.schedule_instant_acl_message(
                 receiver_id=db_aid,
@@ -519,8 +519,8 @@ class UnitsOperator(Role):
 
                 output_agent_list.append(output_dict)
 
-        db_aid = self.context.data_dict.get("learning_output_agent_id")
-        db_addr = self.context.data_dict.get("learning_output_agent_addr")
+        db_aid = self.context.data.get("learning_output_agent_id")
+        db_addr = self.context.data.get("learning_output_agent_addr")
 
         if db_aid and db_addr and output_agent_list:
             self.context.schedule_instant_acl_message(
@@ -596,8 +596,8 @@ class UnitsOperator(Role):
         all_rewards = np.array(all_rewards)
         rl_agent_data = (all_observations, all_actions, all_rewards)
 
-        learning_role_id = self.context.data_dict.get("learning_agent_id")
-        learning_role_addr = self.context.data_dict.get("learning_agent_addr")
+        learning_role_id = self.context.data.get("learning_agent_id")
+        learning_role_addr = self.context.data.get("learning_agent_addr")
 
         if learning_role_id and learning_role_addr:
             self.context.schedule_instant_acl_message(

@@ -27,7 +27,7 @@ enhancing their robustness and performance by providing a diverse and non-correl
 
 
 How are they used in Assume?
-=======================
+============================
 In principal Assume allows for different buffers to be implemented. They just need to adhere to the structure presented in the base buffer. Here we will present the different buffers already implemented, which is only one, yet.
 
 
@@ -39,4 +39,4 @@ Yet, the buffer is quite large to store all observatiosn also from multiple agen
 
 After a certain round of training runs which is defined in the config file the RL strategy is updated by calling the update function of the respective algorithms which calls the sample function of the replay buffer.
 The sample function returns a batch of experiences which is then used to update the RL strategy.
-For more information on the learning capabilities of ASSUME, see :doc:`learning.rst`.
+For more information on the learning capabilities of ASSUME, see :doc:`learning`.
