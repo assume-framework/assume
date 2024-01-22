@@ -16,8 +16,11 @@ from mango.util.termination_detection import tasks_complete_or_sleeping
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
+from assume.strategies.learning_advanced_orders import RLAdvancedOrderStrategy
+from assume.strategies.learning_strategies import RLStrategy
 from assume.strategies.naive_strategies import NaiveStrategy
 from assume.units.demand import Demand
+from assume.units.powerplant import PowerPlant
 
 start = datetime(2020, 1, 1)
 end = datetime(2020, 12, 2)
@@ -94,3 +97,69 @@ async def test_formulate_bids(units_operator: UnitsOperator):
 
     assert orderbook[0]["volume"] == -1000
     assert orderbook[0]["price"] == 3000
+
+
+async def test_write_learning_params(units_operator: UnitsOperator):
+    marketconfig = units_operator.available_markets[0]
+    start = datetime(2020, 1, 1)
+    end = datetime(2020, 1, 2)
+    index = pd.date_range(start=start, end=end + pd.Timedelta(hours=24), freq="1h")
+
+    params_dict = {
+        "bidding_strategies": {
+            "energy": RLAdvancedOrderStrategy(
+                unit_id="testplant",
+                learning_mode=True,
+                observation_dimension=2 + 2 * 23 + 3,
+                action_dimension=2,
+            )
+        },
+        "technology": "energy",
+        "unit_operator": "test_operator",
+        "max_power": 1000,
+        "min_power": 0,
+        "forecaster": NaiveForecast(index, powerplant=1000),
+    }
+    unit = PowerPlant("testplant", index=index, **params_dict)
+    await units_operator.add_unit(unit)
+
+    units_operator.learning_config = {"learning_mode": True}
+    units_operator.learning_data = {"test": 1}
+
+    from assume.common.utils import get_available_products
+
+    products = get_available_products(marketconfig.market_products, start)
+    orderbook = await units_operator.formulate_bids(marketconfig, products)
+
+    units_operator.context.data_dict = {
+        "learning_output_agent_addr": "world",
+        "learning_output_agent_id": "export_agent_1",
+        "learning_agent_addr": "world_0",
+        "learning_agent_id": "learning_agent",
+    }
+
+    open_tasks = len(units_operator.context._scheduler._scheduled_tasks)
+
+    units_operator.write_learning_params(orderbook, marketconfig)
+
+    assert len(units_operator.context._scheduler._scheduled_tasks) == open_tasks + 2
+
+    units_operator.units["testplant"].bidding_strategies[
+        "energy"
+    ].bidding_strategies = RLStrategy(
+        unit_id="testplant",
+        learning_mode=True,
+        observation_dimension=50,
+        action_dimension=2,
+    )
+
+    units_operator.learning_data = {"test": 2}
+
+    products = get_available_products(marketconfig.market_products, start)
+    orderbook = await units_operator.formulate_bids(marketconfig, products)
+
+    open_tasks = len(units_operator.context._scheduler._scheduled_tasks)
+
+    units_operator.write_learning_params(orderbook, marketconfig)
+
+    assert len(units_operator.context._scheduler._scheduled_tasks) == open_tasks + 2
