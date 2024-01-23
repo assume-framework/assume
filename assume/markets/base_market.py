@@ -438,7 +438,10 @@ class MarketRole(MarketMechanism, Role):
         self.all_orders = []
         for order in rejected_orderbook:
             order["accepted_volume"] = 0
-            order["accepted_price"] = market_meta[0]["price"]
+            if len(market_meta) > 0:
+                order["accepted_price"] = market_meta[0]["price"]
+            else:
+                order["accepted_price"] = 0
         self.open_auctions - set(market_products)
 
         accepted_orderbook.sort(key=itemgetter("agent_id"))
@@ -500,8 +503,8 @@ class MarketRole(MarketMechanism, Role):
         :type orderbook: Orderbook
         """
 
-        db_aid = self.context.data_dict.get("output_agent_id")
-        db_addr = self.context.data_dict.get("output_agent_addr")
+        db_aid = self.context.data.get("output_agent_id")
+        db_addr = self.context.data.get("output_agent_addr")
 
         if db_aid and db_addr:
             message = {
@@ -525,8 +528,8 @@ class MarketRole(MarketMechanism, Role):
         :type market_meta: any
         """
 
-        db_aid = self.context.data_dict.get("output_agent_id")
-        db_addr = self.context.data_dict.get("output_agent_addr")
+        db_aid = self.context.data.get("output_agent_id")
+        db_addr = self.context.data.get("output_agent_addr")
 
         if db_aid and db_addr:
             message = {

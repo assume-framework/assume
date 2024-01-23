@@ -2,10 +2,8 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import logging
 import os
 import shutil
-import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -32,6 +30,14 @@ async def load_oeds_async(
     https://github.com/NOWUM/open-energy-data-server/
 
     Scenarios can use any NUTS area in Germany and use any year with appropriate weather available
+
+    Args:
+        world (World): the world to add this scenario to
+        scenario (str): scenario name
+        study_case (str): study case name
+        infra_uri (str): database uri to connect to the OEDS
+        marketdesign (list[MarketConfig]): description of the market design which will be used with the scenario
+        nuts_config (list[str], optional): list of NUTS areas from which the simulation data is taken. Defaults to [].
     """
     year = 2019
     start = datetime(year, 1, 1)
