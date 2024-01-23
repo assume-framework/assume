@@ -5,6 +5,11 @@
 from importlib.metadata import version
 
 from assume.common import MarketConfig, MarketProduct
+from assume.scenario.loader_csv import (
+    load_custom_units,
+    load_scenario_folder,
+    run_learning,
+)
 from assume.world import World
 
 __version__ = version("assume-framework")
