@@ -27,7 +27,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "nbsphinx",
     "nbsphinx_link",
-    "sphinx.ext.imgconverter",  # for SVG conversion
+    # "sphinx.ext.imgconverter",  # for SVG conversion
 ]
 
 intersphinx_mapping = {
