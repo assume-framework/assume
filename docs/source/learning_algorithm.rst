@@ -21,17 +21,17 @@ of the actor, which then updates its weights using backward propagation.
 
 With the learning role, we can also choose which RL algorithm should be used. The algorithm and the buffer have base classes and can be customized if needed.
 But without touching the code there are easy adjustments to the algorithms that can and eventually need to be done in the config file.
-The following table shows the options that can be adjusted and gives a short explanation. For more advanced users is the functionality of the algorithm also documented in xxx.
-As the algorithm is based on stable baselines 3, you can also look up more explanations in their doku.
+The following table shows the options that can be adjusted and gives a short explanation. For more advanced users is the functionality of the algorithm also documented below.
+
 
 
  ======================================== ==========================================================================================================
   learning config item                    description
  ======================================== ==========================================================================================================
   observation_dimension                   The dimension of the observations given to the actor in the bidding strategy.
-  action_dimension                        The dimension of the actors made by the actor, which equals the output neurons of the actor neuronal net.
+  action_dimension                        The dimension of the actors made by the actor, which equals the output neurons of the actor neural net.
   continue_learning                       Whether to use pre-learned strategies and then continue learning.
-  load_model_path                         If pre-learned strategies should be used, where are they stored?
+  trained_actors_path                         If pre-learned strategies should be used, where are they stored?
   max_bid_price                           The maximum bid price which limits the action of the actor to this price.
   learning_mode                           Should we use learning mode at all? If not, the learning bidding strategy is overwritten with a default strategy.
   algorithm                               Specifies which algorithm to use. Currently, only MATD3 is implemented.
@@ -68,17 +68,25 @@ In general the TD3 works in the following way. It maintains a pair of critics an
 target value of actions selected by the current target policy:
 
 
-$$
-\begin{aligned}
-& y=r+\gamma \min _{i=1,2} Q_{\theta_i^{\prime}}\left(s^{\prime}, \pi_{\phi^{\prime}}\left(s^{\prime}\right)+\epsilon\right), \\
-& \epsilon \sim \operatorname{clip}(\mathcal{N}(0, \sigma),-c, c) .
-\end{aligned}
-$$
+.. math::
+    & y=r+\gamma \min _{i=1,2} Q_{\theta_i^{\prime}}\left(s^{\prime}, \pi_{\phi^{\prime}}\left(s^{\prime}\right)+\epsilon\right), \\
+    & \epsilon \sim \operatorname{clip}(\mathcal{N}(0, \sigma),-c, c)
 
-Every $d$ iterations, which is implemented with the train_freq, the policy is updated with respect to $Q_{\theta_1}$ following the deterministic policy gradient algorithm (Silver et al., 2014).
+
+
+Every :math:`d` iterations, which is implemented with the train_freq, the policy is updated with respect to :math:`Q_{\theta_1}` following the deterministic policy gradient algorithm (Silver et al., 2014).
 TD3 is summarized in the following picture from the others of the original paper (Fujimoto, Hoof and Meger, 2018).
 
 
 .. image:: img/TD3_algorithm.jpeg
     :align: center
     :width: 500px
+
+
+The steps in the algorithm are translated to implementations in ASSUME in the following way.
+The initialization of the actors and critics is done by the :func:`assume.reinforcement_learning.MATD3.initialize_policy` function, which is called
+in the learning role. The replay buffer needs to be stable across different episodes, which corresponds to runs of the entire simulation, hence it needs to be detached from the
+entities of the simualtion that are killed after each episode, like the elarning role. Therefore, it is initialized independently and given to the learning role
+at the beginning of each episode. For more information regarding the buffer see :doc:`buffers`.
+
+The core of the algorithm is embodied by the :func:`assume.reinforcement_learning.MATD3.update_policy` in the learning algorithms. Here the critic and the actor are updated according to the algorithm.

@@ -727,7 +727,6 @@ class LearningConfig(TypedDict):
         observation_dimension (int): The observation dimension.
         action_dimension (int): The action dimension.
         continue_learning (bool): Whether to continue learning.
-        load_model_path (str): The path to the model to load.
         max_bid_price (float): The maximum bid price.
         learning_mode (bool): Whether to use learning mode.
         algorithm (str): The algorithm to use.
@@ -748,7 +747,6 @@ class LearningConfig(TypedDict):
     observation_dimension: int
     action_dimension: int
     continue_learning: bool
-    load_model_path: str
     max_bid_price: float
     learning_mode: bool
     algorithm: str

@@ -75,8 +75,10 @@ Documentation
 * :doc:`market_config`
 * :doc:`market_mechanism`
 * :doc:`scenario_loader`
-* :doc:`bidding_agents`
+* :doc:`unit_operator`
 * :doc:`learning`
+* :doc:`learning_algorithm`
+* :doc:`buffers`
 * :doc:`assume`
 
 .. toctree::
@@ -87,8 +89,10 @@ Documentation
    market_config
    market_mechanism
    scenario_loader
-   bidding_agents
+   unit_operator
    learning
+   learning_algorithm
+   buffers
    assume
 
 
