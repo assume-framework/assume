@@ -39,14 +39,7 @@ async def units_operator() -> UnitsOperator:
     units_agent = RoleAgent(container, "test_operator")
     units_role = UnitsOperator(available_markets=[marketconfig])
     units_agent.add_role(units_role)
-    units_agent._role_context.data.update(
-        {
-            "learning_output_agent_addr": "world",
-            "learning_output_agent_id": "export_agent_1",
-            "learning_agent_addr": "world_0",
-            "learning_agent_id": "learning_agent",
-        }
-    )
+    units_agent._role_context.data.update({})
 
     index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 
@@ -136,6 +129,15 @@ async def test_write_learning_params(units_operator: UnitsOperator):
 
     units_operator.learning_config = {"learning_mode": True}
     units_operator.learning_data = {"test": 1}
+
+    units_operator.context.data.update(
+        {
+            "learning_output_agent_addr": "world",
+            "learning_output_agent_id": "export_agent_1",
+            "learning_agent_addr": "world_0",
+            "learning_agent_id": "learning_agent",
+        }
+    )
 
     from assume.common.utils import get_available_products
 
