@@ -2,20 +2,19 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-dam_complex_clearing:
-  start_date: 2019-01-01 12:00
-  end_date: 2019-02-01 00:00
+dam:
+  start_date: 2020-01-01 00:00
+  end_date: 2020-01-31 23:00
   time_step: 1h
   save_frequency_hours: 24
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2019-01-01 12:00
       products:
         - duration: 1h
           count: 24
-          first_delivery: 1h
+          first_delivery: 24h
       opening_frequency: 24h
       opening_duration: 24h
       volume_unit: MWh
@@ -23,8 +22,7 @@ dam_complex_clearing:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: pay_as_clear_complex_opt
+      market_mechanism: pay_as_clear_complex
       additional_fields:
         - bid_type
-        - accepted_price
-        - profile
+        - min_acceptance_ratio

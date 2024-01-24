@@ -2,13 +2,13 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-tiny:
+dam:
   start_date: 2020-01-01 00:00
-  end_date: 2020-01-10 23:00
+  end_date: 2020-01-30 23:00
   time_step: 1h
   save_frequency_hours: 24
   markets_config:
-    EOM:
+    EOM_dam:
       operator: EOM_operator
       product_type: energy
       products:
@@ -28,7 +28,7 @@ tiny:
         - min_acceptance_ratio
         - parent_bid_id
 
-dam:
+dam_2020:
   start_date: 2020-01-01 00:00
   end_date: 2020-12-31 23:00
   time_step: 1h
