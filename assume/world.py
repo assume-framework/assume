@@ -114,11 +114,9 @@ class World:
             from assume.strategies.learning_strategies import RLdamStrategy, RLStrategy
 
             self.bidding_strategies["learning"] = RLStrategy
-            self.bidding_strategies["learning_dam"] = RLdamStrategy
             self.bidding_strategies[
                 "learning_advanced_orders"
             ] = RLAdvancedOrderStrategy
-
         except ImportError as e:
             self.logger.info(
                 "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",
@@ -277,7 +275,7 @@ class World:
 
         # mango multiprocessing is currently only supported on linux
         # with single
-        if platform == "linux":
+        if platform == "linux" and self.distributed_role is not None:
             self.addresses.append(self.addr)
 
             def creator(container):
@@ -318,21 +316,24 @@ class World:
         self.unit_operators[id] = units_operator
 
         # after creation of an agent - we set additional context params
-        unit_operator_agent._role_context.data_dict = {}
         if self.learning_mode:
-            unit_operator_agent._role_context.data_dict = {
-                "learning_output_agent_addr": self.output_agent_addr[0],
-                "learning_output_agent_id": self.output_agent_addr[1],
-                "learning_agent_addr": self.learning_agent_addr[0],
-                "learning_agent_id": self.learning_agent_addr[1],
-            }
+            unit_operator_agent._role_context.data.update(
+                {
+                    "learning_output_agent_addr": self.output_agent_addr[0],
+                    "learning_output_agent_id": self.output_agent_addr[1],
+                    "learning_agent_addr": self.learning_agent_addr[0],
+                    "learning_agent_id": self.learning_agent_addr[1],
+                }
+            )
         else:
-            unit_operator_agent._role_context.data_dict = {
-                "output_agent_addr": self.output_agent_addr[0],
-                "output_agent_id": self.output_agent_addr[1],
-                "learning_output_agent_addr": self.output_agent_addr[0],
-                "learning_output_agent_id": self.output_agent_addr[1],
-            }
+            unit_operator_agent._role_context.data.update(
+                {
+                    "output_agent_addr": self.output_agent_addr[0],
+                    "output_agent_id": self.output_agent_addr[1],
+                    "learning_output_agent_addr": self.output_agent_addr[0],
+                    "learning_output_agent_id": self.output_agent_addr[1],
+                }
+            )
 
     async def async_add_unit(
         self,
@@ -376,11 +377,11 @@ class World:
         for product_type, strategy in unit_params["bidding_strategies"].items():
             if not strategy:
                 continue
-
+            bidding_params = unit_params.get("bidding_params", self.bidding_params)
             try:
                 bidding_strategies[product_type] = self.bidding_strategies[strategy](
                     unit_id=id,
-                    **self.bidding_params,
+                    **bidding_params,
                 )
                 # TODO find better way to count learning agents
                 if self.learning_mode and issubclass(
@@ -428,9 +429,8 @@ class World:
         market_operator_agent.markets = []
 
         # after creation of an agent - we set additional context params
-        market_operator_agent._role_context.data_dict = {}
         if not self.learning_mode and not self.evaluation_mode:
-            market_operator_agent._role_context.data_dict.update(
+            market_operator_agent._role_context.data.update(
                 {
                     "output_agent_addr": self.output_agent_addr[0],
                     "output_agent_id": self.output_agent_addr[1],

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Tuple
 
 import dateutil.rrule as rr
@@ -199,17 +199,13 @@ def add_units(
 ) -> None:
     """
     Add units to the world from a given dataframe.
-
     The callback is used to adjust unit_params depending on the unit_type, before adding the unit to the world.
 
     Args:
-    units_df (pd.DataFrame): The dataframe containing the units.
-    unit_type (str): The type of the unit.
-    world (World): The world to which the units will be added.
-    forecaster (Forecaster): The forecaster used for adding the units.
-
-    Returns:
-    None
+        units_df (pd.DataFrame): The dataframe containing the units.
+        unit_type (str): The type of the unit.
+        world (World): The world to which the units will be added.
+        forecaster (Forecaster): The forecaster used for adding the units.
     """
     if units_df is None:
         return
@@ -283,7 +279,8 @@ async def load_scenario_folder_async(
 
     index = pd.date_range(
         start=start,
-        end=end,
+        # end time needs to be a little ahead for forecasts
+        end=end + timedelta(days=1),
         freq=config["time_step"],
     )
     # get extra parameters for bidding strategies
@@ -324,7 +321,7 @@ async def load_scenario_folder_async(
     )
     learning_config["evaluation_mode"] = perform_evaluation
 
-    if "trained_actors_path" not in learning_config.keys():
+    if not learning_config.get("trained_actors_path"):
         if trained_actors_path:
             learning_config["trained_actors_path"] = trained_actors_path
         else:
@@ -695,9 +692,8 @@ def run_learning(
             )
 
         # give the newly created rl_agent the buffer that we stored from the beginning
-        world.learning_role.create_actors_and_critics(
-            actors_and_critics=actors_and_critics
-        )
+        world.learning_role.initialize_policy(actors_and_critics=actors_and_critics)
+
         world.learning_role.buffer = buffer
         world.learning_role.episodes_done = episode
 
@@ -706,7 +702,7 @@ def run_learning(
 
         world.run()
 
-        actors_and_critics = world.learning_role.extract_actors_and_critics()
+        actors_and_critics = world.learning_role.rl_algorithm.extract_policy()
 
         if (
             episode % validation_interval == 0
@@ -716,7 +712,7 @@ def run_learning(
             new_path = f"{old_path}_eval"
 
             # save validation params in validation path
-            world.learning_role.save_params(directory=new_path)
+            world.learning_role.rl_algorithm.save_params(directory=new_path)
             world.reset()
 
             # load validation run
@@ -740,7 +736,7 @@ def run_learning(
             if avg_reward > best_reward:
                 # update best reward
                 best_reward = avg_reward
-                world.learning_role.save_params(directory=old_path)
+                world.learning_role.rl_algorithm.save_params(directory=old_path)
 
             eval_episode += 1
 

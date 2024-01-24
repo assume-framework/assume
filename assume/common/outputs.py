@@ -99,15 +99,25 @@ class WriteOutput(Role):
         table_names = inspect(self.db).get_table_names()
         # Iterate through each table
         for table_name in table_names:
-            with self.db.begin() as db:
-                # Read table into Pandas DataFrame
-                query = text(
-                    f"delete from {table_name} where simulation = '{simulation_id}'"
+            try:
+                with self.db.begin() as db:
+                    # create index on table
+                    query = text(
+                        f'create index if not exists "{table_name}_scenario" on "{table_name}" (simulation)'
+                    )
+                    db.execute(query)
+
+                    query = text(
+                        f"delete from \"{table_name}\" where simulation = '{simulation_id}'"
+                    )
+                    rowcount = db.execute(query).rowcount
+                    # has to be done manually with raw queries
+                    db.commit()
+                    logger.debug("deleted %s rows from %s", rowcount, table_name)
+            except Exception as e:
+                logger.error(
+                    f"could not clear old scenarios from table {table_name} - {e}"
                 )
-                rowcount = db.execute(query).rowcount
-                # has to be done manually with raw queries
-                db.commit()
-                logger.debug("deleted %s rows from %s", rowcount, table_name)
 
     def del_similar_runs(self):
         """
@@ -296,6 +306,12 @@ class WriteOutput(Role):
 
         market_orders = separate_orders(market_orders)
         df = pd.DataFrame.from_records(market_orders, index="start_time")
+        if "eligible_lambda" in df.columns:
+            df["eligible_lambda"] = df["eligible_lambda"].apply(lambda x: x.__name__)
+        if "evaluation_frequency" in df.columns:
+            df["evaluation_frequency"] = df["evaluation_frequency"].apply(
+                lambda x: repr(x)
+            )
 
         del df["only_hours"]
         del df["agent_id"]

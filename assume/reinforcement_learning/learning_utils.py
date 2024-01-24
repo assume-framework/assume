@@ -23,12 +23,10 @@ observation_dict = dict[list[datetime], ObsActRew]
 class CriticTD3(nn.Module):
     """Initialize parameters and build model.
 
-    :param n_agents: Number of agents
-    :type n_agents: int
-    :param obs_dim: Dimension of each state
-    :type obs_dim: int
-    :param act_dim: Dimension of each action
-    :type act_dim: int
+    Args:
+        n_agents (int): Number of agents
+        obs_dim (int): Dimension of each state
+        act_dim (int): Dimension of each action
     """
 
     def __init__(self, n_agents, obs_dim, act_dim, float_type, unique_obs_len=16):
@@ -62,6 +60,9 @@ class CriticTD3(nn.Module):
         #     self.FC2_4 = nn.Linear(128, 1, dtype = float_type)
 
     def forward(self, obs, actions):
+        """
+        Forward pass through the network, from observation to actions.
+        """
         xu = th.cat([obs, actions], 1)
 
         x1 = F.relu(self.FC1_1(xu))
@@ -81,6 +82,11 @@ class CriticTD3(nn.Module):
         Only predict the Q-value using the first network.
         This allows to reduce computation when all the estimates are not needed
         (e.g. when updating the policy in TD3).
+
+        Args:
+            obs (torch.Tensor): The observations
+            actions (torch.Tensor): The actions
+
         """
         x = th.cat([obs, actions], 1)
         x = F.relu(self.FC1_1(x))
@@ -92,6 +98,10 @@ class CriticTD3(nn.Module):
 
 
 class Actor(nn.Module):
+    """
+    The neurnal network for the actor.
+    """
+
     def __init__(self, obs_dim, act_dim, float_type):
         super(Actor, self).__init__()
 
@@ -111,6 +121,10 @@ class Actor(nn.Module):
 # Ornstein-Uhlenbeck Noise
 # from https://github.com/songrotek/DDPG/blob/master/ou_noise.py
 class OUNoise:
+    """
+    A class that implements Ornstein-Uhlenbeck noise.
+    """
+
     def __init__(self, action_dimension, mu=0, sigma=0.5, theta=0.15, dt=1e-2):
         self.action_dimension = action_dimension
         self.mu = mu
@@ -138,6 +152,10 @@ class OUNoise:
 
 
 class NormalActionNoise:
+    """
+    A gaussian action noise
+    """
+
     def __init__(self, action_dimension, mu=0.0, sigma=0.1, scale=1.0, dt=0.9998):
         self.act_dimension = action_dimension
         self.mu = mu
@@ -163,9 +181,10 @@ def polyak_update(params, target_params, tau):
     params (in place).
     See https://github.com/DLR-RM/stable-baselines3/issues/93
 
-    :param params: parameters to use to update the target params
-    :param target_params: parameters to update
-    :param tau: the soft update coefficient ("Polyak update", between 0 and 1)
+    Args:
+        params: parameters to use to update the target params
+        target_params: parameters to update
+        tau: the soft update coefficient ("Polyak update", between 0 and 1)
     """
     with th.no_grad():
         # zip does not raise an exception if length of parameters does not match.

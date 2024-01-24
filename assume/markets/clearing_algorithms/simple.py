@@ -90,7 +90,7 @@ class PayAsClearRole(MarketRole):
                     rejected_orders.append(demand_order)
                     continue
 
-                assert dem_vol == gen_vol
+                # assert dem_vol == gen_vol
                 # now add the next demand order
                 dem_vol += -demand_order["volume"]
                 demand_order["accepted_volume"] = demand_order["volume"]

@@ -162,9 +162,9 @@ class BaseUnit:
         Calculate the generation cost for a specific product type within the given time range.
 
         Args:
-        - start (datetime): The start time for the calculation.
-        - end (datetime): The end time for the calculation.
-        - product_type (str): The type of product for which the generation cost is to be calculated.
+            start (datetime): The start time for the calculation.
+            end (datetime): The end time for the calculation.
+            product_type (str): The type of product for which the generation cost is to be calculated.
 
         """
         if start not in self.index:
@@ -251,7 +251,9 @@ class BaseUnit:
                     cashflow * self.index.freq.n
                 )
             else:
-                cashflow = float(order["accepted_price"] * order["accepted_volume"])
+                cashflow = float(
+                    order.get("accepted_price", 0) * order.get("accepted_volume", 0)
+                )
                 hours = (end - start) / timedelta(hours=1)
                 self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
                     cashflow * hours
@@ -751,7 +753,6 @@ class LearningConfig(TypedDict):
         observation_dimension (int): The observation dimension.
         action_dimension (int): The action dimension.
         continue_learning (bool): Whether to continue learning.
-        load_model_path (str): The path to the model to load.
         max_bid_price (float): The maximum bid price.
         learning_mode (bool): Whether to use learning mode.
         algorithm (str): The algorithm to use.
@@ -772,7 +773,6 @@ class LearningConfig(TypedDict):
     observation_dimension: int
     action_dimension: int
     continue_learning: bool
-    load_model_path: str
     max_bid_price: float
     learning_mode: bool
     algorithm: str
