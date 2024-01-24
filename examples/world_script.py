@@ -25,7 +25,7 @@ async def init():
     index = pd.date_range(
         start=start,
         end=end + timedelta(hours=24),
-        freq="H",
+        freq="h",
     )
     sim_id = "world_script_simulation"
 

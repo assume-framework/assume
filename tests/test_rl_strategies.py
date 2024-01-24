@@ -23,7 +23,7 @@ end = datetime(2023, 7, 2)
 @pytest.fixture
 def power_plant() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
-    index = pd.date_range("2023-06-30 22:00:00", periods=48, freq="H")
+    index = pd.date_range("2023-06-30 22:00:00", periods=48, freq="h")
     ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
     return PowerPlant(
         id="test_pp",
@@ -52,7 +52,7 @@ def test_learning_strategies(mock_market_config, power_plant):
         "unit_id": "test_pp",
     }
 
-    product_index = pd.date_range("2023-07-01", periods=1, freq="H")
+    product_index = pd.date_range("2023-07-01", periods=1, freq="h")
     mc = mock_market_config
     mc.product_type = "energy_eom"
     product_tuples = [
@@ -76,7 +76,7 @@ def test_learning_strategies(mock_market_config, power_plant):
     regret = power_plant.outputs["regret"].loc[product_index]
     costs = power_plant.outputs["total_costs"].loc[product_index]
 
-    assert reward[0] == 1.2
-    assert profit[0] == 20000.0
-    assert regret[0] == 40000.0
-    assert costs[0] == 0.0
+    assert reward.iloc[0] == 1.2
+    assert profit.iloc[0] == 20000.0
+    assert regret.iloc[0] == 40000.0
+    assert costs.iloc[0] == 0.0

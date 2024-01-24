@@ -39,6 +39,14 @@ async def units_operator() -> UnitsOperator:
     units_agent = RoleAgent(container, "test_operator")
     units_role = UnitsOperator(available_markets=[marketconfig])
     units_agent.add_role(units_role)
+    units_agent._role_context.data.update(
+        {
+            "learning_output_agent_addr": "world",
+            "learning_output_agent_id": "export_agent_1",
+            "learning_agent_addr": "world_0",
+            "learning_agent_id": "learning_agent",
+        }
+    )
 
     index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 
@@ -133,13 +141,6 @@ async def test_write_learning_params(units_operator: UnitsOperator):
 
     products = get_available_products(marketconfig.market_products, start)
     orderbook = await units_operator.formulate_bids(marketconfig, products)
-
-    units_operator.context.data_dict = {
-        "learning_output_agent_addr": "world",
-        "learning_output_agent_id": "export_agent_1",
-        "learning_agent_addr": "world_0",
-        "learning_agent_id": "learning_agent",
-    }
 
     open_tasks = len(units_operator.context._scheduler._scheduled_tasks)
 

@@ -19,7 +19,7 @@ from .utils import get_test_prices
 
 @pytest.fixture
 def power_plant_1() -> PowerPlant:
-    index = pd.date_range("2022-01-01", periods=4, freq="H")
+    index = pd.date_range("2022-01-01", periods=4, freq="h")
     ff = NaiveForecast(
         index,
         availability=1,
@@ -47,7 +47,7 @@ def power_plant_1() -> PowerPlant:
 @pytest.fixture
 def power_plant_day(fuel_type="lignite") -> PowerPlant:
     periods = 48
-    index = pd.date_range("2022-01-01", periods=periods, freq="H")
+    index = pd.date_range("2022-01-01", periods=periods, freq="h")
 
     prices = get_test_prices(periods)
     ff = NaiveForecast(

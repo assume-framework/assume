@@ -174,7 +174,7 @@ class CsvForecaster(Forecaster):
         """
 
         cols = []
-        for pp in self.powerplants.index:
+        for pp in self.powerplants.keys():
             col = f"availability_{pp}"
             if col not in self.forecasts.columns:
                 s = pd.Series(1, index=self.forecasts.index)

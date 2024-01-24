@@ -45,7 +45,7 @@ async def load_oeds_async(
     index = pd.date_range(
         start=start,
         end=end,
-        freq="H",
+        freq="h",
     )
     sim_id = f"{scenario}_{study_case}"
     print(f"loading scenario {sim_id}")
@@ -102,7 +102,7 @@ async def load_oeds_async(
         if not config_path.is_dir():
             print(f"query database time series")
             demand = infra_interface.get_demand_series_in_area(area, year)
-            demand = demand.resample("H").mean()
+            demand = demand.resample("h").mean()
             # demand in MW
             solar, wind = infra_interface.get_renewables_series_in_area(
                 area,

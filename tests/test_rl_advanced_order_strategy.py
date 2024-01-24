@@ -23,7 +23,7 @@ end = datetime(2023, 7, 2)
 @pytest.fixture
 def power_plant() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
-    index = pd.date_range("2023-07-01", periods=48, freq="H")
+    index = pd.date_range("2023-07-01", periods=48, freq="h")
     ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
     return PowerPlant(
         id="test_pp",
@@ -53,7 +53,7 @@ def test_learning_advanced_orders(mock_market_config, power_plant):
         "unit_id": "test_pp",
     }
 
-    product_index = pd.date_range("2023-07-01", periods=24, freq="H")
+    product_index = pd.date_range("2023-07-01", periods=24, freq="h")
     mc = mock_market_config
     mc.product_type = "energy_eom"
     product_tuples = [
