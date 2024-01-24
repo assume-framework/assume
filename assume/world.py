@@ -383,6 +383,13 @@ class World:
                 ):
                     self.learning_role.rl_strats[id] = bidding_strategies[product_type]
 
+                    # if we have learning strategy we need to assign the powerplant to one  unit_operator handling all leanring units
+                    self.logger.warning(
+                        f"Your chosen unit-operator {unit_operator_id} for the learning unit {id} was overwritten, with Operator RL, since al learning units need to be handeled by one unit operator."
+                    )
+
+                    unit_operator_id = "Operator RL"
+
             except KeyError as e:
                 self.logger.error(
                     f"Bidding strategy {strategy} not registered, could not add {id}"
