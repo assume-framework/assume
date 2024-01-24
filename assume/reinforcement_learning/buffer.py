@@ -97,7 +97,7 @@ class ReplayBuffer:
         stored in the buffer).
 
         Returns:
-        - buffer_size(int): The current size of the buffer
+            buffer_size(int): The current size of the buffer
 
         """
         return self.buffer_size if self.full else self.pos
@@ -130,9 +130,9 @@ class ReplayBuffer:
         Adds an observation, action, and reward of all agents to the replay buffer.
 
         Args:
-        - obs (np.array): The observation to add.
-        - actions (np.array): The actions to add.
-        - reward (np.array): The reward to add.
+            obs (np.array): The observation to add.
+            actions (np.array): The actions to add.
+            reward (np.array): The reward to add.
         """
         # copying all to avoid modification
         self.observations[self.pos] = obs.copy()

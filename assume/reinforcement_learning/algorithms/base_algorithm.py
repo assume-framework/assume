@@ -4,6 +4,8 @@
 
 import logging
 
+import torch as th
+
 logger = logging.getLogger(__name__)
 
 
@@ -11,26 +13,17 @@ class RLAlgorithm:
     """
     The base RL model class. To implement your own RL algorithm, you need to subclass this class and implement the `update_policy` method.
 
-    :param learning_role: Learning object
-    :type learning_role: Learning Role object
-    :param learning_rate: learning rate for adam optimizer
-    :type learning_rate: float
-    :param episodes_collecting_initial_experience: how many steps of the model to collect transitions for before learning starts
-    :type episodes_collecting_initial_experience: int
-    :param batch_size: Minibatch size for each gradient update
-    :type batch_size: int
-    :param tau: the soft update coefficient ("Polyak update", between 0 and 1)
-    :type tau: float
-    :param gamma: the discount factor
-    :type gamma: float
-    :param gradient_steps: how many gradient steps to do after each rollout (if -1, no gradient step is done)
-    :type gradient_steps: int
-    :param policy_delay: Policy and target networks will only be updated once every policy_delay steps per training steps. The Q values will be updated policy_delay more often (update every training step)
-    :type policy_delay: int
-    :param target_policy_noise: Standard deviation of Gaussian noise added to target policy (smoothing noise)
-    :type target_policy_noise: float
-    :param target_noise_clip: Limit for absolute value of target policy smoothing noise
-    :type target_noise_clip: float
+    Args:
+        learning_role (Learning Role object): Learning object
+        learning_rate (float): learning rate for adam optimizer
+        episodes_collecting_initial_experience (int): how many steps of the model to collect transitions for before learning starts
+        batch_size (int): Minibatch size for each gradient update
+        tau (float): the soft update coefficient ("Polyak update", between 0 and 1)
+        gamma (float): the discount factor
+        gradient_steps (int): how many gradient steps to do after each rollout (if -1, no gradient step is done)
+        policy_delay (int): Policy and target networks will only be updated once every policy_delay steps per training steps. The Q values will be updated policy_delay more often (update every training step)
+        target_policy_noise (float): Standard deviation of Gaussian noise added to target policy (smoothing noise)
+        target_noise_clip (float): Limit for absolute value of target policy smoothing noise
     """
 
     def __init__(
@@ -76,3 +69,24 @@ class RLAlgorithm:
         logger.error(
             "No policy update function of the used Rl algorithm was defined. Please define how the policies should be updated in the specific algorithm you use"
         )
+
+    def load_obj(self, directory: str):
+        """
+        Load an object from a specified directory.
+
+        This method loads an object, typically saved as a checkpoint file, from the specified
+        directory and returns it. It uses the `torch.load` function and specifies the device for loading.
+
+        Args:
+            directory (str): The directory from which the object should be loaded.
+
+        Returns:
+            object: The loaded object.
+        """
+        return th.load(directory, map_location=self.device)
+
+    def load_params(self, directory: str) -> None:
+        """
+        Load learning params - abstract method to be implemented by the Learning Algorithm
+        """
+        pass

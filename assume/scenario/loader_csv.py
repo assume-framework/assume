@@ -321,7 +321,7 @@ async def load_scenario_folder_async(
     )
     learning_config["evaluation_mode"] = perform_evaluation
 
-    if "trained_actors_path" not in learning_config.keys():
+    if not learning_config.get("trained_actors_path"):
         if trained_actors_path:
             learning_config["trained_actors_path"] = trained_actors_path
         else:
@@ -692,9 +692,8 @@ def run_learning(
             )
 
         # give the newly created rl_agent the buffer that we stored from the beginning
-        world.learning_role.create_actors_and_critics(
-            actors_and_critics=actors_and_critics
-        )
+        world.learning_role.initialize_policy(actors_and_critics=actors_and_critics)
+
         world.learning_role.buffer = buffer
         world.learning_role.episodes_done = episode
 
@@ -703,7 +702,7 @@ def run_learning(
 
         world.run()
 
-        actors_and_critics = world.learning_role.extract_actors_and_critics()
+        actors_and_critics = world.learning_role.rl_algorithm.extract_policy()
 
         if (
             episode % validation_interval == 0
@@ -713,7 +712,7 @@ def run_learning(
             new_path = f"{old_path}_eval"
 
             # save validation params in validation path
-            world.learning_role.save_params(directory=new_path)
+            world.learning_role.rl_algorithm.save_params(directory=new_path)
             world.reset()
 
             # load validation run
@@ -737,7 +736,7 @@ def run_learning(
             if avg_reward > best_reward:
                 # update best reward
                 best_reward = avg_reward
-                world.learning_role.save_params(directory=old_path)
+                world.learning_role.rl_algorithm.save_params(directory=old_path)
 
             eval_episode += 1
 

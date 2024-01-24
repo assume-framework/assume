@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+base:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-30 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
