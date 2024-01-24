@@ -444,8 +444,8 @@ async def load_scenario_folder_async(
         )
 
     # add central RL unit oporator that handels all RL units
-    if world.learning_mode == True and "Operator RL" not in all_operators:
-        all_operators = np.concatenate([all_operators, ["Operator RL"]])
+    if world.learning_mode == True and "Operator-RL" not in all_operators:
+        all_operators = np.concatenate([all_operators, ["Operator-RL"]])
 
     for company_name in set(all_operators):
         world.add_unit_operator(id=str(company_name))
