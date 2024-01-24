@@ -29,6 +29,7 @@ def test_learning_init():
         "algorithm": "matd3",
         "learning_mode": False,
         "training_episodes": 3,
+        "continue_learning": False,
     }
     # test init
     l = Learning(learning_config, start, end)
