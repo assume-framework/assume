@@ -53,6 +53,8 @@ class Learning(Role):
         # define whether we train model or evaluate it
         self.training_episodes = learning_config["training_episodes"]
         self.learning_mode = learning_config["learning_mode"]
+        self.continue_learning = learning_config["continue_learning"]
+        self.trained_actors_path = learning_config["trained_actors_path"]
 
         cuda_device = (
             learning_config["device"]
@@ -93,24 +95,6 @@ class Learning(Role):
         self.rl_eval_rewards = []
         self.rl_eval_profits = []
         self.rl_eval_regrets = []
-
-    def load_policies(self, load_directory) -> None:
-        """
-        Load the policies of the reinforcement learning agent.
-
-        This method loads the entire policies (actor and critics) of the reinforcement learning agent from the specified directory.
-        This is used if we want to continue learning from already learned strategies.
-
-        Args:
-            load_directory (str): The directory from which to load the policies.
-        """
-        if load_directory is None:
-            logger.warning(
-                "You have specified continue learning as True but no trained_actors_path was given!"
-            )
-            logger.info("Continuing learning with randomly initialized values!")
-        else:
-            self.rl_algorithm.load_params(load_directory)
 
     def setup(self) -> None:
         """
@@ -188,14 +172,39 @@ class Learning(Role):
         else:
             logger.error(f"Learning algorithm {algorithm} not implemented!")
 
-    def initialize_policy(self) -> None:
+    def initialize_policy(self, actors_and_critics: dict = None) -> None:
         """
         Initialize the policy of the reinforcement learning agent considering the respective algorithm.
 
-        This method initializes the policy (actor) of the reinforcement learning agent. It iterates through all learning strategies
-        associated with the learning role and initializes their policies.
+        This method initializes the policy (actor) of the reinforcement learning agent. It tests if we want to continue the learning process with
+        stored policies from a former training process. If so, it loads the policies from the specified directory. Otherwise, it initializes the
+        respective new policies.
         """
-        self.rl_algorithm.initialize_policy()
+
+        self.rl_algorithm.initialize_policy(actors_and_critics)
+
+        if self.continue_learning == True and actors_and_critics == None:
+            load_directory = self.trained_actors_path
+            self.load_policies(load_directory)
+
+    def load_policies(self, load_directory) -> None:
+        """
+        Load the policies of the reinforcement learning agent.
+
+        This method loads the entire policies (actor and critics) of the reinforcement learning agent from the specified directory.
+        This is used if we want to continue learning from already learned strategies.
+
+        Args:
+            load_directory (str): The directory from which to load the policies.
+        """
+        if load_directory is None:
+            logger.warning(
+                "You have specified continue learning as True but no trained_actors_path was given!"
+            )
+            logger.info("Restart learning process!")
+        else:
+            logger.info(f"Loading pretrained policies from {load_directory}!")
+            self.rl_algorithm.load_params(load_directory)
 
     async def update_policy(self) -> None:
         """

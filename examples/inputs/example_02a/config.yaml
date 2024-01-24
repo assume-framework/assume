@@ -12,7 +12,7 @@ base:
   learning_config:
     observation_dimension: 50
     action_dimension: 2
-    continue_learning: True
+    continue_learning: False
     trained_actors_path: null
     max_bid_price: 100
     algorithm: matd3

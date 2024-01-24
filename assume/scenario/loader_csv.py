@@ -692,9 +692,7 @@ def run_learning(
             )
 
         # give the newly created rl_agent the buffer that we stored from the beginning
-        world.learning_role.rl_algorithm.initialize_policy(
-            actors_and_critics=actors_and_critics
-        )
+        world.learning_role.initialize_policy(actors_and_critics=actors_and_critics)
 
         world.learning_role.buffer = buffer
         world.learning_role.episodes_done = episode
