@@ -39,7 +39,6 @@ async def units_operator() -> UnitsOperator:
     units_agent = RoleAgent(container, "test_operator")
     units_role = UnitsOperator(available_markets=[marketconfig])
     units_agent.add_role(units_role)
-    units_agent._role_context.data.update({})
 
     index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 

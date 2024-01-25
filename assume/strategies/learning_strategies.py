@@ -184,7 +184,7 @@ class RLStrategy(LearningStrategy):
             If the agent is not in learning mode, the actions are chosen by the actor neuronal net without noise.
         """
 
-        # distinction wethere we are in learning mode or not to handle exploration realised with noise
+        # distinction whether we are in learning mode or not to handle exploration realised with noise
         if self.learning_mode:
             # if we are in learning mode the first x episodes we want to explore the entire action space
             # to get a good initial experience, in the area around the costs of the agent
@@ -380,15 +380,12 @@ class RLStrategy(LearningStrategy):
 
             # calculate opportunity cost
             # as the loss of income we have because we are not running at full power
-            # TODO: shouldn't this be multiplied by the unit.index.freq and not the duration? (for one hour units this is the same, but not for other units)
             order_opportunity_cost = (
                 price_difference
                 * (
-                    unit.max_power
-                    - unit.outputs[product_type].loc[start:end_excl]
-                    * unit.index.freq.n  # only valid, if freq is given in hours
+                    unit.max_power - unit.outputs[product_type].loc[start:end_excl]
                 ).sum()
-                # * duration
+                * duration
             )
 
             # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0

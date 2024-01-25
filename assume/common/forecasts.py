@@ -123,8 +123,6 @@ class CsvForecaster(Forecaster):
             if "availability" in column:
                 return pd.Series(1, self.index)
             return pd.Series(0.0, self.index)
-        elif column == "price_forecast":
-            return self.forecasts["price_EOM"]
 
         return self.forecasts[column]
 
@@ -170,11 +168,11 @@ class CsvForecaster(Forecaster):
         Calculates the forecasts if they are not already calculated.
 
         This method calculates additional forecasts if they do not already exist, including
-        "price_forecast" and "residual_load_forecast".
+        "price_EOM" and "residual_load_forecast".
         """
 
         cols = []
-        for pp in self.powerplants.keys():
+        for pp in self.powerplants.index:
             col = f"availability_{pp}"
             if col not in self.forecasts.columns:
                 s = pd.Series(1, index=self.forecasts.index)
