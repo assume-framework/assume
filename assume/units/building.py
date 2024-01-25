@@ -235,6 +235,3 @@ class Building(BaseUnit):
             logger.debug(
                 "Termination Condition: ", self.results.solver.termination_condition
             )
-
-    def calculate_marginal_cost(self, start, **kwargs):
-        return self.electricity_price[start]

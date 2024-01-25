@@ -1,7 +1,0 @@
-,efficiency,emission_factor,max_power,min_power,simulation,technology,unit_operator
-Wind onshore,1.0,0,2500,0,example_03_base_case_building_2019_0,wind_onshore,vre_operator
-Wind offshore,1.0,0,400,0,example_03_base_case_building_2019_0,wind_offshore,vre_operator
-Solar,1.0,0,2500,0,example_03_base_case_building_2019_0,solar,vre_operator
-Hydro,1.0,0,250,0,example_03_base_case_building_2019_0,hydro,vre_operator
-Biomass,1.0,0,400,0,example_03_base_case_building_2019_0,biomass,vre_operator
-Unit 1,0.3,0,1000,200,example_03_base_case_building_2019_0,nuclear,Operator 1

@@ -5,7 +5,7 @@ from assume.common.forecasts import CsvForecaster
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 from assume.units.building import Building
 from assume.units.plant import Plant
-from assume.units.steel_plant import SteelPlant
+from assume.units.steel_plant_mini import SteelPlant
 
 
 class NaiveStrategy(BaseStrategy):
@@ -119,10 +119,12 @@ class NaiveDABuildingStrategy(BaseStrategy):
         **kwargs,
     ) -> Orderbook:
         # Run the optimization for the building unit
-        t = start
+        start = product_tuples[0][0]
+        end_all = product_tuples[-1][1]
 
         heating_demand = unit.forecaster["heating_demand"]
         cooling_demand = unit.forecaster["cooling_demand"]
+        electricity_price = unit.forecaster["price_EOM"]
         unit.heating_demand = heating_demand
         # print(heating_demand)
         unit.heating_demand = cooling_demand
@@ -131,23 +133,20 @@ class NaiveDABuildingStrategy(BaseStrategy):
         # Fetch the optimized demand (aggregated_power_in)
         optimized_demand = unit.model.aggregated_power_in.get_values()
 
-        start = product_tuples[0][0]
-        end_all = product_tuples[-1][1]
+        # Corrected marginal cost calculation
+        marginal_cost = {time_step: demand * electricity_price for time_step, demand in optimized_demand.items()}
 
-        # Populate product_tuples with optimized demand values
-        product_tuples = [(t, optimized_demand[t]) for t in unit.model.time_steps]
+        # Assuming you want to keep the structure of product_tuples as is, you can use the following:
+        product_tuples = [(start, optimized_demand[start]) for start in unit.model.time_steps]
 
-        # Calculate the marginal cost based on the optimized demand
+        # Then use the optimized_demand values to create a profile as before
+        profile = {product[0]: product[2] for product in product_tuples}
 
-        marginal_cost = optimized_demand[t] * unit.calculate_marginal_cost(start=t)
-
-        # Create the profile using optimized_demand
-        profile = {product[0]: product[1] for product in product_tuples}
 
         order: Order = {
             "start_time": start,
             "end_time": end_all,
-            "only_hours": product_tuples[0][2],
+            "only_hours": product_tuples[0][1],
             "price": marginal_cost,
             "volume": profile,
             "accepted_volume": {product[0]: 0 for product in product_tuples},
@@ -228,32 +227,65 @@ class NaiveDAsteelplantStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-    
+        
+        unit.run_optimization()
+        
         bids = []
-        for product in product_tuples:
-            start, end, only_hours = product
+        start = product_tuples[0][0]  # start time of the first product
+        end_all = product_tuples[-1][1]  # end time of the last product
+        
+        # heating_demand = unit.forecaster["heating_demand"]
+        # cooling_demand = unit.forecaster["cooling_demand"]
 
-            # Calculate the aggregated power and marginal cost for the product's time range
-            aggregated_power, marginal_cost = unit.calculate_min_max_power(start=start, end=end)
+        hydrogen_price = unit.forecaster["hydrogen_price"]
+        electricity_price = unit.forecaster["price_EOM"]
 
-            # The bid price is based on the marginal cost
-            bid_price = marginal_cost
+        unit.run_optimization()
 
-            # The volume of the bid is the negative of the aggregated power
-            bid_volume = -aggregated_power
+        # Fetch the optimized demand (aggregated_power_in)
+        bid_power = unit.model.aggregated_power_in.get_values()
 
-            # Create the bid order
-            order = {
-                "start_time": start,
-                "end_time": end,
-                "only_hours": only_hours,
-                "price": bid_price,
-                "volume": bid_volume,
-            }
+        # Corrected marginal cost calculation
+        marginal_cost = {time_step: electricity_price / power for time_step, power in bid_power.items()}
 
-            bids.append(order)
+        # Assuming you want to keep the structure of product_tuples as is, you can use the following:
+        product_tuples = [(start, bid_power[start]) for start in unit.model.time_steps]
 
+        # Then use the optimized_demand values to create a profile as before
+        profile = {product[0]: product[1] for product in product_tuples}
+
+
+        order: Order = {
+            "start_time": start,
+            "end_time": end_all,
+            "only_hours": product_tuples[0][1],
+            "price": marginal_cost,
+            "volume": profile,
+        }
+
+        bids = [order]
         return bids
+
+            # order = {
+            #     "start_time": start,
+            #     "end_time": end_all,
+            #     "only_hours": product_tuples[0][1],
+            #     "price": bid_price,
+            #     "volume": bid_volume,
+
+
+    def calculate_marginal_cost(self, unit: SteelPlant, start: pd.Timestamp, end: pd.Timestamp, aggregated_power_in: float):
+        # Example calculation of marginal cost
+        electricity_price = unit.forecaster["price_EOM"].loc[start:end]
+        hydrogen_produced = 0
+        # electricity_price = self.unit.electricity_price[start:end]  # Assuming you have a time-based electricity price
+        for t in unit.model.time_steps:
+            hydrogen_produced += unit.model.hydrogen_out[t]
+
+        # Calculate marginal cost by dividing electricity cost by hydrogen produced
+        marginal_cost = electricity_price * aggregated_power_in / hydrogen_produced
+
+        return marginal_cost
 
 class NaivePosReserveStrategy(BaseStrategy):
     """

@@ -282,11 +282,11 @@ class Electrolyser:
         # Power bounds constraints
         @self.component_block.Constraint(time_steps)
         def power_upper_bound(m, t):
-            return m.power_in[t] <= m.max_power * m.operational_status[t]
+            return m.power_in[t] <= m.max_power# * m.operational_status[t]
 
         @self.component_block.Constraint(time_steps)
         def power_lower_bound(m, t):
-            return m.power_in[t] >= m.min_power * m.operational_status[t]
+            return m.power_in[t] >= m.min_power# * m.operational_status[t]
 
         # Ramp-up constraint
         @self.component_block.Constraint(time_steps)
@@ -302,37 +302,37 @@ class Electrolyser:
                 return Constraint.Skip
             return m.power_in[t-1] - m.power_in[t] <= m.ramp_down
 
-        # Minimum operating time constraint
-        def min_operating_time_constraint(m, t):
-            # Calculate the start time for the constraint
-            min_op_time_float = m.min_operating_time
-            start_time = t - int(min_op_time_float) if t >= int(min_op_time_float) else 0
+        # # Minimum operating time constraint
+        # def min_operating_time_constraint(m, t):
+        #     # Calculate the start time for the constraint
+        #     min_op_time_float = m.min_operating_time
+        #     start_time = t - int(min_op_time_float) if t >= int(min_op_time_float) else 0
 
-            # Accumulate operational status over the calculated range
-            operational_hours = sum(m.operational_status[i] for i in range(start_time, t))
+        #     # Accumulate operational status over the calculated range
+        #     operational_hours = sum(m.operational_status[i] for i in range(start_time, t))
 
-            # For fractional min_operating_time, add a weighted operational status of the preceding time step
-            if min_op_time_float % 1 > 0 and t > 0:
-                fractional_part = min_op_time_float % 1
-                operational_hours += fractional_part * m.operational_status[t - 1]
+        #     # For fractional min_operating_time, add a weighted operational status of the preceding time step
+        #     if min_op_time_float % 1 > 0 and t > 0:
+        #         fractional_part = min_op_time_float % 1
+        #         operational_hours += fractional_part * m.operational_status[t - 1]
 
-            return operational_hours >= min_op_time_float * m.operational_status[t]
+        #     return operational_hours >= min_op_time_float * m.operational_status[t]
 
-        # Minimum downtime constraint
-        def min_down_time_constraint(m, t):
-            # Calculate the start time for the constraint
-            min_down_time_float = m.min_down_time
-            start_time = t - int(min_down_time_float) if t >= int(min_down_time_float) else 0
+        # # Minimum downtime constraint
+        # def min_down_time_constraint(m, t):
+        #     # Calculate the start time for the constraint
+        #     min_down_time_float = m.min_down_time
+        #     start_time = t - int(min_down_time_float) if t >= int(min_down_time_float) else 0
 
-            # Accumulate non-operational status over the calculated range
-            non_operational_hours = sum(1 - m.operational_status[i] for i in range(start_time, t))
+        #     # Accumulate non-operational status over the calculated range
+        #     non_operational_hours = sum(1 - m.operational_status[i] for i in range(start_time, t))
 
-            # For fractional min_down_time, add a weighted non-operational status of the preceding time step
-            if min_down_time_float % 1 > 0 and t > 0:
-                fractional_part = min_down_time_float % 1
-                non_operational_hours += fractional_part * (1 - m.operational_status[t - 1])
+        #     # For fractional min_down_time, add a weighted non-operational status of the preceding time step
+        #     if min_down_time_float % 1 > 0 and t > 0:
+        #         fractional_part = min_down_time_float % 1
+        #         non_operational_hours += fractional_part * (1 - m.operational_status[t - 1])
 
-            return non_operational_hours >= min_down_time_float * (1 - m.operational_status[t])
+        #     return non_operational_hours >= min_down_time_float * (1 - m.operational_status[t])
 
         # Power consumption equation
         @self.component_block.Constraint(time_steps)
@@ -344,7 +344,7 @@ class ShaftFurnace:
                  model, 
                  id, 
                  max_iron_ore_throughput, 
-                 max_natural_gas_input, 
+                #  max_natural_gas_input, 
                  max_hydrogen_input, 
                  ramp_up, 
                  ramp_down, 
@@ -358,7 +358,7 @@ class ShaftFurnace:
         self.id = id
         # Operational parameters
         self.max_iron_ore_throughput = max_iron_ore_throughput
-        self.max_natural_gas_input = max_natural_gas_input
+        # self.max_natural_gas_input = max_natural_gas_input
         self.max_hydrogen_input = max_hydrogen_input
         # Additional operational characteristics
         self.ramp_up = ramp_up
@@ -368,8 +368,8 @@ class ShaftFurnace:
         self.efficiency = efficiency
         self.dri_production_efficiency = dri_production_efficiency
         # Reducing gas inlets
-        self.natural_gas_inlet = False
-        self.hydrogen_inlet = False
+        # self.natural_gas_inlet = False
+        # self.hydrogen_inlet = False
 
          # New attributes for dual hydrogen source handling
         # self.max_direct_hydrogen_input = max_hydrogen_input  # Maximum direct hydrogen input from electrolyser
@@ -404,16 +404,11 @@ class ShaftFurnace:
 
     def define_variables(self, time_steps):
         self.component_block.iron_ore_in = Var(time_steps, within=NonNegativeReals)
-        self.component_block.natural_gas_in = Var(time_steps, within=NonNegativeReals)
+        # self.component_block.natural_gas_in = Var(time_steps, within=NonNegativeReals)
         self.component_block.hydrogen_in = Var(time_steps, within=NonNegativeReals)
-        self.component_block.dri_produced = Var(time_steps, within=NonNegativeReals)
         self.component_block.operational_status = Var(time_steps, within=Binary)
+        self.component_block.dri_eff = Var(time_steps, within=NonNegativeReals)
         self.component_block.dri_output = Var(time_steps, within=NonNegativeReals)
-
-        # Variables for hydrogen input from both electrolyser and storage
-        self.component_block.direct_hydrogen_in = Var(time_steps, within=NonNegativeReals)
-        self.component_block.stored_hydrogen_in = Var(time_steps, within=NonNegativeReals)
-        self.component_block.total_hydrogen_in = Var(time_steps, within=NonNegativeReals)
 
     def function_of_hydrogen(self, hydrogen_in):
         # Assuming a simple linear relationship
@@ -425,40 +420,21 @@ class ShaftFurnace:
         # Constraint for iron ore throughput
         @self.component_block.Constraint(time_steps)
         def iron_ore_throughput_constraint(m, t):
-            return m.iron_ore_in[t] <= m.max_iron_ore_throughput * m.operational_status[t]
-
-        # # Constraint for natural gas input
-        # @self.component_block.Constraint(time_steps)
-        # def natural_gas_input_constraint(m, t):
-        #     return m.natural_gas_in[t] <= m.max_natural_gas_input * m.operational_status[t]
+            return m.iron_ore_in[t] <= m.max_iron_ore_throughput #* m.operational_status[t]
 
         # Constraint for direct hydrogen input from electrolyser
         @self.component_block.Constraint(time_steps)
         def direct_hydrogen_input_constraint(m, t):
-            return m.hydrogen_in[t] <= m.max_hydrogen_input * m.operational_status[t]
-            # return m.direct_hydrogen_in[t] <= m.max_hydrogen_input * m.operational_status[t]
-        
-        # @self.component_block.Constraint(time_steps)
-        # def direct_hydrogen_input_constraint(m, t):
-        #     return m.direct_hydrogen_in[t] <= m.max_direct_hydrogen_input * m.operational_status[t]
-
-        # # Constraint for stored hydrogen input from hydrogen storage
-        # @self.component_block.Constraint(time_steps)
-        # def stored_hydrogen_input_constraint(m, t):
-        #     return m.stored_hydrogen_in[t] <= m.max_stored_hydrogen_input * m.operational_status[t]
-
-        # # Constraint for total hydrogen input being the sum of direct and stored hydrogen inputs
-        # @self.component_block.Constraint(time_steps)
-        # def total_hydrogen_input_constraint(m, t):
-        #     return m.hydrogen_in[t] == m.direct_hydrogen_in[t] + m.stored_hydrogen_in[t]
+            return m.hydrogen_in[t] <= m.max_hydrogen_input# * m.operational_status[t]
 
         # Constraint for DRI output
         @self.component_block.Constraint(time_steps)
+        def dri_eff_constraint(m, t):
+            return m.dri_eff[t] == m.iron_ore_in[t] * m.dri_production_efficiency 
+        
+        @self.component_block.Constraint(time_steps)
         def dri_output_constraint(m, t):
-            # Assuming a linear relationship between hydrogen input and DRI output
-            # Adjust the formula as needed to match your process characteristics
-            # return m.dri_output[t] == m.iron_ore_in[t] * m.dri_production_efficiency * self.function_of_hydrogen(m.hydrogen_in[t])
-            return m.dri_output[t] == m.iron_ore_in[t] * m.dri_production_efficiency * m.hydrogen_in[t]
+            return m.dri_output[t] == m.dri_eff[t] * m.hydrogen_in[t]
 
 class ElectricArcFurnace:
     def __init__(self, 
