@@ -1,3 +1,0 @@
-﻿name,technology,bidding_energy,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,fixed_cost,hot_start_cost,warm_start_cost,cold_start_cost,min_operating_time,min_down_time,heat_extraction,max_heat_extraction,unit_operator
-magic_unit,renewable,naive,renewable,0,1000,0,1,1000,1000,1000,,,,,,False,0,magic_unit_operator
-hard_coal_unit,hard coal,flexable_eom,hard coal,0.335,500,100,0.5,200,200,5,,,,,,False,0,hard_coal_unit_operator
