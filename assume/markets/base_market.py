@@ -437,8 +437,6 @@ class MarketRole(MarketMechanism, Role):
         ) = self.clear(self.all_orders, market_products)
         self.all_orders = []
         for order in rejected_orderbook:
-            if isinstance(order, str):
-                logger.warning(f"rejected order: {order}")
             if isinstance(order["volume"], dict):
                 order["accepted_volume"] = {
                     start: 0.0 for start in order["volume"].keys()

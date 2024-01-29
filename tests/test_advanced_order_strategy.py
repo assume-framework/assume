@@ -25,7 +25,7 @@ end = datetime(2023, 7, 2)
 @pytest.fixture
 def power_plant() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
-    index = pd.date_range("2023-07-01", periods=48, freq="H")
+    index = pd.date_range("2023-07-01", periods=48, freq="h")
     ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
     return PowerPlant(
         id="test_pp",
@@ -45,7 +45,7 @@ def power_plant() -> PowerPlant:
 
 def test_eom_with_blocks(mock_market_config, power_plant):
     power_plant.ramp_up = 400
-    product_index = pd.date_range("2023-07-01", periods=24, freq="H")
+    product_index = pd.date_range("2023-07-01", periods=24, freq="h")
     strategy = flexableEOMBlock()
     mc = mock_market_config
     mc.product_type = "energy_eom"
@@ -64,10 +64,10 @@ def test_eom_with_blocks(mock_market_config, power_plant):
     assert bids[-1]["volume"] == {time: 200 for time in product_index}
 
     # add min_down_time, min_operating_time
-    power_plant.index = pd.date_range("2023-07-01", periods=48, freq="H")
+    power_plant.index = pd.date_range("2023-07-01", periods=48, freq="h")
     power_plant.min_down_time = 2
     power_plant.min_operating_time = 3
-    product_index = pd.date_range("2023-07-02", periods=24, freq="H")
+    product_index = pd.date_range("2023-07-02", periods=24, freq="h")
     product_tuples = [
         (start, start + pd.Timedelta(hours=1), None) for start in product_index
     ]
@@ -96,7 +96,7 @@ def test_eom_with_blocks(mock_market_config, power_plant):
 
 def test_eom_with_links(mock_market_config, power_plant):
     power_plant.ramp_up = 400
-    product_index = index = pd.date_range("2023-07-01", periods=24, freq="H")
+    product_index = pd.date_range("2023-07-01", periods=24, freq="h")
     strategy = flexableEOMLinked()
     mc = mock_market_config
     mc.product_type = "energy_eom"
@@ -119,10 +119,10 @@ def test_eom_with_links(mock_market_config, power_plant):
     assert bids[-1]["bid_id"] == power_plant.id + "_block"
 
     # add min_down_time, min_operating_time
-    power_plant.index = pd.date_range("2023-07-01", periods=48, freq="H")
+    power_plant.index = pd.date_range("2023-07-01", periods=48, freq="h")
     power_plant.min_down_time = 2
     power_plant.min_operating_time = 3
-    product_index = pd.date_range("2023-07-02", periods=24, freq="H")
+    product_index = pd.date_range("2023-07-02", periods=24, freq="h")
     product_tuples = [
         (start, start + pd.Timedelta(hours=1), None) for start in product_index
     ]

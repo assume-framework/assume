@@ -2,28 +2,19 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import random as rd
 from datetime import datetime
 
-import numpy as np
 import pandas as pd
 import pytest
-import torch as th
 
 try:
     from assume.reinforcement_learning.learning_role import LearningConfig
-    from assume.reinforcement_learning.learning_utils import Actor, CriticTD3
+    from assume.strategies.learning_advanced_orders import RLAdvancedOrderStrategy
 except ImportError:
     pass
 
 from assume.common.forecasts import NaiveForecast
-from assume.strategies.learning_advanced_orders import RLAdvancedOrderStrategy
 from assume.units import PowerPlant
-
-np.random.seed(0)
-rd.seed(0)
-th.manual_seed(0)
-th.use_deterministic_algorithms(True)
 
 start = datetime(2023, 7, 1)
 end = datetime(2023, 7, 2)
@@ -32,7 +23,7 @@ end = datetime(2023, 7, 2)
 @pytest.fixture
 def power_plant() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
-    index = pd.date_range("2023-07-01", periods=48, freq="H")
+    index = pd.date_range("2023-07-01", periods=48, freq="h")
     ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
     return PowerPlant(
         id="test_pp",
@@ -62,7 +53,7 @@ def test_learning_advanced_orders(mock_market_config, power_plant):
         "unit_id": "test_pp",
     }
 
-    product_index = pd.date_range("2023-07-01", periods=24, freq="H")
+    product_index = pd.date_range("2023-07-01", periods=24, freq="h")
     mc = mock_market_config
     mc.product_type = "energy_eom"
     product_tuples = [
@@ -76,6 +67,8 @@ def test_learning_advanced_orders(mock_market_config, power_plant):
     assert len(bids) == 48
     assert bids[0]["bid_type"] == "SB"
     assert bids[0]["volume"] == 200
+    assert bids[0]["bid_id"] == "test_pp_SB_1"
+    assert bids[-1]["bid_id"] == "test_pp_SB_48"
 
     learning_config["order_types"] = ["SB", "BB"]
     strategy = RLAdvancedOrderStrategy(**learning_config)
@@ -84,6 +77,8 @@ def test_learning_advanced_orders(mock_market_config, power_plant):
     assert len(bids) == 25
     assert bids[0]["bid_type"] == "SB"
     assert bids[0]["volume"] == 800
+    assert bids[0]["bid_id"] == "test_pp_SB_1"
+    assert bids[-1]["bid_id"] == "test_pp_block"
 
     assert bids[-1]["bid_type"] == "BB"
     assert bids[-1]["volume"][product_tuples[0][0]] == 200
@@ -101,6 +96,9 @@ def test_learning_advanced_orders(mock_market_config, power_plant):
     assert bids[1]["volume"][product_tuples[0][0]] == 800
     assert bids[0]["price"] <= bids[1]["price"]
 
+    assert bids[0]["bid_id"] == "test_pp_SB_1"
+    assert bids[-1]["bid_id"] == "test_pp_LB_48"
+
     learning_config["order_types"] = ["SB", "BB", "LB"]
     strategy = RLAdvancedOrderStrategy(**learning_config)
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
@@ -112,3 +110,6 @@ def test_learning_advanced_orders(mock_market_config, power_plant):
     assert bids[-1]["bid_type"] == "BB"
     assert bids[-1]["volume"][product_tuples[0][0]] == 200
     assert bids[0]["price"] >= bids[-1]["price"]
+
+    assert bids[0]["bid_id"] == "test_pp_LB_1"
+    assert bids[-1]["bid_id"] == "test_pp_block"

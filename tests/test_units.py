@@ -15,7 +15,7 @@ def test_minmax():
     mm.ramp_up = 400
     mm.max_power = 1000
     mm.min_power = 200
-    mm.index = pd.date_range("2022-01-01", periods=24, freq="H")
+    mm.index = pd.date_range("2022-01-01", periods=24, freq="h")
 
     # stay turned off
     assert mm.calculate_ramp(op_time=1, previous_power=0, power=0, current_power=0) == 0

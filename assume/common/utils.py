@@ -383,10 +383,6 @@ def separate_orders(orderbook: Orderbook):
                             "end_time": start + duration,
                         }
                     )
-                    # if "bid_id" in single_order.keys():
-                    #     single_order[
-                    #         "bid_id"
-                    #     ] = f"{order['bid_id']}_{order['bid_type']}{i}"
 
                 orderbook.append(single_order)
 
@@ -400,12 +396,12 @@ def separate_orders(orderbook: Orderbook):
 
 def get_products_index(orderbook):
     """
-    creates an index containing all start times of orders in orderbook
-    :param orderbook: the orderbook of the market
-    :type orderbook: Orderbook
-    :param marketconfig: the market configuration
-    :type marketconfig: MarketConfig
-    :return index_products: the index containing all start times of orders in orderbook and all inbetween
+    This function returns the index of all start times of orders in orderbook and all inbetween.
+    Args:
+        orderbook (Orderbook): The orderbook.
+
+    Returns:
+        index_products: the index containing all start times of orders in orderbook and all inbetween
     """
     if orderbook == []:
         return []

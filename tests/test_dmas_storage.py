@@ -30,7 +30,7 @@ def storage_unit() -> Storage:
         max_volume=1000,
         efficiency_charge=0.9,
         efficiency_discharge=0.95,
-        index=pd.date_range("2022-01-01", periods=4, freq="H"),
+        index=pd.date_range("2022-01-01", periods=4, freq="h"),
         ramp_down_charge=-50,
         ramp_down_discharge=50,
         ramp_up_charge=-60,
@@ -44,7 +44,7 @@ def storage_unit() -> Storage:
 @pytest.fixture
 def storage_day() -> PowerPlant:
     periods = 48
-    index = pd.date_range("2022-01-01", periods=periods, freq="H")
+    index = pd.date_range("2022-01-01", periods=periods, freq="h")
 
     prices = get_test_prices(periods)
     ff = NaiveForecast(

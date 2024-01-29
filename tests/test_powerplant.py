@@ -15,7 +15,7 @@ from assume.units import PowerPlant
 @pytest.fixture
 def power_plant_1() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
-    index = pd.date_range("2022-01-01", periods=4, freq="H")
+    index = pd.date_range("2022-01-01", periods=4, freq="h")
     ff = NaiveForecast(
         index, availability=1, fuel_price=[10, 11, 12, 13], co2_price=[10, 20, 30, 30]
     )
@@ -38,7 +38,7 @@ def power_plant_1() -> PowerPlant:
 @pytest.fixture
 def power_plant_2() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
-    index = pd.date_range("2022-01-01", periods=4, freq="H")
+    index = pd.date_range("2022-01-01", periods=4, freq="h")
     ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
     return PowerPlant(
         id="test_pp",
@@ -59,7 +59,7 @@ def power_plant_2() -> PowerPlant:
 @pytest.fixture
 def power_plant_3() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
-    index = pd.date_range("2022-01-01", periods=4, freq="H")
+    index = pd.date_range("2022-01-01", periods=4, freq="h")
     ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
     return PowerPlant(
         id="test_pp",
@@ -90,7 +90,7 @@ def test_init_function(power_plant_1, power_plant_2, power_plant_3):
     assert power_plant_1.emission_factor == 0.5
     assert power_plant_1.ramp_up == 1000
     assert power_plant_1.ramp_down == 1000
-    index = pd.date_range("2022-01-01", periods=4, freq="H")
+    index = pd.date_range("2022-01-01", periods=4, freq="h")
     assert (
         power_plant_1.marginal_cost.to_dict()
         == pd.Series(
@@ -106,22 +106,22 @@ def test_init_function(power_plant_1, power_plant_2, power_plant_3):
 def test_reset_function(power_plant_1):
     # check if total_power_output is reset
     assert power_plant_1.outputs["energy"].equals(
-        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
+        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     )
     # the same for pos and neg capacity reserve
     assert power_plant_1.outputs["pos_capacity"].equals(
-        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
+        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     )
     assert power_plant_1.outputs["neg_capacity"].equals(
-        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
+        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     )
 
     # the same for total_heat_output and power_loss_chp
     assert power_plant_1.outputs["heat"].equals(
-        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
+        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     )
     assert power_plant_1.outputs["power_loss"].equals(
-        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
+        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     )
 
 
@@ -312,7 +312,7 @@ def test_powerplant_ramping(power_plant_1):
 
 
 def test_powerplant_availability(power_plant_1):
-    index = pd.date_range("2022-01-01", periods=4, freq="H")
+    index = pd.date_range("2022-01-01", periods=4, freq="h")
     ff = NaiveForecast(
         index,
         availability=[0.5, 0.01, 1, 1],
@@ -359,7 +359,7 @@ def test_powerplant_availability(power_plant_1):
 
 
 def test_powerplant_execute_dispatch():
-    index = pd.date_range("2022-01-01", periods=24, freq="H")
+    index = pd.date_range("2022-01-01", periods=24, freq="h")
     ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
     power_plant = PowerPlant(
         id="test_pp",
@@ -378,7 +378,7 @@ def test_powerplant_execute_dispatch():
         forecaster=ff,
     )
     # was running before
-    assert power_plant.execute_current_dispatch(index[0], index[0])[0] == 0
+    assert power_plant.execute_current_dispatch(index[0], index[0]).iloc[0] == 0
 
     power_plant.outputs["energy"].loc[index] = [
         0,

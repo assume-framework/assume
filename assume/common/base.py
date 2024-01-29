@@ -426,6 +426,9 @@ class SupportsMinMax(BaseUnit):
 
         Returns:
             tuple[float, float]: avg_op_time, avg_down_time
+
+        Note:
+            down_time in general is indicated with negative values
         """
         op_series = []
 

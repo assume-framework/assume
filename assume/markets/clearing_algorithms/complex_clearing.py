@@ -20,7 +20,42 @@ EPS = 1e-4
 
 
 def market_clearing_opt(orders, market_products, mode, with_linked_bids):
-    # with cProfile.Profile() as pr:
+    """
+    This function solves the market clearing using cost minimization.
+
+    Args:
+        orders (Orderbook): List of the orders
+        market_products (list[MarketProduct]): The products to be traded
+        mode (str): The mode of the market clearing determining whether the minimum acceptance ratio is considered
+        with_linked_bids (bool): Whether the market clearing should include linked bids
+
+    Returns:
+        tuple[pyomo.ConcreteModel, pyomo.opt.results.SolverResults]: The solved pyomo model and the solver results
+
+    Note:
+        The objective of the optimization is to minimize the total cost of the accepted orders.
+        The decision variables are given by the acceptance ratio of each order bounded by 0 and 1 and the acceptance as a binary variable.
+
+        The objective function is defined as the sum of the product of the price, volume, and acceptance ratio of each order.
+
+        The energy balance constraint ensures that the sum of the accepted volumes of all orders is zero.
+        The acceptance of each order is bounded by 0 and 1.
+
+        If the mode is 'with_min_acceptance_ratio', the minimum acceptance ratio is considered.
+        The minimum acceptance ratio is defined as the ratio of the minimum volume to accept to the total volume of the order.
+
+        If linked bids are considered, the acceptance of a child bid is bounded by the acceptance of its parent bid.
+
+        The market clearing is solved using pyomo with the gurobi solver.
+        If the gurobi solver is not available, the model is solved using the glpk solver.
+        Otherwise, the solvers cplex and cbc are tried.
+        If none of the solvers are available, an exception is raised.
+
+        After solving the model, the acceptance of each order is fixed to the value in the solution and the model is solved again.
+        This removes all binary variables from the model and allows to extract the market clearing prices from the dual variables of the energy balance constraint.
+
+    """
+
     model = pyo.ConcreteModel()
     model.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT_EXPORT)
 
@@ -39,6 +74,7 @@ def market_clearing_opt(orders, market_products, mode, with_linked_bids):
         doc="block_bids",
     )
 
+    # decision variables for the acceptance ratio of simple and block bids (including linked bids)
     model.xs = pyo.Var(
         model.sBids,
         domain=pyo.NonNegativeReals,
@@ -56,12 +92,14 @@ def market_clearing_opt(orders, market_products, mode, with_linked_bids):
         model.Bids = pyo.Set(
             initialize=[order["bid_id"] for order in orders], doc="all_bids"
         )
+        # decision variables for the acceptance as binary variable
         model.x = pyo.Var(
             model.Bids,
             domain=pyo.Binary,
             doc="bid_accepted",
         )
 
+        # add minimum acceptance ratio constraints
         model.mar_constr = pyo.ConstraintList()
         for order in orders:
             if order["min_acceptance_ratio"] is None:
@@ -83,7 +121,7 @@ def market_clearing_opt(orders, market_products, mode, with_linked_bids):
                 model.mar_constr.add(
                     model.xb[order["bid_id"]] <= model.x[order["bid_id"]]
                 )
-
+    # add energy balance constraint
     balance_expr = {t: 0.0 for t in model.T}
     for order in orders:
         if order["bid_type"] == "SB":
@@ -99,6 +137,7 @@ def market_clearing_opt(orders, market_products, mode, with_linked_bids):
 
     model.energy_balance = pyo.Constraint(model.T, rule=energy_balance_rule)
 
+    # limit the acceptance of child bids by the acceptance of their parent bid
     if with_linked_bids:
         model.linked_bid_constr = pyo.ConstraintList()
         for order in orders:
@@ -108,6 +147,7 @@ def market_clearing_opt(orders, market_products, mode, with_linked_bids):
                     model.xb[order["bid_id"]] <= model.xb[parent_bid_id]
                 )
 
+    # define the objective function as cost minimization
     obj_expr = 0
     for order in orders:
         if order["bid_type"] == "SB":
@@ -118,6 +158,7 @@ def market_clearing_opt(orders, market_products, mode, with_linked_bids):
 
     model.objective = pyo.Objective(expr=obj_expr, sense=pyo.minimize)
 
+    # check available solvers, gurobi is preferred
     solvers = check_available_solvers(*SOLVERS)
     if len(solvers) < 1:
         raise Exception(f"None of {SOLVERS} are available")
@@ -162,6 +203,17 @@ class ComplexClearingRole(MarketRole):
         super().__init__(marketconfig)
 
     def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> None:
+        """
+        This function ensures that the bid type is in ['SB', 'BB', 'LB'] and that the order volume is not larger than the maximum bid volume.
+
+        Args:
+            orderbook: The orderbook
+            agent_tuple: The agent tuple
+
+        Raises:
+            AssertionError: If the bid type is not in ['SB', 'BB', 'LB'] or the order volume is larger than the maximum bid volume
+        """
+
         super().validate_orderbook(orderbook, agent_tuple)
         max_volume = self.marketconfig.maximum_bid_volume
         for order in orderbook:
@@ -176,6 +228,10 @@ class ComplexClearingRole(MarketRole):
                 assert False not in [
                     abs(volume) <= max_volume for _, volume in order["volume"].items()
                 ], f"max_volume {order['volume']}"
+            elif order["bid_type"] == "SB":
+                assert (
+                    abs(order["volume"]) <= max_volume
+                ), f"max_volume {order['volume']}"
 
     def clear(
         self, orderbook: Orderbook, market_products
@@ -183,11 +239,18 @@ class ComplexClearingRole(MarketRole):
         """
         This implements pay-as-clear with more complex bid structures, including acceptance ratios, bid types, and profiled volumes.
 
-        :param market_products: The products to be traded
-        :type market_products: list[MarketProduct]
+        Args:
+            orderbook: The orderbook
+            market_products: The products to be traded
 
-        :return extract_results(model=model, eps=eps, orders=orders, market_products=market_products, market_clearing_prices=market_clearing_prices)
-        :rtype: tuple[Orderbook, Orderbook, list[dict]]
+        Returns:
+            tuple[Orderbook, Orderbook, list[dict]]: The accepted orders, rejected orders, and meta information by calling extract_results
+
+        Note:
+            First the market clearing is solved using the cost minimization with the pyomo model market_clearing_opt.
+            Then the market clearing prices are extracted from the solved model as dual variables of the energy balance contraint.
+            Next the surplus of each order and its children is calculated and orders with negative surplus are removed from the orderbook.
+            This is repeated until all orders remaining in the orderbook have positive surplus.
         """
 
         if len(orderbook) == 0:
@@ -235,8 +298,8 @@ class ComplexClearingRole(MarketRole):
                 t: instance.dual[instance.energy_balance[t]] for t in instance.T
             }
 
-            # check the profit of each order and remove those with negative profit
-            orders_profit = []
+            # check the surplus of each order and remove those with negative surplus
+            orders_surplus = []
             for order in orderbook:
                 children = []
                 if with_linked_bids:
@@ -246,25 +309,25 @@ class ComplexClearingRole(MarketRole):
                         if child["parent_bid_id"] == order["bid_id"]
                     ]
 
-                order_profit = calculate_order_profit(
+                order_surplus = calculate_order_surplus(
                     order, market_clearing_prices, instance, children
                 )
 
                 # correct rounding
-                if order_profit != 0 and abs(order_profit) < EPS:
-                    order_profit = 0
+                if order_surplus != 0 and abs(order_surplus) < EPS:
+                    order_surplus = 0
 
-                orders_profit.append(order_profit)
+                orders_surplus.append(order_surplus)
 
-                if order_profit < 0:
+                if order_surplus < 0:
                     rejected_orders.append(order)
                     orderbook.remove(order)
                     rejected_orders.extend(children)
                     for child in children:
                         orderbook.remove(child)
 
-            # check if all orders have positive profit
-            if all(order_profit >= 0 for order_profit in orders_profit):
+            # check if all orders have positive surplus
+            if all(order_surplus >= 0 for order_surplus in orders_surplus):
                 break
 
         return extract_results(
@@ -276,17 +339,32 @@ class ComplexClearingRole(MarketRole):
         )
 
 
-def calculate_order_profit(order, market_clearing_prices, instance, children):
-    order_profit = 0
+def calculate_order_surplus(order, market_clearing_prices, instance, children):
+    """
+    Calculate the surplus of an order given the market clearing prices and results of the market clearing.
+
+    Args:
+        order (dict): The order
+        market_clearing_prices (dict): The market clearing prices
+        instance (pyomo.ConcreteModel): The solved pyomo model containing the results of the market clearing
+        children (list[dict]): The linked child bids of the given order
+
+    Returns:
+        float: The surplus of the order as (market_clearing_price - order_price) * order_volume * order_acceptance
+
+    Note: The surplus of children linked to the given order is added if it is positive to account for the rule that children can 'save' their parent bid.
+    """
+
+    order_surplus = 0
 
     if order["bid_type"] == "SB":
         if (
             pyo.value(instance.xs[order["bid_id"]]) < EPS
             or abs(market_clearing_prices[order["start_time"]] - order["price"]) < EPS
         ):
-            order_profit = 0
+            order_surplus = 0
         else:
-            order_profit = (
+            order_surplus = (
                 (market_clearing_prices[order["start_time"]] - order["price"])
                 * order["volume"]
                 * pyo.value(instance.xs[order["bid_id"]])
@@ -294,30 +372,30 @@ def calculate_order_profit(order, market_clearing_prices, instance, children):
     elif order["bid_type"] in ["BB", "LB"]:
         bid_volume = sum(order["volume"].values())
         if pyo.value(instance.xb[order["bid_id"]]) < EPS:
-            order_profit = 0
+            order_surplus = 0
         else:
-            order_profit = (
+            order_surplus = (
                 sum(market_clearing_prices[t] * v for t, v in order["volume"].items())
                 - order["price"] * bid_volume
             ) * pyo.value(instance.xb[order["bid_id"]])
 
         # add the child linked bids
         for child_order in children:
-            child_profit = (
+            child_surplus = (
                 sum(
                     market_clearing_prices[t] * v
                     for t, v in child_order["volume"].items()
                 )
                 - child_order["price"] * bid_volume
             ) * pyo.value(instance.xb[child_order["bid_id"]])
-            if child_profit > 0:
-                order_profit += child_profit
+            if child_surplus > 0:
+                order_surplus += child_surplus
 
     # correct rounding
-    if order_profit != 0 and abs(order_profit) < EPS:
-        order_profit = 0
+    if order_surplus != 0 and abs(order_surplus) < EPS:
+        order_surplus = 0
 
-    return order_profit
+    return order_surplus
 
 
 def extract_results(
@@ -327,6 +405,20 @@ def extract_results(
     market_products,
     market_clearing_prices,
 ):
+    """
+    Extract the results of the market clearing from the solved pyomo model.
+
+    Args:
+        model (pyomo.ConcreteModel): The solved pyomo model containing the results of the market clearing
+        orders (list[dict]): List of the orders
+        rejected_orders (list[dict]): List of the rejected orders
+        market_products (list[MarketProduct]): The products to be traded
+        market_clearing_prices (dict): The market clearing prices
+
+    Returns:
+        tuple[Orderbook, Orderbook, list[dict]]: The accepted orders, rejected orders, and meta information
+
+    """
     accepted_orders: Orderbook = []
     meta = []
 

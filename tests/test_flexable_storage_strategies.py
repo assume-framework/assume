@@ -21,7 +21,7 @@ from assume.units import Storage
 @pytest.fixture
 def storage() -> Storage:
     # Create a PowerPlant instance with some example parameters
-    index = pd.date_range("2023-07-01", periods=48, freq="H")
+    index = pd.date_range("2023-07-01", periods=48, freq="h")
     # constant price of 50
     ff = NaiveForecast(index, availability=1, price_forecast=50)
     return Storage(
@@ -46,7 +46,7 @@ def storage() -> Storage:
 
 
 def test_flexable_eom_storage(mock_market_config, storage):
-    index = pd.date_range("2023-07-01", periods=4, freq="H")
+    index = pd.date_range("2023-07-01", periods=4, freq="h")
     start = datetime(2023, 7, 1)
     end = datetime(2023, 7, 1, 1)
     strategy = flexableEOMStorage()
@@ -80,8 +80,8 @@ def test_flexable_eom_storage(mock_market_config, storage):
     assert bids[0]["volume"] == -60
 
     # change to dam bidding
-    day = pd.date_range(start, start + timedelta(hours=23), freq="H")
-    index = pd.date_range("2023-07-01", periods=24, freq="H")
+    day = pd.date_range(start, start + timedelta(hours=23), freq="h")
+    index = pd.date_range("2023-07-01", periods=24, freq="h")
     product_tuples = [(start, start + timedelta(hours=1), None) for start in day]
     storage.foresight = pd.Timedelta(hours=4)
     forecast = [
@@ -170,7 +170,7 @@ def test_flexable_eom_storage(mock_market_config, storage):
 
 
 def test_flexable_pos_crm_storage(mock_market_config, storage):
-    index = pd.date_range("2023-07-01", periods=4, freq="H")
+    index = pd.date_range("2023-07-01", periods=4, freq="h")
     start = datetime(2023, 7, 1)
     end = datetime(2023, 7, 1, 4, 0, 0)
     strategy = flexablePosCRMStorage()
@@ -211,7 +211,7 @@ def test_flexable_pos_crm_storage(mock_market_config, storage):
 
 
 def test_flexable_neg_crm_storage(mock_market_config, storage):
-    index = pd.date_range("2023-07-01", periods=4, freq="H")
+    index = pd.date_range("2023-07-01", periods=4, freq="h")
     start = datetime(2023, 7, 1)
     end = datetime(2023, 7, 1, 4, 0, 0)
     strategy = flexableNegCRMStorage()

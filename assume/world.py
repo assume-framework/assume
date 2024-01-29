@@ -111,12 +111,14 @@ class World:
             from assume.strategies.learning_advanced_orders import (
                 RLAdvancedOrderStrategy,
             )
-            from assume.strategies.learning_strategies import RLdamStrategy, RLStrategy
+            from assume.strategies.learning_strategies import RLStrategy
 
             self.bidding_strategies["learning"] = RLStrategy
+            self.bidding_strategies["pp_learning"] = RLStrategy
             self.bidding_strategies[
                 "learning_advanced_orders"
             ] = RLAdvancedOrderStrategy
+
         except ImportError as e:
             self.logger.info(
                 "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",

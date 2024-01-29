@@ -23,12 +23,7 @@ from assume.common.market_objects import (
     RegistrationMessage,
 )
 from assume.common.utils import aggregate_step_amount, get_products_index
-from assume.strategies import (
-    BaseStrategy,
-    LearningStrategy,
-    RLAdvancedOrderStrategy,
-    RLdamStrategy,
-)
+from assume.strategies import BaseStrategy, LearningStrategy
 from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
@@ -468,13 +463,24 @@ class UnitsOperator(Role):
             products_index (pd.DatetimeIndex): The index of all products.
             marketconfig (MarketConfig): The market configuration.
         """
+        try:
+            from assume.strategies.learning_advanced_orders import (
+                RLAdvancedOrderStrategy,
+            )
+        except ImportError as e:
+            self.logger.info(
+                "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",
+                e,
+            )
+            return
+
         output_agent_list = []
         start = products_index[0]
         for unit_id, unit in self.units.items():
             # rl only for energy market for now!
             if isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
-                (RLdamStrategy, RLAdvancedOrderStrategy),
+                (RLAdvancedOrderStrategy),
             ):
                 # TODO: check whether to split the reward, profit and regret to different lines
                 output_dict = {
@@ -553,6 +559,9 @@ class UnitsOperator(Role):
         try:
             import torch as th
 
+            from assume.strategies.learning_advanced_orders import (
+                RLAdvancedOrderStrategy,
+            )
         except ImportError:
             logger.error("tried writing learning_params, but torch is not installed")
             return
@@ -565,7 +574,7 @@ class UnitsOperator(Role):
             # rl only for energy market for now!
             if isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
-                (RLdamStrategy, RLAdvancedOrderStrategy),
+                (RLAdvancedOrderStrategy),
             ):
                 all_observations[i, :] = unit.outputs["rl_observations"][start]
                 all_actions[i, :] = unit.outputs["rl_actions"][start]
@@ -578,7 +587,7 @@ class UnitsOperator(Role):
             ):
                 all_observations[i, :] = unit.outputs["rl_observations"][start]
                 all_actions[i, :] = unit.outputs["rl_actions"][start]
-                all_rewards.append(unit.outputs["reward"][start] / 24)
+                all_rewards.append(unit.outputs["reward"][start])
                 i += 1
 
         # convert all_actions list of tensor to numpy 2D array

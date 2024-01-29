@@ -48,3 +48,4 @@ dam_with_complex_clearing:
       additional_fields:
         - bid_type
         - min_acceptance_ratio
+        - parent_bid_id
