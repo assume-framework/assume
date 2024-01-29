@@ -24,7 +24,7 @@ def storage_unit() -> Storage:
         max_volume=1000,
         efficiency_charge=0.9,
         efficiency_discharge=0.95,
-        index=pd.date_range("2022-01-01", periods=4, freq="H"),
+        index=pd.date_range("2022-01-01", periods=4, freq="h"),
         ramp_down_charge=-50,
         ramp_down_discharge=50,
         ramp_up_charge=-60,
@@ -54,17 +54,17 @@ def test_init_function(storage_unit):
 def test_reset_function(storage_unit):
     # check if total_power_output is reset
     assert storage_unit.outputs["energy"].equals(
-        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
+        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     )
     # the same for pos and neg capacity reserve
     assert storage_unit.outputs["pos_capacity"].equals(
-        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
+        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     )
     assert storage_unit.outputs["neg_capacity"].equals(
-        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
+        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     )
     assert storage_unit.outputs["soc"].equals(
-        pd.Series(0.5, index=pd.date_range("2022-01-01", periods=4, freq="H"))
+        pd.Series(0.5, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     )
 
 
@@ -317,7 +317,7 @@ def test_execute_dispatch(storage_unit):
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy.iloc[0] == 100
     assert math.isclose(
-        storage_unit.outputs["soc"][start + storage_unit.index.freq],
+        storage_unit.outputs["soc"][end],
         0.5 - 100 / storage_unit.efficiency_discharge / storage_unit.max_volume,
     )
 
@@ -330,15 +330,15 @@ def test_execute_dispatch(storage_unit):
         storage_unit.outputs["soc"][end],
         0.5 + 100 * storage_unit.efficiency_charge / storage_unit.max_volume,
     )
+    # adjust dispatch to soc limit for discharge
     storage_unit.outputs["energy"][start] = 100
-    storage_unit.outputs["soc"][start] = 0.05
     storage_unit.outputs["soc"][start] = 0.05
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert math.isclose(
         dispatched_energy.iloc[0], 50 * storage_unit.efficiency_discharge, abs_tol=0.1
     )
+    # adjust dispatch to soc limit for charging
     storage_unit.outputs["energy"][start] = -100
-    storage_unit.outputs["soc"][start] = 0.95
     storage_unit.outputs["soc"][start] = 0.95
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert math.isclose(
@@ -346,6 +346,7 @@ def test_execute_dispatch(storage_unit):
     )
     assert math.isclose(storage_unit.outputs["soc"][end], 1, abs_tol=0.001)
 
+    # step into the next hour
     start = start + storage_unit.index.freq
     end = end + storage_unit.index.freq
     storage_unit.outputs["energy"][start] = -100

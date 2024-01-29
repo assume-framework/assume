@@ -40,7 +40,7 @@ end = datetime(2023, 12, 5)
 index = pd.date_range(
     start=start,
     end=end + timedelta(hours=24),
-    freq="H",
+    freq="h",
 )
 sim_id = "handmade_simulation"
 

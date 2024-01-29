@@ -220,13 +220,13 @@ def visualize_orderbook(order_book: Orderbook):
 
     order_book.sort(key=itemgetter("block_id", "link"))
     start_times = sorted(set(o["start_time"] for o in order_book))
-    y_past = pd.Series(0, index=start_times)
+    y_past = pd.Series(0.0, index=start_times)
     for i, bids_grouped in groupby(order_book, itemgetter("block_id")):
         my_cmap_raw = np.array(tab20_cmap.colors) * i / max_block_count
         my_cmap = ListedColormap(my_cmap_raw)
 
         for j, o in groupby(bids_grouped, itemgetter("link")):
-            s = pd.Series(0, index=start_times)
+            s = pd.Series(0.0, index=start_times)
             ys = np.zeros(24)
             o = list(o)
             for order in o:
@@ -370,7 +370,7 @@ def separate_orders(orderbook: Orderbook):
                 len(value) for value in order.values() if isinstance(value, dict)
             )
             duration = (end_hour - start_hour) / order_len
-            i = 1
+
             for start in pd.date_range(start_hour, end_hour - duration, freq=duration):
                 single_order = order.copy()
                 for key in order.keys():
@@ -383,16 +383,46 @@ def separate_orders(orderbook: Orderbook):
                             "end_time": start + duration,
                         }
                     )
-                    if "bid_id" in single_order.keys():
-                        single_order[
-                            "bid_id"
-                        ] = f"{order['bid_id']}_{order['bid_type']}{i}"
 
                 orderbook.append(single_order)
-                i += 1
+
             delete_orders.append(order)
 
     for order in delete_orders:
         orderbook.remove(order)
 
     return orderbook
+
+
+def get_products_index(orderbook):
+    """
+    This function returns the index of all start times of orders in orderbook and all inbetween.
+    Args:
+        orderbook (Orderbook): The orderbook.
+
+    Returns:
+        index_products: the index containing all start times of orders in orderbook and all inbetween
+    """
+    if orderbook == []:
+        return []
+
+    # get the minimum and maximum "start_time" for all orders in orderbook
+    start_time = orderbook[0]["start_time"]
+    end_time = orderbook[0]["start_time"]
+    duration = orderbook[0]["end_time"] - orderbook[0]["start_time"]
+
+    for order in orderbook:
+        if order["start_time"] < start_time:
+            start_time = order["start_time"]
+        if order["end_time"] > end_time:
+            end_time = order["start_time"]
+        if order["end_time"] - order["start_time"] < duration:
+            duration = order["end_time"] - order["start_time"]
+
+    index_products = pd.date_range(
+        start_time,
+        end_time,
+        freq=duration,
+    )
+
+    return index_products

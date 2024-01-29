@@ -9,6 +9,8 @@ from functools import lru_cache
 import pandas as pd
 
 from assume.common.base import SupportsMinMax
+from assume.common.market_objects import MarketConfig, Orderbook
+from assume.common.utils import get_products_index
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +83,7 @@ class PowerPlant(SupportsMinMax):
         min_power: float = 0.0,
         efficiency: float = 1.0,
         fixed_cost: float = 0.0,
+        variable_cost: float | pd.Series = 0.0,
         partial_load_eff: bool = False,
         fuel_type: str = "others",
         emission_factor: float = 0.0,
@@ -130,6 +133,7 @@ class PowerPlant(SupportsMinMax):
         )
 
         self.fixed_cost = fixed_cost
+        self.variable_cost = variable_cost
         self.hot_start_cost = hot_start_cost * max_power
         self.warm_start_cost = warm_start_cost * max_power
         self.cold_start_cost = cold_start_cost * max_power
@@ -162,6 +166,7 @@ class PowerPlant(SupportsMinMax):
         :return: the volume of the unit within the given time range
         :rtype: float
         """
+        start = max(start, self.index[0])
 
         max_power = (
             self.forecaster.get_availability(self.id)[start:end] * self.max_power
@@ -169,18 +174,75 @@ class PowerPlant(SupportsMinMax):
 
         for t in self.outputs["energy"][start:end].index:
             current_power = self.outputs["energy"][t]
+
             previous_power = self.get_output_before(t)
+            op_time = self.get_operation_time(t)
 
-            max_power_t = self.calculate_ramp(previous_power, max_power[t])
-            min_power_t = self.calculate_ramp(previous_power, self.min_power)
+            current_power = self.calculate_ramp(op_time, previous_power, current_power)
 
-            if current_power > max_power_t:
-                self.outputs["energy"][t] = max_power_t
+            if current_power > 0:
+                current_power = min(current_power, max_power[t])
+                current_power = max(current_power, self.min_power)
 
-            elif current_power < min_power_t and current_power > 0:
-                self.outputs["energy"][t] = 0
+            self.outputs["energy"][t] = current_power
 
         return self.outputs["energy"].loc[start:end]
+
+    def set_dispatch_plan(
+        self,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ) -> None:
+        """
+        adds dispatch plan from current market result to total dispatch plan
+
+        :param marketconfig: The market configuration.
+        :type marketconfig: MarketConfig
+        :param orderbook: The orderbook.
+        :type orderbook: Orderbook
+        """
+        products_index = get_products_index(orderbook)
+
+        max_power = (
+            self.forecaster.get_availability(self.id)[products_index] * self.max_power
+        )
+
+        product_type = marketconfig.product_type
+        for order in orderbook:
+            start = order["start_time"]
+            end = order["end_time"]
+            end_excl = end - self.index.freq
+            if isinstance(order["accepted_volume"], dict):
+                self.outputs[product_type].loc[start:end_excl] += [
+                    order["accepted_volume"][key]
+                    for key in order["accepted_volume"].keys()
+                ]
+            else:
+                self.outputs[product_type].loc[start:end_excl] += order[
+                    "accepted_volume"
+                ]
+
+        self.calculate_cashflow(product_type, orderbook)
+
+        for start in products_index:
+            current_power = self.outputs[product_type][start]
+
+            previous_power = self.get_output_before(start)
+            op_time = self.get_operation_time(start)
+
+            current_power = self.calculate_ramp(op_time, previous_power, current_power)
+
+            if current_power > 0:
+                current_power = min(current_power, max_power[start])
+                current_power = max(current_power, self.min_power)
+
+            self.outputs[product_type][start] = current_power
+
+        self.bidding_strategies[product_type].calculate_reward(
+            unit=self,
+            marketconfig=marketconfig,
+            orderbook=orderbook,
+        )
 
     def calc_simple_marginal_cost(
         self,
@@ -196,7 +258,7 @@ class PowerPlant(SupportsMinMax):
         marginal_cost = (
             fuel_price / self.efficiency
             + self.forecaster.get_price("co2") * self.emission_factor / self.efficiency
-            + self.fixed_cost
+            + self.variable_cost
         )
 
         return marginal_cost
@@ -255,10 +317,16 @@ class PowerPlant(SupportsMinMax):
         efficiency = self.efficiency - eta_loss
         co2_price = self.forecaster.get_price("co2").at[timestep]
 
+        variable_cost = (
+            self.variable_cost
+            if isinstance(self.variable_cost, float)
+            else self.variable_cost[timestep]
+        )
+
         marginal_cost = (
             fuel_price / efficiency
             + co2_price * self.emission_factor / efficiency
-            + self.fixed_cost
+            + variable_cost
         )
 
         return marginal_cost
@@ -285,7 +353,7 @@ class PowerPlant(SupportsMinMax):
 
         base_load = self.outputs["energy"][start:end_excl]
         heat_demand = self.outputs["heat"][start:end_excl]
-        assert heat_demand.min() >= 0
+        # assert heat_demand.min() >= 0
 
         capacity_neg = self.outputs["capacity_neg"][start:end_excl]
         # needed minimum + capacity_neg - what is already sold is actual minimum
@@ -319,7 +387,11 @@ class PowerPlant(SupportsMinMax):
         """
         # if marginal costs already exists, return it
         if self.marginal_cost is not None:
-            return self.marginal_cost[start]
+            return (
+                self.marginal_cost[start]
+                if len(self.marginal_cost) > 1
+                else self.marginal_cost
+            )
         # if not, calculate it
         else:
             return self.calc_marginal_cost_with_partial_eff(

@@ -37,7 +37,7 @@ class BasicStrategy(BaseStrategy):
 @pytest.fixture
 def base_unit() -> BaseUnit:
     # Create a PowerPlant instance with some example parameters
-    index = pd.date_range("2022-01-01", periods=4, freq="H")
+    index = pd.date_range("2022-01-01", periods=4, freq="h")
     ff = NaiveForecast(
         index, availability=1, fuel_price=[10, 11, 12, 13], co2_price=[10, 20, 30, 30]
     )

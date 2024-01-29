@@ -168,7 +168,7 @@ class BaseUnit:
 
         """
         if start not in self.index:
-            return
+            start = self.index[0]
         product_type_mc = product_type + "_marginal_costs"
         for t in self.outputs[product_type_mc][start:end].index:
             mc = self.calculate_marginal_cost(
@@ -271,6 +271,19 @@ class BaseUnit:
         """
         return 0
 
+    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
+        """
+        Calculates the marginal cost for the given power
+
+        :param start: the start time of the dispatch
+        :type start: pd.Timestamp
+        :param power: the power output of the unit
+        :type power: float
+        :return: the marginal cost for the given power
+        :rtype: float
+        """
+        pass
+
 
 class SupportsMinMax(BaseUnit):
     """
@@ -297,8 +310,8 @@ class SupportsMinMax(BaseUnit):
     ramp_up: float
     efficiency: float
     emission_factor: float
-    min_operating_time: int
-    min_down_time: int
+    min_operating_time: int = 0
+    min_down_time: int = 0
 
     def calculate_min_max_power(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type: str = "energy"
@@ -317,12 +330,17 @@ class SupportsMinMax(BaseUnit):
         pass
 
     def calculate_ramp(
-        self, previous_power: float, power: float, current_power: float = 0
+        self,
+        op_time: int,
+        previous_power: float,
+        power: float,
+        current_power: float = 0,
     ) -> float:
         """
         Calculates the ramp for the given power
 
         Args:
+            op_time (int): the operation time
             previous_power (float): the previous power output of the unit
             power (float): the power output of the unit
             current_power (float): the current power output of the unit
@@ -330,6 +348,14 @@ class SupportsMinMax(BaseUnit):
         Returns:
             float: the ramp for the given power
         """
+        # op_time_befor = self.get_operation_time(start)
+        # was off before, but should be on now and min_down_time is not reached
+        if power > 0 and op_time < 0 and op_time > -self.min_down_time:
+            power = 0
+        # was on before, but should be off now and min_operating_time is not reached
+        elif power == 0 and op_time > 0 and op_time < self.min_operating_time:
+            power = self.min_power
+
         if power == 0:
             # if less than min_power is required, we run min_power
             # we could also split at self.min_power/2
@@ -375,9 +401,9 @@ class SupportsMinMax(BaseUnit):
             int: the operation time
         """
         before = start - self.index.freq
-        # before = start
+
         max_time = max(self.min_operating_time, self.min_down_time)
-        begin = before - self.index.freq * max_time
+        begin = start - self.index.freq * max_time
         end = before
         arr = self.outputs["energy"][begin:end][::-1] > 0
         if len(arr) < 1:
@@ -400,6 +426,9 @@ class SupportsMinMax(BaseUnit):
 
         Returns:
             tuple[float, float]: avg_op_time, avg_down_time
+
+        Note:
+            down_time in general is indicated with negative values
         """
         op_series = []
 
@@ -408,7 +437,7 @@ class SupportsMinMax(BaseUnit):
 
         if len(arr) < 1:
             # before start of index
-            return self.min_operating_time, self.min_down_time
+            return max(self.min_operating_time, 1), min(-self.min_down_time, -1)
 
         op_series = []
         status = arr.iloc[0]
@@ -418,7 +447,7 @@ class SupportsMinMax(BaseUnit):
                 runn += 1
             else:
                 op_series.append(-((-1) ** status) * runn)
-                runn = 0
+                runn = 1
                 status = val
         op_series.append(-((-1) ** status) * runn)
 
@@ -432,9 +461,11 @@ class SupportsMinMax(BaseUnit):
         if down_times == []:
             avg_down_time = self.min_down_time
         else:
-            avg_down_time = abs(sum(down_times) / len(down_times))
+            avg_down_time = sum(down_times) / len(down_times)
 
-        return max(1, avg_op_time), max(1, avg_down_time)
+        return max(1, avg_op_time, self.min_operating_time), min(
+            -1, avg_down_time, -self.min_down_time
+        )
 
     def get_starting_costs(self, op_time: int) -> float:
         """
@@ -591,8 +622,7 @@ class SupportsMinMaxCharge(BaseUnit):
             )
         else:
             # Assuming the storage is not restricted by ramping charging down
-            if previous_power < 0:
-                previous_power = 0
+            previous_power = max(previous_power, 0)
 
             power_discharge = min(
                 power_discharge,
@@ -635,8 +665,7 @@ class SupportsMinMaxCharge(BaseUnit):
                 previous_power - self.ramp_down_discharge - current_power, 0
             )
         else:
-            if previous_power > 0:
-                previous_power = 0
+            previous_power = min(previous_power, 0)
 
             power_charge = max(
                 power_charge,

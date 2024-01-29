@@ -40,8 +40,7 @@ class Forecaster:
 
         This method returns the forecast for a given column as a pandas Series based on the provided index.
         """
-
-        return pd.Series(0, self.index)
+        return pd.Series(0.0, self.index)
 
     def get_availability(self, unit: str) -> pd.Series:
         """
@@ -123,7 +122,8 @@ class CsvForecaster(Forecaster):
         if column not in self.forecasts.columns:
             if "availability" in column:
                 return pd.Series(1, self.index)
-            return pd.Series(0, self.index)
+            return pd.Series(0.0, self.index)
+
         return self.forecasts[column]
 
     def set_forecast(self, data: pd.DataFrame | pd.Series | None, prefix=""):
@@ -168,7 +168,7 @@ class CsvForecaster(Forecaster):
         Calculates the forecasts if they are not already calculated.
 
         This method calculates additional forecasts if they do not already exist, including
-        "price_forecast" and "residual_load_forecast".
+        "price_EOM" and "residual_load_forecast".
         """
 
         cols = []
@@ -313,7 +313,7 @@ class CsvForecaster(Forecaster):
         if fp_column in self.forecasts.columns:
             fuel_price = self.forecasts[fp_column]
         else:
-            fuel_price = pd.Series(0, index=self.index)
+            fuel_price = pd.Series(0.0, index=self.index)
 
         emission_factor = pp_series["emission_factor"]
         co2_price = self.forecasts["fuel_price_co2"]
@@ -321,8 +321,11 @@ class CsvForecaster(Forecaster):
         fuel_cost = fuel_price / pp_series["efficiency"]
         emissions_cost = co2_price * emission_factor / pp_series["efficiency"]
         fixed_cost = pp_series["fixed_cost"] if "fixed_cost" in pp_series else 0.0
+        variable_cost = (
+            pp_series["variable_cost"] if "variable_cost" in pp_series else 0.0
+        )
 
-        marginal_cost = fuel_cost + emissions_cost + fixed_cost
+        marginal_cost = fuel_cost + emissions_cost + fixed_cost + variable_cost
 
         return marginal_cost
 
@@ -388,7 +391,7 @@ class RandomForecaster(CsvForecaster):
         """
 
         if column not in self.forecasts.columns:
-            return pd.Series(0, self.index)
+            return pd.Series(0.0, self.index)
         noise = np.random.normal(0, self.sigma, len(self.index))
         return self.forecasts[column] * noise
 

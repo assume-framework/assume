@@ -968,7 +968,7 @@ if __name__ == "__main__":
     index = pd.date_range(
         start=start,
         end=end + timedelta(hours=24),
-        freq="H",
+        freq="h",
     )
     database = os.getenv("INFRASTRUCTURE_SOURCE", "timescale.nowum.fh-aachen.de:5432")
     login = os.getenv("INFRASTRUCTURE_LOGIN", "readonly:readonly")

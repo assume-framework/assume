@@ -16,7 +16,8 @@ from assume.reinforcement_learning.learning_utils import Actor, NormalActionNois
 
 class RLStrategy(LearningStrategy):
     """
-    Reinforcement Learning Strategy
+    Reinforcement Learning Strategy, that lets agent learn to bid on an Energy Only Makret
+    by submitting two price bids - one for the infelxible (P_min) and one for the flexible part (P_max-P_min) of ist capacity
 
     :param foresight: Number of time steps to look ahead. Default 24.
     :type foresight: int
@@ -59,6 +60,9 @@ class RLStrategy(LearningStrategy):
         # for definition of observation space
         self.foresight = kwargs.get("foresight", 24)
 
+        # define used order types
+        self.order_types = kwargs.get("order_types", ["SB"])
+
         if self.learning_mode:
             self.learning_role = None
             self.collect_initial_experience_mode = kwargs.get(
@@ -84,16 +88,16 @@ class RLStrategy(LearningStrategy):
         **kwargs,
     ) -> Orderbook:
         """
-        Calculate bids for a unit
+        Calculate bids for a unit, based on the actions from the actor
 
-        :param unit: Unit to calculate bids for
-        :type unit: SupportsMinMax
-        :param market_config: Market configuration
-        :type market_config: MarketConfig
-        :param product_tuples: Product tuples
-        :type product_tuples: list[Product]
-        :return: Bids containing start time, end time, price and volume
-        :rtype: Orderbook
+        Args:
+            unit (SupportsMinMax): Unit to calculate bids for
+            market_config (MarketConfig): Market configuration
+            product_tuples (list[Product]): Product tuples
+
+        Returns:
+            Orderbook: Bids containing start time, end time, price, volume and bid type
+
         """
 
         bid_quantity_inflex, bid_price_inflex = 0, 0
@@ -164,12 +168,19 @@ class RLStrategy(LearningStrategy):
 
     def get_actions(self, next_observation):
         """
-        Get actions
+        Get actions for a unit containing two bid prices depending on the observation
 
-        :param next_observation: Next observation
-        :type next_observation: torch.Tensor
-        :return: Actions
-        :rtype: torch.Tensor
+        Args:
+            next_observation (torch.Tensor): Next observation
+
+        Returns:
+            Actions (torch.Tensor): Actions containing two bid prices
+
+        Note:
+            If the agent is in learning mode, the actions are chosen by the actor neuronal net and noise is added to the action
+            In the first x episodes the agent is in initial exploration mode, where the action is chosen by noise only to explore the entire action space.
+            X is defined by episodes_collecting_initial_experience.
+            If the agent is not in learning mode, the actions are chosen by the actor neuronal net without noise.
         """
 
         # distinction whether we are in learning mode or not to handle exploration realised with noise
@@ -191,7 +202,7 @@ class RLStrategy(LearningStrategy):
                 # =============================================================================
                 base_bid = next_observation[-1]
 
-                # add niose to the last dimension of the observation
+                # add noise to the last dimension of the observation
                 # needs to be adjusted if observation space is changed, because only makes sense
                 # if the last dimension of the observation space are the marginal cost
                 curr_action = noise + base_bid.clone().detach()

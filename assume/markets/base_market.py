@@ -437,11 +437,17 @@ class MarketRole(MarketMechanism, Role):
         ) = self.clear(self.all_orders, market_products)
         self.all_orders = []
         for order in rejected_orderbook:
-            order["accepted_volume"] = 0
-            if len(market_meta) > 0:
-                order["accepted_price"] = market_meta[0]["price"]
+            if isinstance(order["volume"], dict):
+                order["accepted_volume"] = {
+                    start: 0.0 for start in order["volume"].keys()
+                }
+                order["accepted_price"] = {
+                    start: market_meta[i]["price"]
+                    for i, start in enumerate(order["volume"].keys())
+                }
             else:
-                order["accepted_price"] = 0
+                order["accepted_volume"] = 0.0
+                order["accepted_price"] = market_meta[0]["price"]
         self.open_auctions - set(market_products)
 
         accepted_orderbook.sort(key=itemgetter("agent_id"))

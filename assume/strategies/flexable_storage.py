@@ -63,7 +63,6 @@ class flexableEOMStorage(BaseStrategy):
         for product in product_tuples:
             start = product[0]
             end = product[1]
-            end_excl = end - unit.index.freq
 
             current_power = unit.outputs["energy"].at[start]
             current_power_discharge = max(current_power, 0)
@@ -154,7 +153,8 @@ class flexableEOMStorage(BaseStrategy):
         orderbook: Orderbook,
     ):
         """
-        Calculate reward (costs)
+        Calculate reward (costs and profit)
+
         :param unit: Unit to calculate reward for
         :type unit: SupportsMinMax
         :param marketconfig: Market configuration
@@ -170,7 +170,7 @@ class flexableEOMStorage(BaseStrategy):
             end = order["end_time"]
             end_excl = end - unit.index.freq
             index = pd.date_range(start, end_excl, freq=unit.index.freq)
-            costs = pd.Series(unit.fixed_cost, index=index)
+            costs = pd.Series(float(unit.fixed_cost), index=index)
             for start in index:
                 if unit.outputs[product_type][start] != 0:
                     costs[start] += unit.outputs[product_type][
@@ -179,6 +179,9 @@ class flexableEOMStorage(BaseStrategy):
                         start, unit.outputs[product_type][start]
                     )
 
+            unit.outputs["profit"][index] = (
+                unit.outputs[f"{product_type}_cashflow"][index] - costs
+            )
             unit.outputs["total_costs"][index] = costs
 
 
@@ -268,6 +271,7 @@ class flexablePosCRMStorage(BaseStrategy):
                     }
                 )
                 previous_power = current_power
+
             elif market_config.product_type == "energy_pos":
                 bids.append(
                     {
@@ -278,6 +282,15 @@ class flexablePosCRMStorage(BaseStrategy):
                         "volume": bid_quantity,
                     }
                 )
+                time_delta = (end - start) / timedelta(hours=1)
+                delta_soc = -(
+                    (bid_quantity + current_power)
+                    * time_delta
+                    / unit.efficiency_discharge
+                    / unit.max_volume
+                )
+                theoretic_SOC += delta_soc
+                previous_power = bid_quantity + current_power
                 time_delta = (end - start) / timedelta(hours=1)
                 delta_soc = -(
                     (bid_quantity + current_power)
@@ -328,6 +341,7 @@ class flexableNegCRMStorage(BaseStrategy):
         end = product_tuples[-1][1]
 
         previous_power = unit.get_output_before(start)
+
         theoretic_SOC = unit.outputs["soc"][start]
 
         min_power_charge, max_power_charge = unit.calculate_min_max_charge(start, end)
@@ -359,6 +373,7 @@ class flexableNegCRMStorage(BaseStrategy):
                     }
                 )
                 previous_power = current_power
+
             elif market_config.product_type == "energy_neg":
                 bids.append(
                     {
@@ -369,6 +384,15 @@ class flexableNegCRMStorage(BaseStrategy):
                         "volume": bid_quantity,
                     }
                 )
+                time_delta = (end - start) / timedelta(hours=1)
+                delta_soc = (
+                    (bid_quantity + current_power)
+                    * time_delta
+                    * unit.efficiency_charge
+                    / unit.max_volume
+                )
+                theoretic_SOC += delta_soc
+                previous_power = bid_quantity + current_power
                 time_delta = (end - start) / timedelta(hours=1)
                 delta_soc = (
                     (bid_quantity + current_power)

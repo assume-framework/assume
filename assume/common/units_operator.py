@@ -22,7 +22,7 @@ from assume.common.market_objects import (
     Orderbook,
     RegistrationMessage,
 )
-from assume.common.utils import aggregate_step_amount
+from assume.common.utils import aggregate_step_amount, get_products_index
 from assume.strategies import BaseStrategy, LearningStrategy
 from assume.units import BaseUnit
 
@@ -446,27 +446,60 @@ class UnitsOperator(Role):
                     order["volume"] = round(order["volume"] / market.volume_tick)
                 if market.price_tick:
                     order["price"] = round(order["price"] / market.price_tick)
-
-                order["bid_id"] = f"{unit_id}_{i+1}"
+                if "bid_id" not in order.keys() or order["bid_id"] is None:
+                    order["bid_id"] = f"{unit_id}_{i+1}"
                 order["unit_id"] = unit_id
                 orderbook.append(order)
 
         return orderbook
 
     def write_learning_to_output(
-        self, start: datetime, marketconfig: MarketConfig
+        self, products_index: pd.DatetimeIndex, marketconfig: MarketConfig
     ) -> None:
         """
         Sends the current rl_strategy update to the output agent.
 
         Args:
-            start (datetime): The start time.
+            products_index (pd.DatetimeIndex): The index of all products.
             marketconfig (MarketConfig): The market configuration.
         """
+        try:
+            from assume.strategies.learning_advanced_orders import (
+                RLAdvancedOrderStrategy,
+            )
+        except ImportError as e:
+            self.logger.info(
+                "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",
+                e,
+            )
+            return
+
         output_agent_list = []
+        start = products_index[0]
         for unit_id, unit in self.units.items():
             # rl only for energy market for now!
             if isinstance(
+                unit.bidding_strategies.get(marketconfig.product_type),
+                (RLAdvancedOrderStrategy),
+            ):
+                # TODO: check whether to split the reward, profit and regret to different lines
+                output_dict = {
+                    "datetime": start,
+                    "profit": unit.outputs["profit"].loc[products_index].sum(),
+                    "reward": unit.outputs["reward"].loc[products_index].sum() / 24,
+                    "regret": unit.outputs["regret"].loc[products_index].sum(),
+                    "unit": unit_id,
+                }
+                noise_tuple = unit.outputs["rl_exploration_noise"].loc[start]
+                action_tuple = unit.outputs["rl_actions"].loc[start]
+                action_dim = len(action_tuple)
+                for i in range(action_dim):
+                    output_dict[f"exploration_noise_{i}"] = noise_tuple[i]
+                    output_dict[f"actions_{i}"] = action_tuple[i]
+
+                output_agent_list.append(output_dict)
+
+            elif isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
                 LearningStrategy,
             ):
@@ -502,7 +535,7 @@ class UnitsOperator(Role):
 
     def write_to_learning(
         self,
-        start: datetime,
+        products_index: pd.DatetimeIndex,
         marketconfig: MarketConfig,
         obs_dim: int,
         act_dim: int,
@@ -522,9 +555,13 @@ class UnitsOperator(Role):
         """
         all_observations = []
         all_rewards = []
+        start = products_index[0]
         try:
             import torch as th
 
+            from assume.strategies.learning_advanced_orders import (
+                RLAdvancedOrderStrategy,
+            )
         except ImportError:
             logger.error("tried writing learning_params, but torch is not installed")
             return
@@ -536,6 +573,15 @@ class UnitsOperator(Role):
         for unit in self.units.values():
             # rl only for energy market for now!
             if isinstance(
+                unit.bidding_strategies.get(marketconfig.product_type),
+                (RLAdvancedOrderStrategy),
+            ):
+                all_observations[i, :] = unit.outputs["rl_observations"][start]
+                all_actions[i, :] = unit.outputs["rl_actions"][start]
+                all_rewards.append(sum(unit.outputs["reward"][products_index]))
+                i += 1
+
+            elif isinstance(
                 unit.bidding_strategies.get(marketconfig.product_type),
                 LearningStrategy,
             ):
@@ -576,6 +622,7 @@ class UnitsOperator(Role):
         """
 
         learning_strategies = []
+        products_index = get_products_index(orderbook)
 
         for unit in self.units.values():
             bidding_strategy = unit.bidding_strategies.get(marketconfig.product_type)
@@ -588,16 +635,15 @@ class UnitsOperator(Role):
 
         # should write learning results if at least one bidding_strategy is a learning strategy
         if learning_strategies and orderbook:
-            start = orderbook[0]["start_time"]
             # write learning output
-            self.write_learning_to_output(start, marketconfig)
+            self.write_learning_to_output(products_index, marketconfig)
 
             # we are using the first learning_strategy to check learning_mode
             # as this should be the same value for all strategies
             if learning_strategies[0].learning_mode:
                 # in learning mode we are sending data to learning
                 self.write_to_learning(
-                    start=start,
+                    products_index=products_index,
                     marketconfig=marketconfig,
                     obs_dim=obs_dim,
                     act_dim=act_dim,

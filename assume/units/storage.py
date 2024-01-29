@@ -152,6 +152,7 @@ class Storage(SupportsMinMaxCharge):
         # The variable costs to charge/discharge the storage unit.
         self.variable_cost_charge = variable_cost_charge
         self.variable_cost_discharge = variable_cost_discharge
+        self.fixed_cost = fixed_cost
 
         # The emission factor of the storage unit.
         self.emission_factor = emission_factor
@@ -224,6 +225,7 @@ class Storage(SupportsMinMaxCharge):
                 if self.outputs["energy"][t] > max_soc_discharge:
                     self.outputs["energy"][t] = max_soc_discharge
 
+                time_delta = self.index.freq / timedelta(hours=1)
                 delta_soc = (
                     -self.outputs["energy"][t]
                     * time_delta
@@ -238,6 +240,7 @@ class Storage(SupportsMinMaxCharge):
                 if self.outputs["energy"][t] < max_soc_charge:
                     self.outputs["energy"][t] = max_soc_charge
 
+                time_delta = self.index.freq / timedelta(hours=1)
                 delta_soc = (
                     -self.outputs["energy"][t]
                     * time_delta

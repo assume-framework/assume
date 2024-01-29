@@ -107,4 +107,4 @@ dam_with_complex_opt_clearing:
       market_mechanism: pay_as_clear_complex
       additional_fields:
         - bid_type
-        - profile
+        - min_acceptance_ratio

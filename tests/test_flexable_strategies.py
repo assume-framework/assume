@@ -9,7 +9,13 @@ import pandas as pd
 import pytest
 
 from assume.common.forecasts import NaiveForecast
-from assume.strategies import flexableEOM, flexableNegCRM, flexablePosCRM
+from assume.strategies import (
+    flexableEOM,
+    flexableEOMBlock,
+    flexableEOMLinked,
+    flexableNegCRM,
+    flexablePosCRM,
+)
 from assume.units import PowerPlant
 
 start = datetime(2023, 7, 1)
@@ -19,7 +25,7 @@ end = datetime(2023, 7, 2)
 @pytest.fixture
 def power_plant() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
-    index = pd.date_range("2023-07-01", periods=24, freq="H")
+    index = pd.date_range("2023-07-01", periods=48, freq="h")
     ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
     return PowerPlant(
         id="test_pp",
@@ -44,27 +50,27 @@ def test_flexable_eom(mock_market_config, power_plant):
     product_tuples = [(start, end, None)]
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
     assert len(bids) == 2
-    assert bids[0]["price"] == 40
+    assert bids[0]["price"] == 30
     assert bids[0]["volume"] == 200
-    assert bids[1]["price"] == 40
+    assert bids[1]["price"] == 30
     assert bids[1]["volume"] == 800
 
     # start-up situation with ramping restriction
     power_plant.ramp_up = 400
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
     assert len(bids) == 2
-    assert bids[0]["price"] == 40
+    assert bids[0]["price"] == 30
     assert bids[0]["volume"] == 200
-    assert bids[1]["price"] == 40
+    assert bids[1]["price"] == 30
     assert bids[1]["volume"] == 200
 
     # CHP with ramping restrictions, but without start-up
     power_plant.outputs["heat"][start] = 300
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
     assert len(bids) == 2
-    assert math.isclose(bids[0]["price"], (40 - 10 / 0.9))
+    assert math.isclose(bids[0]["price"], (30 - 10 / 0.9))
     assert bids[0]["volume"] == 300
-    assert bids[1]["price"] == 40
+    assert bids[1]["price"] == 30
     assert bids[1]["volume"] == 100
 
 
@@ -76,13 +82,13 @@ def test_flexable_pos_reserve(mock_market_config, power_plant):
     product_tuples = [(start, end, None)]
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
     assert len(bids) == 1
-    assert bids[0]["price"] == 40
+    assert bids[0]["price"] == 30
     assert bids[0]["volume"] == 1000
 
     mc.product_type = "capacity_pos"
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
     assert len(bids) == 1
-    assert bids[0]["price"] == 50
+    assert bids[0]["price"] == 100
     assert bids[0]["volume"] == 1000
 
     # increase the marginal cost to ensure specific_revenue < 0
@@ -111,7 +117,7 @@ def test_flexable_neg_reserve(mock_market_config, power_plant):
 
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
     assert len(bids) == 1
-    assert bids[0]["price"] == -40
+    assert bids[0]["price"] == -30
     assert bids[0]["volume"] == -300
 
     # Calculations for negative capacity

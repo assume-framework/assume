@@ -13,6 +13,7 @@ from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
     aggregate_step_amount,
     get_available_products,
+    get_products_index,
     initializer,
     plot_orderbook,
     separate_orders,
@@ -205,7 +206,7 @@ def test_sep_block_orders():
         {
             "start_time": start,
             "end_time": end,
-            "volume": {i: 60 for i in index},
+            "volume": 50,
             "price": {i: 110 for i in index},
             "agent_id": "mpb1",
             "only_hours": None,
@@ -220,6 +221,55 @@ def test_sep_block_orders():
     assert len(orderbook) == 55
     for order in orderbook:
         assert True not in [isinstance(order[key], dict) for key in order.keys()]
+
+
+def test_get_products_index():
+    index_1 = pd.date_range(
+        start=datetime(2020, 1, 1, 0), end=datetime(2020, 1, 1, 5), freq="1H"
+    )
+    index_2 = pd.date_range(
+        start=datetime(2020, 1, 1, 0), end=datetime(2020, 1, 1, 7), freq="1H"
+    )
+    orderbook = [
+        {
+            "start_time": datetime(2020, 1, 1, 0),
+            "end_time": datetime(2020, 1, 1, 5),
+            "volume": {i: 50 for i in index_1},
+            "price": 120,
+            "agent_id": "block1",
+            "only_hours": None,
+            "accepted_volume": {i: 0 for i in index_1},
+            "accepted_price": {i: None for i in index_1},
+            "bid_type": "BB",
+            "bid_id": "block1_1",
+        },
+        {
+            "start_time": datetime(2020, 1, 1, 0),
+            "end_time": datetime(2020, 1, 1, 7),
+            "volume": 60,
+            "price": {i: 110 for i in index_2},
+            "agent_id": "block1",
+            "only_hours": None,
+            "accepted_volume": {i: 0 for i in index_2},
+            "accepted_price": {i: None for i in index_2},
+            "bid_type": "BB",
+        },
+        {
+            "start_time": datetime(2020, 1, 1, 23),
+            "end_time": datetime(2020, 1, 2, 0),
+            "volume": 80,
+            "price": 58,
+            "agent_id": "gen1",
+            "only_hours": None,
+            "accepted_volume": 0,
+            "accepted_price": None,
+            "bid_type": "SB",
+            "bid_id": "gen1_1",
+        },
+    ]
+    assert len(orderbook) == 3
+    products_index = get_products_index(orderbook)
+    assert len(products_index) == 24
 
 
 @patch("matplotlib.pyplot.show")
@@ -244,4 +294,5 @@ if __name__ == "__main__":
     test_plot_function()
     test_make_market_config()
     test_initializer()
-    test_plot_function()
+    test_sep_block_orders()
+    test_aggregate_step_amount()
