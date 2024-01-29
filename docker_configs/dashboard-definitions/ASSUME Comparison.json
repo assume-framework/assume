@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2,
+  "id": 1,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -536,7 +536,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "select sim1.\"time\", sim2.\" \" - sim1.\" \" as \"Price\", sim1.bid_id from (\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_price) AS \" \",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1\n) sim1\njoin (\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_price) AS \" \",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1) sim2\non sim1.time = sim2.time and sim1.bid_id = sim2.bid_id",
+          "rawSql": "select sim1.\"time\", sim2.\" \" - sim1.\" \" as \"Price\", sim1.bid_id from (\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_price) AS \" \",\n  case\n    when bid_type isnull then concat(unit_id, '_SB')\n    when bid_type != '' then concat(unit_id, '_', bid_type)\n  end AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_type\nORDER BY 1\n) sim1\njoin (\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_price) AS \" \",\n  case\n    when bid_type isnull then concat(unit_id, '_SB')\n    when bid_type != '' then concat(unit_id, '_', bid_type)\n  end AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_type\nORDER BY 1) sim2\non sim1.time = sim2.time and sim1.bid_id = sim2.bid_id",
           "refId": "A",
           "select": [
             [
@@ -738,7 +738,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "select sim1.\"time\", sim2.\" \" - sim1.\" \" as \"Volume\", sim1.bid_id from (\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(volume) AS \" \",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1\n) sim1 \njoin (\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(volume) AS \" \",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, bid_id\nORDER BY 1\n) sim2 on sim1.time = sim2.time and sim1.bid_id = sim2.bid_id",
+          "rawSql": "select sim1.\"time\", sim2.\" \" - sim1.\" \" as \"Volume\", sim1.bid_id from (\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(volume) AS \" \",\n  case\n    when bid_type isnull then concat(unit_id, '_SB')\n    when bid_type != '' then concat(unit_id, '_', bid_type)\n  end AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_type\nORDER BY 1\n) sim1 \njoin (\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(volume) AS \" \",\n  case\n    when bid_type isnull then concat(unit_id, '_SB')\n    when bid_type != '' then concat(unit_id, '_', bid_type)\n  end AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_type\nORDER BY 1\n) sim2 on sim1.time = sim2.time and sim1.bid_id = sim2.bid_id",
           "refId": "A",
           "select": [
             [

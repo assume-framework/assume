@@ -25,7 +25,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": 4,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -2075,7 +2075,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  actions_0 AS \"action_Pinflex\",\n  actions_0+exploration_noise_0 AS \"noisy_action_Pinflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime)\n  and simulation like '${simulation}' || '_%' AND\n  unit = '$rl_unit'\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n    case\n    when actions_0 >= actions_1 then actions_1\n    when actions_0 < actions_1 then actions_0 \n  end as \"action_Pinflex\",\n  case\n    when actions_0 >= actions_1 then actions_1 + exploration_noise_1\n    when actions_0 < actions_1 then actions_0 + exploration_noise_0\n  end as \"noisy_action_Pinflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime)\n  and simulation like '${simulation}' || '_%' AND\n  unit = '$rl_unit'\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2214,7 +2214,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  actions_1 AS \"action_Pflex\",\n  actions_1+exploration_noise_1 AS \"noisy_action_Pflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime)\n  and simulation like '${simulation}' || '_%' AND\n  unit = '$rl_unit'\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  case\n    when actions_0 <= actions_1 then actions_1\n    when actions_0 > actions_1 then actions_0 \n  end as \"action_Pflex\",\n  case\n    when actions_0 <= actions_1 then actions_1 + exploration_noise_1\n    when actions_0 > actions_1 then actions_0 + exploration_noise_0\n  end as \"noisy_action_Pflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime)\n  and simulation like '${simulation}' || '_%' AND\n  unit = '$rl_unit'\nORDER BY 1",
           "refId": "A",
           "select": [
             [

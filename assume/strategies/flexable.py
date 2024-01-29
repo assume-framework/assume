@@ -367,13 +367,14 @@ def calculate_EOM_price_if_off(
     Calculating the average uninterrupted operating period
 
     Args:
-    - unit (SupportsMinMax): A unit that the unit operator manages
-    - marginal_cost_inflex (float): The marginal cost of the unit
-    - bid_quantity_inflex (float): The bid quantity of the unit
-    - op_time (int): The operation time of the unit
+        unit (SupportsMinMax): A unit that the unit operator manages
+        marginal_cost_inflex (float): The marginal cost of the unit
+        bid_quantity_inflex (float): The bid quantity of the unit
+        op_time (int): The operation time of the unit
+        avg_op_time (int): The average operation time of the unit
 
     Returns:
-    - float: The bid price of the unit
+        float: The bid price of the unit
     """
     starting_cost = unit.get_starting_costs(op_time)
     # if we split starting_cost across av_operating_time

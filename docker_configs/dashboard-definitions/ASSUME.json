@@ -447,7 +447,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_price::float) AS \" \",\n  case\n    when bid_type isnull then unit_id\n    when bid_type != '' then concat(unit_id, '_', bid_type)\n  end AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_id, bid_type\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_price::float) AS \" \",\n  case\n    when bid_type isnull concat(unit_id, '_SB')\n    when bid_type != '' then concat(unit_id, '_', bid_type)\n  end AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_id, bid_type\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -624,7 +624,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_volume) AS \" \",\n  case\n    when bid_type isnull then unit_id\n    when bid_type != '' then concat(unit_id, '_', bid_type)\n  end AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_id, bid_type\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_volume) AS \" \",\n  case\n    when bid_type isnull then concat(unit_id, '_SB')\n    when bid_type != '' then concat(unit_id, '_', bid_type)\n  end AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_id, bid_type\nORDER BY 1",
           "refId": "A",
           "select": [
             [

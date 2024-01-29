@@ -11,7 +11,6 @@ import torch as th
 
 from assume.common.base import LearningStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.common.utils import get_products_index
 from assume.reinforcement_learning.learning_utils import Actor, NormalActionNoise
 
 
@@ -92,12 +91,12 @@ class RLStrategy(LearningStrategy):
         Calculate bids for a unit, based on the actions from the actor
 
         Args:
-        - unit (SupportsMinMax): Unit to calculate bids for
-        - market_config (MarketConfig): Market configuration
-        - product_tuples (list[Product]): Product tuples
+            unit (SupportsMinMax): Unit to calculate bids for
+            market_config (MarketConfig): Market configuration
+            product_tuples (list[Product]): Product tuples
 
         Returns:
-        - Orderbook: Bids containing start time, end time, price, volume and bid type
+            Orderbook: Bids containing start time, end time, price, volume and bid type
 
         """
 
@@ -172,10 +171,10 @@ class RLStrategy(LearningStrategy):
         Get actions for a unit containing two bid prices depending on the observation
 
         Args:
-        - next_observation (torch.Tensor): Next observation
+            next_observation (torch.Tensor): Next observation
 
         Returns:
-        - Actions (torch.Tensor): Actions containing two bid prices
+            Actions (torch.Tensor): Actions containing two bid prices
 
         Note:
             If the agent is in learning mode, the actions are chosen by the actor neuronal net and noise is added to the action
@@ -308,7 +307,7 @@ class RLStrategy(LearningStrategy):
 
         # get last accapted bid volume and the current marginal costs of the unit
         current_volume = unit.get_output_before(start)
-        current_costs = unit.calculate_marginal_cost(start, current_volume)
+        current_costs = unit.calc_marginal_cost_with_partial_eff(current_volume, start)
 
         # scale unit outpus
         scaled_total_capacity = current_volume / scaling_factor_total_capacity
@@ -367,10 +366,18 @@ class RLStrategy(LearningStrategy):
             end = order["end_time"]
             end_excl = end - unit.index.freq
 
-            # depending on way the unit calculates marginal costs we take costs
-            marginal_cost = unit.calculate_marginal_cost(
-                start, unit.outputs[product_type].loc[start]
-            )
+            # depending on way the unit calaculates marginal costs we take costs
+            if unit.marginal_cost is not None:
+                marginal_cost = (
+                    unit.marginal_cost[start]
+                    if len(unit.marginal_cost) > 1
+                    else unit.marginal_cost
+                )
+            else:
+                marginal_cost = unit.calc_marginal_cost_with_partial_eff(
+                    power_output=unit.outputs[product_type].loc[start:end_excl],
+                    timestep=start,
+                )
 
             duration = (end - start) / timedelta(hours=1)
 
