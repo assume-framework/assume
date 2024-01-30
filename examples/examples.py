@@ -49,6 +49,10 @@ availabe_examples = {
         "study_case": "dam_case_2019",
     },
     "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
+    "network_clear": {
+        "scenario": "example_01d",
+        "study_case": "base",
+    },
     "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
     "small_learning_3": {"scenario": "example_02c", "study_case": "dam"},
 }
@@ -60,8 +64,8 @@ if __name__ == "__main__":
     - local_db: without database and grafana
     - timescale: with database and grafana (note: you need docker installed)
     """
-    data_format = "timescale"  # "local_db" or "timescale"
-    example = "small"
+    data_format = "local_db"  # "local_db" or "timescale"
+    example = "network_clear"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
@@ -70,9 +74,6 @@ if __name__ == "__main__":
 
     # create world
     world = World(database_uri=db_uri, export_csv_path=csv_path)
-
-    # you can also add custom bidding strategies as follows:
-    from assume.strategies.learning_strategies import RLStrategy
 
     # load scenario
     load_scenario_folder(

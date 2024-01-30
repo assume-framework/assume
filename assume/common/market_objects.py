@@ -115,6 +115,8 @@ class MarketConfig:
         price_tick (float | None): step increments of price (e.g. 0.1)
         supports_get_unmatched (bool): whether the market supports get unmatched
         eligible_obligations_lambda (eligible_lambda): lambda function which determines if an agent is eligible to trade this product
+        network_path (str): the path of for the network
+        solver (str): the solver used for the market clearing
         addr (str): the address of the market
         aid (str): automatic id of the market
     """
@@ -136,6 +138,8 @@ class MarketConfig:
     price_tick: float | None = None  # steps in which the price can be increased
     supports_get_unmatched: bool = False
     eligible_obligations_lambda: eligible_lambda = lambda x: True
+    network_path: str = " "
+    solver: str = "glpk"
 
     addr: str = " "
     aid: str = " "

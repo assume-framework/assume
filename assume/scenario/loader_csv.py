@@ -130,6 +130,7 @@ def convert_to_rrule_freq(string: str) -> Tuple[int, int]:
 def make_market_config(
     id: str,
     market_params: dict,
+    network_path: str,
     world_start: datetime,
     world_end: datetime,
 ) -> MarketConfig:
@@ -186,6 +187,7 @@ def make_market_config(
         price_tick=market_params.get("price_tick"),
         additional_fields=market_params.get("additional_fields", []),
         supports_get_unmatched=market_params.get("supports_get_unmatched", False),
+        network_path=network_path,
     )
 
     return market_config
@@ -416,6 +418,7 @@ async def load_scenario_folder_async(
         market_config = make_market_config(
             id=market_id,
             market_params=market_params,
+            network_path=market_params.get("network_path", path),
             world_start=start,
             world_end=end,
         )
