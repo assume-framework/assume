@@ -23,7 +23,7 @@ class RedispatchMarketRole(MarketRole):
 
         self.network = pypsa.Network()
         # set snapshots as list from the value marketconfig.producs.count converted to list
-        snapshots = list(range(marketconfig.market_products[0].count))
+        snapshots = range(marketconfig.market_products[0].count)
         self.network.set_snapshots(snapshots)
         self.solver = marketconfig.solver
 
@@ -35,6 +35,7 @@ class RedispatchMarketRole(MarketRole):
         self.add_lines(f"{marketconfig.network_path}/lines.csv")
 
         # add generators
+        # TODO: add config parameter for price of the backup generators and backup generators themselves
         self.add_generators(f"{marketconfig.network_path}/powerplant_units.csv")
 
         # add loads
@@ -47,31 +48,24 @@ class RedispatchMarketRole(MarketRole):
         Typically nodes are those substations to which the transmission lines are connected to.
 
         """
-        buses = pd.read_csv(filename)
+        buses = pd.read_csv(filename, index_col=0)
 
         self.network.madd(
             "Bus",
-            names=buses["bus"],
-            v_nom=buses["v_nom"],  # Nominal voltage level of the bus(substation)
-            carrier=buses["carrier"],
-            x=buses["x"],  # longitude
-            y=buses["y"],  # lattitude
+            names=buses.index,
+            **buses,
         )
 
     def add_lines(self, filename):
         """
         This creates transmission network in PyPSA by connecting buses with predefined line capacities
         """
-        lines = pd.read_csv(filename)
+        lines = pd.read_csv(filename, index_col=0)
 
         self.network.madd(
             "Line",
-            names=lines["name"],
-            bus0=lines["bus0"],
-            bus1=lines["bus1"],
-            s_nom=lines["s_nom"],  # transmission line capacity in MW
-            x=1,
-            s_nom_extendable=lines["s_nom_extendable"],
+            names=lines.index,
+            **lines,
         )
 
     def add_generators(self, filename):
@@ -88,12 +82,13 @@ class RedispatchMarketRole(MarketRole):
             columns=generators.index,
         )
 
-        # Iterate through time steps and add generators
+        # add generators and their sold capacities as load with reversed sign to have fixed feed in
         self.network.madd(
             "Load",
             names=generators.index,
             bus=generators["node"],  # bus to which the generator is connected to
             p_set=p_set,
+            sign=1,
         )
 
         # add upward redispatch generators
@@ -118,8 +113,28 @@ class RedispatchMarketRole(MarketRole):
             p_nom=generators[
                 "max_power"
             ],  # Nominal capacity of the powerplant/generator
-            p_max_pu=1,
-            p_min_pu=generators["min_power"] / generators["max_power"],
+            p_min_pu=p_set,
+            p_max_pu=p_set + 1,
+            sign=-1,
+        )
+
+        # add upward and downward backup generators at each node
+        self.network.madd(
+            "Generator",
+            names=self.network.buses.index,
+            suffix="_backup_up",
+            bus=self.network.buses.index,  # bus to which the generator is connected to
+            p_nom=10e4,
+            marginal_cost=10e4,
+        )
+
+        self.network.madd(
+            "Generator",
+            names=self.network.buses.index,
+            suffix="_backup_down",
+            bus=self.network.buses.index,  # bus to which the generator is connected to
+            p_nom=10e4,
+            marginal_cost=10e4,
             sign=-1,
         )
 
@@ -129,214 +144,20 @@ class RedispatchMarketRole(MarketRole):
         """
         loads = pd.read_csv(filename, index_col=0)
 
+        p_set = pd.DataFrame(
+            np.zeros((len(self.network.snapshots), len(loads.index))),
+            index=self.network.snapshots,
+            columns=loads.index,
+        )
+
         # Iterate through time steps and add generators
         self.network.madd(
-            "Generator",
+            "Load",
             names=loads.index,
             bus=loads["node"],  # bus to which the generator is connected to
-            p_nom=loads["max_power"],  # Nominal capacity of the powerplant/generator
-            p_max_pu=1,
-            p_min_pu=loads["min_power"] / loads["max_power"],
-            sign=-1,
+            p_set=p_set,
+            sign=1,
         )
-
-    def congestion_identification(self):
-        """
-        This function identifies congestion in the transmission lines by running simple power flow in PyPSA network
-        """
-
-        zero_r_lines = self.network.lines.index[
-            self.network.lines.r == 0
-        ]  # A small non-zero value for resistance in lines with zero resistance
-        self.network.lines.loc[zero_r_lines, "r"] = 1e-9
-        self.congestion_info = []
-
-        self.network.pf()
-
-        line_index_counter = Counter()
-
-        for (
-            timestep
-        ) in (
-            self.network.snapshots
-        ):  # for each timestep the capacity of line is compared with the actual loading in lines
-            for index, (loading, s_nom_value) in enumerate(
-                zip(
-                    np.round(np.abs(self.network.lines_t.p0.values.flatten())),
-                    self.network.lines.s_nom,
-                )
-            ):
-                net_loading = loading - s_nom_value
-                congestion_status = net_loading > 0
-                self.congestion_info.append(
-                    {
-                        "timestamp": timestep,
-                        "line_index": self.network.lines.index[index],
-                        "nominal_grid_cap": s_nom_value,
-                        "line_loading": loading,
-                        "net_loading": net_loading,
-                        "congestion_status": congestion_status,
-                    }
-                )
-
-                if (
-                    congestion_status
-                ):  # this counter adds everytime for each line if congestion status is True
-                    line_index_counter[self.network.lines.index[index]] += 1
-
-        self.congestion_df = pd.DataFrame(self.congestion_info)
-        self.congestion = (
-            lambda x: "Network is congested" if x.any() else "There is no congestion"
-        )(self.congestion_df["congestion_status"])
-        counter_df = pd.DataFrame(
-            list(line_index_counter.items()), columns=["line_index", "congestion_count"]
-        )
-        counter_df.to_csv("congestion_count.csv", index=False)
-
-        print(f"Congestion count for each line_index:\n {counter_df}")
-
-        return self.congestion_info
-
-    def redispatch(self):
-        """
-        This function runs the redispatch of powerplants if the network is congested.
-
-        It adds one extra generator at each bus with the capacity of power generation equal to the uncleared capacity in the day ahead market
-
-        Also, adds one extra negative generator to symbolize curtailment
-        """
-        redispatch_info = []
-        line_index_counter = Counter()
-
-        if self.congestion_df[
-            "congestion_status"
-        ].any():  # This loops runs only when there is congestion
-            self.redisp_network = self.network.copy()
-            self.redisp_network.lines["s_nom_extendable"] = False
-            self.redisp_network.generators["control"] = "PQ"
-
-            # 1. Positive Redispatch: Adding one extra generator at every node for +ve redispatch
-            generator_data_pos = self.generator_data.copy()
-
-            # p_max_pu is fraction which is estimated to calculate maximum available capacity for positive redispatch
-            generator_data_pos["p_max_pu"] = (
-                generator_data_pos["p_nom"] - generator_data_pos["p_da"]
-            ) / (generator_data_pos["p_nom"])
-            generator_data_pos["p_min_pu"] = 0
-            grouped_data_pos = (
-                generator_data_pos.groupby("name")
-                .agg(lambda x: x.tolist())
-                .reset_index()
-            )
-            grouped_data_pos["p_nom"] = grouped_data_pos["p_nom"].apply(
-                lambda x: x[0] if len(set(x)) == 1 else x
-            )
-
-            for index, row in grouped_data_pos.iterrows():
-                self.redisp_network.add(
-                    "Generator",
-                    name=f"posredisp_{row['name']}",
-                    bus=" ".join(set(row["bus"])),
-                    marginal_cost=row["marginal_cost"],
-                    p_nom_extendable=False,
-                    p_nom=row["p_nom"],
-                    p_max_pu=row["p_max_pu"],
-                    p_min_pu=row["p_min_pu"],
-                    p_set=row["p_da"],
-                    carrier=" ".join(set(row["carrier"])),
-                )
-            print("Positive redispatch capacity is added")
-
-            # 2. Negative Redispatch: Adding one extra generator at every node for -ve redispatch
-
-            generator_data_neg = self.generator_data.copy()
-            generator_data_neg["p_max_pu"] = (
-                generator_data_neg["p_da"] - generator_data_neg["p_min"]
-            ) / (generator_data_neg["p_nom"])
-            generator_data_neg["p_min_pu"] = 0
-            grouped_data_neg = (
-                generator_data_neg.groupby("name")
-                .agg(lambda x: x.tolist())
-                .reset_index()
-            )
-            grouped_data_neg["p_nom"] = grouped_data_neg["p_nom"].apply(
-                lambda x: x[0] if len(set(x)) == 1 else x
-            )
-
-            for index, row in grouped_data_neg.iterrows():
-                self.redisp_network.add(
-                    "Generator",
-                    name=f"negredisp_{row['name']}",
-                    bus=" ".join(set(row["bus"])),
-                    marginal_cost=row["marginal_cost"],
-                    p_nom_extendable=False,
-                    sign=-1,
-                    p_nom=row["p_nom"],
-                    p_max_pu=row["p_max_pu"],
-                    p_min_pu=row["p_min_pu"],
-                    p_set=row["p_da"],
-                    carrier=" ".join(set(row["carrier"])),
-                )
-
-            print("Negative redispatch capacity is added")
-
-            # 3. Solve the network for redispatch
-            self.redisp_network.lopf(solver_name=self.solver)
-
-            # 4. Results and Data storing
-
-            for timestep in self.redisp_network.snapshots:
-                for index, (loading, s_nom_value) in enumerate(
-                    zip(
-                        np.round(
-                            np.abs(self.redisp_network.lines_t.p0.values.flatten())
-                        ),
-                        self.redisp_network.lines.s_nom,
-                    )
-                ):
-                    net_loading = loading - s_nom_value
-                    congestion_status = net_loading > 0
-                    redispatch_info.append(
-                        {
-                            "timestamp": timestep,
-                            "line_index": self.redisp_network.lines.index[index],
-                            "congestion_status": congestion_status,
-                        }
-                    )
-
-                    if congestion_status:
-                        line_index_counter[self.redisp_network.lines.index[index]] += 1
-
-            counter_df = pd.DataFrame(
-                list(line_index_counter.items()),
-                columns=["line_index", "congestion_count"],
-            )
-            counter_0 = set(self.redisp_network.lines.index) - set(
-                counter_df["line_index"]
-            )
-            missing_counts = pd.DataFrame(
-                {"line_index": list(counter_0), "congestion_count": 0}
-            )
-
-            counter_df = pd.concat([counter_df, missing_counts], ignore_index=True)
-            counter_df.to_csv("congestion_count_redisp.csv", index=False)
-
-            redisp_results = pd.DataFrame(self.redisp_network.generators_t.p)
-
-            # the following loop adds positive redispatch to the respective generator and/or reduce negative redispatch from original day ahead generation plan
-            for col in self.network.generators_t.p_set.columns:
-                redisp_results[f"total_{col}"] = (
-                    redisp_results[col]
-                    + redisp_results[f"posredisp_{col}"]
-                    - redisp_results[f"negredisp_{col}"]
-                )
-                total_columns = redisp_results.filter(regex=r"^total_\w+$")
-                total_columns.to_csv("final_dispatch.csv", index=True)
-
-            return self.redisp_network
-
-        else:
-            print("No redispatch needed")
 
     def clear(
         self, orderbook: Orderbook, market_products
@@ -351,3 +172,90 @@ class RedispatchMarketRole(MarketRole):
 
         # convert orderbook into pandas dataframe
         orderbook_df = pd.DataFrame(orderbook)
+
+        print(orderbook_df)
+
+        # construct new p_set dataframe for generators using the volume
+        all_units = orderbook_df["unit_id"].unique()
+
+        p_set = pd.DataFrame(
+            np.ones((len(self.network.snapshots), len(all_units))),
+            index=self.network.snapshots,
+            columns=all_units,
+        )
+
+        p_max_pu_up = p_set.copy()
+        p_max_pu_down = p_set.copy()
+        costs = p_set.copy()
+
+        # update values of p_set for generators from orderbook_df for each unit
+        for unit in all_units:
+            # get all orders for the unit
+            unit_orders = orderbook_df[orderbook_df["unit_id"] == unit].index
+
+            accepted_volume = orderbook_df.loc[unit_orders, "volume"]
+            p_set[unit] = accepted_volume.values
+
+            if (accepted_volume < 0).all():
+                # drop this unit from p_max_pu_up and p_max_pu_down
+                p_max_pu_up.drop(unit, axis=1, inplace=True)
+                p_max_pu_down.drop(unit, axis=1, inplace=True)
+                costs.drop(unit, axis=1, inplace=True)
+                continue
+
+            max_power = orderbook_df.loc[unit_orders, "max_power"]
+            min_power = orderbook_df.loc[unit_orders, "min_power"]
+
+            # calculate p_max_pu_up for unit as difference between max_power and accepted volume
+            pos_redispatch_max_pu = (max_power - accepted_volume) / max_power
+            p_max_pu_up[unit] = pos_redispatch_max_pu.values
+
+            # calculate p_max_pu_down for unit as difference between accepted volume and min_power
+            neg_redispatch_pu = (accepted_volume - min_power) / max_power
+            neg_redispatch_pu = neg_redispatch_pu.where(neg_redispatch_pu > 0, 0)
+            p_max_pu_down[unit] = neg_redispatch_pu.values
+
+            # calculate costs for unit
+            marginal_cost = orderbook_df.loc[unit_orders, "price"]
+            costs[unit] = marginal_cost.values
+
+        # update p_set for loads
+        self.network.loads_t.p_set = p_set
+
+        # add _up suphix to p_max_pu_up
+        p_max_pu_up = p_max_pu_up.add_suffix("_up")
+
+        # update p_max_pu_up for generators with _up suffix
+        self.network.generators_t.p_max_pu[p_max_pu_up.columns] = p_max_pu_up
+
+        # add _down suphix to p_max_pu_down
+        p_max_pu_down = p_max_pu_down.add_suffix("_down")
+
+        # update p_max_pu_down for generators with _down suffix
+        self.network.generators_t.p_max_pu[p_max_pu_down.columns] = p_max_pu_down
+
+        # add _up and _down suffix to costs
+        costs_up = costs.add_suffix("_up")
+        costs_down = costs.add_suffix("_down")
+
+        # update costs for generators with _up and _down suffix
+        self.network.generators_t.marginal_cost[costs_up.columns] = costs_up
+        self.network.generators_t.marginal_cost[costs_down.columns] = costs_down
+
+        # run lopf
+        self.network.lpf()
+
+        # cehck lines for congestion where power flow is larget than s_nom
+        line_loading = self.network.lines_t.p0.abs() / self.network.lines.s_nom
+
+        if line_loading.max().max() > 1:
+            log.debug("Congestion detected")
+            results = self.network.lopf(solver_name=self.solver)
+
+            # TODO: add code to check solver status and if not optimal, then raise exception
+
+        # from self.network.generators_t.p add all values from columns with _up suffix to volume
+        # and subtract all values from columns with _down suffix from volume for respective unit
+        # and update orderbook_df
+
+        self.all_orders = []

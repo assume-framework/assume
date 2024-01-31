@@ -187,7 +187,8 @@ def make_market_config(
         price_tick=market_params.get("price_tick"),
         additional_fields=market_params.get("additional_fields", []),
         supports_get_unmatched=market_params.get("supports_get_unmatched", False),
-        network_path=network_path,
+        network_path=market_params.get("network_path", network_path),
+        solver=market_params.get("solver", "glpk"),
     )
 
     return market_config
