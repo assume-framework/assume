@@ -17,6 +17,7 @@ from assume.strategies.naive_strategies import (
     NaiveDAStrategy,
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
+    NaiveRedispatchStrategy,
     NaiveStrategy,
 )
 
@@ -34,4 +35,5 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "flexable_eom_storage": flexableEOMStorage,
     "flexable_neg_crm_storage": flexableNegCRMStorage,
     "flexable_pos_crm_storage": flexablePosCRMStorage,
+    "naive_redispatch": NaiveRedispatchStrategy,
 }

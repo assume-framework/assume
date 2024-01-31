@@ -3,147 +3,164 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+import os
+import subprocess
+import warnings
 from collections import Counter
-from itertools import groupby
-from operator import itemgetter
 
+import cartopy.crs as ccrs
+import matplotlib.pyplot as plt
 import numpy as np
+import pandapower as pp
 import pandas as pd
 import pypsa
+from shapely.errors import ShapelyDeprecationWarning
 
-from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
-from assume.markets.base_market import MarketRole
+warnings.filterwarnings("ignore", category=ShapelyDeprecationWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
+logging.getLogger("pypsa.pf").setLevel(logging.WARNING)
 
-log = logging.getLogger(__name__)
+# Path to the location of input files
+os.chdir("./examples/inputs/example_03a")
+
+# Path to the location of output files to be saved
+if not os.path.exists("./examples/outputs"):
+    os.makedirs("./examples/outputs")
+else:
+    print(f"The directory already exists.")
 
 
-class RedispatchMarketRole(MarketRole):
-    def __init__(self, marketconfig: MarketConfig):
-        super().__init__(marketconfig)
+class Network_clear:
+    """
+    This class creates PyPSA network to identify congestion in the network
 
+    It adds components to the PyPSA network and solves the power flow to :identify congestion
+
+    If there is congestion then it solves linear optimized powerflow to :redispatch the powerplants
+
+    """
+
+    def __init__(self):
         self.network = pypsa.Network()
-        # set snapshots as list from the value marketconfig.producs.count converted to list
-        snapshots = list(range(marketconfig.market_products[0].count))
-        self.network.set_snapshots(snapshots)
-        self.solver = marketconfig.solver
+        self.network.set_snapshots(
+            pd.date_range("2024-01-01 00:00:00", periods=24, freq="H")
+        )
+        self.solver = "glpk"
+        self.solver_path = (
+            "C:\\Users\\par19744\\.conda\\envs\\PyPSA\\Library\\bin\\glpsol"
+        )
 
-        # setup the network
-        # add buses
-        self.add_buses(f"{marketconfig.network_path}/buses.csv")
-
-        # add lines
-        self.add_lines(f"{marketconfig.network_path}/lines.csv")
-
-        # add generators
-        self.add_generators(f"{marketconfig.network_path}/powerplant_units.csv")
-
-        # add loads
-        self.add_loads(f"{marketconfig.network_path}/demand_units.csv")
-
-    def add_buses(self, filename):
+    def add_buses(self, filename, header):
         """
         This adds nodes in the PyPSA network to which the generators and loads are connected
 
         Typically nodes are those substations to which the transmission lines are connected to.
 
         """
-        buses = pd.read_csv(filename)
+        try:
+            bus_data = pd.read_csv(filename, header=header)
+        except pd.errors.EmptyDataError:
+            print("The CSV file is empty.")
+            return
 
-        self.network.madd(
-            "Bus",
-            names=buses["bus"],
-            v_nom=buses["v_nom"],  # Nominal voltage level of the bus(substation)
-            carrier=buses["carrier"],
-            x=buses["x"],  # longitude
-            y=buses["y"],  # lattitude
-        )
-
-    def add_lines(self, filename):
-        """
-        This creates transmission network in PyPSA by connecting buses with predefined line capacities
-        """
-        lines = pd.read_csv(filename)
-
-        self.network.madd(
-            "Line",
-            names=lines["name"],
-            bus0=lines["bus0"],
-            bus1=lines["bus1"],
-            s_nom=lines["s_nom"],  # transmission line capacity in MW
-            x=1,
-            s_nom_extendable=lines["s_nom_extendable"],
-        )
+        for index, row in bus_data.iterrows():
+            self.network.add(
+                "Bus",
+                name=row["bus"],
+                v_nom=row["v_nom"],  # Nominal voltage level of the bus(substation)
+                carrier=row["carrier"],
+                x=row["x"],  # longitude
+                y=row["y"],  # lattitude
+            )
+        return self.network.buses
 
     def add_generators(self, filename):
         """
         This adds generators in the PyPSA network with respective bus data to which they are connected
         """
-        generators = pd.read_csv(filename, index_col=0)
+        try:
+            self.generator_data = pd.read_csv(filename, index_col=0, header=0)
+        except pd.errors.EmptyDataError:
+            print("The CSV file is empty.")
+            return
 
-        # make dataframe for p_set as zeros for data and index as snapshots
-        # and coliumns as generator names
-        p_set = pd.DataFrame(
-            np.zeros((len(self.network.snapshots), len(generators.index))),
-            index=self.network.snapshots,
-            columns=generators.index,
+        generators_da = self.generator_data.copy()
+        generators_da["p_max_pu"] = generators_da["p_da"] / generators_da["p_nom"]
+        generators_da["p_min_pu"] = generators_da["p_da"] / generators_da["p_nom"]
+        grouped_da = (
+            generators_da.groupby("name").agg(lambda x: x.tolist()).reset_index()
         )
 
         # Iterate through time steps and add generators
-        self.network.madd(
-            "Load",
-            names=generators.index,
-            bus=generators["node"],  # bus to which the generator is connected to
-            p_set=p_set,
-        )
+        for index, row in grouped_da.iterrows():
+            self.network.add(
+                "Generator",
+                name=row["name"],
+                bus=" ".join(
+                    set(row["bus"])
+                ),  # bus to which the generator is connected to
+                p_set=row["p_da"],  # dayahead cleared capacity
+                p_nom=" ".join(
+                    map(str, set(row["p_nom"]))
+                ),  # Nominal capacity of the powerplant/generator
+                marginal_cost=row["marginal_cost"],
+                p_nom_extendable=False,
+                p_max_pu=row["p_max_pu"],
+                p_min_pu=row["p_min_pu"],
+                carrier=" ".join(
+                    set(row["carrier"])
+                ),  # here it is the generator fuel type/technology
+            )
 
-        # add upward redispatch generators
-        self.network.madd(
-            "Generator",
-            names=generators.index,
-            suffix="_up",
-            bus=generators["node"],  # bus to which the generator is connected to
-            p_nom=generators[
-                "max_power"
-            ],  # Nominal capacity of the powerplant/generator
-            p_min_pu=p_set,
-            p_max_pu=p_set + 1,
-        )
+        return self.network.generators_t.p_set
 
-        # add downward redispatch generators
-        self.network.madd(
-            "Generator",
-            names=generators.index,
-            suffix="_down",
-            bus=generators["node"],  # bus to which the generator is connected to
-            p_nom=generators[
-                "max_power"
-            ],  # Nominal capacity of the powerplant/generator
-            p_max_pu=1,
-            p_min_pu=generators["min_power"] / generators["max_power"],
-            sign=-1,
-        )
-
-    def add_loads(self, filename):
+    def add_consumers(self, filename, header):
         """
-        This adds loads in the PyPSA network with respective bus data to which they are connected
+        This adds consumers in the PyPSA network with respective bus data to which they are connected
         """
-        loads = pd.read_csv(filename, index_col=0)
+        try:
+            load = pd.read_csv(filename, header=header, index_col=0)
+        except pd.errors.EmptyDataError:
+            print("The CSV file is empty.")
+            return
 
-        # Iterate through time steps and add generators
-        self.network.madd(
-            "Generator",
-            names=loads.index,
-            bus=loads["node"],  # bus to which the generator is connected to
-            p_nom=loads["max_power"],  # Nominal capacity of the powerplant/generator
-            p_max_pu=1,
-            p_min_pu=loads["min_power"] / loads["max_power"],
-            sign=-1,
-        )
+        for load_name in list(load.columns.unique()):
+            self.network.add(
+                "Load",
+                f"{load_name}",
+                bus=load_name,
+                p_set=load[load_name].tolist(),  # fixed load in MW
+            )
+        return self.network.loads_t.p_set
+
+    def add_lines(self, filename, header):
+        """
+        This creates transmission network in PyPSA by connecting buses with predefined line capacities
+        """
+        try:
+            lines = pd.read_csv(filename, header=header)
+        except pd.errors.EmptyDataError:
+            print("The CSV file is empty.")
+            return
+
+        for index, row in lines.iterrows():
+            self.network.add(
+                "Line",
+                "{}".format(index),
+                bus0=row["bus0"],
+                bus1=row["bus1"],
+                s_nom=row["s_nom"],  # transmission line capacity in MW
+                x=1,
+                s_nom_extendable=row["s_nom_extendable"],
+            )
+        return self.network.lines
 
     def congestion_identification(self):
         """
         This function identifies congestion in the transmission lines by running simple power flow in PyPSA network
         """
+        warnings.simplefilter(action="ignore", category=FutureWarning)
+        warnings.simplefilter(action="ignore", category=DeprecationWarning)
 
         zero_r_lines = self.network.lines.index[
             self.network.lines.r == 0
@@ -205,6 +222,8 @@ class RedispatchMarketRole(MarketRole):
 
         Also, adds one extra negative generator to symbolize curtailment
         """
+        warnings.simplefilter(action="ignore", category=FutureWarning)
+        warnings.simplefilter(action="ignore", category=DeprecationWarning)
         redispatch_info = []
         line_index_counter = Counter()
 
@@ -338,16 +357,19 @@ class RedispatchMarketRole(MarketRole):
         else:
             print("No redispatch needed")
 
-    def clear(
-        self, orderbook: Orderbook, market_products
-    ) -> (Orderbook, Orderbook, list[dict]):
-        """
-        Performs redispatch to resolve congestion in the electricity market.
 
-        :param orderbook: The orderbook containing the orders to be cleared
-        :param market_products: The products to be traded
-        :return: accepted_orders, rejected_orders, meta
-        """
+# ---------------------------------------------------------------------------------------------------------------------------------
 
-        # convert orderbook into pandas dataframe
-        orderbook_df = pd.DataFrame(orderbook)
+if __name__ == "__main__":
+    network_clear_instance = Network_clear()
+
+    network_clear_instance.add_buses("buses.csv", 0)
+    network_clear_instance.add_generators("generators_t.csv")
+    network_clear_instance.add_consumers("consumers_t.csv", 0)
+    network_clear_instance.add_lines("lines.csv", 0)
+
+    # Identify congestion
+    network_clear_instance.congestion_identification()
+
+    # Run Redispatch
+    network_clear_instance.redispatch()
