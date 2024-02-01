@@ -201,7 +201,7 @@ def test_sep_block_orders():
             "bid_id": "gen1_1",
         },
     ]
-    index = pd.date_range(start, end - pd.Timedelta("1h"), freq="1h")
+    index = pd.date_range(start, end - pd.Timedelta("1h"), freq="4h")
     orderbook.append(
         {
             "start_time": start,
