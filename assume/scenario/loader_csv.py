@@ -130,9 +130,9 @@ def convert_to_rrule_freq(string: str) -> Tuple[int, int]:
 def make_market_config(
     id: str,
     market_params: dict,
-    network_path: str,
     world_start: datetime,
     world_end: datetime,
+    network_path: str = " ",
 ) -> MarketConfig:
     """
     Create a market config from a given dictionary.
