@@ -71,9 +71,14 @@ class Learning(Role):
         th.backends.cudnn.allow_tf32 = True
 
         self.learning_rate = learning_config.get("learning_rate", 1e-4)
-        self.episodes_collecting_initial_experience = learning_config.get(
-            "episodes_collecting_initial_experience", 5
+
+        # if we do not have initital experience collected we will get an error as no samples are avaiable on the
+        # buffer from which we can draw exprience to adapt the strategy, hence we set it to minium one episode
+
+        self.episodes_collecting_initial_experience = max(
+            learning_config.get("episodes_collecting_initial_experience", 5), 1
         )
+
         self.train_freq = learning_config.get("train_freq", 1)
         self.gradient_steps = (
             self.train_freq
@@ -221,7 +226,7 @@ class Learning(Role):
             self.rl_algorithm.update_policy()
 
     # TODO: add evaluation function
-    def compare_and_save_policies(self) -> None:
+    def compare_and_save_policies(self, current_avg_reward) -> None:
         """
         Compare evaluation metrics and save policies based on the best achieved performance.
 
@@ -232,8 +237,14 @@ class Learning(Role):
 
         Notes:
             This method is typically used during the evaluation phase to save policies that achieve superior performance.
+            Curretnly the best evaluation metrik is still assessed by the development team and preliminary we use the avergae rewards.
         """
-        modes = ["reward", "profit", "regret"]
+        # modes = ["reward", "profit", "regret"]
+        modes = ["reward"]
+
+        # add current rewrad to list of all rewards
+        self.rl_eval_rewards.append(current_avg_reward)
+
         for mode in modes:
             value = None
 
@@ -243,26 +254,27 @@ class Learning(Role):
 
             if mode == "reward" and self.rl_eval_rewards[-1] > self.max_eval_reward:
                 self.max_eval_reward = self.rl_eval_rewards[-1]
-                dir_name = "highest_reward"
                 value = self.max_eval_reward
             elif mode == "profit" and self.rl_eval_profits[-1] > self.max_eval_profit:
-                self.max_eval_profit = self.rl_eval_profits[-1]
-                dir_name = "highest_profit"
-                value = self.max_eval_profit
+                # self.max_eval_profit = self.rl_eval_profits[-1]
+                # dir_name = "highest_profit"
+                # value = self.max_eval_profit
+
+                return NotImplementedError("Evaluation Strategie is not implemnted yet")
+
             elif (
                 mode == "regret"
                 and self.rl_eval_regrets[-1] < self.max_eval_regret
                 and self.rl_eval_regrets[-1] != 0
             ):
-                self.max_eval_regret = self.rl_eval_regrets[-1]
-                dir_name = "lowest_regret"
-                value = self.max_eval_regret
+                # self.max_eval_regret = self.rl_eval_regrets[-1]
+                # dir_name = "lowest_regret"
+                # value = self.max_eval_regret
+
+                return NotImplementedError("Evaluation Strategie is not implemnted yet")
 
             if value is not None:
-                self.rl_algorithm.save_params(dir_name=dir_name)
-                for unit in self.rl_powerplants + self.rl_storages:
-                    if unit.learning:
-                        unit.save_params(dir_name=dir_name)
+                self.rl_algorithm.save_params(directory=self.trained_actors_path)
 
                 logger.info(
                     f"Policies saved, episode: {self.eval_episodes_done + 1}, mode: {mode}, value: {value:.2f}"

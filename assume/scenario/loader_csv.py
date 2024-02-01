@@ -737,11 +737,8 @@ def run_learning(
             avg_reward = np.mean(total_rewards)
             # check reward improvement in validation run
             world.learning_config["trained_actors_path"] = old_path
-            if avg_reward > best_reward:
-                # update best reward
-                best_reward = avg_reward
-                world.learning_role.rl_algorithm.save_params(directory=old_path)
 
+            world.learning_role.compare_and_save_policies(avg_reward)
             eval_episode += 1
 
         world.reset()
