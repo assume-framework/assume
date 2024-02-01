@@ -3,9 +3,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-from collections import Counter
-from itertools import groupby
-from operator import itemgetter
+import os
+import sys
 
 import numpy as np
 import pandas as pd
@@ -23,8 +22,7 @@ class RedispatchMarketRole(MarketRole):
 
         self.network = pypsa.Network()
         # set snapshots as list from the value marketconfig.producs.count converted to list
-        snapshots = range(marketconfig.market_products[0].count)
-        self.network.set_snapshots(snapshots)
+        self.network.snapshots = range(marketconfig.market_products[0].count)
         self.solver = marketconfig.solver
 
         # setup the network
@@ -102,6 +100,7 @@ class RedispatchMarketRole(MarketRole):
             ],  # Nominal capacity of the powerplant/generator
             p_min_pu=p_set,
             p_max_pu=p_set + 1,
+            marginal_cost=p_set,
         )
 
         # add downward redispatch generators
@@ -115,6 +114,7 @@ class RedispatchMarketRole(MarketRole):
             ],  # Nominal capacity of the powerplant/generator
             p_min_pu=p_set,
             p_max_pu=p_set + 1,
+            marginal_cost=p_set,
             sign=-1,
         )
 
@@ -170,77 +170,65 @@ class RedispatchMarketRole(MarketRole):
         :return: accepted_orders, rejected_orders, meta
         """
 
-        # convert orderbook into pandas dataframe
         orderbook_df = pd.DataFrame(orderbook)
 
-        print(orderbook_df)
-
-        # construct new p_set dataframe for generators using the volume
-        all_units = orderbook_df["unit_id"].unique()
-
-        p_set = pd.DataFrame(
-            np.ones((len(self.network.snapshots), len(all_units))),
-            index=self.network.snapshots,
-            columns=all_units,
+        # Now you can pivot the DataFrame
+        volume_pivot = orderbook_df.pivot(
+            index="start_time", columns="unit_id", values="volume"
+        )
+        max_power_pivot = orderbook_df.pivot(
+            index="start_time", columns="unit_id", values="max_power"
+        )
+        min_power_pivot = orderbook_df.pivot(
+            index="start_time", columns="unit_id", values="min_power"
+        )
+        price_pivot = orderbook_df.pivot(
+            index="start_time", columns="unit_id", values="price"
         )
 
-        p_max_pu_up = p_set.copy()
-        p_max_pu_down = p_set.copy()
-        costs = p_set.copy()
+        # Calculate p_set, p_max_pu_up, and p_max_pu_down directly using DataFrame operations
+        p_set = volume_pivot
 
-        # update values of p_set for generators from orderbook_df for each unit
-        for unit in all_units:
-            # get all orders for the unit
-            unit_orders = orderbook_df[orderbook_df["unit_id"] == unit].index
+        # Calculate p_max_pu_up as difference between max_power and accepted volume
+        p_max_pu_up = (max_power_pivot - volume_pivot).div(
+            max_power_pivot.where(max_power_pivot != 0, np.inf)
+        )
 
-            accepted_volume = orderbook_df.loc[unit_orders, "volume"]
-            p_set[unit] = accepted_volume.values
+        # Calculate p_max_pu_down as difference between accepted volume and min_power
+        p_max_pu_down = (volume_pivot - min_power_pivot).div(
+            max_power_pivot.where(max_power_pivot != 0, np.inf)
+        )
+        p_max_pu_down = p_max_pu_down.clip(lower=0)  # Ensure no negative values
 
-            if (accepted_volume < 0).all():
-                # drop this unit from p_max_pu_up and p_max_pu_down
-                p_max_pu_up.drop(unit, axis=1, inplace=True)
-                p_max_pu_down.drop(unit, axis=1, inplace=True)
-                costs.drop(unit, axis=1, inplace=True)
-                continue
+        # Determine the costs directly from the price pivot
+        costs = price_pivot
 
-            max_power = orderbook_df.loc[unit_orders, "max_power"]
-            min_power = orderbook_df.loc[unit_orders, "min_power"]
+        # Drop units with only negative volumes (if necessary)
+        negative_only_units = volume_pivot.lt(0).all()
+        p_max_pu_up = p_max_pu_up.drop(
+            columns=negative_only_units.index[negative_only_units]
+        )
+        p_max_pu_down = p_max_pu_down.drop(
+            columns=negative_only_units.index[negative_only_units]
+        )
+        costs = costs.drop(columns=negative_only_units.index[negative_only_units])
 
-            # calculate p_max_pu_up for unit as difference between max_power and accepted volume
-            pos_redispatch_max_pu = (max_power - accepted_volume) / max_power
-            p_max_pu_up[unit] = pos_redispatch_max_pu.values
+        # reset indexes for all dataframes
+        p_set.reset_index(inplace=True, drop=True)
+        p_max_pu_up.reset_index(inplace=True, drop=True)
+        p_max_pu_down.reset_index(inplace=True, drop=True)
+        costs.reset_index(inplace=True, drop=True)
 
-            # calculate p_max_pu_down for unit as difference between accepted volume and min_power
-            neg_redispatch_pu = (accepted_volume - min_power) / max_power
-            neg_redispatch_pu = neg_redispatch_pu.where(neg_redispatch_pu > 0, 0)
-            p_max_pu_down[unit] = neg_redispatch_pu.values
-
-            # calculate costs for unit
-            marginal_cost = orderbook_df.loc[unit_orders, "price"]
-            costs[unit] = marginal_cost.values
-
-        # update p_set for loads
+        # Update the network parameters
         self.network.loads_t.p_set = p_set
 
-        # add _up suphix to p_max_pu_up
-        p_max_pu_up = p_max_pu_up.add_suffix("_up")
+        # Update p_max_pu for generators with _up and _down suffixes
+        self.network.generators_t.p_max_pu.update(p_max_pu_up.add_suffix("_up"))
+        self.network.generators_t.p_max_pu.update(p_max_pu_down.add_suffix("_down"))
 
-        # update p_max_pu_up for generators with _up suffix
-        self.network.generators_t.p_max_pu[p_max_pu_up.columns] = p_max_pu_up
-
-        # add _down suphix to p_max_pu_down
-        p_max_pu_down = p_max_pu_down.add_suffix("_down")
-
-        # update p_max_pu_down for generators with _down suffix
-        self.network.generators_t.p_max_pu[p_max_pu_down.columns] = p_max_pu_down
-
-        # add _up and _down suffix to costs
-        costs_up = costs.add_suffix("_up")
-        costs_down = costs.add_suffix("_down")
-
-        # update costs for generators with _up and _down suffix
-        self.network.generators_t.marginal_cost[costs_up.columns] = costs_up
-        self.network.generators_t.marginal_cost[costs_down.columns] = costs_down
+        # Add _up and _down suffix to costs and update the network
+        self.network.generators_t.marginal_cost.update(costs.add_suffix("_up"))
+        self.network.generators_t.marginal_cost.update(costs.add_suffix("_down"))
 
         # run lopf
         self.network.lpf()
@@ -250,12 +238,84 @@ class RedispatchMarketRole(MarketRole):
 
         if line_loading.max().max() > 1:
             log.debug("Congestion detected")
-            results = self.network.lopf(solver_name=self.solver)
 
-            # TODO: add code to check solver status and if not optimal, then raise exception
+            # TODO: need a better way to handle this verbose output from pypsa or is it fine?
+            with open(os.devnull, "w") as fnull:
+                sys.stdout = fnull  # Redirecting stdout to /dev/null
+                status, termination_condition = self.network.lopf(
+                    solver_name=self.solver
+                )
+                sys.stdout = sys.__stdout__  # Resetting stdout
 
-        # from self.network.generators_t.p add all values from columns with _up suffix to volume
-        # and subtract all values from columns with _down suffix from volume for respective unit
-        # and update orderbook_df
+            if status != "ok":
+                log.error(f"Solver exited with {termination_condition}")
+                raise Exception("Solver in redispatch market did not converge")
 
+            # process dispatch data
+            self.process_dispatch_data(orderbook_df)
+
+        # return orderbook_df back to orderbook format as list of dicts
+        accepted_orders = orderbook_df.to_dict("records")
+        rejected_orders = []
+        meta = []
+
+        # calculate meta data such as total upwared and downward redispatch, total backup dispatch
+        # and total redispatch cost
+        for i, product in enumerate(market_products):
+            meta.append(self.calculate_meta_data(product, i))
+
+        # remove all orders to clean up the orderbook and avoid double clearing
         self.all_orders = []
+
+        return accepted_orders, rejected_orders, meta
+
+    def process_dispatch_data(self, orderbook_df):
+        # Extract backup, upward, and downward redispatch
+        generators_t_p = self.network.generators_t.p
+
+        upward_redispatch = generators_t_p.filter(regex="_up")
+        downward_redispatch = generators_t_p.filter(regex="_down")
+
+        # Remove _up and _down suffix from column names
+        upward_redispatch.columns = upward_redispatch.columns.str.replace("_up", "")
+        downward_redispatch.columns = downward_redispatch.columns.str.replace(
+            "_down", ""
+        )
+
+        # Calculate redispatch volumes
+        redispatch_volumes = upward_redispatch.sub(downward_redispatch)
+
+        # Add accepted_volume to orderbook_df for each unit from actual_dispatch
+        for unit in orderbook_df["unit_id"].unique():
+            unit_orders = orderbook_df[orderbook_df["unit_id"] == unit].index
+            orderbook_df.loc[unit_orders, "accepted_volume"] = orderbook_df.loc[
+                unit_orders, "volume"
+            ]
+            orderbook_df.loc[unit_orders, "accepted_price"] = orderbook_df.loc[
+                unit_orders, "price"
+            ]
+
+            if unit in redispatch_volumes.columns:
+                orderbook_df.loc[unit_orders, "accepted_volume"] += redispatch_volumes[
+                    unit
+                ].values
+
+    def calculate_meta_data(self, product: MarketProduct, i):
+        start = product[0]
+
+        # Calculate meta data such as total upward and downward redispatch, total backup dispatch, and total redispatch cost
+        redispatch_volumes = self.network.generators_t.p.iloc[i]
+        upward_redispatch = redispatch_volumes.filter(regex="_up").sum()
+        downward_redispatch = redispatch_volumes.filter(regex="_down").sum()
+        backup_dispatch = redispatch_volumes.filter(regex="_backup").sum()
+        total_redispatch_cost = self.network.generators_t.marginal_cost.iloc[i].sum()
+
+        return {
+            "total_upward_redispatch": upward_redispatch,
+            "total_downward_redispatch": downward_redispatch,
+            "total_backup_dispatch": backup_dispatch,
+            "total_redispatch_cost": total_redispatch_cost,
+            "product_start": product[0],
+            "product_end": product[1],
+            "only_hours": product[2],
+        }
