@@ -660,7 +660,6 @@ def run_learning(
     # remove csv path so that nothing is written while learning
     temp_csv_path = world.export_csv_path
     world.export_csv_path = ""
-    best_reward = -1e10
 
     buffer = ReplayBuffer(
         buffer_size=int(world.learning_config.get("replay_buffer_size", 5e5)),
@@ -716,7 +715,7 @@ def run_learning(
             new_path = f"{old_path}_eval"
 
             # save validation params in validation path
-            world.learning_role.rl_algorithm.save_params(directory=new_path)
+            world.learning_role.rl_algorithm.save_params(directory=old_path)
             world.reset()
 
             # load validation run

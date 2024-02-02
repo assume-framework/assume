@@ -185,9 +185,8 @@ class Learning(Role):
 
         self.rl_algorithm.initialize_policy(actors_and_critics)
 
-        if self.continue_learning == True and actors_and_critics == None:
-            load_directory = self.trained_policies_path
-            self.load_policies(load_directory)
+        if self.continue_learning is True and actors_and_critics is None:
+            self.load_policies(self.trained_policies_path)
 
     def load_policies(self, load_directory) -> None:
         """
@@ -222,7 +221,6 @@ class Learning(Role):
         if self.episodes_done > self.episodes_collecting_initial_experience:
             self.rl_algorithm.update_policy()
 
-    # TODO: add evaluation function
     def compare_and_save_policies(self, metrics: dict) -> None:
         """
         Compare evaluation metrics and save policies based on the best achieved performance according to the metrics calculated.
