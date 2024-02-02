@@ -54,7 +54,7 @@ class Learning(Role):
         self.training_episodes = learning_config["training_episodes"]
         self.learning_mode = learning_config["learning_mode"]
         self.continue_learning = learning_config["continue_learning"]
-        self.trained_actors_path = learning_config["trained_actors_path"]
+        self.trained_policies_path = learning_config["trained_policies_path"]
 
         cuda_device = (
             learning_config["device"]
@@ -89,17 +89,14 @@ class Learning(Role):
         self.gamma = learning_config.get("gamma", 0.99)
 
         self.eval_episodes_done = 0
-        self.max_eval_reward = -1e9
-        self.max_eval_regret = 1e9
-        self.max_eval_profit = -1e9
 
         # function that initializes learning, needs to be an extra function so that it can be called after buffer is given to Role
         self.create_learning_algorithm(self.rl_algorithm)
 
         # store evaluation values
-        self.rl_eval_rewards = []
-        self.rl_eval_profits = []
-        self.rl_eval_regrets = []
+        from collections import defaultdict
+        self.max_eval = defaultdict(lambda: -1e9)
+        self.rl_eval = defaultdict(list)
 
     def setup(self) -> None:
         """
@@ -189,7 +186,7 @@ class Learning(Role):
         self.rl_algorithm.initialize_policy(actors_and_critics)
 
         if self.continue_learning == True and actors_and_critics == None:
-            load_directory = self.trained_actors_path
+            load_directory = self.trained_policies_path
             self.load_policies(load_directory)
 
     def load_policies(self, load_directory) -> None:
@@ -204,7 +201,7 @@ class Learning(Role):
         """
         if load_directory is None:
             logger.warning(
-                "You have specified continue learning as True but no trained_actors_path was given!"
+                "You have specified continue learning as True but no trained_policies_path was given!"
             )
             logger.info("Restart learning process!")
         else:
@@ -226,56 +223,41 @@ class Learning(Role):
             self.rl_algorithm.update_policy()
 
     # TODO: add evaluation function
-    def compare_and_save_policies(self, current_avg_reward) -> None:
+    def compare_and_save_policies(self, metrics: dict) -> None:
         """
-        Compare evaluation metrics and save policies based on the best achieved performance.
+        Compare evaluation metrics and save policies based on the best achieved performance according to the metrics calculated.
 
         This method compares the evaluation metrics, such as reward, profit, and regret, and saves the policies if they achieve the
         best performance in their respective categories. It iterates through the specified modes, compares the current evaluation
         value with the previous best, and updates the best value if necessary. If an improvement is detected, it saves the policy
         and associated parameters.
 
+        metrics contain a metric key like "reward" and the current value.
+        This function stores the policies with the highest metric.
+        So if minimize is required one should add for example "minus_regret" which is then maximized.
+
         Notes:
             This method is typically used during the evaluation phase to save policies that achieve superior performance.
-            Curretnly the best evaluation metrik is still assessed by the development team and preliminary we use the avergae rewards.
+            Currently the best evaluation metric is still assessed by the development team and preliminary we use the average rewards.
         """
-        # modes = ["reward", "profit", "regret"]
-        modes = ["reward"]
+        if not metrics:
+            logger.error("tried to save policies but did not get any metrics")
+            return
+        # if the current values are a new max in one of the metrics - we store them in the default folder
+        first_has_new_max = False
 
-        # add current rewrad to list of all rewards
-        self.rl_eval_rewards.append(current_avg_reward)
+        # add current reward to list of all rewards
+        for metric, value in metrics.items():
+            self.rl_eval[metric].append(value)
+            if self.rl_eval[metric][-1] > self.max_eval[metric]:
+                self.max_eval[metric] = self.rl_eval[metric][-1]
+                if metric == list(metrics.keys())[0]:
+                    first_has_new_max = True
+                self.rl_algorithm.save_params(directory=f"{self.trained_policies_path}/{metric}")
 
-        for mode in modes:
-            value = None
-
-            if not self.rl_eval_rewards:
-                # TODO?
-                return
-
-            if mode == "reward" and self.rl_eval_rewards[-1] > self.max_eval_reward:
-                self.max_eval_reward = self.rl_eval_rewards[-1]
-                value = self.max_eval_reward
-            elif mode == "profit" and self.rl_eval_profits[-1] > self.max_eval_profit:
-                # self.max_eval_profit = self.rl_eval_profits[-1]
-                # dir_name = "highest_profit"
-                # value = self.max_eval_profit
-
-                return NotImplementedError("Evaluation Strategie is not implemnted yet")
-
-            elif (
-                mode == "regret"
-                and self.rl_eval_regrets[-1] < self.max_eval_regret
-                and self.rl_eval_regrets[-1] != 0
-            ):
-                # self.max_eval_regret = self.rl_eval_regrets[-1]
-                # dir_name = "lowest_regret"
-                # value = self.max_eval_regret
-
-                return NotImplementedError("Evaluation Strategie is not implemnted yet")
-
-            if value is not None:
-                self.rl_algorithm.save_params(directory=self.trained_actors_path)
-
-                logger.info(
-                    f"Policies saved, episode: {self.eval_episodes_done + 1}, mode: {mode}, value: {value:.2f}"
-                )
+        # use last metric as default
+        if first_has_new_max:
+            self.rl_algorithm.save_params(directory=self.trained_policies_path)
+            logger.info(
+                f"Policies saved, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
+            )

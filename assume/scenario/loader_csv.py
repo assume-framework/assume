@@ -240,7 +240,7 @@ async def load_scenario_folder_async(
     perform_evaluation: bool = False,
     episode: int = 0,
     eval_episode: int = 0,
-    trained_actors_path: str = "",
+    trained_policies_path: str = "",
 ) -> None:
     """
     Load a scenario from a given path.
@@ -256,7 +256,7 @@ async def load_scenario_folder_async(
     perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
     episode (int, optional): The episode number for learning. Defaults to 0.
     eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
-    trained_actors_path (str, optional): The path to the trained actors. Defaults to an empty string.
+    trained_policies_path (str, optional): The path to the trained actors. Defaults to an empty string.
 
     Raises:
     ValueError: If the specified scenario or study case is not found in the provided inputs.
@@ -321,12 +321,12 @@ async def load_scenario_folder_async(
     )
     learning_config["evaluation_mode"] = perform_evaluation
 
-    if not learning_config.get("trained_actors_path"):
-        if trained_actors_path:
-            learning_config["trained_actors_path"] = trained_actors_path
+    if not learning_config.get("trained_policies_path"):
+        if trained_policies_path:
+            learning_config["trained_policies_path"] = trained_policies_path
         else:
             learning_config[
-                "trained_actors_path"
+                "trained_policies_path"
             ] = f"{inputs_path}/learned_strategies/{sim_id}"
 
     if learning_config.get("learning_mode", False):
@@ -489,7 +489,7 @@ def load_scenario_folder(
     perform_evaluation: bool = False,
     episode: int = 1,
     eval_episode: int = 1,
-    trained_actors_path="",
+    trained_policies_path="",
 ):
     """
     Load a scenario from a given path.
@@ -505,7 +505,7 @@ def load_scenario_folder(
     perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
     episode (int, optional): The episode number for learning. Defaults to 0.
     eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
-    trained_actors_path (str, optional): The path to the trained actors. Defaults to an empty string.
+    trained_policies_path (str, optional): The path to the trained actors. Defaults to an empty string.
 
     Raises:
     ValueError: If the specified scenario or study case is not found in the provided inputs.
@@ -520,7 +520,7 @@ def load_scenario_folder(
             perform_evaluation=False,
             episode=1,
             eval_episode=1,
-            trained_actors_path="",
+            trained_policies_path="",
         )
 
     Notes:
@@ -541,7 +541,7 @@ def load_scenario_folder(
             perform_evaluation=perform_evaluation,
             episode=episode,
             eval_episode=eval_episode,
-            trained_actors_path=trained_actors_path,
+            trained_policies_path=trained_policies_path,
         )
     )
 
@@ -712,7 +712,7 @@ def run_learning(
             episode % validation_interval == 0
             and episode > world.learning_role.episodes_collecting_initial_experience
         ):
-            old_path = world.learning_config["trained_actors_path"]
+            old_path = world.learning_config["trained_policies_path"]
             new_path = f"{old_path}_eval"
 
             # save validation params in validation path
@@ -728,7 +728,7 @@ def run_learning(
                 perform_learning=False,
                 perform_evaluation=True,
                 eval_episode=eval_episode,
-                trained_actors_path=new_path,
+                trained_policies_path=new_path,
             )
 
             world.run()
@@ -736,9 +736,9 @@ def run_learning(
             total_rewards = world.output_role.get_sum_reward()
             avg_reward = np.mean(total_rewards)
             # check reward improvement in validation run
-            world.learning_config["trained_actors_path"] = old_path
+            world.learning_config["trained_policies_path"] = old_path
 
-            world.learning_role.compare_and_save_policies(avg_reward)
+            world.learning_role.compare_and_save_policies({"avg_reward": avg_reward})
             eval_episode += 1
 
         world.reset()
