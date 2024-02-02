@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -12,7 +13,6 @@ import torch as th
 from assume.common.base import LearningStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.reinforcement_learning.learning_utils import Actor, NormalActionNoise
-import logging
 
 logger = logging.getLogger(__name__)
 

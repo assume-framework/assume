@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-import os
+from collections import defaultdict
 from datetime import datetime
 
 import torch as th
@@ -94,7 +94,6 @@ class Learning(Role):
         self.create_learning_algorithm(self.rl_algorithm)
 
         # store evaluation values
-        from collections import defaultdict
         self.max_eval = defaultdict(lambda: -1e9)
         self.rl_eval = defaultdict(list)
 

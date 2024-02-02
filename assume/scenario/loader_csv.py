@@ -736,7 +736,9 @@ def run_learning(
             avg_reward = np.mean(total_rewards)
             # check reward improvement in validation run
             # and store best run in eval folder
-            world.learning_role.compare_and_save_policies({"avg_reward": avg_reward}, eval_path)
+            world.learning_role.compare_and_save_policies(
+                {"avg_reward": avg_reward}, eval_path
+            )
 
             # restore previous policy path
             world.learning_config["trained_policies_path"] = old_path
