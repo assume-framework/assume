@@ -221,7 +221,7 @@ class Learning(Role):
         if self.episodes_done > self.episodes_collecting_initial_experience:
             self.rl_algorithm.update_policy()
 
-    def compare_and_save_policies(self, metrics: dict) -> None:
+    def compare_and_save_policies(self, metrics: dict, eval_save_path: str) -> None:
         """
         Compare evaluation metrics and save policies based on the best achieved performance according to the metrics calculated.
 
@@ -251,11 +251,11 @@ class Learning(Role):
                 self.max_eval[metric] = self.rl_eval[metric][-1]
                 if metric == list(metrics.keys())[0]:
                     first_has_new_max = True
-                self.rl_algorithm.save_params(directory=f"{self.trained_policies_path}/{metric}")
+                self.rl_algorithm.save_params(directory=f"{eval_save_path}/{metric}")
 
         # use last metric as default
         if first_has_new_max:
-            self.rl_algorithm.save_params(directory=self.trained_policies_path)
+            self.rl_algorithm.save_params(directory=eval_save_path)
             logger.info(
                 f"Policies saved, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
             )

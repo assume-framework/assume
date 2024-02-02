@@ -712,9 +712,9 @@ def run_learning(
             and episode > world.learning_role.episodes_collecting_initial_experience
         ):
             old_path = world.learning_config["trained_policies_path"]
-            new_path = f"{old_path}_eval"
+            eval_path = f"{old_path}_eval"
 
-            # save validation params in validation path
+            # save current params in training path
             world.learning_role.rl_algorithm.save_params(directory=old_path)
             world.reset()
 
@@ -727,7 +727,7 @@ def run_learning(
                 perform_learning=False,
                 perform_evaluation=True,
                 eval_episode=eval_episode,
-                trained_policies_path=new_path,
+                trained_policies_path=old_path,
             )
 
             world.run()
@@ -735,9 +735,11 @@ def run_learning(
             total_rewards = world.output_role.get_sum_reward()
             avg_reward = np.mean(total_rewards)
             # check reward improvement in validation run
-            world.learning_config["trained_policies_path"] = old_path
+            # and store best run in eval folder
+            world.learning_role.compare_and_save_policies({"avg_reward": avg_reward}, eval_path)
 
-            world.learning_role.compare_and_save_policies({"avg_reward": avg_reward})
+            # restore previous policy path
+            world.learning_config["trained_policies_path"] = old_path
             eval_episode += 1
 
         world.reset()
