@@ -30,7 +30,7 @@ def test_learning_init():
         "learning_mode": False,
         "training_episodes": 3,
         "continue_learning": False,
-        "trained_policies_path": None,
+        "trained_policies_save_path": None,
     }
     # test init
     l = Learning(learning_config, start, end)

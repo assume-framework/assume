@@ -5,6 +5,7 @@
 import logging
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 
 import torch as th
 from dateutil import rrule as rr
@@ -54,7 +55,10 @@ class Learning(Role):
         self.training_episodes = learning_config["training_episodes"]
         self.learning_mode = learning_config["learning_mode"]
         self.continue_learning = learning_config["continue_learning"]
-        self.trained_policies_path = learning_config["trained_policies_path"]
+        self.trained_policies_save_path = learning_config["trained_policies_save_path"]
+        self.trained_policies_load_path = learning_config.get(
+            "trained_policies_load_path", self.trained_policies_save_path
+        )
 
         cuda_device = (
             learning_config["device"]
@@ -185,26 +189,14 @@ class Learning(Role):
         self.rl_algorithm.initialize_policy(actors_and_critics)
 
         if self.continue_learning is True and actors_and_critics is None:
-            self.load_policies(self.trained_policies_path)
-
-    def load_policies(self, load_directory) -> None:
-        """
-        Load the policies of the reinforcement learning agent.
-
-        This method loads the entire policies (actor and critics) of the reinforcement learning agent from the specified directory.
-        This is used if we want to continue learning from already learned strategies.
-
-        Args:
-            load_directory (str): The directory from which to load the policies.
-        """
-        if load_directory is None:
-            logger.warning(
-                "You have specified continue learning as True but no trained_policies_path was given!"
-            )
-            logger.info("Restart learning process!")
-        else:
-            logger.info(f"Loading pretrained policies from {load_directory}!")
-            self.rl_algorithm.load_params(load_directory)
+            directory = self.trained_policies_load_path
+            if Path(directory).is_dir():
+                logger.info(f"Loading pretrained policies from {directory}!")
+                self.rl_algorithm.load_params(directory)
+            else:
+                logger.warning(
+                    f"Folder with pretrained policies {directory} does not exist"
+                )
 
     async def update_policy(self) -> None:
         """
@@ -220,7 +212,7 @@ class Learning(Role):
         if self.episodes_done > self.episodes_collecting_initial_experience:
             self.rl_algorithm.update_policy()
 
-    def compare_and_save_policies(self, metrics: dict, eval_save_path: str) -> None:
+    def compare_and_save_policies(self, metrics: dict) -> None:
         """
         Compare evaluation metrics and save policies based on the best achieved performance according to the metrics calculated.
 
@@ -250,11 +242,14 @@ class Learning(Role):
                 self.max_eval[metric] = self.rl_eval[metric][-1]
                 if metric == list(metrics.keys())[0]:
                     first_has_new_max = True
-                self.rl_algorithm.save_params(directory=f"{eval_save_path}/{metric}")
+                # store the best for our current metric in its folder
+                self.rl_algorithm.save_params(
+                    directory=f"{self.trained_policies_save_path}/{metric}"
+                )
 
         # use last metric as default
         if first_has_new_max:
-            self.rl_algorithm.save_params(directory=eval_save_path)
+            self.rl_algorithm.save_params(directory=self.trained_policies_save_path)
             logger.info(
                 f"Policies saved, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
             )

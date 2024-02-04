@@ -439,8 +439,6 @@ class UnitsOperator(Role):
                 if isinstance(order["volume"], dict):
                     if all(volume == 0 for volume in order["volume"].values()):
                         continue
-                elif order["volume"] == 0:
-                    continue
                 order["agent_id"] = (self.context.addr, self.context.aid)
                 if market.volume_tick:
                     order["volume"] = round(order["volume"] / market.volume_tick)

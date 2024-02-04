@@ -770,7 +770,8 @@ class LearningConfig(TypedDict):
         noise_sigma (float): The standard deviation of the noise.
         noise_scale (int): Controls the initial strength of the noise.
         noise_dt (int): Determines how quickly the noise weakens over time.
-        trained_policies_path (str): The path to the learned model to load.
+        trained_policies_save_path (str): The path to the learned model to save.
+        trained_policies_load_path (str): The path to the learned model to load.
     """
 
     observation_dimension: int
@@ -790,4 +791,4 @@ class LearningConfig(TypedDict):
     noise_sigma: float
     noise_scale: int
     noise_dt: int
-    trained_policies_path: str
+    trained_policies_save_path: str

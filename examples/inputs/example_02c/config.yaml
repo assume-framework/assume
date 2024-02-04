@@ -13,7 +13,7 @@ dam:
     observation_dimension: 97
     action_dimension: 2
     continue_learning: False
-    trained_policies_path: null
+    trained_policies_save_path: null
     max_bid_price: 200
     algorithm: matd3
     learning_rate: 0.0001
@@ -63,7 +63,7 @@ tiny:
     observation_dimension: 50
     action_dimension: 2
     continue_learning: True
-    trained_policies_path: null
+    trained_policies_save_path: null
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.001
