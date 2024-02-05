@@ -34,7 +34,7 @@ class UnitsOperator(Role):
     The UnitsOperator is the agent that manages the units.
     It receives the opening hours of the market and sends back the bids for the market.
 
-    Args:
+    Attributes:
         available_markets (list[MarketConfig]): The available markets.
         opt_portfolio (tuple[bool, BaseStrategy] | None, optional): Optimized portfolio strategy. Defaults to None.
     """
@@ -44,6 +44,14 @@ class UnitsOperator(Role):
         available_markets: list[MarketConfig],
         opt_portfolio: tuple[bool, BaseStrategy] | None = None,
     ):
+        """
+        Initializes the UnitsOperator.
+
+        Args:
+            self: The instance of the UnitsOperator.
+            available_markets (list[MarketConfig]): The available markets.
+            opt_portfolio (tuple[bool, BaseStrategy] | None, optional): Optimized portfolio strategy. Defaults to None.
+        """
         super().__init__()
 
         self.available_markets = available_markets
@@ -103,6 +111,7 @@ class UnitsOperator(Role):
         Create a unit.
 
         Args:
+            self: The instance of the UnitsOperator.
             unit (BaseUnit): The unit to be added.
         """
         self.units[unit.id] = unit
@@ -132,6 +141,7 @@ class UnitsOperator(Role):
         This always returns true for now.
 
         Args:
+            self: The instance of the UnitsOperator.
             market (MarketConfig): The market to participate in.
 
         Returns:
@@ -144,6 +154,7 @@ class UnitsOperator(Role):
         Register a market.
 
         Args:
+            self: The instance of the UnitsOperator.
             market (MarketConfig): The market to register.
         """
 
@@ -168,6 +179,7 @@ class UnitsOperator(Role):
         When we receive an opening from the market, we schedule sending back our list of orders as a response.
 
         Args:
+            self: The instance of the UnitsOperator.
             opening (OpeningMessage): The opening message.
             meta (MetaDict): The meta data of the market.
         """
@@ -181,6 +193,7 @@ class UnitsOperator(Role):
         Handles the feedback which is received from a market we did bid at.
 
         Args:
+            self: The instance of the UnitsOperator.
             content (ClearingMessage): The content of the clearing message.
             meta (MetaDict): The meta data of the market.
         """
@@ -205,6 +218,7 @@ class UnitsOperator(Role):
         Handles the feedback received from a market regarding registration.
 
         Args:
+            self: The instance of the UnitsOperator.
             content (RegistrationMessage): The content of the registration message.
             meta (MetaDict): The meta data of the market.
         """
@@ -228,6 +242,7 @@ class UnitsOperator(Role):
         Handles the data request received from other agents.
 
         Args:
+            self: The instance of the UnitsOperator.
             content (DataRequestMessage): The content of the data request message.
             meta (MetaDict): The meta data of the market.
         """
@@ -262,6 +277,7 @@ class UnitsOperator(Role):
         Feeds the current market result back to the units.
 
         Args:
+            self: The instance of the UnitsOperator.
             orderbook (Orderbook): The orderbook of the market.
             marketconfig (MarketConfig): The market configuration.
         """
@@ -278,6 +294,7 @@ class UnitsOperator(Role):
         Sends the actual aggregated dispatch curve.
 
         Args:
+            self: The instance of the UnitsOperator.
             product_type (str): The type of the product.
         """
 
@@ -347,11 +364,14 @@ class UnitsOperator(Role):
     async def submit_bids(self, opening: OpeningMessage, meta: MetaDict) -> None:
         """
         Formulates an orderbook and sends it to the market.
-        This function will accomodate the portfolio optimization in the future.
 
         Args:
+            self: The instance of the UnitsOperator.
             opening (OpeningMessage): The opening message.
             meta (MetaDict): The meta data of the market.
+
+        Note:
+            This function will accomodate the portfolio optimization in the future.
         """
 
         products = opening["products"]
@@ -396,14 +416,17 @@ class UnitsOperator(Role):
     ) -> Orderbook:
         """
         Formulates the bid to the market according to the bidding strategy of the unit operator.
-        Placeholder for future portfolio optimization.
 
         Args:
+            self: The instance of the UnitsOperator.
             market (MarketConfig): The market to formulate bids for.
             products (list[tuple]): The products to formulate bids for.
 
         Returns:
             OrderBook: The orderbook that is submitted as a bid to the market.
+
+        Note:
+            Placeholder for future portfolio optimization.
         """
         orderbook: Orderbook = []
         # TODO sort units by priority
@@ -421,6 +444,7 @@ class UnitsOperator(Role):
         Formulates the bid to the market according to the bidding strategy of the each unit individually.
 
         Args:
+            self: The instance of the UnitsOperator.
             market (MarketConfig): The market to formulate bids for.
             products (list[tuple]): The products to formulate bids for.
 
@@ -458,6 +482,7 @@ class UnitsOperator(Role):
         Sends the current rl_strategy update to the output agent.
 
         Args:
+            self: The instance of the UnitsOperator.
             products_index (pd.DatetimeIndex): The index of all products.
             marketconfig (MarketConfig): The market configuration.
         """
@@ -544,7 +569,8 @@ class UnitsOperator(Role):
         Writes learning results to the learning agent.
 
         Args:
-            start (datetime): The start time.
+            self: The instance of the UnitsOperator.
+            products_index (pd.DatetimeIndex): The index of all products.
             marketconfig (MarketConfig): The market configuration.
             obs_dim (int): The observation dimension.
             act_dim (int): The action dimension.
@@ -615,6 +641,7 @@ class UnitsOperator(Role):
         Sends the current rl_strategy update to the output agent.
 
         Args:
+            self: The instance of the UnitsOperator.
             orderbook (Orderbook): The orderbook of the market.
             marketconfig (MarketConfig): The market configuration.
         """

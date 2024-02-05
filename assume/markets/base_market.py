@@ -31,9 +31,16 @@ logger = logging.getLogger(__name__)
 class MarketMechanism:
     """
     This class represents a market mechanism.
-    It is different thant the MarketRole, in the way that the functionality is unrelated to mango.
+
+    It is different than the MarketRole, in the way that the functionality is unrelated to mango.
     The MarketMechanism is embedded into the general MarketRole, which takes care of simulation concerns.
     In the Marketmechanism, all data needed for the clearing is present.
+
+    Attributes:
+        all_orders (Orderbook): The list of all orders.
+        marketconfig (MarketConfig): The configuration of the market.
+        open_auctions (list[dict]): The list of open auctions.
+        name (str): The name of the market.
     """
 
     all_orders: Orderbook
@@ -52,8 +59,15 @@ class MarketMechanism:
         self, content: RegistrationMessage, meta: MetaDict
     ) -> bool:
         """
-        method to validate a given registration.
-        Used to check if a participant is eligible to bid on this market
+        Validates a given registration.
+        Used to check if a participant is eligible to bid on this market.
+
+        Args:
+            content (RegistrationMessage): The content of the message.
+            meta (MetaDict): The metadata of the message.
+
+        Returns:
+            bool: True if the registration is valid, False otherwise.
         """
 
         # simple check that 1 MW can be bid at least by  powerplants
@@ -64,8 +78,17 @@ class MarketMechanism:
 
     def validate_orderbook(self, orderbook: Orderbook, agent_tuple: tuple) -> None:
         """
-        method to validate a given orderbook
-        This is needed to check if all required fields for this mechanism are present
+        Validates a given orderbook.
+
+        This is needed to check if all required fields for this mechanism are present.
+
+        Args:
+            self: The market mechanism.
+            orderbook (Orderbook): The orderbook to be validated.
+            agent_tuple (tuple): The tuple of the agent.
+
+        Raises:
+            AssertionError: If the orderbook is invalid.
         """
         max_price = self.marketconfig.maximum_bid_price
         min_price = self.marketconfig.minimum_bid_price
@@ -111,6 +134,16 @@ class MarketMechanism:
     def clear(
         self, orderbook: Orderbook, market_products: list[MarketProduct]
     ) -> (Orderbook, Orderbook, list[dict]):
+        """
+        Clears the market.
+
+        Args:
+            orderbook (Orderbook): The orderbook to be cleared.
+            market_products (list[MarketProduct]): The products to be traded.
+
+        Returns:
+            (Orderbook, Orderbook, list[dict]): The empty accepted orderbook, the empty rejected orderbook and the empty market metadata.
+        """
         return [], [], []
 
 
@@ -119,8 +152,12 @@ class MarketRole(MarketMechanism, Role):
     This is the base class for all market roles. It implements the basic functionality of a market role, such as
     registering agents, clearing the market and sending the results to the database agent.
 
-    :param marketconfig: The configuration of the market
-    :type marketconfig: MarketConfig
+    Attributes:
+        longitude (float): The longitude of the market.
+        latitude (float): The latitude of the market.
+        marketconfig (MarketConfig): The configuration of the market.
+        registered_agents (dict[tuple[str, str], dict]): The dictionary of registered agents.
+        required_fields (list[str]): The list of required fields.
 
     Methods
     -------
@@ -154,17 +191,21 @@ class MarketRole(MarketMechanism, Role):
     def setup(self):
         """
         This method sets up the initial configuration and subscriptions for the market role.
-        It sets the address and agent ID of the market config to match the current context.
 
+        It sets the address and agent ID of the market config to match the current context.
         It Defines three filter methods (accept_orderbook, accept_registration, and accept_get_unmatched)
         that serve as validation steps for different types of incoming messages.
-
         Subscribes the role to handle incoming order book messages using the handle_orderbook method.
         Subscribes the role to handle incoming registration messages using the handle_registration method
         If the market configuration supports "get unmatched" functionality, subscribes the role to handle
-        such messages using the handle_get_unmatched
-
+        such messages using the handle_get_unmatched.
         Schedules the opening() method to run at the next opening time of the market.
+
+        Args:
+            self: The market role.
+
+        Raises:
+            AssertionError: If a required field is missing.
         """
         super().setup()
         self.marketconfig.addr = self.context.addr
@@ -234,8 +275,10 @@ class MarketRole(MarketMechanism, Role):
 
     async def opening(self):
         """
-        This method is called when the market opens. It sends an opening message to all registered agents,
-        handles scheduling the clearing of the market and the next opening.
+        Sends an opening message to all registered agents, handles scheduling the clearing of the market and the next opening.
+
+        Args:
+            self: The market role.
         """
         # scheduled to be opened now
         market_open = datetime.utcfromtimestamp(self.context.current_timestamp)
@@ -291,13 +334,12 @@ class MarketRole(MarketMechanism, Role):
 
     def handle_registration(self, content: RegistrationMessage, meta: MetaDict):
         """
-        This method handles incoming registration messages.
-        It adds the sender of the message to the list of registered agents
+        This method handles incoming registration messages and adds the sender of the message to the list of registered agents.
 
-        :param content: The content of the message
-        :type content: dict
-        :param meta: The metadata of the message
-        :type meta: any
+        Args:
+            self: The market role.
+            content (RegistrationMessage): The content of the message.
+            meta (MetaDict): The metadata of the message.
         """
         agent_id = meta["sender_id"]
         agent_addr = meta["sender_addr"]
@@ -326,15 +368,15 @@ class MarketRole(MarketMechanism, Role):
 
     def handle_orderbook(self, content: OrderBookMessage, meta: MetaDict):
         """
-        This method handles incoming order book messages.
-        It validates the order book and adds it to the list of all orders.
+        Handles incoming order book messages and validates th order book and adds it to the list of all orders.
 
-        :param content: The content of the message
-        :type content: dict
-        :param meta: The metadata of the message
-        :type meta: any
+        Args:
+            self: The market role.
+            content (OrderBookMessage): The content of the message.
+            meta (MetaDict): The metadata of the message.
 
-        :raises AssertionError: If the order book is invalid
+        Raises:
+            AssertionError: If the order book is invalid.
         """
         orderbook: Orderbook = content["orderbook"]
         agent_addr = meta["sender_addr"]
@@ -357,6 +399,17 @@ class MarketRole(MarketMechanism, Role):
             )
 
     def handle_data_request(self, content: DataRequestMessage, meta: MetaDict):
+        """
+        This method handles incoming data request messages.
+
+        Args:
+            self: The market role.
+            content (DataRequestMessage): The content of the message.
+            meta (MetaDict): The metadata of the message.
+
+        Raises:
+            AssertionError: If the order book is invalid.
+        """
         metric_type = content["metric"]
         start = content["start_time"]
         end = content["end_time"]
@@ -386,15 +439,15 @@ class MarketRole(MarketMechanism, Role):
 
     def handle_get_unmatched(self, content: dict, meta: MetaDict):
         """
-        A handler which sends the orderbook with unmatched orders to an agent.
-        Allows to query a subset of the orderbook.
+        A handler which sends the orderbook with unmatched orders to an agent and allows to query a subset of the orderbook.
 
-        :param content: The content of the message
-        :type content: dict
-        :param meta: The metadata of the message
-        :type meta: MetaDict
+        Args:
+            self: The market role.
+            content (dict): The content of the message.
+            meta (MetaDict): The metadata of the message.
 
-        :raises AssertionError: If the order book is invalid
+        Raises:
+            AssertionError: If the order book is invalid.
         """
         order = content.get("order")
         agent_addr = meta["sender_addr"]
@@ -427,8 +480,9 @@ class MarketRole(MarketMechanism, Role):
         """
         This method clears the market and sends the results to the database agent.
 
-        :param market_products: The products to be traded
-        :type market_products: list[MarketProduct]
+        Args:
+            self: The market role.
+            market_products (list[MarketProduct]): The products to be traded.
         """
         (
             accepted_orderbook,
@@ -503,10 +557,11 @@ class MarketRole(MarketMechanism, Role):
     async def store_order_book(self, orderbook: Orderbook):
         # Send a message to the OutputRole to update data in the database
         """
-        Sends a message to the OutputRole to update data in the database
+        Sends a message to the OutputRole to update data in the database.
 
-        :param orderbook: The order book to be stored
-        :type orderbook: Orderbook
+        Args:
+            self: The market role.
+            orderbook (Orderbook): The order book to be stored.
         """
 
         db_aid = self.context.data.get("output_agent_id")
@@ -526,12 +581,12 @@ class MarketRole(MarketMechanism, Role):
             )
 
     async def store_market_results(self, market_meta):
-        # Send a message to the OutputRole to update data in the database
         """
-        This method sends a message to the OutputRole to update data in the database
+        Sends a message to the OutputRole to update data in the database.
 
-        :param market_meta: The metadata of the market
-        :type market_meta: any
+        Args:
+            self: The market role.
+            market_meta: The metadata of the market.
         """
 
         db_aid = self.context.data.get("output_agent_id")

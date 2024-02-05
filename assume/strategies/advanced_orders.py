@@ -17,7 +17,7 @@ from assume.strategies.flexable import (
 
 class flexableEOMBlock(BaseStrategy):
     """
-    A strategy that bids on the EOM-market.
+    A strategy that bids on the EOM-market with block bids.
     """
 
     def __init__(self, *args, **kwargs):
@@ -34,18 +34,25 @@ class flexableEOMBlock(BaseStrategy):
         **kwargs,
     ) -> Orderbook:
         """
-        Takes information from a unit that the unit operator manages and
-        defines how it is dispatched to the market
-        Returns a list of bids consisting of the start time, end time, only hours, price, volume and bid type.
+        Calculates block bids for the EOM-market and returns a list of bids consisting of the start time, end time, only hours, price, volume and bid type.
+
+        The bids take the following form:
+        One block bid with the minimum acceptance ratio set to 1 spanning the total clearing period.
+        It uses the inflexible power and the weighted average price of the inflexible power as the price.
+        This price is based on the marginal cost of the inflexible power and the starting costs.
+        The starting costs are split across inflexible power and the average operation or down time of the unit depending on the operation status before.
+        Additionally, for every hour where the unit is on, a separate flexible bid is created using the flexible power and marginal costs as bidding price.
 
         Args:
-        - unit (SupportsMinMax): A unit that the unit operator manages
-        - market_config (MarketConfig): A market configuration
-        - product_tuples (list[Product]): A list of tuples containing the start and end time of each product
-        - kwargs (dict): Additional arguments
+            self: The strategy object.
+            unit (SupportsMinMax): A unit that the unit operator manages.
+            market_config (MarketConfig): A market configuration.
+            product_tuples (list[Product]): A list of tuples containing the start and end time of each product.
+            kwargs (dict): Additional arguments.
 
         Returns:
-        - Orderbook: A list of bids
+            Orderbook: A list of bids.
+
         """
 
         start = product_tuples[0][0]
@@ -74,11 +81,11 @@ class flexableEOMBlock(BaseStrategy):
             # Calculating possible bid amount and cost
             # =============================================================================
 
-            # adjust for ramp speed
+            # adjust max_power for ramp speed
             max_power[start] = unit.calculate_ramp(
                 op_time, previous_power, max_power[start], current_power
             )
-            # adjust for ramp speed
+            # adjust min_power for ramp speed
             min_power[start] = unit.calculate_ramp(
                 op_time, previous_power, min_power[start], current_power
             )
@@ -86,7 +93,7 @@ class flexableEOMBlock(BaseStrategy):
             bid_quantity_inflex = min_power[start]
 
             # =============================================================================
-            # Calculating possible price
+            # Calculating marginal cost
             # =============================================================================
 
             marginal_cost_inflex = unit.calculate_marginal_cost(
@@ -129,6 +136,7 @@ class flexableEOMBlock(BaseStrategy):
                 bid_quantity_flex = max_power[start] - bid_quantity_inflex
                 bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
 
+            # add volume and price to block bid
             bid_quantity_block[product[0]] = bid_quantity_inflex
             if bid_quantity_inflex > 0:
                 bid_price_block.append(bid_price_inflex)
@@ -176,6 +184,15 @@ class flexableEOMBlock(BaseStrategy):
         marketconfig: MarketConfig,
         orderbook: Orderbook,
     ):
+        """
+        Calculates and writes the reward (costs and profit).
+
+        Args:
+            self: The strategy object.
+            unit (SupportsMinMax): A unit that the unit operator manages.
+            marketconfig (MarketConfig): A market configuration.
+            orderbook (Orderbook): An orderbook with accepted and rejected orders for the unit.
+        """
         # TODO: Calculate profits over all markets
 
         calculate_reward_EOM(
@@ -187,7 +204,7 @@ class flexableEOMBlock(BaseStrategy):
 
 class flexableEOMLinked(BaseStrategy):
     """
-    A strategy that bids on the EOM-market.
+    A strategy that bids on the EOM-market with block and linked bids.
     """
 
     def __init__(self, *args, **kwargs):
@@ -204,18 +221,25 @@ class flexableEOMLinked(BaseStrategy):
         **kwargs,
     ) -> Orderbook:
         """
-        Takes information from a unit that the unit operator manages and
-        defines how it is dispatched to the market
-        Returns a list of bids consisting of the start time, end time, only hours, price, volume and bid type.
+        Calculates block and linked bids for the EOM-market and returns a list of bids consisting of the start time, end time, only hours, price, volume and bid type.
+
+        The bids take the following form:
+        One block bid with the minimum acceptance ratio set to 1 spanning the total clearing period.
+        It uses the inflexible power and the weighted average price of the inflexible power as the price.
+        This price is based on the marginal cost of the inflexible power and the starting costs.
+        The starting costs are split across inflexible power and the average operation or down time of the unit depending on the operation status before.
+        Additionally, for every hour where the unit is on, a separate flexible bid is created using the flexible power and marginal costs as bidding price.
+        This bids are linked as children to the block bid.
 
         Args:
-        - unit (SupportsMinMax): A unit that the unit operator manages
-        - market_config (MarketConfig): A market configuration
-        - product_tuples (list[Product]): A list of tuples containing the start and end time of each product
-        - kwargs (dict): Additional arguments
+            self: The strategy object.
+            unit (SupportsMinMax): A unit that the unit operator manages.
+            market_config (MarketConfig): A market configuration.
+            product_tuples (list[Product]): A list of tuples containing the start and end time of each product.
+            kwargs (dict): Additional arguments.
 
         Returns:
-        - Orderbook: A list of bids
+            Orderbook: A list of bids.
         """
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
@@ -245,11 +269,11 @@ class flexableEOMLinked(BaseStrategy):
             # Calculating possible bid amount and cost
             # =============================================================================
 
-            # adjust for ramp speed
+            # adjust max_power for ramp speed
             max_power[start] = unit.calculate_ramp(
                 op_time, previous_power, max_power[start], current_power
             )
-            # adjust for ramp speed
+            # adjust min_power for ramp speed
             min_power[start] = unit.calculate_ramp(
                 op_time, previous_power, min_power[start], current_power
             )
@@ -257,7 +281,7 @@ class flexableEOMLinked(BaseStrategy):
             bid_quantity_inflex = min_power[start]
 
             # =============================================================================
-            # Calculating possible price
+            # Calculating marginal cost
             # =============================================================================
 
             marginal_cost_inflex = unit.calculate_marginal_cost(
@@ -352,6 +376,16 @@ class flexableEOMLinked(BaseStrategy):
         marketconfig: MarketConfig,
         orderbook: Orderbook,
     ):
+        """
+        Calculates and writes the reward (costs and profit).
+
+        Args:
+            self: The strategy object.
+            unit (SupportsMinMax): A unit that the unit operator manages.
+            marketconfig (MarketConfig): A market configuration.
+            orderbook (Orderbook): An orderbook with accepted and rejected orders for the unit.
+        """
+
         # TODO: Calculate profits over all markets
 
         calculate_reward_EOM(
