@@ -40,6 +40,7 @@ jobs:
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         python -m pip install -e .[test]
+        python -m pip install pyomo
     - name: Lint with black and isort
       run: |
         # stop the build if there are Python syntax errors or undefined names
