@@ -132,6 +132,10 @@ class NaiveDAStrategy(BaseStrategy):
 class NaivePosReserveStrategy(BaseStrategy):
     """
     A naive strategy that bids the ramp up volume on the positive reserve market (price = 0).
+
+    Args:
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
     """
 
     def __init__(self, *args, **kwargs):
@@ -188,6 +192,10 @@ class NaivePosReserveStrategy(BaseStrategy):
 class NaiveNegReserveStrategy(BaseStrategy):
     """
     A naive strategy that bids the ramp down volume on the negative reserve market (price = 0).
+
+    Args:
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
     """
 
     def __init__(self, *args, **kwargs):

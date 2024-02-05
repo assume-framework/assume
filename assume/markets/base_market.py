@@ -40,7 +40,10 @@ class MarketMechanism:
         all_orders (Orderbook): The list of all orders.
         marketconfig (MarketConfig): The configuration of the market.
         open_auctions (list[dict]): The list of open auctions.
-        name (str): The name of the market.
+        results (list[dict]): The list of market metadata.
+
+    Args:
+        marketconfig (MarketConfig): The configuration of the market.
     """
 
     all_orders: Orderbook
@@ -158,6 +161,9 @@ class MarketRole(MarketMechanism, Role):
         registered_agents (dict[tuple[str, str], dict]): The dictionary of registered agents.
         required_fields (list[str]): The list of required fields.
 
+    Args:
+        marketconfig (MarketConfig): The configuration of the market.
+
     Methods
     -------
     """
@@ -199,8 +205,6 @@ class MarketRole(MarketMechanism, Role):
         If the market configuration supports "get unmatched" functionality, subscribes the role to handle
         such messages using the handle_get_unmatched.
         Schedules the opening() method to run at the next opening time of the market.
-
-        Args:
 
         Raises:
             AssertionError: If a required field is missing.
@@ -275,7 +279,6 @@ class MarketRole(MarketMechanism, Role):
         """
         Sends an opening message to all registered agents, handles scheduling the clearing of the market and the next opening.
 
-        Args:
         """
         # scheduled to be opened now
         market_open = datetime.utcfromtimestamp(self.context.current_timestamp)

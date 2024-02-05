@@ -35,6 +35,10 @@ class RLStrategy(LearningStrategy):
         order_types (list[str]): Order types to use. Defaults to ["SB"].
         action_noise (NormalActionNoise): Action noise. Defaults to None.
         collect_initial_experience_mode (bool): Whether to collect initial experience. Defaults to True.
+
+    Args:
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
     """
 
     def __init__(self, *args, **kwargs):

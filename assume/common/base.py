@@ -30,6 +30,17 @@ class BaseUnit:
         forecaster (Forecaster, optional): The forecast of the unit. Defaults to None.
         **kwargs: Additional keyword arguments.
 
+    Args:
+        id (str): The ID of the unit.
+        unit_operator (str): The operator of the unit.
+        technology (str): The technology of the unit.
+        bidding_strategies (dict[str, BaseStrategy]): The bidding strategies of the unit.
+        index (pd.DatetimeIndex): The index of the unit.
+        node (str, optional): The node of the unit. Defaults to "".
+        forecaster (Forecaster, optional): The forecast of the unit. Defaults to None.
+        location (tuple[float, float], optional): The location of the unit. Defaults to (0.0, 0.0).
+        **kwargs: Additional keyword arguments.
+
     """
 
     def __init__(
@@ -44,21 +55,6 @@ class BaseUnit:
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs,
     ):
-        """
-        Initialize the unit.
-
-        Args:
-            id (str): The ID of the unit.
-            unit_operator (str): The operator of the unit.
-            technology (str): The technology of the unit.
-            bidding_strategies (dict[str, BaseStrategy]): The bidding strategies of the unit.
-            index (pd.DatetimeIndex): The index of the unit.
-            node (str, optional): The node of the unit. Defaults to "".
-            forecaster (Forecaster, optional): The forecast of the unit. Defaults to None.
-            location (tuple[float, float], optional): The location of the unit. Defaults to (0.0, 0.0).
-            **kwargs: Additional keyword arguments.
-        """
-
         self.id = id
         self.unit_operator = unit_operator
         self.technology = technology
@@ -700,15 +696,12 @@ class BaseStrategy:
     """
     A base class for a bidding strategy.
 
-    Attributes:
-        args (list): The arguments.
-        kwargs (dict): The keyword arguments.
+    Args:
+        *args (list): The arguments.
+        **kwargs (dict): The keyword arguments.
     """
 
     def __init__(self, *args, **kwargs):
-        """
-        Initializes the bidding strategy.
-        """
         pass
 
     def calculate_bids(
@@ -754,7 +747,10 @@ class LearningStrategy(BaseStrategy):
     Attributes:
         obs_dim (int): The observation dimension.
         act_dim (int): The action dimension.
-        kwargs (dict): The keyword arguments.
+
+    Args:
+        *args (list): The arguments.
+        **kwargs (dict): The keyword arguments.
     """
 
     obs_dim: int

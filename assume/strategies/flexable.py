@@ -14,6 +14,13 @@ from assume.common.utils import get_products_index
 class flexableEOM(BaseStrategy):
     """
     A strategy that bids on the EOM-market.
+
+    Attributes:
+        foresight (timedelta): The foresight of the unit.
+
+    Args:
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
     """
 
     def __init__(self, *args, **kwargs):
@@ -174,6 +181,13 @@ class flexableEOM(BaseStrategy):
 class flexablePosCRM(BaseStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the CRM (reserve market).
+
+    Attributes:
+        foresight (timedelta): The foresight of the unit.
+
+    Args:
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
     """
 
     def __init__(self, *args, **kwargs):
@@ -272,6 +286,13 @@ class flexablePosCRM(BaseStrategy):
 class flexableNegCRM(BaseStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
+
+    Attributes:
+        foresight (timedelta): The foresight of the unit.
+
+    Args:
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
     """
 
     def __init__(self, *args, **kwargs):

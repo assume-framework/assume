@@ -13,6 +13,15 @@ class Demand(SupportsMinMax):
     """
     A demand unit.
 
+    Attributes:
+        id (str): The unique identifier of the unit.
+        index (pd.DatetimeIndex): The index of the unit.
+        max_power (float): The maximum power output capacity of the power plant in MW.
+        min_power (float): The minimum power output capacity of the power plant in MW.
+        volume (pd.Series): The volume of the unit.
+        price (float): The price of the unit.
+        forecaster (Forecaster): The forecaster of the unit.
+
     Args:
         id (str): The unique identifier of the unit.
         unit_operator (str): The operator of the unit.
@@ -21,7 +30,9 @@ class Demand(SupportsMinMax):
         index (pd.DatetimeIndex): The index of the unit.
         max_power (float): The maximum power output capacity of the power plant in MW.
         min_power (float, optional): The minimum power output capacity of the power plant in MW. Defaults to 0.0 MW.
+        node (str, optional): The node of the unit. Defaults to "bus0".
         price (float): The price of the unit.
+        location (tuple[float, float], optional): The location of the unit. Defaults to (0.0, 0.0).
 
     Methods
     -------
@@ -117,8 +128,6 @@ class Demand(SupportsMinMax):
     def as_dict(self) -> dict:
         """
         Returns the unit as a dictionary.
-
-        Args:
 
         Returns:
             dict: The unit as a dictionary.

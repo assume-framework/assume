@@ -30,6 +30,10 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         order_types (list[str]): The list of order types to use (SB, LB, BB).
         episodes_collecting_initial_experience (int): Number of episodes to collect initial experience.
 
+    Args:
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
+
     Note:
         This strategy is based on the strategy in flexable.py, but uses the actor network to determine the prices
         instead of using the marginal costs as in flexable.py.

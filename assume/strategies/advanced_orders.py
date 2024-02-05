@@ -18,6 +18,13 @@ from assume.strategies.flexable import (
 class flexableEOMBlock(BaseStrategy):
     """
     A strategy that bids on the EOM-market with block bids.
+
+    Attributes:
+        foresight (pd.Timedelta): The foresight for the EOM-market.
+
+    Args:
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
     """
 
     def __init__(self, *args, **kwargs):

@@ -43,6 +43,48 @@ logging.getLogger("mango").setLevel(logging.WARNING)
 
 
 class World:
+
+    """
+    World instance with the provided address, database URI, export CSV path, log level, and distributed role settings.
+
+    If a database URI is provided, it establishes a database connection. Additionally, it sets up various dictionaries and attributes for market operators,
+    markets, unit operators, unit types, bidding strategies, and clearing mechanisms. If available, it imports learning strategies and handles any potential import errors.
+    Finally, it sets up the event loop for asynchronous operations.
+
+    Attributes:
+        logger (logging.Logger): The logger for the world instance.
+        addr (Union[Tuple[str, int], str]): The address of the world, represented as a tuple of string and int or a string.
+        container (Optional[Container]): The container for the world instance.
+        distributed_role (Optional[bool]): A boolean indicating whether distributed roles are enabled.
+        export_csv_path (str): The path for exporting CSV data.
+        db (Optional[create_engine]): The database connection.
+        market_operators (dict[str, RoleAgent]): The market operators for the world instance.
+        markets (dict[str, MarketConfig]): The markets for the world instance.
+        unit_operators (dict[str, UnitsOperator]): The unit operators for the world instance.
+        unit_types (dict[str, BaseUnit]): The unit types for the world instance.
+        bidding_strategies (dict[str, type[BaseStrategy]]): The bidding strategies for the world instance.
+        clearing_mechanisms (dict[str, MarketRole]): The clearing mechanisms for the world instance.
+        addresses (list[str]): The addresses for the world instance.
+        loop (asyncio.AbstractEventLoop): The event loop for the world instance.
+        clock (ExternalClock): The external clock for the world instance.
+        start (datetime): The start datetime for the simulation.
+        end (datetime): The end datetime for the simulation.
+        learning_config (LearningConfig): The configuration for the learning process.
+        evaluation_mode (bool): A boolean indicating whether the evaluation mode is enabled.
+        forecaster (Optional[Forecaster]): The forecaster used for custom unit types.
+        learning_mode (bool): A boolean indicating whether the learning mode is enabled.
+        output_agent_addr (Tuple[str, str]): The address of the output agent.
+        bidding_params (dict): Parameters for bidding.
+        index (pd.Series): The index for the simulation.
+
+    Args:
+        addr (Union[Tuple[str, int], str]): The address of the world, represented as a tuple of string and int or a string.
+        database_uri (str): The URI for the database connection.
+        export_csv_path (str): The path for exporting CSV data.
+        log_level (str): The logging level for the world instance.
+        distributed_role (Optional[bool]): A boolean indicating whether distributed roles are enabled.
+    """
+
     def __init__(
         self,
         addr: Union[Tuple[str, int], str] = "world",
@@ -51,24 +93,6 @@ class World:
         log_level: str = "INFO",
         distributed_role: Optional[bool] = None,
     ) -> None:
-        """
-        Initializes a World instance with the provided address, database URI, export CSV path, log level, and distributed role settings.
-
-        If a database URI is provided, it establishes a database connection. Additionally, it sets up various dictionaries and attributes for market operators,
-        markets, unit operators, unit types, bidding strategies, and clearing mechanisms. If available, it imports learning strategies and handles any potential import errors.
-        Finally, it sets up the event loop for asynchronous operations.
-
-        Args:
-            addr (Union[Tuple[str, int], str]): The address of the world, represented as a tuple of string and int or a string.
-            database_uri (str): The URI for the database connection.
-            export_csv_path (str): The path for exporting CSV data.
-            log_level (str): The logging level for the world instance.
-            distributed_role (Optional[bool]): A boolean indicating whether distributed roles are enabled.
-
-        Returns:
-            None
-        """
-
         logging.getLogger("assume").setLevel(log_level)
         self.logger = logging.getLogger(__name__)
         self.addr = addr
@@ -219,8 +243,6 @@ class World:
         Set up the learning process for the simulation, updating bidding parameters with the learning configuration
         and initializing the reinforcement learning (RL) learning role with the specified parameters. It also sets up
         the RL agent and adds the learning role to it for further processing.
-
-        Args:
 
         Returns:
             None

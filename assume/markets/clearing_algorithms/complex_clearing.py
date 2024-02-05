@@ -202,7 +202,10 @@ class ComplexClearingRole(MarketRole):
     The complex market is a pay-as-clear market with more complex bid structures, including minimum acceptance ratios, bid types, and profiled volumes.
 
     Attributes:
-        required_fields (list[str]): The required fields for the orderbook.
+        marketconfig (MarketConfig): The market configuration.
+
+    Args:
+        marketconfig (MarketConfig): The market configuration.
     """
 
     required_fields = ["bid_type"]

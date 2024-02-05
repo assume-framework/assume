@@ -18,6 +18,9 @@ class Forecaster:
     Attributes:
         index (pd.Series): The index of the forecasts.
 
+    Args:
+        index (pd.Series): The index of the forecasts.
+
     Example:
         >>> forecaster = Forecaster(index=pd.Series([1, 2, 3]))
         >>> forecast = forecaster['temperature']
@@ -88,6 +91,10 @@ class CsvForecaster(Forecaster):
     availability of units, and prices of fuel types, returning the corresponding timeseries as pandas Series.
 
     Attributes:
+        index (pd.Series): The index of the forecasts.
+        powerplants (dict[str, pd.Series]): The power plants.
+
+    Args:
         index (pd.Series): The index of the forecasts.
         powerplants (dict[str, pd.Series]): The power plants.
 
@@ -213,8 +220,6 @@ class CsvForecaster(Forecaster):
         """
         This method calculates the residual demand forecast by subtracting the total available power from renewable energy (VRE) power plants from the overall demand forecast for each time step.
 
-        Args:
-
         Returns:
             pd.Series: The residual demand forecast.
 
@@ -248,8 +253,6 @@ class CsvForecaster(Forecaster):
         Calculates the merit order price forecast for the entire time horizon at once.
 
         The method considers the infeed of renewables, residual demand, and the marginal costs of power plants to derive the price forecast.
-
-        Args:
 
         Returns:
             pd.Series: The merit order price forecast.
@@ -362,6 +365,11 @@ class RandomForecaster(CsvForecaster):
     from the `CsvForecaster` class and initializes with the provided index, power plants, and
     standard deviation of the noise.
 
+    Attributes:
+        index (pd.Series): The index of the forecasts.
+        powerplants (dict[str, pd.Series]): The power plants.
+        sigma (float): The standard deviation of the noise.
+
     Args:
         index (pd.Series): The index of the forecasts.
         powerplants (dict[str, pd.Series]): The power plants.
@@ -424,6 +432,16 @@ class NaiveForecast(Forecaster):
         co2_price (float | list, optional): The CO2 price.
         demand (float | list, optional): The demand.
         price_forecast (float | list, optional): The price forecast.
+
+    Args:
+        index (pd.Series): The index of the forecasts.
+        availability (float | list, optional): The availability of the power plants.
+        fuel_price (float | list, optional): The fuel price.
+        co2_price (float | list, optional): The CO2 price.
+        demand (float | list, optional): The demand.
+        price_forecast (float | list, optional): The price forecast.
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
 
     Example:
         >>> forecaster = NaiveForecast(demand=100, co2_price=10, fuel_price=10, availability=1, price_forecast=50)

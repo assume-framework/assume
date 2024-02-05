@@ -22,6 +22,10 @@ class flexableEOMStorage(BaseStrategy):
 
     Attributes:
         foresight (pd.Timedelta): Foresight for the average price calculation.
+
+    Args:
+        *args: Additional arguments.
+        **kwargs: Additional keyword arguments.
     """
 
     def __init__(self, *args, **kwargs):
@@ -214,6 +218,10 @@ class flexablePosCRMStorage(BaseStrategy):
 
     Attributes:
         foresight (pd.Timedelta): Foresight for the average price calculation.
+
+    Args:
+        *args: Additional arguments.
+        **kwargs: Additional keyword arguments.
     """
 
     def __init__(self, *args, **kwargs):
@@ -345,6 +353,13 @@ class flexablePosCRMStorage(BaseStrategy):
 class flexableNegCRMStorage(BaseStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
+
+    Attributes:
+        foresight (pd.Timedelta): Foresight for the average price calculation.
+
+    Args:
+        *args: Additional arguments.
+        **kwargs: Additional keyword arguments.
     """
 
     def __init__(self, *args, **kwargs):

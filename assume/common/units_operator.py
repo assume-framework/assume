@@ -36,6 +36,17 @@ class UnitsOperator(Role):
 
     Attributes:
         available_markets (list[MarketConfig]): The available markets.
+        registered_markets (dict[str, MarketConfig]): The registered markets.
+        last_sent_dispatch (int): The last sent dispatch.
+        use_portfolio_opt (bool): Whether to use portfolio optimization.
+        portfolio_strategy (BaseStrategy): The portfolio strategy.
+        valid_orders (defaultdict): The valid orders.
+        units (dict[str, BaseUnit]): The units.
+        id (str): The id of the agent.
+        context (Context): The context of the agent.
+
+    Args:
+        available_markets (list[MarketConfig]): The available markets.
         opt_portfolio (tuple[bool, BaseStrategy] | None, optional): Optimized portfolio strategy. Defaults to None.
     """
 
@@ -44,13 +55,6 @@ class UnitsOperator(Role):
         available_markets: list[MarketConfig],
         opt_portfolio: tuple[bool, BaseStrategy] | None = None,
     ):
-        """
-        Initializes the UnitsOperator.
-
-        Args:
-            available_markets (list[MarketConfig]): The available markets.
-            opt_portfolio (tuple[bool, BaseStrategy] | None, optional): Optimized portfolio strategy. Defaults to None.
-        """
         super().__init__()
 
         self.available_markets = available_markets
