@@ -150,8 +150,8 @@ def cli(args=None):
 
     except KeyboardInterrupt:
         pass
-    except Exception as e:
-        print(f"Simulation aborted: {e}")
+    except Exception:
+        logging.exception("Simulation aborted")
 
 
 if __name__ == "__main__":
