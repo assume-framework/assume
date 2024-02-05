@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -12,6 +13,8 @@ import torch as th
 from assume.common.base import LearningStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.reinforcement_learning.learning_utils import Actor, NormalActionNoise
+
+logger = logging.getLogger(__name__)
 
 
 class RLStrategy(LearningStrategy):
@@ -77,8 +80,10 @@ class RLStrategy(LearningStrategy):
                 dt=kwargs.get("noise_dt", 1.0),
             )
 
-        elif Path(kwargs["trained_actors_path"]).is_dir():
-            self.load_actor_params(load_path=kwargs["trained_actors_path"])
+        elif Path(kwargs["trained_policies_save_path"]).is_dir():
+            self.load_actor_params(load_path=kwargs["trained_policies_save_path"])
+        else:
+            logger.error("did not have learning mode and folder did not exist")
 
     def calculate_bids(
         self,
