@@ -129,12 +129,36 @@ def convert_to_rrule_freq(string: str) -> Tuple[int, int]:
     return freq, interval
 
 
+def replace_paths(config: dict, inputs_path: str):
+    """
+    This function replaces all config items which end with "_path"
+    to one starting with the given inputs_path.
+    So that paths in the config are relative to the inputs_path where the config is read from.
+
+    Args:
+        config (dict): the config dict read from yaml
+        inputs_path (str): the base path from the config
+
+    Returns:
+        dict: the adjusted config dict
+    """
+    if isinstance(config, dict):
+        for key, value in config.items():
+            if isinstance(value, (dict, list)):
+                config[key] = replace_paths(value, inputs_path)
+            elif isinstance(key, str) and key.endswith("_path"):
+                config[key] = inputs_path + "/" + value
+    elif isinstance(config, list):
+        for i, item in enumerate(config):
+            config[i] = replace_paths(item, inputs_path)
+    return config
+
+
 def make_market_config(
     id: str,
     market_params: dict,
     world_start: datetime,
     world_end: datetime,
-    network_path: str = " ",
 ) -> MarketConfig:
     """
     Create a market config from a given dictionary.
@@ -189,8 +213,7 @@ def make_market_config(
         price_tick=market_params.get("price_tick"),
         additional_fields=market_params.get("additional_fields", []),
         supports_get_unmatched=market_params.get("supports_get_unmatched", False),
-        network_path=market_params.get("network_path", network_path),
-        solver=market_params.get("solver", "glpk"),
+        param_dict=market_params.get("param_dict", {}),
     )
 
     return market_config
@@ -275,6 +298,8 @@ async def load_scenario_folder_async(
     config = config[study_case]
     logger.info(f"Starting Scenario {scenario}/{study_case} from {inputs_path}")
 
+    config = replace_paths(config, path)
+
     world.reset()
 
     start = pd.Timestamp(config["start_date"])
@@ -324,19 +349,10 @@ async def load_scenario_folder_async(
     )
     learning_config["evaluation_mode"] = perform_evaluation
 
-    if learning_config.get("trained_policies_save_path"):
-        learning_config[
-            "trained_policies_save_path"
-        ] = f"{inputs_path}/{learning_config['trained_policies_save_path']}"
-    else:
+    if not learning_config.get("trained_policies_save_path"):
         learning_config[
             "trained_policies_save_path"
         ] = f"{inputs_path}/learned_strategies/{sim_id}"
-
-    if learning_config.get("trained_policies_load_path"):
-        learning_config[
-            "trained_policies_load_path"
-        ] = f"{inputs_path}/{learning_config['trained_policies_load_path']}"
 
     if learning_config.get("learning_mode", False):
         sim_id = f"{sim_id}_{episode}"
@@ -425,7 +441,6 @@ async def load_scenario_folder_async(
         market_config = make_market_config(
             id=market_id,
             market_params=market_params,
-            network_path=market_params.get("network_path", path),
             world_start=start,
             world_end=end,
         )

@@ -3,9 +3,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-import os
-import sys
-
 import numpy as np
 import pandas as pd
 import pypsa
@@ -15,7 +12,6 @@ from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)
 
-
 class RedispatchMarketRole(MarketRole):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
@@ -23,21 +19,23 @@ class RedispatchMarketRole(MarketRole):
         self.network = pypsa.Network()
         # set snapshots as list from the value marketconfig.producs.count converted to list
         self.network.snapshots = range(marketconfig.market_products[0].count)
-        self.solver = marketconfig.solver
+        self.solver = marketconfig.param_dict.get("solver", "glpk")
+        network_path = marketconfig.param_dict.get("network_path")
+        assert network_path
 
         # setup the network
         # add buses
-        self.add_buses(f"{marketconfig.network_path}/buses.csv")
+        self.add_buses(f"{network_path}/buses.csv")
 
         # add lines
-        self.add_lines(f"{marketconfig.network_path}/lines.csv")
+        self.add_lines(f"{network_path}/lines.csv")
 
         # add generators
         # TODO: add config parameter for price of the backup generators and backup generators themselves
-        self.add_generators(f"{marketconfig.network_path}/powerplant_units.csv")
+        self.add_generators(f"{network_path}/powerplant_units.csv")
 
         # add loads
-        self.add_loads(f"{marketconfig.network_path}/demand_units.csv")
+        self.add_loads(f"{network_path}/demand_units.csv")
 
     def add_buses(self, filename):
         """
@@ -230,22 +228,19 @@ class RedispatchMarketRole(MarketRole):
         self.network.generators_t.marginal_cost.update(costs.add_suffix("_up"))
         self.network.generators_t.marginal_cost.update(costs.add_suffix("_down"))
 
-        # run lopf
+        # run linear powerflow
         self.network.lpf()
 
-        # cehck lines for congestion where power flow is larget than s_nom
+        # check lines for congestion where power flow is larget than s_nom
         line_loading = self.network.lines_t.p0.abs() / self.network.lines.s_nom
 
         if line_loading.max().max() > 1:
             log.debug("Congestion detected")
 
-            # TODO: need a better way to handle this verbose output from pypsa or is it fine?
-            with open(os.devnull, "w") as fnull:
-                sys.stdout = fnull  # Redirecting stdout to /dev/null
-                status, termination_condition = self.network.lopf(
-                    solver_name=self.solver
-                )
-                sys.stdout = sys.__stdout__  # Resetting stdout
+            # lopf is deprecated
+            status, termination_condition = self.network.optimize(
+                solver_name=self.solver
+            )
 
             if status != "ok":
                 log.error(f"Solver exited with {termination_condition}")
@@ -301,8 +296,6 @@ class RedispatchMarketRole(MarketRole):
                 ].values
 
     def calculate_meta_data(self, product: MarketProduct, i):
-        start = product[0]
-
         # Calculate meta data such as total upward and downward redispatch, total backup dispatch, and total redispatch cost
         redispatch_volumes = self.network.generators_t.p.iloc[i]
         upward_redispatch = redispatch_volumes.filter(regex="_up").sum()
