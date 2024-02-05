@@ -4,6 +4,7 @@
 
 import logging
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Optional, Tuple
 
 import dateutil.rrule as rr
@@ -13,6 +14,7 @@ import yaml
 from tqdm import tqdm
 
 from assume.common.base import LearningConfig
+from assume.common.exceptions import AssumeException
 from assume.common.forecasts import CsvForecaster, Forecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.world import World
@@ -42,16 +44,16 @@ def load_file(
     If the index is specified, the dataframe is resampled to the index, if possible. If not, None is returned.
 
     Args:
-    path (str): The path to the csv file.
-    config (dict): The config file containing file mappings.
-    file_name (str): The name of the csv file.
-    index (pd.DatetimeIndex, optional): The index of the dataframe. Defaults to None.
+        path (str): The path to the csv file.
+        config (dict): The config file containing file mappings.
+        file_name (str): The name of the csv file.
+        index (pd.DatetimeIndex, optional): The index of the dataframe. Defaults to None.
 
     Returns:
-    pd.DataFrame: The dataframe containing the loaded data.
+        pd.DataFrame: The dataframe containing the loaded data.
 
     Raises:
-    FileNotFoundError: If the specified file is not found, returns None.
+        FileNotFoundError: If the specified file is not found, returns None.
     """
     df = None
 
@@ -117,10 +119,10 @@ def convert_to_rrule_freq(string: str) -> Tuple[int, int]:
     Convert a string to a rrule frequency and interval.
 
     Args:
-    string (str): The string to be converted. Should be in the format of "1h" or "1d" or "1w".
+        string (str): The string to be converted. Should be in the format of "1h" or "1d" or "1w".
 
     Returns:
-    Tuple[int, int]: The rrule frequency and interval.
+        Tuple[int, int]: The rrule frequency and interval.
     """
     freq = freq_map[string[-1]]
     interval = int(string[:-1])
@@ -240,7 +242,6 @@ async def load_scenario_folder_async(
     perform_evaluation: bool = False,
     episode: int = 0,
     eval_episode: int = 0,
-    trained_actors_path: str = "",
 ) -> None:
     """
     Load a scenario from a given path.
@@ -248,18 +249,17 @@ async def load_scenario_folder_async(
     This function loads a scenario within a specified study case from a given path, setting up the world environment for simulation and learning.
 
     Args:
-    world (World): An instance of the World class representing the simulation environment.
-    inputs_path (str): The path to the folder containing input files necessary for the scenario.
-    scenario (str): The name of the scenario to be loaded.
-    study_case (str): The specific study case within the scenario to be loaded.
-    perform_learning (bool, optional): A flag indicating whether learning should be performed. Defaults to True.
-    perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
-    episode (int, optional): The episode number for learning. Defaults to 0.
-    eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
-    trained_actors_path (str, optional): The path to the trained actors. Defaults to an empty string.
+        world (World): An instance of the World class representing the simulation environment.
+        inputs_path (str): The path to the folder containing input files necessary for the scenario.
+        scenario (str): The name of the scenario to be loaded.
+        study_case (str): The specific study case within the scenario to be loaded.
+        perform_learning (bool, optional): A flag indicating whether learning should be performed. Defaults to True.
+        perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
+        episode (int, optional): The episode number for learning. Defaults to 0.
+        eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
 
     Raises:
-    ValueError: If the specified scenario or study case is not found in the provided inputs.
+        ValueError: If the specified scenario or study case is not found in the provided inputs.
 
     """
 
@@ -321,13 +321,19 @@ async def load_scenario_folder_async(
     )
     learning_config["evaluation_mode"] = perform_evaluation
 
-    if not learning_config.get("trained_actors_path"):
-        if trained_actors_path:
-            learning_config["trained_actors_path"] = trained_actors_path
-        else:
-            learning_config[
-                "trained_actors_path"
-            ] = f"{inputs_path}/learned_strategies/{sim_id}"
+    if learning_config.get("trained_policies_save_path"):
+        learning_config[
+            "trained_policies_save_path"
+        ] = f"{inputs_path}/{learning_config['trained_policies_save_path']}"
+    else:
+        learning_config[
+            "trained_policies_save_path"
+        ] = f"{inputs_path}/learned_strategies/{sim_id}"
+
+    if learning_config.get("trained_policies_load_path"):
+        learning_config[
+            "trained_policies_load_path"
+        ] = f"{inputs_path}/{learning_config['trained_policies_load_path']}"
 
     if learning_config.get("learning_mode", False):
         sim_id = f"{sim_id}_{episode}"
@@ -489,7 +495,6 @@ def load_scenario_folder(
     perform_evaluation: bool = False,
     episode: int = 1,
     eval_episode: int = 1,
-    trained_actors_path="",
 ):
     """
     Load a scenario from a given path.
@@ -497,18 +502,17 @@ def load_scenario_folder(
     This function loads a scenario within a specified study case from a given path, setting up the world environment for simulation and learning.
 
     Args:
-    world (World): An instance of the World class representing the simulation environment.
-    inputs_path (str): The path to the folder containing input files necessary for the scenario.
-    scenario (str): The name of the scenario to be loaded.
-    study_case (str): The specific study case within the scenario to be loaded.
-    perform_learning (bool, optional): A flag indicating whether learning should be performed. Defaults to True.
-    perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
-    episode (int, optional): The episode number for learning. Defaults to 0.
-    eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
-    trained_actors_path (str, optional): The path to the trained actors. Defaults to an empty string.
+        world (World): An instance of the World class representing the simulation environment.
+        inputs_path (str): The path to the folder containing input files necessary for the scenario.
+        scenario (str): The name of the scenario to be loaded.
+        study_case (str): The specific study case within the scenario to be loaded.
+        perform_learning (bool, optional): A flag indicating whether learning should be performed. Defaults to True.
+        perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
+        episode (int, optional): The episode number for learning. Defaults to 0.
+        eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
 
     Raises:
-    ValueError: If the specified scenario or study case is not found in the provided inputs.
+        ValueError: If the specified scenario or study case is not found in the provided inputs.
 
     Example:
         >>> load_scenario_folder(
@@ -520,15 +524,15 @@ def load_scenario_folder(
             perform_evaluation=False,
             episode=1,
             eval_episode=1,
-            trained_actors_path="",
+            trained_policies_save_path="",
         )
 
     Notes:
-    - The function sets up the world environment based on the provided inputs and configuration files.
-    - If `perform_learning` is set to True, the function initializes the learning mode with the specified episode number.
-    - If `perform_evaluation` is set to True, the function performs evaluation using the specified evaluation episode number.
-    - The function utilizes the specified inputs to configure the simulation environment, including market parameters, unit operators, and forecasting data.
-    - After calling this function, the world environment is prepared for further simulation and analysis.
+        - The function sets up the world environment based on the provided inputs and configuration files.
+        - If `perform_learning` is set to True and learning_mode is set, the function initializes the learning mode with the specified episode number.
+        - If `perform_evaluation` is set to True, the function performs evaluation using the specified evaluation episode number.
+        - The function utilizes the specified inputs to configure the simulation environment, including market parameters, unit operators, and forecasting data.
+        - After calling this function, the world environment is prepared for further simulation and analysis.
 
     """
     world.loop.run_until_complete(
@@ -541,7 +545,6 @@ def load_scenario_folder(
             perform_evaluation=perform_evaluation,
             episode=episode,
             eval_episode=eval_episode,
-            trained_actors_path=trained_actors_path,
         )
     )
 
@@ -559,11 +562,11 @@ async def async_load_custom_units(
     This function loads custom units of a specified type from a given path within a scenario, adding them to the world environment for simulation.
 
     Args:
-    world (World): An instance of the World class representing the simulation environment.
-    inputs_path (str): The path to the folder containing input files necessary for the custom units.
-    scenario (str): The name of the scenario from which the custom units are to be loaded.
-    file_name (str): The name of the file containing the custom units.
-    unit_type (str): The type of the custom units to be loaded.
+        world (World): An instance of the World class representing the simulation environment.
+        inputs_path (str): The path to the folder containing input files necessary for the custom units.
+        scenario (str): The name of the scenario from which the custom units are to be loaded.
+        file_name (str): The name of the file containing the custom units.
+        unit_type (str): The type of the custom units to be loaded.
     """
     path = f"{inputs_path}/{scenario}"
 
@@ -602,11 +605,11 @@ def load_custom_units(
     This function loads custom units of a specified type from a given path within a scenario, adding them to the world environment for simulation.
 
     Args:
-    world (World): An instance of the World class representing the simulation environment.
-    inputs_path (str): The path to the folder containing input files necessary for the custom units.
-    scenario (str): The name of the scenario from which the custom units are to be loaded.
-    file_name (str): The name of the file containing the custom units.
-    unit_type (str): The type of the custom units to be loaded.
+        world (World): An instance of the World class representing the simulation environment.
+        inputs_path (str): The path to the folder containing input files necessary for the custom units.
+        scenario (str): The name of the scenario from which the custom units are to be loaded.
+        file_name (str): The name of the file containing the custom units.
+        unit_type (str): The type of the custom units to be loaded.
 
     Example:
         >>> load_custom_units(
@@ -618,10 +621,10 @@ def load_custom_units(
         )
 
     Notes:
-    - The function loads custom units from the specified file within the given scenario and adds them to the world environment for simulation.
-    - If the specified custom units file is not found, a warning is logged.
-    - Each unique unit operator in the custom units is added to the world's unit operators.
-    - The custom units are added to the world environment based on their type for use in simulations.
+        - The function loads custom units from the specified file within the given scenario and adds them to the world environment for simulation.
+        - If the specified custom units file is not found, a warning is logged.
+        - Each unique unit operator in the custom units is added to the world's unit operators.
+        - The custom units are added to the world environment based on their type for use in simulations.
     """
     world.loop.run_until_complete(
         async_load_custom_units(
@@ -660,7 +663,6 @@ def run_learning(
     # remove csv path so that nothing is written while learning
     temp_csv_path = world.export_csv_path
     world.export_csv_path = ""
-    best_reward = -1e10
 
     buffer = ReplayBuffer(
         buffer_size=int(world.learning_config.get("replay_buffer_size", 5e5)),
@@ -679,6 +681,16 @@ def run_learning(
     )
 
     eval_episode = 1
+    save_path = world.learning_config["trained_policies_save_path"]
+
+    if Path(save_path).is_dir():
+        # we are in learning mode and about to train new policies, which might overwrite existing ones
+        accept = input(
+            f"{save_path=} exists - should we overwrite current learnings? (y/N)"
+        )
+        if not accept.lower().startswith("y"):
+            # stop here - do not start learning or save anything
+            raise AssumeException("don't overwrite existing strategies")
 
     for episode in tqdm(
         range(1, world.learning_role.training_episodes + 1),
@@ -712,11 +724,8 @@ def run_learning(
             episode % validation_interval == 0
             and episode > world.learning_role.episodes_collecting_initial_experience
         ):
-            old_path = world.learning_config["trained_actors_path"]
-            new_path = f"{old_path}_eval"
-
-            # save validation params in validation path
-            world.learning_role.rl_algorithm.save_params(directory=new_path)
+            # save current params in training path
+            world.learning_role.rl_algorithm.save_params(directory=save_path)
             world.reset()
 
             # load validation run
@@ -728,7 +737,6 @@ def run_learning(
                 perform_learning=False,
                 perform_evaluation=True,
                 eval_episode=eval_episode,
-                trained_actors_path=new_path,
             )
 
             world.run()
@@ -736,14 +744,10 @@ def run_learning(
             total_rewards = world.output_role.get_sum_reward()
             avg_reward = np.mean(total_rewards)
             # check reward improvement in validation run
-            world.learning_config["trained_actors_path"] = old_path
-            if avg_reward > best_reward:
-                # update best reward
-                best_reward = avg_reward
-                world.learning_role.rl_algorithm.save_params(directory=old_path)
+            # and store best run in eval folder
+            world.learning_role.compare_and_save_policies({"avg_reward": avg_reward})
 
             eval_episode += 1
-
         world.reset()
 
         # in load_scenario_folder_async, we initiate new container and kill old if present

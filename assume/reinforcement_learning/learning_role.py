@@ -3,8 +3,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-import os
+from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 
 import torch as th
 from dateutil import rrule as rr
@@ -54,7 +55,10 @@ class Learning(Role):
         self.training_episodes = learning_config["training_episodes"]
         self.learning_mode = learning_config["learning_mode"]
         self.continue_learning = learning_config["continue_learning"]
-        self.trained_actors_path = learning_config["trained_actors_path"]
+        self.trained_policies_save_path = learning_config["trained_policies_save_path"]
+        self.trained_policies_load_path = learning_config.get(
+            "trained_policies_load_path", self.trained_policies_save_path
+        )
 
         cuda_device = (
             learning_config["device"]
@@ -71,9 +75,14 @@ class Learning(Role):
         th.backends.cudnn.allow_tf32 = True
 
         self.learning_rate = learning_config.get("learning_rate", 1e-4)
-        self.episodes_collecting_initial_experience = learning_config.get(
-            "episodes_collecting_initial_experience", 5
+
+        # if we do not have initital experience collected we will get an error as no samples are avaiable on the
+        # buffer from which we can draw exprience to adapt the strategy, hence we set it to minium one episode
+
+        self.episodes_collecting_initial_experience = max(
+            learning_config.get("episodes_collecting_initial_experience", 5), 1
         )
+
         self.train_freq = learning_config.get("train_freq", 1)
         self.gradient_steps = (
             self.train_freq
@@ -84,17 +93,13 @@ class Learning(Role):
         self.gamma = learning_config.get("gamma", 0.99)
 
         self.eval_episodes_done = 0
-        self.max_eval_reward = -1e9
-        self.max_eval_regret = 1e9
-        self.max_eval_profit = -1e9
 
         # function that initializes learning, needs to be an extra function so that it can be called after buffer is given to Role
         self.create_learning_algorithm(self.rl_algorithm)
 
         # store evaluation values
-        self.rl_eval_rewards = []
-        self.rl_eval_profits = []
-        self.rl_eval_regrets = []
+        self.max_eval = defaultdict(lambda: -1e9)
+        self.rl_eval = defaultdict(list)
 
     def setup(self) -> None:
         """
@@ -183,28 +188,15 @@ class Learning(Role):
 
         self.rl_algorithm.initialize_policy(actors_and_critics)
 
-        if self.continue_learning == True and actors_and_critics == None:
-            load_directory = self.trained_actors_path
-            self.load_policies(load_directory)
-
-    def load_policies(self, load_directory) -> None:
-        """
-        Load the policies of the reinforcement learning agent.
-
-        This method loads the entire policies (actor and critics) of the reinforcement learning agent from the specified directory.
-        This is used if we want to continue learning from already learned strategies.
-
-        Args:
-            load_directory (str): The directory from which to load the policies.
-        """
-        if load_directory is None:
-            logger.warning(
-                "You have specified continue learning as True but no trained_actors_path was given!"
-            )
-            logger.info("Restart learning process!")
-        else:
-            logger.info(f"Loading pretrained policies from {load_directory}!")
-            self.rl_algorithm.load_params(load_directory)
+        if self.continue_learning is True and actors_and_critics is None:
+            directory = self.trained_policies_load_path
+            if Path(directory).is_dir():
+                logger.info(f"Loading pretrained policies from {directory}!")
+                self.rl_algorithm.load_params(directory)
+            else:
+                logger.warning(
+                    f"Folder with pretrained policies {directory} does not exist"
+                )
 
     async def update_policy(self) -> None:
         """
@@ -220,50 +212,44 @@ class Learning(Role):
         if self.episodes_done > self.episodes_collecting_initial_experience:
             self.rl_algorithm.update_policy()
 
-    # TODO: add evaluation function
-    def compare_and_save_policies(self) -> None:
+    def compare_and_save_policies(self, metrics: dict) -> None:
         """
-        Compare evaluation metrics and save policies based on the best achieved performance.
+        Compare evaluation metrics and save policies based on the best achieved performance according to the metrics calculated.
 
         This method compares the evaluation metrics, such as reward, profit, and regret, and saves the policies if they achieve the
         best performance in their respective categories. It iterates through the specified modes, compares the current evaluation
         value with the previous best, and updates the best value if necessary. If an improvement is detected, it saves the policy
         and associated parameters.
 
+        metrics contain a metric key like "reward" and the current value.
+        This function stores the policies with the highest metric.
+        So if minimize is required one should add for example "minus_regret" which is then maximized.
+
         Notes:
             This method is typically used during the evaluation phase to save policies that achieve superior performance.
+            Currently the best evaluation metric is still assessed by the development team and preliminary we use the average rewards.
         """
-        modes = ["reward", "profit", "regret"]
-        for mode in modes:
-            value = None
+        if not metrics:
+            logger.error("tried to save policies but did not get any metrics")
+            return
+        # if the current values are a new max in one of the metrics - we store them in the default folder
+        first_has_new_max = False
 
-            if not self.rl_eval_rewards:
-                # TODO?
-                return
-
-            if mode == "reward" and self.rl_eval_rewards[-1] > self.max_eval_reward:
-                self.max_eval_reward = self.rl_eval_rewards[-1]
-                dir_name = "highest_reward"
-                value = self.max_eval_reward
-            elif mode == "profit" and self.rl_eval_profits[-1] > self.max_eval_profit:
-                self.max_eval_profit = self.rl_eval_profits[-1]
-                dir_name = "highest_profit"
-                value = self.max_eval_profit
-            elif (
-                mode == "regret"
-                and self.rl_eval_regrets[-1] < self.max_eval_regret
-                and self.rl_eval_regrets[-1] != 0
-            ):
-                self.max_eval_regret = self.rl_eval_regrets[-1]
-                dir_name = "lowest_regret"
-                value = self.max_eval_regret
-
-            if value is not None:
-                self.rl_algorithm.save_params(dir_name=dir_name)
-                for unit in self.rl_powerplants + self.rl_storages:
-                    if unit.learning:
-                        unit.save_params(dir_name=dir_name)
-
-                logger.info(
-                    f"Policies saved, episode: {self.eval_episodes_done + 1}, mode: {mode}, value: {value:.2f}"
+        # add current reward to list of all rewards
+        for metric, value in metrics.items():
+            self.rl_eval[metric].append(value)
+            if self.rl_eval[metric][-1] > self.max_eval[metric]:
+                self.max_eval[metric] = self.rl_eval[metric][-1]
+                if metric == list(metrics.keys())[0]:
+                    first_has_new_max = True
+                # store the best for our current metric in its folder
+                self.rl_algorithm.save_params(
+                    directory=f"{self.trained_policies_save_path}/{metric}"
                 )
+
+        # use last metric as default
+        if first_has_new_max:
+            self.rl_algorithm.save_params(directory=self.trained_policies_save_path)
+            logger.info(
+                f"Policies saved, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
+            )

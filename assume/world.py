@@ -242,7 +242,9 @@ class World:
             # separate process does not support buffer and learning
             self.learning_agent_addr = (self.addr, "learning_agent")
             rl_agent = RoleAgent(
-                self.container, suggested_aid=self.learning_agent_addr[1]
+                self.container,
+                suggested_aid=self.learning_agent_addr[1],
+                suspendable_tasks=False,
             )
             rl_agent.add_role(self.learning_role)
 
@@ -281,14 +283,20 @@ class World:
             self.addresses.append(self.addr)
 
             def creator(container):
-                agent = RoleAgent(container, suggested_aid=self.output_agent_addr[1])
+                agent = RoleAgent(
+                    container,
+                    suggested_aid=self.output_agent_addr[1],
+                    suspendable_tasks=False,
+                )
                 agent.add_role(self.output_role)
                 clock_agent = DistributedClockAgent(container)
 
             await self.container.as_agent_process(agent_creator=creator)
         else:
             output_agent = RoleAgent(
-                self.container, suggested_aid=self.output_agent_addr[1]
+                self.container,
+                suggested_aid=self.output_agent_addr[1],
+                suspendable_tasks=False,
             )
             output_agent.add_role(self.output_role)
 
@@ -311,7 +319,9 @@ class World:
 
         units_operator = UnitsOperator(available_markets=list(self.markets.values()))
         # creating a new role agent and apply the role of a unitsoperator
-        unit_operator_agent = RoleAgent(self.container, suggested_aid=f"{id}")
+        unit_operator_agent = RoleAgent(
+            self.container, suggested_aid=f"{id}", suspendable_tasks=False
+        )
         unit_operator_agent.add_role(units_operator)
 
         # add the current unitsoperator to the list of operators currently existing
@@ -433,8 +443,7 @@ class World:
         if self.market_operators.get(id):
             raise ValueError(f"MarketOperator {id} already exists")
         market_operator_agent = RoleAgent(
-            self.container,
-            suggested_aid=id,
+            self.container, suggested_aid=id, suspendable_tasks=False
         )
         market_operator_agent.markets = []
 

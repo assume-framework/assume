@@ -14,6 +14,8 @@ from pathlib import Path
 import argcomplete
 import yaml
 from sqlalchemy import make_url
+import warnings
+from assume.common.exceptions import AssumeException
 
 os.makedirs("./examples/outputs", exist_ok=True)
 os.makedirs("./examples/local_db", exist_ok=True)
@@ -114,6 +116,10 @@ def cli(args=None):
     else:
         db_uri = f"sqlite:///./examples/local_db/{name}.db"
 
+    # add these two weird hacks for now
+    warnings.filterwarnings("ignore", "coroutine.*?was never awaited.*")
+    logging.getLogger("asyncio").setLevel("FATAL")
+
     try:
         # import package after argcomplete.autocomplete
         # to improve autocompletion speed
@@ -144,6 +150,8 @@ def cli(args=None):
 
     except KeyboardInterrupt:
         pass
+    except Exception as e:
+        print(f"Simulation aborted: {e}")
 
 
 if __name__ == "__main__":
