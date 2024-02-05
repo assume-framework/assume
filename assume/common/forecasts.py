@@ -33,7 +33,6 @@ class Forecaster:
         Returns the forecast for a given column.
 
         Args:
-            self: The instance of Forecaster.
             column (str): The column of the forecast.
 
         Returns:
@@ -48,7 +47,6 @@ class Forecaster:
         Returns the availability of a given unit as a pandas Series based on the provided index.
 
         Args:
-            self: The instance of Forecaster.
             unit (str): The unit.
 
         Returns:
@@ -68,7 +66,6 @@ class Forecaster:
         not exist.
 
         Args:
-            self: The instance of Forecaster.
             fuel_type (str): The fuel type.
 
         Returns:
@@ -116,7 +113,6 @@ class CsvForecaster(Forecaster):
         If the column does not exist in the forecasts, a Series of zeros is returned. If the column contains "availability", a Series of ones is returned.
 
         Args:
-            self: The instance of CsvForecaster.
             column (str): The column of the forecast.
 
         Returns:
@@ -138,7 +134,6 @@ class CsvForecaster(Forecaster):
         a Series, it sets the forecast for the given column. If data is None, no action is taken.
 
         Args:
-            self: The instance of CsvForecaster.
             data (pd.DataFrame | pd.Series | None): The forecast data.
             prefix (str): The prefix of the column.
 
@@ -176,7 +171,6 @@ class CsvForecaster(Forecaster):
         "price_EOM" and "residual_load_forecast".
 
         Args:
-            self: The instance of CsvForecaster.
         """
 
         cols = []
@@ -203,7 +197,6 @@ class CsvForecaster(Forecaster):
         the price forecast is not implemented, so it returns the power plants as a DataFrame.
 
         Args:
-            self: The instance of CsvForecaster.
             market_id (str): The market ID.
 
         Returns:
@@ -221,7 +214,6 @@ class CsvForecaster(Forecaster):
         This method calculates the residual demand forecast by subtracting the total available power from renewable energy (VRE) power plants from the overall demand forecast for each time step.
 
         Args:
-            self: The instance of CsvForecaster.
 
         Returns:
             pd.Series: The residual demand forecast.
@@ -258,7 +250,6 @@ class CsvForecaster(Forecaster):
         The method considers the infeed of renewables, residual demand, and the marginal costs of power plants to derive the price forecast.
 
         Args:
-            self: The instance of CsvForecaster.
 
         Returns:
             pd.Series: The merit order price forecast.
@@ -312,7 +303,6 @@ class CsvForecaster(Forecaster):
         - Fixed costs, if specified for the power plant.
 
         Args:
-            self: The instance of CsvForecaster.
             pp_series (pd.Series): Series containing power plant data.
 
         Returns:
@@ -352,7 +342,6 @@ class CsvForecaster(Forecaster):
         Saves the forecasts to a csv file located at the specified path.
 
         Args:
-            self: The instance of CsvForecaster.
             path (str): The path to save the forecasts to.
 
         Raises:
@@ -405,7 +394,6 @@ class RandomForecaster(CsvForecaster):
         forecasts. If the column does not exist in the forecasts, a Series of zeros is returned.
 
         Args:
-            self: The instance of RandomForecaster.
             column (str): The column of the forecast.
 
         Returns:
@@ -473,7 +461,6 @@ class NaiveForecast(Forecaster):
         value is returned as a pandas Series. If the column does not match, a Series of zeros is returned.
 
         Args:
-            self: The instance of NaiveForecast.
             column (str): The column for which forecasted values are requested.
 
         Returns:

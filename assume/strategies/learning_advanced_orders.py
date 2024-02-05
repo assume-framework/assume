@@ -102,7 +102,6 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         Calculates bids for a unit.
 
         Args:
-            self: The instance of the class.
             unit (SupportsMinMax): Unit to calculate bids for
             market_config (MarketConfig): Market configuration
             product_tuples (list[Product]): Product tuples
@@ -258,7 +257,6 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         Gets actions for a unit containing two bid prices depending on the observation
 
         Args:
-            self: The instance of the class.
             next_observation (torch.Tensor): Next observation
 
         Returns:
@@ -325,7 +323,6 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         Create observation.
 
         Args:
-            self: The instance of the class.
             unit (SupportsMinMax): Unit to create observation for
             start (datetime): Start time
             end (datetime): End time
@@ -444,7 +441,6 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         Calculate and write reward, profit and regret to unit outputs.
 
         Args:
-            self: The instance of the class.
             unit (SupportsMinMax): The unit to calculate reward for.
             marketconfig (MarketConfig): The market configuration.
             orderbook (Orderbook): The Orderbook.
@@ -549,7 +545,6 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         Load actor parameters.
 
         Args:
-            self: The instance of the class.
             load_path (str): Thze path to load parameters from.
         """
         directory = f"{load_path}/actors/actor_{self.unit_id}.pt"

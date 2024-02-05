@@ -40,7 +40,6 @@ class flexableEOM(BaseStrategy):
         Here, the price is equal to the marginal costs of the unit.
 
         Args:
-            self: The strategy object.
             unit (SupportsMinMax): A unit that the unit operator manages.
             market_config (MarketConfig): A market configuration.
             product_tuples (list[Product]): A list of tuples containing the start and end time of each product.
@@ -159,7 +158,6 @@ class flexableEOM(BaseStrategy):
         Calculates and writes the reward (costs and profit).
 
         Args:
-            self: The strategy object.
             unit (SupportsMinMax): A unit that the unit operator manages.
             marketconfig (MarketConfig): A market configuration.
             orderbook (Orderbook): An orderbook with accepted and rejected orders for the unit.
@@ -199,7 +197,6 @@ class flexablePosCRM(BaseStrategy):
         Returns a list of bids consisting of the start time, end time, only hours, price and volume.
 
         Args:
-            self: The strategy object.
             unit (SupportsMinMax): A unit that the unit operator manages.
             market_config (MarketConfig): A market configuration.
             product_tuples (list[Product]): A list of tuples containing the start and end time of each product.
@@ -298,7 +295,6 @@ class flexableNegCRM(BaseStrategy):
         Returns a list of bids consisting of the start time, end time, only hours, price and volume.
 
         Args:
-            self: The strategy object.
             unit (SupportsMinMax): A unit that the unit operator manages.
             market_config (MarketConfig): A market configuration.
             product_tuples (list[Product]): A list of tuples containing the start and end time of each product.

@@ -147,7 +147,6 @@ class World:
         Set up the environment for the simulation, initializing various parameters and components required for the simulation run.
 
         Args:
-            self: The instance of the class.
             start (datetime): The start datetime for the simulation.
             end (datetime): The end datetime for the simulation.
             simulation_id (str): The unique identifier for the simulation.
@@ -222,7 +221,6 @@ class World:
         the RL agent and adds the learning role to it for further processing.
 
         Args:
-            self: The instance of the class.
 
         Returns:
             None
@@ -257,7 +255,6 @@ class World:
         it adds the output agent to the container's processes, or directly adds the output role to the output agent.
 
         Args:
-            self: The instance of the class.
             simulation_id (str): The unique identifier for the simulation.
             save_frequency_hours (int): The frequency (in hours) at which to save simulation data.
 
@@ -307,7 +304,6 @@ class World:
         related to learning and output agents are set for the unit operator's role context.
 
         Args:
-            self: The instance of the class.
             id (str): The identifier for the unit operator.
 
         Returns:
@@ -361,7 +357,6 @@ class World:
         strategies for the unit and adds the unit within the associated unit operator.
 
         Args:
-            self: The instance of the class.
             id (str): The identifier for the unit.
             unit_type (str): The type of unit to be added.
             unit_operator_id (str): The identifier of the unit operator to which the unit will be added.
@@ -433,7 +428,6 @@ class World:
         it includes the output agent address and ID in the role context data dictionary.
 
         Args:
-            self: The instance of the class.
             id (str): The identifier for the market operator.
 
         Returns:
@@ -464,7 +458,6 @@ class World:
         of markets within the market operator. Additionally, store the market configuration in the simulation's markets dictionary.
 
         Args:
-            self: The instance of the class.
             market_operator_id (str): The identifier of the market operator to which the market will be added.
             market_config (MarketConfig): The configuration for the market to be added.
 
@@ -507,7 +500,6 @@ class World:
         time reaches the end timestamp, close the progress bar and shut down the simulation container.
 
         Args:
-            self: The instance of the class.
             start_ts: The start timestamp for the simulation run.
             end_ts: The end timestamp for the simulation run.
 

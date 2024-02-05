@@ -249,7 +249,6 @@ class ComplexClearingRole(MarketRole):
         Implements pay-as-clear with more complex bid structures, including acceptance ratios, bid types, and profiled volumes.
 
         Args:
-            self: The instance of the ComplexClearingRole.
             orderbook (Orderbook): The orderbook to be cleared.
             market_products (list[MarketProduct]): The products to be traded.
 

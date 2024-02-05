@@ -75,7 +75,6 @@ class Demand(SupportsMinMax):
         Returns the volume of the unit within the given time range.
 
         Args:
-            self: The instance of the class.
             start (pd.Timestamp): The start time of the dispatch.
             end (pd.Timestamp): The end time of the dispatch.
 
@@ -92,7 +91,6 @@ class Demand(SupportsMinMax):
         Calculates the minimum and maximum power output of the unit and returns the bid volume as both the minimum and maximum power output of the unit.
 
         Args:
-            self: The instance of the class.
             start (pd.Timestamp): The start time of the dispatch.
             end (pd.Timestamp): The end time of the dispatch.
 
@@ -108,7 +106,6 @@ class Demand(SupportsMinMax):
         Calculate the marginal cost of the unit returns the marginal cost of the unit based on the provided time and power.
 
         Args:
-            self: The instance of the class.
             start (pd.Timestamp): The start time of the dispatch.
             power (float): The power output of the unit.
 
@@ -122,7 +119,6 @@ class Demand(SupportsMinMax):
         Returns the unit as a dictionary.
 
         Args:
-            self: The instance of the class.
 
         Returns:
             dict: The unit as a dictionary.

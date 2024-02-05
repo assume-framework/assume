@@ -44,7 +44,6 @@ class flexableEOMBlock(BaseStrategy):
         Additionally, for every hour where the unit is on, a separate flexible bid is created using the flexible power and marginal costs as bidding price.
 
         Args:
-            self: The strategy object.
             unit (SupportsMinMax): A unit that the unit operator manages.
             market_config (MarketConfig): A market configuration.
             product_tuples (list[Product]): A list of tuples containing the start and end time of each product.
@@ -188,7 +187,6 @@ class flexableEOMBlock(BaseStrategy):
         Calculates and writes the reward (costs and profit).
 
         Args:
-            self: The strategy object.
             unit (SupportsMinMax): A unit that the unit operator manages.
             marketconfig (MarketConfig): A market configuration.
             orderbook (Orderbook): An orderbook with accepted and rejected orders for the unit.
@@ -232,7 +230,6 @@ class flexableEOMLinked(BaseStrategy):
         This bids are linked as children to the block bid.
 
         Args:
-            self: The strategy object.
             unit (SupportsMinMax): A unit that the unit operator manages.
             market_config (MarketConfig): A market configuration.
             product_tuples (list[Product]): A list of tuples containing the start and end time of each product.
@@ -380,7 +377,6 @@ class flexableEOMLinked(BaseStrategy):
         Calculates and writes the reward (costs and profit).
 
         Args:
-            self: The strategy object.
             unit (SupportsMinMax): A unit that the unit operator manages.
             marketconfig (MarketConfig): A market configuration.
             orderbook (Orderbook): An orderbook with accepted and rejected orders for the unit.

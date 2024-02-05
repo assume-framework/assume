@@ -83,7 +83,6 @@ class MarketMechanism:
         This is needed to check if all required fields for this mechanism are present.
 
         Args:
-            self: The market mechanism.
             orderbook (Orderbook): The orderbook to be validated.
             agent_tuple (tuple): The tuple of the agent.
 
@@ -202,7 +201,6 @@ class MarketRole(MarketMechanism, Role):
         Schedules the opening() method to run at the next opening time of the market.
 
         Args:
-            self: The market role.
 
         Raises:
             AssertionError: If a required field is missing.
@@ -278,7 +276,6 @@ class MarketRole(MarketMechanism, Role):
         Sends an opening message to all registered agents, handles scheduling the clearing of the market and the next opening.
 
         Args:
-            self: The market role.
         """
         # scheduled to be opened now
         market_open = datetime.utcfromtimestamp(self.context.current_timestamp)
@@ -337,7 +334,6 @@ class MarketRole(MarketMechanism, Role):
         This method handles incoming registration messages and adds the sender of the message to the list of registered agents.
 
         Args:
-            self: The market role.
             content (RegistrationMessage): The content of the message.
             meta (MetaDict): The metadata of the message.
         """
@@ -371,7 +367,6 @@ class MarketRole(MarketMechanism, Role):
         Handles incoming order book messages and validates th order book and adds it to the list of all orders.
 
         Args:
-            self: The market role.
             content (OrderBookMessage): The content of the message.
             meta (MetaDict): The metadata of the message.
 
@@ -403,7 +398,6 @@ class MarketRole(MarketMechanism, Role):
         This method handles incoming data request messages.
 
         Args:
-            self: The market role.
             content (DataRequestMessage): The content of the message.
             meta (MetaDict): The metadata of the message.
 
@@ -442,7 +436,6 @@ class MarketRole(MarketMechanism, Role):
         A handler which sends the orderbook with unmatched orders to an agent and allows to query a subset of the orderbook.
 
         Args:
-            self: The market role.
             content (dict): The content of the message.
             meta (MetaDict): The metadata of the message.
 
@@ -481,7 +474,6 @@ class MarketRole(MarketMechanism, Role):
         This method clears the market and sends the results to the database agent.
 
         Args:
-            self: The market role.
             market_products (list[MarketProduct]): The products to be traded.
         """
         (
@@ -560,7 +552,6 @@ class MarketRole(MarketMechanism, Role):
         Sends a message to the OutputRole to update data in the database.
 
         Args:
-            self: The market role.
             orderbook (Orderbook): The order book to be stored.
         """
 
@@ -585,7 +576,6 @@ class MarketRole(MarketMechanism, Role):
         Sends a message to the OutputRole to update data in the database.
 
         Args:
-            self: The market role.
             market_meta: The metadata of the market.
         """
 

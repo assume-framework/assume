@@ -26,7 +26,6 @@ class NaiveStrategy(BaseStrategy):
         defines how it is dispatched to the market.
 
         Args:
-            self: The instance of the class.
             unit (SupportsMinMax): The unit to be dispatched.
             market_config (MarketConfig): The market configuration.
             product_tuples (list[Product]): The list of all products the unit can offer.
@@ -95,7 +94,6 @@ class NaiveDAStrategy(BaseStrategy):
         defines how it is dispatched to the market.
 
         Args:
-            self: The instance of the class.
             unit (SupportsMinMax): The unit to be dispatched.
             market_config (MarketConfig): The market configuration.
             product_tuples (list[Product]): The list of all products the unit can offer.
@@ -151,7 +149,6 @@ class NaivePosReserveStrategy(BaseStrategy):
         defines how it is dispatched to the market.
 
         Args:
-            self: The instance of the class.
             unit (SupportsMinMax): The unit to be dispatched.
             market_config (MarketConfig): The market configuration.
             product_tuples (list[Product]): The list of all products the unit can offer.
@@ -208,7 +205,6 @@ class NaiveNegReserveStrategy(BaseStrategy):
         defines how it is dispatched to the market.
 
         Args:
-            self: The instance of the class.
             unit (SupportsMinMax): The unit to be dispatched.
             market_config (MarketConfig): The market configuration.
             product_tuples (list[Product]): The list of all products the unit can offer.

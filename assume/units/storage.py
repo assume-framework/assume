@@ -89,7 +89,6 @@ class Storage(SupportsMinMaxCharge):
         Initializes a storage unit.
 
         Args:
-            self: The instance of the class.
             id (str): The ID of the storage unit.
             technology (str): The technology of the storage unit.
             node (str): The node of the storage unit.
@@ -203,7 +202,6 @@ class Storage(SupportsMinMaxCharge):
         Returns the volume of the unit within the given time range.
 
         Args:
-            self: The instance of the class.
             start (pd.Timestamp): The start time of the dispatch.
             end (pd.Timestamp): The end time of the dispatch.
 
@@ -271,7 +269,6 @@ class Storage(SupportsMinMaxCharge):
         Returns the marginal cost of the unit.
 
         Args:
-            self: The instance of the class.
             start (datetime): The start time of the dispatch.
             power (float): The power output of the unit.
 
@@ -304,7 +301,6 @@ class Storage(SupportsMinMaxCharge):
         Calculates the maximum discharge power depending on the current state of charge.
 
         Args:
-            self: The instance of the class.
             soc (float): The current state of charge.
 
         Returns:
@@ -329,7 +325,6 @@ class Storage(SupportsMinMaxCharge):
         Calculates the maximum charge power depending on the current state of charge.
 
         Args:
-            self: The instance of the class.
             soc (float): The current state of charge.
 
         Returns:
@@ -353,7 +348,6 @@ class Storage(SupportsMinMaxCharge):
         Calculates the min and max charging power for the given time period.
 
         Args:
-            self: The instance of the class.
             start (pd.Timestamp): The start of the current dispatch.
             end (pd.Timestamp): The end of the current dispatch.
             product_type (str): The product type of the storage unit.
@@ -402,7 +396,6 @@ class Storage(SupportsMinMaxCharge):
         Calculates the min and max discharging power for the given time period.
 
         Args:
-            self: The instance of the class.
             start (pd.Timestamp): The start of the current dispatch.
             end (pd.Timestamp): The end of the current dispatch.
             product_type (str): The product type of the storage unit.
@@ -456,7 +449,6 @@ class Storage(SupportsMinMaxCharge):
         Adjusts the discharging power to the ramping constraints.
 
         Args:
-            self: The instance of the class.
             soc (float): The current state of charge.
             previous_power (float): The previous power output of the unit.
             power_discharge (float): The discharging power output of the unit.
@@ -492,7 +484,6 @@ class Storage(SupportsMinMaxCharge):
         Adjusts the charging power to the ramping constraints.
 
         Args:
-            self: The instance of the class.
             soc (float): The current state of charge.
             previous_power (float): The previous power output of the unit.
             power_charge (float): The charging power output of the unit.
@@ -522,7 +513,6 @@ class Storage(SupportsMinMaxCharge):
         Calculates the starting costs of the unit depending on how long it was shut down
 
         Args:
-            self: The instance of the class.
             op_time (float): The time the unit was shut down in hours.
 
         Returns:
@@ -543,7 +533,6 @@ class Storage(SupportsMinMaxCharge):
         Return the storage unit's attributes as a dictionary, including specific attributes.
 
         Args:
-            self: The instance of the class.
 
         Returns:
             dict: The storage unit's attributes as a dictionary.

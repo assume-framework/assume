@@ -80,7 +80,6 @@ class PowerPlant(SupportsMinMax):
         Inizializes the power plant unit.
 
         Args:
-            self: The instance of the class.
             id (str): The ID of the storage unit.
             unit_operator (str): The operator of the unit.
             technology (str): The technology of the unit.
@@ -156,7 +155,6 @@ class PowerPlant(SupportsMinMax):
         Initializes the marginal cost of the unit using calc_cimple_marginal_cost().
 
         Args:
-            self: The instance of the class.
         """
         self.marginal_cost = self.calc_simple_marginal_cost()
 
@@ -172,7 +170,6 @@ class PowerPlant(SupportsMinMax):
         Returns the volume of the unit within the given time range.
 
         Args:
-            self: The instance of the class.
             start (pd.Timestamp): The start time of the dispatch.
             end (pd.Timestamp): The end time of the dispatch.
 
@@ -210,7 +207,6 @@ class PowerPlant(SupportsMinMax):
         Adds the dispatch plan from the current market result to the total dispatch plan and claculates the cshflow.
 
         Args:
-            self: The instance of the class.
             marketconfig (MarketConfig): The market configuration.
             orderbook (Orderbook): The orderbook.
         """
@@ -264,7 +260,6 @@ class PowerPlant(SupportsMinMax):
         Calculates the marginal cost of the unit (simple method) and returns the marginal cost of the unit.
 
         Args:
-            self: The instance of the class.
 
         Returns:
             float: The marginal cost of the unit.
@@ -289,7 +284,6 @@ class PowerPlant(SupportsMinMax):
         Returns the marginal cost of the unit.
 
         Args:
-            self: The instance of the class.
             power_output (float): The power output of the unit.
             timestep (pd.Timestamp, optional): The timestamp of the unit. Defaults to None.
 
@@ -354,7 +348,6 @@ class PowerPlant(SupportsMinMax):
         Calculates the minimum and maximum power output of the unit and returns it.
 
         Args:
-            self: The instance of the class.
             start (pd.Timestamp): The start time of the dispatch.
             end (pd.Timestamp): The end time of the dispatch.
             product_type (str, optional): The product type of the unit. Defaults to "energy".
@@ -395,7 +388,6 @@ class PowerPlant(SupportsMinMax):
         Returns the marginal cost of the unit.
 
         Args:
-            self: The instance of the class.
             start (datetime): The start time of the dispatch.
             power (float): The power output of the unit.
 
@@ -421,7 +413,6 @@ class PowerPlant(SupportsMinMax):
         Returns the attributes of the unit as a dictionary, including specific attributes.
 
         Args:
-            self: The instance of the class.
 
         Returns:
             dict: The attributes of the unit as a dictionary.

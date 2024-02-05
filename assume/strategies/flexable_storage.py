@@ -41,7 +41,6 @@ class flexableEOMStorage(BaseStrategy):
         defines how it is dispatched to the market.
 
         Args:
-            self: The strategy object.
             unit (SupportsMinMaxCharge): The unit that is dispatched.
             market_config (MarketConfig): The market configuration.
             product_tuples (list[Product]): List of product tuples.
@@ -180,7 +179,6 @@ class flexableEOMStorage(BaseStrategy):
         The profit is defined by the cashflow minus the costs.
 
         Args:
-            self: The strategy object.
             unit (SupportsMinMaxCharge): The unit to calculate reward for.
             marketconfig (MarketConfig): The market configuration.
             orderbook (Orderbook): The orderbook.
@@ -239,7 +237,6 @@ class flexablePosCRMStorage(BaseStrategy):
         containing start_time, end_time, only_hours, price, volume.
 
         Args:
-            self: The strategy object.
             unit (SupportsMinMaxCharge): The unit that is dispatched.
             market_config (MarketConfig): The market configuration.
             product_tuples (list[Product]): List of product tuples.
@@ -368,7 +365,6 @@ class flexableNegCRMStorage(BaseStrategy):
         Returns a list of bids consisting of the start time, end time, only hours, price and volume.
 
         Args:
-            self: The strategy object.
             unit (SupportsMinMax): A unit that the unit operator manages.
             market_config (MarketConfig): A market configuration.
             product_tuples (list[Product]): A list of tuples containing the start and end time of each product.
