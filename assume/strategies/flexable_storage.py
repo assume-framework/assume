@@ -20,7 +20,7 @@ class flexableEOMStorage(BaseStrategy):
     The price is then set as the average price divided by the discharge efficiency of the unit.
     Otherwise, the unit will charge with the price defined as the average price multiplied by the charge efficiency of the unit.
 
-    Attributes:
+    Parameters:
         foresight (pd.Timedelta): Foresight for the average price calculation.
 
     Args:
@@ -218,7 +218,7 @@ class flexablePosCRMStorage(BaseStrategy):
     The strategy bids the energy_price for the energy_pos product if the specific revenue is positive.
     Otherwise, the strategy bids the capacity_price for the capacity_pos product.
 
-    Attributes:
+    Parameters:
         foresight (pd.Timedelta): Foresight for the average price calculation.
 
     Args:
@@ -358,7 +358,7 @@ class flexableNegCRMStorage(BaseStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
 
-    Attributes:
+    Parameters:
         foresight (pd.Timedelta): Foresight for the average price calculation.
 
     Args:

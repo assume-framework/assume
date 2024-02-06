@@ -4,7 +4,7 @@
 
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Dict, List, Tuple, TypedDict, Union
+from typing import TypedDict, Union
 
 import pandas as pd
 
@@ -20,7 +20,7 @@ class BaseUnit:
     """
     A base class for a unit. This class is used as a foundation for all units.
 
-    Attributes:
+    Parameters:
         id (str): The ID of the unit.
         unit_operator (str): The operator of the unit.
         technology (str): The technology of the unit.
@@ -79,14 +79,14 @@ class BaseUnit:
     def calculate_bids(
         self,
         market_config: MarketConfig,
-        product_tuples: List[Tuple],
+        product_tuples: list[tuple],
     ) -> Orderbook:
         """
         Calculates the bids for the next time step.
 
         Args:
             market_config (MarketConfig): The market configuration.
-            product_tuples (List[Tuple]): The product tuples.
+            product_tuples (list[tuple]): The product tuples.
 
         Returns:
             Orderbook: The bids.
@@ -173,8 +173,8 @@ class BaseUnit:
         Calculates the generation cost for a specific product type within the given time range.
 
         Args:
-            start (datetime): The start time for the calculation.
-            end (datetime): The end time for the calculation.
+            start (datetime.datetime): The start time for the calculation.
+            end (datetime.datetime): The end time for the calculation.
             product_type (str): The type of product for which the generation cost is to be calculated.
 
         """
@@ -225,7 +225,7 @@ class BaseUnit:
         else:
             return self.outputs[product_type].at[dt - self.index.freq]
 
-    def as_dict(self) -> Dict[str, Union[str, int]]:
+    def as_dict(self) -> dict[str, Union[str, int]]:
         """
         Returns a dictionary representation of the unit.
 
@@ -301,7 +301,7 @@ class SupportsMinMax(BaseUnit):
     Base class used for units supporting continuous dispatch and without energy storage.
     This class is best to be used as foundation for classes of power plants and similar units.
 
-    Attributes:
+    Parameters:
         min_power (float): The minimum power output of the unit.
         max_power (float): The maximum power output of the unit.
         ramp_down (float): How much power can be decreased in one time step.
@@ -406,7 +406,7 @@ class SupportsMinMax(BaseUnit):
         Returns the time the unit is operating (positive) or shut down (negative).
 
         Args:
-            start (datetime): The start time.
+            start (datetime.datetime): The start time.
 
         Returns:
             int: The operation time.
@@ -433,7 +433,7 @@ class SupportsMinMax(BaseUnit):
         Calculates the average uninterrupted operation and down time.
 
         Args:
-            start (datetime): The current time.
+            start (datetime.datetime): The current time.
 
         Returns:
             tuple[float, float]: Tuple of the average operation time avg_op_time and average down time avg_down_time.
@@ -511,7 +511,7 @@ class SupportsMinMaxCharge(BaseUnit):
     """
     Base Class used for units with energy storage.
 
-    Attributes:
+    Parameters:
         initial_soc (float): The initial state of charge of the storage.
         min_power_charge (float): How much power must be charged at least in one time step.
         max_power_charge (float): How much power can be charged at most in one time step.
@@ -544,7 +544,7 @@ class SupportsMinMaxCharge(BaseUnit):
 
     def calculate_min_max_charge(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
-    ) -> Tuple[pd.Series, pd.Series]:
+    ) -> tuple[pd.Series, pd.Series]:
         """
         Calculates the min and max charging power for the given time period.
 
@@ -554,7 +554,7 @@ class SupportsMinMaxCharge(BaseUnit):
             product_type (str, optional): The product type of the unit. Defaults to "energy".
 
         Returns:
-            Tuple[pd.Series, pd.Series]: The min and max charging power for the given time period.
+            tuple[pd.Series, pd.Series]: The min and max charging power for the given time period.
         """
         pass
 
@@ -581,7 +581,7 @@ class SupportsMinMaxCharge(BaseUnit):
         The SoC is a float between 0 and 1.
 
         Args:
-            dt (datetime): The current datetime.
+            dt (datetime.datetime): The current datetime.
 
         Returns:
             float: The SoC before the given datetime.
@@ -708,7 +708,7 @@ class BaseStrategy:
         self,
         unit: BaseUnit,
         market_config: MarketConfig,
-        product_tuples: List[Product],
+        product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
         """
@@ -717,7 +717,7 @@ class BaseStrategy:
         Args:
             unit (BaseUnit): The unit.
             market_config (MarketConfig): The market configuration.
-            product_tuples (List[Product]): The product tuples.
+            product_tuples (list[Product]): The product tuples.
 
         Returns:
             Orderbook: The bids.
@@ -768,7 +768,7 @@ class LearningStrategy(BaseStrategy):
     """
     A strategy which provides learning functionality, has a method to calculate the reward.
 
-    Attributes:
+    Parameters:
         obs_dim (int): The observation dimension.
         act_dim (int): The action dimension.
 
@@ -793,7 +793,7 @@ class LearningConfig(TypedDict):
     """
     A class for the learning configuration.
 
-    Attributes:
+    Parameters:
         observation_dimension (int): The observation dimension.
         action_dimension (int): The action dimension.
         continue_learning (bool): Whether to continue learning.

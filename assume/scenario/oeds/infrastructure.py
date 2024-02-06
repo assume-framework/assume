@@ -14,7 +14,7 @@ from pvlib.pvsystem import PVSystem
 from sqlalchemy import create_engine
 from tqdm import tqdm
 
-# !pip install git+https://github.com/maurerle/windpowerlib@maurerle
+# !pip install git+https://github.com/wind-python/windpowerlib@dev
 from windpowerlib import ModelChain, WindTurbine
 
 from assume.scenario.oeds.static import (

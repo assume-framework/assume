@@ -26,8 +26,8 @@ class Learning(Role):
     the provided learning configuration.
 
     Args:
-        simulation_start (datetime): The start of the simulation.
-        simulation_end (datetime): The end of the simulation.
+        simulation_start (datetime.datetime): The start of the simulation.
+        simulation_end (datetime.datetime): The end of the simulation.
         learning_config (LearningConfig): The configuration for the learning process.
 
     """

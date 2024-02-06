@@ -24,6 +24,14 @@ assume.markets.clearing\_algorithms.complex\_clearing module
    :undoc-members:
    :show-inheritance:
 
+assume.markets.clearing\_algorithms.complex\_clearing\_dmas module
+------------------------------------------------------------------
+
+.. automodule:: assume.markets.clearing_algorithms.complex_clearing_dmas
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 assume.markets.clearing\_algorithms.nodal\_pricing module
 ---------------------------------------------------------
 

@@ -30,8 +30,8 @@ class Order(TypedDict):
 
     Args:
         bid_id (str): the id of the bid
-        start_time (datetime): the start time of the order
-        end_time (datetime): the end time of the order
+        start_time (datetime.datetime): the start time of the order
+        end_time (datetime.datetime): the end time of the order
         volume (Number | dict[datetime, Number]): the volume of the order (positive if generation)
         accepted_volume (Number | dict[datetime, Number]): the accepted volume of the order
         price (Number): the price of the order
@@ -82,8 +82,8 @@ class Product(NamedTuple):
     An actual product with start and end.
 
     Args:
-        start (datetime): the start time of the product
-        end (datetime): the end time of the product
+        start (datetime.datetime): the start time of the product
+        end (datetime.datetime): the end time of the product
         only_hours (OnlyHours | None): tuple of hours from which this order is available, on multi day products
     """
 
@@ -231,8 +231,8 @@ class DataRequestMessage(TypedDict):
         context (str): the context of the message
         market_id (str): the id of the market
         metric (str): the specific metric being requested
-        start_time (datetime): the start time of the data request
-        end_time (datetime): the end time of the data request
+        start_time (datetime.datetime): the start time of the data request
+        end_time (datetime.datetime): the end time of the data request
     """
 
     context: str

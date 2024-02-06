@@ -95,7 +95,7 @@ class MarkupStrategy(BaseStrategy):
         Args:
             unit (SupportsMinMax): Unit to dispatch.
             market_config (MarketConfig): Market configuration.
-            product_tuples (List[Product]): List of products to dispatch.
+            product_tuples (list[Product]): List of products to dispatch.
             **kwargs (dict): Additional arguments.
 
         Returns:

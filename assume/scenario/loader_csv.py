@@ -166,8 +166,8 @@ def make_market_config(
     Args:
     id (str): The id of the market.
     market_params (dict): The market parameters.
-    world_start (datetime): The start time of the world.
-    world_end (datetime): The end time of the world.
+    world_start (datetime.datetime): The start time of the world.
+    world_end (datetime.datetime): The end time of the world.
 
     Returns:
     MarketConfig: The market config.

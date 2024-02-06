@@ -2,8 +2,6 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from datetime import datetime, timedelta
-
 import pandas as pd
 
 from assume.common.base import BaseStrategy, SupportsMinMax
@@ -19,7 +17,7 @@ class flexableEOMBlock(BaseStrategy):
     """
     A strategy that bids on the EOM-market with block bids.
 
-    Attributes:
+    Parameters:
         foresight (pd.Timedelta): The foresight for the EOM-market.
 
     Args:
