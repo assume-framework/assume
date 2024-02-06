@@ -45,6 +45,7 @@ black = {version = "^23.3.0", optional = true}
 isort = {version = "^5.12.0", optional = true}
 mypy = {version = "^1.1.1", optional = true}
 matplotlib = {version = "^3.7.2", optional = true}
+pypsa = {version = "^0.26.3", optional = true}
 pytest = {version = "^7.2.2", optional = true}
 pytest-cov = {version = "^4.1.0", optional = true}
 pytest-asyncio = {version = "^0.21.1", optional = true}
@@ -66,9 +67,10 @@ pytest-asyncio = "^0.21.1"
 
 [tool.poetry.extras]
 learning = ["torch"]
-optimization = ["glpk","pyomo"]
-test = ["black", "isort", "matplotlib", "pytest", "pytest-cov", "pytest-asyncio", "glpk"]
-
+optimization = ["glpk","pyomo", "pypsa"]
+oeds = ["windpowerlib", "pvlib", "demandlib", "holidays"]
+full = ["torch", "glpk","pyomo", "pypsa", "windpowerlib", "pvlib", "demandlib", "holidays"]
+test = ["black", "isort", "matplotlib", "pytest", "pytest-cov", "pytest-asyncio", "glpk", "mypy"]
 
 [tool.poetry.scripts]
 assume = "cli:cli"

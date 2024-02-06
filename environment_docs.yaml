@@ -17,7 +17,7 @@ dependencies:
 - pyomo
 
 - pip:
-  - .
+  - .[full]
   - sphinx<7
   - sphinx-book-theme
   - nbsphinx
