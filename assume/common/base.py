@@ -4,7 +4,7 @@
 
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Dict, List, Tuple, TypedDict, Union
+from typing import TypedDict, Union
 
 import pandas as pd
 
@@ -79,14 +79,14 @@ class BaseUnit:
     def calculate_bids(
         self,
         market_config: MarketConfig,
-        product_tuples: List[Tuple],
+        product_tuples: list[tuple],
     ) -> Orderbook:
         """
         Calculates the bids for the next time step.
 
         Args:
             market_config (MarketConfig): The market configuration.
-            product_tuples (List[Tuple]): The product tuples.
+            product_tuples (list[tuple]): The product tuples.
 
         Returns:
             Orderbook: The bids.
@@ -225,7 +225,7 @@ class BaseUnit:
         else:
             return self.outputs[product_type].at[dt - self.index.freq]
 
-    def as_dict(self) -> Dict[str, Union[str, int]]:
+    def as_dict(self) -> dict[str, Union[str, int]]:
         """
         Returns a dictionary representation of the unit.
 
@@ -544,7 +544,7 @@ class SupportsMinMaxCharge(BaseUnit):
 
     def calculate_min_max_charge(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
-    ) -> Tuple[pd.Series, pd.Series]:
+    ) -> tuple[pd.Series, pd.Series]:
         """
         Calculates the min and max charging power for the given time period.
 
@@ -554,7 +554,7 @@ class SupportsMinMaxCharge(BaseUnit):
             product_type (str, optional): The product type of the unit. Defaults to "energy".
 
         Returns:
-            Tuple[pd.Series, pd.Series]: The min and max charging power for the given time period.
+            tuple[pd.Series, pd.Series]: The min and max charging power for the given time period.
         """
         pass
 
@@ -708,7 +708,7 @@ class BaseStrategy:
         self,
         unit: BaseUnit,
         market_config: MarketConfig,
-        product_tuples: List[Product],
+        product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
         """
@@ -717,7 +717,7 @@ class BaseStrategy:
         Args:
             unit (BaseUnit): The unit.
             market_config (MarketConfig): The market configuration.
-            product_tuples (List[Product]): The product tuples.
+            product_tuples (list[Product]): The product tuples.
 
         Returns:
             Orderbook: The bids.

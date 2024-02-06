@@ -16,7 +16,7 @@ class flexableEOM(BaseStrategy):
     A strategy that bids on the EOM-market.
 
     Parameters:
-        foresight (timedelta): The foresight of the unit.
+        foresight (datetime.timedelta): The foresight of the unit.
 
     Args:
         *args: Variable length argument list.
@@ -183,7 +183,7 @@ class flexablePosCRM(BaseStrategy):
     A strategy that bids the energy_price or the capacity_price of the unit on the CRM (reserve market).
 
     Parameters:
-        foresight (timedelta): The foresight of the unit.
+        foresight (datetime.timedelta): The foresight of the unit.
 
     Args:
         *args: Variable length argument list.
@@ -288,7 +288,7 @@ class flexableNegCRM(BaseStrategy):
     A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
 
     Parameters:
-        foresight (timedelta): The foresight of the unit.
+        foresight (datetime.timedelta): The foresight of the unit.
 
     Args:
         *args: Variable length argument list.
@@ -453,7 +453,7 @@ def calculate_EOM_price_if_on(
         start (datetime.datetime): The start time of the product.
         marginal_cost_flex (float): The marginal cost of the unit.
         bid_quantity_inflex (float): The bid quantity of the unit.
-        foresight (timedelta): The foresight of the unit.
+        foresight (datetime.timedelta): The foresight of the unit.
         avg_down_time (int): The average down time of the unit.
 
     Returns:
@@ -508,7 +508,7 @@ def get_specific_revenue(
         unit (SupportsMinMax): A unit that the unit operator manages.
         marginal_cost (float): The marginal cost of the unit.
         t (datetime.datetime): The start time of the product.
-        foresight (timedelta): The foresight of the unit.
+        foresight (datetime.timedelta): The foresight of the unit.
 
     Returns:
         float: The specific revenue of the unit.
