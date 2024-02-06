@@ -34,6 +34,17 @@ class UnitsOperator(Role):
     The UnitsOperator is the agent that manages the units.
     It receives the opening hours of the market and sends back the bids for the market.
 
+    Attributes:
+        available_markets (list[MarketConfig]): The available markets.
+        registered_markets (dict[str, MarketConfig]): The registered markets.
+        last_sent_dispatch (int): The last sent dispatch.
+        use_portfolio_opt (bool): Whether to use portfolio optimization.
+        portfolio_strategy (BaseStrategy): The portfolio strategy.
+        valid_orders (defaultdict): The valid orders.
+        units (dict[str, BaseUnit]): The units.
+        id (str): The id of the agent.
+        context (Context): The context of the agent.
+
     Args:
         available_markets (list[MarketConfig]): The available markets.
         opt_portfolio (tuple[bool, BaseStrategy] | None, optional): Optimized portfolio strategy. Defaults to None.
@@ -347,11 +358,13 @@ class UnitsOperator(Role):
     async def submit_bids(self, opening: OpeningMessage, meta: MetaDict) -> None:
         """
         Formulates an orderbook and sends it to the market.
-        This function will accomodate the portfolio optimization in the future.
 
         Args:
             opening (OpeningMessage): The opening message.
             meta (MetaDict): The meta data of the market.
+
+        Note:
+            This function will accomodate the portfolio optimization in the future.
         """
 
         products = opening["products"]
@@ -396,7 +409,6 @@ class UnitsOperator(Role):
     ) -> Orderbook:
         """
         Formulates the bid to the market according to the bidding strategy of the unit operator.
-        Placeholder for future portfolio optimization.
 
         Args:
             market (MarketConfig): The market to formulate bids for.
@@ -404,6 +416,9 @@ class UnitsOperator(Role):
 
         Returns:
             OrderBook: The orderbook that is submitted as a bid to the market.
+
+        Note:
+            Placeholder for future portfolio optimization.
         """
         orderbook: Orderbook = []
         # TODO sort units by priority
@@ -546,7 +561,7 @@ class UnitsOperator(Role):
         Writes learning results to the learning agent.
 
         Args:
-            start (datetime): The start time.
+            products_index (pd.DatetimeIndex): The index of all products.
             marketconfig (MarketConfig): The market configuration.
             obs_dim (int): The observation dimension.
             act_dim (int): The action dimension.

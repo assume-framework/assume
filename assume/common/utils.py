@@ -396,12 +396,13 @@ def separate_orders(orderbook: Orderbook):
 
 def get_products_index(orderbook):
     """
-    This function returns the index of all start times of orders in orderbook and all inbetween.
+    Creates an index containing all start times of orders in orderbook and all inbetween.
+
     Args:
         orderbook (Orderbook): The orderbook.
 
     Returns:
-        index_products: the index containing all start times of orders in orderbook and all inbetween
+        pd.DatetimeIndex: The index containing all start times of orders in orderbook and all inbetween.
     """
     if orderbook == []:
         return []

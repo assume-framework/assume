@@ -104,7 +104,7 @@ class ReplayBuffer:
 
     def to_torch(self, array: np.array, copy=True):
         """
-        Converts a numpy array to a PyTorch tensor. Note: it copies the data by default.
+        Converts a numpy array to a PyTorch tensor. Note: It copies the data by default.
 
         Args:
             array (np.array): The numpy array to convert.

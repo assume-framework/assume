@@ -15,8 +15,11 @@ class Forecaster:
     to retrieve forecasts for specific columns, availability of units, and prices of fuel types, returning
     the corresponding timeseries as pandas Series.
 
+    Attributes:
+        index (pd.Series): The index of the forecasts.
+
     Args:
-    - index (pd.Series): The index of the forecasts.
+        index (pd.Series): The index of the forecasts.
 
     Example:
         >>> forecaster = Forecaster(index=pd.Series([1, 2, 3]))
@@ -33,10 +36,10 @@ class Forecaster:
         Returns the forecast for a given column.
 
         Args:
-        - column (str): The column of the forecast.
+            column (str): The column of the forecast.
 
         Returns:
-        - pd.Series: The forecast.
+            pd.Series: The forecast.
 
         This method returns the forecast for a given column as a pandas Series based on the provided index.
         """
@@ -47,10 +50,10 @@ class Forecaster:
         Returns the availability of a given unit as a pandas Series based on the provided index.
 
         Args:
-        - unit (str): The unit.
+            unit (str): The unit.
 
         Returns:
-        - pd.Series: The availability of the unit.
+            pd.Series: The availability of the unit.
 
         Example:
         >>> forecaster = Forecaster(index=pd.Series([1, 2, 3]))
@@ -66,10 +69,10 @@ class Forecaster:
         not exist.
 
         Args:
-        - fuel_type (str): The fuel type.
+            fuel_type (str): The fuel type.
 
         Returns:
-        - pd.Series: The price of the fuel.
+            pd.Series: The price of the fuel.
 
         Example:
             >>> forecaster = Forecaster(index=pd.Series([1, 2, 3]))
@@ -83,12 +86,17 @@ class Forecaster:
 class CsvForecaster(Forecaster):
     """
     This class represents a forecaster that provides timeseries for forecasts derived from existing files.
+
     It initializes with the provided index. It includes methods to retrieve forecasts for specific columns,
     availability of units, and prices of fuel types, returning the corresponding timeseries as pandas Series.
 
+    Attributes:
+        index (pd.Series): The index of the forecasts.
+        powerplants (dict[str, pd.Series]): The power plants.
+
     Args:
-    - index (pd.Series): The index of the forecasts.
-    - powerplants (dict[str, pd.Series]): The power plants.
+        index (pd.Series): The index of the forecasts.
+        powerplants (dict[str, pd.Series]): The power plants.
 
     Example:
         >>> forecaster = CsvForecaster(index=pd.Series([1, 2, 3]))
@@ -108,14 +116,14 @@ class CsvForecaster(Forecaster):
     def __getitem__(self, column: str) -> pd.Series:
         """
         Returns the forecast for a given column.
+
         If the column does not exist in the forecasts, a Series of zeros is returned. If the column contains "availability", a Series of ones is returned.
 
-
         Args:
-        - column (str): The column of the forecast.
+            column (str): The column of the forecast.
 
         Returns:
-        - pd.Series: The forecast for the given column.
+            pd.Series: The forecast for the given column.
 
         """
 
@@ -132,10 +140,9 @@ class CsvForecaster(Forecaster):
         If data is a DataFrame, it sets the forecast for each column in the DataFrame. If data is
         a Series, it sets the forecast for the given column. If data is None, no action is taken.
 
-
         Args:
-        - data (pd.DataFrame | pd.Series | None): The forecast data.
-        - prefix (str): The prefix of the column.
+            data (pd.DataFrame | pd.Series | None): The forecast data.
+            prefix (str): The prefix of the column.
 
         Example:
             >>> forecaster = CsvForecaster(index=pd.Series([1, 2, 3]))
@@ -169,6 +176,8 @@ class CsvForecaster(Forecaster):
 
         This method calculates additional forecasts if they do not already exist, including
         "price_EOM" and "residual_load_forecast".
+
+        Args:
         """
 
         cols = []
@@ -189,15 +198,16 @@ class CsvForecaster(Forecaster):
 
     def get_registered_market_participants(self, market_id):
         """
-        This method retrieves information about market participants to make accurate price forecasts.
+        Retrieves information about market participants to make accurate price forecasts.
+
         Currently, the functionality for using different markets and specified registration for
         the price forecast is not implemented, so it returns the power plants as a DataFrame.
 
         Args:
-        - market_id (str): The market ID.
+            market_id (str): The market ID.
 
         Returns:
-        - pd.DataFrame: The registered market participants.
+            pd.DataFrame: The registered market participants.
 
         """
 
@@ -208,11 +218,10 @@ class CsvForecaster(Forecaster):
 
     def calculate_residual_demand_forecast(self):
         """
-        This method calculates the residual demand forecast by subtracting the total available power from
-        renewable energy (VRE) power plants from the overall demand forecast for each time step.
+        This method calculates the residual demand forecast by subtracting the total available power from renewable energy (VRE) power plants from the overall demand forecast for each time step.
 
         Returns:
-        - pd.Series: The residual demand forecast.
+            pd.Series: The residual demand forecast.
 
         Notes:
         1. Selects VRE power plants (wind_onshore, wind_offshore, solar) from the powerplants data.
@@ -241,13 +250,14 @@ class CsvForecaster(Forecaster):
 
     def calculate_EOM_price_forecast(self):
         """
-        This method calculates the merit order price forecast for the entire time horizon at once.
+        Calculates the merit order price forecast for the entire time horizon at once.
+
         The method considers the infeed of renewables, residual demand, and the marginal costs of power plants to derive the price forecast.
 
         Returns:
             pd.Series: The merit order price forecast.
 
-        Note:
+        Notes:
             1. Calculates the marginal costs for each power plant based on fuel costs, efficiencies, emissions, and fixed costs.
             2. Sorts the power plants based on their marginal costs and availability.
             3. Computes the cumulative power of available power plants.
@@ -288,17 +298,18 @@ class CsvForecaster(Forecaster):
 
     def calculate_marginal_cost(self, pp_series: pd.Series):
         """
-        This method calculates the marginal cost of a power plant by taking into account the following factors:
-        - Fuel costs based on the fuel type and efficiency of the power plant.
-        - Emissions costs considering the CO2 price and emission factor of the power plant.
+        Calculates time series of marginal costs for a power plant.
+
+        This method calculates the marginal cost of a power plant by taking into account the following factors: \n
+        - Fuel costs based on the fuel type and efficiency of the power plant. \n
+        - Emissions costs considering the CO2 price and emission factor of the power plant. \n
         - Fixed costs, if specified for the power plant.
 
         Args:
-        - pp_series (pd.Series): Series containing power plant data.
+            pp_series (pd.Series): Series containing power plant data.
 
         Returns:
-        - float: The marginal cost of the power plant.
-
+            pd.Series: The marginal cost of the power plant.
 
         Notes:
         1. Determines the fuel price based on the fuel type of the power plant.
@@ -331,12 +342,13 @@ class CsvForecaster(Forecaster):
 
     def save_forecasts(self, path):
         """
-        This method saves the forecasts to a csv file located at the specified path. If no
-        forecasts are provided, an error message is logged.
+        Saves the forecasts to a csv file located at the specified path.
 
         Args:
-        - path (str): The path to save the forecasts to.
+            path (str): The path to save the forecasts to.
 
+        Raises:
+            ValueError: If no forecasts are provided, an error message is logged.
         """
 
         try:
@@ -353,10 +365,15 @@ class RandomForecaster(CsvForecaster):
     from the `CsvForecaster` class and initializes with the provided index, power plants, and
     standard deviation of the noise.
 
+    Attributes:
+        index (pd.Series): The index of the forecasts.
+        powerplants (dict[str, pd.Series]): The power plants.
+        sigma (float): The standard deviation of the noise.
+
     Args:
-      index (pd.Series): The index of the forecasts.
-      powerplants (dict[str, pd.Series]): The power plants.
-      sigma (float): The standard deviation of the noise.
+        index (pd.Series): The index of the forecasts.
+        powerplants (dict[str, pd.Series]): The power plants.
+        sigma (float): The standard deviation of the noise.
 
     Example:
         >>> forecaster = RandomForecaster(index=pd.Series([1, 2, 3]))
@@ -378,15 +395,17 @@ class RandomForecaster(CsvForecaster):
 
     def __getitem__(self, column: str) -> pd.Series:
         """
+        Retrieves forecasted values modified by random noise.
+
         This method returns the forecast for a given column as a pandas Series modified
         by random noise based on the provided standard deviation of the noise and the existing
         forecasts. If the column does not exist in the forecasts, a Series of zeros is returned.
 
         Args:
-        - column (str): The column of the forecast.
+            column (str): The column of the forecast.
 
         Returns:
-        - pd.Series: The forecast modified by random noise.
+            pd.Series: The forecast modified by random noise.
 
         """
 
@@ -398,23 +417,31 @@ class RandomForecaster(CsvForecaster):
 
 class NaiveForecast(Forecaster):
     """
-    This class represents a forecaster that generates forecasts using naive methods. It inherits
-    from the `Forecaster` class and initializes with the provided index and optional parameters
-    for availability, fuel price, CO2 price, demand, and price forecast.
+    This class represents a forecaster that generates forecasts using naive methods.
 
+    It inherits from the `Forecaster` class and initializes with the provided index and optional parameters
+    for availability, fuel price, CO2 price, demand, and price forecast.
     If the optional parameters are constant values, they are converted to pandas Series with the
     provided index. If the optional parameters are lists, they are converted to pandas Series with
     the provided index and the corresponding values.
 
-    Args:
-    - index (pd.Series): The index of the forecasts.
+    Attributes:
+        index (pd.Series): The index of the forecasts.
+        availability (float | list, optional): The availability of the power plants.
+        fuel_price (float | list, optional): The fuel price.
+        co2_price (float | list, optional): The CO2 price.
+        demand (float | list, optional): The demand.
+        price_forecast (float | list, optional): The price forecast.
 
-    Optional Args:
-    - availability (float | list): The availability of the power plants.
-    - fuel_price (float | list): The fuel price.
-    - co2_price (float | list): The CO2 price.
-    - demand (float | list): The demand.
-    - price_forecast (float | list): The price forecast.
+    Args:
+        index (pd.Series): The index of the forecasts.
+        availability (float | list, optional): The availability of the power plants.
+        fuel_price (float | list, optional): The fuel price.
+        co2_price (float | list, optional): The CO2 price.
+        demand (float | list, optional): The demand.
+        price_forecast (float | list, optional): The price forecast.
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
 
     Example:
         >>> forecaster = NaiveForecast(demand=100, co2_price=10, fuel_price=10, availability=1, price_forecast=50)
@@ -444,16 +471,18 @@ class NaiveForecast(Forecaster):
 
     def __getitem__(self, column: str) -> pd.Series:
         """
+        Retrieves forecasted values.
+
         This method retrieves the forecasted values for a specific column based on the
         provided parameters such as availability, fuel price, CO2 price, demand, and price
         forecast. If the column matches one of the predefined parameters, the corresponding
         value is returned as a pandas Series. If the column does not match, a Series of zeros is returned.
 
         Args:
-        - column (str): The column for which forecasted values are requested.
+            column (str): The column for which forecasted values are requested.
 
         Returns:
-        - pd.Series: The forecasted values for the specified column.
+            pd.Series: The forecasted values for the specified column.
 
         """
 
