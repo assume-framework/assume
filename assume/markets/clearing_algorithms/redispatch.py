@@ -39,7 +39,7 @@ class RedispatchMarketRole(MarketRole):
         # add loads
         self.add_loads(f"{network_path}/demand_units.csv")
 
-    def add_buses(self, filename):
+    def add_buses(self, filename: str):
         """
         This adds nodes in the PyPSA network to which the generators and loads are connected
 
@@ -54,7 +54,7 @@ class RedispatchMarketRole(MarketRole):
             **buses,
         )
 
-    def add_lines(self, filename):
+    def add_lines(self, filename: str):
         """
         This creates transmission network in PyPSA by connecting buses with predefined line capacities
         """
@@ -66,7 +66,7 @@ class RedispatchMarketRole(MarketRole):
             **lines,
         )
 
-    def add_generators(self, filename):
+    def add_generators(self, filename: str):
         """
         This adds generators in the PyPSA network with respective bus data to which they are connected
         """
@@ -138,7 +138,7 @@ class RedispatchMarketRole(MarketRole):
             sign=-1,
         )
 
-    def add_loads(self, filename):
+    def add_loads(self, filename: str):
         """
         This adds loads in the PyPSA network with respective bus data to which they are connected
         """
@@ -165,9 +165,12 @@ class RedispatchMarketRole(MarketRole):
         """
         Performs redispatch to resolve congestion in the electricity market.
 
-        :param orderbook: The orderbook containing the orders to be cleared
-        :param market_products: The products to be traded
-        :return: accepted_orders, rejected_orders, meta
+        Args:
+            orderbook (Orderbook): The orderbook to be cleared.
+            market_products (list[MarketProduct]): The products for which clearing happens.
+
+        Returns:
+            (Orderbook, Orderbook, list[dict]): The accepted orderbook, rejected orderbook and market metadata.
         """
 
         orderbook_df = pd.DataFrame(orderbook)
@@ -266,7 +269,7 @@ class RedispatchMarketRole(MarketRole):
 
         return accepted_orders, rejected_orders, meta
 
-    def process_dispatch_data(self, orderbook_df):
+    def process_dispatch_data(self, orderbook_df: pd.DataFrame):
         # Extract backup, upward, and downward redispatch
         generators_t_p = self.network.generators_t.p
 
@@ -297,7 +300,7 @@ class RedispatchMarketRole(MarketRole):
                     unit
                 ].values
 
-    def calculate_meta_data(self, product: MarketProduct, i):
+    def calculate_meta_data(self, product: MarketProduct, i: int):
         # Calculate meta data such as total upward and downward redispatch, total backup dispatch, and total redispatch cost
         redispatch_volumes = self.network.generators_t.p.iloc[i]
         upward_redispatch = redispatch_volumes.filter(regex="_up").sum()
