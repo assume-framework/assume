@@ -753,13 +753,13 @@ class BaseStrategy:
         """
 
         cleaned_bids = []
-        for order in enumerate(bids):
-            if isinstance(order["volume"], dict):
-                if all(volume == 0 for volume in order["volume"].values()):
+        for bid in bids:
+            if isinstance(bid["volume"], dict):
+                if all(volume == 0 for volume in bid["volume"].values()):
                     continue
-            elif order["volume"] == 0:
+            elif bid["volume"] == 0:
                 continue
-            cleaned_bids.append(order)
+            cleaned_bids.append(bid)
 
         return cleaned_bids
 

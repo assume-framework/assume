@@ -81,13 +81,13 @@ def test_eom_with_blocks(mock_market_config, power_plant):
     assert power_plant.get_operation_time(product_index[0]) == -1
 
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
-    assert len(bids) == 25
-    assert bids[0]["price"] == 0
-    assert bids[0]["volume"] == 0
+    assert len(bids) == 24
+    assert bids[0]["price"] == 30
+    assert bids[0]["volume"] == 200
     assert bids[1]["price"] == 30
-    assert bids[1]["volume"] == 200
+    assert bids[1]["volume"] == 600
     assert bids[2]["price"] == 30
-    assert bids[2]["volume"] == 600
+    assert bids[2]["volume"] == 800
     assert bids[-1]["price"] == 30
     assert bids[-1]["volume"] == {
         product_index[i]: 0 if i == 0 else 200 for i in range(len(product_index))
@@ -136,16 +136,13 @@ def test_eom_with_links(mock_market_config, power_plant):
     assert power_plant.get_operation_time(product_index[0]) == -1
 
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
-    assert len(bids) == 25
-    assert bids[0]["price"] == 0
-    assert bids[0]["volume"] == {product_index[0]: 0}
-    assert bids[0]["parent_bid_id"] == None
+    assert len(bids) == 24
+    assert bids[0]["price"] == 30
+    assert bids[0]["volume"] == {product_index[1]: 200}
+    assert bids[0]["parent_bid_id"] == power_plant.id + "_block"
     assert bids[1]["price"] == 30
-    assert bids[1]["volume"] == {product_index[1]: 200}
+    assert bids[1]["volume"] == {product_index[2]: 600}
     assert bids[1]["parent_bid_id"] == power_plant.id + "_block"
-    assert bids[2]["price"] == 30
-    assert bids[2]["volume"] == {product_index[2]: 600}
-    assert bids[2]["parent_bid_id"] == power_plant.id + "_block"
     assert bids[-1]["price"] == 30
     assert bids[-1]["volume"] == {
         product_index[i]: 0 if i == 0 else 200 for i in range(len(product_index))
