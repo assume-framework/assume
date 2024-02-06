@@ -67,8 +67,8 @@ class World:
         addresses (list[str]): The addresses for the world instance.
         loop (asyncio.AbstractEventLoop): The event loop for the world instance.
         clock (ExternalClock): The external clock for the world instance.
-        start (datetime): The start datetime for the simulation.
-        end (datetime): The end datetime for the simulation.
+        start (datetime.datetime): The start datetime for the simulation.
+        end (datetime.datetime): The end datetime for the simulation.
         learning_config (LearningConfig): The configuration for the learning process.
         evaluation_mode (bool): A boolean indicating whether the evaluation mode is enabled.
         forecaster (Optional[Forecaster]): The forecaster used for custom unit types.
@@ -171,8 +171,8 @@ class World:
         Set up the environment for the simulation, initializing various parameters and components required for the simulation run.
 
         Args:
-            start (datetime): The start datetime for the simulation.
-            end (datetime): The end datetime for the simulation.
+            start (datetime.datetime): The start datetime for the simulation.
+            end (datetime.datetime): The end datetime for the simulation.
             simulation_id (str): The unique identifier for the simulation.
             index (pd.Series): The index for the simulation.
             save_frequency_hours (int, optional): The frequency (in hours) at which to save simulation data. Defaults to 24.

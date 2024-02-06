@@ -263,7 +263,7 @@ class Storage(SupportsMinMaxCharge):
         Returns the marginal cost of the unit.
 
         Args:
-            start (datetime): The start time of the dispatch.
+            start (datetime.datetime): The start time of the dispatch.
             power (float): The power output of the unit.
 
         Returns:

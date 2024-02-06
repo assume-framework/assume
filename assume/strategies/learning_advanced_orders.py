@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -328,17 +328,17 @@ class RLAdvancedOrderStrategy(LearningStrategy):
 
         Args:
             unit (SupportsMinMax): Unit to create observation for
-            start (datetime): Start time
-            end (datetime): End time
+            start (datetime.datetime): Start time
+            end (datetime.datetime): End time
 
         Returns:
             Observation (torch.Tensor): Observation containing residual load forecast, price forecast, must run time, max power and marginal cost
 
         Note:
             The dimension of the observation space is defined by
-                2 * product_len (int): number of hours in the clearing horizon
-                + 2 * (foresight-1) (int): number of hours we look ahead
-                + 3 (int): must run time, max power and marginal cost
+            2 * product_len (int): number of hours in the clearing horizon
+            + 2 * (foresight-1) (int): number of hours we look ahead
+            + 3 (int): must run time, max power and marginal cost
             The observation space is scaled to the range [-1,1] to make it easier for the actor neuronal net to learn.
             The scaling factors are defined by the maximum residual load, the maximum bid price
             and the maximum capacity of the unit.

@@ -245,8 +245,8 @@ class RLStrategy(LearningStrategy):
 
         Args:
             unit (SupportsMinMax): Unit to create observation for.
-            start (datetime): Start time.
-            end (datetime): End time.
+            start (datetime.datetime): Start time.
+            end (datetime.datetime): End time.
 
         Returns:
             Observation (torch.Tensor): Observation.

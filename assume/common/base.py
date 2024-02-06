@@ -173,8 +173,8 @@ class BaseUnit:
         Calculates the generation cost for a specific product type within the given time range.
 
         Args:
-            start (datetime): The start time for the calculation.
-            end (datetime): The end time for the calculation.
+            start (datetime.datetime): The start time for the calculation.
+            end (datetime.datetime): The end time for the calculation.
             product_type (str): The type of product for which the generation cost is to be calculated.
 
         """
@@ -406,7 +406,7 @@ class SupportsMinMax(BaseUnit):
         Returns the time the unit is operating (positive) or shut down (negative).
 
         Args:
-            start (datetime): The start time.
+            start (datetime.datetime): The start time.
 
         Returns:
             int: The operation time.
@@ -433,7 +433,7 @@ class SupportsMinMax(BaseUnit):
         Calculates the average uninterrupted operation and down time.
 
         Args:
-            start (datetime): The current time.
+            start (datetime.datetime): The current time.
 
         Returns:
             tuple[float, float]: Tuple of the average operation time avg_op_time and average down time avg_down_time.
@@ -581,7 +581,7 @@ class SupportsMinMaxCharge(BaseUnit):
         The SoC is a float between 0 and 1.
 
         Args:
-            dt (datetime): The current datetime.
+            dt (datetime.datetime): The current datetime.
 
         Returns:
             float: The SoC before the given datetime.

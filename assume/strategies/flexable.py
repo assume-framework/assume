@@ -450,7 +450,7 @@ def calculate_EOM_price_if_on(
 
     Args:
         unit (SupportsMinMax): A unit that the unit operator manages.
-        start (datetime): The start time of the product.
+        start (datetime.datetime): The start time of the product.
         marginal_cost_flex (float): The marginal cost of the unit.
         bid_quantity_inflex (float): The bid quantity of the unit.
         foresight (timedelta): The foresight of the unit.
@@ -507,7 +507,7 @@ def get_specific_revenue(
     Args:
         unit (SupportsMinMax): A unit that the unit operator manages.
         marginal_cost (float): The marginal cost of the unit.
-        t (datetime): The start time of the product.
+        t (datetime.datetime): The start time of the product.
         foresight (timedelta): The foresight of the unit.
 
     Returns:
