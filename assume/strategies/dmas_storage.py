@@ -25,12 +25,14 @@ def shift(prc, type_: str = "first"):
     """
     Shifts the price curve up or down
 
-    :param prc: price curve
-    :type prc: np.array
-    :param type_: type of shift. default is 'first'
-    :type type_: str
-    :return: shifted price curve
-    :rtype: np.array
+    Args:
+      prc(np.array): price curve
+      type_(str): type of shift. default is 'first'
+      type_: str:  (Default value = "first")
+
+    Returns:
+      np.array: shifted price curve
+
     """
     new_prices, num_prices = [], len(
         prc
@@ -51,12 +53,14 @@ def shaping(prc, type_: str = "peak"):
     """
     Shifts the price curve up or down
 
-    :param prc: price curve
-    :type prc: np.array
-    :param type_: type of shift. default is 'peak'. other options are 'pv' and 'demand'.
-    :type type_: str
-    :return: shifted price curve
-    :rtype: np.array
+    Args:
+      prc(np.array): price curve
+      type_(str): type of shift. default is 'peak'. other options are 'pv' and 'demand'.
+      type_: str:  (Default value = "peak")
+
+    Returns:
+      np.array: shifted price curve
+
     """
     if type_ == "peak":
         prc[
@@ -86,14 +90,18 @@ PRICE_FUNCS = {
 }
 
 
-def get_solver_factory(solvers_str=["glpk", "cbc", "gurobi", "cplex"]):
+def get_solver_factory(solvers_str=["glpk", "cbc", "gurobi", "cplex"]) -> SolverFactory:
     """
     Returns the first available solver from the list of solvers
 
-    :param solvers_str: list of solvers
-    :type solvers_str: list
-    :return: solver factory
-    :rtype: SolverFactory
+    Args:
+        solvers_str (list, optional): default solvers. Defaults to ["glpk", "cbc", "gurobi", "cplex"].
+
+    Raises:
+        Exception: if no solvers available
+
+    Returns:
+        SolverFactory: the first working solver
     """
     solvers = check_available_solvers(*solvers_str)
     if len(solvers) < 1:
@@ -102,18 +110,9 @@ def get_solver_factory(solvers_str=["glpk", "cbc", "gurobi", "cplex"]):
 
 
 class DmasStorageStrategy(BaseStrategy):
-    """
-    Strategy for a storage unit that uses DMAS to optimize its operation
-    """
+    """Strategy for a storage unit that uses DMAS to optimize its operation"""
 
     def __init__(self, *args, **kwargs):
-        """
-        Initializes the strategy
-
-        :param args: arguments
-        :type args: list
-        :param kwargs: keyword arguments
-        :type kwargs: dict"""
         super().__init__(*args, **kwargs)
 
         self.model = ConcreteModel("storage")
@@ -123,14 +122,15 @@ class DmasStorageStrategy(BaseStrategy):
         """
         Builds the optimization model
 
-        :param unit: unit to dispatch
-        :type unit: SupportsMinMaxCharge
-        :param start: start time
-        :type start: datetime
-        :param hour_count: number of hours to optimize
-        :type hour_count: int
-        :return: power
-        :rtype: np.array"""
+        Args:
+            unit (SupportsMinMaxCharge): unit to dispatch
+            start (datetime.datetime): start time
+            hour_count (int): number of hours to optimize
+
+        Returns:
+            np.array: power
+
+        """
         self.model.clear()
         time_range = range(hour_count)
 
@@ -168,12 +168,13 @@ class DmasStorageStrategy(BaseStrategy):
         """
         Optimizes the result
 
-        :param unit: unit to dispatch
-        :type unit: SupportsMinMaxCharge
-        :param committed_power: committed power
-        :type committed_power: np.array
-        :return: optimization result
-        :rtype: pyomo.opt.results.SolverResults
+        Args:
+            unit(SupportsMinMaxCharge): unit to dispatch
+            committed_power(np.array): committed power
+
+        Returns:
+            pyomo.opt.results.SolverResults: optimization result
+
         """
         # if day ahead result is known minimize the difference
         bid_count = len(committed_power)
@@ -215,14 +216,13 @@ class DmasStorageStrategy(BaseStrategy):
         """
         Optimizes the unit operation
 
-        :param unit: unit to dispatch
-        :type unit: SupportsMinMaxCharge
-        :param start: start time
-        :type start: datetime
-        :param hour_count: number of hours to optimize
-        :type hour_count: int
-        :return: optimization results
-        :rtype: dict
+        Args:
+            unit(SupportsMinMaxCharge): unit to dispatch
+            start(datetime.datetime): start time
+            hour_count(int): number of hours to optimize
+
+        Returns:
+          dict: optimization results
         """
         opt_results = {key: np.zeros(hour_count) for key in PRICE_FUNCS.keys()}
         time_range = range(hour_count)
@@ -272,16 +272,16 @@ class DmasStorageStrategy(BaseStrategy):
         defines how it is dispatched to the market
 
         Returns a list of bids that the unit operator will submit to the market
-        :param unit: unit to dispatch
-        :type unit: SupportsMinMaxCharge
-        :param market_config: market configuration
-        :type market_config: MarketConfig
-        :param product_tuples: list of products to dispatch
-        :type product_tuples: list[Product]
-        :param kwargs: additional arguments
-        :type kwargs: dict
-        :return: bids
-        :rtype: Orderbook
+
+        Args:
+            unit (SupportsMinMaxCharge): unit to dispatch
+            market_config (MarketConfig): market configuration
+            product_tuples (list[Product]): list of products to dispatch
+            **kwargs (dict): additional arguments
+
+        Returns:
+            Orderbook: bids
+
         """
         assert "exclusive_id" in market_config.additional_fields
         start = product_tuples[0][0]

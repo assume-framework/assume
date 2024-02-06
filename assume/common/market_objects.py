@@ -100,7 +100,7 @@ class MarketConfig:
     Args:
         name (str): the name of the market
         opening_hours (rr.rrule): the opening hours of the market
-        opening_duration (timedelta): the duration of the opening hours
+        opening_duration (datetime.timedelta): the duration of the opening hours
         market_mechanism (str): name of method used for clearing
         market_products (list[MarketProduct]): list of available products to be traded at the market
         product_type (str): energy or capacity or heat
