@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+
 import numpy as np
 import pandas as pd
 import pypsa
@@ -11,6 +12,7 @@ from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)
+
 
 class RedispatchMarketRole(MarketRole):
     def __init__(self, marketconfig: MarketConfig):
