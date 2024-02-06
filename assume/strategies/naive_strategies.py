@@ -73,6 +73,8 @@ class NaiveStrategy(BaseStrategy):
             else:
                 op_time = min(op_time, 0) - 1
 
+        bids = self.remove_empty_bids(bids)
+
         return bids
 
 
@@ -125,7 +127,8 @@ class NaiveDAStrategy(BaseStrategy):
             "bid_type": "BB",
         }
 
-        bids = [order]
+        bids = self.remove_empty_bids([order])
+
         return bids
 
 
@@ -186,6 +189,9 @@ class NaivePosReserveStrategy(BaseStrategy):
                 }
             )
             previous_power = volume + current_power
+
+        bids = self.remove_empty_bids(bids)
+
         return bids
 
 
@@ -247,6 +253,9 @@ class NaiveNegReserveStrategy(BaseStrategy):
                 }
             )
             previous_power = volume + current_power
+
+        bids = self.remove_empty_bids(bids)
+
         return bids
 
 

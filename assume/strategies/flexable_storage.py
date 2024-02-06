@@ -169,6 +169,8 @@ class flexableEOMStorage(BaseStrategy):
             theoretic_SOC += delta_soc
             previous_power = bid_quantity + current_power
 
+        bids = self.remove_empty_bids(bids)
+
         return bids
 
     def calculate_reward(
@@ -347,6 +349,8 @@ class flexablePosCRMStorage(BaseStrategy):
                     f"Product {market_config.product_type} is not supported by this strategy."
                 )
 
+        bids = self.remove_empty_bids(bids)
+
         return bids
 
 
@@ -459,6 +463,8 @@ class flexableNegCRMStorage(BaseStrategy):
                 raise ValueError(
                     f"Product {market_config.product_type} is not supported by this strategy."
                 )
+
+        bids = self.remove_empty_bids(bids)
 
         return bids
 

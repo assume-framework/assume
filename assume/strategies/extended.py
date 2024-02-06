@@ -63,6 +63,9 @@ class OTCStrategy(BaseStrategy):
                     "volume": volume,
                 }
             )
+
+        bids = self.remove_empty_bids(bids)
+
         return bids
 
 
@@ -121,4 +124,7 @@ class MarkupStrategy(BaseStrategy):
                     "volume": volume,
                 }
             )
+
+        bids = self.remove_empty_bids(bids)
+
         return bids
