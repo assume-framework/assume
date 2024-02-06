@@ -15,7 +15,7 @@ class Forecaster:
     to retrieve forecasts for specific columns, availability of units, and prices of fuel types, returning
     the corresponding timeseries as pandas Series.
 
-    Attributes:
+    Parameters:
         index (pd.Series): The index of the forecasts.
 
     Args:
@@ -90,7 +90,7 @@ class CsvForecaster(Forecaster):
     It initializes with the provided index. It includes methods to retrieve forecasts for specific columns,
     availability of units, and prices of fuel types, returning the corresponding timeseries as pandas Series.
 
-    Attributes:
+    Parameters:
         index (pd.Series): The index of the forecasts.
         powerplants (dict[str, pd.Series]): The power plants.
 
@@ -365,7 +365,7 @@ class RandomForecaster(CsvForecaster):
     from the `CsvForecaster` class and initializes with the provided index, power plants, and
     standard deviation of the noise.
 
-    Attributes:
+    Parameters:
         index (pd.Series): The index of the forecasts.
         powerplants (dict[str, pd.Series]): The power plants.
         sigma (float): The standard deviation of the noise.
@@ -425,7 +425,7 @@ class NaiveForecast(Forecaster):
     provided index. If the optional parameters are lists, they are converted to pandas Series with
     the provided index and the corresponding values.
 
-    Attributes:
+    Parameters:
         index (pd.Series): The index of the forecasts.
         availability (float | list, optional): The availability of the power plants.
         fuel_price (float | list, optional): The fuel price.

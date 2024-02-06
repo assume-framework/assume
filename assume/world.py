@@ -51,7 +51,7 @@ class World:
     markets, unit operators, unit types, bidding strategies, and clearing mechanisms. If available, it imports learning strategies and handles any potential import errors.
     Finally, it sets up the event loop for asynchronous operations.
 
-    Attributes:
+    Parameters:
         logger (logging.Logger): The logger for the world instance.
         addr (Union[Tuple[str, int], str]): The address of the world, represented as a tuple of string and int or a string.
         container (Optional[Container]): The container for the world instance.

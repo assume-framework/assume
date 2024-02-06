@@ -15,7 +15,7 @@ class flexableEOM(BaseStrategy):
     """
     A strategy that bids on the EOM-market.
 
-    Attributes:
+    Parameters:
         foresight (timedelta): The foresight of the unit.
 
     Args:
@@ -182,7 +182,7 @@ class flexablePosCRM(BaseStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the CRM (reserve market).
 
-    Attributes:
+    Parameters:
         foresight (timedelta): The foresight of the unit.
 
     Args:
@@ -287,7 +287,7 @@ class flexableNegCRM(BaseStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
 
-    Attributes:
+    Parameters:
         foresight (timedelta): The foresight of the unit.
 
     Args:

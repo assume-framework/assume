@@ -24,7 +24,7 @@ class RLStrategy(LearningStrategy):
     The agent submittes two price bids
     - one for the infelxible (P_min) and one for the flexible part (P_max-P_min) of ist capacity.
 
-    Attributes:
+    Parameters:
         foresight (int): Number of time steps to look ahead. Defaults to 24.
         max_bid_price (float): Maximum bid price. Defaults to 100.
         max_demand (float): Maximum demand. Defaults to 10e3.

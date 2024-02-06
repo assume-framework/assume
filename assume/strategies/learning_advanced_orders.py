@@ -19,7 +19,7 @@ class RLAdvancedOrderStrategy(LearningStrategy):
     """
     Reinforcement Learning Strategy for an Energy-Only-Market with simple hourly, block and linked orders.
 
-    Attributes:
+    Parameters:
         foresight (int): Number of time steps to look ahead. Default 24.
         max_bid_price (float): The maximum bid price.
         max_demand (float): The maximum demand.

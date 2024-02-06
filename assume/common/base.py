@@ -20,7 +20,7 @@ class BaseUnit:
     """
     A base class for a unit. This class is used as a foundation for all units.
 
-    Attributes:
+    Parameters:
         id (str): The ID of the unit.
         unit_operator (str): The operator of the unit.
         technology (str): The technology of the unit.
@@ -301,7 +301,7 @@ class SupportsMinMax(BaseUnit):
     Base class used for units supporting continuous dispatch and without energy storage.
     This class is best to be used as foundation for classes of power plants and similar units.
 
-    Attributes:
+    Parameters:
         min_power (float): The minimum power output of the unit.
         max_power (float): The maximum power output of the unit.
         ramp_down (float): How much power can be decreased in one time step.
@@ -511,7 +511,7 @@ class SupportsMinMaxCharge(BaseUnit):
     """
     Base Class used for units with energy storage.
 
-    Attributes:
+    Parameters:
         initial_soc (float): The initial state of charge of the storage.
         min_power_charge (float): How much power must be charged at least in one time step.
         max_power_charge (float): How much power can be charged at most in one time step.
@@ -744,7 +744,7 @@ class LearningStrategy(BaseStrategy):
     """
     A strategy which provides learning functionality, has a method to calculate the reward.
 
-    Attributes:
+    Parameters:
         obs_dim (int): The observation dimension.
         act_dim (int): The action dimension.
 
@@ -769,7 +769,7 @@ class LearningConfig(TypedDict):
     """
     A class for the learning configuration.
 
-    Attributes:
+    Parameters:
         observation_dimension (int): The observation dimension.
         action_dimension (int): The action dimension.
         continue_learning (bool): Whether to continue learning.

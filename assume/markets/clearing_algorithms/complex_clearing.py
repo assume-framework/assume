@@ -200,7 +200,7 @@ class ComplexClearingRole(MarketRole):
 
     The complex market is a pay-as-clear market with more complex bid structures, including minimum acceptance ratios, bid types, and profiled volumes.
 
-    Attributes:
+    Parameters:
         marketconfig (MarketConfig): The market configuration.
 
     Args:

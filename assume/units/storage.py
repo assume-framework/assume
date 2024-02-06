@@ -18,7 +18,7 @@ class Storage(SupportsMinMaxCharge):
     """
     A class for a storage unit.
 
-    Attributes:
+    Parameters:
         max_power_charge (float): The maximum power input of the storage unit in MW (negative value).
         min_power_charge (float): The minimum power input of the storage unit in MW (negative value).
         max_power_discharge (float): The maximum power output of the storage unit in MW.

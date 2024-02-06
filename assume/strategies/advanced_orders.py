@@ -17,7 +17,7 @@ class flexableEOMBlock(BaseStrategy):
     """
     A strategy that bids on the EOM-market with block bids.
 
-    Attributes:
+    Parameters:
         foresight (pd.Timedelta): The foresight for the EOM-market.
 
     Args:
