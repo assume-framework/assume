@@ -439,7 +439,7 @@ class DmasPowerplantStrategy(BaseStrategy):
         power_prices: np.array,
     ) -> np.array:
         """
-        calculates the result with prices *2
+        calculates the result with prices times 2
         to optimize according to the result in the best way possible
 
         :param unit: unit to optimize

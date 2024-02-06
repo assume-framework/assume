@@ -34,7 +34,7 @@ class UnitsOperator(Role):
     The UnitsOperator is the agent that manages the units.
     It receives the opening hours of the market and sends back the bids for the market.
 
-    Attributes:
+    Parameters:
         available_markets (list[MarketConfig]): The available markets.
         registered_markets (dict[str, MarketConfig]): The registered markets.
         last_sent_dispatch (int): The last sent dispatch.

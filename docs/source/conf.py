@@ -4,14 +4,19 @@
 
 # Configuration file for the Sphinx documentation builder.
 
+import tomllib
+
+with open("../../pyproject.toml", "rb") as f:
+    pyproject_toml = tomllib.load(f)["tool"]["poetry"]
+
 # -- Project information
 
 project = "ASSUME"
-copyright = "2022-2023 ASSUME Developers"
-author = "ASSUME Developers"
+copyright = "2022-2024 ASSUME Developers"
+author = ",".join(pyproject_toml["authors"])
 
-release = "0.2"
-version = "0.2.1"
+version = pyproject_toml["version"]
+release = version
 
 # -- General configuration
 

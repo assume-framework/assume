@@ -13,7 +13,7 @@ class Demand(SupportsMinMax):
     """
     A demand unit.
 
-    Attributes:
+    Parameters:
         id (str): The unique identifier of the unit.
         index (pd.DatetimeIndex): The index of the unit.
         max_power (float): The maximum power output capacity of the power plant in MW.

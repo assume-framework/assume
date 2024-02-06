@@ -9,12 +9,13 @@ import argparse
 import logging
 import os
 import sys
+import warnings
 from pathlib import Path
 
 import argcomplete
 import yaml
 from sqlalchemy import make_url
-import warnings
+
 from assume.common.exceptions import AssumeException
 
 os.makedirs("./examples/outputs", exist_ok=True)

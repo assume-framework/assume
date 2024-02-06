@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import cProfile
 import logging
 from datetime import timedelta
 from operator import itemgetter
@@ -201,7 +200,7 @@ class ComplexClearingRole(MarketRole):
 
     The complex market is a pay-as-clear market with more complex bid structures, including minimum acceptance ratios, bid types, and profiled volumes.
 
-    Attributes:
+    Parameters:
         marketconfig (MarketConfig): The market configuration.
 
     Args:

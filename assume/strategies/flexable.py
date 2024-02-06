@@ -15,8 +15,8 @@ class flexableEOM(BaseStrategy):
     """
     A strategy that bids on the EOM-market.
 
-    Attributes:
-        foresight (timedelta): The foresight of the unit.
+    Parameters:
+        foresight (datetime.timedelta): The foresight of the unit.
 
     Args:
         *args: Variable length argument list.
@@ -182,8 +182,8 @@ class flexablePosCRM(BaseStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the CRM (reserve market).
 
-    Attributes:
-        foresight (timedelta): The foresight of the unit.
+    Parameters:
+        foresight (datetime.timedelta): The foresight of the unit.
 
     Args:
         *args: Variable length argument list.
@@ -287,8 +287,8 @@ class flexableNegCRM(BaseStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
 
-    Attributes:
-        foresight (timedelta): The foresight of the unit.
+    Parameters:
+        foresight (datetime.timedelta): The foresight of the unit.
 
     Args:
         *args: Variable length argument list.
@@ -450,10 +450,10 @@ def calculate_EOM_price_if_on(
 
     Args:
         unit (SupportsMinMax): A unit that the unit operator manages.
-        start (datetime): The start time of the product.
+        start (datetime.datetime): The start time of the product.
         marginal_cost_flex (float): The marginal cost of the unit.
         bid_quantity_inflex (float): The bid quantity of the unit.
-        foresight (timedelta): The foresight of the unit.
+        foresight (datetime.timedelta): The foresight of the unit.
         avg_down_time (int): The average down time of the unit.
 
     Returns:
@@ -507,8 +507,8 @@ def get_specific_revenue(
     Args:
         unit (SupportsMinMax): A unit that the unit operator manages.
         marginal_cost (float): The marginal cost of the unit.
-        t (datetime): The start time of the product.
-        foresight (timedelta): The foresight of the unit.
+        t (datetime.datetime): The start time of the product.
+        foresight (datetime.timedelta): The foresight of the unit.
 
     Returns:
         float: The specific revenue of the unit.

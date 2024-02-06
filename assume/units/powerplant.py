@@ -19,7 +19,7 @@ class PowerPlant(SupportsMinMax):
     """
     A class for a powerplant unit.
 
-    Attributes:
+    Parameters:
         id (str): The ID of the unit.
         unit_operator (str): The operator of the unit.
         technology (str): The technology of the unit.
@@ -383,7 +383,7 @@ class PowerPlant(SupportsMinMax):
         Returns the marginal cost of the unit.
 
         Args:
-            start (datetime): The start time of the dispatch.
+            start (datetime.datetime): The start time of the dispatch.
             power (float): The power output of the unit.
 
         Returns:

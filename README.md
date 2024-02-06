@@ -183,6 +183,6 @@ ASSUME is funded by the Federal Ministry for Economic Affairs and Climate Action
 
 ## License
 
-Copyright 2022-2023 [ASSUME developers](https://assume.readthedocs.io/en/latest/developers.html).
+Copyright 2022-2024 [ASSUME developers](https://assume.readthedocs.io/en/latest/developers.html).
 
 ASSUME is licensed under the [GNU Affero General Public License v3.0](./LICENSES/AGPL-3.0-or-later.txt). This license is a strong copyleft license that requires that any derivative work be licensed under the same terms as the original work. It is approved by the [Open Source Initiative](https://opensource.org/licenses/AGPL-3.0).
