@@ -41,4 +41,6 @@ base:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: redispatch
-      solver: gurobi
+      param_dict:
+        network_path: .
+        solver: gurobi

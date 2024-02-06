@@ -15,7 +15,7 @@ dependencies:
 - tqdm
 - SQLAlchemy
 - matplotlib
-- pypsa
+- pypsa>=0.26.3
 
 - pip:
   - .
