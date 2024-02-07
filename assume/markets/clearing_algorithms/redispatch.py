@@ -288,30 +288,45 @@ class RedispatchMarketRole(MarketRole):
         # Add accepted_volume to orderbook_df for each unit from actual_dispatch
         for unit in orderbook_df["unit_id"].unique():
             unit_orders = orderbook_df[orderbook_df["unit_id"] == unit].index
-            orderbook_df.loc[unit_orders, "accepted_volume"] = orderbook_df.loc[
-                unit_orders, "volume"
-            ]
-            orderbook_df.loc[unit_orders, "accepted_price"] = orderbook_df.loc[
-                unit_orders, "price"
-            ]
 
             if unit in redispatch_volumes.columns:
-                orderbook_df.loc[unit_orders, "accepted_volume"] += redispatch_volumes[
+                orderbook_df.loc[unit_orders, "accepted_volume"] = redispatch_volumes[
                     unit
                 ].values
+
+                # Set the accepted price as the marginal cost of the generator
+                # time the sign of the redispatch volume (positive for upward, negative for downward)
+                orderbook_df.loc[unit_orders, "accepted_price"] = orderbook_df.loc[
+                    unit_orders, "price"
+                ] * np.sign(redispatch_volumes[unit].values)
+
+            else:
+                orderbook_df.loc[unit_orders, "accepted_volume"] = 0.0
+                # If the unit is not in the redispatch volumes, set the accepted price as the original price
+                orderbook_df.loc[unit_orders, "accepted_price"] = 0.0
 
     def calculate_meta_data(self, product: MarketProduct, i: int):
         # Calculate meta data such as total upward and downward redispatch, total backup dispatch, and total redispatch cost
         redispatch_volumes = self.network.generators_t.p.iloc[i]
-        upward_redispatch = redispatch_volumes.filter(regex="_up").sum()
-        downward_redispatch = redispatch_volumes.filter(regex="_down").sum()
-        backup_dispatch = redispatch_volumes.filter(regex="_backup").sum()
-        total_redispatch_cost = self.network.generators_t.marginal_cost.iloc[i].sum()
+        upward_redispatch_price = self.network.generators_t.marginal_cost.iloc[
+            i
+        ].filter(regex="_up")
+        downward_redispatch_price = self.network.generators_t.marginal_cost.iloc[
+            i
+        ].filter(regex="_down")
+
+        # Calculate total redispatch cost as sum of accepted volumes times the marginal cost for upward redispatch
+        # minus the accepted volumes times the marginal cost for downward redispatch
+        total_redispatch_cost = (
+            redispatch_volumes.filter(regex="_up") * upward_redispatch_price
+        ).sum() - (
+            redispatch_volumes.filter(regex="_down") * downward_redispatch_price
+        ).sum()
 
         return {
-            "total_upward_redispatch": upward_redispatch,
-            "total_downward_redispatch": downward_redispatch,
-            "total_backup_dispatch": backup_dispatch,
+            "total_upward_redispatch": redispatch_volumes.filter(regex="_up").sum(),
+            "total_downward_redispatch": redispatch_volumes.filter(regex="_down").sum(),
+            "total_backup_dispatch": redispatch_volumes.filter(regex="_backup").sum(),
             "total_redispatch_cost": total_redispatch_cost,
             "product_start": product[0],
             "product_end": product[1],

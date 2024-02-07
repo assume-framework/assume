@@ -43,7 +43,6 @@ logging.getLogger("mango").setLevel(logging.WARNING)
 
 
 class World:
-
     """
     World instance with the provided address, database URI, export CSV path, log level, and distributed role settings.
 
