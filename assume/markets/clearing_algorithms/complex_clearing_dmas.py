@@ -16,7 +16,6 @@ from pyomo.environ import (
     NonNegativeReals,
     Objective,
     Reals,
-    SolverFactory,
     Var,
     minimize,
     quicksum,

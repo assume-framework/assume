@@ -29,7 +29,14 @@ class CriticTD3(nn.Module):
         act_dim (int): Dimension of each action
     """
 
-    def __init__(self, n_agents, obs_dim, act_dim, float_type, unique_obs_len=16):
+    def __init__(
+        self,
+        n_agents: int,
+        obs_dim: int,
+        act_dim: int,
+        float_type,
+        unique_obs_len: int = 16,
+    ):
         super(CriticTD3, self).__init__()
 
         self.obs_dim = obs_dim  # + unique_obs_len * (n_agents - 1)
@@ -102,7 +109,7 @@ class Actor(nn.Module):
     The neurnal network for the actor.
     """
 
-    def __init__(self, obs_dim, act_dim, float_type):
+    def __init__(self, obs_dim: int, act_dim: int, float_type):
         super(Actor, self).__init__()
 
         self.FC1 = nn.Linear(obs_dim, 256, dtype=float_type)
@@ -169,7 +176,7 @@ class NormalActionNoise:
         return noise
 
 
-def polyak_update(params, target_params, tau):
+def polyak_update(params, target_params, tau: float):
     """
     Perform a Polyak average update on ``target_params`` using ``params``:
     target parameters are slowly updated towards the main parameters.

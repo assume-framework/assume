@@ -18,7 +18,7 @@ class Storage(SupportsMinMaxCharge):
     """
     A class for a storage unit.
 
-    Parameters:
+    Attributes:
         max_power_charge (float): The maximum power input of the storage unit in MW (negative value).
         min_power_charge (float): The minimum power input of the storage unit in MW (negative value).
         max_power_discharge (float): The maximum power output of the storage unit in MW.
@@ -196,8 +196,8 @@ class Storage(SupportsMinMaxCharge):
         Returns the volume of the unit within the given time range.
 
         Args:
-            start (pd.Timestamp): The start time of the dispatch.
-            end (pd.Timestamp): The end time of the dispatch.
+            start (pandas.Timestamp): The start time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch.
 
         Returns:
             pd.Series: The volume of the unit within the given time range.
@@ -342,8 +342,8 @@ class Storage(SupportsMinMaxCharge):
         Calculates the min and max charging power for the given time period.
 
         Args:
-            start (pd.Timestamp): The start of the current dispatch.
-            end (pd.Timestamp): The end of the current dispatch.
+            start (pandas.Timestamp): The start of the current dispatch.
+            end (pandas.Timestamp): The end of the current dispatch.
             product_type (str): The product type of the storage unit.
 
         Returns:
@@ -390,8 +390,8 @@ class Storage(SupportsMinMaxCharge):
         Calculates the min and max discharging power for the given time period.
 
         Args:
-            start (pd.Timestamp): The start of the current dispatch.
-            end (pd.Timestamp): The end of the current dispatch.
+            start (pandas.Timestamp): The start of the current dispatch.
+            end (pandas.Timestamp): The end of the current dispatch.
             product_type (str): The product type of the storage unit.
 
         Returns:
