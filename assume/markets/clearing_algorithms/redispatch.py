@@ -25,6 +25,11 @@ class RedispatchMarketRole(MarketRole):
         network_path = marketconfig.param_dict.get("network_path")
         assert network_path
 
+        # set backup marginal cost
+        self.backup_marginal_cost = marketconfig.param_dict.get(
+            "backup_marginal_cost", 10e4
+        )
+
         # setup the network
         # add buses
         self.add_buses(f"{network_path}/buses.csv")
@@ -33,7 +38,6 @@ class RedispatchMarketRole(MarketRole):
         self.add_lines(f"{network_path}/lines.csv")
 
         # add generators
-        # TODO: add config parameter for price of the backup generators and backup generators themselves
         self.add_generators(f"{network_path}/powerplant_units.csv")
 
         # add loads
@@ -134,7 +138,7 @@ class RedispatchMarketRole(MarketRole):
             suffix="_backup_down",
             bus=self.network.buses.index,  # bus to which the generator is connected to
             p_nom=10e4,
-            marginal_cost=10e4,
+            marginal_cost=self.backup_marginal_cost,
             sign=-1,
         )
 
@@ -273,37 +277,47 @@ class RedispatchMarketRole(MarketRole):
         # Extract backup, upward, and downward redispatch
         generators_t_p = self.network.generators_t.p
 
-        upward_redispatch = generators_t_p.filter(regex="_up")
-        downward_redispatch = generators_t_p.filter(regex="_down")
-
-        # Remove _up and _down suffix from column names
-        upward_redispatch.columns = upward_redispatch.columns.str.replace("_up", "")
-        downward_redispatch.columns = downward_redispatch.columns.str.replace(
-            "_down", ""
+        # Use regex in a single call to filter and rename columns simultaneously for efficiency
+        upward_redispatch = generators_t_p.filter(regex="_up").rename(
+            columns=lambda x: x.replace("_up", "")
+        )
+        downward_redispatch = generators_t_p.filter(regex="_down").rename(
+            columns=lambda x: x.replace("_down", "")
         )
 
         # Calculate redispatch volumes
         redispatch_volumes = upward_redispatch.sub(downward_redispatch)
 
-        # Add accepted_volume to orderbook_df for each unit from actual_dispatch
-        for unit in orderbook_df["unit_id"].unique():
-            unit_orders = orderbook_df[orderbook_df["unit_id"] == unit].index
+        # Initialize accepted_volume and accepted_price columns
+        orderbook_df["accepted_volume"] = 0.0
+        orderbook_df["accepted_price"] = 0.0
 
-            if unit in redispatch_volumes.columns:
-                orderbook_df.loc[unit_orders, "accepted_volume"] = redispatch_volumes[
-                    unit
-                ].values
+        # Find intersection of unit_ids in orderbook_df and columns in redispatch_volumes for direct mapping
+        valid_units = orderbook_df["unit_id"].unique()
+        valid_columns = [
+            unit for unit in valid_units if unit in redispatch_volumes.columns
+        ]
 
-                # Set the accepted price as the marginal cost of the generator
-                # time the sign of the redispatch volume (positive for upward, negative for downward)
-                orderbook_df.loc[unit_orders, "accepted_price"] = orderbook_df.loc[
-                    unit_orders, "price"
-                ] * np.sign(redispatch_volumes[unit].values)
+        # Directly apply values based on the valid_columns without looping
+        for unit in valid_columns:
+            unit_orders = orderbook_df["unit_id"] == unit
 
-            else:
-                orderbook_df.loc[unit_orders, "accepted_volume"] = 0.0
-                # If the unit is not in the redispatch volumes, set the accepted price as the original price
-                orderbook_df.loc[unit_orders, "accepted_price"] = 0.0
+            # Direct mapping of volumes
+            orderbook_df.loc[unit_orders, "accepted_volume"] = redispatch_volumes[
+                unit
+            ].values
+
+            # Use np.where to directly apply conditional pricing based on the sign of the redispatch volume
+            # and ensure that the volume is not zero to avoid assigning a value to accepted_price in such cases.
+            orderbook_df.loc[unit_orders, "accepted_price"] = np.where(
+                redispatch_volumes[unit].values > 0,
+                orderbook_df.loc[unit_orders, "price"],
+                np.where(
+                    redispatch_volumes[unit].values < 0,
+                    -orderbook_df.loc[unit_orders, "price"],
+                    0,  # This sets accepted_price to 0 when redispatch_volume is exactly 0
+                ),
+            )
 
     def calculate_meta_data(self, product: MarketProduct, i: int):
         # Calculate meta data such as total upward and downward redispatch, total backup dispatch, and total redispatch cost
