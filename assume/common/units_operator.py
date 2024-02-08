@@ -4,7 +4,7 @@
 
 import logging
 from collections import defaultdict
-from datetime import datetime
+from datetime import UTC, datetime
 from itertools import groupby
 from operator import itemgetter
 
@@ -298,8 +298,8 @@ class UnitsOperator(Role):
             return
         self.last_sent_dispatch = self.context.current_timestamp
 
-        now = datetime.utcfromtimestamp(self.context.current_timestamp)
-        start = datetime.utcfromtimestamp(last)
+        now = datetime.fromtimestamp(self.context.current_timestamp, tz=UTC)
+        start = datetime.fromtimestamp(last, tz=UTC)
 
         market_dispatch = aggregate_step_amount(
             self.valid_orders[product_type],

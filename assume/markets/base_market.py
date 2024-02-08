@@ -5,7 +5,7 @@
 import calendar
 import logging
 import math
-from datetime import datetime
+from datetime import UTC, datetime
 from itertools import groupby
 from operator import itemgetter
 
@@ -270,7 +270,7 @@ class MarketRole(MarketMechanism, Role):
                 self, self.handle_get_unmatched, accept_get_unmatched
             )
 
-        current = datetime.utcfromtimestamp(self.context.current_timestamp)
+        current = datetime.fromtimestamp(self.context.current_timestamp)
         next_opening = self.marketconfig.opening_hours.after(current, inc=True)
         opening_ts = calendar.timegm(next_opening.utctimetuple())
         self.context.schedule_timestamp_task(self.opening(), opening_ts)
@@ -281,7 +281,7 @@ class MarketRole(MarketMechanism, Role):
 
         """
         # scheduled to be opened now
-        market_open = datetime.utcfromtimestamp(self.context.current_timestamp)
+        market_open = datetime.fromtimestamp(self.context.current_timestamp, tz=UTC)
         market_closing = market_open + self.marketconfig.opening_duration
         products = get_available_products(
             self.marketconfig.market_products, market_open
