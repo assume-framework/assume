@@ -5,7 +5,7 @@
 import calendar
 import logging
 import math
-from datetime import UTC, datetime
+from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
 
@@ -281,7 +281,7 @@ class MarketRole(MarketMechanism, Role):
 
         """
         # scheduled to be opened now
-        market_open = datetime.fromtimestamp(self.context.current_timestamp, tz=UTC)
+        market_open = datetime.fromtimestamp(self.context.current_timestamp)
         market_closing = market_open + self.marketconfig.opening_duration
         products = get_available_products(
             self.marketconfig.market_products, market_open

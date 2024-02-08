@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.10", "3.11"]
 
     steps:
     - uses: actions/checkout@v3
@@ -40,7 +40,7 @@ jobs:
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         python -m pip install -e .[test]
-        python -m pip install pyomo
+        python -m pip install pyomo=6.6.1
     - name: Lint with black and isort
       run: |
         # stop the build if there are Python syntax errors or undefined names

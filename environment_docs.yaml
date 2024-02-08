@@ -6,7 +6,7 @@ name: assume-doc
 channels:
   - conda-forge
 dependencies:
-- python>=3.11
+- python>=3.10,<3.12
 - pip
 - ipykernel
 - pandas
@@ -14,7 +14,7 @@ dependencies:
 - tqdm
 - SQLAlchemy
 - pytorch
-- pyomo
+- pyomo<=6.6.1
 
 - pip:
   - .[full]

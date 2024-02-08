@@ -28,7 +28,7 @@ base:
     Redispatch:
       start_date: 2019-01-01 21:00
       operator: network_operator
-      product_type: redispatch
+      product_type: energy
       products:
         - duration: 1h
           count: 24
@@ -44,3 +44,4 @@ base:
       param_dict:
         network_path: .
         solver: gurobi
+        market_clearing_mechanism: pay_as_bid

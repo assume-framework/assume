@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+import os
+import sys
 
 import numpy as np
 import pandas as pd
@@ -15,6 +17,25 @@ log = logging.getLogger(__name__)
 
 
 class RedispatchMarketRole(MarketRole):
+    """
+    A market role that performs redispatch to resolve congestion in the electricity market.
+    It uses PyPSA to model the electricity network and perform the redispatch.
+    The redispatched is based on the price the units submit in their orders.
+    This allows this to be a cost based redispatch if units submit their marginal costs as prices.
+    Or it can be a price based redispatch if units submit actual bid prices.
+
+    Parameters:
+        marketconfig (MarketConfig): The market configuration.
+
+    Args:
+        marketconfig (MarketConfig): The market configuration.
+
+    Notes:
+        Users can also configure the path to the network data, the solver to be used,
+        and the backup marginal cost in the param_dict of the market configuration.
+
+    """
+
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
 
@@ -29,6 +50,13 @@ class RedispatchMarketRole(MarketRole):
         self.backup_marginal_cost = marketconfig.param_dict.get(
             "backup_marginal_cost", 10e4
         )
+
+        # set the market clearing principle
+        # as pay as bid or pay as clear
+        self.market_clearing_mechanism = marketconfig.param_dict.get(
+            "market_clearing_mechanism", "pay_as_bid"
+        )
+        assert self.market_clearing_mechanism in ["pay_as_bid", "pay_as_clear"]
 
         # setup the network
         # add buses
@@ -46,8 +74,6 @@ class RedispatchMarketRole(MarketRole):
     def add_buses(self, filename: str):
         """
         This adds nodes in the PyPSA network to which the generators and loads are connected
-
-        Typically nodes are those substations to which the transmission lines are connected to.
 
         """
         buses = pd.read_csv(filename, index_col=0)
@@ -72,7 +98,8 @@ class RedispatchMarketRole(MarketRole):
 
     def add_generators(self, filename: str):
         """
-        This adds generators in the PyPSA network with respective bus data to which they are connected
+        This adds generators in the PyPSA network with respective bus data to which they are connected.
+        It creates upward and downward redispatch generators for each generator and adds backup generators at each node
         """
         generators = pd.read_csv(filename, index_col=0)
 
@@ -168,6 +195,9 @@ class RedispatchMarketRole(MarketRole):
     ) -> (Orderbook, Orderbook, list[dict]):
         """
         Performs redispatch to resolve congestion in the electricity market.
+        It first checks for congestion in the network and if it finds any, it performs redispatch to resolve it.
+        The returned orderbook contains accepted orders with the redispatched volumes and prices.
+        The prices are positive for upward redispatch and negative for downward redispatch.
 
         Args:
             orderbook (Orderbook): The orderbook to be cleared.
@@ -246,10 +276,13 @@ class RedispatchMarketRole(MarketRole):
         if line_loading.max().max() > 1:
             log.debug("Congestion detected")
 
-            # lopf is deprecated
-            status, termination_condition = self.network.optimize(
-                solver_name=self.solver
-            )
+            # TODO: remove this log handling and chnage lopf to optimize when new version of linopy and pypsa is released
+            with open(os.devnull, "w") as fnull:
+                sys.stdout = fnull  # Redirecting stdout to /dev/null
+                status, termination_condition = self.network.optimize(
+                    solver_name=self.solver
+                )
+                sys.stdout = sys.__stdout__  # Resetting stdout
 
             if status != "ok":
                 log.error(f"Solver exited with {termination_condition}")
@@ -266,7 +299,8 @@ class RedispatchMarketRole(MarketRole):
         # calculate meta data such as total upwared and downward redispatch, total backup dispatch
         # and total redispatch cost
         for i, product in enumerate(market_products):
-            meta.append(self.calculate_meta_data(product, i))
+            orders = orderbook_df[orderbook_df["start_time"] == product[0]]
+            meta.append(self.calculate_meta_data(orders=orders, product=product, i=i))
 
         # remove all orders to clean up the orderbook and avoid double clearing
         self.all_orders = []
@@ -274,19 +308,20 @@ class RedispatchMarketRole(MarketRole):
         return accepted_orders, rejected_orders, meta
 
     def process_dispatch_data(self, orderbook_df: pd.DataFrame):
-        # Extract backup, upward, and downward redispatch
-        generators_t_p = self.network.generators_t.p
+        """
+        This function processes the dispatch data to calculate the redispatch volumes and prices
+        and update the orderbook with the accepted volumes and prices.
+
+        Args:
+            orderbook_df (pd.DataFrame): The orderbook to be cleared.
+        """
+
+        # Get all generators except for _backup generators
+        generators_t_p = self.network.generators_t.p.filter(regex="^(?!.*_backup)")
 
         # Use regex in a single call to filter and rename columns simultaneously for efficiency
-        upward_redispatch = generators_t_p.filter(regex="_up").rename(
-            columns=lambda x: x.replace("_up", "")
-        )
-        downward_redispatch = generators_t_p.filter(regex="_down").rename(
-            columns=lambda x: x.replace("_down", "")
-        )
-
-        # Calculate redispatch volumes
-        redispatch_volumes = upward_redispatch.sub(downward_redispatch)
+        upward_redispatch = generators_t_p.filter(regex="_up$")
+        downward_redispatch = generators_t_p.filter(regex="_down$")
 
         # Initialize accepted_volume and accepted_price columns
         orderbook_df["accepted_volume"] = 0.0
@@ -294,54 +329,73 @@ class RedispatchMarketRole(MarketRole):
 
         # Find intersection of unit_ids in orderbook_df and columns in redispatch_volumes for direct mapping
         valid_units = orderbook_df["unit_id"].unique()
-        valid_columns = [
-            unit for unit in valid_units if unit in redispatch_volumes.columns
-        ]
 
-        # Directly apply values based on the valid_columns without looping
-        for unit in valid_columns:
+        for unit in valid_units:
             unit_orders = orderbook_df["unit_id"] == unit
 
-            # Direct mapping of volumes
-            orderbook_df.loc[unit_orders, "accepted_volume"] = redispatch_volumes[
-                unit
-            ].values
+            if f"{unit}_up" in upward_redispatch.columns:
+                orderbook_df.loc[unit_orders, "accepted_volume"] += upward_redispatch[
+                    f"{unit}_up"
+                ].values
 
-            # Use np.where to directly apply conditional pricing based on the sign of the redispatch volume
-            # and ensure that the volume is not zero to avoid assigning a value to accepted_price in such cases.
-            orderbook_df.loc[unit_orders, "accepted_price"] = np.where(
-                redispatch_volumes[unit].values > 0,
-                orderbook_df.loc[unit_orders, "price"],
-                np.where(
-                    redispatch_volumes[unit].values < 0,
-                    -orderbook_df.loc[unit_orders, "price"],
-                    0,  # This sets accepted_price to 0 when redispatch_volume is exactly 0
-                ),
-            )
+            if f"{unit}_down" in downward_redispatch.columns:
+                orderbook_df.loc[unit_orders, "accepted_volume"] -= downward_redispatch[
+                    f"{unit}_down"
+                ].values
 
-    def calculate_meta_data(self, product: MarketProduct, i: int):
-        # Calculate meta data such as total upward and downward redispatch, total backup dispatch, and total redispatch cost
-        redispatch_volumes = self.network.generators_t.p.iloc[i]
-        upward_redispatch_price = self.network.generators_t.marginal_cost.iloc[
-            i
-        ].filter(regex="_up")
-        downward_redispatch_price = self.network.generators_t.marginal_cost.iloc[
-            i
-        ].filter(regex="_down")
+            if self.market_clearing_mechanism == "pay_as_bid":
+                # set accepted price as the price bid price from the orderbook
+                orderbook_df.loc[unit_orders, "accepted_price"] = np.where(
+                    orderbook_df.loc[unit_orders, "accepted_volume"] > 0,
+                    orderbook_df.loc[unit_orders, "price"],
+                    np.where(
+                        orderbook_df.loc[unit_orders, "accepted_volume"] < 0,
+                        orderbook_df.loc[unit_orders, "price"],
+                        0,  # This sets accepted_price to 0 when redispatch_volume is exactly 0
+                    ),
+                )
 
-        # Calculate total redispatch cost as sum of accepted volumes times the marginal cost for upward redispatch
-        # minus the accepted volumes times the marginal cost for downward redispatch
-        total_redispatch_cost = (
-            redispatch_volumes.filter(regex="_up") * upward_redispatch_price
-        ).sum() - (
-            redispatch_volumes.filter(regex="_down") * downward_redispatch_price
-        ).sum()
+            elif self.market_clearing_mechanism == "pay_as_clear":
+                # set accepted price as the nodal marginal price
+                nodal_marginal_prices = abs(self.network.buses_t.marginal_price)
+                unit_node = orderbook_df.loc[unit_orders, "node"].values[0]
+
+                orderbook_df.loc[unit_orders, "accepted_price"] = np.where(
+                    orderbook_df.loc[unit_orders, "accepted_volume"] != 0,
+                    nodal_marginal_prices[unit_node],
+                    0,
+                )
+
+    def calculate_meta_data(self, orders, product: MarketProduct, i: int):
+        """
+        This function calculates the meta data such as total upward and downward redispatch,
+        total backup dispatch, and total redispatch cost.
+
+        Args:
+            product (MarketProduct): The product for which clearing happens.
+            i (int): The index of the product in the market products list.
+
+        Returns:
+            dict: The meta data.
+        """
+
+        total_upward_redispatch = (
+            self.network.generators_t.p.iloc[i].filter(regex="_up").sum()
+        )
+        total_downward_redispatch = (
+            self.network.generators_t.p.iloc[i].filter(regex="_down").sum()
+        )
+        total_backup_dispatch = (
+            self.network.generators_t.p.iloc[i].filter(regex="_backup").sum()
+        )
+
+        total_redispatch_cost = orders["accepted_volume"].dot(orders["accepted_price"])
 
         return {
-            "total_upward_redispatch": redispatch_volumes.filter(regex="_up").sum(),
-            "total_downward_redispatch": redispatch_volumes.filter(regex="_down").sum(),
-            "total_backup_dispatch": redispatch_volumes.filter(regex="_backup").sum(),
-            "total_redispatch_cost": total_redispatch_cost,
+            "total_upward_redispatch": round(total_upward_redispatch, 3),
+            "total_downward_redispatch": round(total_downward_redispatch, 3),
+            "total_backup_dispatch": round(total_backup_dispatch, 3),
+            "total_redispatch_cost": round(total_redispatch_cost, 3),
             "product_start": product[0],
             "product_end": product[1],
             "only_hours": product[2],
