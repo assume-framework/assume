@@ -77,7 +77,6 @@ class NaiveStrategy(BaseStrategy):
 
 
 class NaiveDAStrategy(BaseStrategy):
-
     """
     A naive strategy that bids the marginal cost of the unit as block bids over 24 hours on the day ahead market.
     """

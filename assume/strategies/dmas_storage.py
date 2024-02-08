@@ -26,7 +26,7 @@ def shift(prc, type_: str = "first"):
     Shifts the price curve up or down
 
     Args:
-      prc(np.array): price curve
+      prc(numpy.ndarray): price curve
       type_(str): type of shift. default is 'first'
       type_: str:  (Default value = "first")
 
@@ -54,7 +54,7 @@ def shaping(prc, type_: str = "peak"):
     Shifts the price curve up or down
 
     Args:
-      prc(np.array): price curve
+      prc(numpy.ndarray): price curve
       type_(str): type of shift. default is 'peak'. other options are 'pv' and 'demand'.
       type_: str:  (Default value = "peak")
 
@@ -164,13 +164,13 @@ class DmasStorageStrategy(BaseStrategy):
         self.model.vol_con.add(self.model.volume[hour_count - 1] == unit.max_volume / 2)
         return self.power
 
-    def optimize_result(self, unit: SupportsMinMaxCharge, committed_power: np.array):
+    def optimize_result(self, unit: SupportsMinMaxCharge, committed_power: np.ndarray):
         """
         Optimizes the result
 
         Args:
             unit(SupportsMinMaxCharge): unit to dispatch
-            committed_power(np.array): committed power
+            committed_power(numpy.ndarray): committed power
 
         Returns:
             pyomo.opt.results.SolverResults: optimization result

@@ -313,20 +313,19 @@ class TD3(RLAlgorithm):
         Update the policy of the reinforcement learning agent using the Twin Delayed Deep Deterministic Policy Gradients (TD3) algorithm.
 
         Notes:
+            This function performs the policy update step, which involves updating the actor (policy) and critic (Q-function) networks
+            using TD3 algorithm. It iterates over the specified number of gradient steps and performs the following steps for each
+            learning strategy:
 
-        This function performs the policy update step, which involves updating the actor (policy) and critic (Q-function) networks
-        using TD3 algorithm. It iterates over the specified number of gradient steps and performs the following steps for each
-        learning strategy:
+            1. Sample a batch of transitions from the replay buffer.
+            2. Calculate the next actions with added noise using the actor target network.
+            3. Compute the target Q-values based on the next states, rewards, and the target critic network.
+            4. Compute the critic loss as the mean squared error between current Q-values and target Q-values.
+            5. Optimize the critic network by performing a gradient descent step.
+            6. Optionally, update the actor network if the specified policy delay is reached.
+            7. Apply Polyak averaging to update target networks.
 
-        1. Sample a batch of transitions from the replay buffer.
-        2. Calculate the next actions with added noise using the actor target network.
-        3. Compute the target Q-values based on the next states, rewards, and the target critic network.
-        4. Compute the critic loss as the mean squared error between current Q-values and target Q-values.
-        5. Optimize the critic network by performing a gradient descent step.
-        6. Optionally, update the actor network if the specified policy delay is reached.
-        7. Apply Polyak averaging to update target networks.
-
-        This function implements the TD3 algorithm's key step for policy improvement and exploration.
+            This function implements the TD3 algorithm's key step for policy improvement and exploration.
         """
 
         logger.info(f"Updating Policy")

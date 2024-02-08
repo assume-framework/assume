@@ -256,7 +256,7 @@ class WriteOutput(Role):
 
         Args:
             table (str): The name of the database table.
-            df (pd.DataFrame): The DataFrame to be checked.
+            df (pandas.DataFrame): The DataFrame to be checked.
         """
         with self.db.begin() as db:
             # Read table into Pandas DataFrame
@@ -278,7 +278,7 @@ class WriteOutput(Role):
         Checks if the data contains tensors and converts them to floats.
 
         Args:
-            data (pd.Series): The data to be checked.
+            data (pandas.Series): The data to be checked.
         """
         try:
             import torch as th

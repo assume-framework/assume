@@ -32,6 +32,22 @@ assume.reinforcement\_learning.learning\_utils module
    :undoc-members:
    :show-inheritance:
 
+assume.reinforcement\_learning.algorithms.base_algorithm module
+---------------------------------------------------------------
+
+.. automodule:: assume.reinforcement_learning.algorithms.base_algorithm
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+assume.reinforcement\_learning.algorithms.matd3 module
+------------------------------------------------------
+
+.. automodule:: assume.reinforcement_learning.algorithms.matd3
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Module contents
 ---------------
 

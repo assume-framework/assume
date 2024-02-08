@@ -19,12 +19,12 @@ class PowerPlant(SupportsMinMax):
     """
     A class for a powerplant unit.
 
-    Parameters:
+    Attributes:
         id (str): The ID of the unit.
         unit_operator (str): The operator of the unit.
         technology (str): The technology of the unit.
         bidding_strategies (dict): The bidding strategies of the unit.
-        index (pd.DatetimeIndex): The index of the unit.
+        index (pandas.DatetimeIndex): The index of the unit.
         max_power (float): The maximum power output capacity of the power plant in MW.
         min_power (float, optional): The minimum power output capacity of the power plant in MW. Defaults to 0.0 MW.
         efficiency (float, optional): The efficiency of the poewr plant in converting fuel to electricity (Defaults to 1.0). Defaults to 1.0.
@@ -50,7 +50,7 @@ class PowerPlant(SupportsMinMax):
         unit_operator (str): The operator of the unit.
         technology (str): The technology of the unit.
         bidding_strategies (dict): The bidding strategies of the unit.
-        index (pd.DatetimeIndex): The index of the unit.
+        index (pandas.DatetimeIndex): The index of the unit.
         max_power (float): The maximum power output capacity of the power plant in MW.
         min_power (float, optional): The minimum power output capacity of the power plant in MW. Defaults to 0.0 MW.
         efficiency (float, optional): The efficiency of the poewr plant in converting fuel to electricity (Defaults to 1.0). Defaults to 1.0.
@@ -167,8 +167,8 @@ class PowerPlant(SupportsMinMax):
         Returns the volume of the unit within the given time range.
 
         Args:
-            start (pd.Timestamp): The start time of the dispatch.
-            end (pd.Timestamp): The end time of the dispatch.
+            start (pandas.Timestamp): The start time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch.
 
         Returns:
             pd.Series: The volume of the unit within the given time range.
@@ -343,12 +343,12 @@ class PowerPlant(SupportsMinMax):
         Calculates the minimum and maximum power output of the unit and returns it.
 
         Args:
-            start (pd.Timestamp): The start time of the dispatch.
-            end (pd.Timestamp): The end time of the dispatch.
+            start (pandas.Timestamp): The start time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch.
             product_type (str, optional): The product type of the unit. Defaults to "energy".
 
         Returns:
-            tuple[pd.Series, pd.Series]: The minimum and maximum power output of the unit.
+            tuple[pandas.Series, pandas.Series]: The minimum and maximum power output of the unit.
 
         Note:
             The calculation does not include ramping constraints and can be used for arbitrary start times in the future.

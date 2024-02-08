@@ -5,7 +5,7 @@
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
 import dateutil.rrule as rr
 import numpy as np
@@ -50,7 +50,7 @@ def load_file(
         index (pd.DatetimeIndex, optional): The index of the dataframe. Defaults to None.
 
     Returns:
-        pd.DataFrame: The dataframe containing the loaded data.
+        pandas.DataFrame: The dataframe containing the loaded data.
 
     Raises:
         FileNotFoundError: If the specified file is not found, returns None.
@@ -114,7 +114,7 @@ def load_file(
         return None
 
 
-def convert_to_rrule_freq(string: str) -> Tuple[int, int]:
+def convert_to_rrule_freq(string: str) -> tuple[int, int]:
     """
     Convert a string to a rrule frequency and interval.
 
@@ -122,7 +122,7 @@ def convert_to_rrule_freq(string: str) -> Tuple[int, int]:
         string (str): The string to be converted. Should be in the format of "1h" or "1d" or "1w".
 
     Returns:
-        Tuple[int, int]: The rrule frequency and interval.
+        tuple[int, int]: The rrule frequency and interval.
     """
     freq = freq_map[string[-1]]
     interval = int(string[:-1])
@@ -204,7 +204,7 @@ def add_units(
     The callback is used to adjust unit_params depending on the unit_type, before adding the unit to the world.
 
     Args:
-        units_df (pd.DataFrame): The dataframe containing the units.
+        units_df (pandas.DataFrame): The dataframe containing the units.
         unit_type (str): The type of the unit.
         world (World): The world to which the units will be added.
         forecaster (Forecaster): The forecaster used for adding the units.
