@@ -22,7 +22,7 @@ sho_case:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: pay_as_clear_complex
+      market_mechanism: pay_as_clear_advanced
       additional_fields:
         - bid_type
         - min_acceptance_ratio
@@ -48,7 +48,7 @@ bo_case:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: pay_as_clear_complex
+      market_mechanism: pay_as_clear_advanced
       additional_fields:
         - bid_type
         - min_acceptance_ratio
@@ -74,7 +74,7 @@ lo_case:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: pay_as_clear_complex
+      market_mechanism: pay_as_clear_advanced
       additional_fields:
         - bid_type
         - min_acceptance_ratio
