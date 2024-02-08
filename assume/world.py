@@ -7,7 +7,7 @@ import calendar
 import logging
 import sys
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from sys import platform
 from typing import Any, Optional, Tuple, Union
 
@@ -540,7 +540,7 @@ class World:
             if delta:
                 pbar.update(delta)
                 pbar.set_description(
-                    f"{self.output_role.simulation_id} {datetime.utcfromtimestamp(self.clock.time)}",
+                    f"{self.output_role.simulation_id} {datetime.fromtimestamp(self.clock.time, tz=UTC)}",
                     refresh=False,
                 )
             else:

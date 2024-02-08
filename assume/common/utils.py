@@ -60,7 +60,7 @@ def get_available_products(market_products: list[MarketProduct], startdate: date
 
     Args:
         market_products (list[MarketProduct]): List of market products.
-        startdate (datetime): The startdate.
+        startdate (datetime.datetime): The startdate.
 
     Returns:
         list[MarketProduct]: List of available products.
