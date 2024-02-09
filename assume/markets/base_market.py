@@ -36,20 +36,15 @@ class MarketMechanism:
     The MarketMechanism is embedded into the general MarketRole, which takes care of simulation concerns.
     In the Marketmechanism, all data needed for the clearing is present.
 
-    Parameters:
+    Attributes:
         all_orders (Orderbook): The list of all orders.
         marketconfig (MarketConfig): The configuration of the market.
-        open_auctions (list[dict]): The list of open auctions.
+        open_auctions (set): The list of open auctions.
         results (list[dict]): The list of market metadata.
 
     Args:
         marketconfig (MarketConfig): The configuration of the market.
     """
-
-    all_orders: Orderbook
-    marketconfig: MarketConfig
-    open_auctions: list[dict]
-    name: str
 
     def __init__(self, marketconfig: MarketConfig):
         super().__init__()
@@ -153,13 +148,6 @@ class MarketRole(MarketMechanism, Role):
     """
     This is the base class for all market roles. It implements the basic functionality of a market role, such as
     registering agents, clearing the market and sending the results to the database agent.
-
-    Parameters:
-        longitude (float): The longitude of the market.
-        latitude (float): The latitude of the market.
-        marketconfig (MarketConfig): The configuration of the market.
-        registered_agents (dict[tuple[str, str], dict]): The dictionary of registered agents.
-        required_fields (list[str]): The list of required fields.
 
     Args:
         marketconfig (MarketConfig): The configuration of the market.

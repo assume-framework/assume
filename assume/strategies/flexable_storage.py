@@ -20,8 +20,8 @@ class flexableEOMStorage(BaseStrategy):
     The price is then set as the average price divided by the discharge efficiency of the unit.
     Otherwise, the unit will charge with the price defined as the average price multiplied by the charge efficiency of the unit.
 
-    Parameters:
-        foresight (pd.Timedelta): Foresight for the average price calculation.
+    Attributes:
+        foresight (pandas.Timedelta): Foresight for the average price calculation.
 
     Args:
         *args: Additional arguments.
@@ -218,8 +218,8 @@ class flexablePosCRMStorage(BaseStrategy):
     The strategy bids the energy_price for the energy_pos product if the specific revenue is positive.
     Otherwise, the strategy bids the capacity_price for the capacity_pos product.
 
-    Parameters:
-        foresight (pd.Timedelta): Foresight for the average price calculation.
+    Attributes:
+        foresight (pandas.Timedelta): Foresight for the average price calculation.
 
     Args:
         *args: Additional arguments.
@@ -358,8 +358,8 @@ class flexableNegCRMStorage(BaseStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
 
-    Parameters:
-        foresight (pd.Timedelta): Foresight for the average price calculation.
+    Attributes:
+        foresight (pandas.Timedelta): Foresight for the average price calculation.
 
     Args:
         *args: Additional arguments.
@@ -475,9 +475,9 @@ def calculate_price_average(unit, current_time, foresight, price_forecast):
 
     Args:
         unit (SupportsMinMaxCharge): The unit that is dispatched.
-        current_time (pd.Timestamp): The current time.
-        foresight (pd.Timedelta): The foresight.
-        price_forecast (pd.Series): The price forecast.
+        current_time (pandas.Timestamp): The current time.
+        foresight (pandas.Timedelta): The foresight.
+        price_forecast (pandas.Series): The price forecast.
 
     Returns:
         float: The average price.
@@ -497,9 +497,9 @@ def get_specific_revenue(unit, marginal_cost, current_time, foresight, price_for
     Args:
         unit (SupportsMinMaxCharge): The unit that is dispatched.
         marginal_cost (float): The marginal cost.
-        current_time (pd.Timestamp): The current time.
-        foresight (pd.Timedelta): The foresight.
-        price_forecast (pd.Series): The price forecast.
+        current_time (pandas.Timestamp): The current time.
+        foresight (pandas.Timedelta): The foresight.
+        price_forecast (pandas.Series): The price forecast.
 
     Returns:
         float: The specific revenue.

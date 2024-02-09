@@ -63,9 +63,9 @@ class MarketProduct:
     Describes the configuration of a market product which is available at a market.
 
     Args:
-        duration (rd | rr.rrule): the duration of the product
+        duration (dateutil.relativedelta.relativedelta | dateutil.rrule.rrule): the duration of the product
         count (int): how many future durations can be traded, must be >= 1
-        first_delivery (rd): when does the first delivery begin, in relation to market start
+        first_delivery (dateutil.relativedelta.relativedelta): when does the first delivery begin, in relation to market start
         only_hours (OnlyHours | None): tuple of hours from which this order is available, on multi day products
         eligible_lambda_function (eligible_lambda | None): lambda function which determines if an agent is eligible to trade this product
     """
@@ -99,7 +99,7 @@ class MarketConfig:
 
     Args:
         name (str): the name of the market
-        opening_hours (rr.rrule): the opening hours of the market
+        opening_hours (dateutil.rrule.rrule): the opening hours of the market
         opening_duration (datetime.timedelta): the duration of the opening hours
         market_mechanism (str): name of method used for clearing
         market_products (list[MarketProduct]): list of available products to be traded at the market

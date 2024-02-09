@@ -9,7 +9,7 @@ import sys
 import time
 from datetime import datetime
 from sys import platform
-from typing import Any, Optional, Tuple, Union
+from typing import Optional, Union
 
 import nest_asyncio
 import pandas as pd
@@ -50,14 +50,14 @@ class World:
     markets, unit operators, unit types, bidding strategies, and clearing mechanisms. If available, it imports learning strategies and handles any potential import errors.
     Finally, it sets up the event loop for asynchronous operations.
 
-    Parameters:
+    Attributes:
         logger (logging.Logger): The logger for the world instance.
-        addr (Union[Tuple[str, int], str]): The address of the world, represented as a tuple of string and int or a string.
-        container (Optional[Container]): The container for the world instance.
-        distributed_role (Optional[bool]): A boolean indicating whether distributed roles are enabled.
+        addr (Union[tuple[str, int], str]): The address of the world, represented as a tuple of string and int or a string.
+        container (mango.Container, optional): The container for the world instance.
+        distributed_role (bool, optional): A boolean indicating whether distributed roles are enabled.
         export_csv_path (str): The path for exporting CSV data.
-        db (Optional[create_engine]): The database connection.
-        market_operators (dict[str, RoleAgent]): The market operators for the world instance.
+        db (sqlalchemy.engine.base.Engine, optional): The database connection.
+        market_operators (dict[str, mango.RoleAgent]): The market operators for the world instance.
         markets (dict[str, MarketConfig]): The markets for the world instance.
         unit_operators (dict[str, UnitsOperator]): The unit operators for the world instance.
         unit_types (dict[str, BaseUnit]): The unit types for the world instance.
@@ -70,23 +70,23 @@ class World:
         end (datetime.datetime): The end datetime for the simulation.
         learning_config (LearningConfig): The configuration for the learning process.
         evaluation_mode (bool): A boolean indicating whether the evaluation mode is enabled.
-        forecaster (Optional[Forecaster]): The forecaster used for custom unit types.
+        forecaster (Forecaster, optional): The forecaster used for custom unit types.
         learning_mode (bool): A boolean indicating whether the learning mode is enabled.
-        output_agent_addr (Tuple[str, str]): The address of the output agent.
+        output_agent_addr (tuple[str, str]): The address of the output agent.
         bidding_params (dict): Parameters for bidding.
-        index (pd.Series): The index for the simulation.
+        index (pandas.Series): The index for the simulation.
 
     Args:
-        addr (Union[Tuple[str, int], str]): The address of the world, represented as a tuple of string and int or a string.
-        database_uri (str): The URI for the database connection.
-        export_csv_path (str): The path for exporting CSV data.
-        log_level (str): The logging level for the world instance.
-        distributed_role (Optional[bool]): A boolean indicating whether distributed roles are enabled.
+        addr: The address of the world, represented as a tuple of string and int or a string.
+        database_uri: The URI for the database connection.
+        export_csv_path: The path for exporting CSV data.
+        log_level: The logging level for the world instance.
+        distributed_role: A boolean indicating whether distributed roles are enabled.
     """
 
     def __init__(
         self,
-        addr: Union[Tuple[str, int], str] = "world",
+        addr: Union[tuple[str, int], str] = "world",
         database_uri: str = "",
         export_csv_path: str = "",
         log_level: str = "INFO",
@@ -163,8 +163,8 @@ class World:
         bidding_params: dict = {},
         learning_config: LearningConfig = {},
         forecaster: Optional[Forecaster] = None,
-        manager_address: Optional[Any] = None,
-        **kwargs: Any,
+        manager_address=None,
+        **kwargs: dict,
     ) -> None:
         """
         Set up the environment for the simulation, initializing various parameters and components required for the simulation run.
@@ -173,14 +173,12 @@ class World:
             start (datetime.datetime): The start datetime for the simulation.
             end (datetime.datetime): The end datetime for the simulation.
             simulation_id (str): The unique identifier for the simulation.
-            index (pd.Series): The index for the simulation.
+            index (pandas.Series): The index for the simulation.
             save_frequency_hours (int, optional): The frequency (in hours) at which to save simulation data. Defaults to 24.
             bidding_params (dict, optional): Parameters for bidding. Defaults to an empty dictionary.
             learning_config (LearningConfig, optional): Configuration for the learning process. Defaults to an empty configuration.
             forecaster (Forecaster, optional): The forecaster used for custom unit types. Defaults to None.
-            manager_address (Any, optional): The address of the manager.
-
-        Other Parameters:
+            manager_address: The address of the manager.
             **kwargs: Additional keyword arguments.
 
         Returns:
@@ -242,9 +240,6 @@ class World:
         Set up the learning process for the simulation, updating bidding parameters with the learning configuration
         and initializing the reinforcement learning (RL) learning role with the specified parameters. It also sets up
         the RL agent and adds the learning role to it for further processing.
-
-        Returns:
-            None
         """
 
         self.bidding_params.update(self.learning_config)
@@ -278,9 +273,6 @@ class World:
         Args:
             simulation_id (str): The unique identifier for the simulation.
             save_frequency_hours (int): The frequency (in hours) at which to save simulation data.
-
-        Returns:
-            None
         """
 
         self.logger.debug(f"creating output agent {self.db=} {self.export_csv_path=}")
@@ -326,9 +318,6 @@ class World:
 
         Args:
             id (str): The identifier for the unit operator.
-
-        Returns:
-            None
         """
 
         if self.unit_operators.get(id):
@@ -383,9 +372,6 @@ class World:
             unit_operator_id (str): The identifier of the unit operator to which the unit will be added.
             unit_params (dict): Parameters for configuring the unit.
             forecaster (Forecaster): The forecaster used by the unit.
-
-        Returns:
-            None
         """
 
         # check if unit operator exists
@@ -450,9 +436,6 @@ class World:
 
         Args:
             id (str): The identifier for the market operator.
-
-        Returns:
-            None
         """
 
         if self.market_operators.get(id):
@@ -513,7 +496,7 @@ class World:
         await tasks_complete_or_sleeping(self.container)
         return delta
 
-    async def async_run(self, start_ts, end_ts):
+    async def async_run(self, start_ts: datetime, end_ts: datetime):
         """
         Run the simulation asynchronously, progressing the simulation time from the start timestamp to the end timestamp,
         allowing registration before the first opening. If distributed roles are enabled, broadcast the simulation time.
@@ -521,11 +504,8 @@ class World:
         time reaches the end timestamp, close the progress bar and shut down the simulation container.
 
         Args:
-            start_ts: The start timestamp for the simulation run.
-            end_ts: The end timestamp for the simulation run.
-
-        Returns:
-            None
+            start_ts (datetime.datetime): The start timestamp for the simulation run.
+            end_ts (datetime.datetime): The end timestamp for the simulation run.
         """
         # agent is implicit added to self.container._agents
         pbar = tqdm(total=end_ts - start_ts)
@@ -558,9 +538,6 @@ class World:
         method then iterates through the simulation time, updating the progress bar and the simulation description. Once
         the simulation time reaches the end timestamp, the method closes the progress bar and shuts down the simulation
         container.
-
-        Returns:
-            None
         """
 
         start_ts = calendar.timegm(self.start.utctimetuple())
@@ -606,9 +583,6 @@ class World:
             unit_operator_id (str): The identifier of the unit operator.
             unit_params (dict): Parameters specific to the unit.
             forecaster (Forecaster): The forecaster associated with the unit.
-
-        Returns:
-            None
         """
 
         return self.loop.run_until_complete(
