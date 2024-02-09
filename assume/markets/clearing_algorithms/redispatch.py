@@ -3,8 +3,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-import os
-import sys
 
 import numpy as np
 import pandas as pd
@@ -276,13 +274,9 @@ class RedispatchMarketRole(MarketRole):
         if line_loading.max().max() > 1:
             log.debug("Congestion detected")
 
-            # TODO: remove this log handling and chnage lopf to optimize when new version of linopy and pypsa is released
-            with open(os.devnull, "w") as fnull:
-                sys.stdout = fnull  # Redirecting stdout to /dev/null
-                status, termination_condition = self.network.optimize(
-                    solver_name=self.solver
-                )
-                sys.stdout = sys.__stdout__  # Resetting stdout
+            status, termination_condition = self.network.optimize(
+                solver_name=self.solver
+            )
 
             if status != "ok":
                 log.error(f"Solver exited with {termination_condition}")
