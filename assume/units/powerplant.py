@@ -20,32 +20,6 @@ class PowerPlant(SupportsMinMax):
     A class for a powerplant unit.
 
     Attributes:
-        id (str): The ID of the unit.
-        unit_operator (str): The operator of the unit.
-        technology (str): The technology of the unit.
-        bidding_strategies (dict): The bidding strategies of the unit.
-        index (pandas.DatetimeIndex): The index of the unit.
-        max_power (float): The maximum power output capacity of the power plant in MW.
-        min_power (float, optional): The minimum power output capacity of the power plant in MW. Defaults to 0.0 MW.
-        efficiency (float, optional): The efficiency of the poewr plant in converting fuel to electricity (Defaults to 1.0). Defaults to 1.0.
-        fixed_cost (float, optional): The fixed operating cost of the power plant, independent of the power output (Defaults to 0.0 monetary units). Defaults to 0.0.
-        variable_cost (float | pd.Series, optional): The variable operating cost of the power plant, dependent on the power output (Defaults to 0.0 monetary units). Defaults to 0.0.
-        partial_load_eff (bool, optional): Does the efficiency varies at part loads? (Defaults to False). Defaults to False.
-        fuel_type (str, optional): The type of fuel used by the power plant for power generation (Defaults to "others"). Defaults to "others".
-        emission_factor (float, optional): The emission factor associated with the power plants fuel type -> CO2 emissions per unit of energy produced (Defaults to 0.0.). Defaults to 0.0.
-        ramp_up (float | None, optional): The ramp-up rate of the power plant, indicating how quickly it can increase power output (Defaults to -1). Defaults to None.
-        ramp_down (float | None, optional): The ramp-down rate of the power plant, indicating how quickly it can decrease power output. (Defaults to -1). Defaults to None.
-        hot_start_cost (float, optional): The cost of a hot start, where the power plant is restarted after a recent shutdown.(Defaults to 0 monetary units.). Defaults to 0.
-        warm_start_cost (float, optional): The cost of a warm start, where the power plant is restarted after a moderate downtime.(Defaults to 0 monetary units.). Defaults to 0.
-        cold_start_cost (float, optional): The cost of a cold start, where the power plant is restarted after a prolonged downtime.(Defaults to 0 monetary units.). Defaults to 0.
-        min_operating_time (float, optional): The minimum duration that the power plant must operate once started, in hours.(Defaults to 0 hours.). Defaults to 0.
-        min_down_time (float, optional): The minimum downtime required after a shutdown before the power plant can be restarted, in hours.(Defaults to 0 hours.). Defaults to 0.
-        downtime_hot_start (int, optional): The downtime required after a hot start before the power plant can be restarted, in hours.(Defaults to 8 hours.). Defaults to 8.
-        downtime_warm_start (int, optional): The downtime required after a warm start before the power plant can be restarted, in hours.( Defaults to 48 hours.). Defaults to 48.
-        heat_extraction (bool, optional): A boolean indicating whether the power plant can extract heat for external purposes.(Defaults to False.). Defaults to False.
-        max_heat_extraction (float, optional): The maximum amount of heat that the power plant can extract for external use, in some suitable unit.(Defaults to 0.). Defaults to 0.
-
-    Args:
         id (str): The ID of the storage unit.
         unit_operator (str): The operator of the unit.
         technology (str): The technology of the unit.
@@ -244,7 +218,7 @@ class PowerPlant(SupportsMinMax):
 
             self.outputs[product_type][start] = current_power
 
-        self.bidding_strategies[product_type].calculate_reward(
+        self.bidding_strategies[marketconfig.name].calculate_reward(
             unit=self,
             marketconfig=marketconfig,
             orderbook=orderbook,

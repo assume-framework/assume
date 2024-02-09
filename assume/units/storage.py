@@ -19,32 +19,6 @@ class Storage(SupportsMinMaxCharge):
     A class for a storage unit.
 
     Attributes:
-        max_power_charge (float): The maximum power input of the storage unit in MW (negative value).
-        min_power_charge (float): The minimum power input of the storage unit in MW (negative value).
-        max_power_discharge (float): The maximum power output of the storage unit in MW.
-        min_power_discharge (float): The minimum power output of the storage unit in MW.
-        max_volume (float): The maximum state of charge of the storage unit in MWh (equivalent to capacity).
-        min_volume (float): The minimum state of charge of the storage unit in MWh.
-        efficiency_charge (float): The efficiency of the storage unit while charging.
-        efficiency_discharge (float): The efficiency of the storage unit while discharging.
-        variable_cost_charge (float): Variable costs to charge the storage unit in €/MW.
-        variable_costs_discharge (float): Variable costs to discharge the storage unit in €/MW.
-        emission_factor (float): The emission factor of the storage unit.
-        ramp_up_charge (float): The ramp up rate of charging the storage unit in MW/15 minutes (negative value).
-        ramp_down_charge (float): The ramp down rate of charging the storage unit in MW/15 minutes (negative value).
-        ramp_up_discharge (float): The ramp up rate of discharging the storage unit in MW/15 minutes.
-        ramp_down_discharge (float): The ramp down rate of discharging the storage unit in MW/15 minutes.
-        fixed_cost (float): The fixed cost of the storage unit in €/MW. (related to capacity?)
-        hot_start_cost (float): The hot start cost of the storage unit in €/MW.
-        warm_start_cost (float): The warm start cost of the storage unit in €/MW.
-        cold_start_cost (float): The cold start cost of the storage unit in €/MW.
-        downtime_hot_start (float): Definition of downtime before hot start in h.
-        downtime_warm_start (float): Definition of downtime before warm start in h.
-        min_operating_time (float): The minimum operating time of the storage unit in hours.
-        min_down_time (float): The minimum down time of the storage unit in hours.
-        bidding_startegies (str): In case the unit is active it has to be defined which bidding strategy should be used.
-
-    Args:
         id (str): The ID of the storage unit.
         technology (str): The technology of the storage unit.
         node (str): The node of the storage unit.
