@@ -68,7 +68,7 @@ async def test_request_messages():
     index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 
     params_dict = {
-        "bidding_strategies": {"energy": NaiveStrategy()},
+        "bidding_strategies": {"EOM": NaiveStrategy()},
         "technology": "energy",
         "unit_operator": "test_operator",
         "max_power": 1000,

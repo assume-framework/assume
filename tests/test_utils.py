@@ -51,6 +51,7 @@ def test_make_market_config():
         ],
     )
     market_params = {
+        "name": "EOM",
         "operator": "EOM_operator",
         "product_type": "energy",
         "products": [{"duration": "1h", "count": 1, "first_delivery": "1h"}],

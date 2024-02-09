@@ -118,7 +118,7 @@ def test_flexable_neg_reserve(mock_market_config, power_plant):
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
     assert len(bids) == 1
     assert bids[0]["price"] == -30
-    assert bids[0]["volume"] == -300
+    assert bids[0]["volume"] == 300
 
     # Calculations for negative capacity
     mc.product_type = "capacity_neg"
@@ -135,7 +135,7 @@ def test_flexable_neg_reserve(mock_market_config, power_plant):
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
     assert len(bids) == 1
     assert bids[0]["price"] == 0
-    assert bids[0]["volume"] == -300
+    assert bids[0]["volume"] == 300
 
     # increase the marginal cost to ensure specific_revenue < 0
     power_plant.marginal_cost[start + pd.Timedelta(hours=1)] = 60
@@ -143,7 +143,7 @@ def test_flexable_neg_reserve(mock_market_config, power_plant):
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
     assert len(bids) == 1
     assert math.isclose(bids[0]["price"], 50 / 3)
-    assert bids[0]["volume"] == -300
+    assert bids[0]["volume"] == 300
 
 
 if __name__ == "__main__":

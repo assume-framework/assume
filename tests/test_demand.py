@@ -14,7 +14,7 @@ from assume.units.demand import Demand
 
 
 def test_demand():
-    strategies = {"energy": NaiveStrategy()}
+    strategies = {"EOM": NaiveStrategy()}
 
     index = pd.date_range(
         start=datetime(2023, 7, 1),
@@ -46,7 +46,7 @@ def test_demand():
     assert dem.calculate_marginal_cost(start, max_power.max()) == 2000
 
     mc = MarketConfig(
-        name="Test",
+        name="EOM",
         opening_hours=rr.rrule(rr.HOURLY),
         opening_duration=timedelta(hours=1),
         market_mechanism="not needed",
@@ -64,7 +64,7 @@ def test_demand():
 
 
 def test_demand_series():
-    strategies = {"energy": NaiveStrategy()}
+    strategies = {"EOM": NaiveStrategy()}
 
     index = pd.date_range(
         start=datetime(2023, 7, 1),
@@ -107,7 +107,7 @@ def test_demand_series():
     assert dem.calculate_marginal_cost(end, max_power) == 1000
 
     mc = MarketConfig(
-        name="Test",
+        name="EOM",
         opening_hours=rr.rrule(rr.HOURLY),
         opening_duration=timedelta(hours=1),
         market_mechanism="not needed",
