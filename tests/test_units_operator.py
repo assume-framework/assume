@@ -16,7 +16,7 @@ from mango.util.termination_detection import tasks_complete_or_sleeping
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
-from assume.strategies.naive_strategies import NaiveStrategy
+from assume.strategies.naive_strategies import NaiveEOMStrategy
 from assume.units.demand import Demand
 from assume.units.powerplant import PowerPlant
 
@@ -43,7 +43,7 @@ async def units_operator() -> UnitsOperator:
     index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 
     params_dict = {
-        "bidding_strategies": {"EOM": NaiveStrategy()},
+        "bidding_strategies": {"EOM": NaiveEOMStrategy()},
         "technology": "energy",
         "unit_operator": "test_operator",
         "max_power": 1000,

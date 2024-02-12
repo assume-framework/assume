@@ -167,7 +167,7 @@ def add_agent_to_world(
                     {
                         "min_power": 0,
                         "max_power": 100000,
-                        "bidding_strategies": {"energy": "naive"},
+                        "bidding_strategies": {"EOM": "naive"},
                         "technology": "demand",
                         "price": load["ValueOfLostLoad"],
                     },
@@ -206,7 +206,7 @@ def add_agent_to_world(
                     "efficiency_discharge": device["DischargingEfficiency"],
                     "initial_soc": initial_soc,
                     "max_volume": max_volume,
-                    "bidding_strategies": {"energy": "flexable_eom_storage"},
+                    "bidding_strategies": {"EOM": "flexable_eom_storage"},
                     "technology": "hydro",  # PSPP? Pump-Storage Power Plant
                     "emission_factor": 0,
                 },
@@ -273,7 +273,7 @@ def add_agent_to_world(
                         "min_power": 0,
                         "max_power": power,
                         "fixed_cost": markup,
-                        "bidding_strategies": {"energy": "naive"},
+                        "bidding_strategies": {"EOM": "naive"},
                         "technology": translate_fuel_type[prototype["FuelType"]],
                         "fuel_type": translate_fuel_type[prototype["FuelType"]],
                         "emission_factor": prototype["SpecificCo2EmissionsInTperMWH"],
@@ -314,7 +314,7 @@ def add_agent_to_world(
                 {
                     "min_power": 0,
                     "max_power": max_power,
-                    "bidding_strategies": {"energy": "naive"},
+                    "bidding_strategies": {"EOM": "naive"},
                     "technology": translate_fuel_type[attr["EnergyCarrier"]],
                     "fuel_type": translate_fuel_type[attr["EnergyCarrier"]],
                     "emission_factor": 0,

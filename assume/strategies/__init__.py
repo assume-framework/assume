@@ -14,15 +14,15 @@ from assume.strategies.flexable_storage import (
     flexablePosCRMStorage,
 )
 from assume.strategies.naive_strategies import (
-    NaiveDAStrategy,
+    NaiveDAMStrategy,
+    NaiveEOMStrategy,
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
-    NaiveStrategy,
 )
 
 bidding_strategies: dict[str, BaseStrategy] = {
-    "naive": NaiveStrategy,
-    "naive_da": NaiveDAStrategy,
+    "naive_eom": NaiveEOMStrategy,
+    "naive_dam": NaiveDAMStrategy,
     "naive_pos_reserve": NaivePosReserveStrategy,
     "naive_neg_reserve": NaiveNegReserveStrategy,
     "otc_strategy": OTCStrategy,

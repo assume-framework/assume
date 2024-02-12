@@ -6,7 +6,7 @@ from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 
 
-class NaiveStrategy(BaseStrategy):
+class NaiveEOMStrategy(BaseStrategy):
     """
     A naive strategy that bids the marginal cost of the unit on the market.
 
@@ -76,7 +76,7 @@ class NaiveStrategy(BaseStrategy):
         return bids
 
 
-class NaiveDAStrategy(BaseStrategy):
+class NaiveDAMStrategy(BaseStrategy):
     """
     A naive strategy that bids the marginal cost of the unit as block bids over 24 hours on the day ahead market.
     """
