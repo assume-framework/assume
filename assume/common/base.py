@@ -182,10 +182,8 @@ class BaseUnit:
             start = self.index[0]
         product_type_mc = product_type + "_marginal_costs"
         for t in self.outputs[product_type_mc][start:end].index:
-            mc = self.calculate_marginal_cost(
-                start, self.outputs[product_type].loc[start]
-            )
-            self.outputs[product_type_mc][t] = mc * self.outputs[product_type][start]
+            mc = self.calculate_marginal_cost(t, self.outputs[product_type].loc[t])
+            self.outputs[product_type_mc][t] = abs(mc * self.outputs[product_type][t])
 
     def execute_current_dispatch(
         self,
