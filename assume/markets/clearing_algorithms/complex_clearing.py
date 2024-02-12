@@ -166,7 +166,7 @@ def market_clearing_opt(
     solver = SolverFactory(solvers[0])
 
     if solver.name == "gurobi":
-        options = {"cutoff": -1.0, "eps": EPS}
+        options = {"cutoff": -1.0, "MIPGap": EPS}
     elif solver.name == "cplex":
         options = {
             "mip.tolerances.lowercutoff": -1.0,

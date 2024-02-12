@@ -45,7 +45,7 @@ def base_unit() -> BaseUnit:
         id="test_pp",
         unit_operator="test_operator",
         technology="base",
-        bidding_strategies={"energy": BasicStrategy()},
+        bidding_strategies={"EOM": BasicStrategy()},
         index=index,
     )
 
