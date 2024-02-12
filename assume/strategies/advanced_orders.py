@@ -181,6 +181,8 @@ class flexableEOMBlock(BaseStrategy):
             }
         )
 
+        bids = self.remove_empty_bids(bids)
+
         return bids
 
     def calculate_reward(
@@ -371,6 +373,8 @@ class flexableEOMLinked(BaseStrategy):
                 "bid_id": block_id,
             }
         )
+
+        bids = self.remove_empty_bids(bids)
 
         return bids
 

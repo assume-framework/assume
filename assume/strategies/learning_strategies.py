@@ -174,6 +174,8 @@ class RLStrategy(LearningStrategy):
         unit.outputs["rl_actions"][start] = actions
         unit.outputs["rl_exploration_noise"][start] = noise
 
+        bids = self.remove_empty_bids(bids)
+
         return bids
 
     def get_actions(self, next_observation):

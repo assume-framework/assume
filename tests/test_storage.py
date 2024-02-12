@@ -374,10 +374,11 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     storage_unit.outputs["soc"][start] = 0.5
 
     bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
-    bids[0]["accepted_volume"] = bids[0]["volume"]
+    assert len(bids) == 0
 
     # dispatch full discharge
     storage_unit.set_dispatch_plan(mc, bids)
+    storage_unit.execute_current_dispatch(start, end)
 
     assert storage_unit.outputs["energy"][start] == 100
     assert math.isclose(
@@ -389,6 +390,8 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     storage_unit.outputs["soc"][start] = 0.5
 
     storage_unit.set_dispatch_plan(mc, bids)
+    storage_unit.execute_current_dispatch(start, end)
+
     assert storage_unit.outputs["energy"][start] == -100
     assert math.isclose(
         storage_unit.outputs["soc"][end],
@@ -399,6 +402,8 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     storage_unit.outputs["soc"][start] = 0.05
 
     storage_unit.set_dispatch_plan(mc, bids)
+    storage_unit.execute_current_dispatch(start, end)
+
     assert math.isclose(
         storage_unit.outputs["energy"][start],
         50 * storage_unit.efficiency_discharge,
@@ -409,6 +414,8 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     storage_unit.outputs["soc"][start] = 0.95
 
     storage_unit.set_dispatch_plan(mc, bids)
+    storage_unit.execute_current_dispatch(start, end)
+
     assert math.isclose(
         storage_unit.outputs["energy"][start],
         -50 / storage_unit.efficiency_charge,
@@ -422,10 +429,13 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     product_tuples = [(start, end, None)]
 
     bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
-    bids[0]["accepted_volume"] = bids[0]["volume"]
+    assert len(bids) == 0
 
     storage_unit.outputs["energy"][start] = -100
+
     storage_unit.set_dispatch_plan(mc, bids)
+    storage_unit.execute_current_dispatch(start, end)
+
     assert storage_unit.outputs["energy"][start] == 0
     assert math.isclose(storage_unit.outputs["soc"][end], 1, abs_tol=0.001)
 

@@ -255,6 +255,8 @@ class RLAdvancedOrderStrategy(LearningStrategy):
                 }
             )
 
+        bids = self.remove_empty_bids(bids)
+
         return bids
 
     def get_actions(self, next_observation):

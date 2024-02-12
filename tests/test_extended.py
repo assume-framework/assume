@@ -61,8 +61,11 @@ def test_otc_strategy_scaled(scale, mock_supports_minmax):
 
     power = 400 * scale
 
-    assert bids[0]["price"] == 3
-    assert bids[0]["volume"] == power
+    if power != 0:
+        assert bids[0]["price"] == 3
+        assert bids[0]["volume"] == power
+    else:
+        assert len(bids) == 0
 
 
 if __name__ == "__main__":
