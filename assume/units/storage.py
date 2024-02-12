@@ -291,7 +291,7 @@ class Storage(SupportsMinMaxCharge):
 
             self.outputs["soc"][start + self.index.freq :] = soc + delta_soc
 
-        self.bidding_strategies[product_type].calculate_reward(
+        self.bidding_strategies[marketconfig.name].calculate_reward(
             unit=self,
             marketconfig=marketconfig,
             orderbook=orderbook,
