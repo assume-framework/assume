@@ -489,7 +489,7 @@ class UnitsOperator(Role):
         for unit_id, unit in self.units.items():
             # rl only for energy market for now!
             if isinstance(
-                unit.bidding_strategies.get(marketconfig.product_type),
+                unit.bidding_strategies.get(marketconfig.name),
                 (RLAdvancedOrderStrategy),
             ):
                 # TODO: check whether to split the reward, profit and regret to different lines
@@ -510,7 +510,7 @@ class UnitsOperator(Role):
                 output_agent_list.append(output_dict)
 
             elif isinstance(
-                unit.bidding_strategies.get(marketconfig.product_type),
+                unit.bidding_strategies.get(marketconfig.name),
                 LearningStrategy,
             ):
                 output_dict = {
@@ -583,7 +583,7 @@ class UnitsOperator(Role):
         for unit in self.units.values():
             # rl only for energy market for now!
             if isinstance(
-                unit.bidding_strategies.get(marketconfig.product_type),
+                unit.bidding_strategies.get(marketconfig.name),
                 (RLAdvancedOrderStrategy),
             ):
                 all_observations[i, :] = unit.outputs["rl_observations"][start]
@@ -592,7 +592,7 @@ class UnitsOperator(Role):
                 i += 1
 
             elif isinstance(
-                unit.bidding_strategies.get(marketconfig.product_type),
+                unit.bidding_strategies.get(marketconfig.name),
                 LearningStrategy,
             ):
                 all_observations[i, :] = unit.outputs["rl_observations"][start]
@@ -635,7 +635,7 @@ class UnitsOperator(Role):
         products_index = get_products_index(orderbook)
 
         for unit in self.units.values():
-            bidding_strategy = unit.bidding_strategies.get(marketconfig.product_type)
+            bidding_strategy = unit.bidding_strategies.get(marketconfig.name)
             if isinstance(bidding_strategy, LearningStrategy):
                 learning_strategies.append(bidding_strategy)
                 # should be the same across all strategies

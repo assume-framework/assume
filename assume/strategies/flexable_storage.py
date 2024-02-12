@@ -199,10 +199,11 @@ class flexableEOMStorage(BaseStrategy):
             costs = pd.Series(float(unit.fixed_cost), index=index)
             for start in index:
                 if unit.outputs[product_type][start] != 0:
-                    costs[start] += unit.outputs[product_type][
-                        start
-                    ] * unit.calculate_marginal_cost(
-                        start, unit.outputs[product_type][start]
+                    costs[start] += abs(
+                        unit.outputs[product_type][start]
+                        * unit.calculate_marginal_cost(
+                            start, unit.outputs[product_type][start]
+                        )
                     )
 
             unit.outputs["profit"][index] = (
@@ -405,11 +406,13 @@ class flexableNegCRMStorage(BaseStrategy):
         for product in product_tuples:
             start = product[0]
             current_power = unit.outputs["energy"].at[start]
-            bid_quantity = unit.calculate_ramp_charge(
-                theoretic_SOC,
-                previous_power,
-                max_power_charge[start],
-                current_power,
+            bid_quantity = abs(
+                unit.calculate_ramp_charge(
+                    theoretic_SOC,
+                    previous_power,
+                    max_power_charge[start],
+                    current_power,
+                )
             )
 
             # if bid_quantity >= min_bid_volume  --> not checked here

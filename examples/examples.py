@@ -23,7 +23,7 @@ availabe_examples = {
         "study_case": "dam_with_complex_clearing",
     },
     "small_with_BB_and_LB": {
-        "scenario": "example_01e",
+        "scenario": "example_01d",
         "study_case": "dam_with_complex_clearing",
     },
     "small_with_vre": {"scenario": "example_01b", "study_case": "base"},
@@ -82,6 +82,11 @@ if __name__ == "__main__":
         scenario=availabe_examples[example]["scenario"],
         study_case=availabe_examples[example]["study_case"],
     )
+
+    # to add custom bidding strategies, you need to import them
+    # and add them to the world as follows:
+    # from custom_bidding_strategy import CustomBiddingStrategy
+    # world.bidding_strategies["custom_bidding_strategy"] = CustomBiddingStrategy
 
     # to add a custom unit type, you need to import it
     # and add it to the world as follows:

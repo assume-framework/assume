@@ -213,14 +213,14 @@ def test_flexable_neg_crm_storage(mock_market_config, storage):
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     assert len(bids) == 1
     assert math.isclose(bids[0]["price"], 0)
-    assert bids[0]["volume"] == -60
+    assert bids[0]["volume"] == 60
 
     # assert capacity_pos
     mc.product_type = "capacity_neg"
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     assert len(bids) == 1
     assert math.isclose(bids[0]["price"], 0)
-    assert bids[0]["volume"] == -60
+    assert bids[0]["volume"] == 60
 
     # was charging before
     storage.outputs["energy"][start] = 60
