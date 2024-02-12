@@ -208,7 +208,7 @@ class CsvForecaster(Forecaster):
             if f"price_{market_id}" not in self.forecasts.columns:
                 self.forecasts[
                     f"price_{market_id}"
-                ] = self.calculate_EOM_price_forecast(market_id=market_id)
+                ] = self.calculate_market_price_forecast(market_id=market_id)
 
             if f"residual_load_{market_id}" not in self.forecasts.columns:
                 self.forecasts[
@@ -271,7 +271,7 @@ class CsvForecaster(Forecaster):
 
         return res_demand_df
 
-    def calculate_EOM_price_forecast(self, market_id):
+    def calculate_market_price_forecast(self, market_id):
         """
         Calculates the merit order price forecast for the entire time horizon at once.
 

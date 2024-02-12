@@ -195,7 +195,9 @@ def test_clear_empty_bids(base_unit, mock_market_config):
             }
         )
     assert (
-        base_unit.bidding_strategies[mock_market_config.market_id].remove_empty_bids(bids)
+        base_unit.bidding_strategies[mock_market_config.market_id].remove_empty_bids(
+            bids
+        )
         == []
     )
 

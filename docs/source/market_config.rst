@@ -12,7 +12,7 @@ A full list of configurations and explanation is given here.
  ============================= =====================================================
   market config item            description
  ============================= =====================================================
-  market_id                          string name
+  market_id                     string name
   product_type                  energy or capacity or heat
   market_products               list of available products to be traded
   opening_hours                 recurrence rule of openings
