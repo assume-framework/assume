@@ -9,7 +9,7 @@ from operator import itemgetter
 import pyomo.environ as pyo
 from pyomo.opt import SolverFactory, TerminationCondition, check_available_solvers
 
-from assume.common.market_objects import MarketConfig, Orderbook
+from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)
@@ -18,7 +18,9 @@ SOLVERS = ["gurobi", "glpk"]
 EPS = 1e-4
 
 
-def market_clearing_opt(orders, market_products, mode, with_linked_bids):
+def market_clearing_opt(
+    orders: Orderbook, market_products: list[MarketProduct], mode: str, with_linked_bids
+):
     """
     Sets up and solves the market clearing optimization problem.
 
@@ -29,7 +31,7 @@ def market_clearing_opt(orders, market_products, mode, with_linked_bids):
         with_linked_bids (bool): Whether the market clearing should include linked bids.
 
     Returns:
-        tuple[pyomo.ConcreteModel, pyomo.opt.results.SolverResults]: The solved pyomo model and the solver results
+        tuple[pyomo.core.base.PyomoModel.ConcreteModel, pyomo.opt.results.SolverResults]: The solved pyomo model and the solver results
 
     Notes:
         The problem is formulated as a mixed-integer linear program (MILP) and solved using the pyomo package.
@@ -200,7 +202,7 @@ class ComplexClearingRole(MarketRole):
 
     The complex market is a pay-as-clear market with more complex bid structures, including minimum acceptance ratios, bid types, and profiled volumes.
 
-    Parameters:
+    Attributes:
         marketconfig (MarketConfig): The market configuration.
 
     Args:
@@ -245,7 +247,7 @@ class ComplexClearingRole(MarketRole):
                 ), f"max_volume {order['volume']}"
 
     def clear(
-        self, orderbook: Orderbook, market_products
+        self, orderbook: Orderbook, market_products: list[MarketProduct]
     ) -> (Orderbook, Orderbook, list[dict]):
         """
         Implements pay-as-clear with more complex bid structures, including acceptance ratios, bid types, and profiled volumes.
@@ -359,14 +361,19 @@ class ComplexClearingRole(MarketRole):
         )
 
 
-def calculate_order_surplus(order, market_clearing_prices, instance, children):
+def calculate_order_surplus(
+    order: dict,
+    market_clearing_prices: dict,
+    instance: pyo.ConcreteModel,
+    children: list[dict],
+):
     """
     Calculates the surplus of an order given the market clearing prices and results of the market clearing.
 
     Args:
         order (dict): The order
         market_clearing_prices (dict): The market clearing prices.
-        instance (pyomo.ConcreteModel): The solved pyomo model containing the results of the market clearing.
+        instance (pyomo.core.base.PyomoModel.ConcreteModel): The solved pyomo model containing the results of the market clearing.
         children (list[dict]): The linked child bids of the given order.
 
     Returns:
@@ -422,19 +429,19 @@ def calculate_order_surplus(order, market_clearing_prices, instance, children):
 
 
 def extract_results(
-    model,
-    orders,
-    rejected_orders,
-    market_products,
-    market_clearing_prices,
+    model: pyo.ConcreteModel,
+    orders: Orderbook,
+    rejected_orders: Orderbook,
+    market_products: list[MarketProduct],
+    market_clearing_prices: dict,
 ):
     """
     Extracts the results of the market clearing from the solved pyomo model.
 
     Args:
-        model (pyomo.ConcreteModel): The solved pyomo model containing the results of the market clearing
-        orders (list[dict]): List of the orders
-        rejected_orders (list[dict]): List of the rejected orders
+        model (pyomo.core.base.PyomoModel.ConcreteModel): The solved pyomo model containing the results of the market clearing
+        orders (Orderbook): List of the orders
+        rejected_orders (Orderbook): List of the rejected orders
         market_products (list[MarketProduct]): The products to be traded
         market_clearing_prices (dict): The market clearing prices
 

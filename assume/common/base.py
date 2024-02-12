@@ -20,12 +20,12 @@ class BaseUnit:
     """
     A base class for a unit. This class is used as a foundation for all units.
 
-    Parameters:
+    Attributes:
         id (str): The ID of the unit.
         unit_operator (str): The operator of the unit.
         technology (str): The technology of the unit.
         bidding_strategies (dict[str, BaseStrategy]): The bidding strategies of the unit.
-        index (pd.DatetimeIndex): The index of the unit.
+        index (pandas.DatetimeIndex): The index of the unit.
         node (str, optional): The node of the unit. Defaults to "".
         forecaster (Forecaster, optional): The forecast of the unit. Defaults to None.
         **kwargs: Additional keyword arguments.
@@ -35,7 +35,7 @@ class BaseUnit:
         unit_operator (str): The operator of the unit.
         technology (str): The technology of the unit.
         bidding_strategies (dict[str, BaseStrategy]): The bidding strategies of the unit.
-        index (pd.DatetimeIndex): The index of the unit.
+        index (pandas.DatetimeIndex): The index of the unit.
         node (str, optional): The node of the unit. Defaults to "".
         forecaster (Forecaster, optional): The forecast of the unit. Defaults to None.
         location (tuple[float, float], optional): The location of the unit. Defaults to (0.0, 0.0).
@@ -121,7 +121,7 @@ class BaseUnit:
         Calculates the marginal cost for the given power.
 
         Args:
-            start (pd.Timestamp): The start time of the dispatch.
+            start (pandas.Timestamp): The start time of the dispatch.
             power (float): The power output of the unit.
 
         Returns:
@@ -285,7 +285,7 @@ class BaseUnit:
         Calculates the marginal cost for the given power.
 
         Args:
-            start (pd.Timestamp): The start time of the dispatch.
+            start (pandas.Timestamp): The start time of the dispatch.
             power (float): The power output of the unit.
 
         Returns:
@@ -298,19 +298,6 @@ class SupportsMinMax(BaseUnit):
     """
     Base class used for units supporting continuous dispatch and without energy storage.
     This class is best to be used as foundation for classes of power plants and similar units.
-
-    Parameters:
-        min_power (float): The minimum power output of the unit.
-        max_power (float): The maximum power output of the unit.
-        ramp_down (float): How much power can be decreased in one time step.
-        ramp_up (float): How much power can be increased in one time step.
-        efficiency (float): The efficiency of the unit.
-        emission_factor (float): The emission factor of the unit.
-        min_operating_time (int): The minimum time the unit has to be on.
-        min_down_time (int): The minimum time the unit has to be off.
-
-    Methods
-    -------
     """
 
     min_power: float
@@ -329,12 +316,12 @@ class SupportsMinMax(BaseUnit):
         Calculates the min and max power for the given time period.
 
         Args:
-            start (pd.Timestamp): The start time of the dispatch.
-            end (pd.Timestamp): The end time of the dispatch.
+            start (pandas.Timestamp): The start time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch.
             product_type (str): The product type of the unit.
 
         Returns:
-            tuple[pd.Series, pd.Series]: The min and max power for the given time period.
+            tuple[pandas.Series, pandas.Series]: The min and max power for the given time period.
         """
         pass
 
@@ -390,7 +377,7 @@ class SupportsMinMax(BaseUnit):
         Returns the clean spread for the given prices.
 
         Args:
-            prices (pd.DataFrame): The prices.
+            prices (pandas.DataFrame): The prices.
 
         Returns:
             float: The clean spread for the given prices.
@@ -509,22 +496,6 @@ class SupportsMinMaxCharge(BaseUnit):
     """
     Base Class used for units with energy storage.
 
-    Parameters:
-        initial_soc (float): The initial state of charge of the storage.
-        min_power_charge (float): How much power must be charged at least in one time step.
-        max_power_charge (float): How much power can be charged at most in one time step.
-        min_power_discharge (float): How much power must be discharged at least in one time step.
-        max_power_discharge (float): How much power can be discharged at most in one time step.
-        ramp_up_discharge (float): How much power can be increased in discharging in one time step.
-        ramp_down_discharge (float): How much power can be decreased in discharging in one time step.
-        ramp_up_charge (float): How much power can be increased in charging in one time step.
-        ramp_down_charge (float): How much power can be decreased in charging in one time step.
-        max_volume (float): The maximum volume of the storage.
-        efficiency_charge (float): The efficiency of charging.
-        efficiency_discharge (float): The efficiency of discharging.
-
-    Methods
-    -------
     """
 
     initial_soc: float
@@ -547,12 +518,12 @@ class SupportsMinMaxCharge(BaseUnit):
         Calculates the min and max charging power for the given time period.
 
         Args:
-            start (pd.Timestamp): The start time of the dispatch.
-            end (pd.Timestamp): The end time of the dispatch.
+            start (pandas.Timestamp): The start time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch.
             product_type (str, optional): The product type of the unit. Defaults to "energy".
 
         Returns:
-            tuple[pd.Series, pd.Series]: The min and max charging power for the given time period.
+            tuple[pandas.Series, pandas.Series]: The min and max charging power for the given time period.
         """
         pass
 
@@ -563,12 +534,12 @@ class SupportsMinMaxCharge(BaseUnit):
         Calculates the min and max discharging power for the given time period.
 
         Args:
-            start (pd.Timestamp): The start time of the dispatch.
-            end (pd.Timestamp): The end time of the dispatch.
+            start (pandas.Timestamp): The start time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch.
             product_type (str, optional): The product type of the unit. Defaults to "energy".
 
         Returns:
-            tuple[pd.Series, pd.Series]: The min and max discharging power for the given time period.
+            tuple[pandas.Series, pandas.Series]: The min and max discharging power for the given time period.
         """
         pass
 
@@ -594,7 +565,7 @@ class SupportsMinMaxCharge(BaseUnit):
         Returns the clean spread for the given prices.
 
         Args:
-            prices (pd.DataFrame): The prices.
+            prices (pandas.DataFrame): The prices.
 
         Returns:
             float: The clean spread for the given prices.
@@ -742,7 +713,7 @@ class LearningStrategy(BaseStrategy):
     """
     A strategy which provides learning functionality, has a method to calculate the reward.
 
-    Parameters:
+    Attributes:
         obs_dim (int): The observation dimension.
         act_dim (int): The action dimension.
 
@@ -750,9 +721,6 @@ class LearningStrategy(BaseStrategy):
         *args (list): The arguments.
         **kwargs (dict): The keyword arguments.
     """
-
-    obs_dim: int
-    act_dim: int
 
     def __init__(self, *args, **kwargs):
         """
@@ -766,27 +734,6 @@ class LearningStrategy(BaseStrategy):
 class LearningConfig(TypedDict):
     """
     A class for the learning configuration.
-
-    Parameters:
-        observation_dimension (int): The observation dimension.
-        action_dimension (int): The action dimension.
-        continue_learning (bool): Whether to continue learning.
-        max_bid_price (float): The maximum bid price.
-        learning_mode (bool): Whether to use learning mode.
-        algorithm (str): The algorithm to use.
-        learning_rate (float): The learning rate.
-        training_episodes (int): The number of training episodes.
-        episodes_collecting_initial_experience (int): The number of episodes collecting initial experience.
-        train_freq (int): The training frequency.
-        gradient_steps (int): The number of gradient steps.
-        batch_size (int): The batch size.
-        gamma (float): The discount factor.
-        device (str): The device to use.
-        noise_sigma (float): The standard deviation of the noise.
-        noise_scale (int): Controls the initial strength of the noise.
-        noise_dt (int): Determines how quickly the noise weakens over time.
-        trained_policies_save_path (str): The path to the learned model to save.
-        trained_policies_load_path (str): The path to the learned model to load.
     """
 
     observation_dimension: int

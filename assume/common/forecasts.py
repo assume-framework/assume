@@ -15,11 +15,11 @@ class Forecaster:
     to retrieve forecasts for specific columns, availability of units, and prices of fuel types, returning
     the corresponding timeseries as pandas Series.
 
-    Parameters:
-        index (pd.Series): The index of the forecasts.
+    Attributes:
+        index (pandas.Series): The index of the forecasts.
 
     Args:
-        index (pd.Series): The index of the forecasts.
+        index (pandas.Series): The index of the forecasts.
 
     Example:
         >>> forecaster = Forecaster(index=pd.Series([1, 2, 3]))
@@ -90,13 +90,13 @@ class CsvForecaster(Forecaster):
     It initializes with the provided index. It includes methods to retrieve forecasts for specific columns,
     availability of units, and prices of fuel types, returning the corresponding timeseries as pandas Series.
 
-    Parameters:
-        index (pd.Series): The index of the forecasts.
-        powerplants (dict[str, pd.Series]): The power plants.
+    Attributes:
+        index (pandas.Series): The index of the forecasts.
+        powerplants (dict[str, pandas.Series]): The power plants.
 
     Args:
-        index (pd.Series): The index of the forecasts.
-        powerplants (dict[str, pd.Series]): The power plants.
+        index (pandas.Series): The index of the forecasts.
+        powerplants (dict[str, pandas.Series]): The power plants.
 
     Example:
         >>> forecaster = CsvForecaster(index=pd.Series([1, 2, 3]))
@@ -216,7 +216,7 @@ class CsvForecaster(Forecaster):
         )
         return self.powerplants
 
-    def calculate_residual_demand_forecast(self):
+    def calculate_residual_demand_forecast(self) -> pd.Series:
         """
         This method calculates the residual demand forecast by subtracting the total available power from renewable energy (VRE) power plants from the overall demand forecast for each time step.
 
@@ -224,11 +224,10 @@ class CsvForecaster(Forecaster):
             pd.Series: The residual demand forecast.
 
         Notes:
-        1. Selects VRE power plants (wind_onshore, wind_offshore, solar) from the powerplants data.
-        2. Creates a DataFrame, vre_feed_in_df, with columns representing VRE power plants and initializes it with zeros.
-        3. Calculates the power feed-in for each VRE power plant based on its availability and maximum power.
-        4. Calculates the residual demand by subtracting the total VRE power feed-in from the overall demand forecast.
-
+            1. Selects VRE power plants (wind_onshore, wind_offshore, solar) from the powerplants data.
+            2. Creates a DataFrame, vre_feed_in_df, with columns representing VRE power plants and initializes it with zeros.
+            3. Calculates the power feed-in for each VRE power plant based on its availability and maximum power.
+            4. Calculates the residual demand by subtracting the total VRE power feed-in from the overall demand forecast.
         """
 
         vre_powerplants = self.powerplants[
@@ -296,7 +295,7 @@ class CsvForecaster(Forecaster):
 
         return price_forecast
 
-    def calculate_marginal_cost(self, pp_series: pd.Series):
+    def calculate_marginal_cost(self, pp_series: pd.Series) -> pd.Series:
         """
         Calculates time series of marginal costs for a power plant.
 
@@ -306,18 +305,17 @@ class CsvForecaster(Forecaster):
         - Fixed costs, if specified for the power plant.
 
         Args:
-            pp_series (pd.Series): Series containing power plant data.
+            pp_series (pandas.Series): Series containing power plant data.
 
         Returns:
-            pd.Series: The marginal cost of the power plant.
+            pandas.Series: The marginal cost of the power plant.
 
         Notes:
-        1. Determines the fuel price based on the fuel type of the power plant.
-        2. Calculates the fuel cost by dividing the fuel price by the efficiency of the power plant.
-        3. Calculates the emissions cost based on the CO2 price and emission factor, adjusted by the efficiency of the power plant.
-        4. Considers any fixed costs specified for the power plant.
-        5. Aggregates the fuel cost, emissions cost, and fixed cost to obtain the marginal cost of the power plant.
-
+            1. Determines the fuel price based on the fuel type of the power plant.
+            2. Calculates the fuel cost by dividing the fuel price by the efficiency of the power plant.
+            3. Calculates the emissions cost based on the CO2 price and emission factor, adjusted by the efficiency of the power plant.
+            4. Considers any fixed costs specified for the power plant.
+            5. Aggregates the fuel cost, emissions cost, and fixed cost to obtain the marginal cost of the power plant.
         """
 
         fp_column = f"fuel_price_{pp_series.fuel_type}"
@@ -365,14 +363,14 @@ class RandomForecaster(CsvForecaster):
     from the `CsvForecaster` class and initializes with the provided index, power plants, and
     standard deviation of the noise.
 
-    Parameters:
-        index (pd.Series): The index of the forecasts.
-        powerplants (dict[str, pd.Series]): The power plants.
+    Attributes:
+        index (pandas.Series): The index of the forecasts.
+        powerplants (dict[str, pandas.Series]): The power plants.
         sigma (float): The standard deviation of the noise.
 
     Args:
-        index (pd.Series): The index of the forecasts.
-        powerplants (dict[str, pd.Series]): The power plants.
+        index (pandas.Series): The index of the forecasts.
+        powerplants (dict[str, pandas.Series]): The power plants.
         sigma (float): The standard deviation of the noise.
 
     Example:
@@ -425,8 +423,8 @@ class NaiveForecast(Forecaster):
     provided index. If the optional parameters are lists, they are converted to pandas Series with
     the provided index and the corresponding values.
 
-    Parameters:
-        index (pd.Series): The index of the forecasts.
+    Attributes:
+        index (pandas.Series): The index of the forecasts.
         availability (float | list, optional): The availability of the power plants.
         fuel_price (float | list, optional): The fuel price.
         co2_price (float | list, optional): The CO2 price.
@@ -434,7 +432,7 @@ class NaiveForecast(Forecaster):
         price_forecast (float | list, optional): The price forecast.
 
     Args:
-        index (pd.Series): The index of the forecasts.
+        index (pandas.Series): The index of the forecasts.
         availability (float | list, optional): The availability of the power plants.
         fuel_price (float | list, optional): The fuel price.
         co2_price (float | list, optional): The CO2 price.

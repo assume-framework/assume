@@ -181,7 +181,7 @@ async def test_market_for_BB(market_role: MarketRole):
     market_role.marketconfig.maximum_bid_volume = 9090
 
     end = start + rd(hours=24)
-    time_range = pd.date_range(start, end - pd.Timedelta("1H"), freq="1H")
+    time_range = pd.date_range(start, end - pd.Timedelta("1h"), freq="1h")
     market_role.open_auctions |= {
         (time, time + rd(hours=1), None) for time in time_range
     }

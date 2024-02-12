@@ -13,12 +13,12 @@ class Demand(SupportsMinMax):
     """
     A demand unit.
 
-    Parameters:
+    Attributes:
         id (str): The unique identifier of the unit.
-        index (pd.DatetimeIndex): The index of the unit.
+        index (pandas.DatetimeIndex): The index of the unit.
         max_power (float): The maximum power output capacity of the power plant in MW.
         min_power (float): The minimum power output capacity of the power plant in MW.
-        volume (pd.Series): The volume of the unit.
+        volume (pandas.Series): The volume of the unit.
         price (float): The price of the unit.
         forecaster (Forecaster): The forecaster of the unit.
 
@@ -27,7 +27,7 @@ class Demand(SupportsMinMax):
         unit_operator (str): The operator of the unit.
         technology (str): The technology of the unit.
         bidding_strategies (dict): The bidding strategies of the unit.
-        index (pd.DatetimeIndex): The index of the unit.
+        index (pandas.DatetimeIndex): The index of the unit.
         max_power (float): The maximum power output capacity of the power plant in MW.
         min_power (float, optional): The minimum power output capacity of the power plant in MW. Defaults to 0.0 MW.
         node (str, optional): The node of the unit. Defaults to "bus0".
@@ -86,8 +86,8 @@ class Demand(SupportsMinMax):
         Returns the volume of the unit within the given time range.
 
         Args:
-            start (pd.Timestamp): The start time of the dispatch.
-            end (pd.Timestamp): The end time of the dispatch.
+            start (pandas.Timestamp): The start time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch.
 
         Returns:
             pd.Series: The volume of the unit within the gicen time range.
@@ -102,11 +102,11 @@ class Demand(SupportsMinMax):
         Calculates the minimum and maximum power output of the unit and returns the bid volume as both the minimum and maximum power output of the unit.
 
         Args:
-            start (pd.Timestamp): The start time of the dispatch.
-            end (pd.Timestamp): The end time of the dispatch.
+            start (pandas.Timestamp): The start time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch.
 
         Returns:
-            tuple[pd.Series, pd.Series]: The bid colume as both the minimum and maximum power output of the unit.
+            tuple[pandas.Series, pandas.Series]: The bid colume as both the minimum and maximum power output of the unit.
         """
         end_excl = end - self.index.freq
         bid_volume = (self.volume - self.outputs[product_type]).loc[start:end_excl]
@@ -117,7 +117,7 @@ class Demand(SupportsMinMax):
         Calculate the marginal cost of the unit returns the marginal cost of the unit based on the provided time and power.
 
         Args:
-            start (pd.Timestamp): The start time of the dispatch.
+            start (pandas.Timestamp): The start time of the dispatch.
             power (float): The power output of the unit.
 
         Returns:

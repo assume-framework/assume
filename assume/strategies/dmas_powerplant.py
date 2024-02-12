@@ -100,9 +100,9 @@ class DmasPowerplantStrategy(BaseStrategy):
             unit (SupportsMinMax): Unit to optimize.
             start (datetime.datetime): Start time.
             hour_count (int): Number of hours to optimize.
-            emission_prices (np.array): Emission prices.
-            fuel_prices (np.array): Fuel prices.
-            power_prices (np.array): Power prices.
+            emission_prices (numpy.ndarray): Emission prices.
+            fuel_prices (numpy.ndarray): Fuel prices.
+            power_prices (numpy.ndarray): Power prices.
             runtime (int, optional): Runtime of the unit. Defaults to None.
             p0 (float, optional): Initial power. Defaults to None.
 
@@ -237,9 +237,9 @@ class DmasPowerplantStrategy(BaseStrategy):
 
         Args:
             unit(SupportsMinMax): unit to optimize
-            emission_prices(np.array): emission prices
-            fuel_prices(np.array): fuel prices
-            power_prices(np.array): power prices
+            emission_prices(numpy.ndarray): emission prices
+            fuel_prices(numpy.ndarray): fuel prices
+            power_prices(numpy.ndarray): power prices
             start(datetime.datetime): start time
             step(int): step
             hour_count(int): number of hours to optimize
@@ -431,9 +431,9 @@ class DmasPowerplantStrategy(BaseStrategy):
         Args:
           unit(SupportsMinMax): unit to optimize
           start(datetime.datetime): start time
-          committed_power(np.array): committed power
+          committed_power(numpy.ndarray): committed power
           hour_count(int): number of hours to optimize
-          power_prices(np.array): power prices
+          power_prices(numpy.ndarray): power prices
 
         Returns:
           np.array: generation

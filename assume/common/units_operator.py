@@ -34,7 +34,7 @@ class UnitsOperator(Role):
     The UnitsOperator is the agent that manages the units.
     It receives the opening hours of the market and sends back the bids for the market.
 
-    Parameters:
+    Attributes:
         available_markets (list[MarketConfig]): The available markets.
         registered_markets (dict[str, MarketConfig]): The registered markets.
         last_sent_dispatch (int): The last sent dispatch.
@@ -475,7 +475,7 @@ class UnitsOperator(Role):
         Sends the current rl_strategy update to the output agent.
 
         Args:
-            products_index (pd.DatetimeIndex): The index of all products.
+            products_index (pandas.DatetimeIndex): The index of all products.
             marketconfig (MarketConfig): The market configuration.
         """
         try:
@@ -561,7 +561,7 @@ class UnitsOperator(Role):
         Writes learning results to the learning agent.
 
         Args:
-            products_index (pd.DatetimeIndex): The index of all products.
+            products_index (pandas.DatetimeIndex): The index of all products.
             marketconfig (MarketConfig): The market configuration.
             obs_dim (int): The observation dimension.
             act_dim (int): The action dimension.
