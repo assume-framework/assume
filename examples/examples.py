@@ -49,7 +49,7 @@ availabe_examples = {
         "study_case": "dam_case_2019",
     },
     "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
-    "network_clear": {
+    "small_redispatch": {
         "scenario": "example_01d",
         "study_case": "base",
     },
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     - timescale: with database and grafana (note: you need docker installed)
     """
     data_format = "local_db"  # "local_db" or "timescale"
-    example = "network_clear"
+    example = "small_redispatch"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
