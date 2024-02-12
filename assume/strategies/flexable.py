@@ -153,6 +153,8 @@ class flexableEOM(BaseStrategy):
             previous_power = bid_quantity_inflex + bid_quantity_flex + current_power
             op_time = max(op_time, 0) + 1 if previous_power > 0 else min(op_time, 0) - 1
 
+        bids = self.remove_empty_bids(bids)
+
         return bids
 
     def calculate_reward(
@@ -280,6 +282,8 @@ class flexablePosCRM(BaseStrategy):
             )
             previous_power = bid_quantity + current_power
 
+        bids = self.remove_empty_bids(bids)
+
         return bids
 
 
@@ -386,6 +390,8 @@ class flexableNegCRM(BaseStrategy):
                 }
             )
             previous_power = current_power + bid_quantity
+
+        bids = self.remove_empty_bids(bids)
 
         return bids
 

@@ -708,6 +708,30 @@ class BaseStrategy:
         """
         pass
 
+    def remove_empty_bids(self, bids: list) -> list:
+        """
+        Removes empty bids from the orderbook. Use this method to clean the bids before submitting
+        them to the market to speed up the market clearing process, and if zero volume bids are not
+        required for the specific market.
+
+        Args:
+            bids (list): The bids.
+
+        Returns:
+            list: The cleaned bids.
+        """
+
+        cleaned_bids = []
+        for bid in bids:
+            if isinstance(bid["volume"], dict):
+                if all(volume == 0 for volume in bid["volume"].values()):
+                    continue
+            elif bid["volume"] == 0:
+                continue
+            cleaned_bids.append(bid)
+
+        return cleaned_bids
+
 
 class LearningStrategy(BaseStrategy):
     """

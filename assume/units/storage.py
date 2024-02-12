@@ -20,7 +20,7 @@ class Storage(SupportsMinMaxCharge):
     """
     A class for a storage unit.
 
-    Attributes:
+    Args:
         id (str): The ID of the storage unit.
         technology (str): The technology of the storage unit.
         node (str): The node of the storage unit.

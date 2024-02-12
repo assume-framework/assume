@@ -374,7 +374,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     storage_unit.outputs["soc"][start] = 0.5
 
     bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
-    bids[0]["accepted_volume"] = bids[0]["volume"]
+    assert len(bids) == 0
 
     # dispatch full discharge
     storage_unit.set_dispatch_plan(mc, bids)
