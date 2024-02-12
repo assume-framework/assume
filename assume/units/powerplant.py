@@ -19,7 +19,7 @@ class PowerPlant(SupportsMinMax):
     """
     A class for a powerplant unit.
 
-    Attributes:
+    Args:
         id (str): The ID of the storage unit.
         unit_operator (str): The operator of the unit.
         technology (str): The technology of the unit.

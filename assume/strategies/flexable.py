@@ -340,8 +340,8 @@ class flexableNegCRM(BaseStrategy):
             min_power[start] = unit.calculate_ramp(
                 op_time, previous_power, min_power[start], current_power
             )
-            bid_quantity = previous_power - min_power[start]
-            if bid_quantity <= 0:
+            bid_quantity = min_power[start] - previous_power
+            if bid_quantity >= 0:
                 continue
 
             # bid_quantity < 0
@@ -360,7 +360,7 @@ class flexableNegCRM(BaseStrategy):
             if specific_revenue < 0:
                 capacity_price = (
                     abs(specific_revenue)
-                    * (bid_quantity - unit.min_power)
+                    * (unit.min_power + bid_quantity)
                     / bid_quantity
                 )
             else:
