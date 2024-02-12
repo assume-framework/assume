@@ -20,7 +20,7 @@ async def create_worker(world: World, marketdesign: list[MarketConfig]):
     for market_config in marketdesign:
         market_config.addr = market_operator_addr
         market_config.aid = market_operator_aid
-        world.markets[f"{market_config.name}"] = market_config
+        world.markets[f"{market_config.market_id}"] = market_config
 
     world.add_unit_operator("my_demand")
     world.add_unit(
@@ -31,7 +31,7 @@ async def create_worker(world: World, marketdesign: list[MarketConfig]):
         {
             "min_power": 0,
             "max_power": 1000,
-            "bidding_strategies": {market_config.name: "naive_eom"},
+            "bidding_strategies": {market_config.market_id: "naive_eom"},
             "technology": "demand",
         },
         NaiveForecast(index, demand=100),

@@ -38,11 +38,11 @@ def test_convert_rrule():
 
 
 def test_make_market_config():
-    market_name = "Test"
+    market_id = "Test"
     start = datetime(2020, 1, 1)
     end = datetime(2020, 12, 2)
     mc = MarketConfig(
-        name=market_name,
+        market_id=market_id,
         opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
         opening_duration=pd.Timedelta(hours=1),
         market_mechanism="pay_as_clear",
@@ -51,7 +51,7 @@ def test_make_market_config():
         ],
     )
     market_params = {
-        "name": "EOM",
+        "market_id": "EOM",
         "operator": "EOM_operator",
         "product_type": "energy",
         "products": [{"duration": "1h", "count": 1, "first_delivery": "1h"}],
@@ -64,7 +64,7 @@ def test_make_market_config():
         "price_unit": "€/MWh",
         "market_mechanism": "pay_as_clear",
     }
-    mconfig = make_market_config(market_name, market_params, start, end)
+    mconfig = make_market_config(market_id, market_params, start, end)
     assert str(mc.opening_hours) == str(mconfig.opening_hours)
     mc.opening_hours = mconfig.opening_hours
     assert mc == mconfig

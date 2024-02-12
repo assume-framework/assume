@@ -26,9 +26,9 @@ end = datetime(2020, 12, 2)
 
 @pytest.fixture
 async def units_operator() -> UnitsOperator:
-    market_name = "EOM"
+    market_id = "EOM"
     marketconfig = MarketConfig(
-        name=market_name,
+        market_id=market_id,
         opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
         opening_duration=rd(hours=1),
         market_mechanism="pay_as_clear",

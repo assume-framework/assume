@@ -98,7 +98,7 @@ class MarketConfig:
     Describes the configuration of a market.
 
     Args:
-        name (str): the name of the market
+        market_id (str): the ID of the market
         opening_hours (dateutil.rrule.rrule): the opening hours of the market
         opening_duration (datetime.timedelta): the duration of the opening hours
         market_mechanism (str): name of method used for clearing
@@ -119,7 +119,7 @@ class MarketConfig:
         aid (str): automatic id of the market
     """
 
-    name: str = "market"
+    market_id: str = "market"
     opening_hours: rr.rrule = rr.rrule(rr.HOURLY)
     opening_duration: timedelta = timedelta(hours=1)
     market_mechanism: str = "pay_as_clear"

@@ -43,7 +43,7 @@ def test_otc_strategy_scaled(scale, mock_supports_minmax):
     strategy = OTCStrategy(scale_firm_power_capacity=scale)
 
     mc = MarketConfig(
-        name="OTC",
+        market_id="OTC",
         opening_hours=rr.rrule(rr.HOURLY),
         opening_duration=timedelta(hours=1),
         market_mechanism="not needed",

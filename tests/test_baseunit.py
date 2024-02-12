@@ -195,7 +195,9 @@ def test_clear_empty_bids(base_unit, mock_market_config):
             }
         )
     assert (
-        base_unit.bidding_strategies[mock_market_config.name].remove_empty_bids(bids)
+        base_unit.bidding_strategies[mock_market_config.market_id].remove_empty_bids(
+            bids
+        )
         == []
     )
 
@@ -212,7 +214,7 @@ def test_clear_empty_bids(base_unit, mock_market_config):
             }
         )
     non_empty_bids_result = base_unit.bidding_strategies[
-        mock_market_config.name
+        mock_market_config.market_id
     ].remove_empty_bids(non_empty_bids)
     assert non_empty_bids_result == non_empty_bids
 
@@ -229,6 +231,6 @@ def test_clear_empty_bids(base_unit, mock_market_config):
             }
         )
     mixed_bids_result = base_unit.bidding_strategies[
-        mock_market_config.name
+        mock_market_config.market_id
     ].remove_empty_bids(mixed_bids)
     assert mixed_bids_result == [bid for bid in mixed_bids if bid["volume"] > 0]
