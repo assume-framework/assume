@@ -119,6 +119,8 @@ def add_agent_to_world(
     base_path: str,
     markups: dict = {},
 ):
+    strategies = {m: "naive" for m in list(world.markets.keys())}
+    storage_strategies = {m: "flexable_eom_storage" for m in list(world.markets.keys())}
     match agent["Type"]:
         case "EnergyExchange" | "DayAheadMarketSingleZone":
             market_config = MarketConfig(
@@ -167,7 +169,7 @@ def add_agent_to_world(
                     {
                         "min_power": 0,
                         "max_power": 100000,
-                        "bidding_strategies": {"EOM": "naive"},
+                        "bidding_strategies": strategies,
                         "technology": "demand",
                         "price": load["ValueOfLostLoad"],
                     },
@@ -206,7 +208,7 @@ def add_agent_to_world(
                     "efficiency_discharge": device["DischargingEfficiency"],
                     "initial_soc": initial_soc,
                     "max_volume": max_volume,
-                    "bidding_strategies": {"EOM": "flexable_eom_storage"},
+                    "bidding_strategies": storage_strategies,
                     "technology": "hydro",  # PSPP? Pump-Storage Power Plant
                     "emission_factor": 0,
                 },
@@ -273,7 +275,7 @@ def add_agent_to_world(
                         "min_power": 0,
                         "max_power": power,
                         "fixed_cost": markup,
-                        "bidding_strategies": {"EOM": "naive"},
+                        "bidding_strategies": strategies,
                         "technology": translate_fuel_type[prototype["FuelType"]],
                         "fuel_type": translate_fuel_type[prototype["FuelType"]],
                         "emission_factor": prototype["SpecificCo2EmissionsInTperMWH"],
@@ -314,7 +316,7 @@ def add_agent_to_world(
                 {
                     "min_power": 0,
                     "max_power": max_power,
-                    "bidding_strategies": {"EOM": "naive"},
+                    "bidding_strategies": strategies,
                     "technology": translate_fuel_type[attr["EnergyCarrier"]],
                     "fuel_type": translate_fuel_type[attr["EnergyCarrier"]],
                     "emission_factor": 0,
