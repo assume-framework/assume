@@ -16,8 +16,8 @@ from assume.strategies.flexable_storage import (
 from assume.strategies.naive_strategies import (
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
-    NaiveRedispatchStrategy,
     NaiveProfileStrategy,
+    NaiveRedispatchStrategy,
     NaiveSingleBidStrategy,
 )
 
