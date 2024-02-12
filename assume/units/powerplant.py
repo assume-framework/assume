@@ -201,7 +201,7 @@ class PowerPlant(SupportsMinMax):
         orderbook: Orderbook,
     ) -> None:
         """
-        Adds the dispatch plan from the current market result to the total dispatch plan and claculates the cshflow.
+        Adds the dispatch plan from the current market result to the total dispatch plan and calculates the cashflow.
 
         Args:
             marketconfig (MarketConfig): The market configuration.

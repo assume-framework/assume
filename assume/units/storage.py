@@ -9,6 +9,8 @@ from functools import lru_cache
 import pandas as pd
 
 from assume.common.base import SupportsMinMaxCharge
+from assume.common.market_objects import MarketConfig, Orderbook
+from assume.common.utils import get_products_index
 
 logger = logging.getLogger(__name__)
 EPS = 1e-4
@@ -204,7 +206,7 @@ class Storage(SupportsMinMaxCharge):
         """
         time_delta = self.index.freq / timedelta(hours=1)
 
-        for t in self.outputs["energy"][start:end].index:
+        for t in self.outputs["energy"][start : end - self.index.freq].index:
             delta_soc = 0
             soc = self.outputs["soc"][t]
             if self.outputs["energy"][t] > self.max_power_discharge:
@@ -248,9 +250,78 @@ class Storage(SupportsMinMaxCharge):
                     / self.max_volume
                 )
 
-            self.outputs["soc"][t + self.index.freq :] = soc + delta_soc
+            self.outputs["soc"][t + self.index.freq] = soc + delta_soc
 
         return self.outputs["energy"].loc[start:end]
+
+    def set_dispatch_plan(
+        self,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ) -> None:
+        """
+        Adds the dispatch plan from the current market result to the total dispatch plan and calculates the cashflow.
+
+        Args:
+            marketconfig (MarketConfig): The market configuration.
+            orderbook (Orderbook): The orderbook.
+        """
+        products_index = get_products_index(orderbook)
+
+        product_type = marketconfig.product_type
+        for order in orderbook:
+            start = order["start_time"]
+            end = order["end_time"]
+            end_excl = end - self.index.freq
+            if isinstance(order["accepted_volume"], dict):
+                added_volume = list(order["accepted_volume"].values())
+            else:
+                added_volume = order["accepted_volume"]
+            self.outputs[product_type].loc[start:end_excl] += added_volume
+        self.calculate_cashflow(product_type, orderbook)
+
+        for start in products_index:
+            delta_soc = 0
+            soc = self.outputs["soc"][start]
+            current_power = self.outputs[product_type][start]
+
+            # discharging
+            if current_power > 0:
+                max_soc_discharge = self.calculate_soc_max_discharge(soc)
+
+                if current_power > max_soc_discharge:
+                    self.outputs[product_type][start] = max_soc_discharge
+
+                time_delta = self.index.freq / timedelta(hours=1)
+                delta_soc = (
+                    -self.outputs["energy"][start]
+                    * time_delta
+                    / self.efficiency_discharge
+                    / self.max_volume
+                )
+
+            # charging
+            elif current_power < 0:
+                max_soc_charge = self.calculate_soc_max_charge(soc)
+
+                if current_power < max_soc_charge:
+                    self.outputs[product_type][start] = max_soc_charge
+
+                time_delta = self.index.freq / timedelta(hours=1)
+                delta_soc = (
+                    -self.outputs["energy"][start]
+                    * time_delta
+                    * self.efficiency_charge
+                    / self.max_volume
+                )
+
+            self.outputs["soc"][start + self.index.freq :] = soc + delta_soc
+
+        self.bidding_strategies[product_type].calculate_reward(
+            unit=self,
+            marketconfig=marketconfig,
+            orderbook=orderbook,
+        )
 
     @lru_cache(maxsize=256)
     def calculate_marginal_cost(
