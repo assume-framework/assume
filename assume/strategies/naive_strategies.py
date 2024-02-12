@@ -75,8 +75,6 @@ class NaiveSingleBidStrategy(BaseStrategy):
 
         bids = self.remove_empty_bids(bids)
 
-        bids = self.remove_empty_bids(bids)
-
         return bids
 
 
