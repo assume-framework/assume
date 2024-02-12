@@ -6,6 +6,7 @@ base_case_2019:
   start_date: 2019-01-01 00:00
   end_date: 2019-02-01 00:00
   time_step: 1h
+
   markets_config:
     EOM:
       operator: EOM_operator
@@ -28,6 +29,7 @@ dam_case_2019:
   start_date: 2019-01-01 12:00
   end_date: 2019-02-01 00:00
   time_step: 1h
+
   markets_config:
     EOM:
       operator: EOM_operator
@@ -58,7 +60,7 @@ eom_crm_case_2019:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2019-01-01 02:00
+      start_date: 2019-01-01 1:00
       products:
         - duration: 1h
           count: 1

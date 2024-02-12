@@ -26,7 +26,7 @@ end = datetime(2020, 12, 2)
 
 @pytest.fixture
 async def units_operator() -> UnitsOperator:
-    market_name = "Test"
+    market_name = "EOM"
     marketconfig = MarketConfig(
         name=market_name,
         opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
@@ -43,7 +43,7 @@ async def units_operator() -> UnitsOperator:
     index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 
     params_dict = {
-        "bidding_strategies": {"energy": NaiveStrategy()},
+        "bidding_strategies": {"EOM": NaiveStrategy()},
         "technology": "energy",
         "unit_operator": "test_operator",
         "max_power": 1000,
@@ -110,7 +110,7 @@ async def test_write_learning_params(units_operator: UnitsOperator):
 
     params_dict = {
         "bidding_strategies": {
-            "energy": RLAdvancedOrderStrategy(
+            "EOM": RLAdvancedOrderStrategy(
                 unit_id="testplant",
                 learning_mode=True,
                 observation_dimension=2 + 2 * 23 + 3,
@@ -150,7 +150,7 @@ async def test_write_learning_params(units_operator: UnitsOperator):
     assert len(units_operator.context._scheduler._scheduled_tasks) == open_tasks + 2
 
     units_operator.units["testplant"].bidding_strategies[
-        "energy"
+        "EOM"
     ].bidding_strategies = RLStrategy(
         unit_id="testplant",
         learning_mode=True,

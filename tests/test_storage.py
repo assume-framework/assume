@@ -19,7 +19,7 @@ def storage_unit() -> Storage:
         id="Test_Storage",
         unit_operator="TestOperator",
         technology="TestTechnology",
-        bidding_strategies={"energy": NaiveStrategy()},
+        bidding_strategies={"EOM": NaiveStrategy()},
         max_power_charge=-100,
         max_power_discharge=100,
         max_volume=1000,

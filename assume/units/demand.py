@@ -15,15 +15,6 @@ class Demand(SupportsMinMax):
 
     Attributes:
         id (str): The unique identifier of the unit.
-        index (pandas.DatetimeIndex): The index of the unit.
-        max_power (float): The maximum power output capacity of the power plant in MW.
-        min_power (float): The minimum power output capacity of the power plant in MW.
-        volume (pandas.Series): The volume of the unit.
-        price (float): The price of the unit.
-        forecaster (Forecaster): The forecaster of the unit.
-
-    Args:
-        id (str): The unique identifier of the unit.
         unit_operator (str): The operator of the unit.
         technology (str): The technology of the unit.
         bidding_strategies (dict): The bidding strategies of the unit.
