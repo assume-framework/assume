@@ -11,7 +11,7 @@ from assume.common.base import SupportsMinMax
 
 
 class MockMarketConfig:
-    name = "EOM"
+    market_id = "EOM"
     product_type = "energy"
     additional_fields = []
 

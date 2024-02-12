@@ -48,7 +48,7 @@ class OTCStrategy(BaseStrategy):
                 start
             ]  # current power output describes the power output at the start of the product
             volume = max_power[start]
-            if "OTC" in market_config.name:
+            if "OTC" in market_config.market_id:
                 volume *= self.scale
             price = unit.calculate_marginal_cost(start, current_power + volume)
 

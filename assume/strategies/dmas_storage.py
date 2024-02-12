@@ -164,52 +164,10 @@ class DmasStorageStrategy(BaseStrategy):
         self.model.vol_con.add(self.model.volume[hour_count - 1] == unit.max_volume / 2)
         return self.power
 
-    def optimize_result(self, unit: SupportsMinMaxCharge, committed_power: np.ndarray):
-        """
-        Optimizes the result
-
-        Args:
-            unit(SupportsMinMaxCharge): unit to dispatch
-            committed_power(numpy.ndarray): committed power
-
-        Returns:
-            pyomo.opt.results.SolverResults: optimization result
-
-        """
-        # if day ahead result is known minimize the difference
-        bid_count = len(committed_power)
-        time_range = range(bid_count)
-
-        self.model.power_difference = Var(time_range, within=Reals)
-        self.model.minus = Var(time_range, within=Reals, bounds=(0, None))
-        self.model.plus = Var(time_range, within=Reals, bounds=(0, None))
-
-        difference = [committed_power[t] - self.power[t] for t in time_range]
-
-        self.model.difference = ConstraintList()
-        for t in time_range:
-            self.model.difference.add(
-                self.model.plus[t] - self.model.minus[t] == difference[t]
-            )
-        abs_difference = [self.model.plus[t] + self.model.minus[t] for t in time_range]
-        costs = [
-            abs_difference[t] * np.abs(unit.forecaster["price_EOM"][t] * 2)
-            for t in time_range
-        ]
-
-        profit = [
-            -self.power[t] * unit.forecaster["price_EOM"][t] - costs[t]
-            for t in time_range
-        ]
-        self.model.obj = Objective(
-            quicksum(profit[t] for t in time_range), sense=maximize
-        )
-        r = self.opt.solve(self.model)
-        return r
-
     def optimize(
         self,
         unit: SupportsMinMaxCharge,
+        market_id: str,
         start: datetime,
         hour_count: int,
     ):
@@ -227,7 +185,7 @@ class DmasStorageStrategy(BaseStrategy):
         opt_results = {key: np.zeros(hour_count) for key in PRICE_FUNCS.keys()}
         time_range = range(hour_count)
 
-        base_price = unit.forecaster["price_EOM"][
+        base_price = unit.forecaster[f"price_{market_id}"][
             start : start + timedelta(hours=hour_count)
         ]
 
@@ -287,10 +245,15 @@ class DmasStorageStrategy(BaseStrategy):
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
         hour_count = (end - start) // timedelta(hours=1)
-        opt_results = self.optimize(unit, start, hour_count)
+        opt_results = self.optimize(
+            unit=unit,
+            market_id=market_config.market_id,
+            start=start,
+            hour_count=hour_count,
+        )
         total_orders = {}
         block_id = 0
-        power_prices = unit.forecaster["price_EOM"][
+        power_prices = unit.forecaster[f"price_{market_config.market_id}"][
             start : start + timedelta(hours=hour_count)
         ]
         for key, power in opt_results.items():

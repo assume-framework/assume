@@ -124,7 +124,7 @@ def add_agent_to_world(
     match agent["Type"]:
         case "EnergyExchange" | "DayAheadMarketSingleZone":
             market_config = MarketConfig(
-                name=f"Market_{agent['Id']}",
+                market_id=f"Market_{agent['Id']}",
                 opening_hours=rr.rrule(
                     rr.HOURLY, interval=1, dtstart=world.start, until=world.end
                 ),

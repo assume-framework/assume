@@ -161,7 +161,7 @@ class UnitsOperator(Role):
         await self.context.send_acl_message(
             {
                 "context": "registration",
-                "market_id": market.name,
+                "market_id": market.market_id,
                 "information": [u.as_dict() for u in self.units.values()],
             },
             receiver_addr=market.addr,
@@ -169,10 +169,10 @@ class UnitsOperator(Role):
             acl_metadata={
                 "sender_addr": self.context.addr,
                 "sender_id": self.context.aid,
-                "reply_with": market.name,
+                "reply_with": market.market_id,
             },
         ),
-        logger.debug(f"{self.id} sent market registration to {market.name}")
+        logger.debug(f"{self.id} sent market registration to {market.market_id}")
 
     def handle_opening(self, opening: OpeningMessage, meta: MetaDict) -> None:
         """
@@ -223,8 +223,8 @@ class UnitsOperator(Role):
         if content["accepted"]:
             found = False
             for market in self.available_markets:
-                if content["market_id"] == market.name:
-                    self.registered_markets[market.name] = market
+                if content["market_id"] == market.market_id:
+                    self.registered_markets[market.market_id] = market
                     found = True
                     break
             if not found:
@@ -369,7 +369,7 @@ class UnitsOperator(Role):
 
         products = opening["products"]
         market = self.registered_markets[opening["market_id"]]
-        logger.debug(f"{self.id} setting bids for {market.name} - {products}")
+        logger.debug(f"{self.id} setting bids for {market.market_id} - {products}")
 
         # the given products just became available on our market
         # and we need to provide bids
@@ -396,7 +396,7 @@ class UnitsOperator(Role):
         await self.context.send_acl_message(
             content={
                 "context": "submit_bids",
-                "market_id": market.name,
+                "market_id": market.market_id,
                 "orderbook": orderbook,
             },
             receiver_addr=market.addr,
@@ -494,7 +494,7 @@ class UnitsOperator(Role):
         for unit_id, unit in self.units.items():
             # rl only for energy market for now!
             if isinstance(
-                unit.bidding_strategies.get(marketconfig.name),
+                unit.bidding_strategies.get(marketconfig.market_id),
                 (RLAdvancedOrderStrategy),
             ):
                 # TODO: check whether to split the reward, profit and regret to different lines
@@ -515,7 +515,7 @@ class UnitsOperator(Role):
                 output_agent_list.append(output_dict)
 
             elif isinstance(
-                unit.bidding_strategies.get(marketconfig.name),
+                unit.bidding_strategies.get(marketconfig.market_id),
                 LearningStrategy,
             ):
                 output_dict = {
@@ -588,7 +588,7 @@ class UnitsOperator(Role):
         for unit in self.units.values():
             # rl only for energy market for now!
             if isinstance(
-                unit.bidding_strategies.get(marketconfig.name),
+                unit.bidding_strategies.get(marketconfig.market_id),
                 (RLAdvancedOrderStrategy),
             ):
                 all_observations[i, :] = unit.outputs["rl_observations"][start]
@@ -597,7 +597,7 @@ class UnitsOperator(Role):
                 i += 1
 
             elif isinstance(
-                unit.bidding_strategies.get(marketconfig.name),
+                unit.bidding_strategies.get(marketconfig.market_id),
                 LearningStrategy,
             ):
                 all_observations[i, :] = unit.outputs["rl_observations"][start]
@@ -640,7 +640,7 @@ class UnitsOperator(Role):
         products_index = get_products_index(orderbook)
 
         for unit in self.units.values():
-            bidding_strategy = unit.bidding_strategies.get(marketconfig.name)
+            bidding_strategy = unit.bidding_strategies.get(marketconfig.market_id)
             if isinstance(bidding_strategy, LearningStrategy):
                 learning_strategies.append(bidding_strategy)
                 # should be the same across all strategies

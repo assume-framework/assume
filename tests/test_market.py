@@ -22,9 +22,9 @@ end = datetime(2020, 12, 2)
 
 @pytest.fixture
 async def market_role() -> MarketRole:
-    market_name = "Test"
+    market_id = "Test"
     marketconfig = MarketConfig(
-        name=market_name,
+        market_id=market_id,
         opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
         opening_duration=rd(hours=1),
         market_mechanism="pay_as_clear",
@@ -210,7 +210,8 @@ async def test_market_registration(market_role: MarketRole):
     assert market_role.registered_agents == {}
     info = [{"technology": "nuclear", "max_power": 2}]
     market_role.handle_registration(
-        {"market_id": market_role.marketconfig.name, "information": info}, meta=meta
+        {"market_id": market_role.marketconfig.market_id, "information": info},
+        meta=meta,
     )
     assert len(market_role.registered_agents.keys()) == 1
     assert market_role.registered_agents[tuple(meta.values())] == info

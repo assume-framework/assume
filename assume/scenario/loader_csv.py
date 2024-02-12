@@ -166,7 +166,7 @@ def make_market_config(
         for product in market_params["products"]
     ]
     market_config = MarketConfig(
-        name=id,
+        market_id=id,
         market_products=market_products,
         product_type=market_params.get("product_type", "energy"),
         opening_hours=rr.rrule(
@@ -345,7 +345,9 @@ async def load_scenario_folder_async(
     logger.info("Adding forecast")
     forecaster = CsvForecaster(
         index=index,
-        powerplants=powerplant_units,
+        powerplants_units=powerplant_units,
+        demand_units=demand_units,
+        market_configs=config["markets_config"],
     )
 
     forecasts_df = load_file(

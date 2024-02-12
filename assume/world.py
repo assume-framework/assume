@@ -388,12 +388,12 @@ class World:
             raise ValueError(f"Unit {id} already exists")
 
         bidding_strategies = {}
-        for market_name, strategy in unit_params["bidding_strategies"].items():
+        for market_id, strategy in unit_params["bidding_strategies"].items():
             if not strategy:
                 continue
             bidding_params = unit_params.get("bidding_params", self.bidding_params)
             try:
-                bidding_strategies[market_name] = self.bidding_strategies[strategy](
+                bidding_strategies[market_id] = self.bidding_strategies[strategy](
                     unit_id=id,
                     **bidding_params,
                 )
@@ -401,7 +401,7 @@ class World:
                 if self.learning_mode and issubclass(
                     self.bidding_strategies[strategy], LearningStrategy
                 ):
-                    self.learning_role.rl_strats[id] = bidding_strategies[market_name]
+                    self.learning_role.rl_strats[id] = bidding_strategies[market_id]
 
                     # if we have learning strategy we need to assign the powerplant to one  unit_operator handling all leanring units
                     if unit_operator_id != "Operator-RL":
@@ -481,7 +481,7 @@ class World:
 
         market_operator.add_role(market_role)
         market_operator.markets.append(market_config)
-        self.markets[f"{market_config.name}"] = market_config
+        self.markets[f"{market_config.market_id}"] = market_config
 
     async def _step(self):
         if self.distributed_role is not False:

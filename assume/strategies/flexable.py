@@ -103,20 +103,21 @@ class flexableEOM(BaseStrategy):
             # =============================================================================
             if op_time > 0:
                 bid_price_inflex = calculate_EOM_price_if_on(
-                    unit,
-                    start,
-                    marginal_cost_flex,
-                    bid_quantity_inflex,
-                    self.foresight,
-                    avg_down_time,
+                    unit=unit,
+                    market_id=market_config.market_id,
+                    start=start,
+                    marginal_cost_flex=marginal_cost_flex,
+                    bid_quantity_inflex=bid_quantity_inflex,
+                    foresight=self.foresight,
+                    avg_down_time=avg_down_time,
                 )
             else:
                 bid_price_inflex = calculate_EOM_price_if_off(
-                    unit,
-                    marginal_cost_inflex,
-                    bid_quantity_inflex,
-                    op_time,
-                    avg_op_time,
+                    unit=unit,
+                    marginal_cost_inflex=marginal_cost_inflex,
+                    bid_quantity_inflex=bid_quantity_inflex,
+                    op_time=op_time,
+                    avg_op_time=avg_op_time,
                 )
 
             if unit.outputs["heat"][start] > 0:
@@ -248,7 +249,7 @@ class flexablePosCRM(BaseStrategy):
             )
             # Specific revenue if power was offered on the energy market
             specific_revenue = get_specific_revenue(
-                unit=unit,
+                price_forecast=unit.forecaster[f"price_{market_config.market_id}"],
                 marginal_cost=marginal_cost,
                 t=start,
                 foresight=self.foresight,
@@ -351,7 +352,7 @@ class flexableNegCRM(BaseStrategy):
 
             # Specific revenue if power was offered on the energy market
             specific_revenue = get_specific_revenue(
-                unit=unit,
+                price_forecast=unit.forecaster[f"price_{market_config.market_id}"],
                 marginal_cost=marginal_cost,
                 t=start,
                 foresight=self.foresight,
@@ -431,6 +432,7 @@ def calculate_EOM_price_if_off(
 
 def calculate_EOM_price_if_on(
     unit: SupportsMinMax,
+    market_id: str,
     start,
     marginal_cost_flex,
     bid_quantity_inflex,
@@ -478,12 +480,15 @@ def calculate_EOM_price_if_on(
         heat_gen_cost = 0.0
 
     possible_revenue = get_specific_revenue(
-        unit=unit,
+        price_forecast=unit.forecaster[f"price_{market_id}"],
         marginal_cost=marginal_cost_flex,
         t=start,
         foresight=foresight,
     )
-    if possible_revenue >= 0 and unit.forecaster["price_EOM"][t] < marginal_cost_flex:
+    if (
+        possible_revenue >= 0
+        and unit.forecaster[f"price_{market_id}"][t] < marginal_cost_flex
+    ):
         marginal_cost_flex = 0
 
     bid_price_inflex = max(
@@ -495,7 +500,7 @@ def calculate_EOM_price_if_on(
 
 
 def get_specific_revenue(
-    unit: SupportsMinMax,
+    price_forecast,
     marginal_cost: float,
     t: datetime,
     foresight: timedelta,
@@ -505,7 +510,7 @@ def get_specific_revenue(
     and marginal costs for the time defined by the foresight.
 
     Args:
-        unit (SupportsMinMax): A unit that the unit operator manages.
+        price_forecast (pandas.Series): The price forecast.
         marginal_cost (float): The marginal cost of the unit.
         t (datetime.datetime): The start time of the product.
         foresight (datetime.timedelta): The foresight of the unit.
@@ -513,12 +518,11 @@ def get_specific_revenue(
     Returns:
         float: The specific revenue of the unit.
     """
-    price_forecast = []
 
-    if t + foresight > unit.forecaster["price_EOM"].index[-1]:
-        price_forecast = unit.forecaster["price_EOM"][t:]
+    if t + foresight > price_forecast.index[-1]:
+        price_forecast = price_forecast[t:]
     else:
-        price_forecast = unit.forecaster["price_EOM"][t : t + foresight]
+        price_forecast = price_forecast[t : t + foresight]
 
     possible_revenue = (price_forecast - marginal_cost).sum()
 

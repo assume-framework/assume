@@ -112,20 +112,21 @@ class flexableEOMBlock(BaseStrategy):
             # =============================================================================
             if op_time > 0:
                 bid_price_inflex = calculate_EOM_price_if_on(
-                    unit,
-                    start,
-                    marginal_cost_flex,
-                    bid_quantity_inflex,
-                    self.foresight,
-                    avg_down_time,
+                    unit=unit,
+                    market_id=market_config.market_id,
+                    start=start,
+                    marginal_cost_flex=marginal_cost_flex,
+                    bid_quantity_inflex=bid_quantity_inflex,
+                    foresight=self.foresight,
+                    avg_down_time=avg_down_time,
                 )
             else:
                 bid_price_inflex = calculate_EOM_price_if_off(
-                    unit,
-                    marginal_cost_inflex,
-                    bid_quantity_inflex,
-                    op_time,
-                    avg_op_time,
+                    unit=unit,
+                    marginal_cost_inflex=marginal_cost_inflex,
+                    bid_quantity_inflex=bid_quantity_inflex,
+                    op_time=op_time,
+                    avg_op_time=avg_op_time,
                 )
 
             if unit.outputs["heat"][start] > 0:
@@ -298,20 +299,21 @@ class flexableEOMLinked(BaseStrategy):
             # =============================================================================
             if op_time > 0:
                 bid_price_inflex = calculate_EOM_price_if_on(
-                    unit,
-                    start,
-                    marginal_cost_flex,
-                    bid_quantity_inflex,
-                    self.foresight,
-                    avg_down_time,
+                    unit=unit,
+                    market_id=market_config.market_id,
+                    start=start,
+                    marginal_cost_flex=marginal_cost_flex,
+                    bid_quantity_inflex=bid_quantity_inflex,
+                    foresight=self.foresight,
+                    avg_down_time=avg_down_time,
                 )
             else:
                 bid_price_inflex = calculate_EOM_price_if_off(
-                    unit,
-                    marginal_cost_inflex,
-                    bid_quantity_inflex,
-                    op_time,
-                    avg_op_time,
+                    unit=unit,
+                    marginal_cost_inflex=marginal_cost_inflex,
+                    bid_quantity_inflex=bid_quantity_inflex,
+                    op_time=op_time,
+                    avg_op_time=avg_op_time,
                 )
 
             if unit.outputs["heat"][start] > 0:

@@ -49,9 +49,9 @@ class DataRequester(Agent):
 
 
 async def test_request_messages():
-    market_name = "Test"
+    market_id = "Test"
     marketconfig = MarketConfig(
-        name=market_name,
+        market_id=market_id,
         opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
         opening_duration=rd(hours=1),
         market_mechanism="pay_as_clear",
