@@ -9,12 +9,12 @@ from dateutil import rrule as rr
 
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
-from assume.strategies import NaiveEOMStrategy
+from assume.strategies import NaiveSingleBidStrategy
 from assume.units.demand import Demand
 
 
 def test_demand():
-    strategies = {"EOM": NaiveEOMStrategy()}
+    strategies = {"EOM": NaiveSingleBidStrategy()}
 
     index = pd.date_range(
         start=datetime(2023, 7, 1),
@@ -64,7 +64,7 @@ def test_demand():
 
 
 def test_demand_series():
-    strategies = {"EOM": NaiveEOMStrategy()}
+    strategies = {"EOM": NaiveSingleBidStrategy()}
 
     index = pd.date_range(
         start=datetime(2023, 7, 1),

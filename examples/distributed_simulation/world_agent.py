@@ -31,7 +31,7 @@ async def create_worker(world: World, marketdesign: list[MarketConfig]):
         {
             "min_power": 0,
             "max_power": 1000,
-            "bidding_strategies": {market_config.name: "naive"},
+            "bidding_strategies": {market_config.name: "naive_eom"},
             "technology": "demand",
         },
         NaiveForecast(index, demand=100),

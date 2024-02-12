@@ -119,7 +119,7 @@ def add_agent_to_world(
     base_path: str,
     markups: dict = {},
 ):
-    strategies = {m: "naive" for m in list(world.markets.keys())}
+    strategies = {m: "naive_eom" for m in list(world.markets.keys())}
     storage_strategies = {m: "flexable_eom_storage" for m in list(world.markets.keys())}
     match agent["Type"]:
         case "EnergyExchange" | "DayAheadMarketSingleZone":
