@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 from assume.strategies.flexable_storage import flexableEOMStorage
-from assume.strategies.naive_strategies import NaiveStrategy
+from assume.strategies.naive_strategies import NaiveSingleBidStrategy
 from assume.units import Storage
 
 
@@ -19,7 +19,7 @@ def storage_unit() -> Storage:
         id="Test_Storage",
         unit_operator="TestOperator",
         technology="TestTechnology",
-        bidding_strategies={"EOM": NaiveStrategy()},
+        bidding_strategies={"EOM": NaiveSingleBidStrategy()},
         max_power_charge=-100,
         max_power_discharge=100,
         max_volume=1000,

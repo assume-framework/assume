@@ -63,7 +63,7 @@ async def init():
         {
             "min_power": 0,
             "max_power": 1000,
-            "bidding_strategies": {"energy": "naive"},
+            "bidding_strategies": {"EOM": "naive_eom"},
             "technology": "demand",
         },
         NaiveForecast(index, demand=100),
@@ -77,7 +77,7 @@ async def init():
         {
             "min_power": 200,
             "max_power": 1000,
-            "bidding_strategies": {"energy": "naive"},
+            "bidding_strategies": {"EOM": "naive_eom"},
             "technology": "nuclear",
         },
         nuclear_forecast,

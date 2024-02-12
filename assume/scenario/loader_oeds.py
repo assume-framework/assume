@@ -79,10 +79,9 @@ async def load_oeds_async(
         "co2": 20,
     }
 
-    default_strategy = {"energy": "naive"}
+    default_strategy = {mc.name: "naive_eom" for mc in marketdesign}
 
     world.bidding_strategies["dmas_pwp"] = DmasPowerplantStrategy
-    dmas_strategy = {"energy": "dmas_pwp"}
     bidding_strategies = {
         "hard coal": default_strategy,
         "lignite": default_strategy,

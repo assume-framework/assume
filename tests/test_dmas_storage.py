@@ -12,7 +12,7 @@ from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
 from assume.strategies.dmas_storage import DmasStorageStrategy
-from assume.strategies.naive_strategies import NaiveStrategy
+from assume.strategies.naive_strategies import NaiveSingleBidStrategy
 from assume.units import PowerPlant, Storage
 
 from .utils import get_test_prices
@@ -24,7 +24,7 @@ def storage_unit() -> Storage:
         id="Test_Storage",
         unit_operator="TestOperator",
         technology="TestTechnology",
-        bidding_strategies={"EOM": NaiveStrategy()},
+        bidding_strategies={"EOM": NaiveSingleBidStrategy()},
         max_power_charge=100,
         max_power_discharge=100,
         max_volume=1000,
@@ -57,7 +57,7 @@ def storage_day() -> PowerPlant:
         id="Test_Storage",
         unit_operator="TestOperator",
         technology="TestTechnology",
-        bidding_strategies={"EOM": NaiveStrategy()},
+        bidding_strategies={"EOM": NaiveSingleBidStrategy()},
         max_power_charge=100,
         max_power_discharge=100,
         max_volume=1000,
