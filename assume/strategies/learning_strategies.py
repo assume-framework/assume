@@ -376,6 +376,7 @@ class RLStrategy(LearningStrategy):
         profit = 0
         reward = 0
         opportunity_cost = 0
+        costs = 0
 
         # iterate over all orders in the orderbook, to calculate order specific profit
         for order in orderbook:
@@ -399,25 +400,25 @@ class RLStrategy(LearningStrategy):
             duration = (end - start) / timedelta(hours=1)
 
             # calculate profit as income - running_cost from this event
-            price_difference = order["accepted_price"] - marginal_cost
-            order_profit = price_difference * order["accepted_volume"] * duration
+            order_profit = order["accepted_price"] * order["accepted_volume"] * duration
+            order_cost = marginal_cost * order["accepted_volume"] * duration
 
             # calculate opportunity cost
             # as the loss of income we have because we are not running at full power
             order_opportunity_cost = (
-                price_difference
+                (order["accepted_price"] - marginal_cost)
                 * (
                     unit.max_power - unit.outputs[product_type].loc[start:end_excl]
                 ).sum()
                 * duration
             )
-
             # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
             order_opportunity_cost = max(order_opportunity_cost, 0)
 
             # collect profit and opportunity cost for all orders
-            opportunity_cost += order_opportunity_cost
             profit += order_profit
+            costs += order_cost
+            opportunity_cost += order_opportunity_cost
 
         # consideration of start-up costs, which are evenly divided between the
         # upward and downward regulation events
@@ -425,12 +426,14 @@ class RLStrategy(LearningStrategy):
             unit.outputs[product_type].loc[start] != 0
             and unit.outputs[product_type].loc[start - unit.index.freq] == 0
         ):
-            profit = profit - unit.hot_start_cost / 2
+            costs += unit.hot_start_cost / 2
         elif (
             unit.outputs[product_type].loc[start] == 0
             and unit.outputs[product_type].loc[start - unit.index.freq] != 0
         ):
-            profit = profit - unit.hot_start_cost / 2
+            costs += unit.hot_start_cost / 2
+
+        profit = profit - costs
 
         # ---------------------------
         # 4.1 Calculate Reward
@@ -446,6 +449,7 @@ class RLStrategy(LearningStrategy):
         unit.outputs["profit"].loc[start:end_excl] += profit
         unit.outputs["reward"].loc[start:end_excl] = reward
         unit.outputs["regret"].loc[start:end_excl] = opportunity_cost
+        unit.outputs["total_costs"].loc[start:end_excl] = costs
 
     def load_actor_params(self, load_path):
         """

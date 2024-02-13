@@ -167,7 +167,7 @@ def test_flexable_pos_crm_storage(mock_market_config, storage):
     product_tuples = [(start, end, None)]
 
     # constant price of 50
-    specific_revenue = (50 - (4 / 0.95)) * 360 / (0.36 * 1000)
+    specific_revenue = (50 - (4 / 0.95 + 1)) * 360 / (0.36 * 1000)
 
     storage.forecaster = NaiveForecast(index, availability=1, price_forecast=50)
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)

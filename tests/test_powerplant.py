@@ -94,13 +94,13 @@ def test_init_function(power_plant_1, power_plant_2, power_plant_3):
     assert (
         power_plant_1.marginal_cost.to_dict()
         == pd.Series(
-            [30.0, 42.0, 54.0, 56.0],
+            [40.0, 52.0, 64.0, 66.0],
             index,
         ).to_dict()
     )
 
-    assert power_plant_2.marginal_cost.to_dict() == pd.Series(30, index).to_dict()
-    assert power_plant_3.marginal_cost.to_dict() == pd.Series(30, index).to_dict()
+    assert power_plant_2.marginal_cost.to_dict() == pd.Series(40, index).to_dict()
+    assert power_plant_3.marginal_cost.to_dict() == pd.Series(40, index).to_dict()
 
 
 def test_reset_function(power_plant_1):
@@ -141,10 +141,10 @@ def test_calculate_operational_window(power_plant_1):
     max_cost = power_plant_1.calculate_marginal_cost(start, max_power[start])
 
     assert min_power[start] == 200
-    assert min_cost == 30.0
+    assert min_cost == 40.0
 
     assert max_power[start] == 1000
-    assert max_cost == 30
+    assert max_cost == 40
 
     assert power_plant_1.outputs["energy"].at[start] == 0
 
@@ -165,10 +165,10 @@ def test_powerplant_feedback(power_plant_1, mock_market_config):
     max_cost = power_plant_1.calculate_marginal_cost(start, max_power[start])
 
     assert min_power[start] == 200
-    assert min_cost == 30.0
+    assert min_cost == 40.0
 
     assert max_power[start] == 1000
-    assert max_cost == 30
+    assert max_cost == 40
     assert power_plant_1.outputs["energy"].at[start] == 0
 
     orderbook = [
@@ -234,10 +234,10 @@ def test_powerplant_ramping(power_plant_1):
     min_ramp = power_plant_1.calculate_ramp(op_time, 100, min_power[start])
 
     assert min_ramp == 50
-    assert min_cost == 30.0
+    assert min_cost == 40.0
 
     assert max_ramp == 300
-    assert max_cost == 30
+    assert max_cost == 40
 
     # min_power gets accepted
 

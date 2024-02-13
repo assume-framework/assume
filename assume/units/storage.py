@@ -158,8 +158,6 @@ class Storage(SupportsMinMaxCharge):
         # The downtime before warm start of the storage unit.
         self.downtime_warm_start = downtime_warm_start
 
-        self.fixed_cost = fixed_cost
-
         self.hot_start_cost = hot_start_cost * max_power_discharge
         self.warm_start_cost = warm_start_cost * max_power_discharge
         self.cold_start_cost = cold_start_cost * max_power_discharge
@@ -331,7 +329,7 @@ class Storage(SupportsMinMaxCharge):
             )
             efficiency = self.efficiency_charge
 
-        marginal_cost = variable_cost / efficiency
+        marginal_cost = variable_cost / efficiency + self.fixed_cost
 
         return marginal_cost
 

@@ -86,7 +86,7 @@ def test_calculate_operational_window(storage_unit):
 
     assert min_power_discharge[start] == 0
     assert max_power_discharge[start] == 100
-    assert cost_discharge == 4 / 0.95
+    assert cost_discharge == 4 / 0.95 + 1
 
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end, product_type="energy"
@@ -95,7 +95,7 @@ def test_calculate_operational_window(storage_unit):
 
     assert min_power_charge[start] == 0
     assert max_power_charge[start] == -100
-    assert math.isclose(cost_charge, 3 / 0.9)
+    assert math.isclose(cost_charge, 3 / 0.9 + 1)
 
     assert storage_unit.outputs["energy"].at[start] == 0
 
