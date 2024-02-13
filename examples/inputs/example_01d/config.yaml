@@ -44,5 +44,5 @@ base:
       market_mechanism: redispatch
       param_dict:
         network_path: .
-        solver: gurobi
+        solver: glpk
         market_clearing_mechanism: pay_as_bid

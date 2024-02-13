@@ -13,6 +13,7 @@ from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)
 
+logging.getLogger("linopy").setLevel(logging.WARNING)
 
 class RedispatchMarketRole(MarketRole):
     """
@@ -265,7 +266,7 @@ class RedispatchMarketRole(MarketRole):
 
         # Add _up and _down suffix to costs and update the network
         self.network.generators_t.marginal_cost.update(costs.add_suffix("_up"))
-        self.network.generators_t.marginal_cost.update(costs.add_suffix("_down"))
+        self.network.generators_t.marginal_cost.update(-costs.add_suffix("_down"))
 
         # run linear powerflow
         self.network.lpf()
