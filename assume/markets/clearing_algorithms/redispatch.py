@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -14,6 +15,7 @@ from assume.markets.base_market import MarketRole
 log = logging.getLogger(__name__)
 
 logging.getLogger("linopy").setLevel(logging.WARNING)
+
 
 class RedispatchMarketRole(MarketRole):
     """
@@ -191,7 +193,7 @@ class RedispatchMarketRole(MarketRole):
 
     def clear(
         self, orderbook: Orderbook, market_products
-    ) -> (Orderbook, Orderbook, list[dict]):
+    ) -> Tuple[Orderbook, Orderbook, List[dict]]:
         """
         Performs redispatch to resolve congestion in the electricity market.
         It first checks for congestion in the network and if it finds any, it performs redispatch to resolve it.
@@ -203,7 +205,7 @@ class RedispatchMarketRole(MarketRole):
             market_products (list[MarketProduct]): The products for which clearing happens.
 
         Returns:
-            (Orderbook, Orderbook, list[dict]): The accepted orderbook, rejected orderbook and market metadata.
+            Tuple[Orderbook, Orderbook, List[dict]]: The accepted orderbook, rejected orderbook and market metadata.
         """
 
         orderbook_df = pd.DataFrame(orderbook)
@@ -266,7 +268,7 @@ class RedispatchMarketRole(MarketRole):
 
         # Add _up and _down suffix to costs and update the network
         self.network.generators_t.marginal_cost.update(costs.add_suffix("_up"))
-        self.network.generators_t.marginal_cost.update(-costs.add_suffix("_down"))
+        self.network.generators_t.marginal_cost.update(costs.add_suffix("_down") * (-1))
 
         # run linear powerflow
         self.network.lpf()

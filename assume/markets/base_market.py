@@ -527,7 +527,7 @@ class MarketRole(MarketMechanism, Role):
                 "clearing price for %s is %.2f, volume: %f",
                 self.marketconfig.market_id,
                 meta.get("price", 0.0),
-                meta.get("demand_volume", 0.0)
+                meta.get("demand_volume", 0.0),
             )
             meta["market_id"] = self.marketconfig.market_id
             meta["time"] = meta["product_start"]

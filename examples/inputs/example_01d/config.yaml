@@ -46,3 +46,4 @@ base:
         network_path: .
         solver: glpk
         market_clearing_mechanism: pay_as_bid
+        backup_marginal_cost: 10000
