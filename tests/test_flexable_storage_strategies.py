@@ -39,9 +39,9 @@ def storage() -> Storage:
         ramp_down_discharge=50,
         ramp_up_charge=-60,
         ramp_up_discharge=60,
-        variable_cost_charge=3,
-        variable_cost_discharge=4,
-        fixed_cost=1,
+        additional_cost_charge=3,
+        additional_cost_discharge=4,
+        additional_cost=1,
     )
 
 
@@ -167,7 +167,7 @@ def test_flexable_pos_crm_storage(mock_market_config, storage):
     product_tuples = [(start, end, None)]
 
     # constant price of 50
-    specific_revenue = (50 - (4 / 0.95 + 1)) * 360 / (0.36 * 1000)
+    specific_revenue = (50 - (4 / 0.95)) * 360 / (0.36 * 1000)
 
     storage.forecaster = NaiveForecast(index, availability=1, price_forecast=50)
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)

@@ -35,7 +35,7 @@ def power_plant() -> PowerPlant:
         max_power=1000,
         min_power=200,
         efficiency=0.5,
-        fixed_cost=10,
+        additional_cost=10,
         bidding_strategies={},
         fuel_type="lignite",
         emission_factor=0.5,

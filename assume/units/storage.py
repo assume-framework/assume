@@ -32,14 +32,13 @@ class Storage(SupportsMinMaxCharge):
         min_volume (float): The minimum state of charge of the storage unit in MWh.
         efficiency_charge (float): The efficiency of the storage unit while charging.
         efficiency_discharge (float): The efficiency of the storage unit while discharging.
-        variable_cost_charge (float): Variable costs to charge the storage unit in €/MW.
-        variable_costs_discharge (float): Variable costs to discharge the storage unit in €/MW.
+        additional_cost_charge (Union[float, pd.Series], optional): Additional costs associated with power consumption, in EUR/MWh. Defaults to 0.
+        additional_cost_discharge (Union[float, pd.Series], optional): Additional costs associated with power generation, in EUR/MWh. Defaults to 0.
         emission_factor (float): The emission factor of the storage unit.
         ramp_up_charge (float): The ramp up rate of charging the storage unit in MW/15 minutes (negative value).
         ramp_down_charge (float): The ramp down rate of charging the storage unit in MW/15 minutes (negative value).
         ramp_up_discharge (float): The ramp up rate of discharging the storage unit in MW/15 minutes.
         ramp_down_discharge (float): The ramp down rate of discharging the storage unit in MW/15 minutes.
-        fixed_cost (float): The fixed cost of the storage unit in €/MW. (related to capacity?)
         hot_start_cost (float): The hot start cost of the storage unit in €/MW.
         warm_start_cost (float): The warm start cost of the storage unit in €/MW.
         cold_start_cost (float): The cold start cost of the storage unit in €/MW.
@@ -68,14 +67,13 @@ class Storage(SupportsMinMaxCharge):
         soc_tick: float = 0.01,
         efficiency_charge: float = 1,
         efficiency_discharge: float = 1,
-        variable_cost_charge: float | pd.Series = 0.0,
-        variable_cost_discharge: float | pd.Series = 0.0,
+        additional_cost_charge: float | pd.Series = 0.0,
+        additional_cost_discharge: float | pd.Series = 0.0,
         emission_factor: float = 0.0,
         ramp_up_charge: float = None,
         ramp_down_charge: float = None,
         ramp_up_discharge: float = None,
         ramp_down_discharge: float = None,
-        fixed_cost: float = 0,
         hot_start_cost: float = 0,
         warm_start_cost: float = 0,
         cold_start_cost: float = 0,
@@ -122,9 +120,8 @@ class Storage(SupportsMinMaxCharge):
         )
 
         # The variable costs to charge/discharge the storage unit.
-        self.variable_cost_charge = variable_cost_charge
-        self.variable_cost_discharge = variable_cost_discharge
-        self.fixed_cost = fixed_cost
+        self.additional_cost_charge = additional_cost_charge
+        self.additional_cost_discharge = additional_cost_discharge
 
         # The emission factor of the storage unit.
         self.emission_factor = emission_factor
@@ -314,22 +311,22 @@ class Storage(SupportsMinMaxCharge):
         """
 
         if power > 0:
-            variable_cost = (
-                self.variable_cost_discharge.at[start]
-                if isinstance(self.variable_cost_discharge, pd.Series)
-                else self.variable_cost_discharge
+            additional_cost = (
+                self.additional_cost_discharge.at[start]
+                if isinstance(self.additional_cost_discharge, pd.Series)
+                else self.additional_cost_discharge
             )
             efficiency = self.efficiency_discharge
 
         else:
-            variable_cost = (
-                self.variable_cost_charge.at[start]
-                if isinstance(self.variable_cost_charge, pd.Series)
-                else self.variable_cost_charge
+            additional_cost = (
+                self.additional_cost_charge.at[start]
+                if isinstance(self.additional_cost_charge, pd.Series)
+                else self.additional_cost_charge
             )
             efficiency = self.efficiency_charge
 
-        marginal_cost = variable_cost / efficiency + self.fixed_cost
+        marginal_cost = additional_cost / efficiency
 
         return marginal_cost
 

@@ -5,7 +5,8 @@
 import logging
 from datetime import datetime, timedelta
 from functools import lru_cache
-from typing import Union, Tuple
+from typing import Tuple, Union
+
 import pandas as pd
 
 from assume.common.base import SupportsMinMax
@@ -77,7 +78,17 @@ class PowerPlant(SupportsMinMax):
         node: str = "bus0",
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(
+            id=id,
+            unit_operator=unit_operator,
+            technology=technology,
+            bidding_strategies=bidding_strategies,
+            index=index,
+            node=node,
+            location=location,
+            **kwargs,
+        )
+
         self.id = id
         self.unit_operator = unit_operator
         self.technology = technology
@@ -103,17 +114,6 @@ class PowerPlant(SupportsMinMax):
         self.max_heat_extraction = max_heat_extraction
         self.location = location
         self.node = node
-
-        super().__init__(
-            id=id,
-            unit_operator=unit_operator,
-            technology=technology,
-            bidding_strategies=bidding_strategies,
-            index=index,
-            node=node,
-            location=location,
-            **kwargs,
-        )
 
         self.max_power = max_power
         self.min_power = min_power
@@ -320,9 +320,9 @@ class PowerPlant(SupportsMinMax):
         co2_price = self.forecaster.get_price("co2").at[timestep]
 
         additional_cost = (
-            self.additional_cost
-            if isinstance(self.additional_cost, float)
-            else self.additional_cost[timestep]
+            self.additional_cost.at[timestep]
+            if isinstance(self.additional_cost, pd.Series)
+            else self.additional_cost
         )
 
         marginal_cost = (
