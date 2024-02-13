@@ -96,10 +96,10 @@ class BaseUnit:
 
         """
 
-        if market_config.name not in self.bidding_strategies:
+        if market_config.market_id not in self.bidding_strategies:
             return []
 
-        bids = self.bidding_strategies[market_config.name].calculate_bids(
+        bids = self.bidding_strategies[market_config.market_id].calculate_bids(
             unit=self,
             market_config=market_config,
             product_tuples=product_tuples,
@@ -157,7 +157,7 @@ class BaseUnit:
             self.outputs[product_type].loc[start:end_excl] += added_volume
         self.calculate_cashflow(product_type, orderbook)
 
-        self.bidding_strategies[marketconfig.name].calculate_reward(
+        self.bidding_strategies[marketconfig.market_id].calculate_reward(
             unit=self,
             marketconfig=marketconfig,
             orderbook=orderbook,

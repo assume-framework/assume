@@ -118,7 +118,7 @@ class flexableEOMStorage(BaseStrategy):
                 min_power_charge[start],
             )
 
-            price_forecast = unit.forecaster["price_EOM"]
+            price_forecast = unit.forecaster[f"price_{market_config.market_id}"]
 
             # calculate average price
             average_price = calculate_price_average(
@@ -288,9 +288,9 @@ class flexablePosCRMStorage(BaseStrategy):
             specific_revenue = get_specific_revenue(
                 unit=unit,
                 marginal_cost=marginal_cost,
-                current_time=start,
+                t=start,
                 foresight=self.foresight,
-                price_forecast=unit.forecaster["price_EOM"],
+                price_forecast=unit.forecaster[f"price_{market_config.market_id}"],
             )
 
             # if specific revenue is positive, bid specific_revenue
@@ -492,7 +492,7 @@ def calculate_price_average(unit, current_time, foresight, price_forecast):
     return average_price
 
 
-def get_specific_revenue(unit, marginal_cost, current_time, foresight, price_forecast):
+def get_specific_revenue(unit, marginal_cost, t, foresight, price_forecast):
     """
     Calculates the specific revenue as difference between price forecast
     and marginal costs for the time defined by the foresight.
@@ -500,14 +500,13 @@ def get_specific_revenue(unit, marginal_cost, current_time, foresight, price_for
     Args:
         unit (SupportsMinMaxCharge): The unit that is dispatched.
         marginal_cost (float): The marginal cost.
-        current_time (pandas.Timestamp): The current time.
+        t (datetime.datetime): The start time of the product.
         foresight (pandas.Timedelta): The foresight.
         price_forecast (pandas.Series): The price forecast.
 
     Returns:
         float: The specific revenue.
     """
-    t = current_time
 
     if t + foresight > price_forecast.index[-1]:
         price_forecast = price_forecast.loc[t:]

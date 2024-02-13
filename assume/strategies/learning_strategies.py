@@ -124,6 +124,7 @@ class RLStrategy(LearningStrategy):
         # =============================================================================
         next_observation = self.create_observation(
             unit=unit,
+            market_id=market_config.market_id,
             start=start,
             end=end,
         )
@@ -239,6 +240,7 @@ class RLStrategy(LearningStrategy):
     def create_observation(
         self,
         unit: SupportsMinMax,
+        market_id: str,
         start: datetime,
         end: datetime,
     ):
@@ -275,15 +277,18 @@ class RLStrategy(LearningStrategy):
 
         # checks if we are at end of simulation horizon, since we need to change the forecast then
         # for residual load and price forecast and scale them
-        if end_excl + forecast_len > unit.forecaster["residual_load_EOM"].index[-1]:
+        if (
+            end_excl + forecast_len
+            > unit.forecaster[f"residual_load_{market_id}"].index[-1]
+        ):
             scaled_res_load_forecast = (
-                unit.forecaster["residual_load_EOM"].loc[start:].values
+                unit.forecaster[f"residual_load_{market_id}"].loc[start:].values
                 / scaling_factor_res_load
             )
             scaled_res_load_forecast = np.concatenate(
                 [
                     scaled_res_load_forecast,
-                    unit.forecaster["residual_load_EOM"].iloc[
+                    unit.forecaster[f"residual_load_{market_id}"].iloc[
                         : self.foresight - len(scaled_res_load_forecast)
                     ],
                 ]
@@ -291,20 +296,21 @@ class RLStrategy(LearningStrategy):
 
         else:
             scaled_res_load_forecast = (
-                unit.forecaster["residual_load_EOM"]
+                unit.forecaster[f"residual_load_{market_id}"]
                 .loc[start : end_excl + forecast_len]
                 .values
                 / scaling_factor_res_load
             )
 
-        if end_excl + forecast_len > unit.forecaster["price_EOM"].index[-1]:
+        if end_excl + forecast_len > unit.forecaster[f"price_{market_id}"].index[-1]:
             scaled_price_forecast = (
-                unit.forecaster["price_EOM"].loc[start:].values / scaling_factor_price
+                unit.forecaster[f"price_{market_id}"].loc[start:].values
+                / scaling_factor_price
             )
             scaled_price_forecast = np.concatenate(
                 [
                     scaled_price_forecast,
-                    unit.forecaster["price_EOM"].iloc[
+                    unit.forecaster[f"price_{market_id}"].iloc[
                         : self.foresight - len(scaled_price_forecast)
                     ],
                 ]
@@ -312,7 +318,9 @@ class RLStrategy(LearningStrategy):
 
         else:
             scaled_price_forecast = (
-                unit.forecaster["price_EOM"].loc[start : end_excl + forecast_len].values
+                unit.forecaster[f"price_{market_id}"]
+                .loc[start : end_excl + forecast_len]
+                .values
                 / scaling_factor_price
             )
 

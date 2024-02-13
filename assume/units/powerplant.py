@@ -218,7 +218,7 @@ class PowerPlant(SupportsMinMax):
 
             self.outputs[product_type][start] = current_power
 
-        self.bidding_strategies[marketconfig.name].calculate_reward(
+        self.bidding_strategies[marketconfig.market_id].calculate_reward(
             unit=self,
             marketconfig=marketconfig,
             orderbook=orderbook,

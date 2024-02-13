@@ -46,7 +46,7 @@ def test_demand():
     assert dem.calculate_marginal_cost(start, max_power.max()) == 2000
 
     mc = MarketConfig(
-        name="EOM",
+        market_id="EOM",
         opening_hours=rr.rrule(rr.HOURLY),
         opening_duration=timedelta(hours=1),
         market_mechanism="not needed",
@@ -107,7 +107,7 @@ def test_demand_series():
     assert dem.calculate_marginal_cost(end, max_power) == 1000
 
     mc = MarketConfig(
-        name="EOM",
+        market_id="EOM",
         opening_hours=rr.rrule(rr.HOURLY),
         opening_duration=timedelta(hours=1),
         market_mechanism="not needed",

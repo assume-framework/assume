@@ -416,85 +416,6 @@ class DmasPowerplantStrategy(BaseStrategy):
                 self.opt_results[step]["obj"] = 0
         return unit.outputs["generation"][start:]
 
-    def optimize_result(
-        self,
-        unit: SupportsMinMax,
-        start: datetime,
-        committed_power: np.array,
-        hour_count: int,
-        power_prices: np.array,
-    ) -> np.array:
-        """
-        calculates the result with prices times 2
-        to optimize according to the result in the best way possible
-
-        Args:
-          unit(SupportsMinMax): unit to optimize
-          start(datetime.datetime): start time
-          committed_power(numpy.ndarray): committed power
-          hour_count(int): number of hours to optimize
-          power_prices(numpy.ndarray): power prices
-
-        Returns:
-          np.array: generation
-
-        """
-        cashflow = self.build_model(unit, start, 24)
-        tr = np.arange(hour_count)
-        # if day ahead power is known minimize the difference
-        self.model.power_difference = Var(tr, within=NonNegativeReals)
-        self.model.minus = Var(tr, within=NonNegativeReals)
-        self.model.plus = Var(tr, within=NonNegativeReals)
-
-        difference = [self.model.minus[t] + self.model.plus[t] for t in tr]
-        self.model.difference = ConstraintList()
-        for t in tr:
-            self.model.difference.add(
-                committed_power[t] - self.model.p_out[t]
-                == -self.model.minus[t] + self.model.plus[t]
-            )
-        difference_cost = [difference[t] * np.abs(power_prices[t] * 2) for t in tr]
-
-        # set new objective
-        self.model.obj = Objective(
-            expr=quicksum(cashflow[t] - difference_cost[t] for t in tr),
-            sense=maximize,
-        )
-        r = self.opt.solve(self.model)
-
-        if (r.solver.status == SolverStatus.ok) & (
-            r.solver.termination_condition == TerminationCondition.optimal
-        ):
-            log.info("find optimal solution in step: dayAhead adjustment")
-            self._set_results(
-                unit,
-                emission_prices,
-                fuel_prices,
-                adjusted_price,
-                start=start,
-                step=0,
-                hour_count=hour_count,
-            )
-            running_since, off_since = 0, 0
-            for t in tr:
-                # find count of last 1s and 0s
-                if self.model.z[t].value > 0:
-                    running_since += 1
-                    off_since = 0
-                else:
-                    running_since = 0
-                    off_since += 1
-        else:
-            if r.solver.termination_condition == TerminationCondition.infeasible:
-                log.error("infeasible model in step: dayAhead adjustment")
-            else:
-                log.error(r.solver)
-            running_since = 1
-            off_since = 0
-            # TODO set running with min_power
-
-        return self.power.copy()
-
     def calculate_bids(
         self,
         unit: SupportsMinMax,
@@ -525,7 +446,7 @@ class DmasPowerplantStrategy(BaseStrategy):
         hour_count = len(product_tuples)
         hour_count2 = hour_count * 2
 
-        base_price = unit.forecaster["price_EOM"][
+        base_price = unit.forecaster[f"price_{market_config.market_id}"][
             start : start + timedelta(hours=hour_count2 - 1)
         ]
         e_price = unit.forecaster.get_price("co2")[

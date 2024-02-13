@@ -168,17 +168,17 @@ class MarketRole(MarketMechanism, Role):
         if marketconfig.price_tick:
             if marketconfig.maximum_bid_price % marketconfig.price_tick != 0:
                 logger.warning(
-                    f"{marketconfig.name} - max price not a multiple of tick size"
+                    f"{marketconfig.market_id} - max price not a multiple of tick size"
                 )
             if marketconfig.minimum_bid_price % marketconfig.price_tick != 0:
                 logger.warning(
-                    f"{marketconfig.name} - min price not a multiple of tick size"
+                    f"{marketconfig.market_id} - min price not a multiple of tick size"
                 )
 
         if marketconfig.volume_tick and marketconfig.maximum_bid_volume:
             if marketconfig.maximum_bid_volume % marketconfig.volume_tick != 0:
                 logger.warning(
-                    f"{marketconfig.name} - max volume not a multiple of tick size"
+                    f"{marketconfig.market_id} - max volume not a multiple of tick size"
                 )
 
     def setup(self):
@@ -212,7 +212,7 @@ class MarketRole(MarketMechanism, Role):
                 meta["sender_addr"] = tuple(meta["sender_addr"])
 
             return (
-                content.get("market_id") == self.marketconfig.name
+                content.get("market_id") == self.marketconfig.market_id
                 and content.get("orderbook") is not None
                 and (meta["sender_addr"], meta["sender_id"])
                 in self.registered_agents.keys()
@@ -226,7 +226,7 @@ class MarketRole(MarketMechanism, Role):
 
             return (
                 content.get("context") == "registration"
-                and content.get("market_id") == self.marketconfig.name
+                and content.get("market_id") == self.marketconfig.market_id
             )
 
         def accept_get_unmatched(content: dict, meta: MetaDict):
@@ -236,13 +236,13 @@ class MarketRole(MarketMechanism, Role):
                 meta["sender_addr"] = tuple(meta["sender_addr"])
             return (
                 content.get("context") == "get_unmatched"
-                and content.get("market_id") == self.marketconfig.name
+                and content.get("market_id") == self.marketconfig.market_id
             )
 
         def accept_data_request(content: dict, meta: MetaDict):
             return (
                 content.get("context") == "data_request"
-                and content.get("market_id") == self.marketconfig.name
+                and content.get("market_id") == self.marketconfig.market_id
             )
 
         self.context.subscribe_message(
@@ -281,7 +281,7 @@ class MarketRole(MarketMechanism, Role):
 
         opening_message: OpeningMessage = {
             "context": "opening",
-            "market_id": self.marketconfig.name,
+            "market_id": self.marketconfig.market_id,
             "start_time": market_open,
             "end_time": market_closing,
             "products": products,
@@ -298,7 +298,7 @@ class MarketRole(MarketMechanism, Role):
                 acl_metadata={
                     "sender_addr": self.context.addr,
                     "sender_id": self.context.aid,
-                    "reply_with": f"{self.marketconfig.name}_{market_open}",
+                    "reply_with": f"{self.marketconfig.market_id}_{market_open}",
                 },
             )
 
@@ -313,12 +313,12 @@ class MarketRole(MarketMechanism, Role):
             self.context.schedule_timestamp_task(self.opening(), next_opening_ts)
             logger.debug(
                 f"market opening: %s - %s - %s",
-                self.marketconfig.name,
+                self.marketconfig.market_id,
                 market_open,
                 market_closing,
             )
         else:
-            logger.debug("market %s - does not reopen", self.marketconfig.name)
+            logger.debug("market %s - does not reopen", self.marketconfig.market_id)
 
     def handle_registration(self, content: RegistrationMessage, meta: MetaDict):
         """
@@ -330,7 +330,7 @@ class MarketRole(MarketMechanism, Role):
         """
         agent_id = meta["sender_id"]
         agent_addr = meta["sender_addr"]
-        assert content["market_id"] == self.marketconfig.name
+        assert content["market_id"] == self.marketconfig.market_id
         if self.validate_registration(content, meta):
             self.registered_agents[(agent_addr, agent_id)] = content["information"]
             accepted = True
@@ -339,7 +339,7 @@ class MarketRole(MarketMechanism, Role):
 
         msg: RegistrationReplyMessage = {
             "context": "registration",
-            "market_id": self.marketconfig.name,
+            "market_id": self.marketconfig.market_id,
             "accepted": accepted,
         }
         self.context.schedule_instant_acl_message(
@@ -504,7 +504,7 @@ class MarketRole(MarketMechanism, Role):
             meta = {"sender_addr": self.context.addr, "sender_id": self.context.aid}
             closing: ClearingMessage = {
                 "context": "clearing",
-                "market_id": self.marketconfig.name,
+                "market_id": self.marketconfig.market_id,
                 "accepted_orders": accepted_orders.get(agent, []),
                 "rejected_orders": rejected_orders.get(agent, []),
             }
@@ -517,7 +517,7 @@ class MarketRole(MarketMechanism, Role):
         # store order book in db agent
         if not accepted_orderbook:
             logger.warning(
-                f"{self.context.current_timestamp} Market result {market_products} for market {self.marketconfig.name} are empty!"
+                f"{self.context.current_timestamp} Market result {market_products} for market {self.marketconfig.market_id} are empty!"
             )
         all_orders = accepted_orderbook + rejected_orderbook
         await self.store_order_book(all_orders)
@@ -525,11 +525,11 @@ class MarketRole(MarketMechanism, Role):
         for meta in market_meta:
             logger.debug(
                 "clearing price for %s is %.2f, volume: %f",
-                self.marketconfig.name,
-                meta.get("price", "N/A"),
-                meta.get("demand_volume", "N/A"),
+                self.marketconfig.market_id,
+                meta["price"],
+                meta["demand_volume"],
             )
-            meta["market_id"] = self.marketconfig.name
+            meta["market_id"] = self.marketconfig.market_id
             meta["time"] = meta["product_start"]
             self.results.append(meta)
 
@@ -553,7 +553,7 @@ class MarketRole(MarketMechanism, Role):
             message = {
                 "context": "write_results",
                 "type": "store_order_book",
-                "market_id": self.marketconfig.name,
+                "market_id": self.marketconfig.market_id,
                 "data": orderbook,
             }
             await self.context.send_acl_message(
@@ -577,7 +577,7 @@ class MarketRole(MarketMechanism, Role):
             message = {
                 "context": "write_results",
                 "type": "store_market_results",
-                "market_id": self.marketconfig.name,
+                "market_id": self.marketconfig.market_id,
                 "data": market_meta,
             }
             await self.context.send_acl_message(

@@ -93,7 +93,7 @@ def test_dmas_calc(storage_unit):
     hour_count = len(storage_unit.index) // 2
 
     mc = MarketConfig(
-        name="Test",
+        market_id="EOM",
         opening_hours=rr.rrule(rr.HOURLY),
         opening_duration=timedelta(hours=1),
         market_mechanism="not needed",
@@ -118,7 +118,7 @@ def test_dmas_day(storage_day):
     assert hour_count == 24
 
     mc = MarketConfig(
-        name="Test",
+        market_id="EOM",
         opening_hours=rr.rrule(rr.HOURLY),
         opening_duration=timedelta(hours=1),
         market_mechanism="not needed",

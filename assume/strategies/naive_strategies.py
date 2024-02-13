@@ -126,7 +126,9 @@ class NaiveProfileStrategy(BaseStrategy):
             "bid_type": "BB",
         }
 
-        bids = self.remove_empty_bids([order])
+        bids = [order]
+
+        bids = self.remove_empty_bids(bids)
 
         return bids
 

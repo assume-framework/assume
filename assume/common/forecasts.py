@@ -92,11 +92,11 @@ class CsvForecaster(Forecaster):
 
     Attributes:
         index (pandas.Series): The index of the forecasts.
-        powerplants (dict[str, pandas.Series]): The power plants.
+        powerplants_units (dict[str, pandas.Series]): The power plants.
 
     Args:
         index (pandas.Series): The index of the forecasts.
-        powerplants (dict[str, pandas.Series]): The power plants.
+        powerplants_units (dict[str, pandas.Series]): The power plants.
 
     Example:
         >>> forecaster = CsvForecaster(index=pd.Series([1, 2, 3]))
@@ -106,11 +106,19 @@ class CsvForecaster(Forecaster):
     """
 
     def __init__(
-        self, index: pd.Series, powerplants: dict[str, pd.Series] = {}, *args, **kwargs
+        self,
+        index: pd.Series,
+        powerplants_units: dict[str, pd.Series] = {},
+        demand_units: dict[str, pd.Series] = {},
+        market_configs: dict[str, pd.Series] = {},
+        *args,
+        **kwargs,
     ):
         super().__init__(index, *args, **kwargs)
         self.logger = logging.getLogger(__name__)
-        self.powerplants = powerplants
+        self.powerplants_units = powerplants_units
+        self.demand_units = demand_units
+        self.market_configs = market_configs
         self.forecasts = pd.DataFrame(index=index)
 
     def __getitem__(self, column: str) -> pd.Series:
@@ -174,14 +182,14 @@ class CsvForecaster(Forecaster):
         """
         Calculates the forecasts if they are not already calculated.
 
-        This method calculates additional forecasts if they do not already exist, including
-        "price_EOM" and "residual_load_forecast".
+        This method calculates price forecast and residual load forecast for available markets, if
+        thise don't already exist.
 
         Args:
         """
 
         cols = []
-        for pp in self.powerplants.index:
+        for pp in self.powerplants_units.index:
             col = f"availability_{pp}"
             if col not in self.forecasts.columns:
                 s = pd.Series(1, index=self.forecasts.index)
@@ -189,12 +197,23 @@ class CsvForecaster(Forecaster):
                 cols.append(s)
         cols.append(self.forecasts)
         self.forecasts = pd.concat(cols, axis=1).copy()
-        if "price_EOM" not in self.forecasts.columns:
-            self.forecasts["price_EOM"] = self.calculate_EOM_price_forecast()
-        if "residual_load_EOM" not in self.forecasts.columns:
-            self.forecasts[
-                "residual_load_EOM"
-            ] = self.calculate_residual_demand_forecast()
+
+        for market_id, config in self.market_configs.items():
+            if config["product_type"] != "energy":
+                self.logger.warning(
+                    f"Price forecast could be calculated for {market_id}. It can only be calculated for energy only markets for now"
+                )
+                continue
+
+            if f"price_{market_id}" not in self.forecasts.columns:
+                self.forecasts[
+                    f"price_{market_id}"
+                ] = self.calculate_market_price_forecast(market_id=market_id)
+
+            if f"residual_load_{market_id}" not in self.forecasts.columns:
+                self.forecasts[
+                    f"residual_load_{market_id}"
+                ] = self.calculate_residual_load_forecast(market_id=market_id)
 
     def get_registered_market_participants(self, market_id):
         """
@@ -214,9 +233,9 @@ class CsvForecaster(Forecaster):
         self.logger.warn(
             "Functionality of using the different markets and specified registration for the price forecast is not implemented yet"
         )
-        return self.powerplants
+        return self.powerplants_units
 
-    def calculate_residual_demand_forecast(self) -> pd.Series:
+    def calculate_residual_load_forecast(self, market_id) -> pd.Series:
         """
         This method calculates the residual demand forecast by subtracting the total available power from renewable energy (VRE) power plants from the overall demand forecast for each time step.
 
@@ -224,30 +243,35 @@ class CsvForecaster(Forecaster):
             pd.Series: The residual demand forecast.
 
         Notes:
-            1. Selects VRE power plants (wind_onshore, wind_offshore, solar) from the powerplants data.
+            1. Selects VRE power plants (wind_onshore, wind_offshore, solar) from the powerplants_units data.
             2. Creates a DataFrame, vre_feed_in_df, with columns representing VRE power plants and initializes it with zeros.
             3. Calculates the power feed-in for each VRE power plant based on its availability and maximum power.
             4. Calculates the residual demand by subtracting the total VRE power feed-in from the overall demand forecast.
         """
 
-        vre_powerplants = self.powerplants[
-            self.powerplants["technology"].isin(
+        vre_powerplants_units = self.powerplants_units[
+            self.powerplants_units["technology"].isin(
                 ["wind_onshore", "wind_offshore", "solar"]
             )
         ].copy()
 
         vre_feed_in_df = pd.DataFrame(
-            index=self.index, columns=vre_powerplants.index, data=0.0
+            index=self.index, columns=vre_powerplants_units.index, data=0.0
         )
 
-        for pp, max_power in vre_powerplants["max_power"].items():
+        for pp, max_power in vre_powerplants_units["max_power"].items():
             vre_feed_in_df[pp] = self.forecasts[f"availability_{pp}"] * max_power
 
-        res_demand_df = self.forecasts["demand_EOM"] - vre_feed_in_df.sum(axis=1)
+        demand_units = self.demand_units[
+            self.demand_units[f"bidding_{market_id}"].notnull()
+        ]
+        sum_demand = self.forecasts[demand_units.index].sum(axis=1)
+
+        res_demand_df = sum_demand - vre_feed_in_df.sum(axis=1)
 
         return res_demand_df
 
-    def calculate_EOM_price_forecast(self):
+    def calculate_market_price_forecast(self, market_id):
         """
         Calculates the merit order price forecast for the entire time horizon at once.
 
@@ -270,7 +294,13 @@ class CsvForecaster(Forecaster):
 
         # calculate infeed of renewables and residual demand_df
         # check if max_power is a series or a float
-        marginal_costs = self.powerplants.apply(self.calculate_marginal_cost, axis=1).T
+
+        # select only those power plant units, which have a bidding strategy for the specifi market_id
+        powerplants_units = self.powerplants_units[
+            self.powerplants_units[f"bidding_{market_id}"].notnull()
+        ]
+
+        marginal_costs = powerplants_units.apply(self.calculate_marginal_cost, axis=1).T
         sorted_columns = marginal_costs.loc[self.index[0]].sort_values().index
         col_availabilities = self.forecasts.columns[
             self.forecasts.columns.str.startswith("availability")
@@ -278,8 +308,14 @@ class CsvForecaster(Forecaster):
         availabilities = self.forecasts[col_availabilities]
         availabilities.columns = col_availabilities.str.replace("availability_", "")
 
-        power = self.powerplants.max_power * availabilities
+        power = self.powerplants_units.max_power * availabilities
         cumsum_power = power[sorted_columns].cumsum(axis=1)
+
+        demand_units = self.demand_units[
+            self.demand_units[f"bidding_{market_id}"].notnull()
+        ]
+        sum_demand = self.forecasts[demand_units.index].sum(axis=1)
+
         # initialize empty price_forecast
         price_forecast = pd.Series(index=self.index, data=0.0)
 
@@ -287,7 +323,7 @@ class CsvForecaster(Forecaster):
         for col in sorted_columns[::-1]:
             # find times which can still be provided with this technology
             # and cheaper once
-            cheaper = cumsum_power[col] > self.forecasts["demand_EOM"]
+            cheaper = cumsum_power[col] > sum_demand
             # set the price of this technology as the forecast price
             # for these times
             price_forecast.loc[cheaper] = marginal_costs[col].loc[cheaper]
@@ -365,12 +401,12 @@ class RandomForecaster(CsvForecaster):
 
     Attributes:
         index (pandas.Series): The index of the forecasts.
-        powerplants (dict[str, pandas.Series]): The power plants.
+        powerplants_units (dict[str, pandas.Series]): The power plants.
         sigma (float): The standard deviation of the noise.
 
     Args:
         index (pandas.Series): The index of the forecasts.
-        powerplants (dict[str, pandas.Series]): The power plants.
+        powerplants_units (dict[str, pandas.Series]): The power plants.
         sigma (float): The standard deviation of the noise.
 
     Example:
@@ -383,13 +419,13 @@ class RandomForecaster(CsvForecaster):
     def __init__(
         self,
         index: pd.Series,
-        powerplants: dict[str, pd.Series] = {},
+        powerplants_units: dict[str, pd.Series] = {},
         sigma: float = 0.02,
         *args,
         **kwargs,
     ):
         self.sigma = sigma
-        super().__init__(index, powerplants, *args, **kwargs)
+        super().__init__(index, powerplants_units, *args, **kwargs)
 
     def __getitem__(self, column: str) -> pd.Series:
         """

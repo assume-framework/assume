@@ -39,7 +39,7 @@ async def init():
 
     marketdesign = [
         MarketConfig(
-            name="EOM",
+            market_id="EOM",
             opening_hours=rr.rrule(rr.HOURLY, interval=24, dtstart=start, until=end),
             opening_duration=timedelta(hours=1),
             market_mechanism="pay_as_clear",
