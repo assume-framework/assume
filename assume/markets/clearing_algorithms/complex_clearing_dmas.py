@@ -16,7 +16,6 @@ from pyomo.environ import (
     NonNegativeReals,
     Objective,
     Reals,
-    SolverFactory,
     Var,
     minimize,
     quicksum,
@@ -48,14 +47,13 @@ class ComplexDmasClearingRole(MarketRole):
         During this process, incoming orders are matched against each other and allocations are determined to adhere to market rules.
         The result are an orderbook, the rejected orders and market metadata.
 
-        :param market_agent: The market agent
-        :type market_agent: MarketRole
-        :param market_products: The products to be traded
-        :type market_products: list[MarketProduct]
-        :return: orderbook, rejected_orders, meta
-        :rtype: tuple[Orderbook, Orderbook, list[dict]]
+        Args:
+            orderbook (Orderbook): the orders to be cleared as an orderbook
+            market_products (list[MarketProduct]): the list of products which are cleared in this clearing
+
+        Returns:
+            tuple[Orderbook, Orderbook, list[dict]]: accepted orderbook, rejected orderbook and clearing meta data
         """
-        # INIT
         start = market_products[0][0]
         T = len(market_products)
         t_range = np.arange(T)

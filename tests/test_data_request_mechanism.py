@@ -15,7 +15,7 @@ from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
 from assume.markets.base_market import MarketRole
-from assume.strategies.naive_strategies import NaiveStrategy
+from assume.strategies.naive_strategies import NaiveSingleBidStrategy
 from assume.units.demand import Demand
 
 start = datetime(2020, 1, 1)
@@ -49,9 +49,9 @@ class DataRequester(Agent):
 
 
 async def test_request_messages():
-    market_name = "Test"
+    market_id = "Test"
     marketconfig = MarketConfig(
-        name=market_name,
+        market_id=market_id,
         opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
         opening_duration=rd(hours=1),
         market_mechanism="pay_as_clear",
@@ -68,7 +68,7 @@ async def test_request_messages():
     index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 
     params_dict = {
-        "bidding_strategies": {"energy": NaiveStrategy()},
+        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
         "technology": "energy",
         "unit_operator": "test_operator",
         "max_power": 1000,

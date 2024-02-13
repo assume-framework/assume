@@ -23,20 +23,18 @@ class OTCStrategy(BaseStrategy):
         **kwargs,
     ) -> Orderbook:
         """
-        Takes information from a unit that the unit operator manages and
-        defines how it is dispatched to the market
+        Takes information from a unit that the unit operator manages and defines how it is dispatched to the market.
 
-        Returns a list of bids that the unit operator will submit to the market
-        :param unit: unit to dispatch
-        :type unit: SupportsMinMax
-        :param market_config: market configuration
-        :type market_config: MarketConfig
-        :param product_tuples: list of products to dispatch
-        :type product_tuples: list[Product]
-        :param kwargs: additional arguments
-        :type kwargs: dict
-        :return: orderbook
-        :rtype: Orderbook
+        Returns a list of bids that the unit operator will submit to the market.
+
+        Args:
+            unit (SupportsMinMax): Unit to dispatch.
+            market_config (MarketConfig): Market configuration.
+            product_tuples (list[Product]): List of products to dispatch.
+            **kwargs (dict): Additional arguments.
+
+        Returns:
+            Orderbook: Orderbook.
         """
         bids = []
         for product in product_tuples:
@@ -50,7 +48,7 @@ class OTCStrategy(BaseStrategy):
                 start
             ]  # current power output describes the power output at the start of the product
             volume = max_power[start]
-            if "OTC" in market_config.name:
+            if "OTC" in market_config.market_id:
                 volume *= self.scale
             price = unit.calculate_marginal_cost(start, current_power + volume)
 
@@ -63,6 +61,9 @@ class OTCStrategy(BaseStrategy):
                     "volume": volume,
                 }
             )
+
+        bids = self.remove_empty_bids(bids)
+
         return bids
 
 
@@ -92,7 +93,7 @@ class MarkupStrategy(BaseStrategy):
         Args:
             unit (SupportsMinMax): Unit to dispatch.
             market_config (MarketConfig): Market configuration.
-            product_tuples (List[Product]): List of products to dispatch.
+            product_tuples (list[Product]): List of products to dispatch.
             **kwargs (dict): Additional arguments.
 
         Returns:
@@ -121,4 +122,7 @@ class MarkupStrategy(BaseStrategy):
                     "volume": volume,
                 }
             )
+
+        bids = self.remove_empty_bids(bids)
+
         return bids

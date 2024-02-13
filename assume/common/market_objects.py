@@ -30,8 +30,8 @@ class Order(TypedDict):
 
     Args:
         bid_id (str): the id of the bid
-        start_time (datetime): the start time of the order
-        end_time (datetime): the end time of the order
+        start_time (datetime.datetime): the start time of the order
+        end_time (datetime.datetime): the end time of the order
         volume (Number | dict[datetime, Number]): the volume of the order (positive if generation)
         accepted_volume (Number | dict[datetime, Number]): the accepted volume of the order
         price (Number): the price of the order
@@ -63,9 +63,9 @@ class MarketProduct:
     Describes the configuration of a market product which is available at a market.
 
     Args:
-        duration (rd | rr.rrule): the duration of the product
+        duration (dateutil.relativedelta.relativedelta | dateutil.rrule.rrule): the duration of the product
         count (int): how many future durations can be traded, must be >= 1
-        first_delivery (rd): when does the first delivery begin, in relation to market start
+        first_delivery (dateutil.relativedelta.relativedelta): when does the first delivery begin, in relation to market start
         only_hours (OnlyHours | None): tuple of hours from which this order is available, on multi day products
         eligible_lambda_function (eligible_lambda | None): lambda function which determines if an agent is eligible to trade this product
     """
@@ -82,8 +82,8 @@ class Product(NamedTuple):
     An actual product with start and end.
 
     Args:
-        start (datetime): the start time of the product
-        end (datetime): the end time of the product
+        start (datetime.datetime): the start time of the product
+        end (datetime.datetime): the end time of the product
         only_hours (OnlyHours | None): tuple of hours from which this order is available, on multi day products
     """
 
@@ -98,9 +98,9 @@ class MarketConfig:
     Describes the configuration of a market.
 
     Args:
-        name (str): the name of the market
-        opening_hours (rr.rrule): the opening hours of the market
-        opening_duration (timedelta): the duration of the opening hours
+        market_id (str): the ID of the market
+        opening_hours (dateutil.rrule.rrule): the opening hours of the market
+        opening_duration (datetime.timedelta): the duration of the opening hours
         market_mechanism (str): name of method used for clearing
         market_products (list[MarketProduct]): list of available products to be traded at the market
         product_type (str): energy or capacity or heat
@@ -119,7 +119,7 @@ class MarketConfig:
         aid (str): automatic id of the market
     """
 
-    name: str = "market"
+    market_id: str = "market"
     opening_hours: rr.rrule = rr.rrule(rr.HOURLY)
     opening_duration: timedelta = timedelta(hours=1)
     market_mechanism: str = "pay_as_clear"
@@ -230,8 +230,8 @@ class DataRequestMessage(TypedDict):
         context (str): the context of the message
         market_id (str): the id of the market
         metric (str): the specific metric being requested
-        start_time (datetime): the start time of the data request
-        end_time (datetime): the end time of the data request
+        start_time (datetime.datetime): the start time of the data request
+        end_time (datetime.datetime): the end time of the data request
     """
 
     context: str

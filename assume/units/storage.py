@@ -9,74 +9,47 @@ from functools import lru_cache
 import pandas as pd
 
 from assume.common.base import SupportsMinMaxCharge
+from assume.common.market_objects import MarketConfig, Orderbook
+from assume.common.utils import get_products_index
 
 logger = logging.getLogger(__name__)
 EPS = 1e-4
 
 
 class Storage(SupportsMinMaxCharge):
-    """A class for a storage unit.
+    """
+    A class for a storage unit.
 
-    Attributes
-    ----------
-    id : str
-        The ID of the storage unit.
-    technology : str
-        The technology of the storage unit.
-    node : str
-        The node of the storage unit.
-    max_power_charge : float
-        The maximum power input of the storage unit in MW (negative value).
-    min_power_charge : float
-        The minimum power input of the storage unit in MW (negative value).
-    max_power_discharge : float
-        The maximum power output of the storage unit in MW.
-    min_power_discharge : float
-        The minimum power output of the storage unit in MW.
-    max_volume : float
-        The maximum state of charge of the storage unit in MWh (equivalent to capacity).
-    min_volume : float
-        The minimum state of charge of the storage unit in MWh.
-    efficiency_charge : float
-        The efficiency of the storage unit while charging.
-    efficiency_discharge : float
-        The efficiency of the storage unit while discharging.
-    variable_cost_charge : float
-        Variable costs to charge the storage unit in €/MW.
-    variable_costs_discharge : float
-        Variable costs to discharge the storage unit in €/MW.
-    emission_factor : float
-        The emission factor of the storage unit.
-    ramp_up_charge : float, optional
-        The ramp up rate of charging the storage unit in MW/15 minutes (negative value).
-    ramp_down_charge : float, optional
-        The ramp down rate of charging the storage unit in MW/15 minutes (negative value).
-    ramp_up_discharge : float, optional
-        The ramp up rate of discharging the storage unit in MW/15 minutes.
-    ramp_down_discharge : float, optional
-        The ramp down rate of discharging the storage unit in MW/15 minutes.
-    fixed_cost : float, optional
-        The fixed cost of the storage unit in €/MW. (related to capacity?)
-    hot_start_cost : float, optional
-        The hot start cost of the storage unit in €/MW.
-    warm_start_cost : float, optional
-        The warm start cost of the storage unit in €/MW.
-    cold_start_cost : float, optional
-        The cold start cost of the storage unit in €/MW.
-    downtime_hot_start : float, optional
-        Definition of downtime before hot start in h.
-    downtime_warm_start : float
-        Definition of downtime before warm start in h.
-    min_operating_time : float, optional
-        The minimum operating time of the storage unit in hours.
-    min_down_time : float, optional
-        The minimum down time of the storage unit in hours.
-    is_active: bool
-        Defines whether or not the unit bids itself or is portfolio optimized.
-    bidding_startegy: str
-        In case the unit is active it has to be defined which bidding strategy should be used
-    kwargs
-        Additional keyword arguments.
+    Args:
+        id (str): The ID of the storage unit.
+        technology (str): The technology of the storage unit.
+        node (str): The node of the storage unit.
+        max_power_charge (float): The maximum power input of the storage unit in MW (negative value).
+        min_power_charge (float): The minimum power input of the storage unit in MW (negative value).
+        max_power_discharge (float): The maximum power output of the storage unit in MW.
+        min_power_discharge (float): The minimum power output of the storage unit in MW.
+        max_volume (float): The maximum state of charge of the storage unit in MWh (equivalent to capacity).
+        min_volume (float): The minimum state of charge of the storage unit in MWh.
+        efficiency_charge (float): The efficiency of the storage unit while charging.
+        efficiency_discharge (float): The efficiency of the storage unit while discharging.
+        variable_cost_charge (float): Variable costs to charge the storage unit in €/MW.
+        variable_costs_discharge (float): Variable costs to discharge the storage unit in €/MW.
+        emission_factor (float): The emission factor of the storage unit.
+        ramp_up_charge (float): The ramp up rate of charging the storage unit in MW/15 minutes (negative value).
+        ramp_down_charge (float): The ramp down rate of charging the storage unit in MW/15 minutes (negative value).
+        ramp_up_discharge (float): The ramp up rate of discharging the storage unit in MW/15 minutes.
+        ramp_down_discharge (float): The ramp down rate of discharging the storage unit in MW/15 minutes.
+        fixed_cost (float): The fixed cost of the storage unit in €/MW. (related to capacity?)
+        hot_start_cost (float): The hot start cost of the storage unit in €/MW.
+        warm_start_cost (float): The warm start cost of the storage unit in €/MW.
+        cold_start_cost (float): The cold start cost of the storage unit in €/MW.
+        downtime_hot_start (float): Definition of downtime before hot start in h.
+        downtime_warm_start (float): Definition of downtime before warm start in h.
+        min_operating_time (float): The minimum operating time of the storage unit in hours.
+        min_down_time (float): The minimum down time of the storage unit in hours.
+        is_active (bool): Defines whether or not the unit bids itself or is portfolio optimized.
+        bidding_startegy (str): In case the unit is active it has to be defined which bidding strategy should be used
+
     """
 
     def __init__(
@@ -115,7 +88,6 @@ class Storage(SupportsMinMaxCharge):
         node: str = None,
         **kwargs,
     ):
-        """Initialize a storage unit."""
         super().__init__(
             id=id,
             technology=technology,
@@ -194,17 +166,21 @@ class Storage(SupportsMinMaxCharge):
 
     def execute_current_dispatch(self, start: pd.Timestamp, end: pd.Timestamp):
         """
-        Execute the current dispatch of the storage unit.
-        Returns the dispatched energy in MWh.
+        Executes the current dispatch of the unit based on the provided timestamps.
 
-        :param start: The start of the current dispatch.
-        :param end: The end of the current dispatch.
-        :return: The dispatched energy in MWh.
-        :rtype: pd.Series
+        The dispatch is only executed, if it is in the constraints given by the unit.
+        Returns the volume of the unit within the given time range.
+
+        Args:
+            start (pandas.Timestamp): The start time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch.
+
+        Returns:
+            pd.Series: The volume of the unit within the given time range.
         """
         time_delta = self.index.freq / timedelta(hours=1)
 
-        for t in self.outputs["energy"][start:end].index:
+        for t in self.outputs["energy"][start : end - self.index.freq].index:
             delta_soc = 0
             soc = self.outputs["soc"][t]
             if self.outputs["energy"][t] > self.max_power_discharge:
@@ -248,9 +224,78 @@ class Storage(SupportsMinMaxCharge):
                     / self.max_volume
                 )
 
-            self.outputs["soc"][t + self.index.freq :] = soc + delta_soc
+            self.outputs["soc"][t + self.index.freq] = soc + delta_soc
 
         return self.outputs["energy"].loc[start:end]
+
+    def set_dispatch_plan(
+        self,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ) -> None:
+        """
+        Adds the dispatch plan from the current market result to the total dispatch plan and calculates the cashflow.
+
+        Args:
+            marketconfig (MarketConfig): The market configuration.
+            orderbook (Orderbook): The orderbook.
+        """
+        products_index = get_products_index(orderbook)
+
+        product_type = marketconfig.product_type
+        for order in orderbook:
+            start = order["start_time"]
+            end = order["end_time"]
+            end_excl = end - self.index.freq
+            if isinstance(order["accepted_volume"], dict):
+                added_volume = list(order["accepted_volume"].values())
+            else:
+                added_volume = order["accepted_volume"]
+            self.outputs[product_type].loc[start:end_excl] += added_volume
+        self.calculate_cashflow(product_type, orderbook)
+
+        for start in products_index:
+            delta_soc = 0
+            soc = self.outputs["soc"][start]
+            current_power = self.outputs[product_type][start]
+
+            # discharging
+            if current_power > 0:
+                max_soc_discharge = self.calculate_soc_max_discharge(soc)
+
+                if current_power > max_soc_discharge:
+                    self.outputs[product_type][start] = max_soc_discharge
+
+                time_delta = self.index.freq / timedelta(hours=1)
+                delta_soc = (
+                    -self.outputs["energy"][start]
+                    * time_delta
+                    / self.efficiency_discharge
+                    / self.max_volume
+                )
+
+            # charging
+            elif current_power < 0:
+                max_soc_charge = self.calculate_soc_max_charge(soc)
+
+                if current_power < max_soc_charge:
+                    self.outputs[product_type][start] = max_soc_charge
+
+                time_delta = self.index.freq / timedelta(hours=1)
+                delta_soc = (
+                    -self.outputs["energy"][start]
+                    * time_delta
+                    * self.efficiency_charge
+                    / self.max_volume
+                )
+
+            self.outputs["soc"][start + self.index.freq :] = soc + delta_soc
+
+        self.bidding_strategies[marketconfig.market_id].calculate_reward(
+            unit=self,
+            marketconfig=marketconfig,
+            orderbook=orderbook,
+        )
 
     @lru_cache(maxsize=256)
     def calculate_marginal_cost(
@@ -258,6 +303,18 @@ class Storage(SupportsMinMaxCharge):
         start: pd.Timestamp,
         power: float,
     ) -> float:
+        """
+        Calculates the marginal cost of the unit based on the provided start time and power output and returns it.
+        Returns the marginal cost of the unit.
+
+        Args:
+            start (datetime.datetime): The start time of the dispatch.
+            power (float): The power output of the unit.
+
+        Returns:
+            float: The marginal cost of the unit.
+        """
+
         if power > 0:
             variable_cost = (
                 self.variable_cost_discharge.at[start]
@@ -279,6 +336,15 @@ class Storage(SupportsMinMaxCharge):
         return marginal_cost
 
     def calculate_soc_max_discharge(self, soc) -> float:
+        """
+        Calculates the maximum discharge power depending on the current state of charge.
+
+        Args:
+            soc (float): The current state of charge.
+
+        Returns:
+            float: The maximum discharge power.
+        """
         duration = self.index.freq / timedelta(hours=1)
         power = max(
             0,
@@ -294,6 +360,15 @@ class Storage(SupportsMinMaxCharge):
         self,
         soc,
     ) -> float:
+        """
+        Calculates the maximum charge power depending on the current state of charge.
+
+        Args:
+            soc (float): The current state of charge.
+
+        Returns:
+            float: The maximum charge power.
+        """
         duration = self.index.freq / timedelta(hours=1)
         power = min(
             0,
@@ -309,14 +384,15 @@ class Storage(SupportsMinMaxCharge):
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series]:
         """
-        Calculate the minimum and maximum charge power levels of the storage unit.
-        Returns the minimum and maximum charge power levels of the storage unit in MW.
+        Calculates the min and max charging power for the given time period.
 
-        :param start: The start of the current dispatch.
-        :param end: The end of the current dispatch.
-        :param product_type: The product type of the storage unit.
-        :return: The minimum and maximum charge power levels of the storage unit in MW.
-        :rtype: tuple[pd.Series]
+        Args:
+            start (pandas.Timestamp): The start of the current dispatch.
+            end (pandas.Timestamp): The end of the current dispatch.
+            product_type (str): The product type of the storage unit.
+
+        Returns:
+            tuple[pd.Series]: The minimum and maximum charge power levels of the storage unit in MW.
         """
         end_excl = end - self.index.freq
 
@@ -356,14 +432,15 @@ class Storage(SupportsMinMaxCharge):
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series]:
         """
-        Calculate the minimum and maximum discharge power levels of the storage unit.
-        Returns the minimum and maximum discharge power levels of the storage unit in MW.
+        Calculates the min and max discharging power for the given time period.
 
-        :param start: The start of the current dispatch.
-        :param end: The end of the current dispatch.
-        :param product_type: The product type of the storage unit.
-        :return: The minimum and maximum discharge power levels of the storage unit in MW.
-        :rtype: tuple[pd.Series]
+        Args:
+            start (pandas.Timestamp): The start of the current dispatch.
+            end (pandas.Timestamp): The end of the current dispatch.
+            product_type (str): The product type of the storage unit.
+
+        Returns:
+            tuple[pd.Series]: The minimum and maximum discharge power levels of the storage unit in MW.
         """
         end_excl = end - self.index.freq
 
@@ -407,6 +484,19 @@ class Storage(SupportsMinMaxCharge):
         current_power: float = 0,
         min_power_discharge: float = 0,
     ) -> float:
+        """
+        Adjusts the discharging power to the ramping constraints.
+
+        Args:
+            soc (float): The current state of charge.
+            previous_power (float): The previous power output of the unit.
+            power_discharge (float): The discharging power output of the unit.
+            current_power (float, optional): The current power output of the unit. Defaults to 0.
+            min_power_discharge (float, optional): The minimum discharging power output of the unit. Defaults to 0.
+
+        Returns:
+            float: The discharging power adjusted to the ramping constraints.
+        """
         power_discharge = super().calculate_ramp_discharge(
             previous_power,
             power_discharge,
@@ -429,6 +519,19 @@ class Storage(SupportsMinMaxCharge):
         current_power: float = 0,
         min_power_charge: float = 0,
     ) -> float:
+        """
+        Adjusts the charging power to the ramping constraints.
+
+        Args:
+            soc (float): The current state of charge.
+            previous_power (float): The previous power output of the unit.
+            power_charge (float): The charging power output of the unit.
+            current_power (float, optional): The current power output of the unit. Defaults to 0.
+            min_power_charge (float, optional): The minimum charging power output of the unit. Defaults to 0.
+
+        Returns:
+            float: The charging power adjusted to the ramping constraints.
+        """
         power_charge = super().calculate_ramp_charge(
             previous_power,
             power_charge,
@@ -446,7 +549,13 @@ class Storage(SupportsMinMaxCharge):
 
     def get_starting_costs(self, op_time):
         """
-        op_time is hours running
+        Calculates the starting costs of the unit depending on how long it was shut down
+
+        Args:
+            op_time (float): The time the unit was shut down in hours.
+
+        Returns:
+            float: The starting costs of the unit.
         """
         if op_time > 0:
             # unit is running
@@ -462,8 +571,8 @@ class Storage(SupportsMinMaxCharge):
         """
         Return the storage unit's attributes as a dictionary, including specific attributes.
 
-        :return: the storage unit's attributes as a dictionary
-        :rtype: dict
+        Returns:
+            dict: The storage unit's attributes as a dictionary.
         """
         unit_dict = super().as_dict()
         unit_dict.update(

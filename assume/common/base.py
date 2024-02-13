@@ -4,7 +4,7 @@
 
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Dict, List, Tuple, TypedDict, Union
+from typing import TypedDict, Union
 
 import pandas as pd
 
@@ -20,14 +20,25 @@ class BaseUnit:
     """
     A base class for a unit. This class is used as a foundation for all units.
 
+    Attributes:
+        id (str): The ID of the unit.
+        unit_operator (str): The operator of the unit.
+        technology (str): The technology of the unit.
+        bidding_strategies (dict[str, BaseStrategy]): The bidding strategies of the unit.
+        index (pandas.DatetimeIndex): The index of the unit.
+        node (str, optional): The node of the unit. Defaults to "".
+        forecaster (Forecaster, optional): The forecast of the unit. Defaults to None.
+        **kwargs: Additional keyword arguments.
+
     Args:
         id (str): The ID of the unit.
         unit_operator (str): The operator of the unit.
         technology (str): The technology of the unit.
         bidding_strategies (dict[str, BaseStrategy]): The bidding strategies of the unit.
-        index (pd.DatetimeIndex): The index of the unit.
+        index (pandas.DatetimeIndex): The index of the unit.
         node (str, optional): The node of the unit. Defaults to "".
         forecaster (Forecaster, optional): The forecast of the unit. Defaults to None.
+        location (tuple[float, float], optional): The location of the unit. Defaults to (0.0, 0.0).
         **kwargs: Additional keyword arguments.
 
     """
@@ -68,14 +79,14 @@ class BaseUnit:
     def calculate_bids(
         self,
         market_config: MarketConfig,
-        product_tuples: List[Tuple],
+        product_tuples: list[tuple],
     ) -> Orderbook:
         """
-        Calculate the bids for the next time step.
+        Calculates the bids for the next time step.
 
         Args:
             market_config (MarketConfig): The market configuration.
-            product_tuples (List[Tuple]): The product tuples.
+            product_tuples (list[tuple]): The product tuples.
 
         Returns:
             Orderbook: The bids.
@@ -85,10 +96,10 @@ class BaseUnit:
 
         """
 
-        if market_config.product_type not in self.bidding_strategies:
+        if market_config.market_id not in self.bidding_strategies:
             return []
 
-        bids = self.bidding_strategies[market_config.product_type].calculate_bids(
+        bids = self.bidding_strategies[market_config.market_id].calculate_bids(
             unit=self,
             market_config=market_config,
             product_tuples=product_tuples,
@@ -107,10 +118,10 @@ class BaseUnit:
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         """
-        Calculate the marginal cost for the given power.
+        Calculates the marginal cost for the given power.
 
         Args:
-            start (pd.Timestamp): The start time of the dispatch.
+            start (pandas.Timestamp): The start time of the dispatch.
             power (float): The power output of the unit.
 
         Returns:
@@ -125,7 +136,7 @@ class BaseUnit:
         orderbook: Orderbook,
     ) -> None:
         """
-        The method iterates through the orderbook, adding the accepted volumes to the corresponding time slots
+        Iterates through the orderbook, adding the accepted volumes to the corresponding time slots
         in the dispatch plan. It then calculates the cashflow and the reward for the bidding strategies.
 
         Args:
@@ -146,7 +157,7 @@ class BaseUnit:
             self.outputs[product_type].loc[start:end_excl] += added_volume
         self.calculate_cashflow(product_type, orderbook)
 
-        self.bidding_strategies[product_type].calculate_reward(
+        self.bidding_strategies[marketconfig.market_id].calculate_reward(
             unit=self,
             marketconfig=marketconfig,
             orderbook=orderbook,
@@ -159,11 +170,11 @@ class BaseUnit:
         product_type: str,
     ) -> None:
         """
-        Calculate the generation cost for a specific product type within the given time range.
+        Calculates the generation cost for a specific product type within the given time range.
 
         Args:
-            start (datetime): The start time for the calculation.
-            end (datetime): The end time for the calculation.
+            start (datetime.datetime): The start time for the calculation.
+            end (datetime.datetime): The end time for the calculation.
             product_type (str): The type of product for which the generation cost is to be calculated.
 
         """
@@ -171,10 +182,8 @@ class BaseUnit:
             start = self.index[0]
         product_type_mc = product_type + "_marginal_costs"
         for t in self.outputs[product_type_mc][start:end].index:
-            mc = self.calculate_marginal_cost(
-                start, self.outputs[product_type].loc[start]
-            )
-            self.outputs[product_type_mc][t] = mc * self.outputs[product_type][start]
+            mc = self.calculate_marginal_cost(t, self.outputs[product_type].loc[t])
+            self.outputs[product_type_mc][t] = abs(mc * self.outputs[product_type][t])
 
     def execute_current_dispatch(
         self,
@@ -182,7 +191,7 @@ class BaseUnit:
         end: pd.Timestamp,
     ) -> pd.Series:
         """
-        Check if the total dispatch plan is feasible.
+        Checks if the total dispatch plan is feasible.
 
         This method checks if the market feedback is feasible for the given unit and sets the closest dispatch if not.
         The end parameter should be inclusive.
@@ -198,7 +207,7 @@ class BaseUnit:
 
     def get_output_before(self, dt: datetime, product_type: str = "energy") -> float:
         """
-        Return output before the given datetime.
+        Returns output before the given datetime.
 
         If the datetime is before the start of the index, 0 is returned.
 
@@ -214,7 +223,7 @@ class BaseUnit:
         else:
             return self.outputs[product_type].at[dt - self.index.freq]
 
-    def as_dict(self) -> Dict[str, Union[str, int]]:
+    def as_dict(self) -> dict[str, Union[str, int]]:
         """
         Returns a dictionary representation of the unit.
 
@@ -231,7 +240,7 @@ class BaseUnit:
 
     def calculate_cashflow(self, product_type: str, orderbook: Orderbook):
         """
-        Calculates the cashflow for the given product_type.
+        Calculates the cashflow for the given product type.
 
         Args:
             product_type: The product type.
@@ -273,35 +282,22 @@ class BaseUnit:
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         """
-        Calculates the marginal cost for the given power
+        Calculates the marginal cost for the given power.
 
-        :param start: the start time of the dispatch
-        :type start: pd.Timestamp
-        :param power: the power output of the unit
-        :type power: float
-        :return: the marginal cost for the given power
-        :rtype: float
+        Args:
+            start (pandas.Timestamp): The start time of the dispatch.
+            power (float): The power output of the unit.
+
+        Returns:
+            float: The marginal cost for the given power.
         """
         pass
 
 
 class SupportsMinMax(BaseUnit):
     """
-    Base Class used for units supporting continuous dispatch and without energy storage.
+    Base class used for units supporting continuous dispatch and without energy storage.
     This class is best to be used as foundation for classes of power plants and similar units.
-
-    Args:
-        min_power (float): The minimum power output of the unit.
-        max_power (float): The maximum power output of the unit.
-        ramp_down (float): How much power can be decreased in one time step.
-        ramp_up (float): How much power can be increased in one time step.
-        efficiency (float): The efficiency of the unit.
-        emission_factor (float): The emission factor of the unit.
-        min_operating_time (int): The minimum time the unit has to be on.
-        min_down_time (int): The minimum time the unit has to be off.
-
-    Methods
-    -------
     """
 
     min_power: float
@@ -317,15 +313,15 @@ class SupportsMinMax(BaseUnit):
         self, start: pd.Timestamp, end: pd.Timestamp, product_type: str = "energy"
     ) -> tuple[pd.Series, pd.Series]:
         """
-        Calculates the min and max power for the given time period
+        Calculates the min and max power for the given time period.
 
         Args:
-            start (pd.Timestamp): the start time of the dispatch
-            end (pd.Timestamp): the end time of the dispatch
-            product_type (str): the product type of the unit
+            start (pandas.Timestamp): The start time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch.
+            product_type (str): The product type of the unit.
 
         Returns:
-            tuple[pd.Series, pd.Series]: the min and max power for the given time period
+            tuple[pandas.Series, pandas.Series]: The min and max power for the given time period.
         """
         pass
 
@@ -337,18 +333,18 @@ class SupportsMinMax(BaseUnit):
         current_power: float = 0,
     ) -> float:
         """
-        Calculates the ramp for the given power
+        Corrects the possible power to offer according to ramping restrictions.
 
         Args:
-            op_time (int): the operation time
-            previous_power (float): the previous power output of the unit
-            power (float): the power output of the unit
-            current_power (float): the current power output of the unit
+            op_time (int): The operation time.
+            previous_power (float): The previous power output of the unit.
+            power (float): The planned power offer of the unit.
+            current_power (float): The current power output of the unit.
 
         Returns:
-            float: the ramp for the given power
+            float: The corrected possible power to offer according to ramping restrictions.
         """
-        # op_time_befor = self.get_operation_time(start)
+
         # was off before, but should be on now and min_down_time is not reached
         if power > 0 and op_time < 0 and op_time > -self.min_down_time:
             power = 0
@@ -378,13 +374,13 @@ class SupportsMinMax(BaseUnit):
 
     def get_clean_spread(self, prices: pd.DataFrame) -> float:
         """
-        Returns the clean spread for the given prices
+        Returns the clean spread for the given prices.
 
         Args:
-            prices (pd.DataFrame): the prices
+            prices (pandas.DataFrame): The prices.
 
         Returns:
-            float: the clean spread for the given prices
+            float: The clean spread for the given prices.
         """
         emission_cost = self.emission_factor * prices["co"].mean()
         fuel_cost = prices[self.technology.replace("_combined", "")].mean()
@@ -392,13 +388,13 @@ class SupportsMinMax(BaseUnit):
 
     def get_operation_time(self, start: datetime) -> int:
         """
-        Returns the operation time
+        Returns the time the unit is operating (positive) or shut down (negative).
 
         Args:
-            start (datetime): the start time
+            start (datetime.datetime): The start time.
 
         Returns:
-            int: the operation time
+            int: The operation time.
         """
         before = start - self.index.freq
 
@@ -419,13 +415,13 @@ class SupportsMinMax(BaseUnit):
 
     def get_average_operation_times(self, start: datetime) -> tuple[float, float]:
         """
-        Calculates the average uninterrupted operation time
+        Calculates the average uninterrupted operation and down time.
 
         Args:
-            start (datetime): the current time
+            start (datetime.datetime): The current time.
 
         Returns:
-            tuple[float, float]: avg_op_time, avg_down_time
+            tuple[float, float]: Tuple of the average operation time avg_op_time and average down time avg_down_time.
 
         Note:
             down_time in general is indicated with negative values
@@ -475,10 +471,10 @@ class SupportsMinMax(BaseUnit):
         according to the start-up costs of the unit and the hot/warm/cold start times.
 
         Args:
-            op_time (int): operation time
+            op_time (int): The operation time.
 
         Returns:
-            float: start_costs
+            float: The start-up costs depending on the down time.
         """
         if op_time > 0:
             # unit is running
@@ -500,22 +496,6 @@ class SupportsMinMaxCharge(BaseUnit):
     """
     Base Class used for units with energy storage.
 
-    Args:
-        initial_soc (float): The initial state of charge of the storage.
-        min_power_charge (float): How much power must be charged at least in one time step.
-        max_power_charge (float): How much power can be charged at most in one time step.
-        min_power_discharge (float): How much power must be discharged at least in one time step.
-        max_power_discharge (float): How much power can be discharged at most in one time step.
-        ramp_up_discharge (float): How much power can be increased in discharging in one time step.
-        ramp_down_discharge (float): How much power can be decreased in discharging in one time step.
-        ramp_up_charge (float): How much power can be increased in charging in one time step.
-        ramp_down_charge (float): How much power can be decreased in charging in one time step.
-        max_volume (float): The maximum volume of the storage.
-        efficiency_charge (float): The efficiency of charging.
-        efficiency_discharge (float): The efficiency of discharging.
-
-    Methods
-    -------
     """
 
     initial_soc: float
@@ -533,17 +513,17 @@ class SupportsMinMaxCharge(BaseUnit):
 
     def calculate_min_max_charge(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
-    ) -> Tuple[pd.Series, pd.Series]:
+    ) -> tuple[pd.Series, pd.Series]:
         """
-        calculates the min and max charging power for the given time period
+        Calculates the min and max charging power for the given time period.
 
         Args:
-            start (pd.Timestamp): the start time of the dispatch
-            end (pd.Timestamp): the end time of the dispatch
-            product_type (str, optional): the product type of the unit. Defaults to "energy".
+            start (pandas.Timestamp): The start time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch.
+            product_type (str, optional): The product type of the unit. Defaults to "energy".
 
         Returns:
-            Tuple[pd.Series, pd.Series]: the min and max charging power for the given time period
+            tuple[pandas.Series, pandas.Series]: The min and max charging power for the given time period.
         """
         pass
 
@@ -551,30 +531,29 @@ class SupportsMinMaxCharge(BaseUnit):
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series, pd.Series]:
         """
-        calculates the min and max discharging power for the given time period
+        Calculates the min and max discharging power for the given time period.
 
-        :param start: the start time of the dispatch
-        :type start: pd.Timestamp
-        :param end: the end time of the dispatch
-        :type end: pd.Timestamp
-        :param product_type: the product type of the unit
-        :type product_type: str
-        :return: the min and max discharging power for the given time period
-        :rtype: tuple[pd.Series, pd.Series]
+        Args:
+            start (pandas.Timestamp): The start time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch.
+            product_type (str, optional): The product type of the unit. Defaults to "energy".
+
+        Returns:
+            tuple[pandas.Series, pandas.Series]: The min and max discharging power for the given time period.
         """
         pass
 
     def get_soc_before(self, dt: datetime) -> float:
         """
-        This method returns the State of Charge (SoC) before the given datetime.
+        Returns the State of Charge (SoC) before the given datetime.
         If datetime is before the start of the index, the initial SoC is returned.
         The SoC is a float between 0 and 1.
 
         Args:
-            dt (datetime): the datetime
+            dt (datetime.datetime): The current datetime.
 
         Returns:
-            float: the SoC before the given datetime
+            float: The SoC before the given datetime.
         """
         if dt - self.index.freq <= self.index[0]:
             return self.initial_soc
@@ -583,13 +562,13 @@ class SupportsMinMaxCharge(BaseUnit):
 
     def get_clean_spread(self, prices: pd.DataFrame) -> float:
         """
-        Return the clean spread for the given prices
+        Returns the clean spread for the given prices.
 
         Args:
-            prices (pd.DataFrame): the prices
+            prices (pandas.DataFrame): The prices.
 
         Returns:
-            float: the clean spread for the given prices
+            float: The clean spread for the given prices.
         """
         emission_cost = self.emission_factor * prices["co"].mean()
         fuel_cost = prices[self.technology.replace("_combined", "")].mean()
@@ -605,12 +584,12 @@ class SupportsMinMaxCharge(BaseUnit):
         Adjusts the discharging power to the ramping constraints.
 
         Args:
-            previous_power (float): the previous power output of the unit
-            power_discharge (float): the discharging power output of the unit
-            current_power (float, optional): the current power output of the unit. Defaults to 0.
+            previous_power (float): The previous power output of the unit.
+            power_discharge (float): The discharging power output of the unit.
+            current_power (float, optional): The current power output of the unit. Defaults to 0.
 
         Returns:
-            float: the ramp for the given discharging power
+            float: The discharging power adjusted to the ramping constraints.
         """
         if power_discharge == 0:
             return power_discharge
@@ -647,12 +626,12 @@ class SupportsMinMaxCharge(BaseUnit):
         Adjusts the charging power to the ramping constraints.
 
         Args:
-            previous_power (float): the previous power output of the unit
-            power_charge (float): the charging power output of the unit
-            current_power (float, optional): the current power output of the unit. Defaults to 0.
+            previous_power (float): The previous power output of the unit.
+            power_charge (float): The charging power output of the unit.
+            current_power (float, optional): The current power output of the unit. Defaults to 0.
 
         Returns:
-            float: the ramp for the given charging power
+            float: The charging power adjusted to the ramping constraints.
         """
 
         if power_charge == 0:
@@ -687,8 +666,8 @@ class BaseStrategy:
     A base class for a bidding strategy.
 
     Args:
-        args (list): The arguments.
-        kwargs (dict): The keyword arguments.
+        *args (list): The arguments.
+        **kwargs (dict): The keyword arguments.
     """
 
     def __init__(self, *args, **kwargs):
@@ -698,7 +677,7 @@ class BaseStrategy:
         self,
         unit: BaseUnit,
         market_config: MarketConfig,
-        product_tuples: List[Product],
+        product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
         """
@@ -707,10 +686,10 @@ class BaseStrategy:
         Args:
             unit (BaseUnit): The unit.
             market_config (MarketConfig): The market configuration.
-            product_tuples (List[Product]): The product tuples.
+            product_tuples (list[Product]): The product tuples.
 
         Returns:
-            Orderbook: The bids
+            Orderbook: The bids.
         """
 
     def calculate_reward(
@@ -720,29 +699,57 @@ class BaseStrategy:
         orderbook: Orderbook,
     ):
         """
-        Calculates the reward for the given unit
+        Calculates the reward for the given unit.
 
         Args:
-            unit (BaseUnit): the unit
+            unit (BaseUnit): The unit.
             marketconfig (MarketConfig): The market configuration.
             orderbook (Orderbook): The orderbook.
         """
         pass
+
+    def remove_empty_bids(self, bids: list) -> list:
+        """
+        Removes empty bids from the orderbook. Use this method to clean the bids before submitting
+        them to the market to speed up the market clearing process, and if zero volume bids are not
+        required for the specific market.
+
+        Args:
+            bids (list): The bids.
+
+        Returns:
+            list: The cleaned bids.
+        """
+
+        cleaned_bids = []
+        for bid in bids:
+            if isinstance(bid["volume"], dict):
+                if all(volume == 0 for volume in bid["volume"].values()):
+                    continue
+            elif bid["volume"] == 0:
+                continue
+            cleaned_bids.append(bid)
+
+        return cleaned_bids
 
 
 class LearningStrategy(BaseStrategy):
     """
     A strategy which provides learning functionality, has a method to calculate the reward.
 
+    Attributes:
+        obs_dim (int): The observation dimension.
+        act_dim (int): The action dimension.
+
     Args:
-        args (list): The arguments.
-        kwargs (dict): The keyword arguments.
+        *args (list): The arguments.
+        **kwargs (dict): The keyword arguments.
     """
 
-    obs_dim: int
-    act_dim: int
-
     def __init__(self, *args, **kwargs):
+        """
+        Initializes the learning strategy.
+        """
         super().__init__(*args, **kwargs)
         self.obs_dim = kwargs.get("observation_dimension", 50)
         self.act_dim = kwargs.get("action_dimension", 2)
@@ -751,26 +758,6 @@ class LearningStrategy(BaseStrategy):
 class LearningConfig(TypedDict):
     """
     A class for the learning configuration.
-
-    Args:
-        observation_dimension (int): The observation dimension.
-        action_dimension (int): The action dimension.
-        continue_learning (bool): Whether to continue learning.
-        max_bid_price (float): The maximum bid price.
-        learning_mode (bool): Whether to use learning mode.
-        algorithm (str): The algorithm to use.
-        learning_rate (float): The learning rate.
-        training_episodes (int): The number of training episodes.
-        episodes_collecting_initial_experience (int): The number of episodes collecting initial experience.
-        train_freq (int): The training frequency.
-        gradient_steps (int): The number of gradient steps.
-        batch_size (int): The batch size.
-        gamma (float): The discount factor.
-        device (str): The device to use.
-        noise_sigma (float): The standard deviation of the noise.
-        noise_scale (int): Controls the initial strength of the noise.
-        noise_dt (int): Determines how quickly the noise weakens over time.
-        trained_actors_path (str): The path to the learned model to load.
     """
 
     observation_dimension: int
@@ -790,4 +777,4 @@ class LearningConfig(TypedDict):
     noise_sigma: float
     noise_scale: int
     noise_dt: int
-    trained_actors_path: str
+    trained_policies_save_path: str

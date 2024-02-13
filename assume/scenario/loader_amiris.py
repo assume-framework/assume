@@ -3,17 +3,14 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import dateutil.rrule as rr
-import numpy as np
 import pandas as pd
 import yaml
-from tqdm import tqdm
 from yamlinclude import YamlIncludeConstructor
 
-from assume.common.base import LearningConfig
-from assume.common.forecasts import CsvForecaster, Forecaster, NaiveForecast
+from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.world import World
 
@@ -122,10 +119,12 @@ def add_agent_to_world(
     base_path: str,
     markups: dict = {},
 ):
+    strategies = {m: "naive_eom" for m in list(world.markets.keys())}
+    storage_strategies = {m: "flexable_eom_storage" for m in list(world.markets.keys())}
     match agent["Type"]:
         case "EnergyExchange" | "DayAheadMarketSingleZone":
             market_config = MarketConfig(
-                name=f"Market_{agent['Id']}",
+                market_id=f"Market_{agent['Id']}",
                 opening_hours=rr.rrule(
                     rr.HOURLY, interval=1, dtstart=world.start, until=world.end
                 ),
@@ -170,7 +169,7 @@ def add_agent_to_world(
                     {
                         "min_power": 0,
                         "max_power": 100000,
-                        "bidding_strategies": {"energy": "naive"},
+                        "bidding_strategies": strategies,
                         "technology": "demand",
                         "price": load["ValueOfLostLoad"],
                     },
@@ -209,7 +208,7 @@ def add_agent_to_world(
                     "efficiency_discharge": device["DischargingEfficiency"],
                     "initial_soc": initial_soc,
                     "max_volume": max_volume,
-                    "bidding_strategies": {"energy": "flexable_eom_storage"},
+                    "bidding_strategies": storage_strategies,
                     "technology": "hydro",  # PSPP? Pump-Storage Power Plant
                     "emission_factor": 0,
                 },
@@ -276,7 +275,7 @@ def add_agent_to_world(
                         "min_power": 0,
                         "max_power": power,
                         "fixed_cost": markup,
-                        "bidding_strategies": {"energy": "naive"},
+                        "bidding_strategies": strategies,
                         "technology": translate_fuel_type[prototype["FuelType"]],
                         "fuel_type": translate_fuel_type[prototype["FuelType"]],
                         "emission_factor": prototype["SpecificCo2EmissionsInTperMWH"],
@@ -317,7 +316,7 @@ def add_agent_to_world(
                 {
                     "min_power": 0,
                     "max_power": max_power,
-                    "bidding_strategies": {"energy": "naive"},
+                    "bidding_strategies": strategies,
                     "technology": translate_fuel_type[attr["EnergyCarrier"]],
                     "fuel_type": translate_fuel_type[attr["EnergyCarrier"]],
                     "emission_factor": 0,

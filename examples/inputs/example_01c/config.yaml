@@ -7,6 +7,7 @@ eom_only:
   end_date: 2019-02-01 00:00
   time_step: 1h
   save_frequency_hours: 24
+
   markets_config:
     EOM:
       operator: EOM_operator
@@ -57,9 +58,9 @@ eom_and_crm:
       products:
         - duration: 4h
           count: 1
-          first_delivery: 2h
+          first_delivery: 1h
       opening_frequency: 4h
-      opening_duration: 30m
+      opening_duration: 1h
       volume_unit: MW
       maximum_bid_volume: 100000
       maximum_bid_price: 9999
@@ -74,9 +75,9 @@ eom_and_crm:
       products:
         - duration: 4h
           count: 1
-          first_delivery: 2h
+          first_delivery: 1h
       opening_frequency: 4h
-      opening_duration: 30m
+      opening_duration: 1h
       volume_unit: MW
       maximum_bid_volume: 100000
       maximum_bid_price: 9999
@@ -89,6 +90,7 @@ dam_with_complex_opt_clearing:
   end_date: 2019-04-01 00:00
   time_step: 1h
   save_frequency_hours: 24
+
   markets_config:
     EOM:
       operator: EOM_operator

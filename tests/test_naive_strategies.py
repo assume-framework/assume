@@ -10,10 +10,10 @@ from dateutil.relativedelta import relativedelta as rd
 from assume.common.market_objects import MarketProduct
 from assume.common.utils import get_available_products
 from assume.strategies import (
-    NaiveDAStrategy,
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
-    NaiveStrategy,
+    NaiveProfileStrategy,
+    NaiveSingleBidStrategy,
 )
 from tests.conftest import MockMinMaxUnit
 
@@ -22,7 +22,7 @@ end = datetime(2023, 7, 2)
 
 
 def test_naive_strategy(mock_market_config, mock_supports_minmax):
-    strategy = NaiveStrategy()
+    strategy = NaiveSingleBidStrategy()
     mc = mock_market_config
     product_tuples = [(start, end, None)]
     bids = strategy.calculate_bids(
@@ -60,7 +60,7 @@ def test_naive_neg_strategy(mock_market_config, mock_supports_minmax):
 
 def test_naive_da_strategy(mock_market_config, mock_supports_minmax):
     # test with mock market
-    strategy = NaiveDAStrategy()
+    strategy = NaiveProfileStrategy()
     mc = mock_market_config
     unit = mock_supports_minmax
     product_tuples = [(start, end, None)]

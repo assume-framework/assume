@@ -33,7 +33,7 @@ async def create_worker(world: World, marketdesign: list[MarketConfig]):
         {
             "min_power": 200,
             "max_power": 1000,
-            "bidding_strategies": {"energy": "naive"},
+            "bidding_strategies": {market_config.market_id: "naive_eom"},
             "technology": "nuclear",
         },
         nuclear_forecast,

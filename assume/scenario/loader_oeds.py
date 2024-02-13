@@ -79,10 +79,9 @@ async def load_oeds_async(
         "co2": 20,
     }
 
-    default_strategy = {"energy": "naive"}
+    default_strategy = {mc.market_id: "naive_eom" for mc in marketdesign}
 
     world.bidding_strategies["dmas_pwp"] = DmasPowerplantStrategy
-    dmas_strategy = {"energy": "dmas_pwp"}
     bidding_strategies = {
         "hard coal": default_strategy,
         "lignite": default_strategy,
@@ -229,14 +228,13 @@ def load_oeds(
     """
     Load a scenario from a given path.
 
-    :param world: The world.
-    :type world: World
-    :param inputs_path: Path to the inputs folder.
-    :type inputs_path: str
-    :param scenario: Name of the scenario.
-    :type scenario: str
-    :param study_case: Name of the study case.
-    :type study_case: str
+    Args:
+        world (World): the world to add the oeds scenario to
+        scenario (str): the scenario name of the simulation
+        study_case (str): the study case name of the simulation
+        infra_uri (str): database uri for the infrastructure
+        marketdesign (list[MarketConfig]): the list of marketconfigs, which form the market design
+        nuts_config (list[str], optional): The list of NUTS areas which are loaded in the scenario. Defaults to [].
     """
     world.loop.run_until_complete(
         load_oeds_async(

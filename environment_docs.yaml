@@ -15,9 +15,10 @@ dependencies:
 - SQLAlchemy
 - pytorch
 - pyomo
+- pypsa
 
 - pip:
-  - .
+  - .[oeds]
   - sphinx<7
   - sphinx-book-theme
   - nbsphinx

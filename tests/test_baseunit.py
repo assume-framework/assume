@@ -45,7 +45,7 @@ def base_unit() -> BaseUnit:
         id="test_pp",
         unit_operator="test_operator",
         technology="base",
-        bidding_strategies={"energy": BasicStrategy()},
+        bidding_strategies={"EOM": BasicStrategy()},
         index=index,
     )
 
@@ -178,3 +178,59 @@ def test_calculate_multi_bids(base_unit, mock_market_config):
         base_unit.execute_current_dispatch(index[0], index[2])
         == base_unit.outputs["energy"][index[0] : index[2]]
     ).all()
+
+
+def test_clear_empty_bids(base_unit, mock_market_config):
+    # Test empty bids
+    bids = []
+    index = base_unit.index
+    for start in index:
+        bids.append(
+            {
+                "start_time": start,
+                "end_time": start + timedelta(hours=1),
+                "only_hours": None,
+                "price": 10,
+                "volume": 0,
+            }
+        )
+    assert (
+        base_unit.bidding_strategies[mock_market_config.market_id].remove_empty_bids(
+            bids
+        )
+        == []
+    )
+
+    # Test non-empty bids
+    non_empty_bids = []
+    for start in index:
+        non_empty_bids.append(
+            {
+                "start_time": start,
+                "end_time": start + timedelta(hours=1),
+                "only_hours": None,
+                "price": 10,
+                "volume": 10,
+            }
+        )
+    non_empty_bids_result = base_unit.bidding_strategies[
+        mock_market_config.market_id
+    ].remove_empty_bids(non_empty_bids)
+    assert non_empty_bids_result == non_empty_bids
+
+    # Test mixed empty and non-empty bids
+    mixed_bids = []
+    for start in index:
+        mixed_bids.append(
+            {
+                "start_time": start,
+                "end_time": start + timedelta(hours=1),
+                "only_hours": None,
+                "price": 10,
+                "volume": 0 if start.hour % 2 == 0 else 10,
+            }
+        )
+    mixed_bids_result = base_unit.bidding_strategies[
+        mock_market_config.market_id
+    ].remove_empty_bids(mixed_bids)
+    assert mixed_bids_result == [bid for bid in mixed_bids if bid["volume"] > 0]

@@ -38,11 +38,11 @@ def test_convert_rrule():
 
 
 def test_make_market_config():
-    market_name = "Test"
+    market_id = "Test"
     start = datetime(2020, 1, 1)
     end = datetime(2020, 12, 2)
     mc = MarketConfig(
-        name=market_name,
+        market_id=market_id,
         opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
         opening_duration=pd.Timedelta(hours=1),
         market_mechanism="pay_as_clear",
@@ -51,6 +51,7 @@ def test_make_market_config():
         ],
     )
     market_params = {
+        "market_id": "EOM",
         "operator": "EOM_operator",
         "product_type": "energy",
         "products": [{"duration": "1h", "count": 1, "first_delivery": "1h"}],
@@ -63,7 +64,7 @@ def test_make_market_config():
         "price_unit": "€/MWh",
         "market_mechanism": "pay_as_clear",
     }
-    mconfig = make_market_config(market_name, market_params, start, end)
+    mconfig = make_market_config(market_id, market_params, start, end)
     assert str(mc.opening_hours) == str(mconfig.opening_hours)
     mc.opening_hours = mconfig.opening_hours
     assert mc == mconfig
@@ -163,7 +164,7 @@ def test_initializer():
 def test_sep_block_orders():
     start = datetime(2020, 1, 1)
     end = datetime(2020, 1, 2)
-    index = pd.date_range(start, end - pd.Timedelta("1H"), freq="1H")
+    index = pd.date_range(start, end - pd.Timedelta("1h"), freq="1h")
     orderbook = [
         {
             "start_time": start,
@@ -201,7 +202,7 @@ def test_sep_block_orders():
             "bid_id": "gen1_1",
         },
     ]
-    index = pd.date_range(start, end - pd.Timedelta("1H"), freq="4H")
+    index = pd.date_range(start, end - pd.Timedelta("1h"), freq="4h")
     orderbook.append(
         {
             "start_time": start,
@@ -225,10 +226,10 @@ def test_sep_block_orders():
 
 def test_get_products_index():
     index_1 = pd.date_range(
-        start=datetime(2020, 1, 1, 0), end=datetime(2020, 1, 1, 5), freq="1H"
+        start=datetime(2020, 1, 1, 0), end=datetime(2020, 1, 1, 5), freq="1h"
     )
     index_2 = pd.date_range(
-        start=datetime(2020, 1, 1, 0), end=datetime(2020, 1, 1, 7), freq="1H"
+        start=datetime(2020, 1, 1, 0), end=datetime(2020, 1, 1, 7), freq="1h"
     )
     orderbook = [
         {

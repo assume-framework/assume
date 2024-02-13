@@ -4,7 +4,7 @@
 
 [tool.poetry]
 name = "assume-framework"
-version = "0.2.1"
+version = "0.3.0"
 description = "ASSUME - Agent-Based Electricity Markets Simulation Toolbox"
 authors = ["ASSUME Developers <contact@assume-project.de>"]
 license = "AGPL-3.0-or-later"
@@ -32,26 +32,26 @@ packages = [
 python = "^3.10"
 argcomplete = "^3.1.4"
 nest-asyncio = "^1.5.6"
-paho-mqtt = "^1.5.1"
 mango-agents-assume = "^1.1.1-8"
 tqdm = "^4.64.1"
 python-dateutil = "^2.8.2"
 sqlalchemy = "^2.0.9"
 pandas = {version = "^2.0.0"}
 psycopg2-binary = "^2.9.5"
-pyomo = "^6.6.1"
 pyyaml = "^6.0"
 pyyaml-include = "^1.3.1"
+pyomo = {version = "^6.6.1", optional = true}
 black = {version = "^23.3.0", optional = true}
 isort = {version = "^5.12.0", optional = true}
 mypy = {version = "^1.1.1", optional = true}
 matplotlib = {version = "^3.7.2", optional = true}
+pypsa = {version = "^0.26.3", optional = true}
 pytest = {version = "^7.2.2", optional = true}
 pytest-cov = {version = "^4.1.0", optional = true}
 pytest-asyncio = {version = "^0.21.1", optional = true}
 torch = {version = "^2.0.1", optional = true}
 glpk = {version = "^0.4.7", optional = true}
-windpowerlib = {git = "https://github.com/maurerle/windpowerlib", rev = "maurerle"}
+windpowerlib = {version = "^0.2.1", optional = true}
 pvlib = {version = "^0.10.2", optional = true}
 holidays = {version = "^0.37", optional = true}
 demandlib = {version = "^0.1.9", optional = true}
@@ -67,9 +67,10 @@ pytest-asyncio = "^0.21.1"
 
 [tool.poetry.extras]
 learning = ["torch"]
-optimize = ["glpk"]
-test = ["black", "isort", "matplotlib", "pytest", "pytest-cov", "pytest-asyncio", "glpk"]
-
+optimization = ["glpk","pyomo", "pypsa"]
+oeds = ["windpowerlib", "pvlib", "demandlib", "holidays"]
+full = ["torch", "glpk","pyomo", "pypsa", "windpowerlib", "pvlib", "demandlib", "holidays"]
+test = ["black", "isort", "matplotlib", "pytest", "pytest-cov", "pytest-asyncio", "glpk", "mypy"]
 
 [tool.poetry.scripts]
 assume = "cli:cli"

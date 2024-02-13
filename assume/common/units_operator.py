@@ -34,6 +34,17 @@ class UnitsOperator(Role):
     The UnitsOperator is the agent that manages the units.
     It receives the opening hours of the market and sends back the bids for the market.
 
+    Attributes:
+        available_markets (list[MarketConfig]): The available markets.
+        registered_markets (dict[str, MarketConfig]): The registered markets.
+        last_sent_dispatch (int): The last sent dispatch.
+        use_portfolio_opt (bool): Whether to use portfolio optimization.
+        portfolio_strategy (BaseStrategy): The portfolio strategy.
+        valid_orders (defaultdict): The valid orders.
+        units (dict[str, BaseUnit]): The units.
+        id (str): The id of the agent.
+        context (Context): The context of the agent.
+
     Args:
         available_markets (list[MarketConfig]): The available markets.
         opt_portfolio (tuple[bool, BaseStrategy] | None, optional): Optimized portfolio strategy. Defaults to None.
@@ -150,7 +161,7 @@ class UnitsOperator(Role):
         await self.context.send_acl_message(
             {
                 "context": "registration",
-                "market_id": market.name,
+                "market_id": market.market_id,
                 "information": [u.as_dict() for u in self.units.values()],
             },
             receiver_addr=market.addr,
@@ -158,10 +169,10 @@ class UnitsOperator(Role):
             acl_metadata={
                 "sender_addr": self.context.addr,
                 "sender_id": self.context.aid,
-                "reply_with": market.name,
+                "reply_with": market.market_id,
             },
         ),
-        logger.debug(f"{self.id} sent market registration to {market.name}")
+        logger.debug(f"{self.id} sent market registration to {market.market_id}")
 
     def handle_opening(self, opening: OpeningMessage, meta: MetaDict) -> None:
         """
@@ -212,8 +223,8 @@ class UnitsOperator(Role):
         if content["accepted"]:
             found = False
             for market in self.available_markets:
-                if content["market_id"] == market.name:
-                    self.registered_markets[market.name] = market
+                if content["market_id"] == market.market_id:
+                    self.registered_markets[market.market_id] = market
                     found = True
                     break
             if not found:
@@ -347,16 +358,18 @@ class UnitsOperator(Role):
     async def submit_bids(self, opening: OpeningMessage, meta: MetaDict) -> None:
         """
         Formulates an orderbook and sends it to the market.
-        This function will accomodate the portfolio optimization in the future.
 
         Args:
             opening (OpeningMessage): The opening message.
             meta (MetaDict): The meta data of the market.
+
+        Note:
+            This function will accomodate the portfolio optimization in the future.
         """
 
         products = opening["products"]
         market = self.registered_markets[opening["market_id"]]
-        logger.debug(f"{self.id} setting bids for {market.name} - {products}")
+        logger.debug(f"{self.id} setting bids for {market.market_id} - {products}")
 
         # the given products just became available on our market
         # and we need to provide bids
@@ -383,7 +396,7 @@ class UnitsOperator(Role):
         await self.context.send_acl_message(
             content={
                 "context": "submit_bids",
-                "market_id": market.name,
+                "market_id": market.market_id,
                 "orderbook": orderbook,
             },
             receiver_addr=market.addr,
@@ -396,7 +409,6 @@ class UnitsOperator(Role):
     ) -> Orderbook:
         """
         Formulates the bid to the market according to the bidding strategy of the unit operator.
-        Placeholder for future portfolio optimization.
 
         Args:
             market (MarketConfig): The market to formulate bids for.
@@ -404,6 +416,9 @@ class UnitsOperator(Role):
 
         Returns:
             OrderBook: The orderbook that is submitted as a bid to the market.
+
+        Note:
+            Placeholder for future portfolio optimization.
         """
         orderbook: Orderbook = []
         # TODO sort units by priority
@@ -436,11 +451,6 @@ class UnitsOperator(Role):
                 product_tuples=products,
             )
             for i, order in enumerate(product_bids):
-                if isinstance(order["volume"], dict):
-                    if all(volume == 0 for volume in order["volume"].values()):
-                        continue
-                elif order["volume"] == 0:
-                    continue
                 order["agent_id"] = (self.context.addr, self.context.aid)
                 if market.volume_tick:
                     order["volume"] = round(order["volume"] / market.volume_tick)
@@ -460,7 +470,7 @@ class UnitsOperator(Role):
         Sends the current rl_strategy update to the output agent.
 
         Args:
-            products_index (pd.DatetimeIndex): The index of all products.
+            products_index (pandas.DatetimeIndex): The index of all products.
             marketconfig (MarketConfig): The market configuration.
         """
         try:
@@ -479,7 +489,7 @@ class UnitsOperator(Role):
         for unit_id, unit in self.units.items():
             # rl only for energy market for now!
             if isinstance(
-                unit.bidding_strategies.get(marketconfig.product_type),
+                unit.bidding_strategies.get(marketconfig.market_id),
                 (RLAdvancedOrderStrategy),
             ):
                 # TODO: check whether to split the reward, profit and regret to different lines
@@ -500,7 +510,7 @@ class UnitsOperator(Role):
                 output_agent_list.append(output_dict)
 
             elif isinstance(
-                unit.bidding_strategies.get(marketconfig.product_type),
+                unit.bidding_strategies.get(marketconfig.market_id),
                 LearningStrategy,
             ):
                 output_dict = {
@@ -546,7 +556,7 @@ class UnitsOperator(Role):
         Writes learning results to the learning agent.
 
         Args:
-            start (datetime): The start time.
+            products_index (pandas.DatetimeIndex): The index of all products.
             marketconfig (MarketConfig): The market configuration.
             obs_dim (int): The observation dimension.
             act_dim (int): The action dimension.
@@ -573,7 +583,7 @@ class UnitsOperator(Role):
         for unit in self.units.values():
             # rl only for energy market for now!
             if isinstance(
-                unit.bidding_strategies.get(marketconfig.product_type),
+                unit.bidding_strategies.get(marketconfig.market_id),
                 (RLAdvancedOrderStrategy),
             ):
                 all_observations[i, :] = unit.outputs["rl_observations"][start]
@@ -582,7 +592,7 @@ class UnitsOperator(Role):
                 i += 1
 
             elif isinstance(
-                unit.bidding_strategies.get(marketconfig.product_type),
+                unit.bidding_strategies.get(marketconfig.market_id),
                 LearningStrategy,
             ):
                 all_observations[i, :] = unit.outputs["rl_observations"][start]
@@ -625,7 +635,7 @@ class UnitsOperator(Role):
         products_index = get_products_index(orderbook)
 
         for unit in self.units.values():
-            bidding_strategy = unit.bidding_strategies.get(marketconfig.product_type)
+            bidding_strategy = unit.bidding_strategies.get(marketconfig.market_id)
             if isinstance(bidding_strategy, LearningStrategy):
                 learning_strategies.append(bidding_strategy)
                 # should be the same across all strategies

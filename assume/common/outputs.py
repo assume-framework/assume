@@ -28,8 +28,8 @@ class WriteOutput(Role):
 
     Args:
         simulation_id (str): The ID of the simulation as a unique classifier.
-        start (datetime): The start datetime of the simulation run.
-        end (datetime): The end datetime of the simulation run.
+        start (datetime.datetime): The start datetime of the simulation run.
+        end (datetime.datetime): The end datetime of the simulation run.
         db_engine: The database engine. Defaults to None.
         export_csv_path (str, optional): The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
         save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to None.
@@ -256,7 +256,7 @@ class WriteOutput(Role):
 
         Args:
             table (str): The name of the database table.
-            df (pd.DataFrame): The DataFrame to be checked.
+            df (pandas.DataFrame): The DataFrame to be checked.
         """
         with self.db.begin() as db:
             # Read table into Pandas DataFrame
@@ -278,7 +278,7 @@ class WriteOutput(Role):
         Checks if the data contains tensors and converts them to floats.
 
         Args:
-            data (pd.Series): The data to be checked.
+            data (pandas.Series): The data to be checked.
         """
         try:
             import torch as th

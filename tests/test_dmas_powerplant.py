@@ -32,7 +32,7 @@ def power_plant_1() -> PowerPlant:
         id="test_pp",
         unit_operator="test_operator",
         technology="hard coal",
-        bidding_strategies={"energy": DmasPowerplantStrategy()},
+        bidding_strategies={"EOM": DmasPowerplantStrategy()},
         index=index,
         max_power=1000,
         min_power=200,
@@ -62,7 +62,7 @@ def power_plant_day(fuel_type="lignite") -> PowerPlant:
         id="test_pp",
         unit_operator="test_operator",
         technology="hard coal",
-        bidding_strategies={"energy": DmasPowerplantStrategy()},
+        bidding_strategies={"EOM": DmasPowerplantStrategy()},
         index=index,
         max_power=1000,
         min_power=200,
@@ -97,7 +97,7 @@ def test_dmas_calc(power_plant_1):
     hour_count = len(power_plant_1.index) // 2
 
     mc = MarketConfig(
-        name="Test",
+        market_id="EOM",
         opening_hours=rr.rrule(rr.HOURLY),
         opening_duration=timedelta(hours=1),
         market_mechanism="not needed",
@@ -124,7 +124,7 @@ def test_dmas_day(power_plant_day):
     assert hour_count == 24
 
     mc = MarketConfig(
-        name="Test",
+        market_id="EOM",
         opening_hours=rr.rrule(rr.HOURLY),
         opening_duration=timedelta(hours=1),
         market_mechanism="not needed",
@@ -159,7 +159,7 @@ def test_dmas_prevent_start(power_plant_day):
     power_plant_day.forecaster.price_forecast.iloc[10:11] = -10
 
     mc = MarketConfig(
-        name="Test",
+        market_id="EOM",
         opening_hours=rr.rrule(rr.HOURLY),
         opening_duration=timedelta(hours=1),
         market_mechanism="not needed",
@@ -193,7 +193,7 @@ def test_dmas_prevent_start_end(power_plant_day):
     power_plant_day.forecaster.price_forecast.iloc[20:24] = -10
 
     mc = MarketConfig(
-        name="Test",
+        market_id="EOM",
         opening_hours=rr.rrule(rr.HOURLY),
         opening_duration=timedelta(hours=1),
         market_mechanism="not needed",

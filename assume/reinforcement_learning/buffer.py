@@ -43,9 +43,9 @@ class ReplayBuffer:
             n_rl_units (int): The number of reinforcement learning units.
             device (str): The device to use for storing the data (e.g., 'cpu' or 'cuda').
             float_type (torch.dtype): The data type to use for the stored data.
-            observations (np.array): The stored observations.
-            actions (np.array): The stored actions.
-            rewards (np.array): The stored rewards.
+            observations (numpy.ndarray): The stored observations.
+            actions (numpy.ndarray): The stored actions.
+            rewards (numpy.ndarray): The stored rewards.
         """
 
         self.buffer_size = buffer_size
@@ -104,10 +104,10 @@ class ReplayBuffer:
 
     def to_torch(self, array: np.array, copy=True):
         """
-        Converts a numpy array to a PyTorch tensor. Note: it copies the data by default.
+        Converts a numpy array to a PyTorch tensor. Note: It copies the data by default.
 
         Args:
-            array (np.array): The numpy array to convert.
+            array (numpy.ndarray): The numpy array to convert.
             copy (bool, optional): Whether to copy or not the data
                 (may be useful to avoid changing things by reference). Defaults to True.
 
@@ -130,9 +130,9 @@ class ReplayBuffer:
         Adds an observation, action, and reward of all agents to the replay buffer.
 
         Args:
-            obs (np.array): The observation to add.
-            actions (np.array): The actions to add.
-            reward (np.array): The reward to add.
+            obs (numpy.ndarray): The observation to add.
+            actions (numpy.ndarray): The actions to add.
+            reward (numpy.ndarray): The reward to add.
         """
         # copying all to avoid modification
         self.observations[self.pos] = obs.copy()

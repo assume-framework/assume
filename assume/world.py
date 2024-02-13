@@ -9,7 +9,7 @@ import sys
 import time
 from datetime import datetime
 from sys import platform
-from typing import Any, Optional, Tuple, Union
+from typing import Optional, Union
 
 import nest_asyncio
 import pandas as pd
@@ -43,32 +43,55 @@ logging.getLogger("mango").setLevel(logging.WARNING)
 
 
 class World:
+    """
+    World instance with the provided address, database URI, export CSV path, log level, and distributed role settings.
+
+    If a database URI is provided, it establishes a database connection. Additionally, it sets up various dictionaries and attributes for market operators,
+    markets, unit operators, unit types, bidding strategies, and clearing mechanisms. If available, it imports learning strategies and handles any potential import errors.
+    Finally, it sets up the event loop for asynchronous operations.
+
+    Attributes:
+        logger (logging.Logger): The logger for the world instance.
+        addr (Union[tuple[str, int], str]): The address of the world, represented as a tuple of string and int or a string.
+        container (mango.Container, optional): The container for the world instance.
+        distributed_role (bool, optional): A boolean indicating whether distributed roles are enabled.
+        export_csv_path (str): The path for exporting CSV data.
+        db (sqlalchemy.engine.base.Engine, optional): The database connection.
+        market_operators (dict[str, mango.RoleAgent]): The market operators for the world instance.
+        markets (dict[str, MarketConfig]): The markets for the world instance.
+        unit_operators (dict[str, UnitsOperator]): The unit operators for the world instance.
+        unit_types (dict[str, BaseUnit]): The unit types for the world instance.
+        bidding_strategies (dict[str, type[BaseStrategy]]): The bidding strategies for the world instance.
+        clearing_mechanisms (dict[str, MarketRole]): The clearing mechanisms for the world instance.
+        addresses (list[str]): The addresses for the world instance.
+        loop (asyncio.AbstractEventLoop): The event loop for the world instance.
+        clock (ExternalClock): The external clock for the world instance.
+        start (datetime.datetime): The start datetime for the simulation.
+        end (datetime.datetime): The end datetime for the simulation.
+        learning_config (LearningConfig): The configuration for the learning process.
+        evaluation_mode (bool): A boolean indicating whether the evaluation mode is enabled.
+        forecaster (Forecaster, optional): The forecaster used for custom unit types.
+        learning_mode (bool): A boolean indicating whether the learning mode is enabled.
+        output_agent_addr (tuple[str, str]): The address of the output agent.
+        bidding_params (dict): Parameters for bidding.
+        index (pandas.Series): The index for the simulation.
+
+    Args:
+        addr: The address of the world, represented as a tuple of string and int or a string.
+        database_uri: The URI for the database connection.
+        export_csv_path: The path for exporting CSV data.
+        log_level: The logging level for the world instance.
+        distributed_role: A boolean indicating whether distributed roles are enabled.
+    """
+
     def __init__(
         self,
-        addr: Union[Tuple[str, int], str] = "world",
+        addr: Union[tuple[str, int], str] = "world",
         database_uri: str = "",
         export_csv_path: str = "",
         log_level: str = "INFO",
         distributed_role: Optional[bool] = None,
     ) -> None:
-        """
-        Initializes a World instance with the provided address, database URI, export CSV path, log level, and distributed role settings.
-
-        If a database URI is provided, it establishes a database connection. Additionally, it sets up various dictionaries and attributes for market operators,
-        markets, unit operators, unit types, bidding strategies, and clearing mechanisms. If available, it imports learning strategies and handles any potential import errors.
-        Finally, it sets up the event loop for asynchronous operations.
-
-        Args:
-            addr (Union[Tuple[str, int], str]): The address of the world, represented as a tuple of string and int or a string.
-            database_uri (str): The URI for the database connection.
-            export_csv_path (str): The path for exporting CSV data.
-            log_level (str): The logging level for the world instance.
-            distributed_role (Optional[bool]): A boolean indicating whether distributed roles are enabled.
-
-        Returns:
-            None
-        """
-
         logging.getLogger("assume").setLevel(log_level)
         self.logger = logging.getLogger(__name__)
         self.addr = addr
@@ -140,25 +163,22 @@ class World:
         bidding_params: dict = {},
         learning_config: LearningConfig = {},
         forecaster: Optional[Forecaster] = None,
-        manager_address: Optional[Any] = None,
-        **kwargs: Any,
+        manager_address=None,
+        **kwargs: dict,
     ) -> None:
         """
         Set up the environment for the simulation, initializing various parameters and components required for the simulation run.
 
         Args:
-            self: The instance of the class.
-            start (datetime): The start datetime for the simulation.
-            end (datetime): The end datetime for the simulation.
+            start (datetime.datetime): The start datetime for the simulation.
+            end (datetime.datetime): The end datetime for the simulation.
             simulation_id (str): The unique identifier for the simulation.
-            index (pd.Series): The index for the simulation.
+            index (pandas.Series): The index for the simulation.
             save_frequency_hours (int, optional): The frequency (in hours) at which to save simulation data. Defaults to 24.
             bidding_params (dict, optional): Parameters for bidding. Defaults to an empty dictionary.
             learning_config (LearningConfig, optional): Configuration for the learning process. Defaults to an empty configuration.
             forecaster (Forecaster, optional): The forecaster used for custom unit types. Defaults to None.
-            manager_address (Any, optional): The address of the manager.
-
-        Other Parameters:
+            manager_address: The address of the manager.
             **kwargs: Additional keyword arguments.
 
         Returns:
@@ -220,12 +240,6 @@ class World:
         Set up the learning process for the simulation, updating bidding parameters with the learning configuration
         and initializing the reinforcement learning (RL) learning role with the specified parameters. It also sets up
         the RL agent and adds the learning role to it for further processing.
-
-        Args:
-            self: The instance of the class.
-
-        Returns:
-            None
         """
 
         self.bidding_params.update(self.learning_config)
@@ -242,7 +256,9 @@ class World:
             # separate process does not support buffer and learning
             self.learning_agent_addr = (self.addr, "learning_agent")
             rl_agent = RoleAgent(
-                self.container, suggested_aid=self.learning_agent_addr[1]
+                self.container,
+                suggested_aid=self.learning_agent_addr[1],
+                suspendable_tasks=False,
             )
             rl_agent.add_role(self.learning_role)
 
@@ -255,12 +271,8 @@ class World:
         it adds the output agent to the container's processes, or directly adds the output role to the output agent.
 
         Args:
-            self: The instance of the class.
             simulation_id (str): The unique identifier for the simulation.
             save_frequency_hours (int): The frequency (in hours) at which to save simulation data.
-
-        Returns:
-            None
         """
 
         self.logger.debug(f"creating output agent {self.db=} {self.export_csv_path=}")
@@ -281,14 +293,20 @@ class World:
             self.addresses.append(self.addr)
 
             def creator(container):
-                agent = RoleAgent(container, suggested_aid=self.output_agent_addr[1])
+                agent = RoleAgent(
+                    container,
+                    suggested_aid=self.output_agent_addr[1],
+                    suspendable_tasks=False,
+                )
                 agent.add_role(self.output_role)
                 clock_agent = DistributedClockAgent(container)
 
             await self.container.as_agent_process(agent_creator=creator)
         else:
             output_agent = RoleAgent(
-                self.container, suggested_aid=self.output_agent_addr[1]
+                self.container,
+                suggested_aid=self.output_agent_addr[1],
+                suspendable_tasks=False,
             )
             output_agent.add_role(self.output_role)
 
@@ -299,11 +317,7 @@ class World:
         related to learning and output agents are set for the unit operator's role context.
 
         Args:
-            self: The instance of the class.
             id (str): The identifier for the unit operator.
-
-        Returns:
-            None
         """
 
         if self.unit_operators.get(id):
@@ -311,7 +325,9 @@ class World:
 
         units_operator = UnitsOperator(available_markets=list(self.markets.values()))
         # creating a new role agent and apply the role of a unitsoperator
-        unit_operator_agent = RoleAgent(self.container, suggested_aid=f"{id}")
+        unit_operator_agent = RoleAgent(
+            self.container, suggested_aid=f"{id}", suspendable_tasks=False
+        )
         unit_operator_agent.add_role(units_operator)
 
         # add the current unitsoperator to the list of operators currently existing
@@ -351,15 +367,11 @@ class World:
         strategies for the unit and adds the unit within the associated unit operator.
 
         Args:
-            self: The instance of the class.
             id (str): The identifier for the unit.
             unit_type (str): The type of unit to be added.
             unit_operator_id (str): The identifier of the unit operator to which the unit will be added.
             unit_params (dict): Parameters for configuring the unit.
             forecaster (Forecaster): The forecaster used by the unit.
-
-        Returns:
-            None
         """
 
         # check if unit operator exists
@@ -376,12 +388,12 @@ class World:
             raise ValueError(f"Unit {id} already exists")
 
         bidding_strategies = {}
-        for product_type, strategy in unit_params["bidding_strategies"].items():
+        for market_id, strategy in unit_params["bidding_strategies"].items():
             if not strategy:
                 continue
             bidding_params = unit_params.get("bidding_params", self.bidding_params)
             try:
-                bidding_strategies[product_type] = self.bidding_strategies[strategy](
+                bidding_strategies[market_id] = self.bidding_strategies[strategy](
                     unit_id=id,
                     **bidding_params,
                 )
@@ -389,7 +401,7 @@ class World:
                 if self.learning_mode and issubclass(
                     self.bidding_strategies[strategy], LearningStrategy
                 ):
-                    self.learning_role.rl_strats[id] = bidding_strategies[product_type]
+                    self.learning_role.rl_strats[id] = bidding_strategies[market_id]
 
                     # if we have learning strategy we need to assign the powerplant to one  unit_operator handling all leanring units
                     if unit_operator_id != "Operator-RL":
@@ -423,18 +435,13 @@ class World:
         it includes the output agent address and ID in the role context data dictionary.
 
         Args:
-            self: The instance of the class.
             id (str): The identifier for the market operator.
-
-        Returns:
-            None
         """
 
         if self.market_operators.get(id):
             raise ValueError(f"MarketOperator {id} already exists")
         market_operator_agent = RoleAgent(
-            self.container,
-            suggested_aid=id,
+            self.container, suggested_aid=id, suspendable_tasks=False
         )
         market_operator_agent.markets = []
 
@@ -455,7 +462,6 @@ class World:
         of markets within the market operator. Additionally, store the market configuration in the simulation's markets dictionary.
 
         Args:
-            self: The instance of the class.
             market_operator_id (str): The identifier of the market operator to which the market will be added.
             market_config (MarketConfig): The configuration for the market to be added.
 
@@ -475,7 +481,7 @@ class World:
 
         market_operator.add_role(market_role)
         market_operator.markets.append(market_config)
-        self.markets[f"{market_config.name}"] = market_config
+        self.markets[f"{market_config.market_id}"] = market_config
 
     async def _step(self):
         if self.distributed_role is not False:
@@ -490,7 +496,7 @@ class World:
         await tasks_complete_or_sleeping(self.container)
         return delta
 
-    async def async_run(self, start_ts, end_ts):
+    async def async_run(self, start_ts: datetime, end_ts: datetime):
         """
         Run the simulation asynchronously, progressing the simulation time from the start timestamp to the end timestamp,
         allowing registration before the first opening. If distributed roles are enabled, broadcast the simulation time.
@@ -498,12 +504,8 @@ class World:
         time reaches the end timestamp, close the progress bar and shut down the simulation container.
 
         Args:
-            self: The instance of the class.
-            start_ts: The start timestamp for the simulation run.
-            end_ts: The end timestamp for the simulation run.
-
-        Returns:
-            None
+            start_ts (datetime.datetime): The start timestamp for the simulation run.
+            end_ts (datetime.datetime): The end timestamp for the simulation run.
         """
         # agent is implicit added to self.container._agents
         pbar = tqdm(total=end_ts - start_ts)
@@ -536,9 +538,6 @@ class World:
         method then iterates through the simulation time, updating the progress bar and the simulation description. Once
         the simulation time reaches the end timestamp, the method closes the progress bar and shuts down the simulation
         container.
-
-        Returns:
-            None
         """
 
         start_ts = calendar.timegm(self.start.utctimetuple())
@@ -584,9 +583,6 @@ class World:
             unit_operator_id (str): The identifier of the unit operator.
             unit_params (dict): Parameters specific to the unit.
             forecaster (Forecaster): The forecaster associated with the unit.
-
-        Returns:
-            None
         """
 
         return self.loop.run_until_complete(

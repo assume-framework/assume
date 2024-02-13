@@ -39,7 +39,7 @@ async def init():
 
     marketdesign = [
         MarketConfig(
-            name="EOM",
+            market_id="EOM",
             opening_hours=rr.rrule(rr.HOURLY, interval=24, dtstart=start, until=end),
             opening_duration=timedelta(hours=1),
             market_mechanism="pay_as_clear",
@@ -63,7 +63,7 @@ async def init():
         {
             "min_power": 0,
             "max_power": 1000,
-            "bidding_strategies": {"energy": "naive"},
+            "bidding_strategies": {"EOM": "naive_eom"},
             "technology": "demand",
         },
         NaiveForecast(index, demand=100),
@@ -77,7 +77,7 @@ async def init():
         {
             "min_power": 200,
             "max_power": 1000,
-            "bidding_strategies": {"energy": "naive"},
+            "bidding_strategies": {"EOM": "naive_eom"},
             "technology": "nuclear",
         },
         nuclear_forecast,

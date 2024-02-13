@@ -60,7 +60,7 @@ def get_available_products(market_products: list[MarketProduct], startdate: date
 
     Args:
         market_products (list[MarketProduct]): List of market products.
-        startdate (datetime): The startdate.
+        startdate (datetime.datetime): The startdate.
 
     Returns:
         list[MarketProduct]: List of available products.
@@ -321,15 +321,15 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=No
     return [j for sub in list(aggregation.values()) for j in sub]
 
 
-def get_test_demand_orders(power: np.array):
+def get_test_demand_orders(power: np.ndarray):
     """
     Get test demand orders.
 
     Args:
-        power (np.array): Power array.
+        power (numpy.ndarray): Power array.
 
     Returns:
-        pd.DataFrame: DataFrame of demand orders.
+        pandas.DataFrame: DataFrame of demand orders.
 
     Examples:
         >>> power = np.array([100, 200, 150])
@@ -394,14 +394,15 @@ def separate_orders(orderbook: Orderbook):
     return orderbook
 
 
-def get_products_index(orderbook):
+def get_products_index(orderbook: Orderbook) -> pd.DatetimeIndex:
     """
-    This function returns the index of all start times of orders in orderbook and all inbetween.
+    Creates an index containing all start times of orders in orderbook and all inbetween.
+
     Args:
         orderbook (Orderbook): The orderbook.
 
     Returns:
-        index_products: the index containing all start times of orders in orderbook and all inbetween
+        pd.DatetimeIndex: The index containing all start times of orders in orderbook and all inbetween.
     """
     if orderbook == []:
         return []

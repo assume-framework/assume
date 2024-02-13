@@ -4,14 +4,19 @@
 
 # Configuration file for the Sphinx documentation builder.
 
+import tomllib
+
+with open("../../pyproject.toml", "rb") as f:
+    pyproject_toml = tomllib.load(f)["tool"]["poetry"]
+
 # -- Project information
 
 project = "ASSUME"
-copyright = "2022-2023 ASSUME Developers"
-author = "ASSUME Developers"
+copyright = "2022-2024 ASSUME Developers"
+author = ",".join(pyproject_toml["authors"])
 
-release = "0.2"
-version = "0.2.1"
+version = pyproject_toml["version"]
+release = version
 
 # -- General configuration
 
@@ -33,6 +38,13 @@ extensions = [
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),
     "sphinx": ("https://www.sphinx-doc.org/en/master/", None),
+    "mango": ("https://mango-agents.readthedocs.io/en/latest/", None),
+    "pandas": ("https://pandas.pydata.org/docs/", None),
+    "sqlalchemy": ("https://docs.sqlalchemy.org/en/20/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "torch": ("https://pytorch.org/docs/stable/", None),
+    "dateutil": ("https://dateutil.readthedocs.io/en/stable/", None),
+    "pyomo": ("https://pyomo.readthedocs.io/en/stable/", None),
 }
 intersphinx_disabled_domains = ["std"]
 

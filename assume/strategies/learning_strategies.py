@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -14,26 +15,31 @@ from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_products_index
 from assume.reinforcement_learning.learning_utils import Actor, NormalActionNoise
 
+logger = logging.getLogger(__name__)
+
 
 class RLStrategy(LearningStrategy):
     """
-    Reinforcement Learning Strategy, that lets agent learn to bid on an Energy Only Makret
-    by submitting two price bids - one for the infelxible (P_min) and one for the flexible part (P_max-P_min) of ist capacity
+    Reinforcement Learning Strategy, that lets agent learn to bid on an Energy Only Makret.
 
-    :param foresight: Number of time steps to look ahead. Default 24.
-    :type foresight: int
-    :param max_bid_price: Maximum bid price
-    :type max_bid_price: float
-    :param max_demand: Maximum demand
-    :type max_demand: float
-    :param device: Device to run on
-    :type device: str
-    :param float_type: Float type to use
-    :type float_type: str
-    :param learning_mode: Whether to use learning mode
-    :type learning_mode: bool
-    :param actor: Actor network
-    :type actor: torch.nn.Module
+    The agent submittes two price bids
+    - one for the infelxible (P_min) and one for the flexible part (P_max-P_min) of ist capacity.
+
+    Attributes:
+        foresight (int): Number of time steps to look ahead. Defaults to 24.
+        max_bid_price (float): Maximum bid price. Defaults to 100.
+        max_demand (float): Maximum demand. Defaults to 10e3.
+        device (str): Device to run on. Defaults to "cpu".
+        float_type (str): Float type to use. Defaults to "float32".
+        learning_mode (bool): Whether to use learning mode. Defaults to False.
+        actor (torch.nn.Module): Actor network. Defaults to None.
+        order_types (list[str]): Order types to use. Defaults to ["SB"].
+        action_noise (NormalActionNoise): Action noise. Defaults to None.
+        collect_initial_experience_mode (bool): Whether to collect initial experience. Defaults to True.
+
+    Args:
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
     """
 
     def __init__(self, *args, **kwargs):
@@ -78,8 +84,10 @@ class RLStrategy(LearningStrategy):
                 dt=kwargs.get("noise_dt", 1.0),
             )
 
-        elif Path(kwargs["trained_actors_path"]).is_dir():
-            self.load_actor_params(load_path=kwargs["trained_actors_path"])
+        elif Path(kwargs["trained_policies_save_path"]).is_dir():
+            self.load_actor_params(load_path=kwargs["trained_policies_save_path"])
+        else:
+            logger.error("did not have learning mode and folder did not exist")
 
     def calculate_bids(
         self,
@@ -89,15 +97,16 @@ class RLStrategy(LearningStrategy):
         **kwargs,
     ) -> Orderbook:
         """
-        Calculate bids for a unit, based on the actions from the actor
+        Calculates bids for a unit, based on the actions from the actors.
 
         Args:
-        - unit (SupportsMinMax): Unit to calculate bids for
-        - market_config (MarketConfig): Market configuration
-        - product_tuples (list[Product]): Product tuples
+            unit (SupportsMinMax): Unit to calculate bids for.
+            market_config (MarketConfig): Market configuration.
+            product_tuples (list[Product]): Product tuples.
+            **kwargs: Keyword arguments.
 
         Returns:
-        - Orderbook: Bids containing start time, end time, price, volume and bid type
+            Orderbook: Bids containing start time, end time, price, volume and bid type.
 
         """
 
@@ -116,6 +125,7 @@ class RLStrategy(LearningStrategy):
         # =============================================================================
         next_observation = self.create_observation(
             unit=unit,
+            market_id=market_config.market_id,
             start=start,
             end=end,
         )
@@ -165,17 +175,19 @@ class RLStrategy(LearningStrategy):
         unit.outputs["rl_actions"][start] = actions
         unit.outputs["rl_exploration_noise"][start] = noise
 
+        bids = self.remove_empty_bids(bids)
+
         return bids
 
     def get_actions(self, next_observation):
         """
-        Get actions for a unit containing two bid prices depending on the observation
+        Gets actions for a unit containing two bid prices depending on the observation.
 
         Args:
-        - next_observation (torch.Tensor): Next observation
+            next_observation (torch.Tensor): Next observation.
 
         Returns:
-        - Actions (torch.Tensor): Actions containing two bid prices
+            Actions (torch.Tensor): Actions containing two bid prices.
 
         Note:
             If the agent is in learning mode, the actions are chosen by the actor neuronal net and noise is added to the action
@@ -229,20 +241,21 @@ class RLStrategy(LearningStrategy):
     def create_observation(
         self,
         unit: SupportsMinMax,
+        market_id: str,
         start: datetime,
         end: datetime,
     ):
         """
-        Create observation
+        Creates an observation.
 
-        :param unit: Unit to create observation for
-        :type unit: SupportsMinMax
-        :param start: Start time
-        :type start: datetime
-        :param end: End time
-        :type end: datetime
-        :return: Observation
-        :rtype: torch.Tensor"""
+        Args:
+            unit (SupportsMinMax): Unit to create observation for.
+            start (datetime.datetime): Start time.
+            end (datetime.datetime): End time.
+
+        Returns:
+            Observation (torch.Tensor): Observation.
+        """
         end_excl = end - unit.index.freq
 
         # get the forecast length depending on the tme unit considered in the modelled unit
@@ -265,15 +278,18 @@ class RLStrategy(LearningStrategy):
 
         # checks if we are at end of simulation horizon, since we need to change the forecast then
         # for residual load and price forecast and scale them
-        if end_excl + forecast_len > unit.forecaster["residual_load_EOM"].index[-1]:
+        if (
+            end_excl + forecast_len
+            > unit.forecaster[f"residual_load_{market_id}"].index[-1]
+        ):
             scaled_res_load_forecast = (
-                unit.forecaster["residual_load_EOM"].loc[start:].values
+                unit.forecaster[f"residual_load_{market_id}"].loc[start:].values
                 / scaling_factor_res_load
             )
             scaled_res_load_forecast = np.concatenate(
                 [
                     scaled_res_load_forecast,
-                    unit.forecaster["residual_load_EOM"].iloc[
+                    unit.forecaster[f"residual_load_{market_id}"].iloc[
                         : self.foresight - len(scaled_res_load_forecast)
                     ],
                 ]
@@ -281,20 +297,21 @@ class RLStrategy(LearningStrategy):
 
         else:
             scaled_res_load_forecast = (
-                unit.forecaster["residual_load_EOM"]
+                unit.forecaster[f"residual_load_{market_id}"]
                 .loc[start : end_excl + forecast_len]
                 .values
                 / scaling_factor_res_load
             )
 
-        if end_excl + forecast_len > unit.forecaster["price_EOM"].index[-1]:
+        if end_excl + forecast_len > unit.forecaster[f"price_{market_id}"].index[-1]:
             scaled_price_forecast = (
-                unit.forecaster["price_EOM"].loc[start:].values / scaling_factor_price
+                unit.forecaster[f"price_{market_id}"].loc[start:].values
+                / scaling_factor_price
             )
             scaled_price_forecast = np.concatenate(
                 [
                     scaled_price_forecast,
-                    unit.forecaster["price_EOM"].iloc[
+                    unit.forecaster[f"price_{market_id}"].iloc[
                         : self.foresight - len(scaled_price_forecast)
                     ],
                 ]
@@ -302,7 +319,9 @@ class RLStrategy(LearningStrategy):
 
         else:
             scaled_price_forecast = (
-                unit.forecaster["price_EOM"].loc[start : end_excl + forecast_len].values
+                unit.forecaster[f"price_{market_id}"]
+                .loc[start : end_excl + forecast_len]
+                .values
                 / scaling_factor_price
             )
 
@@ -339,14 +358,12 @@ class RLStrategy(LearningStrategy):
         orderbook: Orderbook,
     ):
         """
-        Calculate reward
+        Calculates the reward for the unit.
 
-        :param unit: Unit to calculate reward for
-        :type unit: SupportsMinMax
-        :param marketconfig: Market configuration
-        :type marketconfig: MarketConfig
-        :param orderbook: Orderbook
-        :type orderbook: Orderbook
+        Args:
+            unit (SupportsMinMax): Unit to calculate reward for.
+            marketconfig (MarketConfig): Market configuration.
+            orderbook (Orderbook): Orderbook.
         """
 
         # =============================================================================
@@ -425,10 +442,10 @@ class RLStrategy(LearningStrategy):
 
     def load_actor_params(self, load_path):
         """
-        Load actor parameters
+        Loads actor parameters.
 
-        :param simulation_id: Simulation ID
-        :type simulation_id: str
+        Args:
+            load_path (str): Path to load from.
         """
         directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
 
