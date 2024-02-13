@@ -237,7 +237,7 @@ class PowerPlant(SupportsMinMax):
         marginal_cost = (
             fuel_price / self.efficiency
             + self.forecaster.get_price("co2") * self.emission_factor / self.efficiency
-            + self.variable_cost
+            + self.variable_cost + self.fixed_cost
         )
 
         return marginal_cost

@@ -9,7 +9,7 @@ base:
   save_frequency_hours: 24
 
   markets_config:
-    DAM:
+    EOM:
       start_date: 2019-01-01 00:00
       operator: EOM_operator
       product_type: energy

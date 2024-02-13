@@ -206,6 +206,8 @@ class RedispatchMarketRole(MarketRole):
         """
 
         orderbook_df = pd.DataFrame(orderbook)
+        orderbook_df["accepted_volume"] = 0.0
+        orderbook_df["accepted_price"] = 0.0
 
         # Now you can pivot the DataFrame
         volume_pivot = orderbook_df.pivot(
@@ -271,6 +273,7 @@ class RedispatchMarketRole(MarketRole):
         # check lines for congestion where power flow is larget than s_nom
         line_loading = self.network.lines_t.p0.abs() / self.network.lines.s_nom
 
+        # if any line is congested, perform redispatch
         if line_loading.max().max() > 1:
             log.debug("Congestion detected")
 
@@ -284,6 +287,10 @@ class RedispatchMarketRole(MarketRole):
 
             # process dispatch data
             self.process_dispatch_data(orderbook_df)
+
+        # if no congestion is detected set accepted volume and price to 0
+        else:
+            log.debug("No congestion detected")
 
         # return orderbook_df back to orderbook format as list of dicts
         accepted_orders = orderbook_df.to_dict("records")
@@ -316,10 +323,6 @@ class RedispatchMarketRole(MarketRole):
         # Use regex in a single call to filter and rename columns simultaneously for efficiency
         upward_redispatch = generators_t_p.filter(regex="_up$")
         downward_redispatch = generators_t_p.filter(regex="_down$")
-
-        # Initialize accepted_volume and accepted_price columns
-        orderbook_df["accepted_volume"] = 0.0
-        orderbook_df["accepted_price"] = 0.0
 
         # Find intersection of unit_ids in orderbook_df and columns in redispatch_volumes for direct mapping
         valid_units = orderbook_df["unit_id"].unique()
