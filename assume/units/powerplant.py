@@ -101,30 +101,18 @@ class PowerPlant(SupportsMinMax):
         self.partial_load_eff = partial_load_eff
         self.fuel_type = fuel_type
         self.emission_factor = emission_factor
-        self.ramp_up = ramp_up
-        self.ramp_down = ramp_down
-        self.hot_start_cost = hot_start_cost
-        self.warm_start_cost = warm_start_cost
-        self.cold_start_cost = cold_start_cost
-        self.min_operating_time = min_operating_time
-        self.min_down_time = min_down_time
-        self.downtime_hot_start = downtime_hot_start
-        self.downtime_warm_start = downtime_warm_start
         self.heat_extraction = heat_extraction
         self.max_heat_extraction = max_heat_extraction
+        self.hot_start_cost = hot_start_cost * max_power
+        self.warm_start_cost = warm_start_cost * max_power
+        self.cold_start_cost = cold_start_cost * max_power
         self.location = location
         self.node = node
-
-        self.max_power = max_power
-        self.min_power = min_power
-        self.efficiency = efficiency
-        self.partial_load_eff = partial_load_eff
-        self.fuel_type = fuel_type
-        self.emission_factor = emission_factor
 
         # check ramping enabled
         self.ramp_down = max_power if ramp_down == 0 or ramp_down is None else ramp_down
         self.ramp_up = max_power if ramp_up == 0 or ramp_up is None else ramp_up
+
         self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
         self.min_down_time = min_down_time if min_down_time > 0 else 1
         self.downtime_hot_start = downtime_hot_start / (
@@ -133,14 +121,6 @@ class PowerPlant(SupportsMinMax):
         self.downtime_warm_start = downtime_warm_start / (
             self.index.freq / timedelta(hours=1)
         )
-
-        self.additional_cost = additional_cost
-        self.hot_start_cost = hot_start_cost * max_power
-        self.warm_start_cost = warm_start_cost * max_power
-        self.cold_start_cost = cold_start_cost * max_power
-
-        self.heat_extraction = heat_extraction
-        self.max_heat_extraction = max_heat_extraction
 
         self.init_marginal_cost()
 
