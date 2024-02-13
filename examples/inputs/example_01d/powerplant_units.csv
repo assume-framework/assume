@@ -1,4 +1,4 @@
-name,technology,bidding_EOM,bidding_redispatch,fuel_type,emission_factor,max_power,min_power,efficiency,fixed_cost,node,unit_operator
+name,technology,bidding_EOM,bidding_redispatch,fuel_type,emission_factor,max_power,min_power,efficiency,additional_cost,node,unit_operator
 Unit 1,nuclear,naive_eom,naive_redispatch,uranium,0.0,1000.0,0,0.3,5,north,Operator 1
 Unit 2,nuclear,naive_eom,naive_redispatch,uranium,0.0,1000.0,0,0.3,6,north,Operator 1
 Unit 3,nuclear,naive_eom,naive_redispatch,uranium,0.0,1000.0,0,0.3,7,north,Operator 1
