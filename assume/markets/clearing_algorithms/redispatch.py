@@ -45,7 +45,18 @@ class RedispatchMarketRole(MarketRole):
         self.network.snapshots = range(marketconfig.market_products[0].count)
         self.solver = marketconfig.param_dict.get("solver", "glpk")
         network_path = marketconfig.param_dict.get("network_path")
+        self.env = None
         assert network_path
+
+        if self.solver == "gurobi":
+            try:
+                from gurobipy import Env
+
+                self.env = Env()
+                self.env.setParam("LogToConsole", 0)
+            except ImportError:
+                log.error("gurobi not installed - using GLPK")
+                self.solver = "glpk"
 
         # set backup marginal cost
         self.backup_marginal_cost = marketconfig.param_dict.get(
@@ -281,7 +292,8 @@ class RedispatchMarketRole(MarketRole):
             log.debug("Congestion detected")
 
             status, termination_condition = self.network.optimize(
-                solver_name=self.solver
+                solver_name=self.solver,
+                env=self.env,
             )
 
             if status != "ok":
