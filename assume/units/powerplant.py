@@ -5,6 +5,7 @@
 import logging
 from datetime import datetime, timedelta
 from functools import lru_cache
+from typing import Tuple, Union
 
 import pandas as pd
 
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class PowerPlant(SupportsMinMax):
     """
-    A class for a powerplant unit.
+    A class for a power plant unit.
 
     Args:
         id (str): The ID of the storage unit.
@@ -27,27 +28,25 @@ class PowerPlant(SupportsMinMax):
         index (pandas.DatetimeIndex): The index of the unit.
         max_power (float): The maximum power output capacity of the power plant in MW.
         min_power (float, optional): The minimum power output capacity of the power plant in MW. Defaults to 0.0 MW.
-        efficiency (float, optional): The efficiency of the poewr plant in converting fuel to electricity (Defaults to 1.0). Defaults to 1.0.
-        fixed_cost (float, optional): The fixed operating cost of the power plant, independent of the power output (Defaults to 0.0 monetary units). Defaults to 0.0.
-        variable_cost (float | pd.Series, optional): The variable operating cost of the power plant, dependent on the power output (Defaults to 0.0 monetary units). Defaults to 0.0.
-        partial_load_eff (bool, optional): Does the efficiency varies at part loads? (Defaults to False). Defaults to False.
-        fuel_type (str, optional): The type of fuel used by the power plant for power generation (Defaults to "others"). Defaults to "others".
-        emission_factor (float, optional): The emission factor associated with the power plants fuel type -> CO2 emissions per unit of energy produced (Defaults to 0.0.). Defaults to 0.0.
-        ramp_up (float | None, optional): The ramp-up rate of the power plant, indicating how quickly it can increase power output (Defaults to -1). Defaults to None.
-        ramp_down (float | None, optional): The ramp-down rate of the power plant, indicating how quickly it can decrease power output. (Defaults to -1). Defaults to None.
-        hot_start_cost (float, optional): The cost of a hot start, where the power plant is restarted after a recent shutdown.(Defaults to 0 monetary units.). Defaults to 0.
-        warm_start_cost (float, optional): The cost of a warm start, where the power plant is restarted after a moderate downtime.(Defaults to 0 monetary units.). Defaults to 0.
-        cold_start_cost (float, optional): The cost of a cold start, where the power plant is restarted after a prolonged downtime.(Defaults to 0 monetary units.). Defaults to 0.
-        min_operating_time (float, optional): The minimum duration that the power plant must operate once started, in hours.(Defaults to 0 hours.). Defaults to 0.
-        min_down_time (float, optional): The minimum downtime required after a shutdown before the power plant can be restarted, in hours.(Defaults to 0 hours.). Defaults to 0.
-        downtime_hot_start (int, optional): The downtime required after a hot start before the power plant can be restarted, in hours.(Defaults to 8 hours.). Defaults to 8.
-        downtime_warm_start (int, optional): The downtime required after a warm start before the power plant can be restarted, in hours.( Defaults to 48 hours.). Defaults to 48.
-        heat_extraction (bool, optional): A boolean indicating whether the power plant can extract heat for external purposes.(Defaults to False.). Defaults to False.
-        max_heat_extraction (float, optional): The maximum amount of heat that the power plant can extract for external use, in some suitable unit.(Defaults to 0.). Defaults to 0.
-        location (tuple[float, float], optional): The geographical coordinates (latitude and longitude) of the power plant's location.(Defaults to (0.0, 0.0).). Defaults to (0.0, 0.0).
-        node (str, optional): The identifier of the electrical bus or network node to which the power plant is connected.(Defaults to "bus0".). Defaults to "bus0".
+        efficiency (float, optional): The efficiency of the power plant in converting fuel to electricity. Defaults to 1.0.
+        additional_cost (Union[float, pd.Series], optional): Additional costs associated with power generation, in EUR/MWh. Defaults to 0.
+        partial_load_eff (bool, optional): Does the efficiency vary at part loads? Defaults to False.
+        fuel_type (str, optional): The type of fuel used by the power plant for power generation. Defaults to "others".
+        emission_factor (float, optional): The emission factor associated with the power plant's fuel type (CO2 emissions per unit of energy produced). Defaults to 0.0.
+        ramp_up (Union[float, None], optional): The ramp-up rate of the power plant, indicating how quickly it can increase power output. Defaults to None.
+        ramp_down (Union[float, None], optional): The ramp-down rate of the power plant, indicating how quickly it can decrease power output. Defaults to None.
+        hot_start_cost (float, optional): The cost of a hot start, where the power plant is restarted after a recent shutdown. Defaults to 0.
+        warm_start_cost (float, optional): The cost of a warm start, where the power plant is restarted after a moderate downtime. Defaults to 0.
+        cold_start_cost (float, optional): The cost of a cold start, where the power plant is restarted after a prolonged downtime. Defaults to 0.
+        min_operating_time (float, optional): The minimum duration that the power plant must operate once started, in hours. Defaults to 0.
+        min_down_time (float, optional): The minimum downtime required after a shutdown before the power plant can be restarted, in hours. Defaults to 0.
+        downtime_hot_start (int, optional): The downtime required after a hot start before the power plant can be restarted, in hours. Defaults to 8.
+        downtime_warm_start (int, optional): The downtime required after a warm start before the power plant can be restarted, in hours. Defaults to 48.
+        heat_extraction (bool, optional): A boolean indicating whether the power plant can extract heat for external purposes. Defaults to False.
+        max_heat_extraction (float, optional): The maximum amount of heat that the power plant can extract for external use, in some suitable unit. Defaults to 0.
+        location (Tuple[float, float], optional): The geographical coordinates (latitude and longitude) of the power plant's location. Defaults to (0.0, 0.0).
+        node (str, optional): The identifier of the electrical bus or network node to which the power plant is connected. Defaults to "bus0".
         **kwargs (dict, optional): Additional keyword arguments to be passed to the base class. Defaults to {}.
-
     """
 
     def __init__(
@@ -60,13 +59,12 @@ class PowerPlant(SupportsMinMax):
         max_power: float,
         min_power: float = 0.0,
         efficiency: float = 1.0,
-        fixed_cost: float = 0.0,
-        variable_cost: float | pd.Series = 0.0,
+        additional_cost: Union[float, pd.Series] = 0.0,
         partial_load_eff: bool = False,
         fuel_type: str = "others",
         emission_factor: float = 0.0,
-        ramp_up: float | None = None,
-        ramp_down: float | None = None,
+        ramp_up: Union[float, None] = None,
+        ramp_down: Union[float, None] = None,
         hot_start_cost: float = 0,
         warm_start_cost: float = 0,
         cold_start_cost: float = 0,
@@ -76,7 +74,7 @@ class PowerPlant(SupportsMinMax):
         downtime_warm_start: int = 48,  # hours
         heat_extraction: bool = False,
         max_heat_extraction: float = 0,
-        location: tuple[float, float] = (0.0, 0.0),
+        location: Tuple[float, float] = (0.0, 0.0),
         node: str = "bus0",
         **kwargs,
     ):
@@ -94,13 +92,20 @@ class PowerPlant(SupportsMinMax):
         self.max_power = max_power
         self.min_power = min_power
         self.efficiency = efficiency
+        self.additional_cost = additional_cost
         self.partial_load_eff = partial_load_eff
         self.fuel_type = fuel_type
         self.emission_factor = emission_factor
+        self.heat_extraction = heat_extraction
+        self.max_heat_extraction = max_heat_extraction
+        self.hot_start_cost = hot_start_cost * max_power
+        self.warm_start_cost = warm_start_cost * max_power
+        self.cold_start_cost = cold_start_cost * max_power
 
         # check ramping enabled
         self.ramp_down = max_power if ramp_down == 0 or ramp_down is None else ramp_down
         self.ramp_up = max_power if ramp_up == 0 or ramp_up is None else ramp_up
+
         self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
         self.min_down_time = min_down_time if min_down_time > 0 else 1
         self.downtime_hot_start = downtime_hot_start / (
@@ -109,15 +114,6 @@ class PowerPlant(SupportsMinMax):
         self.downtime_warm_start = downtime_warm_start / (
             self.index.freq / timedelta(hours=1)
         )
-
-        self.fixed_cost = fixed_cost
-        self.variable_cost = variable_cost
-        self.hot_start_cost = hot_start_cost * max_power
-        self.warm_start_cost = warm_start_cost * max_power
-        self.cold_start_cost = cold_start_cost * max_power
-
-        self.heat_extraction = heat_extraction
-        self.max_heat_extraction = max_heat_extraction
 
         self.init_marginal_cost()
 
@@ -237,7 +233,7 @@ class PowerPlant(SupportsMinMax):
         marginal_cost = (
             fuel_price / self.efficiency
             + self.forecaster.get_price("co2") * self.emission_factor / self.efficiency
-            + self.variable_cost
+            + self.additional_cost
         )
 
         return marginal_cost
@@ -296,16 +292,16 @@ class PowerPlant(SupportsMinMax):
         efficiency = self.efficiency - eta_loss
         co2_price = self.forecaster.get_price("co2").at[timestep]
 
-        variable_cost = (
-            self.variable_cost
-            if isinstance(self.variable_cost, float)
-            else self.variable_cost[timestep]
+        additional_cost = (
+            self.additional_cost.at[timestep]
+            if isinstance(self.additional_cost, pd.Series)
+            else self.additional_cost
         )
 
         marginal_cost = (
             fuel_price / efficiency
             + co2_price * self.emission_factor / efficiency
-            + variable_cost
+            + additional_cost
         )
 
         return marginal_cost

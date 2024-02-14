@@ -274,7 +274,7 @@ def add_agent_to_world(
                         # AMIRIS does not have min_power
                         "min_power": 0,
                         "max_power": power,
-                        "fixed_cost": markup,
+                        "additional_cost": markup,
                         "bidding_strategies": strategies,
                         "technology": translate_fuel_type[prototype["FuelType"]],
                         "fuel_type": translate_fuel_type[prototype["FuelType"]],
