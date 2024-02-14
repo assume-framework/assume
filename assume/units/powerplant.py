@@ -89,11 +89,6 @@ class PowerPlant(SupportsMinMax):
             **kwargs,
         )
 
-        self.id = id
-        self.unit_operator = unit_operator
-        self.technology = technology
-        self.bidding_strategies = bidding_strategies
-        self.index = index
         self.max_power = max_power
         self.min_power = min_power
         self.efficiency = efficiency

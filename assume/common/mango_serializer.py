@@ -14,7 +14,7 @@ def datetime_json_serializer():
         return calendar.timegm(dt.utctimetuple())
 
     def __fromstring__(dt: datetime):
-        return datetime.fromtimestamp(dt)
+        return datetime.utcfromtimestamp(dt)
 
     return datetime, __tostring__, __fromstring__
 

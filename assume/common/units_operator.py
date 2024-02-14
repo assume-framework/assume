@@ -298,8 +298,8 @@ class UnitsOperator(Role):
             return
         self.last_sent_dispatch = self.context.current_timestamp
 
-        now = datetime.fromtimestamp(self.context.current_timestamp)
-        start = datetime.fromtimestamp(last)
+        now = datetime.utcfromtimestamp(self.context.current_timestamp)
+        start = datetime.utcfromtimestamp(last)
 
         market_dispatch = aggregate_step_amount(
             self.valid_orders[product_type],
