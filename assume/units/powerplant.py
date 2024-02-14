@@ -106,8 +106,6 @@ class PowerPlant(SupportsMinMax):
         self.hot_start_cost = hot_start_cost * max_power
         self.warm_start_cost = warm_start_cost * max_power
         self.cold_start_cost = cold_start_cost * max_power
-        self.location = location
-        self.node = node
 
         # check ramping enabled
         self.ramp_down = max_power if ramp_down == 0 or ramp_down is None else ramp_down
