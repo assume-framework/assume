@@ -258,3 +258,64 @@ class NaiveNegReserveStrategy(BaseStrategy):
         bids = self.remove_empty_bids(bids)
 
         return bids
+
+
+class NaiveRedispatchStrategy(BaseStrategy):
+    """
+    A naive strategy that simply submits all information about the unit and
+    currently dispatched power for the following hours to the redispatch market.
+    Information incldes the marginal cost, the ramp up and down values, and the dispatch.
+
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Takes information from a unit that the unit operator manages and
+        defines how it is dispatched to the market
+
+        :param unit: the unit to be dispatched
+        :type unit: SupportsMinMax
+        :param market_config: the market configuration
+        :type market_config: MarketConfig
+        :param product_tuples: list of all products the unit can offer
+        :type product_tuples: list[Product]
+        :return: the bids consisting of the start time, end time, only hours, price and volume.
+        :rtype: Orderbook
+        """
+        start = product_tuples[0][0]
+        end_all = product_tuples[-1][1]
+        previous_power = unit.get_output_before(start)
+        min_power, max_power = unit.min_power, unit.max_power
+        node = unit.node
+
+        bids = []
+        for product in product_tuples:
+            start = product[0]
+            current_power = unit.outputs["energy"].at[start]
+            marginal_cost = unit.calculate_marginal_cost(
+                start, previous_power
+            )  # calculation of the marginal costs
+
+            bids.append(
+                {
+                    "start_time": product[0],
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": marginal_cost,
+                    "volume": current_power,
+                    "max_power": max_power,
+                    "min_power": min_power,
+                    "node": node,
+                }
+            )
+
+        return bids
