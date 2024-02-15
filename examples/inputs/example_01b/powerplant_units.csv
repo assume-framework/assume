@@ -1,4 +1,4 @@
-name,technology,bidding_EOM,fuel_type,emission_factor,max_power,min_power,efficiency,fixed_cost,unit_operator
+name,technology,bidding_EOM,fuel_type,emission_factor,max_power,min_power,efficiency,additional_cost,unit_operator
 Wind onshore,wind_onshore,naive_eom,renewable,0,2500,0,1,0,vre_operator
 Wind offshore,wind_offshore,naive_eom,renewable,0,400,0,1,0,vre_operator
 Solar,solar,naive_eom,renewable,0,2500,0,1,0,vre_operator

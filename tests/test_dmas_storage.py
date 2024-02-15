@@ -35,9 +35,9 @@ def storage_unit() -> Storage:
         ramp_down_discharge=50,
         ramp_up_charge=-60,
         ramp_up_discharge=60,
-        variable_cost_charge=3,
-        variable_cost_discharge=4,
-        fixed_cost=1,
+        additional_cost_charge=3,
+        additional_cost_discharge=4,
+        additional_cost=1,
     )
 
 
@@ -68,9 +68,9 @@ def storage_day() -> PowerPlant:
         ramp_down_discharge=50,
         ramp_up_charge=-60,
         ramp_up_discharge=60,
-        variable_cost_charge=3,
-        variable_cost_discharge=4,
-        fixed_cost=1,
+        additional_cost_charge=3,
+        additional_cost_discharge=4,
+        additional_cost=1,
         forecaster=ff,
     )
 

@@ -20,3 +20,11 @@ clearing_mechanisms: dict[str, MarketRole] = {
     "pay_as_clear_aon": PayAsClearAonRole,
     "nodal_pricing": NodalPyomoMarketRole,
 }
+
+# try importing pypsa if it is installed
+try:
+    from .redispatch import RedispatchMarketRole
+
+    clearing_mechanisms["redispatch"] = RedispatchMarketRole
+except ImportError:
+    pass

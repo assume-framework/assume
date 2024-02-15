@@ -33,7 +33,7 @@ def power_plant() -> PowerPlant:
         max_power=1000,
         min_power=200,
         efficiency=0.5,
-        fixed_cost=10,
+        additional_cost=10,
         bidding_strategies={},
         fuel_type="lignite",
         emission_factor=0.5,
@@ -76,7 +76,7 @@ def test_learning_strategies(mock_market_config, power_plant):
     regret = power_plant.outputs["regret"].loc[product_index]
     costs = power_plant.outputs["total_costs"].loc[product_index]
 
-    assert reward.iloc[0] == 1.2
-    assert profit.iloc[0] == 20000.0
-    assert regret.iloc[0] == 40000.0
-    assert costs.iloc[0] == 0.0
+    assert reward.iloc[0] == 0.6
+    assert profit.iloc[0] == 10000.0
+    assert regret.iloc[0] == 20000.0
+    assert costs.iloc[0] == 40000.0

@@ -196,7 +196,7 @@ class flexableEOMStorage(BaseStrategy):
             end = order["end_time"]
             end_excl = end - unit.index.freq
             index = pd.date_range(start, end_excl, freq=unit.index.freq)
-            costs = pd.Series(float(unit.fixed_cost), index=index)
+            costs = pd.Series(float(unit.additional_cost), index=index)
             for start in index:
                 if unit.outputs[product_type][start] != 0:
                     costs[start] += abs(
