@@ -247,8 +247,8 @@ class ComplexClearingRole(MarketRole):
                 ), f"max_volume {order['volume']}"
 
     def clear(
-        self, orderbook: Orderbook, market_products: list[MarketProduct]
-    ) -> (Orderbook, Orderbook, list[dict]):
+        self, orderbook: Orderbook, market_products
+    ) -> tuple[Orderbook, Orderbook, list[dict]]:
         """
         Implements pay-as-clear with more complex bid structures, including acceptance ratios, bid types, and profiled volumes.
 

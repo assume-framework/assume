@@ -1,4 +1,4 @@
-name,technology,bidding_energy,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,variable_cost,hot_start_cost,warm_start_cost,cold_start_cost,min_operating_time,min_down_time,heat_extraction,max_heat_extraction,unit_operator
+name,technology,bidding_EOM,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,additional_cost,hot_start_cost,warm_start_cost,cold_start_cost,min_operating_time,min_down_time,heat_extraction,max_heat_extraction,unit_operator
 Wind onshore,wind_onshore,new_advanced_strategy,renewable,0,2805,0,1,-,-,-28.8,0,0,0,0,0,0,0,renewables_operator
 Wind offshore,wind_offshore,new_advanced_strategy,renewable,0,390,0,1,-,-,6.8,0,0,0,0,0,0,0,renewables_operator
 Solar,solar,new_advanced_strategy,renewable,0,2965,0,1,-,-,-17.4,0,0,0,0,0,0,0,renewables_operator

@@ -7,8 +7,9 @@ sho_case:
   end_date: 2020-01-30 23:00
   time_step: 1h
   save_frequency_hours: 24
+
   markets_config:
-    EOM_dam:
+    EOM:
       operator: EOM_operator
       product_type: energy
       products:
@@ -34,7 +35,7 @@ bo_case:
   time_step: 1h
   save_frequency_hours: 24
   markets_config:
-    EOM_dam:
+    EOM:
       operator: EOM_operator
       product_type: energy
       products:
@@ -60,7 +61,7 @@ lo_case:
   time_step: 1h
   save_frequency_hours: 24
   markets_config:
-    EOM_dam:
+    EOM:
       operator: EOM_operator
       product_type: energy
       products:
