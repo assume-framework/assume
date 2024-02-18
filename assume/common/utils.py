@@ -309,7 +309,7 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=No
         # as a new order with this start point might be added
         # afterwards - so the end is excluded here
         # this also makes sure that each timestamp is only written
-        # once when iterativley calling this function
+        # once when iteratively calling this function
         if (not begin or time >= begin) and (not end or time < end):
             if aggregation[groupdata_str] and aggregation[groupdata_str][-1][0] == time:
                 aggregation[groupdata_str][-1][1] = current_power[groupdata_str]

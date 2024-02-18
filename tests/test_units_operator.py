@@ -53,6 +53,9 @@ async def units_operator() -> UnitsOperator:
     unit = Demand("testdemand", index=index, **params_dict)
     await units_role.add_unit(unit)
 
+    start_ts = calendar.timegm(start.utctimetuple())
+    clock.set_time(start_ts)
+
     yield units_role
 
     end_ts = calendar.timegm(end.utctimetuple())
@@ -83,6 +86,14 @@ async def test_set_unit_dispatch(units_operator: UnitsOperator):
     assert units_operator.units["testdemand"].outputs["energy"].max() == 500
 
 
+async def test_write_actual_dispatch(units_operator: UnitsOperator):
+    units_operator.write_actual_dispatch("energy")
+    assert units_operator.last_sent_dispatch["energy"] > 0
+    assert units_operator.last_sent_dispatch["test"] == 0
+    units_operator.write_actual_dispatch("test")
+    assert units_operator.last_sent_dispatch["test"] > 0
+
+
 async def test_formulate_bids(units_operator: UnitsOperator):
     marketconfig = units_operator.available_markets[0]
     from assume.common.utils import get_available_products
@@ -97,11 +108,8 @@ async def test_formulate_bids(units_operator: UnitsOperator):
 
 @pytest.mark.require_learning
 async def test_write_learning_params(units_operator: UnitsOperator):
-    try:
-        from assume.strategies.learning_advanced_orders import RLAdvancedOrderStrategy
-        from assume.strategies.learning_strategies import RLStrategy
-    except ImportError:
-        pass
+    from assume.strategies.learning_advanced_orders import RLAdvancedOrderStrategy
+    from assume.strategies.learning_strategies import RLStrategy
 
     marketconfig = units_operator.available_markets[0]
     start = datetime(2020, 1, 1)

@@ -59,7 +59,7 @@ class UnitsOperator(Role):
 
         self.available_markets = available_markets
         self.registered_markets: dict[str, MarketConfig] = {}
-        self.last_sent_dispatch = 0
+        self.last_sent_dispatch = defaultdict(lambda: 0)
 
         if opt_portfolio is None:
             self.use_portfolio_opt = False
@@ -292,11 +292,11 @@ class UnitsOperator(Role):
             product_type (str): The type of the product.
         """
 
-        last = self.last_sent_dispatch
+        last = self.last_sent_dispatch[product_type]
         if self.context.current_timestamp == last:
             # stop if we exported at this time already
             return
-        self.last_sent_dispatch = self.context.current_timestamp
+        self.last_sent_dispatch[product_type] = self.context.current_timestamp
 
         now = datetime.utcfromtimestamp(self.context.current_timestamp)
         start = datetime.utcfromtimestamp(last)

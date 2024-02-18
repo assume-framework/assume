@@ -150,6 +150,122 @@ def test_aggregate_step_amount():
     assert step_func
 
 
+def test_aggregate_step_amount_multi_hour():
+    # when we have a single multi-hour bid
+    orderbook = [
+        {
+            "start_time": datetime(2019, 1, 3, 9, 0),
+            "end_time": datetime(2019, 1, 3, 13, 0),
+            "only_hours": None,
+            "price": 0,
+            "volume": -2756.0,
+            "agent_id": ("world", "crm_de"),
+            "bid_id": "demand_CRM_pos_1",
+            "unit_id": "demand_CRM_pos",
+            "accepted_volume": -992.0,
+            "accepted_price": 0.0,
+            "market_id": "CRM_pos",
+        },
+    ]
+    # and we calculate the amount inbetween this bid
+    step_func = aggregate_step_amount(
+        orderbook, datetime(2019, 1, 3, 12), datetime(2019, 1, 3, 13)
+    )
+    # it will be empty
+    assert step_func == []
+
+    # if we calculate the step function for the whole interval
+    # we get a representation of this bid
+    step_func = aggregate_step_amount(
+        orderbook, datetime(2019, 1, 3, 7), datetime(2019, 1, 3, 17)
+    )
+    assert step_func == [
+        [datetime(2019, 1, 3, 9), -992.0],
+        [datetime(2019, 1, 3, 13), 0.0],
+    ]
+
+    # if we select the start only - the step function goes back to this value
+    step_func = aggregate_step_amount(
+        orderbook, datetime(2019, 1, 3, 9), datetime(2019, 1, 3, 10)
+    )
+    assert step_func == [[datetime(2019, 1, 3, 9), -992.0]]
+
+    # if we select the end only - the step function goes back to zero
+    step_func = aggregate_step_amount(
+        orderbook, datetime(2019, 1, 3, 13), datetime(2019, 1, 3, 14)
+    )
+    assert step_func == [[datetime(2019, 1, 3, 13), 0.0]]
+
+
+def test_aggregate_step_amount_long():
+    # when we have two valid bids and additional empty bids, this should not change much:
+    orderbook = [
+        {
+            "start_time": datetime(2019, 1, 3, 9, 0),
+            "end_time": datetime(2019, 1, 3, 13, 0),
+            "only_hours": None,
+            "price": 0,
+            "volume": -2756.0,
+            "agent_id": ("world", "crm_de"),
+            "bid_id": "demand_CRM_pos_1",
+            "unit_id": "demand_CRM_pos",
+            "accepted_volume": -992.0,
+            "accepted_price": 0.0,
+            "market_id": "CRM_pos",
+        },
+        {
+            "start_time": datetime(2019, 1, 3, 9, 0),
+            "end_time": datetime(2019, 1, 3, 13, 0),
+            "only_hours": None,
+            "price": 0,
+            "volume": -2756.0,
+            "agent_id": ("world", "crm_de"),
+            "bid_id": "demand_CRM_pos_1",
+            "unit_id": "demand_CRM_pos",
+            "accepted_volume": 0.0,
+            "accepted_price": 0.0,
+            "market_id": "CRM_pos",
+        },
+        {
+            "start_time": datetime(2019, 1, 3, 13, 0),
+            "end_time": datetime(2019, 1, 3, 17, 0),
+            "only_hours": None,
+            "price": 0,
+            "volume": -2756.0,
+            "agent_id": ("world", "crm_de"),
+            "bid_id": "demand_CRM_pos_1",
+            "unit_id": "demand_CRM_pos",
+            "accepted_volume": -992.0,
+            "accepted_price": 0.0,
+            "market_id": "CRM_pos",
+        },
+        {
+            "start_time": datetime(2019, 1, 3, 13, 0),
+            "end_time": datetime(2019, 1, 3, 17, 0),
+            "only_hours": None,
+            "price": 0,
+            "volume": -2756.0,
+            "agent_id": ("world", "crm_de"),
+            "bid_id": "demand_CRM_pos_1",
+            "unit_id": "demand_CRM_pos",
+            "accepted_volume": 0.0,
+            "accepted_price": 0.0,
+            "market_id": "CRM_pos",
+        },
+    ]
+
+    # calculating the step function for the whole series
+    step_func = aggregate_step_amount(
+        orderbook, datetime(2019, 1, 3, 7), datetime(2019, 1, 3, 18)
+    )
+    assert step_func == [
+        [datetime(2019, 1, 3, 9, 0), -992.0],
+        [datetime(2019, 1, 3, 13, 0), -992.0],
+        [datetime(2019, 1, 3, 17, 0), 0.0],
+    ]
+    # this returns the bids in a minimal representation
+
+
 def test_initializer():
     class Test:
         @initializer
