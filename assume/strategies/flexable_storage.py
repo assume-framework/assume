@@ -175,7 +175,7 @@ class flexableEOMStorage(BaseStrategy):
 
     def calculate_reward(
         self,
-        unit,
+        unit: SupportsMinMaxCharge,
         marketconfig: MarketConfig,
         orderbook: Orderbook,
     ):
