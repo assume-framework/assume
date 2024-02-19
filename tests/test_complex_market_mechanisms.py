@@ -72,6 +72,56 @@ def test_complex_clearing():
     assert math.isclose(accepted_orders[2]["volume"], 900, abs_tol=eps)
 
 
+def test_market_coupling():
+    import copy
+
+    market_config = copy.copy(simple_dayahead_auction_config)
+    h = 2
+    market_config.market_products = [MarketProduct(rd(hours=+1), h, rd(hours=1))]
+    market_config.additional_fields = [
+        "bid_type",
+        "node_id",
+    ]
+    # add nodes and network to market_config
+    nodes = ["node1", "node2"]
+    network = {"line_1": ("node1", "node2", 500)}
+
+    next_opening = market_config.opening_hours.after(datetime.now())
+    products = get_available_products(market_config.market_products, next_opening)
+    assert len(products) == h
+
+    """
+    Create Orderbook with constant order volumes and prices:
+        - dem1: volume = -1000, price = 3000, node1
+        - dem2: volume = -200, price = 3000, node2
+        - gen1: volume = 1000, price = 100, node1
+        - gen2: volume = 1000, price = 50, node2
+    """
+    orderbook = []
+    orderbook = extend_orderbook(
+        products, volume=-1000, price=3000, orderbook=orderbook, node="node1"
+    )
+    orderbook = extend_orderbook(
+        products, volume=-200, price=3000, orderbook=orderbook, node="node2"
+    )
+    orderbook = extend_orderbook(products, 1000, 100, orderbook, node="node1")
+    orderbook = extend_orderbook(products, 1000, 50, orderbook, node="node2")
+
+    mr = ComplexClearingRole(market_config, nodes, network)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+
+    assert math.isclose(meta[0]["supply_volume"], 1000, abs_tol=eps)
+    assert math.isclose(meta[0]["demand_volume"], 1000, abs_tol=eps)
+    assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
+    assert rejected_orders == []
+    assert accepted_orders[0]["agent_id"] == "dem1"
+    assert math.isclose(accepted_orders[0]["accepted_volume"], -1000, abs_tol=eps)
+    assert accepted_orders[1]["agent_id"] == f"gen{h+1}"
+    assert math.isclose(accepted_orders[1]["accepted_volume"], 100, abs_tol=eps)
+    assert accepted_orders[2]["agent_id"] == f"gen{2*h+1}"
+    assert math.isclose(accepted_orders[2]["volume"], 900, abs_tol=eps)
+
+
 def test_complex_clearing_BB():
     import copy
 

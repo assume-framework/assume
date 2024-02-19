@@ -57,7 +57,7 @@ class NodalPyomoMarketRole(MarketRole):
 
     def clear(
         self, orderbook: Orderbook, market_products: list[MarketProduct]
-    ) -> (Orderbook, Orderbook, list[dict]):
+    ) -> tuple[Orderbook, Orderbook, list[dict]]:
         """
         Performs a nodal pricing optimization using the Pyomo library.
         It takes market orders, simulates network congestion, and computes optimal power generation and

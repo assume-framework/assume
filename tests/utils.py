@@ -51,6 +51,7 @@ def extend_orderbook(
     bid_type="SB",
     min_acceptance_ratio=None,
     parent_bid_id=None,
+    node=None,
 ):
     """
     Creates constant bids over the time span of all products
@@ -87,6 +88,9 @@ def extend_orderbook(
         else:
             order.update({"min_acceptance_ratio": 0})
 
+        if node is not None:
+            order.update({"node_id": node})
+
         orderbook.append(order)
 
     else:
@@ -114,6 +118,8 @@ def extend_orderbook(
                 order.update({"min_acceptance_ratio": min_acceptance_ratio})
             else:
                 order.update({"min_acceptance_ratio": 0})
+            if node is not None:
+                order.update({"node_id": node})
 
             orderbook.append(order)
 
