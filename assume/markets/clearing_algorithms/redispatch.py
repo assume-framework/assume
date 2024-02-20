@@ -11,6 +11,7 @@ import pypsa
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.markets.base_market import MarketRole
+from assume.markets.grid_utils import read_pypsa_grid
 
 log = logging.getLogger(__name__)
 
@@ -39,14 +40,19 @@ class RedispatchMarketRole(MarketRole):
 
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
-
         self.network = pypsa.Network()
         # set snapshots as list from the value marketconfig.producs.count converted to list
         self.network.snapshots = range(marketconfig.market_products[0].count)
-        self.solver = marketconfig.param_dict.get("solver", "glpk")
-        network_path = marketconfig.param_dict.get("network_path")
+        self.network_data = marketconfig.param_dict.get("grid_data")
+        assert self.network_data
+        # set backup marginal cost
+        backup_marginal_cost = marketconfig.param_dict.get("backup_marginal_cost", 10e4)
+        read_pypsa_grid(
+            self.network, self.network_data, backup_marginal_cost=backup_marginal_cost
+        )
+
+        self.solver = self.marketconfig.param_dict.get("solver", "glpk")
         self.env = None
-        assert network_path
 
         if self.solver == "gurobi":
             try:
@@ -58,11 +64,6 @@ class RedispatchMarketRole(MarketRole):
                 log.error("gurobi not installed - using GLPK")
                 self.solver = "glpk"
 
-        # set backup marginal cost
-        self.backup_marginal_cost = marketconfig.param_dict.get(
-            "backup_marginal_cost", 10e4
-        )
-
         # set the market clearing principle
         # as pay as bid or pay as clear
         self.market_clearing_mechanism = marketconfig.param_dict.get(
@@ -70,136 +71,19 @@ class RedispatchMarketRole(MarketRole):
         )
         assert self.market_clearing_mechanism in ["pay_as_bid", "pay_as_clear"]
 
-        # setup the network
-        # add buses
-        self.add_buses(f"{network_path}/buses.csv")
+    def setup(self):
+        super().setup()
 
-        # add lines
-        self.add_lines(f"{network_path}/lines.csv")
-
-        # add generators
-        self.add_generators(f"{network_path}/powerplant_units.csv")
-
-        # add loads
-        self.add_loads(f"{network_path}/demand_units.csv")
-
-    def add_buses(self, filename: str):
-        """
-        This adds nodes in the PyPSA network to which the generators and loads are connected
-
-        """
-        buses = pd.read_csv(filename, index_col=0)
-
-        self.network.madd(
-            "Bus",
-            names=buses.index,
-            **buses,
-        )
-
-    def add_lines(self, filename: str):
-        """
-        This creates transmission network in PyPSA by connecting buses with predefined line capacities
-        """
-        lines = pd.read_csv(filename, index_col=0)
-
-        self.network.madd(
-            "Line",
-            names=lines.index,
-            **lines,
-        )
-
-    def add_generators(self, filename: str):
-        """
-        This adds generators in the PyPSA network with respective bus data to which they are connected.
-        It creates upward and downward redispatch generators for each generator and adds backup generators at each node
-        """
-        generators = pd.read_csv(filename, index_col=0)
-
-        # make dataframe for p_set as zeros for data and index as snapshots
-        # and coliumns as generator names
-        p_set = pd.DataFrame(
-            np.zeros((len(self.network.snapshots), len(generators.index))),
-            index=self.network.snapshots,
-            columns=generators.index,
-        )
-
-        # add generators and their sold capacities as load with reversed sign to have fixed feed in
-        self.network.madd(
-            "Load",
-            names=generators.index,
-            bus=generators["node"],  # bus to which the generator is connected to
-            p_set=p_set,
-            sign=1,
-        )
-
-        # add upward redispatch generators
-        self.network.madd(
-            "Generator",
-            names=generators.index,
-            suffix="_up",
-            bus=generators["node"],  # bus to which the generator is connected to
-            p_nom=generators[
-                "max_power"
-            ],  # Nominal capacity of the powerplant/generator
-            p_min_pu=p_set,
-            p_max_pu=p_set + 1,
-            marginal_cost=p_set,
-        )
-
-        # add downward redispatch generators
-        self.network.madd(
-            "Generator",
-            names=generators.index,
-            suffix="_down",
-            bus=generators["node"],  # bus to which the generator is connected to
-            p_nom=generators[
-                "max_power"
-            ],  # Nominal capacity of the powerplant/generator
-            p_min_pu=p_set,
-            p_max_pu=p_set + 1,
-            marginal_cost=p_set,
-            sign=-1,
-        )
-
-        # add upward and downward backup generators at each node
-        self.network.madd(
-            "Generator",
-            names=self.network.buses.index,
-            suffix="_backup_up",
-            bus=self.network.buses.index,  # bus to which the generator is connected to
-            p_nom=10e4,
-            marginal_cost=10e4,
-        )
-
-        self.network.madd(
-            "Generator",
-            names=self.network.buses.index,
-            suffix="_backup_down",
-            bus=self.network.buses.index,  # bus to which the generator is connected to
-            p_nom=10e4,
-            marginal_cost=self.backup_marginal_cost,
-            sign=-1,
-        )
-
-    def add_loads(self, filename: str):
-        """
-        This adds loads in the PyPSA network with respective bus data to which they are connected
-        """
-        loads = pd.read_csv(filename, index_col=0)
-
-        p_set = pd.DataFrame(
-            np.zeros((len(self.network.snapshots), len(loads.index))),
-            index=self.network.snapshots,
-            columns=loads.index,
-        )
-
-        # Iterate through time steps and add generators
-        self.network.madd(
-            "Load",
-            names=loads.index,
-            bus=loads["node"],  # bus to which the generator is connected to
-            p_set=p_set,
-            sign=1,
+        # send grid topology data once
+        self.context.schedule_instant_acl_message(
+            {
+                "context": "write_results",
+                "type": "grid_topology",
+                "data": self.network_data,
+                "market_id": self.marketconfig.market_id,
+            },
+            receiver_addr=self.context.data.get("output_agent_addr"),
+            receiver_id=self.context.data.get("output_agent_id"),
         )
 
     def clear(

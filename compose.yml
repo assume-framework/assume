@@ -5,7 +5,9 @@
 version: "3.9"
 services:
   assume_db:
-    image: timescale/timescaledb:latest-pg15
+    image: timescale/timescaledb-ha:pg15-all-oss
+    # smaller without postgis support:
+    # image: timescale/timescaledb:latest-pg15
     container_name: assume_db
     restart: always
     environment:

@@ -15,6 +15,7 @@ from mango import Role
 from pandas.api.types import is_numeric_dtype
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
+from psycopg2.errors import UndefinedColumn
 
 logger = logging.getLogger(__name__)
 
@@ -55,11 +56,12 @@ class WriteOutput(Role):
         self.save_frequency_hours = save_frequency_hours or (end - start).days * 24
 
         # make directory if not already present
-        self.export_csv_path = export_csv_path
-        if self.export_csv_path:
-            self.p = Path(self.export_csv_path, simulation_id)
-            shutil.rmtree(self.p, ignore_errors=True)
-            self.p.mkdir(parents=True)
+        if export_csv_path:
+            self.export_csv_path = Path(export_csv_path, simulation_id)
+            shutil.rmtree(self.export_csv_path, ignore_errors=True)
+            self.export_csv_path.mkdir(parents=True)
+        else:
+            self.export_csv_path = None
 
         self.db = db_engine
 
@@ -99,6 +101,9 @@ class WriteOutput(Role):
         table_names = inspect(self.db).get_table_names()
         # Iterate through each table
         for table_name in table_names:
+            # ignore postgis table
+            if "spatial_ref_sys" == table_name:
+                continue
             try:
                 with self.db.begin() as db:
                     # create index on table
@@ -185,6 +190,9 @@ class WriteOutput(Role):
         elif content.get("type") == "rl_learning_params":
             self.write_rl_params(content.get("data"))
 
+        elif content.get("type") == "grid_topology":
+            self.store_grid(content.get("data"), content.get("market_id"))
+
     def write_rl_params(self, rl_params: dict):
         """
         Writes the RL parameters such as reward, regret, and profit to the corresponding data frame.
@@ -235,7 +243,7 @@ class WriteOutput(Role):
             df = df.apply(self.check_for_tensors)
 
             if self.export_csv_path:
-                data_path = self.p.joinpath(f"{table}.csv")
+                data_path = self.export_csv_path / f"{table}.csv"
                 df.to_csv(data_path, mode="a", header=not data_path.exists())
 
             if self.db is not None:
@@ -249,6 +257,48 @@ class WriteOutput(Role):
                         df.to_sql(table, db, if_exists="append")
 
             self.write_dfs[table] = []
+
+    def store_grid(
+        self,
+        grid_data: dict[str, pd.DataFrame],
+        market_id: str,
+    ):
+        """
+        Stores the grid data to the database.
+        This is done once at the beginning for every agent which takes care of a grid.
+        """
+        if self.db is None:
+            return
+
+        with self.db.begin() as db:
+            try:
+                db.execute(text("CREATE EXTENSION IF NOT EXISTS postgis;"))
+            except Exception:
+                logger.exception("tried writing grid data to non postGIS database")
+                return
+
+        import geopandas as gpd
+        from shapely.wkt import loads
+
+        for table, df in grid_data.items():
+            geo_table = f"{table}_geo"
+            if df.empty:
+                continue
+            df["geometry"] = df["shape"].apply(loads)
+            del df["shape"]
+            df = gpd.GeoDataFrame(df, geometry="geometry")
+            df.set_crs(crs="EPSG:4326", inplace=True)
+            df["simulation"] = self.simulation_id
+
+            # df.reset_index()
+            try:
+                with self.db.begin() as db:
+                    df.to_postgis(geo_table, db, if_exists="append")
+            except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
+                self.check_columns(geo_table, df)
+                # now try again
+                with self.db.begin() as db:
+                    df.to_postgis(geo_table, db, if_exists="append")
 
     def check_columns(self, table: str, df: pd.DataFrame):
         """
@@ -414,7 +464,7 @@ class WriteOutput(Role):
         df["simulation"] = self.simulation_id
 
         if self.export_csv_path:
-            kpi_data_path = self.p.joinpath("kpis.csv")
+            kpi_data_path = self.export_csv_path / "kpis.csv"
             df.to_csv(
                 kpi_data_path,
                 mode="a",

@@ -221,6 +221,21 @@ def make_market_config(
     return market_config
 
 
+def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame]:
+    network_path = Path(network_path)
+    buses = pd.read_csv(network_path / "buses.csv", index_col=0)
+    lines = pd.read_csv(network_path / "lines.csv", index_col=0)
+    generators = pd.read_csv(network_path / "powerplant_units.csv", index_col=0)
+    loads = pd.read_csv(network_path / "demand_units.csv", index_col=0)
+
+    return {
+        "buses": buses,
+        "lines": lines,
+        "generators": generators,
+        "loads": loads,
+    }
+
+
 def add_units(
     units_df: pd.DataFrame,
     unit_type: str,
@@ -448,6 +463,9 @@ async def load_scenario_folder_async(
             world_start=start,
             world_end=end,
         )
+        if "network_path" in market_config.param_dict.keys():
+            grid_data = read_grid(market_config.param_dict["network_path"])
+            market_config.param_dict["grid_data"] = grid_data
 
         operator_id = str(market_params["operator"])
         if operator_id not in world.market_operators:
