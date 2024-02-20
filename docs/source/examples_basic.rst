@@ -19,3 +19,4 @@ Here you can find several tutorials on how to use ASSUME framework to get you st
    examples/03_custom_unit_example.nblink
    examples/04_reinforcement_learning_example.nblink
    examples/05_market_comparison.nblink
+   examples/06_advanced_orders_example.nblink
