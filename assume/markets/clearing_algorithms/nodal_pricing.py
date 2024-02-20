@@ -28,6 +28,13 @@ log = logging.getLogger(__name__)
 SOLVERS = ["glpk", "cbc", "gurobi", "cplex"]
 
 
+def lines_to_dict(lines):
+    result = {}
+    for row in lines.iterrows():
+        result[row["name"]] = (row["bus0"], row["bus1"], row["s_nom"])
+    return result
+
+
 class NodalPyomoMarketRole(MarketRole):
     required_fields = ["node_id"]
 
@@ -47,8 +54,12 @@ class NodalPyomoMarketRole(MarketRole):
         network = {"Line_0": (0, 1, 100), "Line_1": (1, 2, 100), "Line_2": (2, 0, 100)}
         """
         super().__init__(marketconfig)
-        self.nodes = nodes
-        self.network = network
+
+        self.network_data = marketconfig.param_dict.get("grid_data")
+        assert self.network_data
+        
+        self.nodes = list(self.network_data["buses"].name)
+        self.network = lines_to_dict(self.network_data["lines"])
 
         self.incidence_matrix = pd.DataFrame(0, index=self.nodes, columns=self.network)
         for i, (node1, node2, capacity) in self.network.items():
