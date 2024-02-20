@@ -1,2 +1,2 @@
-name,bus0,bus1,s_nom,x,r
-0,north,south,5000,0.01,0.001
+name,bus0,bus1,s_nom,x,r,shape
+0,north,south,5000,0.01,0.001,"LINESTRING (9.598 53.5585, 13.607 51.0769)"
