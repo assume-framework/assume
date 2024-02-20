@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import calendar
 from datetime import datetime
 
 import pandas as pd
@@ -14,6 +13,7 @@ from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 
 from assume.common.market_objects import MarketConfig
+from assume.common.utils import datetime2timestamp
 from assume.markets.base_market import MarketProduct, MarketRole
 
 start = datetime(2020, 1, 1)
@@ -38,7 +38,7 @@ async def market_role() -> MarketRole:
 
     yield market_role
 
-    end_ts = calendar.timegm(end.utctimetuple())
+    end_ts = datetime2timestamp(end)
     clock.set_time(end_ts)
     await tasks_complete_or_sleeping(container)
     await container.shutdown()

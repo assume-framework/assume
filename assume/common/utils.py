@@ -2,10 +2,11 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import calendar
 import inspect
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from functools import wraps
 from itertools import groupby
 from operator import itemgetter
@@ -427,3 +428,11 @@ def get_products_index(orderbook: Orderbook) -> pd.DatetimeIndex:
     )
 
     return index_products
+
+
+def timestamp2datetime(timestamp: float):
+    return datetime.fromtimestamp(timestamp, tz=UTC).replace(tzinfo=None)
+
+
+def datetime2timestamp(datetime: datetime):
+    return calendar.timegm(datetime.utctimetuple())
