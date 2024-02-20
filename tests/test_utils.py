@@ -426,6 +426,15 @@ def test_broken_timestamps():
     # and for the utc timestamp
     assert 0 == calendar.timegm(unix_start.utctimetuple())
 
+    # pandas fromtimestamp has this problem too:
+    assert offset + unix_start == pd.Timestamp.fromtimestamp(0)
+
+    # though this can work
+    assert unix_start == pd.Timestamp(0)
+
+    # the other way works with pandas
+    assert pd.Timestamp(unix_start).timestamp() == 0
+
 
 def test_timestamp2datetime():
     unix_start = datetime(1970, 1, 1)
