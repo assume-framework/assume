@@ -8,7 +8,6 @@ from assume.markets.base_market import MarketRole
 from .all_or_nothing import PayAsBidAonRole, PayAsClearAonRole
 from .complex_clearing import ComplexClearingRole
 from .complex_clearing_dmas import ComplexDmasClearingRole
-from .nodal_pricing import NodalPyomoMarketRole
 from .simple import PayAsBidRole, PayAsClearRole
 
 clearing_mechanisms: dict[str, MarketRole] = {
@@ -18,7 +17,6 @@ clearing_mechanisms: dict[str, MarketRole] = {
     "pay_as_clear_complex_dmas": ComplexDmasClearingRole,
     "pay_as_bid_aon": PayAsBidAonRole,
     "pay_as_clear_aon": PayAsClearAonRole,
-    "nodal_pricing": NodalPyomoMarketRole,
 }
 
 # try importing pypsa if it is installed
