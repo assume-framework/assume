@@ -30,13 +30,13 @@ SOLVERS = ["glpk", "cbc", "gurobi", "cplex"]
 
 def lines_to_dict(lines):
     result = {}
-    for row in lines.iterrows():
-        result[row["name"]] = (row["bus0"], row["bus1"], row["s_nom"])
+    for idx, row in lines.iterrows():
+        result[row.name] = (row.bus0, row.bus1, row.s_nom)
     return result
 
 
 class NodalPyomoMarketRole(MarketRole):
-    required_fields = ["node_id"]
+    required_fields = ["node"]
 
     def __init__(
         self,
@@ -57,14 +57,29 @@ class NodalPyomoMarketRole(MarketRole):
 
         self.network_data = marketconfig.param_dict.get("grid_data")
         assert self.network_data
-        
-        self.nodes = list(self.network_data["buses"].name)
+
+        self.nodes = list(self.network_data["buses"].index)
         self.network = lines_to_dict(self.network_data["lines"])
 
         self.incidence_matrix = pd.DataFrame(0, index=self.nodes, columns=self.network)
         for i, (node1, node2, capacity) in self.network.items():
             self.incidence_matrix.at[node1, i] = 1
             self.incidence_matrix.at[node2, i] = -1
+
+    def setup(self):
+        super().setup()
+
+        # send grid topology data once
+        self.context.schedule_instant_acl_message(
+            {
+                "context": "write_results",
+                "type": "grid_topology",
+                "data": self.network_data,
+                "market_id": self.marketconfig.market_id,
+            },
+            receiver_addr=self.context.data.get("output_agent_addr"),
+            receiver_id=self.context.data.get("output_agent_id"),
+        )
 
     def clear(
         self, orderbook: Orderbook, market_products: list[MarketProduct]
@@ -102,7 +117,7 @@ class NodalPyomoMarketRole(MarketRole):
                 supply_bids = list(
                     map(
                         itemgetter(
-                            "node_id", "price", "volume", "agent_id", "acceptance_ratio"
+                            "node", "price", "volume", "agent_id", "acceptance_ratio"
                         ),
                         supply_orders,
                     )
@@ -111,7 +126,7 @@ class NodalPyomoMarketRole(MarketRole):
                 for order in demand_orders:
                     demand_bids.append(
                         (
-                            order["node_id"],
+                            order["node"],
                             order["price"],
                             -order["volume"],
                             order["agent_id"],
@@ -121,7 +136,7 @@ class NodalPyomoMarketRole(MarketRole):
             else:
                 supply_bids = list(
                     map(
-                        itemgetter("node_id", "price", "volume", "agent_id"),
+                        itemgetter("node", "price", "volume", "agent_id"),
                         supply_orders,
                     )
                 )
@@ -129,7 +144,7 @@ class NodalPyomoMarketRole(MarketRole):
                 for order in demand_orders:
                     demand_bids.append(
                         (
-                            order["node_id"],
+                            order["node"],
                             order["price"],
                             -order["volume"],
                             order["agent_id"],
@@ -246,7 +261,7 @@ class NodalPyomoMarketRole(MarketRole):
             consumption = {node: 0 for node in self.nodes}
             # add demand to accepted orders with confirmed volume
             for i in range(len(demand_orders)):
-                node = demand_orders[i]["node_id"]
+                node = demand_orders[i]["node"]
                 opt_volume = model.p_consumption[i].value
                 consumption[node] += opt_volume
                 demand_orders[i]["volume"] = -opt_volume
@@ -255,7 +270,7 @@ class NodalPyomoMarketRole(MarketRole):
                     accepted_orders.append(demand_orders[i])
 
             for i in range(len(supply_orders)):
-                node = supply_orders[i]["node_id"]
+                node = supply_orders[i]["node"]
                 opt_volume = model.p_generation[i].value
                 generation[node] += opt_volume
                 supply_orders[i]["volume"] = opt_volume
@@ -276,7 +291,7 @@ class NodalPyomoMarketRole(MarketRole):
                         "demand_volume": consumption[node],
                         "uniform_price": duals_dict[f"balance_constraint[{node+1}]"],
                         "price": duals_dict[f"balance_constraint[{node+1}]"],
-                        "node_id": node,
+                        "node": node,
                         "flow": power_in,
                         "product_start": product[0],
                         "product_end": product[1],

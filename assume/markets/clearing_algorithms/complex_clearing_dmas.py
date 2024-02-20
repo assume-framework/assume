@@ -500,7 +500,7 @@ class ComplexDmasClearingRole(MarketRole):
                     "price": prc,
                     "max_price": prc,
                     "min_price": prc,
-                    "node_id": None,
+                    "node": None,
                     "product_start": bstart,
                     "product_end": end,
                     "only_hours": None,

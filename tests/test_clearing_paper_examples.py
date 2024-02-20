@@ -17,7 +17,7 @@ from .utils import extend_orderbook
 simple_dayahead_auction_config = MarketConfig(
     market_id="simple_dayahead_auction",
     market_products=[MarketProduct(rd(hours=+1), 1, rd(hours=1))],
-    additional_fields=["node_id"],
+    additional_fields=["node"],
     opening_hours=rr.rrule(
         rr.HOURLY,
         dtstart=datetime(2005, 6, 1),

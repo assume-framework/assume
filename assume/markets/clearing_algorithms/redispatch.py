@@ -38,6 +38,8 @@ class RedispatchMarketRole(MarketRole):
 
     """
 
+    required_fields = ["node"]
+
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
         self.network = pypsa.Network()

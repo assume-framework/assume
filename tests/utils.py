@@ -23,7 +23,7 @@ def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
             "volume": 0,
             "price": 0,
             "only_hours": None,
-            "node_id": 0,
+            "node": 0,
         }
     orders = []
     np.random.seed(seed)
@@ -38,7 +38,7 @@ def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
             agent_id = f"dem_{i}"
         new_order["agent_id"] = agent_id
         new_order["bid_id"] = f"bid_{i}"
-        new_order["node_id"] = node_id
+        new_order["node"] = node_id
         orders.append(new_order)
     return orders
 
