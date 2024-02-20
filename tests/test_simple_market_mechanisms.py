@@ -64,7 +64,7 @@ def test_simple_market_mechanism():
     import copy
 
     for name, role in clearing_mechanisms.items():
-        if "complex" in name or "redispatch" in name:
+        if "complex" in name or "nodal_pricing" in name or "redispatch" in name:
             continue
 
         print(name)

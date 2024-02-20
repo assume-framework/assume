@@ -41,8 +41,6 @@ class NodalPyomoMarketRole(MarketRole):
     def __init__(
         self,
         marketconfig: MarketConfig,
-        nodes=[0, 1, 2],
-        network={"Line_0": (0, 1, 100), "Line_1": (1, 2, 100), "Line_2": (2, 0, 100)},
     ):
         """
         Network can be for example:
