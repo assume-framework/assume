@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import calendar
 import logging
 import math
 from datetime import datetime
@@ -23,7 +22,12 @@ from assume.common.market_objects import (
     RegistrationMessage,
     RegistrationReplyMessage,
 )
-from assume.common.utils import get_available_products, separate_orders
+from assume.common.utils import (
+    datetime2timestamp,
+    get_available_products,
+    separate_orders,
+    timestamp2datetime,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -258,9 +262,9 @@ class MarketRole(MarketMechanism, Role):
                 self, self.handle_get_unmatched, accept_get_unmatched
             )
 
-        current = datetime.utcfromtimestamp(self.context.current_timestamp)
+        current = timestamp2datetime(self.context.current_timestamp)
         next_opening = self.marketconfig.opening_hours.after(current, inc=True)
-        opening_ts = calendar.timegm(next_opening.utctimetuple())
+        opening_ts = datetime2timestamp(next_opening)
         self.context.schedule_timestamp_task(self.opening(), opening_ts)
 
     async def opening(self):
@@ -269,7 +273,7 @@ class MarketRole(MarketMechanism, Role):
 
         """
         # scheduled to be opened now
-        market_open = datetime.utcfromtimestamp(self.context.current_timestamp)
+        market_open = timestamp2datetime(self.context.current_timestamp)
         market_closing = market_open + self.marketconfig.opening_duration
         products = get_available_products(
             self.marketconfig.market_products, market_open
@@ -303,13 +307,13 @@ class MarketRole(MarketMechanism, Role):
             )
 
         # schedule closing this market
-        closing_ts = calendar.timegm(market_closing.utctimetuple())
+        closing_ts = datetime2timestamp(market_closing)
         self.context.schedule_timestamp_task(self.clear_market(products), closing_ts)
 
         # schedule the next opening too
         next_opening = self.marketconfig.opening_hours.after(market_open)
         if next_opening:
-            next_opening_ts = calendar.timegm(next_opening.utctimetuple())
+            next_opening_ts = datetime2timestamp(next_opening)
             self.context.schedule_timestamp_task(self.opening(), next_opening_ts)
             logger.debug(
                 f"market opening: %s - %s - %s",

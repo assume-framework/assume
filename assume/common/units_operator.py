@@ -22,7 +22,11 @@ from assume.common.market_objects import (
     Orderbook,
     RegistrationMessage,
 )
-from assume.common.utils import aggregate_step_amount, get_products_index
+from assume.common.utils import (
+    aggregate_step_amount,
+    get_products_index,
+    timestamp2datetime,
+)
 from assume.strategies import BaseStrategy, LearningStrategy
 from assume.units import BaseUnit
 
@@ -298,8 +302,8 @@ class UnitsOperator(Role):
             return
         self.last_sent_dispatch[product_type] = self.context.current_timestamp
 
-        now = datetime.utcfromtimestamp(self.context.current_timestamp)
-        start = datetime.utcfromtimestamp(last)
+        now = timestamp2datetime(self.context.current_timestamp)
+        start = timestamp2datetime(last)
 
         market_dispatch = aggregate_step_amount(
             self.valid_orders[product_type],
