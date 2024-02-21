@@ -521,37 +521,37 @@ class ElectricArcFurnace:
                 return pyo.Constraint.Skip
             return b.power_eaf[t-1] - b.power_eaf[t] <= b.ramp_down_eaf
 
-        # @self.b.Constraint(time_steps)
-        # def min_operating_time_eaf_constraint(b, t):
-        #     if t == 0:
-        #         return pyo.Constraint.Skip  # No constraint for the first time step
-        #     # Calculate the time step duration dynamically
-        #     delta_t = t - (t-1)
-        #     # Convert minimum operating time to the time unit of your choice
-        #     min_operating_time_units = int(self.min_operating_time / delta_t)
-        #     if t < min_operating_time_units:
-        #         return b.power_eaf[t] == b.rated_power_eaf
-        #     else:
-        #         return sum(b.power_eaf[t-i] for i in range(min_operating_time_units)) >= min_operating_time_units * b.rated_power_eaf
+        @self.b.Constraint(time_steps)
+        def min_operating_time_eaf_constraint(b, t):
+            if t == 0:
+                return pyo.Constraint.Skip  # No constraint for the first time step
+            # Calculate the time step duration dynamically
+            delta_t = t - (t-1)
+            # Convert minimum operating time to the time unit of your choice
+            min_operating_time_units = int(self.min_operating_time / delta_t)
+            if t < min_operating_time_units:
+                return b.power_eaf[t] == b.rated_power_eaf
+            else:
+                return sum(b.power_eaf[t-i] for i in range(min_operating_time_units)) >= min_operating_time_units * b.rated_power_eaf
 
-        # @self.b.Constraint(time_steps)
-        # def min_down_time_eaf_constraint(b, t):
-        #     if t == 0:
-        #         return pyo.Constraint.Skip  # No constraint for the first time step
-        #     # Calculate the time step duration dynamically
-        #     delta_t = t - (t-1)
-        #     # Convert minimum downtime to the time unit of your choice
-        #     min_downtime_units = int(self.min_down_time / delta_t)
-        #     if t < min_downtime_units:
-        #         return b.power_eaf[t] == 0
-        #     else:
-        #         return sum(b.power_eaf[t-i] for i in range(min_downtime_units)) == 0
+        @self.b.Constraint(time_steps)
+        def min_down_time_eaf_constraint(b, t):
+            if t == 0:
+                return pyo.Constraint.Skip  # No constraint for the first time step
+            # Calculate the time step duration dynamically
+            delta_t = t - (t-1)
+            # Convert minimum downtime to the time unit of your choice
+            min_downtime_units = int(self.min_down_time / delta_t)
+            if t < min_downtime_units:
+                return b.power_eaf[t] == 0
+            else:
+                return sum(b.power_eaf[t-i] for i in range(min_downtime_units)) == 0
             
-        # # operational cost
-        # @self.b.Constraint(time_steps)
-        # def eaf_operating_cost_cosntraint(b, t):
-        #     # This constraint defines the steel output based on inputs and efficiency
-        #     return b.eaf_operating_cost[t] == b.power_eaf[t] * self.model.electricity_price[t]
+        # operational cost
+        @self.b.Constraint(time_steps)
+        def eaf_operating_cost_cosntraint(b, t):
+            # This constraint defines the steel output based on inputs and efficiency
+            return b.eaf_operating_cost[t] == b.power_eaf[t] * self.model.electricity_price[t]
         
 class GenericStorage:
     def __init__(self, 

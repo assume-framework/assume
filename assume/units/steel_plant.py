@@ -1,38 +1,23 @@
 import logging
 from typing import Dict, List
+import assume.common.flexibility as flex
 
 import pandas as pd
 import pyomo.environ as pyo
 from pyomo.opt import SolverFactory, SolverStatus, TerminationCondition
 
 from assume.common.base import SupportsMinMax
-from assume.units.dst_components import Electrolyser, ShaftFurnace, ElectricArcFurnace
+from assume.units.dst_components import Electrolyser, DriPlant, ElectricArcFurnace, GenericStorage, DRIStorage
 
 logger = logging.getLogger(__name__)
 
 # Mapping of component type identifiers to their respective classes
 dst_components = {
     "electrolyser": Electrolyser,
-    "shaft_furnace": ShaftFurnace,
-    "electric_arc_furnace": ElectricArcFurnace
-}
-
-# Define possible technology configurations
-technology_configurations = {
-    'electrolyser_shaftFurnace_EAF': [
-        ('electrolyser', 'hydrogen_out', 'shaft_furnace', 'hydrogen_in'),
-        ('shaft_furnace', 'dri_output', 'electric_arc_furnace', 'dri_input')
-    ],
-    'blastFurnace_basicOxygenFurnace': [
-        ('blast_furnace', 'iron_output', 'basic_oxygen_furnace', 'iron_input')
-    ],
-    'electrolyser_storage_shaftFurnace_EAF': [
-        ('electrolyser', 'hydrogen_out', 'hydrogen_storage', 'hydrogen_in'),
-        ('electrolyser', 'hydrogen_out', 'shaft_furnace', 'direct_hydrogen_input'),
-        ('hydrogen_storage', 'hydrogen_out', 'shaft_furnace', 'stored_hydrogen_in'),
-        ('shaft_furnace', 'dri_output', 'electric_arc_furnace', 'dri_input')
-    ],
-    # Add other configurations as needed
+    "h2storage": GenericStorage,
+    "dri_plant": DriPlant,
+    "dri_storage": DRIStorage,
+    "eaf": ElectricArcFurnace
 }
 
 class SteelPlant(SupportsMinMax):
@@ -42,20 +27,12 @@ class SteelPlant(SupportsMinMax):
         unit_operator: str,
         bidding_strategies: dict,
         technology: str = "steel_plant",
-        plant_type: str = 'electrolyser_shaftFurnace_EAF',
+        plant_type: str = "electrolyser_h2storage_dri_eaf",
         node: str = "bus0",
         index: pd.DatetimeIndex = None,
         location: tuple[float, float] = (0.0, 0.0),
         components: Dict[str, Dict] = None,
         objective: str = None,
-
-        # hydrogen_price: float = None,
-        # electricity_price: float = None,
-        # natural_gas_price: float = None,
-        # iron_ore_price: float = None,
-        # steel_price: float = None,
-        # steel_demand: float = None,
-
         **kwargs,
     ):
         super().__init__(
@@ -67,250 +44,139 @@ class SteelPlant(SupportsMinMax):
             node=node,
             **kwargs,
         )
-
-        self.hydrogen_demand = self.forecaster[f"{self.id}_hydrogen_demand"]
-        self.hydrogen_price = self.forecaster["hydrogen_price"]
+        self.natural_gas_price = self.forecaster["fuel_price_natural_gas"]
         self.electricity_price = self.forecaster["price_EOM"]
-        self.natural_gas_price = self.forecaster["fuel_price_naturalgas"]
         self.iron_ore_price = self.forecaster["iron_ore_price"]
-        self.steel_price = self.forecaster["steel_price"]
         self.steel_demand = self.forecaster["steel_demand"]
+        self.dri_price = self.forecaster["dri_price"]
 
         self.location = location
-
         self.objective = objective
 
         self.components = {}
-
-        # Validate and set the plant_type attribute
-        if plant_type not in technology_configurations:
-            raise ValueError(f"Plant type '{plant_type}' is not recognized.")
         self.plant_type = plant_type
 
-        self.create_model()
-        
-        # Initialize components based on the selected technology configuration
-        self.initialize_components(components)
-        self.initialize_process_sequence(plant_type)
-        
-        self.define_constraints()
-
-        print(self.model.display())
-
-    def create_model(self):
-        print("Creating Master Model for SteelPlant")
         self.model = pyo.ConcreteModel()
         self.define_sets()
         self.define_parameters()
+        
+        # Initialize components based on the selected technology configuration
+        self.initialize_components(components)
+        self.initialize_process_sequence()
+        
         self.define_variables()
+        self.define_constraints()
         self.define_objective()
 
+        self.power_requirement = None
+
     def initialize_components(self, components):
-        for component_id, component_info in components.items():
-            component_type = component_info["technology"]
-            if component_type not in dst_components:
-                raise ValueError(f"Component type '{component_type}' not recognized.")
+        for component_id, component_data in components.items():
+            component_technology = component_data["technology"]
+            if component_technology in dst_components:
+                component_class = dst_components[component_technology]
+                component_instance = component_class(model=self.model, id=component_id, **component_data)
 
-            component_class = dst_components[component_type]
+                 # Call the add_to_model method for each component
+                component_instance.add_to_model(self.model, self.model.time_steps)
+                self.components[component_id] = component_instance
+
+
+    def initialize_process_sequence(self):
+        # Assuming the presence of 'h2storage' indicates the desire for dynamic flow management
+        has_h2storage = 'h2storage' in self.components
+
+        # Constraint for direct hydrogen flow from Electrolyser to dri plant
+        @self.model.Constraint(self.model.time_steps)
+        def direct_hydrogen_flow_constraint(m, t):
+            # This constraint allows part of the hydrogen produced by the dri plant to go directly to the EAF
+            # The actual amount should ensure that it does not exceed the capacity or demand of the EAF
+            if has_h2storage:
+                return self.components['electrolyser'].b.hydrogen_out[t] + self.components['h2storage'].b.discharge[t] >= self.components['dri_plant'].b.hydrogen_in[t] + self.components['h2storage'].b.charge[t]
+            else: 
+                return self.components['electrolyser'].b.hydrogen_out[t] >= self.components['dri_plant'].b.hydrogen_in[t]
             
-            self.components[component_id] = component_class(self.model, component_id, **component_info)
-            self.components[component_id].add_to_model(self.model, self.model.time_steps)
+        # Assuming the presence of dristorage' indicates the desire for dynamic flow management
+        has_dristorage = 'dri_storage' in self.components
 
-    def initialize_process_sequence(self, plant_type):
-        # Use plant_type to determine the process sequence
-        if plant_type not in technology_configurations:
-            raise ValueError(f"Plant type '{plant_type}' is not recognized.")
-
-        sequence = technology_configurations[plant_type]
-        for unit_type in sequence:
-            if unit_type in self.components:
-                self.initialize_unit_sequence(self.components[unit_type])
-
-    def initialize_unit_sequence(self, technology_choice):
-        process_sequence = technology_configurations[technology_choice]
-        for process_link in process_sequence:
-            source_unit, source_output, target_unit, target_input = process_link
-
-            @self.model.Constraint(self.model.time_steps)
-            def process_flow_constraint(m, t):
-                if target_unit == 'shaft_furnace' and source_unit == 'electrolyser':
-                    # Constraint for hydrogen flow from electrolyser to shaft furnace
-                    return m.shaft_furnace.hydrogen_input_from_electrolyser[t] == getattr(m.components[source_unit], source_output)[t] * m.use_hydrogen_from_electrolyser[t]
-                elif target_unit == 'shaft_furnace' and source_unit == 'hydrogen_storage':
-                    # Constraint for hydrogen flow from storage to shaft furnace
-                    return m.shaft_furnace.hydrogen_input_from_storage[t] == getattr(m.components[source_unit], source_output)[t] * m.use_hydrogen_from_storage[t]
-                else:
-                    # Standard process flow constraint
-                    return getattr(m.components[source_unit], source_output)[t] == getattr(m.components[target_unit], target_input)[t]
-
-            constraint_name = f"flow_from_{source_unit}_to_{target_unit}"
-            self.model.add_component(constraint_name, process_flow_constraint)
-
-
+        # Constraint for direct hydrogen flow from Electrolyser to dri plant
+        @self.model.Constraint(self.model.time_steps)
+        def direct_dri_flow_constraint(m, t):
+            # This constraint allows part of the dri produced by the dri plant to go directly to the dri storage
+            # The actual amount should ensure that it does not exceed the capacity or demand of the EAF
+            if has_dristorage:
+                return self.components['dri_plant'].b.dri_output[t] + self.components['dri_storage'].b.discharge_dri[t] >= self.components['eaf'].b.dri_input[t] + self.components['dri_storage'].b.charge_dri[t]
+            else: 
+                return self.components['dri_plant'].b.dri_output[t] == self.components['eaf'].b.dri_input[t]
+            
+        # Constraint for material flow from dri plant to Electric Arc Furnace
+        @self.model.Constraint(self.model.time_steps)
+        def shaft_to_arc_furnace_material_flow_constraint(m, t):
+            return self.components['dri_plant'].b.dri_output[t] == self.components['eaf'].b.dri_input[t]
 
     def define_sets(self) -> None:
-        # self.model.time_steps = pyo.Set(initialize=range(len(self.index)))
         self.model.time_steps = pyo.Set(
             initialize=[idx for idx, _ in enumerate(self.index)]
         )
 
     def define_parameters(self):
-        self.model.electricity_price = pyo.Param(self.model.time_steps, 
-                                                 initialize={t: self.electricity_price if isinstance(self.electricity_price, (float, int)) 
-                                                             else self.electricity_price[t] for t in self.model.time_steps})
-        
-        self.model.hydrogen_price = pyo.Param(self.model.time_steps, 
-                                                 initialize={t: self.hydrogen_price if isinstance(self.hydrogen_price, (float, int)) 
-                                                             else self.hydrogen_price[t] for t in self.model.time_steps})
-        
-        self.model.natural_gas_price = pyo.Param(self.model.time_steps, 
-                                                 initialize={t: self.natural_gas_price if isinstance(self.natural_gas_price, (float, int)) 
-                                                             else self.natural_gas_price[t] for t in self.model.time_steps})
-        
-        self.model.iron_ore_price = pyo.Param(self.model.time_steps, 
-                                                 initialize={t: self.iron_ore_price if isinstance(self.iron_ore_price, (float, int)) 
-                                                             else self.iron_ore_price[t] for t in self.model.time_steps})
-        
-        self.model.steel_price = pyo.Param(self.model.time_steps, 
-                                                 initialize={t: self.steel_price if isinstance(self.steel_price, (float, int)) 
-                                                             else self.steel_price[t] for t in self.model.time_steps})
-        
-        self.model.steel_demand = pyo.Param(self.model.time_steps, 
-                                                 initialize={t: self.steel_demand if isinstance(self.steel_demand, (float, int)) 
-                                                             else self.steel_demand[t] for t in self.model.time_steps})
+        self.model.electricity_price = pyo.Param(self.model.time_steps, initialize={t: value for t, value in enumerate(self.electricity_price)})
+        self.model.natural_gas_price = pyo.Param(self.model.time_steps, initialize={t: value for t, value in enumerate(self.natural_gas_price)})
+        self.model.iron_ore_price = pyo.Param(self.model.time_steps, initialize={t: value for t, value in enumerate(self.iron_ore_price)})
+        self.model.dri_price = pyo.Param(self.model.time_steps, initialize={t: value for t, value in enumerate(self.dri_price)})
+
+        self.model.steel_demand = pyo.Param(self.model.time_steps, initialize={t: value for t, value in enumerate(self.steel_demand)})
         
     def define_variables(self):
+        self.model.total_power_input = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
         
-        # Binary decision variables for hydrogen source selection
-        self.model.use_hydrogen_from_electrolyser = pyo.Var(self.model.time_steps, within=pyo.Binary)
-        # self.model.hydrogen_input_from_electrolyser = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
-        self.model.use_hydrogen_from_storage = pyo.Var(self.model.time_steps, within=pyo.Binary)
-        # self.model.hydrogen_input_from_storage = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
-
-        self.model.hydrogen_input_from_electrolyser = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
-
-
-        self.model.power_in = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
-        self.model.hydrogen_in = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
-        self.model.natural_gas_in = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
-        self.model.iron_ore_in = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
-
-        # Function to initialize the steel_output variable based on the outputs of different components
-        def initialize_steel_output(m, t):
-            steel_output = 0
-            if 'electric_arc_furnace' in self.components:
-                steel_output += self.components['electric_arc_furnace'].steel_output[t]
-            if 'basic_oxygen_furnace' in self.components:  # Placeholder for future implementation
-                steel_output += self.components['basic_oxygen_furnace'].steel_output[t]
-            # Add other component outputs as needed
-            return steel_output
-
-        # Define the steel_output variable with the initialization rule
-        self.model.steel_output = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals, 
-                                          initialize=initialize_steel_output)
-
-
     def define_constraints(self):
-
-        # Check if steel demand is a scalar (float or int)
-        if isinstance(self.steel_demand, (float, int)):
-            # Constraint for scalar steel demand - total steel output should match total demand over all time steps
-            @self.model.Constraint()
-            def total_steel_demand_constraint(m):
-                return sum(m.steel_output[t] for t in m.time_steps) == m.steel_demand
-
-        else:  # Assuming steel demand is a time series
-            # Constraint for time series steel demand - steel output should match demand at each time step
-            @self.model.Constraint(self.model.time_steps)
-            def steel_demand_constraint(m, t):
-                return m.steel_output[t] == m.steel_demand[t]
-
-    def calculate_min_max_power(self, start: pd.Timestamp, end: pd.Timestamp):
-        aggregated_power = 0
-        total_cost = 0
-
-        for t in pd.date_range(start=start, end=end, freq='H'):
-            hour_index = t.hour  # Convert timestamp to hour index
-
-            # print(f"Hour Index: {hour_index}")
-
-            # Aggregating power input and calculating cost for Electrolyser
-            if 'electrolyser' in self.components:
-                electrolyser_power_in = self.components['electrolyser'].component_block.power_in[hour_index].value
-                if electrolyser_power_in is not None:
-                    aggregated_power += electrolyser_power_in
-                    electrolyser_cost = (electrolyser_power_in * self.model.electricity_price[hour_index].value +
-                                        self.components['electrolyser'].component_block.hydrogen_in[hour_index].value * self.model.hydrogen_price[hour_index].value)
-                    total_cost += electrolyser_cost
-                # else:
-                #     print(f"Warning: electrolyser Power Input is None for hour {hour_index}")
-
-            # Calculating cost for Shaft Furnace (assuming it doesn't use power_in)
-            if 'shaft_furnace' in self.components:
-                natural_gas_input = self.components['shaft_furnace'].component_block.natural_gas_in[hour_index]
-                if natural_gas_input.value is not None:
-                    shaft_furnace_cost = (natural_gas_input.value * self.model.natural_gas_price[hour_index].value +
-                                        self.components['shaft_furnace'].component_block.hydrogen_in[hour_index].value * self.model.hydrogen_price[hour_index].value +
-                                        self.components['shaft_furnace'].component_block.iron_ore_in[hour_index].value * self.model.iron_ore_price[hour_index].value)
-                    total_cost += shaft_furnace_cost
-
-            # Aggregating power input and calculating cost for Electric Arc Furnace
-            if 'electric_arc_furnace' in self.components:
-                eaf_power_input = self.components['electric_arc_furnace'].component_block.power_in[hour_index]
-                if eaf_power_input.value is not None:
-                    eaf_power_in = eaf_power_input.value
-                    aggregated_power += eaf_power_in
-                    electric_arc_furnace_cost = eaf_power_in * self.model.electricity_price[hour_index].value
-                    total_cost += electric_arc_furnace_cost
-
-            # Add other component power and cost calculations as needed
-
-        # Calculate marginal cost (total cost divided by total power, if power is not zero)
-        if aggregated_power > 0:
-            marginal_cost = total_cost / aggregated_power
-        else:
-            marginal_cost = 0
-
-        return aggregated_power, marginal_cost
-
-
+        @self.model.Constraint(self.model.time_steps)
+        def dri_output_association_constraint(m, t):
+            return self.components['eaf'].b.steel_output[t] >= self.steel_demand[t]
+        
+        @self.model.Constraint(self.model.time_steps)
+        def total_power_input_constraint(m, t):
+            return m.total_power_input[t] == self.components['electrolyser'].b.power_in[t] + self.components['eaf'].b.power_eaf[t]
 
     def define_objective(self):
-    # Helper function to calculate total costs
-        def total_costs(m):
-            return sum(m.electricity_price[t] * m.power_in[t] +
-                    m.hydrogen_price[t] * m.hydrogen_in[t] +
-                    m.natural_gas_price[t] * m.natural_gas_in[t] +
-                    m.iron_ore_price[t] * m.iron_ore_in[t]
-                    for t in m.time_steps)
-
-        # Helper function to calculate total revenue
-        def total_revenue(m):
-            return sum(m.steel_price[t] * m.steel_output[t] for t in m.time_steps)
-
-        # Define the objective function based on the specified objective
         if self.objective == "maximize_marginal_profit":
-            self.model.objective = pyo.Objective(expr=total_revenue(self.model) - total_costs(self.model), sense=pyo.maximize)
+            @self.model.Objective(sense=pyo.maximize)
+            def obj_rule(m):
+                total_revenue = sum(
+                    self.dri_price[t] * m.aggregated_dri_output[t]
+                    for t in m.time_steps
+                )
+                
+                total_costs = sum(
+                    self.electricity_price[t] * self.components['electrolyser'].b.power_in[t] + 
+                    # self.hydrogen_price[t] * self.components['electrolyser'].b.hydrogen_out[t] +
+                    self.iron_ore_price[t] * self.components['dri_plant'].b.iron_ore_in[t]
+                    for t in m.time_steps
+                )
+                
+                return total_revenue - total_costs
         elif self.objective == "minimize_marginal_cost":
-            self.model.objective = pyo.Objective(expr=total_costs(self.model), sense=pyo.minimize)
+            @self.model.Objective(sense=pyo.minimize)
+            def obj_rule(m):
+                total_costs = sum(
+                    self.components['electrolyser'].b.start_cost[t] + 
+                    self.components['electrolyser'].b.electricity_cost[t] +
+                    self.components['dri_plant'].b.dri_operating_cost[t] +
+                    self.components['eaf'].b.eaf_operating_cost[t] +
+                    self.iron_ore_price[t] * self.components['dri_plant'].b.iron_ore_in[t]
+                    for t in m.time_steps
+                )
+                return total_costs
+        else:
+            raise ValueError(f"Unknown objective: {self.objective}")
 
     def run_optimization(self):
         # Create a solver
         solver = SolverFactory("gurobi")
 
         print("Model Components Before Optimization:")
-        self.model.pprint()
-
-        for t in self.model.time_steps:
-            self.model.power_in[t] = 0  
-
-        for t in self.model.time_steps:
-            variable_name = f"power_in[{t}]"
-            variable_value = self.model.power_in[t].value
-            print(f"{variable_name} = {variable_value}")
-
-        # Solve the model
-        # solver.solve(self.model, tee=True)
+        # self.model.pprint()
         results = solver.solve(self.model, tee=True)  # , tee=True
         # print(results)
         # self.model.display()
@@ -331,4 +197,16 @@ class SteelPlant(SupportsMinMax):
         else:
             print("Solver Status: ", results.solver.status)
             print("Termination Condition: ", results.solver.termination_condition)
+
+        temp = self.model.total_power_input.get_values()
+        self.power_requirement = pd.Series(index=self.index, data=0.0)
+        for i, date in enumerate(self.index):
+            self.power_requirement.loc[date] = temp[i]
+
+def determine_optimal_operation(self):
+        """
+        Determines the optimal operation of the steel plant without considering flexibility.
+        """
+        optimal_operation = self.run_optimization()
+        return optimal_operation
 
