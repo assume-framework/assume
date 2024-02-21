@@ -529,10 +529,12 @@ class ElectricArcFurnace:
             delta_t = t - (t-1)
             # Convert minimum operating time to the time unit of your choice
             min_operating_time_units = int(self.min_operating_time / delta_t)
+            
             if t < min_operating_time_units:
-                return b.power_eaf[t] == b.rated_power_eaf
+                # Ensure that the cumulative sum of DRI production over the past min_operating_time_units time steps is at least min_operating_time_units times the production at time step t
+                return sum(b.steed_output[i] for i in range(t - min_operating_time_units + 1, t + 1)) >= min_operating_time_units * b.steel_output[t]
             else:
-                return sum(b.power_eaf[t-i] for i in range(min_operating_time_units)) >= min_operating_time_units * b.rated_power_eaf
+                return sum(b.steel_output[i] for i in range(t - min_operating_time_units + 1, t + 1)) >= min_operating_time_units * b.steel_output[t]
 
         @self.b.Constraint(time_steps)
         def min_down_time_eaf_constraint(b, t):
@@ -542,10 +544,11 @@ class ElectricArcFurnace:
             delta_t = t - (t-1)
             # Convert minimum downtime to the time unit of your choice
             min_downtime_units = int(self.min_down_time / delta_t)
+            
             if t < min_downtime_units:
-                return b.power_eaf[t] == 0
+                return sum(b.steel_output[t-i] for i in range(min_downtime_units)) >= min_downtime_units * b.steel_output[t]
             else:
-                return sum(b.power_eaf[t-i] for i in range(min_downtime_units)) == 0
+                return sum(b.steel_output[t-i] for i in range(min_downtime_units)) >= min_downtime_units * b.steel_output[t]
             
         # operational cost
         @self.b.Constraint(time_steps)
