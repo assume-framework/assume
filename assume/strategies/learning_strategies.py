@@ -12,6 +12,7 @@ import torch as th
 
 from assume.common.base import LearningStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
+from assume.common.utils import get_products_index
 from assume.reinforcement_learning.learning_utils import Actor, NormalActionNoise
 
 logger = logging.getLogger(__name__)
@@ -326,7 +327,7 @@ class RLStrategy(LearningStrategy):
 
         # get last accapted bid volume and the current marginal costs of the unit
         current_volume = unit.get_output_before(start)
-        current_costs = unit.calc_marginal_cost_with_partial_eff(current_volume, start)
+        current_costs = unit.calculate_marginal_cost(start, current_volume)
 
         # scale unit outpus
         scaled_total_capacity = current_volume / scaling_factor_total_capacity
@@ -384,18 +385,10 @@ class RLStrategy(LearningStrategy):
             end = order["end_time"]
             end_excl = end - unit.index.freq
 
-            # depending on way the unit calaculates marginal costs we take costs
-            if unit.marginal_cost is not None:
-                marginal_cost = (
-                    unit.marginal_cost[start]
-                    if len(unit.marginal_cost) > 1
-                    else unit.marginal_cost
-                )
-            else:
-                marginal_cost = unit.calc_marginal_cost_with_partial_eff(
-                    power_output=unit.outputs[product_type].loc[start:end_excl],
-                    timestep=start,
-                )
+            # depending on way the unit calculates marginal costs we take costs
+            marginal_cost = unit.calculate_marginal_cost(
+                start, unit.outputs[product_type].loc[start]
+            )
 
             duration = (end - start) / timedelta(hours=1)
 

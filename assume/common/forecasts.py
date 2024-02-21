@@ -181,8 +181,6 @@ class CsvForecaster(Forecaster):
 
         This method calculates price forecast and residual load forecast for available markets, if
         thise don't already exist.
-
-        Args:
         """
 
         cols = []

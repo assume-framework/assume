@@ -417,13 +417,13 @@ def get_products_index(orderbook: Orderbook) -> pd.DatetimeIndex:
         if order["start_time"] < start_time:
             start_time = order["start_time"]
         if order["end_time"] > end_time:
-            end_time = order["start_time"]
+            end_time = order["end_time"]
         if order["end_time"] - order["start_time"] < duration:
             duration = order["end_time"] - order["start_time"]
 
     index_products = pd.date_range(
         start_time,
-        end_time,
+        end_time - duration,
         freq=duration,
     )
 
