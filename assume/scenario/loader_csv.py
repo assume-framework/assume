@@ -142,6 +142,7 @@ def replace_paths(config: dict, inputs_path: str):
     Returns:
         dict: the adjusted config dict
     """
+
     if isinstance(config, dict):
         for key, value in config.items():
             if isinstance(value, (dict, list)):
@@ -298,8 +299,6 @@ async def load_scenario_folder_async(
     config = config[study_case]
     logger.info(f"Starting Scenario {scenario}/{study_case} from {inputs_path}")
 
-    config = replace_paths(config, path)
-
     world.reset()
 
     start = pd.Timestamp(config["start_date"])
@@ -353,6 +352,8 @@ async def load_scenario_folder_async(
         learning_config[
             "trained_policies_save_path"
         ] = f"{inputs_path}/learned_strategies/{sim_id}"
+
+    config = replace_paths(config, path)
 
     if learning_config.get("learning_mode", False):
         sim_id = f"{sim_id}_{episode}"
