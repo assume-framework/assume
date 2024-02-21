@@ -3,7 +3,6 @@ import pandas as pd
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.forecasts import CsvForecaster
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
-from assume.units.building import Building
 from assume.units.steel_plant import SteelPlant
 
 
@@ -109,52 +108,6 @@ class NaiveDAStrategy(BaseStrategy):
         return bids
 
 
-class NaiveDABuildingStrategy(BaseStrategy):
-    def calculate_bids(
-        self,
-        unit: SupportsMinMax,
-        market_config: MarketConfig,
-        product_tuples: list[Product],
-        **kwargs,
-    ) -> Orderbook:
-        # Run the optimization for the building unit
-        start = product_tuples[0][0]
-        end_all = product_tuples[-1][1]
-
-        heating_demand = unit.forecaster["heating_demand"]
-        cooling_demand = unit.forecaster["cooling_demand"]
-        electricity_price = unit.forecaster["price_EOM"]
-        unit.heating_demand = heating_demand
-        # print(heating_demand)
-        unit.heating_demand = cooling_demand
-        unit.run_optimization()
-
-        # Fetch the optimized demand (aggregated_power_in)
-        optimized_demand = unit.model.aggregated_power_in.get_values()
-
-        # Corrected marginal cost calculation
-        marginal_cost = {time_step: demand * electricity_price for time_step, demand in optimized_demand.items()}
-
-        # Assuming you want to keep the structure of product_tuples as is, you can use the following:
-        product_tuples = [(start, optimized_demand[start]) for start in unit.model.time_steps]
-
-        # Then use the optimized_demand values to create a profile as before
-        profile = {product[0]: product[2] for product in product_tuples}
-
-
-        order: Order = {
-            "start_time": start,
-            "end_time": end_all,
-            "only_hours": product_tuples[0][1],
-            "price": marginal_cost,
-            "volume": profile,
-            "accepted_volume": {product[0]: 0 for product in product_tuples},
-            "bid_type": "BB",
-        }
-
-        bids = [order]
-        return bids
-    
 class NaiveDAsteelplantStrategy(BaseStrategy):
     def calculate_bids(
         self,
@@ -163,7 +116,6 @@ class NaiveDAsteelplantStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        
         bids = []
         start = product_tuples[0][0]  # start time of the first product
         end_all = product_tuples[-1][1]  # end time of the last product
@@ -173,7 +125,6 @@ class NaiveDAsteelplantStrategy(BaseStrategy):
 
         if unit.power_requirement is None:
             unit.run_optimization()
-
 
         bids = []
         for product in product_tuples:
@@ -193,8 +144,9 @@ class NaiveDAsteelplantStrategy(BaseStrategy):
                     "volume": -volume,
                 }
             )
-        
+
         return bids
+
 
 class NaivePosReserveStrategy(BaseStrategy):
     """

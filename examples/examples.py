@@ -31,10 +31,6 @@ availabe_examples = {
         "scenario": "example_01c",
         "study_case": "eom_and_crm",
     },
-    "small_with_heatpumps": {
-        "scenario": "example_03",
-        "study_case": "base_case_building_2019",
-    },
     "large_2019_eom": {"scenario": "example_02", "study_case": "base_case_2019"},
     "large_2019_eom_crm": {
         "scenario": "example_02",
@@ -45,13 +41,9 @@ availabe_examples = {
         "study_case": "dam_case_2019",
     },
     "rl": {"scenario": "example_01_rl", "study_case": "base"},
-    "small_with_building": {
-        "scenario": "example_03",
-        "study_case": "base_case_building_2019"
-    },
     "small_with_steel_plant": {
         "scenario": "example_04",
-        "study_case": "base_case_steel_plant_2019"
+        "study_case": "base_case_steel_plant_2019",
     },
 }
 

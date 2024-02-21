@@ -133,12 +133,11 @@ class BaseUnit:
         self.calculate_cashflow(product_type, orderbook)
 
         marginal_cost = self.calculate_marginal_cost(
-                start=start, power=self.outputs[product_type].loc[start]
-            )
+            start=start, power=self.outputs[product_type].loc[start]
+        )
         if marginal_cost:
             self.outputs[product_type + "_marginal_costs"].loc[start:end_excl] = (
-                marginal_cost
-                * self.outputs[product_type].loc[start:end_excl]
+                marginal_cost * self.outputs[product_type].loc[start:end_excl]
             )
 
         self.bidding_strategies[product_type].calculate_reward(
