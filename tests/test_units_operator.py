@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import calendar
 from datetime import datetime
 
 import pandas as pd
@@ -16,6 +15,7 @@ from mango.util.termination_detection import tasks_complete_or_sleeping
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
+from assume.common.utils import datetime2timestamp
 from assume.strategies.naive_strategies import NaiveSingleBidStrategy
 from assume.units.demand import Demand
 from assume.units.powerplant import PowerPlant
@@ -53,12 +53,12 @@ async def units_operator() -> UnitsOperator:
     unit = Demand("testdemand", index=index, **params_dict)
     await units_role.add_unit(unit)
 
-    start_ts = calendar.timegm(start.utctimetuple())
+    start_ts = datetime2timestamp(start)
     clock.set_time(start_ts)
 
     yield units_role
 
-    end_ts = calendar.timegm(end.utctimetuple())
+    end_ts = datetime2timestamp(end)
     clock.set_time(end_ts)
     await tasks_complete_or_sleeping(container)
     await container.shutdown()
