@@ -38,7 +38,6 @@ class SteelPlant(SupportsMinMax):
         unit_operator: str,
         bidding_strategies: dict,
         technology: str = "steel_plant",
-        plant_type: str = "electrolyser_h2storage_dri_eaf",
         node: str = "bus0",
         index: pd.DatetimeIndex = None,
         location: tuple[float, float] = (0.0, 0.0),
@@ -55,6 +54,7 @@ class SteelPlant(SupportsMinMax):
             node=node,
             **kwargs,
         )
+
         self.natural_gas_price = self.forecaster["fuel_price_natural_gas"]
         self.electricity_price = self.forecaster["price_EOM"]
         self.iron_ore_price = self.forecaster["iron_ore_price"]
@@ -65,7 +65,6 @@ class SteelPlant(SupportsMinMax):
         self.objective = objective
 
         self.components = {}
-        self.plant_type = plant_type
 
         self.model = pyo.ConcreteModel()
         self.define_sets()
@@ -81,18 +80,18 @@ class SteelPlant(SupportsMinMax):
 
         self.power_requirement = None
 
-    def initialize_components(self, components):
-        for component_id, component_data in components.items():
-            component_technology = component_data["technology"]
-            if component_technology in dst_components:
-                component_class = dst_components[component_technology]
+    def initialize_components(self, components: Dict[str, Dict]):
+        for technology, component_data in components.items():
+            component_id = f"{self.id}_{technology}"
+            if technology in dst_components:
+                component_class = dst_components[technology]
                 component_instance = component_class(
                     model=self.model, id=component_id, **component_data
                 )
 
                 # Call the add_to_model method for each component
                 component_instance.add_to_model(self.model, self.model.time_steps)
-                self.components[component_id] = component_instance
+                self.components[technology] = component_instance
 
     def initialize_process_sequence(self):
         # Assuming the presence of 'h2storage' indicates the desire for dynamic flow management
@@ -181,7 +180,7 @@ class SteelPlant(SupportsMinMax):
     def define_constraints(self):
         @self.model.Constraint(self.model.time_steps)
         def dri_output_association_constraint(m, t):
-            return self.components["eaf"].b.steel_output[t] >= self.steel_demand[t]
+            return self.components["eaf"].b.steel_output[t] >= self.steel_demand.iloc[t]
 
         @self.model.Constraint(self.model.time_steps)
         def total_power_input_constraint(m, t):
@@ -197,15 +196,16 @@ class SteelPlant(SupportsMinMax):
             @self.model.Objective(sense=pyo.maximize)
             def obj_rule(m):
                 total_revenue = sum(
-                    self.dri_price[t] * m.aggregated_dri_output[t] for t in m.time_steps
+                    self.dri_price.iloc[t] * m.aggregated_dri_output[t]
+                    for t in m.time_steps
                 )
 
                 total_costs = sum(
-                    self.electricity_price[t]
+                    self.electricity_price.iloc[t]
                     * self.components["electrolyser"].b.power_in[t]
                     +
                     # self.hydrogen_price[t] * self.components['electrolyser'].b.hydrogen_out[t] +
-                    self.iron_ore_price[t]
+                    self.iron_ore_price.iloc[t]
                     * self.components["dri_plant"].b.iron_ore_in[t]
                     for t in m.time_steps
                 )
@@ -221,7 +221,7 @@ class SteelPlant(SupportsMinMax):
                     + self.components["electrolyser"].b.electricity_cost[t]
                     + self.components["dri_plant"].b.dri_operating_cost[t]
                     + self.components["eaf"].b.eaf_operating_cost[t]
-                    + self.iron_ore_price[t]
+                    + self.iron_ore_price.iloc[t]
                     * self.components["dri_plant"].b.iron_ore_in[t]
                     for t in m.time_steps
                 )
@@ -234,7 +234,7 @@ class SteelPlant(SupportsMinMax):
         # Create a solver
         solver = SolverFactory("gurobi")
 
-        results = solver.solve(self.model, tee=True)  # , tee=True
+        results = solver.solve(self.model, tee=False)  # , tee=True
 
         # Check solver status and termination condition
         if (results.solver.status == SolverStatus.ok) and (
@@ -260,10 +260,32 @@ class SteelPlant(SupportsMinMax):
         for i, date in enumerate(self.index):
             self.power_requirement.loc[date] = temp[i]
 
+    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
+        """
+        Calculate the marginal cost of the unit returns the marginal cost of the unit based on the provided time and power.
 
-def determine_optimal_operation(self):
-    """
-    Determines the optimal operation of the steel plant without considering flexibility.
-    """
-    optimal_operation = self.run_optimization()
-    return optimal_operation
+        Args:
+            start (pandas.Timestamp): The start time of the dispatch.
+            power (float): The power output of the unit.
+
+        Returns:
+            float: the marginal cost of the unit for the given power.
+        """
+        return self.electricity_price.at[start]
+
+    def as_dict(self) -> dict:
+        """
+        Returns the attributes of the unit as a dictionary, including specific attributes.
+
+        Returns:
+            dict: The attributes of the unit as a dictionary.
+        """
+        unit_dict = super().as_dict()
+        unit_dict.update(
+            {
+                "unit_type": "steel_plant",
+                "components": [component for component in self.components.keys()],
+            }
+        )
+
+        return unit_dict

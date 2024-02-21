@@ -85,25 +85,27 @@ def load_file(
                 df.index, pd.DatetimeIndex
             ):
                 logger.warning(
-                    f"{file_name}: simulation time line does not match length of dataframe and index is not a datetimeindex. Returning None."
+                    f"{file_name}: simulation time line does not match length of dataframe and index is not a datetimeindex."
                 )
-                return None
+                raise ValueError
 
             df.index.freq = df.index.inferred_freq
 
             if len(df.index) < len(index) and df.index.freq == index.freq:
                 logger.warning(
-                    f"{file_name}: simulation time line is longer than length of the dataframe. Returning None."
+                    f"{file_name}: simulation time line is longer than length of the dataframe."
                 )
-                return None
+                raise ValueError
 
             if df.index.freq < index.freq:
                 df = df.resample(index.freq).mean()
                 logger.info(f"Downsampling {file_name} successful.")
 
             elif df.index.freq > index.freq or len(df.index) < len(index):
-                logger.warning("Upsampling not implemented yet. Returning None.")
-                return None
+                logger.warning(
+                    f"{file_name}: frequency of dataframe is higher than index."
+                )
+                raise ValueError
 
             df = df.loc[index]
 
@@ -112,6 +114,46 @@ def load_file(
     except FileNotFoundError:
         logger.info(f"{file_name} not found. Returning None")
         return None
+
+
+def load_dsm_units(path: str, config: dict, file_name: str) -> pd.DataFrame:
+    dsm_units = load_file(
+        path=path,
+        config=config,
+        file_name=file_name,
+    )
+    # convert dsm_units into a components dict where each technology has values with non nan values
+    columns = ["unit_operator", "objective"]
+    dsm_units_dict = {}
+    for name, data in dsm_units.groupby(dsm_units.index):
+        dsm_unit = {}
+        # add other columns to dsm_unit
+        dsm_unit.update(data[columns].iloc[0].to_dict())
+        # remove the columns from the dataframe
+        data = data.drop(columns=columns)
+
+        # also add all values from columns starting with bidding_
+        for key, value in data.items():
+            if key.startswith("bidding_"):
+                dsm_unit[key] = value.iloc[0]
+                # remove the column from the dataframe
+                data = data.drop(columns=[key])
+
+        components = {}
+        for tech in data["technology"].unique():
+            tech_df = data[data["technology"] == tech]
+            tech_df = tech_df.dropna(axis=1, how="all")
+            # drop technology column
+            tech_df = tech_df.drop(columns=["technology"])
+            components[tech] = tech_df.to_dict(orient="records")[0]
+
+        dsm_unit["components"] = components
+
+        dsm_units_dict[name] = dsm_unit
+
+    dsm_units = pd.DataFrame.from_dict(dsm_units_dict, orient="index")
+
+    return dsm_units
 
 
 def convert_to_rrule_freq(string: str) -> tuple[int, int]:
@@ -335,6 +377,12 @@ async def load_scenario_folder_async(
         file_name="demand_units",
     )
 
+    dsm_units = load_dsm_units(
+        path=path,
+        config=config,
+        file_name="dsm_units",
+    )
+
     if powerplant_units is None or demand_units is None:
         raise ValueError("No power plant or no demand units were provided!")
 
@@ -424,7 +472,6 @@ async def load_scenario_folder_async(
         load_file(path=path, config=config, file_name="temperature", index=index)
     )
     forecaster.calc_forecast_if_needed()
-    forecaster.save_forecasts(path)
 
     await world.setup(
         start=start,
@@ -470,6 +517,11 @@ async def load_scenario_folder_async(
             [all_operators, storage_units.unit_operator.unique()]
         )
 
+    if dsm_units is not None:
+        all_operators = np.concatenate(
+            [all_operators, dsm_units.unit_operator.unique()]
+        )
+
     # add central RL unit oporator that handels all RL units
     if world.learning_mode == True and "Operator-RL" not in all_operators:
         all_operators = np.concatenate([all_operators, ["Operator-RL"]])
@@ -495,6 +547,13 @@ async def load_scenario_folder_async(
     add_units(
         units_df=demand_units,
         unit_type="demand",
+        world=world,
+        forecaster=forecaster,
+    )
+
+    add_units(
+        units_df=dsm_units,
+        unit_type="steel_plant",
         world=world,
         forecaster=forecaster,
     )

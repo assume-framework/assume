@@ -3,9 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from assume.common.base import BaseStrategy, SupportsMinMax
-from assume.common.forecasts import CsvForecaster
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
-from assume.units.steel_plant import SteelPlant
 
 
 class NaiveSingleBidStrategy(BaseStrategy):
@@ -134,10 +132,10 @@ class NaiveProfileStrategy(BaseStrategy):
         return bids
 
 
-class NaiveDAsteelplantStrategy(BaseStrategy):
+class NaiveDASteelplantStrategy(BaseStrategy):
     def calculate_bids(
         self,
-        unit: SteelPlant,
+        unit: SupportsMinMax,
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,

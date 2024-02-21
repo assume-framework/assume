@@ -32,7 +32,7 @@ from assume.common.base import LearningConfig
 from assume.common.utils import datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import LearningStrategy, bidding_strategies
-from assume.units import BaseUnit, Demand, PowerPlant, Storage
+from assume.units import BaseUnit, Demand, PowerPlant, SteelPlant, Storage
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
 stdout_handler = logging.StreamHandler(stream=sys.stdout)
@@ -126,6 +126,7 @@ class World:
             "power_plant": PowerPlant,
             "demand": Demand,
             "storage": Storage,
+            "steel_plant": SteelPlant,
         }
 
         self.bidding_strategies = bidding_strategies
