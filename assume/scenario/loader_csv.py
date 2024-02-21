@@ -148,7 +148,8 @@ def replace_paths(config: dict, inputs_path: str):
             if isinstance(value, (dict, list)):
                 config[key] = replace_paths(value, inputs_path)
             elif isinstance(key, str) and key.endswith("_path"):
-                config[key] = inputs_path + "/" + value
+                if not value.startswith(inputs_path):
+                    config[key] = inputs_path + "/" + value
     elif isinstance(config, list):
         for i, item in enumerate(config):
             config[i] = replace_paths(item, inputs_path)
