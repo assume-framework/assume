@@ -48,7 +48,6 @@ availabe_examples = {
         "scenario": "example_02",
         "study_case": "dam_case_2019",
     },
-    "rl": {"scenario": "example_01_rl", "study_case": "base"},
     "small_with_steel_plant": {
         "scenario": "example_04",
         "study_case": "base_case_steel_plant_2019",
