@@ -447,6 +447,7 @@ class ElectricArcFurnace:
                  model, 
                  id, 
                  rated_power, 
+                 min_power,
                  max_dri_input,
                  specific_electricity_demand, 
                  specific_dri_demand,
@@ -460,6 +461,7 @@ class ElectricArcFurnace:
         self.id = id
         # Operational parameters
         self.rated_power = rated_power
+        self.min_power = min_power
         self.max_dri_input = max_dri_input
         # Additional operational characteristics
         self.specific_electricity_demand = specific_electricity_demand
@@ -478,6 +480,7 @@ class ElectricArcFurnace:
 
     def define_parameters(self):
         self.b.rated_power_eaf = Param(initialize=self.rated_power)
+        self.b.min_power_eaf = Param(initialize=self.min_power)
         self.b.max_dri_input = Param(initialize=self.max_dri_input)
         self.b.specific_electricity_demand = Param(initialize=self.specific_electricity_demand)
         self.b.specific_dri_demand = Param(initialize=self.specific_dri_demand)
@@ -494,9 +497,15 @@ class ElectricArcFurnace:
         self.b.eaf_operating_cost = Var(time_steps, within=NonNegativeReals)
 
     def define_constraints(self, time_steps):
+
+        # Power bounds constraints
         @self.b.Constraint(time_steps)
-        def electricity_input_constraint(b, t):
+        def electricity_input_upper_bound(b, t):
             return b.power_eaf[t] <= b.rated_power_eaf
+
+        @self.b.Constraint(time_steps)
+        def electricity_input_lower_bound(b, t):
+            return b.power_eaf[t] >= b.min_power_eaf
         
         @self.b.Constraint(time_steps)
         def steel_output_dri_relation(b, t):

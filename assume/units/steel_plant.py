@@ -203,10 +203,15 @@ class SteelPlant(SupportsMinMax):
         for i, date in enumerate(self.index):
             self.power_requirement.loc[date] = temp[i]
 
-def determine_optimal_operation(self):
-        """
-        Determines the optimal operation of the steel plant without considering flexibility.
-        """
-        optimal_operation = self.run_optimization()
-        return optimal_operation
+    def determine_optimal_operation(self):
+            """
+            Determines the optimal operation of the steel plant without considering flexibility.
+            """
+            # Determine the operational state of the EAF
+            eaf_operational_state = self.calculate_operational_state(components={'eaf': self.components['eaf']})
+            
+            # Determine the optimal operation of the steel plant
+            optimal_operation = self.run_optimization()
+            
+            return optimal_operation, eaf_operational_state
 
