@@ -148,7 +148,7 @@ class NaiveDASteelplantStrategy(BaseStrategy):
         electricity_price = unit.forecaster["price_EOM"]
 
         if unit.power_requirement is None:
-            unit.run_optimization()
+            unit.determine_optimal_operation()
 
         bids = []
         for product in product_tuples:

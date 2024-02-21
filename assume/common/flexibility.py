@@ -26,19 +26,6 @@ def calculate_reference_operational_state(demand_side_agent):
     reference_operational_state = demand_side_agent.calculate_operational_state()
     return reference_operational_state
 
-
-def calculate_operational_state(components, t):
-    operational_states = {}
-    for technology, component in components.items():
-        operational_states[technology] = calculate_technology_state(component, t)
-    return operational_states
-
-
-def calculate_technology_state(component, t):
-    # Implement logic to calculate operational state for a specific technology component at time step t
-    pass
-
-
 def determine_flexibility(reference_curve, tolerance):
     min_flexibility = {}
     max_flexibility = {}
