@@ -1,6 +1,8 @@
 import logging
+from collections import defaultdict
 
 import pandas as pd
+from assume.common.forecasts import Forecaster
 import pyomo.environ as pyo
 from pyomo.environ import *
 
@@ -26,51 +28,51 @@ class HeatPump:
         self.cop = cop
 
     def add_to_model(self, unit_block, time_steps):
-        self.component_block = unit_block
+        self.b = unit_block
         self.define_parameters()
         self.define_variables(time_steps)
         self.define_constraints(time_steps)
 
     def define_parameters(self) -> None:
-        self.component_block.max_power = Param(initialize=self.max_power)
-        self.component_block.min_power = Param(initialize=self.min_power)
-        self.component_block.ramp_up = Param(initialize=self.ramp_up)
-        self.component_block.ramp_down = Param(initialize=self.ramp_down)
-        self.component_block.cop = Param(
+        self.b.max_power = Param(initialize=self.max_power)
+        self.b.min_power = Param(initialize=self.min_power)
+        self.b.ramp_up = Param(initialize=self.ramp_up)
+        self.b.ramp_down = Param(initialize=self.ramp_down)
+        self.b.cop = Param(
             initialize=self.cop
         )  # Coefficient of Performance
 
     def define_variables(self, time_steps):
-        self.component_block.heat_out = Var(time_steps, within=pyo.NonNegativeReals)
-        self.component_block.power_in = Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.heat_out = Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.power_in = Var(time_steps, within=pyo.NonNegativeReals)
 
     def define_constraints(self, time_steps) -> None:
         # Heat output bounds
-        @self.component_block.Constraint(time_steps)
-        def p_output_lower_bound(m, t):
-            return m.power_in[t] >= m.min_power
+        @self.b.Constraint(time_steps)
+        def p_output_lower_bound(b, t):
+            return b.power_in[t] >= b.min_power
 
-        @self.component_block.Constraint(time_steps)
-        def p_output_upper_bound(m, t):
-            return m.power_in[t] <= m.max_power
+        @self.b.Constraint(time_steps)
+        def p_output_upper_bound(b, t):
+            return b.power_in[t] <= b.max_power
 
         # Ramp up/down constraints
-        @self.component_block.Constraint(time_steps)
-        def ramp_up_constraint(m, t):
+        @self.b.Constraint(time_steps)
+        def ramp_up_constraint(b, t):
             if t == 0:
                 return Constraint.Skip
-            return m.heat_out[t] - m.heat_out[t - 1] <= m.ramp_up
+            return b.heat_out[t] - b.heat_out[t - 1] <= b.ramp_up
 
-        @self.component_block.Constraint(time_steps)
-        def ramp_down_constraint(m, t):
+        @self.b.Constraint(time_steps)
+        def ramp_down_constraint(b, t):
             if t == 0:
                 return Constraint.Skip
-            return m.heat_out[t - 1] - m.heat_out[t] <= m.ramp_down
+            return b.heat_out[t - 1] - b.heat_out[t] <= b.ramp_down
 
         # COP constraint
-        @self.component_block.Constraint(time_steps)
-        def cop_constraint(m, t):
-            return m.power_in[t] == m.heat_out[t] / m.cop
+        @self.b.Constraint(time_steps)
+        def cop_constraint(b, t):
+            return b.power_in[t] == b.heat_out[t] / b.cop
 
     def define_objective_h(self):
         # Define the objective function specific to HeatPump if needed
@@ -98,404 +100,610 @@ class AirConditioner:
         self.cooling_factor = cooling_factor
 
     def add_to_model(self, unit_block, time_steps):
-        self.component_block = unit_block
+        self.b = unit_block
         self.define_parameters()
         self.define_variables(time_steps)
         self.define_constraints(time_steps)
 
     def define_parameters(self) -> None:
-        self.component_block.max_power = Param(initialize=self.max_power)
-        self.component_block.min_power = Param(initialize=self.min_power)
-        self.component_block.ramp_up = Param(initialize=self.ramp_up)
-        self.component_block.ramp_down = Param(initialize=self.ramp_down)
-        self.component_block.cooling_factor = Param(
+        self.b.max_power = Param(initialize=self.max_power)
+        self.b.min_power = Param(initialize=self.min_power)
+        self.b.ramp_up = Param(initialize=self.ramp_up)
+        self.b.ramp_down = Param(initialize=self.ramp_down)
+        self.b.cooling_factor = Param(
             initialize=self.cooling_factor
         )  # Add the cooling factor parameter
 
     def define_variables(self, time_steps):
-        self.component_block.cool_out = Var(time_steps, within=pyo.NonNegativeReals)
-        self.component_block.power_in = Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.cool_out = Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.power_in = Var(time_steps, within=pyo.NonNegativeReals)
 
     def define_constraints(self, time_steps) -> None:
         # Heat output bounds
-        @self.component_block.Constraint(time_steps)
-        def p_output_lower_bound(m, t):
-            return m.cool_out[t] >= m.min_power
+        @self.b.Constraint(time_steps)
+        def p_output_lower_bound(b, t):
+            return b.cool_out[t] >= b.min_power
 
-        @self.component_block.Constraint(time_steps)
-        def p_output_upper_bound(m, t):
-            return m.cool_out[t] <= m.max_power
+        @self.b.Constraint(time_steps)
+        def p_output_upper_bound(b, t):
+            return b.cool_out[t] <= b.max_power
 
         # Ramp up/down constraints
-        @self.component_block.Constraint(time_steps)
-        def ramp_up_constraint(m, t):
+        @self.b.Constraint(time_steps)
+        def ramp_up_constraint(b, t):
             if t == 0:
                 return Constraint.Skip
-            return m.cool_out[t] - m.cool_out[t - 1] <= m.ramp_up
+            return b.cool_out[t] - b.cool_out[t - 1] <= b.ramp_up
 
-        @self.component_block.Constraint(time_steps)
-        def ramp_down_constraint(m, t):
+        @self.b.Constraint(time_steps)
+        def ramp_down_constraint(b, t):
             if t == 0:
                 return Constraint.Skip
-            return m.cool_out[t - 1] - m.cool_out[t] <= m.ramp_down
+            return b.cool_out[t - 1] - b.cool_out[t] <= b.ramp_down
 
         # Cooling factor constraint
-        @self.component_block.Constraint(time_steps)
-        def cooling_factor_constraint(m, t):
-            return m.power_in[t] == m.cool_out[t] / m.cooling_factor
+        @self.b.Constraint(time_steps)
+        def cooling_factor_constraint(b, t):
+            return b.power_in[t] == b.cool_out[t] / b.cooling_factor
 
     def define_objective(self):
         # Define the objective function specific to HeatPump if needed
         pass
-
-
-class Storage:
-    def __init__(
-        self,
-        id: str,
-        model,
-        storage_type: str,  # Either 'heat' or 'electricity'
-        max_capacity: float = None,
-        min_capacity: float = None,
-        charge_efficiency: float = None,
-        discharge_efficiency: float = None,
-        **kwargs,
-    ):
-        self.model = model
-        self.id = id
-        self.storage_type = storage_type
-        self.max_capacity = max_capacity
-        self.min_capacity = min_capacity
-        self.charge_efficiency = charge_efficiency
-        self.discharge_efficiency = discharge_efficiency
-
-    def add_to_model(self, unit_storage_block, storage_units, time_steps):
-        self.model = unit_storage_block
-        self.define_parameters(unit_storage_block)
-        self.define_variables(unit_storage_block, storage_units, time_steps)
-        self.define_constraints(unit_storage_block, storage_units, time_steps)
-
-    def define_parameters(self, unit_storage_block) -> None:
-        unit_storage_block.max_capacity = Param(initialize=self.max_capacity)
-        unit_storage_block.min_capacity = Param(initialize=self.min_capacity)
-        unit_storage_block.charge_efficiency = Param(initialize=self.charge_efficiency)
-        unit_storage_block.discharge_efficiency = Param(
-            initialize=self.discharge_efficiency
-        )
-
-    def define_variables(self, unit_storage_block, storage_units, time_steps):
-        unit_storage_block.state_of_charge = Var(
-            storage_units, time_steps, domain=pyo.NonNegativeReals
-        )
-        unit_storage_block.energy_in = Var(
-            storage_units, time_steps, domain=pyo.NonNegativeReals
-        )
-        unit_storage_block.energy_out = Var(
-            storage_units, time_steps, domain=pyo.NonNegativeReals
-        )
-
-    def define_constraints(self, unit_storage_block, storage_units, time_steps) -> None:
-        @unit_storage_block.Constraint(storage_units, time_steps)
-        def soc_upper_limit(m, u, t):
-            return m.state_of_charge[u, t] <= m.max_capacity
-
-        @unit_storage_block.Constraint(storage_units, time_steps)
-        def soc_lower_limit(m, u, t):
-            return m.min_capacity <= m.state_of_charge[u, t]
-
-        @unit_storage_block.Constraint(storage_units, time_steps)
-        def charge_discharge_balance(m, u, t):
-            if t == 0:
-                return Constraint.Skip
-            return (
-                m.state_of_charge[u, t]
-                == m.state_of_charge[u, t - 1]
-                + m.charge_efficiency * m.energy_in[u, t]
-                - m.energy_out[u, t] / m.discharge_efficiency
-            )
-
-        @unit_storage_block.Constraint(storage_units, time_steps)
-        def energy_in_out_relation(m, u, t):
-            if self.storage_type == "heat":
-                return (
-                    m.energy_in[u, t] == m.heat_out[u, t]
-                )  # Replace with appropriate heat source
-            elif self.storage_type == "electricity":
-                return (
-                    m.energy_in[t] == m.power_out[t]
-                )  # Replace with appropriate power source
-
-        # Additional constraints specific to the storage technology
 
 class Electrolyser:
     def __init__(
         self, 
         model, 
         id, 
-        max_power, 
+        rated_power, 
         min_power, 
         ramp_up, 
         ramp_down,
         min_operating_time, 
-        min_down_time, 
-        downtime_hot_start, 
-        downtime_warm_start,
-        efficiency, 
-        compressor_power, 
+        min_down_time,
+        efficiency,
+        start_price,
+        fuel_type,
         **kwargs
     ):
         self.model = model
         self.id = id
-        self.max_power = max_power
+        self.fuel_type = fuel_type
+        self.rated_power = rated_power
         self.min_power = min_power
         self.ramp_up = ramp_up
         self.ramp_down = ramp_down
         self.min_operating_time = min_operating_time
         self.min_down_time = min_down_time
-        self.downtime_hot_start = downtime_hot_start
-        self.downtime_warm_start = downtime_warm_start
         self.efficiency = efficiency
-        self.compressor_power = compressor_power
+        self.start_price = start_price
 
     def add_to_model(self, unit_block, time_steps):
-        self.component_block = unit_block
+        
+        self.b = unit_block
         self.define_parameters()
         self.define_variables(time_steps)
         self.define_constraints(time_steps)
 
     def define_parameters(self):
-        self.component_block.max_power = Param(initialize=self.max_power)
-        self.component_block.min_power = Param(initialize=self.min_power)
-        self.component_block.ramp_up = Param(initialize=self.ramp_up)
-        self.component_block.ramp_down = Param(initialize=self.ramp_down)
-        self.component_block.min_operating_time = Param(initialize=self.min_operating_time)
-        self.component_block.min_down_time = Param(initialize=self.min_down_time)
-        self.component_block.efficiency = Param(initialize=self.efficiency)
-        self.component_block.compressor_power = Param(initialize=self.compressor_power)
+        self.b.rated_power = Param(initialize=self.rated_power)
+        self.b.min_power = Param(initialize=self.min_power)
+        self.b.ramp_up = Param(initialize=self.ramp_up)
+        self.b.ramp_down = Param(initialize=self.ramp_down)
+        self.b.min_operating_time = Param(initialize=self.min_operating_time)
+        self.b.min_down_time = Param(initialize=self.min_down_time)
+        self.b.efficiency = Param(initialize=self.efficiency)
+
+        self.b.start_price= Param(initialize=self.start_price)
 
     def define_variables(self, time_steps):
-        self.component_block.power_in = Var(time_steps, within=pyo.NonNegativeReals)
-        self.component_block.hydrogen_out = Var(time_steps, within=pyo.NonNegativeReals)
-        self.component_block.operational_status = Var(time_steps, within=Binary)
+        self.b.power_in = Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.hydrogen_out = Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.in_operation = Var(time_steps, within=Boolean)
+        self.b.start_up = Var(time_steps, within=Boolean)
+        self.b.shut_down = Var(time_steps, within=Boolean)
+
+        self.b.electricity_cost = Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.start_cost = Var(time_steps, within=pyo.NonNegativeReals) 
+
 
     def define_constraints(self, time_steps):
+        
         # Power bounds constraints
-        @self.component_block.Constraint(time_steps)
-        def power_upper_bound(m, t):
-            return m.power_in[t] <= m.max_power# * m.operational_status[t]
+        @self.b.Constraint(time_steps)
+        def power_upper_bound(b, t):
+            return b.power_in[t] <= b.rated_power * b.in_operation[t]
 
-        @self.component_block.Constraint(time_steps)
-        def power_lower_bound(m, t):
-            return m.power_in[t] >= m.min_power# * m.operational_status[t]
+        @self.b.Constraint(time_steps)
+        def power_lower_bound(b, t):
+            return b.power_in[t] >= b.min_power * b.in_operation[t]
 
         # Ramp-up constraint
-        @self.component_block.Constraint(time_steps)
-        def ramp_up_constraint(m, t):
+        @self.b.Constraint(time_steps)
+        def ramp_up_constraint(b, t):
             if t == 0:
                 return Constraint.Skip
-            return m.power_in[t] - m.power_in[t-1] <= m.ramp_up
+            return b.power_in[t] - b.power_in[t-1] <= b.ramp_up #* b.in_operation[t-1]
 
         # Ramp-down constraint
-        @self.component_block.Constraint(time_steps)
-        def ramp_down_constraint(m, t):
+        @self.b.Constraint(time_steps)
+        def ramp_down_constraint(b, t):
             if t == 0:
                 return Constraint.Skip
-            return m.power_in[t-1] - m.power_in[t] <= m.ramp_down
+            return b.power_in[t-1] - b.power_in[t] <= b.ramp_down #* b.in_operation[t]
 
-        # # Minimum operating time constraint
-        # def min_operating_time_constraint(m, t):
-        #     # Calculate the start time for the constraint
-        #     min_op_time_float = m.min_operating_time
-        #     start_time = t - int(min_op_time_float) if t >= int(min_op_time_float) else 0
+        # Plant running constraint
+        @self.b.Constraint(time_steps)
+        def in_operation_rule(b, t):
+            if t == 0:
+                return b.in_operation[t] ==  b.start_up[t]
+            return b.in_operation[t] - b.in_operation[t-1] ==  b.start_up[t] - b.shut_down[t]
 
-        #     # Accumulate operational status over the calculated range
-        #     operational_hours = sum(m.operational_status[i] for i in range(start_time, t))
+        # Switch on and off constraints
+        @self.b.Constraint(time_steps)
+        def start_up_off_rule(b, t):
+            return b.start_up[t] + b.shut_down[t] <= 1
+        
+        @self.model.Constraint(time_steps)
+        def shut_down_logic(b, t):
+         return b.shut_down[t] >= - b.power_in[t]
+    
+        @self.b.Constraint(time_steps)
+        def min_operating_time_constraint(b, t):
+            if t == 0:
+                return Constraint.Skip  # No constraint for the first time step
+            # Calculate the time step duration dynamically
+            delta_t = t - (t-1)
+            # Convert minimum operating time to the time unit of your choice
+            min_operating_time_units = int(self.min_operating_time / delta_t)
 
-        #     # For fractional min_operating_time, add a weighted operational status of the preceding time step
-        #     if min_op_time_float % 1 > 0 and t > 0:
-        #         fractional_part = min_op_time_float % 1
-        #         operational_hours += fractional_part * m.operational_status[t - 1]
-
-        #     return operational_hours >= min_op_time_float * m.operational_status[t]
-
-        # # Minimum downtime constraint
-        # def min_down_time_constraint(m, t):
-        #     # Calculate the start time for the constraint
-        #     min_down_time_float = m.min_down_time
-        #     start_time = t - int(min_down_time_float) if t >= int(min_down_time_float) else 0
-
-        #     # Accumulate non-operational status over the calculated range
-        #     non_operational_hours = sum(1 - m.operational_status[i] for i in range(start_time, t))
-
-        #     # For fractional min_down_time, add a weighted non-operational status of the preceding time step
-        #     if min_down_time_float % 1 > 0 and t > 0:
-        #         fractional_part = min_down_time_float % 1
-        #         non_operational_hours += fractional_part * (1 - m.operational_status[t - 1])
-
-        #     return non_operational_hours >= min_down_time_float * (1 - m.operational_status[t])
-
-        # Power consumption equation
-        @self.component_block.Constraint(time_steps)
-        def power_in_equation(m, t):
-            return m.power_in[t] == m.hydrogen_out[t] / m.efficiency + m.compressor_power
-
-class ShaftFurnace:
+            if t < min_operating_time_units:
+                return b.start_up[t] == 1
+            else:
+                return sum(b.start_up[t-i] for i in range(min_operating_time_units)) >= min_operating_time_units * b.start_up[t]
+            
+        @self.b.Constraint(time_steps)
+        def min_downtime_constraint(b, t):
+            if t == 0:
+                return Constraint.Skip  # No constraint for the first time step
+            # Calculate the time step duration dynamically
+            delta_t = t - (t-1)
+            # Convert minimum downtime to the time unit of your choice
+            min_downtime_units = int(self.min_down_time / delta_t)
+            if t < min_downtime_units:
+                return b.shut_down[t] == 1
+            else:
+                return sum(1 - b.in_operation[t-i] for i in range(min_downtime_units)) >= min_downtime_units * b.shut_down[t] 
+        
+        @self.b.Constraint(time_steps)
+        def operating_cost_with_el_price(b, t):
+            return b.electricity_cost[t] == b.power_in[t] * self.model.electricity_price[t] 
+        
+        # Efficiency constraint
+        @self.b.Constraint(time_steps)
+        def power_in_equation(b, t):
+            return  b.power_in[t] == b.hydrogen_out[t] / b.efficiency 
+        
+        # Switch on and off constraints
+        @self.b.Constraint(time_steps)
+        def start_up_cost(b, t):
+            return b.start_cost[t] == b.start_up[t] * b.start_price
+        
+class DriPlant:
     def __init__(self, 
                  model, 
                  id, 
                  max_iron_ore_throughput, 
-                #  max_natural_gas_input, 
+                 max_natural_gas_input, 
                  max_hydrogen_input, 
-                 ramp_up, 
-                 ramp_down, 
-                 downtime_hot_start, 
-                 downtime_warm_start, 
                  efficiency,
-                 dri_production_efficiency,
+                 specific_hydrogen_consumption,
+                 specific_natural_gas_consumption,
+                 fuel_type,
+                 ramp_up,
+                 ramp_down,
+                 min_operating_time,
+                 min_down_time,
                  **kwargs):
         
         self.model = model
         self.id = id
+        self.fuel_type = fuel_type
         # Operational parameters
         self.max_iron_ore_throughput = max_iron_ore_throughput
-        # self.max_natural_gas_input = max_natural_gas_input
+        self.max_natural_gas_input = max_natural_gas_input
         self.max_hydrogen_input = max_hydrogen_input
         # Additional operational characteristics
+        self.efficiency = efficiency
+        self.specific_hydrogen_consumption = specific_hydrogen_consumption
+        self.specific_natural_gas_consumption = specific_natural_gas_consumption
+        # Flexibility parameters
         self.ramp_up = ramp_up
         self.ramp_down = ramp_down
-        self.downtime_hot_start = downtime_hot_start
-        self.downtime_warm_start = downtime_warm_start
-        self.efficiency = efficiency
-        self.dri_production_efficiency = dri_production_efficiency
-        # Reducing gas inlets
-        # self.natural_gas_inlet = False
-        # self.hydrogen_inlet = False
-
-         # New attributes for dual hydrogen source handling
-        # self.max_direct_hydrogen_input = max_hydrogen_input  # Maximum direct hydrogen input from electrolyser
-        # self.max_stored_hydrogen_input = max_hydrogen_input  # Maximum stored hydrogen input from storage
+        self.min_operating_time = min_operating_time
+        self.min_down_time = min_down_time
 
     def add_to_model(self, unit_block, time_steps):
-        self.component_block = unit_block
-        self.define_parameters()
-        self.define_variables(time_steps)
-        self.define_constraints(time_steps)
-
-    # def configure_reducing_gases(self, reducing_gas_specification):
-    #     self.natural_gas_inlet = reducing_gas_specification.get('natural_gas', False)
-    #     self.hydrogen_inlet = reducing_gas_specification.get('hydrogen', False)
-
-    def add_to_model(self, unit_block, time_steps):
-        self.component_block = unit_block
+        self.b = unit_block
         self.define_parameters()
         self.define_variables(time_steps)
         self.define_constraints(time_steps)
 
     def define_parameters(self):
-        self.component_block.max_iron_ore_throughput = Param(initialize=self.max_iron_ore_throughput)
-        # self.component_block.max_natural_gas_input = Param(initialize=self.max_natural_gas_input)
-        self.component_block.max_hydrogen_input = Param(initialize=self.max_hydrogen_input)
-        self.component_block.ramp_up = Param(initialize=self.ramp_up)
-        self.component_block.ramp_down = Param(initialize=self.ramp_down)
-        self.component_block.downtime_hot_start = Param(initialize=self.downtime_hot_start)
-        self.component_block.downtime_warm_start = Param(initialize=self.downtime_warm_start)
-        self.component_block.efficiency = Param(initialize=self.efficiency)
-        self.component_block.dri_production_efficiency = Param(initialize=self.dri_production_efficiency)
+        self.b.max_iron_ore_throughput = Param(initialize=self.max_iron_ore_throughput)
+        self.b.max_natural_gas_input = Param(initialize=self.max_natural_gas_input)
+        self.b.max_hydrogen_input = Param(initialize=self.max_hydrogen_input)
+        self.b.efficiency_dri = Param(initialize=self.efficiency)
+        self.b.specific_hydrogen_consumption = Param(initialize=self.specific_hydrogen_consumption)
+        self.b.specific_natural_gas_consumption = Param(initialize=self.specific_natural_gas_consumption)
+        # Flexibility parameters
+        self.b.ramp_up_dri = Param(initialize=self.ramp_up)
+        self.b.ramp_down_dri = Param(initialize=self.ramp_down)
+        self.b.min_operating_time_dri = Param(initialize=self.min_operating_time)
+        self.b.min_down_time_dri = Param(initialize=self.min_down_time)
 
     def define_variables(self, time_steps):
-        self.component_block.iron_ore_in = Var(time_steps, within=NonNegativeReals)
-        # self.component_block.natural_gas_in = Var(time_steps, within=NonNegativeReals)
-        self.component_block.hydrogen_in = Var(time_steps, within=NonNegativeReals)
-        self.component_block.operational_status = Var(time_steps, within=Binary)
-        self.component_block.dri_eff = Var(time_steps, within=NonNegativeReals)
-        self.component_block.dri_output = Var(time_steps, within=NonNegativeReals)
+        self.b.iron_ore_in = Var(time_steps, within=NonNegativeReals)
+        self.b.natural_gas_in = Var(time_steps, within=NonNegativeReals)
+        self.b.dri_operating_cost = Var(time_steps, within=NonNegativeReals)
+        self.b.hydrogen_in = Var(time_steps, within=NonNegativeReals)
+        self.b.operational_status = Var(time_steps, within=Binary)
+        self.b.dri_output = Var(time_steps, within=NonNegativeReals)
 
     def function_of_hydrogen(self, hydrogen_in):
         # Assuming a simple linear relationship
         # Replace with more accurate representation as needed
         efficiency_factor = self.dri_production_efficiency  # example efficiency factor
         return hydrogen_in * efficiency_factor
-
+    
     def define_constraints(self, time_steps):
-        # Constraint for iron ore throughput
-        @self.component_block.Constraint(time_steps)
-        def iron_ore_throughput_constraint(m, t):
-            return m.iron_ore_in[t] <= m.max_iron_ore_throughput #* m.operational_status[t]
+        @self.b.Constraint(time_steps)
+        def iron_ore_throughput_constraint(b, t):
+            return b.iron_ore_in[t] <= b.max_iron_ore_throughput
 
-        # Constraint for direct hydrogen input from electrolyser
-        @self.component_block.Constraint(time_steps)
-        def direct_hydrogen_input_constraint(m, t):
-            return m.hydrogen_in[t] <= m.max_hydrogen_input# * m.operational_status[t]
+        @self.b.Constraint(time_steps)
+        def hydrogen_input_constraint(b, t):
+            if self.fuel_type == "hydrogen" or self.fuel_type == "both":
+                return b.hydrogen_in[t] <= b.max_hydrogen_input
+            else:
+                return Constraint.Skip
 
-        # Constraint for DRI output
-        @self.component_block.Constraint(time_steps)
-        def dri_eff_constraint(m, t):
-            return m.dri_eff[t] == m.iron_ore_in[t] * m.dri_production_efficiency 
+        @self.b.Constraint(time_steps)
+        def natural_gas_input_constraint(b, t):
+            if self.fuel_type == "natural_gas" or self.fuel_type == "both":
+                return b.natural_gas_in[t] <= b.max_natural_gas_input
+            else:
+                return Constraint.Skip
+            
+        @self.b.Constraint(time_steps)
+        def iron_ore_constraint(b, t):
+            return b.iron_ore_in[t] == b.dri_output[t] /  b.efficiency_dri
+
+        @self.b.Constraint(time_steps)
+        def dri_output_constraint(b, t):
+            if self.fuel_type == "hydrogen":
+                return b.dri_output[t] == b.hydrogen_in[t] * b.specific_hydrogen_consumption
+            elif self.fuel_type == "natural_gas":
+                return b.dri_output[t] == b.natural_gas_in[t] * b.specific_natural_gas_consumption
+            elif self.fuel_type == "both":
+                return b.dri_output[t] == b.hydrogen_in[t] * b.specific_hydrogen_consumption + b.natural_gas_in[t] * b.specific_natural_gas_consumption
+            
+
+        # Flexibility constraints
+        @self.b.Constraint(time_steps)
+        def ramp_up_dri_constraint(b, t):
+            if t == 0:
+                return Constraint.Skip
+            else:
+                return b.dri_output[t] - b.dri_output[t-1] <= b.ramp_up
         
-        @self.component_block.Constraint(time_steps)
-        def dri_output_constraint(m, t):
-            return m.dri_output[t] == m.dri_eff[t] * m.hydrogen_in[t]
+        @self.b.Constraint(time_steps)
+        def ramp_down_dri_constraint(b, t):
+            if t == 0:
+                return Constraint.Skip
+            else:
+                return b.dri_output[t-1] - b.dri_output[t] <= b.ramp_down
+        
+        @self.b.Constraint(time_steps)
+        def min_operating_time_dri__constraint(b, t):
+            if t == 0:
+                return pyo.Constraint.Skip
+
+            # Calculate the time step duration dynamically
+            delta_t = t - (t-1)
+            # Convert minimum operating time to the time unit of your choice
+            min_operating_time_units = int(self.min_operating_time / delta_t)
+
+            if t < min_operating_time_units:
+                # Ensure that the cumulative sum of DRI production over the past min_operating_time_units time steps is at least min_operating_time_units times the production at time step t
+                return sum(b.dri_output[i] for i in range(t - min_operating_time_units + 1, t + 1)) >= min_operating_time_units * b.dri_output[t]
+            else:
+                return sum(b.dri_output[i] for i in range(t - min_operating_time_units + 1, t + 1)) >= min_operating_time_units * b.dri_output[t]
+
+        @self.b.Constraint(time_steps)
+        def min_down_time_dri_constraint(b, t):
+            if t == 0:
+                return pyo.Constraint.Skip  # No constraint for the first time step
+
+            # Calculate the time step duration dynamically
+            delta_t = t - (t-1)
+            # Convert minimum downtime to the time unit of your choice
+            min_downtime_units = int(self.min_down_time / delta_t)
+
+            if t < min_downtime_units:
+                # Ensure that the cumulative sum of DRI production over the past min_downtime_units time steps is at least min_downtime_units times the production at time step t
+                return sum(b.dri_output[t-i] for i in range(min_downtime_units)) >= min_downtime_units * b.dri_output[t]
+            else:
+                return sum(b.dri_output[t-i] for i in range(min_downtime_units)) >= min_downtime_units * b.dri_output[t]
+            
+        # Operational cost
+        @self.b.Constraint(time_steps)
+        def dri_operating_cost_constraint(b, t):
+            # This constraint defines the steel output based on inputs and efficiency
+            return b.dri_operating_cost[t] == b.natural_gas_in[t] * self.model.natural_gas_price[t]
 
 class ElectricArcFurnace:
     def __init__(self, 
                  model, 
                  id, 
-                 max_power, 
+                 rated_power, 
                  max_dri_input,
-                 efficiency, 
-                 ramp_up, 
-                 ramp_down, 
-                 downtime_hot_start, 
-                 downtime_warm_start, 
+                 specific_electricity_demand, 
+                 specific_dri_demand,
+                 ramp_up,
+                 ramp_down,
+                 min_operating_time,
+                 min_down_time,
                  **kwargs):
         
         self.model = model
         self.id = id
         # Operational parameters
-        self.max_power = max_power
+        self.rated_power = rated_power
         self.max_dri_input = max_dri_input
-        self.efficiency = efficiency
         # Additional operational characteristics
+        self.specific_electricity_demand = specific_electricity_demand
+        self.specific_dri_demand = specific_dri_demand
+        # Flexibility parameters
         self.ramp_up = ramp_up
         self.ramp_down = ramp_down
-        self.downtime_hot_start = downtime_hot_start
-        self.downtime_warm_start = downtime_warm_start
+        self.min_operating_time = min_operating_time
+        self.min_down_time = min_down_time
 
     def add_to_model(self, unit_block, time_steps):
-        self.component_block = unit_block
+        self.b = unit_block
         self.define_parameters()
         self.define_variables(time_steps)
         self.define_constraints(time_steps)
 
     def define_parameters(self):
-        self.component_block.max_power = Param(initialize=self.max_power)
-        self.component_block.max_dri_input = Param(initialize=self.max_dri_input)
-        self.component_block.efficiency = Param(initialize=self.efficiency)
-        self.component_block.ramp_up = Param(initialize=self.ramp_up)
-        self.component_block.ramp_down = Param(initialize=self.ramp_down)
-        self.component_block.downtime_hot_start = Param(initialize=self.downtime_hot_start)
-        self.component_block.downtime_warm_start = Param(initialize=self.downtime_warm_start)
+        self.b.rated_power_eaf = Param(initialize=self.rated_power)
+        self.b.max_dri_input = Param(initialize=self.max_dri_input)
+        self.b.specific_electricity_demand = Param(initialize=self.specific_electricity_demand)
+        self.b.specific_dri_demand = Param(initialize=self.specific_dri_demand)
+        # Flexibility parameters
+        self.b.ramp_up_eaf = pyo.Param(initialize=self.ramp_up)
+        self.b.ramp_down_eaf = pyo.Param(initialize=self.ramp_down)
+        self.b.min_operating_time_eaf = pyo.Param(initialize=self.min_operating_time)
+        self.b.min_down_time_eaf = pyo.Param(initialize=self.min_down_time)
 
     def define_variables(self, time_steps):
-        self.component_block.power_in = Var(time_steps, within=NonNegativeReals)
-        self.component_block.dri_input = Var(time_steps, within=NonNegativeReals)
-        self.component_block.steel_output = Var(time_steps, within=NonNegativeReals)
-        self.component_block.operational_status = Var(time_steps, within=Binary)
+        self.b.power_eaf = Var(time_steps, within=NonNegativeReals)
+        self.b.dri_input = Var(time_steps, within=NonNegativeReals)
+        self.b.steel_output = Var(time_steps, within=NonNegativeReals)
+        self.b.eaf_operating_cost = Var(time_steps, within=NonNegativeReals)
 
     def define_constraints(self, time_steps):
-        @self.component_block.Constraint(time_steps)
-        def electricity_input_constraint(m, t):
-            return m.power_in[t] <= m.max_power * m.operational_status[t]
-
-        @self.component_block.Constraint(time_steps)
-        def dri_input_constraint(m, t):
-            return m.dri_input[t] <= m.max_dri_input * m.operational_status[t]
-
-        @self.component_block.Constraint(time_steps)
-        def steel_output_constraint(m, t):
+        @self.b.Constraint(time_steps)
+        def electricity_input_constraint(b, t):
+            return b.power_eaf[t] <= b.rated_power_eaf
+        
+        @self.b.Constraint(time_steps)
+        def steel_output_dri_relation(b, t):
             # This constraint defines the steel output based on inputs and efficiency
-            return m.steel_output[t] == m.dri_input[t] * m.efficiency
+            return b.dri_input[t] ==  b.steel_output[t] * b.specific_dri_demand
+        
+        @self.b.Constraint(time_steps)
+        def steel_output_power_relation(b, t):
+            # This constraint defines the steel output based on inputs and efficiency
+            return b.power_eaf[t] == b.steel_output[t] * b.specific_electricity_demand
+        
+        # Flexibility constraints
+        @self.b.Constraint(time_steps)
+        def ramp_up_eaf_constraint(b, t):
+            if t == 0:
+                return pyo.Constraint.Skip
+            return b.power_eaf[t] - b.power_eaf[t-1] <= b.ramp_up_eaf
 
-    # Additional methods for processing, ramping up/down, etc.
+        @self.b.Constraint(time_steps)
+        def ramp_down_eaf_constraint(b, t):
+            if t == 0:
+                return pyo.Constraint.Skip
+            return b.power_eaf[t-1] - b.power_eaf[t] <= b.ramp_down_eaf
+
+        # @self.b.Constraint(time_steps)
+        # def min_operating_time_eaf_constraint(b, t):
+        #     if t == 0:
+        #         return pyo.Constraint.Skip  # No constraint for the first time step
+        #     # Calculate the time step duration dynamically
+        #     delta_t = t - (t-1)
+        #     # Convert minimum operating time to the time unit of your choice
+        #     min_operating_time_units = int(self.min_operating_time / delta_t)
+        #     if t < min_operating_time_units:
+        #         return b.power_eaf[t] == b.rated_power_eaf
+        #     else:
+        #         return sum(b.power_eaf[t-i] for i in range(min_operating_time_units)) >= min_operating_time_units * b.rated_power_eaf
+
+        # @self.b.Constraint(time_steps)
+        # def min_down_time_eaf_constraint(b, t):
+        #     if t == 0:
+        #         return pyo.Constraint.Skip  # No constraint for the first time step
+        #     # Calculate the time step duration dynamically
+        #     delta_t = t - (t-1)
+        #     # Convert minimum downtime to the time unit of your choice
+        #     min_downtime_units = int(self.min_down_time / delta_t)
+        #     if t < min_downtime_units:
+        #         return b.power_eaf[t] == 0
+        #     else:
+        #         return sum(b.power_eaf[t-i] for i in range(min_downtime_units)) == 0
+            
+        # # operational cost
+        # @self.b.Constraint(time_steps)
+        # def eaf_operating_cost_cosntraint(b, t):
+        #     # This constraint defines the steel output based on inputs and efficiency
+        #     return b.eaf_operating_cost[t] == b.power_eaf[t] * self.model.electricity_price[t]
+        
+class GenericStorage:
+    def __init__(self, 
+                 model, 
+                 id,
+                 max_capacity, 
+                 min_capacity, 
+                 initial_soc, 
+                 storage_loss_rate, 
+                 charge_loss_rate, 
+                 discharge_loss_rate,
+                 **kwargs
+                 ):
+        self.model = model
+        self.id = id
+        self.max_capacity = max_capacity
+        self.min_capacity = min_capacity
+        self.initial_soc = initial_soc
+        self.storage_loss_rate = storage_loss_rate
+        self.charge_loss_rate = charge_loss_rate
+        self.discharge_loss_rate = discharge_loss_rate
+
+    def add_to_model(self, unit_block, time_steps):
+        self.b = unit_block
+        self.define_parameters()
+        self.define_variables(time_steps)
+        self.define_constraints(time_steps)
+
+    def define_parameters(self):
+        self.b.max_capacity = Param(initialize=self.max_capacity)
+        self.b.min_capacity = Param(initialize=self.min_capacity)
+        self.b.initial_soc = Param(initialize=self.initial_soc)
+        self.b.storage_loss_rate = Param(initialize=self.storage_loss_rate)
+        self.b.charge_loss_rate = Param(initialize=self.charge_loss_rate)
+        self.b.discharge_loss_rate = Param(initialize=self.discharge_loss_rate)
+
+    def define_variables(self, time_steps):
+        self.b.soc = Var(time_steps, within=NonNegativeReals) 
+        self.b.uniformity_indicator = Var(time_steps, within=Binary)
+
+         # Define the variables for power and hydrogen
+        self.b.charge = Var(time_steps, within=NonNegativeReals)
+        self.b.discharge = Var(time_steps, within=NonNegativeReals)
+
+    def define_constraints(self, time_steps):
+        @self.b.Constraint(time_steps)
+        def storage_min_capacity_constraint(b, t):
+            return b.soc[t] >= b.min_capacity
+
+        @self.b.Constraint(time_steps)
+        def storage_max_capacity_constraint(b, t):
+            return b.soc[t] <= b.max_capacity
+        
+        @self.b.Constraint(time_steps)
+        def energy_in_max_capacity_constraint(b, t):
+            return b.charge[t] <= b.max_capacity #* b.uniformity_indicator[t]
+
+        @self.b.Constraint(time_steps)
+        def energy_out_max_capacity_constraint(b, t):
+            return  b.discharge[t] <= b.max_capacity #* (1 - b.uniformity_indicator[t])
+
+        @self.b.Constraint(time_steps)
+        def energy_in_uniformity_constraint(b, t):
+            return b.charge[t] <= b.max_capacity * b.uniformity_indicator[t]
+
+        @self.b.Constraint(time_steps)
+        def energy_out_uniformity_constraint(b, t):
+            return  b.discharge[t] <= b.max_capacity * (1 - b.uniformity_indicator[t])
+
+        @self.b.Constraint(self.model.time_steps)
+        def storage_capacity_change_constraint(b, t):
+            return b.soc[t] == (
+                ((b.soc[t - 1] if t > 0 else b.initial_soc) * (1 - b.storage_loss_rate)) +
+                ((1 - b.charge_loss_rate) * b.charge[t]) -
+                ((1 + b.discharge_loss_rate) * b.discharge[t])
+            )
+        
+class DRIStorage:
+    def __init__(self, 
+                 model, 
+                 id,
+                 max_capacity, 
+                 min_capacity, 
+                 initial_soc, 
+                 storage_loss_rate, 
+                 charge_loss_rate, 
+                 discharge_loss_rate,
+                 **kwargs
+                 ):
+        self.model = model
+        self.id = id
+        self.max_capacity = max_capacity
+        self.min_capacity = min_capacity
+        self.initial_soc = initial_soc
+        self.storage_loss_rate = storage_loss_rate
+        self.charge_loss_rate = charge_loss_rate
+        self.discharge_loss_rate = discharge_loss_rate
+
+    def add_to_model(self, unit_block, time_steps):
+        self.b = unit_block
+        self.define_parameters()
+        self.define_variables(time_steps)
+        self.define_constraints(time_steps)
+
+    def define_parameters(self):
+        self.b.max_capacity_dri = Param(initialize=self.max_capacity)
+        self.b.min_capacity_dri = Param(initialize=self.min_capacity)
+        self.b.initial_soc_dri = Param(initialize=self.initial_soc)
+        self.b.storage_loss_rate_dri = Param(initialize=self.storage_loss_rate)
+        self.b.charge_loss_rate_dri = Param(initialize=self.charge_loss_rate)
+        self.b.discharge_loss_rate_dri = Param(initialize=self.discharge_loss_rate)
+
+    def define_variables(self, time_steps):
+        self.b.soc_dri = Var(time_steps, within=NonNegativeReals) 
+        self.b.uniformity_indicator_dri = Var(time_steps, within=Binary)
+
+         # Define the variables for power and hydrogen
+        self.b.charge_dri = Var(time_steps, within=NonNegativeReals)
+        self.b.discharge_dri = Var(time_steps, within=NonNegativeReals)
+
+    def define_constraints(self, time_steps):
+        @self.b.Constraint(time_steps)
+        def storage_min_capacity_dri_constraint(b, t):
+            return b.soc_dri[t] >= b.min_capacity_dri
+
+        @self.b.Constraint(time_steps)
+        def storage_max_capacity_dri_constraint(b, t):
+            return b.soc_dri[t] <= b.max_capacity_dri
+        
+        @self.b.Constraint(time_steps)
+        def energy_in_max_capacity_dri_constraint(b, t):
+            return b.charge_dri[t] <= b.max_capacity_dri #* b.uniformity_indicator[t]
+
+        @self.b.Constraint(time_steps)
+        def energy_out_max_capacity_dri_constraint(b, t):
+            return  b.discharge_dri[t] <= b.max_capacity_dri #* (1 - b.uniformity_indicator[t])
+
+        @self.b.Constraint(time_steps)
+        def energy_in_uniformity_dri_constraint(b, t):
+            return b.charge_dri[t] <= b.max_capacity_dri * b.uniformity_indicator_dri[t]
+
+        @self.b.Constraint(time_steps)
+        def energy_out_uniformity_dri_constraint(b, t):
+            return  b.discharge_dri[t] <= b.max_capacity_dri * (1 - b.uniformity_indicator_dri[t])
+
+        @self.b.Constraint(self.model.time_steps)
+        def storage_capacity_change_dri_constraint(b, t):
+            return b.soc_dri[t] == (
+                ((b.soc_dri[t - 1] if t > 0 else b.initial_soc_dri) * (1 - b.storage_loss_rate_dri)) +
+                ((1 - b.charge_loss_rate_dri) * b.charge_dri[t]) -
+                ((1 + b.discharge_loss_rate_dri) * b.discharge_dri[t])
+            )
+
   
     

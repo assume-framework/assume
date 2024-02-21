@@ -11,7 +11,7 @@ from pyomo.opt import (
 )
 
 from assume.common.base import BaseUnit
-from assume.units.dst_components import AirConditioner, HeatPump, Storage
+from assume.units.dst_components import AirConditioner, HeatPump, GenericStorage
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +20,8 @@ SOLVERS = ["gurobi", "glpk"]
 dst_components = {
     "heat_pump": HeatPump,
     "air_conditioner": AirConditioner,
-    "thermal_storage": Storage,
-    "electrical_storage": Storage,
+    "thermal_storage": GenericStorage,
+    "electrical_storage": GenericStorage,
 }
 
 

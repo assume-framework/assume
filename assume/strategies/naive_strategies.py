@@ -228,50 +228,37 @@ class NaiveDAsteelplantStrategy(BaseStrategy):
         **kwargs,
     ) -> Orderbook:
         
-        unit.run_optimization()
-        
         bids = []
         start = product_tuples[0][0]  # start time of the first product
         end_all = product_tuples[-1][1]  # end time of the last product
-        
-        # heating_demand = unit.forecaster["heating_demand"]
-        # cooling_demand = unit.forecaster["cooling_demand"]
 
         hydrogen_price = unit.forecaster["hydrogen_price"]
         electricity_price = unit.forecaster["price_EOM"]
 
-        unit.run_optimization()
-
-        # Fetch the optimized demand (aggregated_power_in)
-        bid_power = unit.model.aggregated_power_in.get_values()
-
-        # Corrected marginal cost calculation
-        marginal_cost = {time_step: electricity_price / power for time_step, power in bid_power.items()}
-
-        # Assuming you want to keep the structure of product_tuples as is, you can use the following:
-        product_tuples = [(start, bid_power[start]) for start in unit.model.time_steps]
-
-        # Then use the optimized_demand values to create a profile as before
-        profile = {product[0]: product[1] for product in product_tuples}
+        if unit.power_requirement is None:
+            unit.run_optimization()
 
 
-        order: Order = {
-            "start_time": start,
-            "end_time": end_all,
-            "only_hours": product_tuples[0][1],
-            "price": marginal_cost,
-            "volume": profile,
-        }
-
-        bids = [order]
+        bids = []
+        for product in product_tuples:
+            """
+            for each product, calculate the marginal cost of the unit at the start time of the product
+            and the volume of the product. Dispatch the order to the market.
+            """
+            start = product[0]
+            volume = unit.power_requirement.loc[start]
+            price = 3000
+            bids.append(
+                {
+                    "start_time": product[0],
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": price,
+                    "volume": -volume,
+                }
+            )
+        
         return bids
-
-            # order = {
-            #     "start_time": start,
-            #     "end_time": end_all,
-            #     "only_hours": product_tuples[0][1],
-            #     "price": bid_price,
-            #     "volume": bid_volume,
 
 
     def calculate_marginal_cost(self, unit: SteelPlant, start: pd.Timestamp, end: pd.Timestamp, aggregated_power_in: float):

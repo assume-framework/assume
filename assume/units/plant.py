@@ -6,7 +6,7 @@ import pyomo.environ as pyo
 from pyomo.opt import SolverFactory, SolverStatus, TerminationCondition
 
 from assume.common.base import BaseUnit
-from assume.units.dst_components import Electrolyser, ShaftFurnace, ElectricArcFurnace
+from assume.units.dst_components import Electrolyser, DriPlant, ElectricArcFurnace
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 dst_components = {
     "electrolyser": Electrolyser,
-    "shaft_furnace": ShaftFurnace,
+    "dri_plant": DriPlant,
     "electric_arc_furnace": ElectricArcFurnace
 }
 

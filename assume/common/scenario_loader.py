@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import dateutil.rrule as rr
 import numpy as np
@@ -324,7 +324,8 @@ async def load_scenario_folder_async(
 
     index = pd.date_range(
         start=start,
-        end=end,
+        # end time needs to be a little ahead for forecasts
+        end=end + timedelta(days=1),
         freq=config["time_step"],
     )
     # get extra parameters for bidding strategies
