@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import asyncio
-import calendar
 import logging
 import sys
 import time
@@ -30,6 +29,7 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.common.base import LearningConfig
+from assume.common.utils import datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import LearningStrategy, bidding_strategies
 from assume.units import BaseUnit, Demand, PowerPlant, Storage
@@ -520,7 +520,7 @@ class World:
             if delta:
                 pbar.update(delta)
                 pbar.set_description(
-                    f"{self.output_role.simulation_id} {datetime.utcfromtimestamp(self.clock.time)}",
+                    f"{self.output_role.simulation_id} {timestamp2datetime(self.clock.time)}",
                     refresh=False,
                 )
             else:
@@ -540,8 +540,8 @@ class World:
         container.
         """
 
-        start_ts = calendar.timegm(self.start.utctimetuple())
-        end_ts = calendar.timegm(self.end.utctimetuple())
+        start_ts = datetime2timestamp(self.start)
+        end_ts = datetime2timestamp(self.end)
 
         try:
             return self.loop.run_until_complete(
