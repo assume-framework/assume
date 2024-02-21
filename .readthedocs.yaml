@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # .readthedocs.yaml
 # Read the Docs configuration file
 # See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
@@ -12,4 +16,4 @@ build:
     python: mambaforge-4.10
 
 conda:
-  environment: environment_docs.yml
+  environment: environment_docs.yaml

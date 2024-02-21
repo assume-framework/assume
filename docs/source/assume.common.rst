@@ -1,5 +1,9 @@
-assume.common package
-=====================
+.. SPDX-FileCopyrightText: ASSUME Developers
+..
+.. SPDX-License-Identifier: AGPL-3.0-or-later
+
+Common components and methods
+=============================
 
 Submodules
 ----------
@@ -48,14 +52,6 @@ assume.common.outputs module
 ----------------------------
 
 .. automodule:: assume.common.outputs
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-assume.common.scenario\_loader module
--------------------------------------
-
-.. automodule:: assume.common.scenario_loader
    :members:
    :undoc-members:
    :show-inheritance:

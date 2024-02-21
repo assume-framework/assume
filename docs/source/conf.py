@@ -1,13 +1,22 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Configuration file for the Sphinx documentation builder.
+
+import tomllib
+
+with open("../../pyproject.toml", "rb") as f:
+    pyproject_toml = tomllib.load(f)["tool"]["poetry"]
 
 # -- Project information
 
 project = "ASSUME"
-copyright = "2022-2023 ASSUME Developers"
-author = "ASSUME Developers"
+copyright = "2022-2024 ASSUME Developers"
+author = ",".join(pyproject_toml["authors"])
 
-release = "0.1"
-version = "0.1.0"
+version = pyproject_toml["version"]
+release = version
 
 # -- General configuration
 
@@ -18,11 +27,24 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
     "sphinxcontrib.mermaid",
+    "sphinx.ext.todo",
+    "sphinx.ext.mathjax",
+    "sphinx.ext.napoleon",
+    "nbsphinx",
+    "nbsphinx_link",
+    # "sphinx.ext.imgconverter",  # for SVG conversion
 ]
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),
     "sphinx": ("https://www.sphinx-doc.org/en/master/", None),
+    "mango": ("https://mango-agents.readthedocs.io/en/latest/", None),
+    "pandas": ("https://pandas.pydata.org/docs/", None),
+    "sqlalchemy": ("https://docs.sqlalchemy.org/en/20/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "torch": ("https://pytorch.org/docs/stable/", None),
+    "dateutil": ("https://dateutil.readthedocs.io/en/stable/", None),
+    "pyomo": ("https://pyomo.readthedocs.io/en/stable/", None),
 }
 intersphinx_disabled_domains = ["std"]
 
@@ -38,6 +60,7 @@ html_theme_options = {
     "repository_url": "https://github.com/assume-framework/assume.git",
     "use_repository_button": True,
     "show_navbar_depth": 2,
+    "navigation_with_keys": False,
 }
 
 # The name for this set of Sphinx documents.  If None, it defaults to
@@ -57,3 +80,15 @@ html_static_path = ["_static"]
 
 # -- Options for EPUB output
 epub_show_urls = "footnote"
+
+# -- Options for nbsphinx -------------------------------------------------
+# nbsphinx_kernel_name = 'assume'
+nbsphinx_prolog = """
+{% set docname = env.doc2path(env.docname, base=None).replace("nblink", "ipynb").replace("examples/", "examples/notebooks/") %}
+.. note::
+
+    You can `download <https://github.com/assume-framework/assume/tree/main/{{ docname }}>`_ this example as a Jupyter notebook
+    or try it out directly in `Google Colab <https://colab.research.google.com/github/assume-framework/assume/blob/main/{{ docname }}>`_.
+"""
+
+nbsphinx_allow_errors = True

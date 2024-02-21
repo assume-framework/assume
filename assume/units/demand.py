@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import numbers
 
 import pandas as pd
@@ -9,28 +13,17 @@ class Demand(SupportsMinMax):
     """
     A demand unit.
 
-    :param id: unique identifier for the unit
-    :type id: str
-    :param unit_operator: the operator of the unit
-    :type unit_operator: str
-    :param technology: the technology of the unit
-    :type technology: str
-    :param bidding_strategies: the bidding strategies of the unit
-    :type bidding_strategies: dict
-    :param index: the index of the unit
-    :type index: pd.DatetimeIndex
-    :param max_power: the maximum power output of the unit (kW)
-    :type max_power: float | pd.Series
-    :param min_power: the minimum power output of the unit (kW)
-    :type min_power: float | pd.Series
-    :param node: the node of the unit
-    :type node: str
-    :param price: the price of the unit
-    :type price: float | pd.Series
-    :param location: the location of the unit (latitude, longitude)
-    :type location: tuple[float, float]
-    :param kwargs: additional keyword arguments
-    :type kwargs: dict
+    Attributes:
+        id (str): The unique identifier of the unit.
+        unit_operator (str): The operator of the unit.
+        technology (str): The technology of the unit.
+        bidding_strategies (dict): The bidding strategies of the unit.
+        index (pandas.DatetimeIndex): The index of the unit.
+        max_power (float): The maximum power output capacity of the power plant in MW.
+        min_power (float, optional): The minimum power output capacity of the power plant in MW. Defaults to 0.0 MW.
+        node (str, optional): The node of the unit. Defaults to "bus0".
+        price (float): The price of the unit.
+        location (tuple[float, float], optional): The location of the unit. Defaults to (0.0, 0.0).
 
     Methods
     -------
@@ -57,6 +50,7 @@ class Demand(SupportsMinMax):
             bidding_strategies=bidding_strategies,
             index=index,
             node=node,
+            location=location,
             **kwargs,
         )
         """Create a demand unit."""
@@ -72,7 +66,6 @@ class Demand(SupportsMinMax):
         if isinstance(price, numbers.Real):
             price = pd.Series(price, index=self.index)
         self.price = price
-        self.location = location
 
     def execute_current_dispatch(
         self,
@@ -83,55 +76,52 @@ class Demand(SupportsMinMax):
         Execute the current dispatch of the unit.
         Returns the volume of the unit within the given time range.
 
-        :param start: the start time of the dispatch
-        :type start: pd.Timestamp
-        :param end: the end time of the dispatch
-        :type end: pd.Timestamp
-        :return: the volume of the unit within the given time range
-        :rtype: pd.Series
+        Args:
+            start (pandas.Timestamp): The start time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch.
+
+        Returns:
+            pd.Series: The volume of the unit within the gicen time range.
         """
-        end_excl = end - self.index.freq
-        return self.volume[start:end_excl]
+
+        return self.volume[start:end]
 
     def calculate_min_max_power(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series, pd.Series]:
         """
-        Calculate the minimum and maximum power output of the unit.
-        Returns the bid volume as both the minimum and maximum power output of the unit.
+        Calculates the minimum and maximum power output of the unit and returns the bid volume as both the minimum and maximum power output of the unit.
 
-        :param start: the start time of the dispatch
-        :type start: pd.Timestamp
-        :param end: the end time of the dispatch
-        :type end: pd.Timestamp
-        :param product_type: the product type of the unit
-        :type product_type: str
-        :return: the bid volume as both the minimum and maximum power output of the unit
-        :rtype: tuple[pd.Series, pd.Series]
+        Args:
+            start (pandas.Timestamp): The start time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch.
+
+        Returns:
+            tuple[pandas.Series, pandas.Series]: The bid colume as both the minimum and maximum power output of the unit.
         """
-        bid_volume = (self.volume - self.outputs[product_type]).loc[start:end]
+        end_excl = end - self.index.freq
+        bid_volume = (self.volume - self.outputs[product_type]).loc[start:end_excl]
         return bid_volume, bid_volume
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         """
-        Calculate the marginal cost of the unit.
-        Returns the marginal cost of the unit based on the provided time and power.
+        Calculate the marginal cost of the unit returns the marginal cost of the unit based on the provided time and power.
 
-        :param start: the start time of the dispatch
-        :type start: pd.Timestamp
-        :param power: the power output of the unit
-        :type power: float
-        :return: the marginal cost of the unit
-        :rtype: float
+        Args:
+            start (pandas.Timestamp): The start time of the dispatch.
+            power (float): The power output of the unit.
+
+        Returns:
+            float: the marginal cost of the unit for the given power.
         """
         return self.price.at[start]
 
     def as_dict(self) -> dict:
         """
-        Return the unit as a dictionary.
+        Returns the unit as a dictionary.
 
-        :return: the unit as a dictionary
-        :rtype: dict
+        Returns:
+            dict: The unit as a dictionary.
         """
         unit_dict = super().as_dict()
         unit_dict.update(

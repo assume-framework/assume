@@ -1,8 +1,36 @@
-assume.strategies package
-=========================
+.. SPDX-FileCopyrightText: ASSUME Developers
+..
+.. SPDX-License-Identifier: AGPL-3.0-or-later
+
+Bidding strategies
+===================
 
 Submodules
 ----------
+
+assume.strategies.advanced\_orders module
+-----------------------------------------
+
+.. automodule:: assume.strategies.advanced_orders
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+assume.strategies.dmas\_powerplant module
+-----------------------------------------
+
+.. automodule:: assume.strategies.dmas_powerplant
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+assume.strategies.dmas\_storage module
+--------------------------------------
+
+.. automodule:: assume.strategies.dmas_storage
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 assume.strategies.extended module
 ---------------------------------
@@ -28,6 +56,14 @@ assume.strategies.flexable\_storage module
    :undoc-members:
    :show-inheritance:
 
+assume.strategies.learning\_advanced\_orders module
+---------------------------------------------------
+
+.. automodule:: assume.strategies.learning_advanced_orders
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 assume.strategies.learning\_strategies module
 ---------------------------------------------
 
@@ -40,14 +76,6 @@ assume.strategies.naive\_strategies module
 ------------------------------------------
 
 .. automodule:: assume.strategies.naive_strategies
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-assume.strategies.storage\_strategies module
---------------------------------------------
-
-.. automodule:: assume.strategies.storage_strategies
    :members:
    :undoc-members:
    :show-inheritance:

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -15,7 +19,7 @@ from .utils import get_test_prices
 
 @pytest.fixture
 def power_plant_1() -> PowerPlant:
-    index = pd.date_range("2022-01-01", periods=4, freq="H")
+    index = pd.date_range("2022-01-01", periods=4, freq="h")
     ff = NaiveForecast(
         index,
         availability=1,
@@ -27,13 +31,13 @@ def power_plant_1() -> PowerPlant:
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
-        technology="coal",
-        bidding_strategies={"energy": DmasPowerplantStrategy()},
+        technology="hard coal",
+        bidding_strategies={"EOM": DmasPowerplantStrategy()},
         index=index,
         max_power=1000,
         min_power=200,
         efficiency=0.5,
-        fixed_cost=10,
+        additional_cost=10,
         fuel_type="lignite",
         emission_factor=0.5,
         forecaster=ff,
@@ -43,7 +47,7 @@ def power_plant_1() -> PowerPlant:
 @pytest.fixture
 def power_plant_day(fuel_type="lignite") -> PowerPlant:
     periods = 48
-    index = pd.date_range("2022-01-01", periods=periods, freq="H")
+    index = pd.date_range("2022-01-01", periods=periods, freq="h")
 
     prices = get_test_prices(periods)
     ff = NaiveForecast(
@@ -57,13 +61,13 @@ def power_plant_day(fuel_type="lignite") -> PowerPlant:
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
-        technology="coal",
-        bidding_strategies={"energy": DmasPowerplantStrategy()},
+        technology="hard coal",
+        bidding_strategies={"EOM": DmasPowerplantStrategy()},
         index=index,
         max_power=1000,
         min_power=200,
         efficiency=0.5,
-        fixed_cost=10,
+        additional_cost=10,
         fuel_type="lignite",
         emission_factor=0.5,
         forecaster=ff,
@@ -93,11 +97,13 @@ def test_dmas_calc(power_plant_1):
     hour_count = len(power_plant_1.index) // 2
 
     mc = MarketConfig(
-        "Test",
-        rr.rrule(rr.HOURLY),
-        timedelta(hours=1),
-        "not needed",
-        [MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))],
+        market_id="EOM",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[
+            MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))
+        ],
         additional_fields=["link", "block_id"],
     )
     start = power_plant_1.index[0]
@@ -118,11 +124,13 @@ def test_dmas_day(power_plant_day):
     assert hour_count == 24
 
     mc = MarketConfig(
-        "Test",
-        rr.rrule(rr.HOURLY),
-        timedelta(hours=1),
-        "not needed",
-        [MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))],
+        market_id="EOM",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[
+            MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))
+        ],
         additional_fields=["link", "block_id"],
     )
     start = power_plant_day.index[0]
@@ -151,11 +159,13 @@ def test_dmas_prevent_start(power_plant_day):
     power_plant_day.forecaster.price_forecast.iloc[10:11] = -10
 
     mc = MarketConfig(
-        "Test",
-        rr.rrule(rr.HOURLY),
-        timedelta(hours=1),
-        "not needed",
-        [MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))],
+        market_id="EOM",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[
+            MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))
+        ],
         additional_fields=["link", "block_id"],
     )
     start = power_plant_day.index[0]
@@ -183,11 +193,13 @@ def test_dmas_prevent_start_end(power_plant_day):
     power_plant_day.forecaster.price_forecast.iloc[20:24] = -10
 
     mc = MarketConfig(
-        "Test",
-        rr.rrule(rr.HOURLY),
-        timedelta(hours=1),
-        "not needed",
-        [MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))],
+        market_id="EOM",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[
+            MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))
+        ],
         additional_fields=["link", "block_id"],
     )
     start = power_plant_day.index[0]

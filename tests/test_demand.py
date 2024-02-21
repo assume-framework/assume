@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -5,12 +9,12 @@ from dateutil import rrule as rr
 
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
-from assume.strategies import NaiveStrategy
+from assume.strategies import NaiveSingleBidStrategy
 from assume.units.demand import Demand
 
 
 def test_demand():
-    strategies = {"energy": NaiveStrategy()}
+    strategies = {"EOM": NaiveSingleBidStrategy()}
 
     index = pd.date_range(
         start=datetime(2023, 7, 1),
@@ -42,11 +46,11 @@ def test_demand():
     assert dem.calculate_marginal_cost(start, max_power.max()) == 2000
 
     mc = MarketConfig(
-        "Test",
-        rr.rrule(rr.HOURLY),
-        timedelta(hours=1),
-        "not needed",
-        [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+        market_id="EOM",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
     )
 
     bids = dem.calculate_bids(mc, [product_tuple])
@@ -60,7 +64,7 @@ def test_demand():
 
 
 def test_demand_series():
-    strategies = {"energy": NaiveStrategy()}
+    strategies = {"EOM": NaiveSingleBidStrategy()}
 
     index = pd.date_range(
         start=datetime(2023, 7, 1),
@@ -103,11 +107,11 @@ def test_demand_series():
     assert dem.calculate_marginal_cost(end, max_power) == 1000
 
     mc = MarketConfig(
-        "Test",
-        rr.rrule(rr.HOURLY),
-        timedelta(hours=1),
-        "not needed",
-        [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+        market_id="EOM",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
     )
 
     bids = dem.calculate_bids(mc, [product_tuple])

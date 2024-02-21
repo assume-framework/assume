@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import math
 from datetime import datetime, timedelta
 
@@ -11,7 +15,7 @@ from assume.markets.clearing_algorithms import ComplexClearingRole
 from .utils import extend_orderbook
 
 simple_dayahead_auction_config = MarketConfig(
-    "simple_dayahead_auction",
+    market_id="simple_dayahead_auction",
     market_products=[MarketProduct(rd(hours=+1), 1, rd(hours=1))],
     additional_fields=["node_id"],
     opening_hours=rr.rrule(

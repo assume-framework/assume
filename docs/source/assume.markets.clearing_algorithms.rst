@@ -1,5 +1,9 @@
-assume.markets.clearing\_algorithms package
-===========================================
+.. SPDX-FileCopyrightText: ASSUME Developers
+..
+.. SPDX-License-Identifier: AGPL-3.0-or-later
+
+Market clearing algorithms
+==========================
 
 Submodules
 ----------
@@ -16,6 +20,14 @@ assume.markets.clearing\_algorithms.complex\_clearing module
 ------------------------------------------------------------
 
 .. automodule:: assume.markets.clearing_algorithms.complex_clearing
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+assume.markets.clearing\_algorithms.complex\_clearing\_dmas module
+------------------------------------------------------------------
+
+.. automodule:: assume.markets.clearing_algorithms.complex_clearing_dmas
    :members:
    :undoc-members:
    :show-inheritance:

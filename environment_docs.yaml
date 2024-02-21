@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+name: assume-doc
+channels:
+  - conda-forge
+dependencies:
+- python>=3.11
+- pip
+- ipykernel
+- pandas
+- numpy
+- tqdm
+- SQLAlchemy
+- pytorch
+- pyomo
+- pypsa
+
+- pip:
+  - .[oeds]
+  - sphinx<7
+  - sphinx-book-theme
+  - nbsphinx
+  - nbsphinx_link
+  - git+https://github.com/maurerle/sphinxcontrib-mermaid@maurerle

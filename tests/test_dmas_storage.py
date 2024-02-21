@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -8,7 +12,7 @@ from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
 from assume.strategies.dmas_storage import DmasStorageStrategy
-from assume.strategies.naive_strategies import NaiveStrategy
+from assume.strategies.naive_strategies import NaiveSingleBidStrategy
 from assume.units import PowerPlant, Storage
 
 from .utils import get_test_prices
@@ -20,27 +24,27 @@ def storage_unit() -> Storage:
         id="Test_Storage",
         unit_operator="TestOperator",
         technology="TestTechnology",
-        bidding_strategies={"energy": NaiveStrategy()},
+        bidding_strategies={"EOM": NaiveSingleBidStrategy()},
         max_power_charge=100,
         max_power_discharge=100,
         max_volume=1000,
         efficiency_charge=0.9,
         efficiency_discharge=0.95,
-        index=pd.date_range("2022-01-01", periods=4, freq="H"),
+        index=pd.date_range("2022-01-01", periods=4, freq="h"),
         ramp_down_charge=-50,
         ramp_down_discharge=50,
         ramp_up_charge=-60,
         ramp_up_discharge=60,
-        variable_cost_charge=3,
-        variable_cost_discharge=4,
-        fixed_cost=1,
+        additional_cost_charge=3,
+        additional_cost_discharge=4,
+        additional_cost=1,
     )
 
 
 @pytest.fixture
 def storage_day() -> PowerPlant:
     periods = 48
-    index = pd.date_range("2022-01-01", periods=periods, freq="H")
+    index = pd.date_range("2022-01-01", periods=periods, freq="h")
 
     prices = get_test_prices(periods)
     ff = NaiveForecast(
@@ -53,7 +57,7 @@ def storage_day() -> PowerPlant:
         id="Test_Storage",
         unit_operator="TestOperator",
         technology="TestTechnology",
-        bidding_strategies={"energy": NaiveStrategy()},
+        bidding_strategies={"EOM": NaiveSingleBidStrategy()},
         max_power_charge=100,
         max_power_discharge=100,
         max_volume=1000,
@@ -64,9 +68,9 @@ def storage_day() -> PowerPlant:
         ramp_down_discharge=50,
         ramp_up_charge=-60,
         ramp_up_discharge=60,
-        variable_cost_charge=3,
-        variable_cost_discharge=4,
-        fixed_cost=1,
+        additional_cost_charge=3,
+        additional_cost_discharge=4,
+        additional_cost=1,
         forecaster=ff,
     )
 
@@ -89,11 +93,13 @@ def test_dmas_calc(storage_unit):
     hour_count = len(storage_unit.index) // 2
 
     mc = MarketConfig(
-        "Test",
-        rr.rrule(rr.HOURLY),
-        timedelta(hours=1),
-        "not needed",
-        [MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))],
+        market_id="EOM",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[
+            MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))
+        ],
         additional_fields=["exclusive_id"],
     )
     start = storage_unit.index[0]
@@ -112,11 +118,13 @@ def test_dmas_day(storage_day):
     assert hour_count == 24
 
     mc = MarketConfig(
-        "Test",
-        rr.rrule(rr.HOURLY),
-        timedelta(hours=1),
-        "not needed",
-        [MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))],
+        market_id="EOM",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[
+            MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))
+        ],
         additional_fields=["exclusive_id"],
     )
     start = storage_day.index[0]
