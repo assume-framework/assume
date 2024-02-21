@@ -50,8 +50,8 @@ availabe_examples = {
         "study_case": "base_case_building_2019"
     },
     "small_with_steel_plant": {
-        "scenario": "example_05",
-        "study_case": "base_case_plant_2019"
+        "scenario": "example_04",
+        "study_case": "base_case_steel_plant_2019"
     },
 }
 

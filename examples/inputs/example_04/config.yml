@@ -1,6 +1,6 @@
-base_case_plant_2019:
+base_case_steel_plant_2019:
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-01 23:00
+  end_date: 2019-01-02 23:00
   time_step: 1h
   save_frequency_hours: 24
   markets_config:
@@ -9,9 +9,9 @@ base_case_plant_2019:
       product_type: energy
       products:
         - duration: 1h
-          count: 1
+          count: 24
           first_delivery: 1h
-      opening_frequency: 1h
+      opening_frequency: 24h
       opening_duration: 1h
       volume_unit: MWh
       maximum_bid_volume: 100000
