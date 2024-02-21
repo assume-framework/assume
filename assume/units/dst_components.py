@@ -501,6 +501,7 @@ class ElectricArcFurnace:
         model,
         id,
         rated_power,
+        min_power,
         max_dri_input,
         specific_electricity_demand,
         specific_dri_demand,
