@@ -219,7 +219,6 @@ class ComplexClearingRole(MarketRole):
         Checks whether the bid types are valid and whether the volumes are within the maximum bid volume.
 
         Args:
-            sel: The instance of the ComplexClearingRole.
             orderbook (Orderbook): The orderbook to be validated.
             agent_tuple (tuple[str, str]): The agent tuple of the market (agend_adrr, agent_id).
 
@@ -247,8 +246,8 @@ class ComplexClearingRole(MarketRole):
                 ), f"max_volume {order['volume']}"
 
     def clear(
-        self, orderbook: Orderbook, market_products: list[MarketProduct]
-    ) -> (Orderbook, Orderbook, list[dict]):
+        self, orderbook: Orderbook, market_products
+    ) -> tuple[Orderbook, Orderbook, list[dict]]:
         """
         Implements pay-as-clear with more complex bid structures, including acceptance ratios, bid types, and profiled volumes.
 

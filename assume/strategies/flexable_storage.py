@@ -335,15 +335,6 @@ class flexablePosCRMStorage(BaseStrategy):
                 )
                 theoretic_SOC += delta_soc
                 previous_power = bid_quantity + current_power
-                time_delta = (end - start) / timedelta(hours=1)
-                delta_soc = -(
-                    (bid_quantity + current_power)
-                    * time_delta
-                    / unit.efficiency_discharge
-                    / unit.max_volume
-                )
-                theoretic_SOC += delta_soc
-                previous_power = bid_quantity + current_power
             else:
                 previous_power = current_power
                 raise ValueError(
@@ -443,15 +434,6 @@ class flexableNegCRMStorage(BaseStrategy):
                     }
                 )
                 # calculate theoretic SOC
-                time_delta = (end - start) / timedelta(hours=1)
-                delta_soc = (
-                    (bid_quantity + current_power)
-                    * time_delta
-                    * unit.efficiency_charge
-                    / unit.max_volume
-                )
-                theoretic_SOC += delta_soc
-                previous_power = bid_quantity + current_power
                 time_delta = (end - start) / timedelta(hours=1)
                 delta_soc = (
                     (bid_quantity + current_power)
