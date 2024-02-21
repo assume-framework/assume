@@ -286,8 +286,8 @@ class SteelPlant(SupportsMinMax):
                 eaf_operational_state[time_step]['ramp_up_capacity'] = value(state['ramp_up_capacity'])
                 eaf_operational_state[time_step]['ramp_down_capacity'] = value(state['ramp_down_capacity'])
                 eaf_operational_state[time_step]['is_operating'] = value(state['is_operating'])
-                eaf_operational_state[time_step]['is_min_operating_time_met'] = value(state['is_min_operating_time_met'])
-                eaf_operational_state[time_step]['is_min_down_time_met'] = value(state['is_min_down_time_met'])
+                # eaf_operational_state[time_step]['is_min_operating_time_met'] = value(state['is_min_operating_time_met'])
+                # eaf_operational_state[time_step]['is_min_down_time_met'] = value(state['is_min_down_time_met'])
             
             return optimal_operation, eaf_operational_state, total_cost
     

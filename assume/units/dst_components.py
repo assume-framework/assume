@@ -641,6 +641,27 @@ class ElectricArcFurnace:
                 b.eaf_operating_cost[t]
                 == b.power_eaf[t] * self.model.electricity_price[t]
             )
+    def calculate_operational_state(self, time_steps):
+        # Calculate operational state at each time step
+        operational_state = {}
+
+        for t in time_steps:
+            capacity_utilization = self.b.power_eaf[t] / self.b.rated_power_eaf
+            ramp_up_capacity = self.b.rated_power_eaf - self.b.power_eaf[t]
+            ramp_down_capacity = self.b.power_eaf[t] - self.b.min_power_eaf
+            is_operating = self.b.power_eaf[t] > 0
+
+            # Store expressions directly in the operational state dictionary
+            operational_state[t] = {
+                'capacity_utilization': capacity_utilization,
+                'ramp_up_capacity': ramp_up_capacity,
+                'ramp_down_capacity': ramp_down_capacity,
+                'is_operating': is_operating,
+                # 'is_min_operating_time_met': False,  # Placeholder values for now
+                # 'is_min_down_time_met': False       # Placeholder values for now
+            }
+
+        return operational_state
 
 
 class GenericStorage:
