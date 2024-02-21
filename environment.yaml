@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+name: assume-framework
+channels:
+- conda-forge
+dependencies:
+- python>=3.10
+- pip
+- ipykernel
+- pandas
+- numpy
+- tqdm
+- SQLAlchemy
+- matplotlib
+- pyomo
+- pypsa>=0.26.3
+- pyyaml
+
+- pip:
+  - .

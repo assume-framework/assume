@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import logging
 from itertools import groupby
 from operator import itemgetter
@@ -60,10 +64,12 @@ class NodalPyomoMarketRole(MarketRole):
         consumption at different nodes while considering constraints and objectives.
         The results are used to update order information and collect meta-information for reporting.
 
-        :param market_products: The products to be traded
-        :type market_products: list[MarketProduct]
-        :return: accepted_orders, [], meta
-        :rtype: tuple[Orderbook, Orderbook, list[dict]]
+        Args:
+            orderbook (Orderbook): the orders to be cleared as an orderbook
+            market_products (list[MarketProduct]): the list of products which are cleared in this clearing
+
+        Returns:
+            tuple[Orderbook, Orderbook, list[dict]]: accepted orderbook, rejected orderbook and clearing meta data
         """
         market_getter = itemgetter("start_time", "end_time", "only_hours")
         accepted_orders: Orderbook = []

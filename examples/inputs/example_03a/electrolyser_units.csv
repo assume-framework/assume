@@ -1,0 +1,2 @@
+name,technology,bidding_EOM,max_power,min_power,min_hydrogen,max_hydrogen,additional_cost,conversion_factor,unit_operator
+elektrolyser_01,electrolyser,electrolyser_naive,52.25,7.84,0.15,1,10,33.3,electrolyser_operator

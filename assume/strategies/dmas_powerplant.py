@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import logging
 from datetime import datetime, timedelta
 
@@ -33,10 +37,12 @@ def get_solver_factory(solvers_str=["cbc", "glpk", "cbc", "gurobi", "cplex"]):
     """
     select the first available solver from the list
 
-    :param solvers_str: list of solvers
-    :type solvers_str: list
-    :return: solver factory
-    :rtype: SolverFactory
+    Args:
+      solvers_str(list, optional): list of solvers
+
+    Returns:
+      SolverFactory: solver factory
+
     """
     solvers = check_available_solvers(*solvers_str)
     if len(solvers) < 1:
@@ -49,12 +55,10 @@ class DmasPowerplantStrategy(BaseStrategy):
         """
         Initializes the strategy
 
-        :param steps: list of steps to optimize
-        :type steps: list
-        :param args: additional arguments
-        :type args: list
-        :param kwargs: additional keyword arguments
-        :type kwargs: dict
+        Args:
+            steps (list): list of steps to optimize
+            *args (list): additional arguments
+            **kwargs (dict): additional keyword arguments
         """
         super().__init__(*args, **kwargs)
         self.model = ConcreteModel("powerplant")
@@ -90,27 +94,20 @@ class DmasPowerplantStrategy(BaseStrategy):
         p0: float = None,
     ) -> None:
         """
-        builds the optimization model
-        returns the cashflow
+        Builds the optimization model and returns the cashflow.
 
-        :param unit: unit to optimize
-        :type unit: SupportsMinMax
-        :param start: start time
-        :type start: datetime
-        :param hour_count: number of hours to optimize
-        :type hour_count: int
-        :param emission_prices: emission prices
-        :type emission_prices: np.array
-        :param fuel_prices: fuel prices
-        :type fuel_prices: np.array
-        :param power_prices: power prices
-        :type power_prices: np.array
-        :param runtime: runtime of the unit
-        :type runtime: int
-        :param p0: initial power
-        :type p0: float
-        :return: cashflow
-        :rtype: np.array
+        Args:
+            unit (SupportsMinMax): Unit to optimize.
+            start (datetime.datetime): Start time.
+            hour_count (int): Number of hours to optimize.
+            emission_prices (numpy.ndarray): Emission prices.
+            fuel_prices (numpy.ndarray): Fuel prices.
+            power_prices (numpy.ndarray): Power prices.
+            runtime (int, optional): Runtime of the unit. Defaults to None.
+            p0 (float, optional): Initial power. Defaults to None.
+
+        Returns:
+            np.array: Cashflow.
         """
         runtime = runtime or unit.get_operation_time(start)
         p0 = p0 or unit.get_output_before(start)
@@ -238,22 +235,17 @@ class DmasPowerplantStrategy(BaseStrategy):
         """
         sets the results of the optimization
 
-        :param unit: unit to optimize
-        :type unit: SupportsMinMax
-        :param emission_prices: emission prices
-        :type emission_prices: np.array
-        :param fuel_prices: fuel prices
-        :type fuel_prices: np.array
-        :param power_prices: power prices
-        :type power_prices: np.array
-        :param start: start time
-        :type start: datetime
-        :param step: step
-        :type step: int
-        :param hour_count: number of hours to optimize
-        :type hour_count: int
-        :return: None
-        :rtype: None
+        Args:
+            unit(SupportsMinMax): unit to optimize
+            emission_prices(numpy.ndarray): emission prices
+            fuel_prices(numpy.ndarray): fuel prices
+            power_prices(numpy.ndarray): power prices
+            start(datetime.datetime): start time
+            step(int): step
+            hour_count(int): number of hours to optimize
+        Returns:
+            None: None
+
         """
         # -> output power
         tr = np.arange(hour_count)
@@ -300,18 +292,16 @@ class DmasPowerplantStrategy(BaseStrategy):
         """
         optimizes the unit
 
-        :param unit: unit to optimize
-        :type unit: SupportsMinMax
-        :param start: start time
-        :type start: datetime
-        :param hour_count: number of hours to optimize
-        :type hour_count: int
-        :param prices: prices
-        :type prices: pd.DataFrame
-        :param steps: steps to optimize
-        :type steps: tuple
-        :return: generation
-        :rtype: np.array
+        Args:
+          unit(SupportsMinMax): unit to optimize
+          start(datetime.datetime): start time
+          hour_count(int): number of hours to optimize
+          prices(pd.DataFrame): prices
+          steps(tuple): steps to optimize
+
+        Returns:
+          np.array: generation
+
         """
         base_price = prices.copy()
         self.prevented_start = dict(
@@ -426,87 +416,6 @@ class DmasPowerplantStrategy(BaseStrategy):
                 self.opt_results[step]["obj"] = 0
         return unit.outputs["generation"][start:]
 
-    def optimize_result(
-        self,
-        unit: SupportsMinMax,
-        start: datetime,
-        committed_power: np.array,
-        hour_count: int,
-        power_prices: np.array,
-    ) -> np.array:
-        """
-        calculates the result with prices *2
-        to optimize according to the result in the best way possible
-
-        :param unit: unit to optimize
-        :type unit: SupportsMinMax
-        :param start: start time
-        :type start: datetime
-        :param committed_power: committed power
-        :type committed_power: np.array
-        :param hour_count: number of hours to optimize
-        :type hour_count: int
-        :param power_prices: power prices
-        :type power_prices: np.array
-        :return: generation
-        :rtype: np.array
-        """
-        cashflow = self.build_model(unit, start, 24)
-        tr = np.arange(hour_count)
-        # if day ahead power is known minimize the difference
-        self.model.power_difference = Var(tr, within=NonNegativeReals)
-        self.model.minus = Var(tr, within=NonNegativeReals)
-        self.model.plus = Var(tr, within=NonNegativeReals)
-
-        difference = [self.model.minus[t] + self.model.plus[t] for t in tr]
-        self.model.difference = ConstraintList()
-        for t in tr:
-            self.model.difference.add(
-                committed_power[t] - self.model.p_out[t]
-                == -self.model.minus[t] + self.model.plus[t]
-            )
-        difference_cost = [difference[t] * np.abs(power_prices[t] * 2) for t in tr]
-
-        # set new objective
-        self.model.obj = Objective(
-            expr=quicksum(cashflow[t] - difference_cost[t] for t in tr),
-            sense=maximize,
-        )
-        r = self.opt.solve(self.model)
-
-        if (r.solver.status == SolverStatus.ok) & (
-            r.solver.termination_condition == TerminationCondition.optimal
-        ):
-            log.info("find optimal solution in step: dayAhead adjustment")
-            self._set_results(
-                unit,
-                emission_prices,
-                fuel_prices,
-                adjusted_price,
-                start=start,
-                step=0,
-                hour_count=hour_count,
-            )
-            running_since, off_since = 0, 0
-            for t in tr:
-                # find count of last 1s and 0s
-                if self.model.z[t].value > 0:
-                    running_since += 1
-                    off_since = 0
-                else:
-                    running_since = 0
-                    off_since += 1
-        else:
-            if r.solver.termination_condition == TerminationCondition.infeasible:
-                log.error("infeasible model in step: dayAhead adjustment")
-            else:
-                log.error(r.solver)
-            running_since = 1
-            off_since = 0
-            # TODO set running with min_power
-
-        return self.power.copy()
-
     def calculate_bids(
         self,
         unit: SupportsMinMax,
@@ -519,26 +428,25 @@ class DmasPowerplantStrategy(BaseStrategy):
         defines how it is dispatched to the market
         Returns a list of bids that the unit operator will submit to the market
 
-        :param unit: unit to dispatch
-        :type unit: SupportsMinMax
-        :param market_config: market configuration
-        :type market_config: MarketConfig
-        :param product_tuples: list of products to dispatch
-        :type product_tuples: list[Product]
-        :param kwargs: additional arguments
-        :type kwargs: dict
-        :return: orderbook
-        :rtype: Orderbook
+        Args:
+          unit(SupportsMinMax): unit to dispatch
+          market_config(MarketConfig): market configuration
+          product_tuples(list[Product]): list of products to dispatch
+          kwargs(dict): additional arguments
+
+        Returns:
+          Orderbook: orderbook
+
         """
-        if not "block_id" in market_config.additional_fields:
+        if "block_id" not in market_config.additional_fields:
             raise Exception("Block Id missing from Marketconfig")
-        if not "link" in market_config.additional_fields:
+        if "link" not in market_config.additional_fields:
             raise Exception("link missing from Marketconfig")
         start = product_tuples[0][0]
         hour_count = len(product_tuples)
         hour_count2 = hour_count * 2
 
-        base_price = unit.forecaster["price_forecast"][
+        base_price = unit.forecaster[f"price_{market_config.market_id}"][
             start : start + timedelta(hours=hour_count2 - 1)
         ]
         e_price = unit.forecaster.get_price("co2")[

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import logging
 from itertools import groupby
 from operator import itemgetter
@@ -13,6 +17,12 @@ log = logging.getLogger(__name__)
 def cumsum(orderbook: Orderbook):
     """
     This function adds a cumsum field to the orderbook.
+
+    Args:
+        orderbook (Orderbook): the orderbook to sum up
+
+    Returns:
+        Orderbook: the resulting orderbook with cumulative sum added
     """
     sum_ = 0
     for order in orderbook:
@@ -35,10 +45,12 @@ class PayAsClearAonRole(MarketRole):
         Partial clearing is not allowed here.
         This has the side effect, that the cleared price can be much higher if bids with different volume are accepted
 
-        :param market_agent: The market agent
-        :type market_agent: MarketRole
-        :param market_products: The products to be traded
-        :type market_products: list[MarketProduct]
+        Args:
+            orderbook (Orderbook): the orders to be cleared as an orderbook
+            market_products (list[MarketProduct]): the list of products which are cleared in this clearing
+
+        Returns:
+            tuple[Orderbook, Orderbook, list[dict]]: accepted orderbook, rejected orderbook and clearing meta data
         """
         market_getter = itemgetter("start_time", "end_time", "only_hours")
         accepted_orders: Orderbook = []
@@ -81,12 +93,6 @@ class PayAsClearAonRole(MarketRole):
                 # resulting i is the cut point
                 accepted_product_orders.extend(demand_orders[:i])
                 accepted_product_orders.extend(supply_orders[:i])
-
-                for order in supply_orders[i:]:
-                    order["accepted_volume"] = 0
-                for order in demand_orders[i:]:
-                    order["accepted_volume"] = 0
-
                 rejected_orders.extend(demand_orders[i:])
                 rejected_orders.extend(supply_orders[i:])
 
@@ -123,10 +129,12 @@ class PayAsBidAonRole(MarketRole):
         This implements pay-as-bid where each bids volume needs an exactly matching order with the same volume.
         Partial clearing is not allowed here.
 
-        :param market_agent: The market agent
-        :type market_agent: MarketRole
-        :param market_products: The products to be traded
-        :type market_products: list[MarketProduct]
+        Args:
+            orderbook (Orderbook): the orders to be cleared as an orderbook
+            market_products (list[MarketProduct]): the list of products which are cleared in this clearing
+
+        Returns:
+            tuple[Orderbook, Orderbook, list[dict]]: accepted orderbook, rejected orderbook and clearing meta data
         """
         market_getter = itemgetter("start_time", "end_time", "only_hours")
         accepted_orders: Orderbook = []
@@ -168,12 +176,6 @@ class PayAsBidAonRole(MarketRole):
 
                 accepted_product_orders.extend(demand_orders[:i])
                 accepted_product_orders.extend(supply_orders[:i])
-
-                for order in supply_orders[i:]:
-                    order["accepted_volume"] = 0
-                for order in demand_orders[i:]:
-                    order["accepted_volume"] = 0
-
                 rejected_orders.extend(demand_orders[i:])
                 rejected_orders.extend(supply_orders[i:])
 

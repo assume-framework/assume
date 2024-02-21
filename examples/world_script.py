@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import logging
 from datetime import datetime, timedelta
 
@@ -16,14 +20,14 @@ world = World(database_uri=db_uri)
 
 
 async def init():
-    start = datetime(2023, 10, 4)
-    end = datetime(2023, 12, 5)
+    start = datetime(2019, 1, 1)
+    end = datetime(2019, 3, 1)
     index = pd.date_range(
         start=start,
         end=end + timedelta(hours=24),
-        freq="H",
+        freq="h",
     )
-    sim_id = "handmade_simulation"
+    sim_id = "world_script_simulation"
 
     await world.setup(
         start=start,
@@ -35,11 +39,11 @@ async def init():
 
     marketdesign = [
         MarketConfig(
-            "EOM",
-            rr.rrule(rr.HOURLY, interval=24, dtstart=start, until=end),
-            timedelta(hours=1),
-            "pay_as_clear",
-            [MarketProduct(timedelta(hours=1), 24, timedelta(hours=1))],
+            market_id="EOM",
+            opening_hours=rr.rrule(rr.HOURLY, interval=24, dtstart=start, until=end),
+            opening_duration=timedelta(hours=1),
+            market_mechanism="pay_as_clear",
+            market_products=[MarketProduct(timedelta(hours=1), 24, timedelta(hours=1))],
             additional_fields=["block_id", "link", "exclusive_id"],
         )
     ]
@@ -59,7 +63,7 @@ async def init():
         {
             "min_power": 0,
             "max_power": 1000,
-            "bidding_strategies": {"energy": "naive"},
+            "bidding_strategies": {"EOM": "naive_eom"},
             "technology": "demand",
         },
         NaiveForecast(index, demand=100),
@@ -73,7 +77,7 @@ async def init():
         {
             "min_power": 200,
             "max_power": 1000,
-            "bidding_strategies": {"energy": "naive"},
+            "bidding_strategies": {"EOM": "naive_eom"},
             "technology": "nuclear",
         },
         nuclear_forecast,

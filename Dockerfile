@@ -1,10 +1,14 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 FROM python:3.11-bookworm
 
 RUN useradd -m -s /bin/bash admin
 
 RUN mkdir /src
 WORKDIR /src
-COPY README.md LICENSE pyproject.toml .
+COPY README.md pyproject.toml .
 #RUN python -m pip install --upgrade pip
 # thats needed to use create the requirements.txt only
 RUN pip install pip-tools
@@ -21,4 +25,5 @@ RUN chown -R admin /src /home/admin
 USER admin
 RUN pip install -e .
 ENV PYTHONUNBUFFERED=1
+EXPOSE 9099
 ENTRYPOINT ["assume"]

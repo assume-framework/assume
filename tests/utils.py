@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 from datetime import datetime, timedelta
 from itertools import product
 
@@ -43,19 +47,22 @@ def extend_orderbook(
     products,
     volume,
     price,
-    orderbook=[],
+    orderbook=None,
     bid_type="SB",
     min_acceptance_ratio=None,
+    parent_bid_id=None,
 ):
     """
     Creates constant bids over the time span of all products
     with specified values for price and volume
     and appends the orderbook
     """
+    if not orderbook:
+        orderbook = []
     if volume == 0:
         return orderbook
 
-    if bid_type == "BB":
+    if bid_type == "BB" or bid_type == "LB":
         if volume < 0:
             agent_id = f"block_dem{len(orderbook)+1}"
         else:
@@ -63,7 +70,7 @@ def extend_orderbook(
 
         order: Order = {
             "start_time": products[0][0],
-            "end_time": products[0][1],
+            "end_time": products[-1][1],
             "agent_id": agent_id,
             "bid_id": f"bid_{len(orderbook)+1}",
             "volume": {product[0]: volume for product in products},
@@ -72,6 +79,7 @@ def extend_orderbook(
             "accepted_price": {},
             "only_hours": None,
             "bid_type": bid_type,
+            "parent_bid_id": parent_bid_id,
         }
 
         if min_acceptance_ratio is not None:
@@ -94,11 +102,12 @@ def extend_orderbook(
                 "agent_id": agent_id,
                 "bid_id": f"bid_{len(orderbook)+1}",
                 "volume": volume,
-                "accepted_volume": None,
+                "accepted_volume": 0,
                 "price": price,
                 "accepted_price": None,
                 "only_hours": None,
                 "bid_type": bid_type,
+                "parent_bid_id": parent_bid_id,
             }
 
             if min_acceptance_ratio is not None:

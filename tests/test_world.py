@@ -1,6 +1,11 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import asyncio
 
-from assume import World, load_scenario_folder
+from assume import World
+from assume.scenario.loader_csv import load_scenario_folder
 
 
 def test_world():

@@ -1,34 +1,46 @@
+.. SPDX-FileCopyrightText: ASSUME Developers
+..
+.. SPDX-License-Identifier: AGPL-3.0-or-later
+
 ###########################
 Quick Start
 ###########################
 
 For installation instructions see :doc:`installation`.
 
-To run an exemplar simulation without database and grafana, run the following command::
+Exploring Examples
+==================
 
-    python examples/example_01_sqlite.py
+To explore the provided examples, follow these steps:
 
+1. Clone the repository and navigate to its directory:
 
-If you have also built the docker container, run the following command::
+.. code-block:: bash
 
-    docker compose up -d
-    python examples/example_01_timescale.py
+   git clone https://github.com/assume-framework/assume.git
+   cd assume
 
-Afterwards you can access the Dashboard on `http://localhost:3000`
+2. Run a simulation:
 
+   There are three ways to run a simulation:
 
-Using the command line interface (CLI)
-======================================
+   - Local:
 
-Instead of using one of the written examples, you can also use the CLI::
+   .. code-block:: bash
 
-    assume -s example_01b -db "postgresql://assume:assume@localhost:5432/assume" -l DEBUG
+      python examples/examples.py
 
-This will run the example_01b and write the output into the local PostgreSQL database.
-All Debug logs will be written (to the file assume.log).
-To take a look at options which can be used for this command run::
+   - Using the provided Docker setup:
 
-    assume --help
+     If you have installed Docker and set up the Docker Compose file previously, you can select 'timescale' in ``examples.py`` before running the simulation. This will save the simulation results in a Timescale database, and you can access the Dashboard at http://localhost:3000.
+
+   - Using the CLI to run simulations:
+
+   .. code-block:: bash
+
+      assume -s example_01b -db "postgresql://assume:assume@localhost:5432/assume"
+
+     For additional CLI options, run ``assume -h``.
 
 
 Running tests
@@ -50,7 +62,7 @@ Building Docs
 
 Create the Docs environment::
 
-    conda env create -f environment_docs.yml
+    conda env create -f environment_docs.yaml
 
 Then you can build the docs using the Makefile in the docs directory::
 
@@ -61,4 +73,4 @@ Finally, to serve the build directory locally, run::
 
     python -m http.server --directory build/html
 
-Now you can visit http://localhost:8000 to see the working docs locally
+Now you can visit http://localhost:8000 to see the working docs locally.
