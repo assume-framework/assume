@@ -26,6 +26,7 @@ def calculate_reference_operational_state(demand_side_agent):
     reference_operational_state = demand_side_agent.calculate_operational_state()
     return reference_operational_state
 
+
 def determine_flexibility(reference_curve, tolerance):
     min_flexibility = {}
     max_flexibility = {}

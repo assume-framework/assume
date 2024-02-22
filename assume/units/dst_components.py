@@ -553,7 +553,6 @@ class ElectricArcFurnace:
         self.b.eaf_operating_cost = Var(time_steps, within=NonNegativeReals)
 
     def define_constraints(self, time_steps):
-
         # Power bounds constraints
         @self.b.Constraint(time_steps)
         def electricity_input_upper_bound(b, t):
@@ -562,7 +561,7 @@ class ElectricArcFurnace:
         @self.b.Constraint(time_steps)
         def electricity_input_lower_bound(b, t):
             return b.power_eaf[t] >= b.min_power_eaf
-        
+
         @self.b.Constraint(time_steps)
         def steel_output_dri_relation(b, t):
             # This constraint defines the steel output based on inputs and efficiency
@@ -641,6 +640,7 @@ class ElectricArcFurnace:
                 b.eaf_operating_cost[t]
                 == b.power_eaf[t] * self.model.electricity_price[t]
             )
+
     def calculate_operational_state(self, time_steps):
         # Calculate operational state at each time step
         operational_state = {}
@@ -653,10 +653,10 @@ class ElectricArcFurnace:
 
             # Store expressions directly in the operational state dictionary
             operational_state[t] = {
-                'capacity_utilization': capacity_utilization,
-                'ramp_up_capacity': ramp_up_capacity,
-                'ramp_down_capacity': ramp_down_capacity,
-                'is_operating': is_operating,
+                "capacity_utilization": capacity_utilization,
+                "ramp_up_capacity": ramp_up_capacity,
+                "ramp_down_capacity": ramp_down_capacity,
+                "is_operating": is_operating,
                 # 'is_min_operating_time_met': False,  # Placeholder values for now
                 # 'is_min_down_time_met': False       # Placeholder values for now
             }
