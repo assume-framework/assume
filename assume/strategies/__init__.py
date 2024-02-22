@@ -4,8 +4,6 @@
 
 from assume.common.base import BaseStrategy, LearningStrategy
 from assume.strategies.advanced_orders import flexableEOMBlock, flexableEOMLinked
-from assume.strategies.dmas_powerplant import DmasPowerplantStrategy
-from assume.strategies.dmas_storage import DmasStorageStrategy
 from assume.strategies.extended import OTCStrategy
 from assume.strategies.flexable import flexableEOM, flexableNegCRM, flexablePosCRM
 from assume.strategies.flexable_storage import (
@@ -37,3 +35,13 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "flexable_pos_crm_storage": flexablePosCRMStorage,
     "naive_redispatch": NaiveRedispatchStrategy,
 }
+
+try:
+    from assume.strategies.dmas_powerplant import DmasPowerplantStrategy
+    from assume.strategies.dmas_storage import DmasStorageStrategy
+
+    bidding_strategies["dmas_powerplant"] = DmasPowerplantStrategy
+    bidding_strategies["dmas_storage"] = DmasStorageStrategy
+
+except ImportError:
+    pass
