@@ -4,7 +4,7 @@
 
 [tool.poetry]
 name = "assume-framework"
-version = "0.3.5"
+version = "0.3.6"
 description = "ASSUME - Agent-Based Electricity Markets Simulation Toolbox"
 authors = ["ASSUME Developers <contact@assume-project.de>"]
 license = "AGPL-3.0-or-later"
