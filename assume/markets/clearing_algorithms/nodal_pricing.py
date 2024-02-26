@@ -16,6 +16,8 @@ log = logging.getLogger(__name__)
 
 logging.getLogger("linopy").setLevel(logging.WARNING)
 
+pd.options.mode.copy_on_write = True
+
 
 class NodalMarketRole(MarketRole):
     """
@@ -132,11 +134,10 @@ class NodalMarketRole(MarketRole):
             p_min_pu=p_set,
             p_max_pu=p_set + 1,
             marginal_cost=p_set,
-            committable=True,
             **generators,
         )
 
-        # add upward and downward backup generators at each node
+        # add backup generators at each node
         self.network.madd(
             "Generator",
             names=self.network.buses.index,
@@ -167,7 +168,6 @@ class NodalMarketRole(MarketRole):
             p_min_pu=p_set,
             p_max_pu=p_set + 1,
             marginal_cost=p_set,
-            committable=True,
             sign=-1,
             **loads,
         )
@@ -203,14 +203,14 @@ class NodalMarketRole(MarketRole):
         costs = orderbook_df.pivot(
             index="start_time", columns="unit_id", values="price"
         )
+        # change costs to negative where volume is negative
+        costs = costs.where(volume_pivot > 0, -costs)
 
         # Calculate p_max_pu_up as difference between max_power and accepted volume
-        p_max_pu = (max_power_pivot - volume_pivot).div(
-            max_power_pivot.where(max_power_pivot != 0, np.inf)
-        )
+        p_max_pu = volume_pivot.div(max_power_pivot.where(max_power_pivot != 0, np.inf))
 
         # Calculate p_max_pu_down as difference between accepted volume and min_power
-        p_min_pu = (volume_pivot - min_power_pivot).div(
+        p_min_pu = min_power_pivot.div(
             max_power_pivot.where(max_power_pivot != 0, np.inf)
         )
         p_min_pu = p_min_pu.clip(lower=0)  # Ensure no negative values
@@ -269,9 +269,11 @@ class NodalMarketRole(MarketRole):
         # Get all generators except for _backup generators
         generators_t_p = self.network.generators_t.p.filter(regex="^(?!.*_backup)")
 
-        # Use regex in a single call to filter and rename columns simultaneously for efficiency
-        upward_redispatch = generators_t_p.filter(regex="_up$")
-        downward_redispatch = generators_t_p.filter(regex="_down$")
+        # select demand units as those with negative volume in orderbook
+        demand_units = orderbook_df[orderbook_df["volume"] < 0]["unit_id"].unique()
+
+        # change values to negative for demand units
+        generators_t_p.loc[:, demand_units] = -generators_t_p.loc[:, demand_units]
 
         # Find intersection of unit_ids in orderbook_df and columns in redispatch_volumes for direct mapping
         valid_units = orderbook_df["unit_id"].unique()

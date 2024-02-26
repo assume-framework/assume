@@ -49,14 +49,14 @@ base:
         backup_marginal_cost: 10000
 
 
-nodal:
+nodal_case:
   start_date: 2019-01-01 00:00
   end_date: 2019-01-06 00:00
   time_step: 1h
   save_frequency_hours: 24
 
   markets_config:
-    EOM:
+    nodal:
       start_date: 2019-01-01 00:00
       operator: EOM_operator
       product_type: energy
@@ -75,5 +75,5 @@ nodal:
       param_dict:
         network_path: .
         solver: glpk
-        market_clearing_mechanism: pay_as_bid
+        market_clearing_mechanism: pay_as_clear
         backup_marginal_cost: 10000
