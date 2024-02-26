@@ -17,13 +17,11 @@ log = logging.getLogger(__name__)
 logging.getLogger("linopy").setLevel(logging.WARNING)
 
 
-class RedispatchMarketRole(MarketRole):
+class NodalMarketRole(MarketRole):
     """
-    A market role that performs redispatch to resolve congestion in the electricity market.
-    It uses PyPSA to model the electricity network and perform the redispatch.
-    The redispatched is based on the price the units submit in their orders.
-    This allows this to be a cost based redispatch if units submit their marginal costs as prices.
-    Or it can be a price based redispatch if units submit actual bid prices.
+
+    A market role that performs market clearing at each node (bus) in an electricity network.
+    It uses PyPSA to model the electricity network and perform market clearing.
 
     Parameters:
         marketconfig (MarketConfig): The market configuration.
@@ -123,20 +121,10 @@ class RedispatchMarketRole(MarketRole):
             columns=generators.index,
         )
 
-        # add generators and their sold capacities as load with reversed sign to have fixed feed in
-        self.network.madd(
-            "Load",
-            names=generators.index,
-            bus=generators["node"],  # bus to which the generator is connected to
-            p_set=p_set,
-            sign=1,
-        )
-
-        # add upward redispatch generators
+        # add generators
         self.network.madd(
             "Generator",
             names=generators.index,
-            suffix="_up",
             bus=generators["node"],  # bus to which the generator is connected to
             p_nom=generators[
                 "max_power"
@@ -144,41 +132,18 @@ class RedispatchMarketRole(MarketRole):
             p_min_pu=p_set,
             p_max_pu=p_set + 1,
             marginal_cost=p_set,
-        )
-
-        # add downward redispatch generators
-        self.network.madd(
-            "Generator",
-            names=generators.index,
-            suffix="_down",
-            bus=generators["node"],  # bus to which the generator is connected to
-            p_nom=generators[
-                "max_power"
-            ],  # Nominal capacity of the powerplant/generator
-            p_min_pu=p_set,
-            p_max_pu=p_set + 1,
-            marginal_cost=p_set,
-            sign=-1,
+            committable=True,
+            **generators,
         )
 
         # add upward and downward backup generators at each node
         self.network.madd(
             "Generator",
             names=self.network.buses.index,
-            suffix="_backup_up",
+            suffix="_backup",
             bus=self.network.buses.index,  # bus to which the generator is connected to
             p_nom=10e4,
             marginal_cost=self.backup_marginal_cost,
-        )
-
-        self.network.madd(
-            "Generator",
-            names=self.network.buses.index,
-            suffix="_backup_down",
-            bus=self.network.buses.index,  # bus to which the generator is connected to
-            p_nom=10e4,
-            marginal_cost=self.backup_marginal_cost,
-            sign=-1,
         )
 
     def add_loads(self, filename: str):
@@ -193,23 +158,25 @@ class RedispatchMarketRole(MarketRole):
             columns=loads.index,
         )
 
-        # add loads with reversed sign as demand is modeled with negative values
+        # add loads as negative generators
         self.network.madd(
-            "Load",
+            "Generator",
             names=loads.index,
             bus=loads["node"],  # bus to which the generator is connected to
-            p_set=p_set,
-            sign=1,
+            p_nom=loads["max_power"],  # Nominal capacity of the powerplant/generator
+            p_min_pu=p_set,
+            p_max_pu=p_set + 1,
+            marginal_cost=p_set,
+            committable=True,
+            sign=-1,
+            **loads,
         )
 
     def clear(
         self, orderbook: Orderbook, market_products
     ) -> Tuple[Orderbook, Orderbook, List[dict]]:
         """
-        Performs redispatch to resolve congestion in the electricity market.
-        It first checks for congestion in the network and if it finds any, it performs redispatch to resolve it.
-        The returned orderbook contains accepted orders with the redispatched volumes and prices.
-        The prices are positive for upward redispatch and negative for downward redispatch.
+        Clears the market by running a linear optimal power flow (LOPF) with PyPSA.
 
         Args:
             orderbook (Orderbook): The orderbook to be cleared.
@@ -233,79 +200,46 @@ class RedispatchMarketRole(MarketRole):
         min_power_pivot = orderbook_df.pivot(
             index="start_time", columns="unit_id", values="min_power"
         )
-        price_pivot = orderbook_df.pivot(
+        costs = orderbook_df.pivot(
             index="start_time", columns="unit_id", values="price"
         )
 
-        # Calculate p_set, p_max_pu_up, and p_max_pu_down directly using DataFrame operations
-        p_set = volume_pivot
-
         # Calculate p_max_pu_up as difference between max_power and accepted volume
-        p_max_pu_up = (max_power_pivot - volume_pivot).div(
+        p_max_pu = (max_power_pivot - volume_pivot).div(
             max_power_pivot.where(max_power_pivot != 0, np.inf)
         )
 
         # Calculate p_max_pu_down as difference between accepted volume and min_power
-        p_max_pu_down = (volume_pivot - min_power_pivot).div(
+        p_min_pu = (volume_pivot - min_power_pivot).div(
             max_power_pivot.where(max_power_pivot != 0, np.inf)
         )
-        p_max_pu_down = p_max_pu_down.clip(lower=0)  # Ensure no negative values
-
-        # Determine the costs directly from the price pivot
-        costs = price_pivot
-
-        # Drop units with only negative volumes (if necessary)
-        negative_only_units = volume_pivot.lt(0).all()
-        p_max_pu_up = p_max_pu_up.drop(
-            columns=negative_only_units.index[negative_only_units]
-        )
-        p_max_pu_down = p_max_pu_down.drop(
-            columns=negative_only_units.index[negative_only_units]
-        )
-        costs = costs.drop(columns=negative_only_units.index[negative_only_units])
+        p_min_pu = p_min_pu.clip(lower=0)  # Ensure no negative values
 
         # reset indexes for all dataframes
-        p_set.reset_index(inplace=True, drop=True)
-        p_max_pu_up.reset_index(inplace=True, drop=True)
-        p_max_pu_down.reset_index(inplace=True, drop=True)
+        p_max_pu.reset_index(inplace=True, drop=True)
+        p_min_pu.reset_index(inplace=True, drop=True)
         costs.reset_index(inplace=True, drop=True)
 
         # Update the network parameters
-        self.network.loads_t.p_set = p_set
 
         # Update p_max_pu for generators with _up and _down suffixes
-        self.network.generators_t.p_max_pu.update(p_max_pu_up.add_suffix("_up"))
-        self.network.generators_t.p_max_pu.update(p_max_pu_down.add_suffix("_down"))
+        self.network.generators_t.p_max_pu.update(p_max_pu)
+        self.network.generators_t.p_min_pu.update(p_min_pu)
 
         # Add _up and _down suffix to costs and update the network
-        self.network.generators_t.marginal_cost.update(costs.add_suffix("_up"))
-        self.network.generators_t.marginal_cost.update(costs.add_suffix("_down") * (-1))
+        self.network.generators_t.marginal_cost.update(costs)
 
-        # run linear powerflow
-        self.network.lpf()
+        status, termination_condition = self.network.optimize(
+            solver_name=self.solver,
+            env=self.env,
+        )
 
-        # check lines for congestion where power flow is larget than s_nom
-        line_loading = self.network.lines_t.p0.abs() / self.network.lines.s_nom
+        if status != "ok":
+            log.error(f"Solver exited with {termination_condition}")
+            raise Exception("Solver in redispatch market did not converge")
 
-        # if any line is congested, perform redispatch
-        if line_loading.max().max() > 1:
-            log.debug("Congestion detected")
-
-            status, termination_condition = self.network.optimize(
-                solver_name=self.solver,
-                env=self.env,
-            )
-
-            if status != "ok":
-                log.error(f"Solver exited with {termination_condition}")
-                raise Exception("Solver in redispatch market did not converge")
-
-            # process dispatch data
-            self.process_dispatch_data(orderbook_df)
-
-        # if no congestion is detected set accepted volume and price to 0
-        else:
-            log.debug("No congestion detected")
+        # process dispatch data
+        self.process_dispatch_data(orderbook_df)
 
         # return orderbook_df back to orderbook format as list of dicts
         accepted_orders = orderbook_df.to_dict("records")
@@ -345,15 +279,9 @@ class RedispatchMarketRole(MarketRole):
         for unit in valid_units:
             unit_orders = orderbook_df["unit_id"] == unit
 
-            if f"{unit}_up" in upward_redispatch.columns:
-                orderbook_df.loc[unit_orders, "accepted_volume"] += upward_redispatch[
-                    f"{unit}_up"
-                ].values
-
-            if f"{unit}_down" in downward_redispatch.columns:
-                orderbook_df.loc[unit_orders, "accepted_volume"] -= downward_redispatch[
-                    f"{unit}_down"
-                ].values
+            orderbook_df.loc[unit_orders, "accepted_volume"] += generators_t_p[
+                unit
+            ].values
 
             if self.market_clearing_mechanism == "pay_as_bid":
                 # set accepted price as the price bid price from the orderbook
@@ -391,23 +319,18 @@ class RedispatchMarketRole(MarketRole):
             dict: The meta data.
         """
 
-        total_upward_redispatch = (
-            self.network.generators_t.p.iloc[i].filter(regex="_up").sum()
-        )
-        total_downward_redispatch = (
-            self.network.generators_t.p.iloc[i].filter(regex="_down").sum()
-        )
+        total_redispatch = self.network.generators_t.p.iloc[i].sum()
+
         total_backup_dispatch = (
             self.network.generators_t.p.iloc[i].filter(regex="_backup").sum()
         )
 
-        total_redispatch_cost = orders["accepted_volume"].dot(orders["accepted_price"])
+        total_dispatch_cost = orders["accepted_volume"].dot(orders["accepted_price"])
 
         return {
-            "total_upward_redispatch": round(total_upward_redispatch, 3),
-            "total_downward_redispatch": round(total_downward_redispatch, 3),
+            "total_dispatch": round(total_redispatch, 3),
             "total_backup_dispatch": round(total_backup_dispatch, 3),
-            "total_redispatch_cost": round(total_redispatch_cost, 3),
+            "total_dispatch_cost": round(total_dispatch_cost, 3),
             "product_start": product[0],
             "product_end": product[1],
             "only_hours": product[2],

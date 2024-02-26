@@ -19,13 +19,13 @@ clearing_mechanisms: dict[str, MarketRole] = {
 try:
     from .complex_clearing import ComplexClearingRole
     from .complex_clearing_dmas import ComplexDmasClearingRole
-    from .nodal_pricing import NodalPyomoMarketRole
+    from .nodal_pricing import NodalMarketRole
     from .redispatch import RedispatchMarketRole
 
     clearing_mechanisms["pay_as_clear_complex"] = ComplexClearingRole
     clearing_mechanisms["pay_as_clear_complex_dmas"] = ComplexDmasClearingRole
     clearing_mechanisms["redispatch"] = RedispatchMarketRole
-    clearing_mechanisms["nodal_pricing"] = NodalPyomoMarketRole
+    clearing_mechanisms["nodal"] = NodalMarketRole
 
 except ImportError:
     pass
