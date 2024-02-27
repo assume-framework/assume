@@ -7,12 +7,14 @@ from assume.markets.base_market import MarketRole
 
 from .all_or_nothing import PayAsBidAonRole, PayAsClearAonRole
 from .simple import PayAsBidRole, PayAsClearRole
+from .contracts import PayAsBidContractRole
 
 clearing_mechanisms: dict[str, MarketRole] = {
     "pay_as_clear": PayAsClearRole,
     "pay_as_bid": PayAsBidRole,
     "pay_as_bid_aon": PayAsBidAonRole,
     "pay_as_clear_aon": PayAsClearAonRole,
+    "pay_as_bid_contract": PayAsBidContractRole,
 }
 
 # try importing pypsa if it is installed
