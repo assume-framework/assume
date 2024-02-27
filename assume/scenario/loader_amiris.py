@@ -9,6 +9,7 @@ from datetime import timedelta
 import dateutil.rrule as rr
 import pandas as pd
 import yaml
+from dateutil.relativedelta import relativedelta as rd
 from yamlinclude import YamlIncludeConstructor
 
 from assume.common.forecasts import NaiveForecast
@@ -176,6 +177,7 @@ def add_agent_to_world(
                     NaiveForecast(world.index, demand=100000),
                 )
         case "EnergyExchange" | "DayAheadMarketSingleZone":
+            clearing_section = agent["Attributes"].get("Clearing", agent["Attributes"])
             market_config = MarketConfig(
                 market_id=f"Market_{agent['Id']}",
                 opening_hours=rr.rrule(
@@ -183,7 +185,7 @@ def add_agent_to_world(
                 ),
                 opening_duration=timedelta(hours=1),
                 market_mechanism=translate_clearing[
-                    agent["Attributes"]["DistributionMethod"]
+                    clearing_section["DistributionMethod"]
                 ],
                 market_products=[
                     MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))
@@ -196,7 +198,9 @@ def add_agent_to_world(
             if supports:
                 support_config = MarketConfig(
                     name=f"SupportMarket_{agent['Id']}",
-                    opening_hours=rr.rrule(rr.YEARLY, dtstart=start, until=end),
+                    opening_hours=rr.rrule(
+                        rr.YEARLY, dtstart=world.start, until=world.end
+                    ),
                     opening_duration=timedelta(hours=1),
                     market_mechanism="pay_as_bid_contract",
                     market_products=[
@@ -392,12 +396,13 @@ def add_agent_to_world(
                 fuel_price=fuel_price,
                 co2_price=prices.get("co2", 0),
             )
-            strategies = {"energy": "naive"}
             support_instrument = attr.get("SupportInstrument")
             support_conf = supports.get(attr.get("Set"))
             bidding_params = {}
             if support_instrument and support_conf:
-                strategies["financial_support"] = "support"
+                for market in world.markets.keys():
+                    if "SupportMarket" in market:
+                        strategies[market] = "support"
                 if support_instrument == "FIT":
                     conf_key = "TsFit"
                 elif support_instrument in ["CFD", "MPVAR"]:
@@ -465,7 +470,7 @@ async def load_amiris_async(
     # AMIRIS caveat: start and end is always two minutes before actual start
     start += timedelta(minutes=2)
     sim_id = f"{scenario}_{study_case}"
-    save_interval = amiris_scenario["GeneralProperties"]["Output"]["Interval"] // 2
+    save_interval = amiris_scenario["GeneralProperties"]["Output"]["Interval"] // 4
     prices = {}
     index = pd.date_range(start=start, end=end, freq="1h", inclusive="left")
     world.bidding_strategies["support"] = SupportStrategy
@@ -537,7 +542,7 @@ if __name__ == "__main__":
         load_amiris_async(
             world,
             "amiris",
-            scenario,
+            scenario.lower(),
             base_path,
         )
     )
