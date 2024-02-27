@@ -1,3 +1,3 @@
-name,v_nom,carrier,x,y,shape
-north,380,AC,9.598,53.5585,POINT (9.598 53.5585)
-south,380,AC,13.607,51.0769,POINT (13.607 51.0769)
+name,v_nom,carrier,x,y
+north,380,AC,9.598,53.5585
+south,380,AC,13.607,51.0769

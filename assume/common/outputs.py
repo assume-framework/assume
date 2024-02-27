@@ -277,30 +277,40 @@ class WriteOutput(Role):
                 logger.exception("tried writing grid data to non postGIS database")
                 return
 
-        import geopandas as gpd
-        from shapely.wkt import loads
-
         for table, df in grid_data.items():
             geo_table = f"{table}_geo"
             if df.empty:
                 continue
-            df["geometry"] = df["shape"].apply(loads)
-            del df["shape"]
-            df = gpd.GeoDataFrame(df, geometry="geometry")
-            df.set_crs(crs="EPSG:4326", inplace=True)
             df["simulation"] = self.simulation_id
+            df.reset_index()
 
-            # df.reset_index()
             try:
-                with self.db.begin() as db:
-                    df.to_postgis(geo_table, db, if_exists="append")
-            except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
-                self.check_columns(geo_table, df)
-                # now try again
-                with self.db.begin() as db:
-                    df.to_postgis(geo_table, db, if_exists="append")
+                # try to use geopandas
+                import geopandas as gpd
+                from shapely.wkt import loads
 
-    def check_columns(self, table: str, df: pd.DataFrame):
+                def load_wkt(string: str):
+                    return loads(string.split(";")[1])
+
+                df["geometry"] = df["wkt_srid_4326"].apply(load_wkt)
+                df = gpd.GeoDataFrame(df, geometry="geometry")
+                df.set_crs(crs="EPSG:4326", inplace=True)
+                try:
+                    # try to input as geodataframe
+                    with self.db.begin() as db:
+                        df.to_postgis(geo_table, db, if_exists="append", index=True)
+                except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
+                    # if a column is missing, check and try again
+                    self.check_columns(geo_table, df)
+                    # now try again
+                    with self.db.begin() as db:
+                        df.to_postgis(geo_table, db, if_exists="append", index=True)
+            except Exception:
+                # otherwise, just use plain SQL anyway
+                with self.db.begin() as db:
+                    df.to_sql(geo_table, db, if_exists="append")
+
+    def check_columns(self, table: str, df: pd.DataFrame, index: bool = True):
         """
         Checks and adds columns to the database table if necessary.
 
@@ -312,6 +322,7 @@ class WriteOutput(Role):
             # Read table into Pandas DataFrame
             query = f"select * from {table} where 1=0"
             db_columns = pd.read_sql(query, db).columns
+
         for column in df.columns:
             if column not in db_columns:
                 try:
@@ -322,6 +333,12 @@ class WriteOutput(Role):
                         db.execute(text(query))
                 except Exception:
                     logger.exception("Error converting column")
+
+        if index and df.index.name:
+            column_type = "float" if is_numeric_dtype(df.index) else "text"
+            query = f"ALTER TABLE {table} ADD COLUMN {df.index.name} {column_type}"
+            with self.db.begin() as db:
+                db.execute(text(query))
 
     def check_for_tensors(self, data: pd.Series):
         """

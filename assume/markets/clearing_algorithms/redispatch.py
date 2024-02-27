@@ -11,7 +11,7 @@ import pypsa
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.markets.base_market import MarketRole
-from assume.markets.grid_utils import read_pypsa_grid
+from assume.markets.grid_utils import add_redispatch_generators, read_pypsa_grid
 
 log = logging.getLogger(__name__)
 
@@ -49,8 +49,11 @@ class RedispatchMarketRole(MarketRole):
         assert self.network_data
         # set backup marginal cost
         backup_marginal_cost = marketconfig.param_dict.get("backup_marginal_cost", 10e4)
-        read_pypsa_grid(
-            self.network, self.network_data, backup_marginal_cost=backup_marginal_cost
+        read_pypsa_grid(self.network, self.network_data)
+        add_redispatch_generators(
+            self.network,
+            self.network_data["generators"],
+            backup_marginal_cost,
         )
 
         self.solver = self.marketconfig.param_dict.get("solver", "glpk")
