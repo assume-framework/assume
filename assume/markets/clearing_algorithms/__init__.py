@@ -6,8 +6,8 @@ from assume.common.market_objects import Orderbook
 from assume.markets.base_market import MarketRole
 
 from .all_or_nothing import PayAsBidAonRole, PayAsClearAonRole
-from .simple import PayAsBidRole, PayAsClearRole
 from .contracts import PayAsBidContractRole
+from .simple import PayAsBidRole, PayAsClearRole
 
 clearing_mechanisms: dict[str, MarketRole] = {
     "pay_as_clear": PayAsClearRole,
