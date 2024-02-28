@@ -150,6 +150,8 @@ class NaiveDASteelplantStrategy(BaseStrategy):
         if unit.power_requirement is None:
             unit.determine_optimal_operation()
 
+        # unit.run_modified_optimization()
+
         bids = []
         for product in product_tuples:
             """

@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+import os
 
 import numpy as np
 import pandas as pd
@@ -529,3 +530,97 @@ class NaiveForecast(Forecaster):
         if isinstance(value, pd.Series):
             value.index = self.index
         return pd.Series(value, self.index)
+
+class OperationStatesForecaster(Forecaster):
+    def __init__(self, index: pd.Series, operation_states: dict[str, pd.DataFrame] = None):
+        super().__init__(index)
+        self.operation_states = operation_states if operation_states is not None else {}
+
+    def get_operational_state(self, unit: str) -> pd.DataFrame:
+        """
+        Returns the operational state for a given unit.
+
+        Args:
+            unit (str): The unit for which the operational state is requested.
+
+        Returns:
+            pd.DataFrame: The operational state data for the specified unit.
+
+        Example:
+            >>> forecaster = OperationStatesForecaster(index=pd.Series([1, 2, 3]))
+            >>> operational_state = forecaster.get_operational_state('unit_1')
+            >>> print(operational_state)
+        """
+        return self.operation_states.get(unit, pd.DataFrame(index=self.index))
+
+    def set_operation_states(self, unit: str, data: pd.DataFrame):
+        """
+        Sets the operational state data for a given unit.
+
+        Args:
+            unit (str): The unit for which the operational state data is provided.
+            data (pd.DataFrame): The operational state data.
+
+        Example:
+            >>> forecaster = OperationStatesForecaster(index=pd.Series([1, 2, 3]))
+            >>> forecaster.set_operation_states('unit_1', pd.DataFrame(...))
+        """
+        # Check if the unit already exists in the operation_states dictionary
+        if unit in self.operation_states:
+            # Append the new data to the existing DataFrame for the unit
+            self.operation_states[unit] = pd.concat([self.operation_states[unit], data], axis=1)
+        else:
+            # Set the operational state data for the unit
+            self.operation_states[unit] = data
+
+    def save_operation_states(self, path: str):
+        """
+        Saves the operation states data to a single CSV file located at the specified path.
+
+        Args:
+            path (str): The path to save the operation states data to.
+        """
+        # Concatenate all operation states dataframes along the columns axis
+        concatenated_data = pd.concat(self.operation_states.values(), axis=0)
+        concatenated_data.index = self.index
+        # Check if the CSV file already exists
+        csv_file = f"{path}/operation_states.csv"
+        if os.path.exists(csv_file):
+            # Load existing CSV file
+            existing_df = pd.read_csv(csv_file, index_col=0)
+            # Update existing DataFrame with new data
+            existing_df.update(concatenated_data)
+            # Update the DataFrame
+            concatenated_data = existing_df
+
+        # Save the concatenated data to a CSV file
+        concatenated_data.to_csv(csv_file)
+
+    def save_total_cost(self, total_cost: float, id, path: str):
+        """
+        Saves the total cost to a CSV file at the specified path.
+
+        Args:
+            total_cost (float): The total cost value to save.
+            path (str): The path to save the CSV file.
+        """
+        # Create a DataFrame with the total cost and steel plant ID as header
+        total_cost_df = pd.DataFrame({id: [total_cost]})
+        
+        # Check if the CSV file already exists
+        csv_file = f"{path}/total_cost.csv"
+        if os.path.exists(csv_file):
+            # Load existing CSV file
+            existing_df = pd.read_csv(csv_file, index_col=0)
+            # Check if the header already exists
+            if id in existing_df.columns:
+                # If header exists, overwrite the existing value
+                existing_df[id] = total_cost
+                # Update the DataFrame
+                total_cost_df = existing_df
+            else:
+                # If header does not exist, append a new column
+                total_cost_df = pd.concat([existing_df, total_cost_df], axis=1)
+        
+        # Save the DataFrame to a CSV file
+        total_cost_df.to_csv(csv_file)

@@ -12,6 +12,7 @@ from pyomo.opt import SolverFactory, SolverStatus, TerminationCondition
 
 import assume.common.flexibility as flex
 from assume.common.base import SupportsMinMax
+from assume.common.forecasts import OperationStatesForecaster
 from assume.units.dst_components import (
     DriPlant,
     DRIStorage,
@@ -44,6 +45,8 @@ class SteelPlant(SupportsMinMax):
         location: tuple[float, float] = (0.0, 0.0),
         components: Dict[str, Dict] = None,
         objective: str = None,
+        steel_demand: float = 2000,
+        tolerance_percentage: float = 2.0,
         **kwargs,
     ):
         super().__init__(
@@ -59,12 +62,13 @@ class SteelPlant(SupportsMinMax):
         self.natural_gas_price = self.forecaster["fuel_price_natural_gas"]
         self.electricity_price = self.forecaster["price_EOM"]
         self.iron_ore_price = self.forecaster["iron_ore_price"]
-        self.steel_demand = self.forecaster["steel_demand"]
+        self.steel_demand = steel_demand
         self.dri_price = self.forecaster["dri_price"]
+        self.holiday = self.forecaster["holiday"]
 
         self.location = location
         self.objective = objective
-
+        self.tolerance_percentage = tolerance_percentage
         self.components = {}
 
         self.model = pyo.ConcreteModel()
@@ -168,9 +172,11 @@ class SteelPlant(SupportsMinMax):
             initialize={t: value for t, value in enumerate(self.dri_price)},
         )
 
-        self.model.steel_demand = pyo.Param(
+        self.model.steel_demand = pyo.Param(initialize=self.steel_demand)
+
+        self.model.holiday = pyo.Param(
             self.model.time_steps,
-            initialize={t: value for t, value in enumerate(self.steel_demand)},
+            initialize={t: value for t, value in enumerate(self.holiday)},
         )
 
     def define_variables(self):
@@ -181,7 +187,7 @@ class SteelPlant(SupportsMinMax):
     def define_constraints(self):
         @self.model.Constraint(self.model.time_steps)
         def dri_output_association_constraint(m, t):
-            return self.components["eaf"].b.steel_output[t] >= self.steel_demand.iat[t]
+            return sum(self.components["eaf"].b.steel_output[t] for t in self.model.time_steps) >= self.model.steel_demand #self.steel_demand.iat[t]
 
         @self.model.Constraint(self.model.time_steps)
         def total_power_input_constraint(m, t):
@@ -190,7 +196,11 @@ class SteelPlant(SupportsMinMax):
                 == self.components["electrolyser"].b.power_in[t]
                 + self.components["eaf"].b.power_eaf[t]
             )
+    
+        if self.objective == "max_flexibility":
+            flex.modify_model_for_flexibility(self, id=self.id)
 
+            
     def define_objective(self):
         if self.objective == "maximize_marginal_profit":
 
@@ -213,7 +223,7 @@ class SteelPlant(SupportsMinMax):
 
                 return total_revenue - total_costs
 
-        elif self.objective == "minimize_marginal_cost":
+        elif self.objective == "min_total_cost":
 
             @self.model.Objective(sense=pyo.minimize)
             def obj_rule(m):
@@ -227,11 +237,22 @@ class SteelPlant(SupportsMinMax):
                     for t in m.time_steps
                 )
                 return total_costs
+        elif self.objective == "max_flexibility":
+            @self.model.Objective(sense=pyo.maximize)
+            def obj_rule(m):
+                flexibility_utilisation = sum(
+                    self.model.max_ramp_up_electrolyser[t] 
+                    +  self.model.max_ramp_down_electrolyser[t] 
+                    +  self.model.max_ramp_up_eaf[t] 
+                    +  self.model.max_ramp_down_eaf[t] for t in self.model.time_steps)
 
         else:
             raise ValueError(f"Unknown objective: {self.objective}")
 
-    def run_optimization(self):
+    def determine_optimal_operation(self):
+        """
+        Determines the optimal operation of the steel plant without considering flexibility.
+        """
         # Create a solver
         solver = SolverFactory("gurobi")
 
@@ -255,13 +276,8 @@ class SteelPlant(SupportsMinMax):
             logger.debug(
                 "Termination Condition: ", results.solver.termination_condition
             )
-
-    def determine_optimal_operation(self):
-        """
-        Determines the optimal operation of the steel plant without considering flexibility.
-        """
         # Determine the optimal operation of the steel plant
-        optimal_operation = self.run_optimization()
+        # optimal_operation = self.run_optimization()
 
         temp = self.model.total_power_input.get_values()
         self.power_requirement = pd.Series(index=self.index, data=0.0)
@@ -270,88 +286,112 @@ class SteelPlant(SupportsMinMax):
 
         # Calculate the total cost of the optimal operation
         total_cost = sum(
-            self.components["electrolyser"].b.start_cost[t]
-            + self.components["electrolyser"].b.electricity_cost[t]
-            + self.components["dri_plant"].b.dri_operating_cost[t]
-            + self.components["eaf"].b.eaf_operating_cost[t]
-            + self.iron_ore_price.iat[t] * self.components["dri_plant"].b.iron_ore_in[t]
-            for t in self.model.time_steps
-        )
+        value(self.components["electrolyser"].b.start_cost[t])
+                + value(self.components["electrolyser"].b.electricity_cost[t])
+                + value(self.components["dri_plant"].b.dri_operating_cost[t])
+                + value(self.components["eaf"].b.eaf_operating_cost[t])
+                + value(self.iron_ore_price.iat[t] * self.components["dri_plant"].b.iron_ore_in[t])
+                for t in self.model.time_steps
+            )
+
+         # Save the total cost using the OperationStatesForecaster method
+        operation_states_forecaster = OperationStatesForecaster(index=self.index)
+        operation_states_forecaster.save_total_cost(total_cost, self.id, path="C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04")
+
         # Calculate the operational state of the Electric Arc Furnace
         eaf_operational_state = self.components["eaf"].calculate_operational_state(
             self.model.time_steps
         )
+
+        # Calculate the operational state of the Electrolyser
+        electrolyser_operational_state = self.components["electrolyser"].calculate_operational_state(
+            self.model.time_steps
+        )
+
         # Extract actual values from the Pyomo expressions and variables
         for time_step, state in eaf_operational_state.items():
-            eaf_operational_state[time_step]["capacity_utilization"] = value(
-                state["capacity_utilization"]
+            
+            eaf_operational_state[time_step]["power"] = value(
+                state["power"]
             )
-            eaf_operational_state[time_step]["ramp_up_capacity"] = value(
-                state["ramp_up_capacity"]
+
+        for time_step, state in electrolyser_operational_state.items():
+            electrolyser_operational_state[time_step]["power"] = value(
+                state["power"]
             )
-            eaf_operational_state[time_step]["ramp_down_capacity"] = value(
-                state["ramp_down_capacity"]
-            )
-            eaf_operational_state[time_step]["is_operating"] = value(
-                state["is_operating"]
-            )
-            # eaf_operational_state[time_step]['is_min_operating_time_met'] = value(state['is_min_operating_time_met'])
-            # eaf_operational_state[time_step]['is_min_down_time_met'] = value(state['is_min_down_time_met'])
 
-        return optimal_operation, eaf_operational_state, total_cost
+        # Instantiate an OperationStatesForecaster object
+        operation_states_forecaster = OperationStatesForecaster(index=self.index)
 
-    def determine_flexibility(self, eaf_operational_state, tolerance):
-        """
-        Determines the optimal maximum negative and positive flexibility of the steel plant
-        considering a tolerance on the total cost.
-        """
-        # Extract operational state parameters from eaf_operational_state
-        ramp_up_capacity = max(
-            eaf_operational_state[t]["ramp_up_capacity"] for t in self.model.time_steps
-        )
-        ramp_down_capacity = max(
-            eaf_operational_state[t]["ramp_down_capacity"]
-            for t in self.model.time_steps
-        )
+        # Set the operational state data for each unit
+        for time_step, state_data in eaf_operational_state.items():
+            unit_id = self.components["eaf"].id  # Get the ID of the Electric Arc Furnace
+            prefixed_state_data = {f"{unit_id}_{key}": [value] for key, value in state_data.items()}
+            operation_states_forecaster.set_operation_states(time_step, pd.DataFrame(prefixed_state_data, index=[0]))
 
-        # Determine the maximum negative flexibility
-        max_negative_flexibility = (1 - tolerance) * sum(
-            self.components["electrolyser"].b.start_cost[t]
-            + self.components["electrolyser"].b.electricity_cost[t]
-            + self.components["dri_plant"].b.dri_operating_cost[t]
-            + self.components["eaf"].b.eaf_operating_cost[t]
-            + self.iron_ore_price.iat[t] * self.components["dri_plant"].b.iron_ore_in[t]
-            for t in self.model.time_steps
-        )
+        for time_step, state_data in electrolyser_operational_state.items():
+            unit_id = self.components["electrolyser"].id  # Get the ID of the Electrolyser
+            prefixed_state_data = {f"{unit_id}_{key}": [value] for key, value in state_data.items()}
+            operation_states_forecaster.set_operation_states(time_step, pd.DataFrame(prefixed_state_data, index=[0]))
 
-        # Determine the maximum positive flexibility
-        max_positive_flexibility = (1 + tolerance) * sum(
-            self.components["electrolyser"].b.start_cost[t]
-            + self.components["electrolyser"].b.electricity_cost[t]
-            + self.components["dri_plant"].b.dri_operating_cost[t]
-            + self.components["eaf"].b.eaf_operating_cost[t]
-            + self.iron_ore_price.iat[t] * self.components["dri_plant"].b.iron_ore_in[t]
-            for t in self.model.time_steps
-        )
+        # Save the operation states data to a CSV file
+        operation_states_forecaster.save_operation_states(path="C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04")
 
-        # Apply the flexibility constraints on ramp_up_capacity and ramp_down_capacity
-        adjusted_ramp_up_capacity = ramp_up_capacity + max_positive_flexibility
-        adjusted_ramp_down_capacity = ramp_down_capacity + max_negative_flexibility
+        results_dfs = []
 
-        # Run optimization again with adjusted flexibility parameters
-        optimal_operation = self.run_optimization()
+        # Iterate over each time step
+        for t in self.model.time_steps:
+            steel_out = self.components['eaf'].b.steel_output[t].value
+            power_in_eaf = self.components['eaf'].b.power_eaf[t].value
+            power_in_electrolyser = self.components['electrolyser'].b.power_in[t].value
+            hydrogen_out_electrolyser = self.components['electrolyser'].b.hydrogen_out[t].value
+            natural_gas_in = self.components['dri_plant'].b.natural_gas_in[t].value
 
-        # Capture the operational state during flexibility provision
-        adjusted_eaf_operational_state = self.components[
-            "eaf"
-        ].calculate_operational_state(self.model.time_steps)
+            dri_in_eaf = self.components['eaf'].b.dri_input[t].value
+            dri_charge = self.components['dri_storage'].b.charge_dri[t].value
+            dri_discharge = self.components['dri_storage'].b.discharge_dri[t].value
+            dri_SOC = self.components['dri_storage'].b.soc_dri[t].value
+            
+            H2_in_dri = self.components['dri_plant'].b.hydrogen_in[t].value
+            H2_charge = self.components['h2storage'].b.charge[t].value
+            H2_discharge = self.components['h2storage'].b.discharge[t].value
+            H2_SOC = self.components['h2storage'].b.soc[t].value
+            # shutdown_electrolyser = self.components['electrolyser'].b.shut_down[t].value
+            # in_operation_electrolyser = self.components['electrolyser'].b.in_operation[t].value
+            # start_up_electrolyser = self.components['electrolyser'].b.start_up[t].value
 
-        return (
-            adjusted_ramp_up_capacity,
-            adjusted_ramp_down_capacity,
-            adjusted_eaf_operational_state,
-            optimal_operation,
-        )
+            # Create a DataFrame for the current time step
+            df = pd.DataFrame({
+                'Time Step': [t],
+                'Steel': [steel_out],
+                'El. eaf': [power_in_eaf],
+                'El. elec.': [power_in_electrolyser],
+                'H2 Prod.': [hydrogen_out_electrolyser],
+                'NH2_in.': [natural_gas_in],
+                'DRI Charge': [dri_charge],
+                'DRI Discharge': [dri_discharge],
+                'DRI SOC': [dri_SOC],
+                'DRI In': [dri_in_eaf],
+
+                'H2 Charge': [H2_charge],
+                'H2 Discharge': [H2_discharge],
+                'H2 SOC': [H2_SOC],
+                'H2 In': [H2_in_dri],
+                # 'Shutdown': [shutdown_electrolyser],
+                # 'On': [in_operation_electrolyser],
+                # 'Start Up': [start_up_electrolyser]
+            })
+
+            # Append the DataFrame to the list
+            results_dfs.append(df)
+
+        # Concatenate all DataFrames in the list into a single DataFrame
+        results_df = pd.concat(results_dfs, ignore_index=True)
+
+        # Display the entire table
+        print(results_df)
+
+        self.total_cost = total_cost
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         """

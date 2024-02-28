@@ -304,6 +304,26 @@ class Electrolyser:
         @self.b.Constraint(time_steps)
         def start_up_cost(b, t):
             return b.start_cost[t] == b.start_up[t] * b.start_price
+        
+    def calculate_operational_state(self, time_steps):
+        # Calculate operational state at each time step
+        operational_state = {}
+
+        for t in time_steps:
+            # capacity_utilization = self.b.power_in[t] / self.b.rated_power
+            # ramp_up_capacity = self.b.rated_power - self.b.power_in[t]
+            # ramp_down_capacity = self.b.power_in[t] - self.b.min_power
+            power = self.b.power_in[t]
+
+            # Store expressions directly in the operational state dictionary
+            operational_state[t] = {
+                # "capacity_utilization": capacity_utilization,
+                # "ramp_up_capacity": ramp_up_capacity,
+                # "ramp_down_capacity": ramp_down_capacity,
+                "power" :  power
+            }
+
+        return operational_state
 
 
 class DriPlant:
@@ -381,12 +401,12 @@ class DriPlant:
     def define_constraints(self, time_steps):
         @self.b.Constraint(time_steps)
         def iron_ore_throughput_constraint(b, t):
-            return b.iron_ore_in[t] <= b.max_iron_ore_throughput
+            return b.iron_ore_in[t] <= b.max_iron_ore_throughput * self.model.holiday[t]
 
         @self.b.Constraint(time_steps)
         def hydrogen_input_constraint(b, t):
             if self.fuel_type == "hydrogen" or self.fuel_type == "both":
-                return b.hydrogen_in[t] <= b.max_hydrogen_input
+                return b.hydrogen_in[t] <= b.max_hydrogen_input * self.model.holiday[t]
             else:
                 return Constraint.Skip
 
@@ -556,16 +576,16 @@ class ElectricArcFurnace:
         # Power bounds constraints
         @self.b.Constraint(time_steps)
         def electricity_input_upper_bound(b, t):
-            return b.power_eaf[t] <= b.rated_power_eaf
+            return b.power_eaf[t] <= b.rated_power_eaf * self.model.holiday[t]
 
         @self.b.Constraint(time_steps)
         def electricity_input_lower_bound(b, t):
-            return b.power_eaf[t] >= b.min_power_eaf
+            return b.power_eaf[t] >= b.min_power_eaf * self.model.holiday[t]
 
         @self.b.Constraint(time_steps)
         def steel_output_dri_relation(b, t):
             # This constraint defines the steel output based on inputs and efficiency
-            return b.dri_input[t] == b.steel_output[t] * b.specific_dri_demand
+            return b.dri_input[t] == b.steel_output[t] * b.specific_dri_demand * self.model.holiday[t]
 
         @self.b.Constraint(time_steps)
         def steel_output_power_relation(b, t):
@@ -646,19 +666,17 @@ class ElectricArcFurnace:
         operational_state = {}
 
         for t in time_steps:
-            capacity_utilization = self.b.power_eaf[t] / self.b.rated_power_eaf
-            ramp_up_capacity = self.b.rated_power_eaf - self.b.power_eaf[t]
-            ramp_down_capacity = self.b.power_eaf[t] - self.b.min_power_eaf
-            is_operating = self.b.power_eaf[t] > 0
+            # capacity_utilization = self.b.power_eaf[t] / self.b.rated_power_eaf
+            # ramp_up_capacity = self.b.rated_power_eaf - self.b.power_eaf[t]
+            # ramp_down_capacity = self.b.power_eaf[t] - self.b.min_power_eaf
+            power = self.b.power_eaf[t]
 
             # Store expressions directly in the operational state dictionary
             operational_state[t] = {
-                "capacity_utilization": capacity_utilization,
-                "ramp_up_capacity": ramp_up_capacity,
-                "ramp_down_capacity": ramp_down_capacity,
-                "is_operating": is_operating,
-                # 'is_min_operating_time_met': False,  # Placeholder values for now
-                # 'is_min_down_time_met': False       # Placeholder values for now
+                # "capacity_utilization": capacity_utilization,
+                # "ramp_up_capacity": ramp_up_capacity,
+                # "ramp_down_capacity": ramp_down_capacity,
+                "power": power,
             }
 
         return operational_state
