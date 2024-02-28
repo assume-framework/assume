@@ -224,20 +224,9 @@ def make_market_config(
 def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame]:
     network_path = Path(network_path)
     buses = pd.read_csv(network_path / "buses.csv", index_col=0)
-    buses["wkt_srid_4326"] = buses.agg("SRID=4326;POINT ({0[x]} {0[y]})".format, axis=1)
-    translate_point_dict = buses["wkt_srid_4326"].to_dict()
-    translate_dict = buses.agg("{0[x]} {0[y]}".format, axis=1).to_dict()
-
-    def create_line(row):
-        return f"SRID=4326;LINESTRING ({translate_dict[row['bus0']]}, {translate_dict[row['bus1']]})"
-
     lines = pd.read_csv(network_path / "lines.csv", index_col=0)
-    # Apply the function to each row
-    lines["wkt_srid_4326"] = lines.apply(create_line, axis=1)
     generators = pd.read_csv(network_path / "powerplant_units.csv", index_col=0)
     loads = pd.read_csv(network_path / "demand_units.csv", index_col=0)
-    generators["wkt_srid_4326"] = generators["node"].apply(translate_point_dict.get)
-    loads["wkt_srid_4326"] = loads["node"].apply(translate_point_dict.get)
 
     return {
         "buses": buses,

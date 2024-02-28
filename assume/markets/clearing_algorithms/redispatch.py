@@ -45,14 +45,13 @@ class RedispatchMarketRole(MarketRole):
         self.network = pypsa.Network()
         # set snapshots as list from the value marketconfig.producs.count converted to list
         self.network.snapshots = range(marketconfig.market_products[0].count)
-        self.network_data = marketconfig.param_dict.get("grid_data")
-        assert self.network_data
+        assert self.grid_data
         # set backup marginal cost
         backup_marginal_cost = marketconfig.param_dict.get("backup_marginal_cost", 10e4)
-        read_pypsa_grid(self.network, self.network_data)
+        read_pypsa_grid(self.network, self.grid_data)
         add_redispatch_generators(
             self.network,
-            self.network_data["generators"],
+            self.grid_data["generators"],
             backup_marginal_cost,
         )
 
@@ -78,18 +77,6 @@ class RedispatchMarketRole(MarketRole):
 
     def setup(self):
         super().setup()
-
-        # send grid topology data once
-        self.context.schedule_instant_acl_message(
-            {
-                "context": "write_results",
-                "type": "grid_topology",
-                "data": self.network_data,
-                "market_id": self.marketconfig.market_id,
-            },
-            receiver_addr=self.context.data.get("output_agent_addr"),
-            receiver_id=self.context.data.get("output_agent_id"),
-        )
 
     def clear(
         self, orderbook: Orderbook, market_products

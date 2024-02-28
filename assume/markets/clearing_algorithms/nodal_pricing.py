@@ -52,12 +52,10 @@ class NodalPyomoMarketRole(MarketRole):
         network = {"Line_0": (0, 1, 100), "Line_1": (1, 2, 100), "Line_2": (2, 0, 100)}
         """
         super().__init__(marketconfig)
+        assert self.grid_data
 
-        self.network_data = marketconfig.param_dict.get("grid_data")
-        assert self.network_data
-
-        self.nodes = list(self.network_data["buses"].index)
-        self.network = lines_to_dict(self.network_data["lines"])
+        self.nodes = list(self.grid_data["buses"].index)
+        self.network = lines_to_dict(self.grid_data["lines"])
 
         self.incidence_matrix = pd.DataFrame(0, index=self.nodes, columns=self.network)
         for i, (node1, node2, capacity) in self.network.items():
@@ -66,18 +64,6 @@ class NodalPyomoMarketRole(MarketRole):
 
     def setup(self):
         super().setup()
-
-        # send grid topology data once
-        self.context.schedule_instant_acl_message(
-            {
-                "context": "write_results",
-                "type": "grid_topology",
-                "data": self.network_data,
-                "market_id": self.marketconfig.market_id,
-            },
-            receiver_addr=self.context.data.get("output_agent_addr"),
-            receiver_id=self.context.data.get("output_agent_id"),
-        )
 
     def clear(
         self, orderbook: Orderbook, market_products: list[MarketProduct]

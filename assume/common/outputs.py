@@ -260,7 +260,7 @@ class WriteOutput(Role):
 
     def store_grid(
         self,
-        grid_data: dict[str, pd.DataFrame],
+        grid: dict[str, pd.DataFrame],
         market_id: str,
     ):
         """
@@ -277,7 +277,28 @@ class WriteOutput(Role):
                 logger.exception("tried writing grid data to non postGIS database")
                 return
 
-        for table, df in grid_data.items():
+        grid["buses"]["wkt_srid_4326"] = grid["buses"].agg(
+            "SRID=4326;POINT ({0[x]} {0[y]})".format, axis=1
+        )
+        translate_point_dict = grid["buses"]["wkt_srid_4326"].to_dict()
+        translate_dict = grid["buses"].agg("{0[x]} {0[y]}".format, axis=1).to_dict()
+
+        def create_line(row):
+            return f"SRID=4326;LINESTRING ({translate_dict[row['bus0']]}, {translate_dict[row['bus1']]})"
+
+        # Apply the function to each row
+        grid["lines"]["wkt_srid_4326"] = grid["lines"].apply(create_line, axis=1)
+
+        grid_col = "node" if "node" in grid["generators"].columns else "bus"
+        grid["generators"]["wkt_srid_4326"] = grid["generators"][grid_col].apply(
+            translate_point_dict.get
+        )
+        grid_col = "node" if "node" in grid["loads"].columns else "bus"
+        grid["loads"]["wkt_srid_4326"] = grid["loads"][grid_col].apply(
+            translate_point_dict.get
+        )
+
+        for table, df in grid.items():
             geo_table = f"{table}_geo"
             if df.empty:
                 continue
@@ -305,7 +326,7 @@ class WriteOutput(Role):
                     # now try again
                     with self.db.begin() as db:
                         df.to_postgis(geo_table, db, if_exists="append", index=True)
-            except Exception:
+            except ImportError:
                 # otherwise, just use plain SQL anyway
                 with self.db.begin() as db:
                     df.to_sql(geo_table, db, if_exists="append")
@@ -324,7 +345,7 @@ class WriteOutput(Role):
             db_columns = pd.read_sql(query, db).columns
 
         for column in df.columns:
-            if column not in db_columns:
+            if column.lower() not in db_columns:
                 try:
                     # TODO this only works for float and text
                     column_type = "float" if is_numeric_dtype(df[column]) else "text"
@@ -335,6 +356,10 @@ class WriteOutput(Role):
                     logger.exception("Error converting column")
 
         if index and df.index.name:
+            print("added inex", df.index.name)
+            df.index.name = df.index.name.lower()
+            if df.index.name in db_columns:
+                return
             column_type = "float" if is_numeric_dtype(df.index) else "text"
             query = f"ALTER TABLE {table} ADD COLUMN {df.index.name} {column_type}"
             with self.db.begin() as db:
