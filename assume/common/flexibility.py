@@ -37,7 +37,7 @@ def modify_model_for_flexibility(self, id):
         initialize={t: operation_states_df.at[t, f'{component_id}_power'] for t in self.model.time_steps},
     )
 
-    self.model.prev_power_in_electrolyser = pyo.Param(
+    self.model.prev_power_in_eaf = pyo.Param(
         self.model.time_steps,
         initialize={t: operation_states_df.at[t, f'{component_id}_power'] for t in self.model.time_steps},
     )
