@@ -17,7 +17,7 @@ RUN touch assume/__init__.py
 RUN pip-compile --resolver=backtracking -o requirements.txt ./pyproject.toml
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY README.md pyproject.toml /src
+COPY README.md pyproject.toml cli.py /src
 COPY assume /src/assume
 COPY examples /src/examples
 ENV PATH /home/admin/.local/bin:$PATH
