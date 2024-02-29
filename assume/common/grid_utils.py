@@ -124,6 +124,7 @@ def read_pypsa_grid(
         network (pypsa.Network): the pypsa network to which the components will be added
         grid_dict (dict[str, pd.DataFrame]): the dictionary containing dataframes for generators, loads, buses and links
     """
+
     def add_buses(network: pypsa.Network, buses: pd.DataFrame) -> None:
         network.madd(
             "Bus",

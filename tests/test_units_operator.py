@@ -157,13 +157,13 @@ async def test_write_learning_params(units_operator: UnitsOperator):
 
     assert len(units_operator.context._scheduler._scheduled_tasks) == open_tasks + 2
 
-    units_operator.units["testplant"].bidding_strategies[
-        "EOM"
-    ].bidding_strategies = RLStrategy(
-        unit_id="testplant",
-        learning_mode=True,
-        observation_dimension=50,
-        action_dimension=2,
+    units_operator.units["testplant"].bidding_strategies["EOM"].bidding_strategies = (
+        RLStrategy(
+            unit_id="testplant",
+            learning_mode=True,
+            observation_dimension=50,
+            action_dimension=2,
+        )
     )
 
     units_operator.learning_data = {"test": 2}
