@@ -9,9 +9,9 @@ import numpy as np
 import pandas as pd
 import pypsa
 
+from assume.common.grid_utils import add_redispatch_generators, read_pypsa_grid
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.markets.base_market import MarketRole
-from assume.markets.grid_utils import add_redispatch_generators, read_pypsa_grid
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ class RedispatchMarketRole(MarketRole):
             backup_marginal_cost,
         )
 
-        self.solver = self.marketconfig.param_dict.get("solver", "glpk")
+        self.solver = marketconfig.param_dict.get("solver", "glpk")
         self.env = None
 
         if self.solver == "gurobi":

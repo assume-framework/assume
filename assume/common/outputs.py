@@ -316,6 +316,8 @@ class WriteOutput(Role):
                 df["geometry"] = df["wkt_srid_4326"].apply(load_wkt)
                 df = gpd.GeoDataFrame(df, geometry="geometry")
                 df.set_crs(crs="EPSG:4326", inplace=True)
+                # postgis does not lowercase tablenames
+                df.columns = map(str.lower, df.columns)
                 try:
                     # try to input as geodataframe
                     with self.db.begin() as db:
@@ -356,7 +358,6 @@ class WriteOutput(Role):
                     logger.exception("Error converting column")
 
         if index and df.index.name:
-            print("added inex", df.index.name)
             df.index.name = df.index.name.lower()
             if df.index.name in db_columns:
                 return
