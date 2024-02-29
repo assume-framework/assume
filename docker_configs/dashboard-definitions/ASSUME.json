@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": 2,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -283,7 +283,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  demand_volume AS \"Demand volume\",\n  supply_volume AS \"Supply volume\"\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, demand_volume, supply_volume\nORDER BY 1;\n",
+          "rawSql": "SELECT\n  product_start AS \"time\",\n  demand_volume AS \"Demand volume\",\n  supply_volume AS \"Supply volume\",\n  node_id\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, demand_volume, supply_volume, node_id\nORDER BY product_start, node_id;\n",
           "refId": "Volume",
           "select": [
             [
@@ -316,7 +316,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  price AS \"Price\"\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, price\nORDER BY 1;\n",
+          "rawSql": "SELECT\n  product_start AS \"time\",\n  price AS \"Price\",\n  node_id\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, price, node_id\nORDER BY product_start, node_id;\n",
           "refId": "Price",
           "select": [
             [
@@ -406,7 +406,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 32
+        "y": 80
       },
       "id": 19,
       "options": {
@@ -447,7 +447,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_price::float) AS \" \",\n  case\n    when bid_type isnull then concat(unit_id, '_SB')\n    when bid_type != '' then concat(unit_id, '_', bid_type)\n  end AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_id, bid_type\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_price::float) AS \"Prices\"\n\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_id\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -517,7 +517,7 @@
           ]
         }
       ],
-      "title": "Accepted Bid Prices",
+      "title": "Average Accepted Bid Prices",
       "type": "timeseries"
     },
     {
@@ -583,7 +583,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 32
+        "y": 80
       },
       "id": 20,
       "options": {
@@ -624,7 +624,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_volume) AS \" \",\n  case\n    when bid_type isnull then concat(unit_id, '_SB')\n    when bid_type != '' then concat(unit_id, '_', bid_type)\n  end AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_id, bid_type\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_volume) AS \"Volume\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_id\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -694,7 +694,7 @@
           ]
         }
       ],
-      "title": "Accepted Bid Volume",
+      "title": "Average Accepted Bid Volume",
       "type": "timeseries"
     },
     {
@@ -703,7 +703,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 41
+        "y": 89
       },
       "id": 74,
       "panels": [],
@@ -792,7 +792,7 @@
         "h": 12,
         "w": 10,
         "x": 0,
-        "y": 42
+        "y": 90
       },
       "id": 72,
       "options": {
@@ -926,7 +926,7 @@
         "h": 12,
         "w": 9,
         "x": 10,
-        "y": 42
+        "y": 90
       },
       "id": 76,
       "options": {
@@ -1011,7 +1011,7 @@
         "h": 12,
         "w": 5,
         "x": 19,
-        "y": 42
+        "y": 90
       },
       "id": 7,
       "options": {
@@ -1100,7 +1100,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 54
+        "y": 102
       },
       "id": 41,
       "panels": [],
@@ -1117,7 +1117,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 55
+        "y": 103
       },
       "id": 22,
       "options": {
@@ -1231,7 +1231,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 58
+        "y": 106
       },
       "id": 24,
       "options": {
@@ -1348,7 +1348,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 58
+        "y": 106
       },
       "id": 26,
       "options": {
@@ -1482,7 +1482,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 67
+        "y": 115
       },
       "id": 70,
       "options": {
@@ -1724,7 +1724,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 67
+        "y": 115
       },
       "id": 78,
       "options": {
@@ -1895,7 +1895,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 75
+        "y": 123
       },
       "id": 93,
       "options": {
@@ -2044,7 +2044,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 84
+        "y": 132
       },
       "id": 99,
       "options": {
@@ -2103,7 +2103,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 89
+        "y": 137
       },
       "id": 39,
       "panels": [],
@@ -2172,7 +2172,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 90
+        "y": 138
       },
       "id": 36,
       "options": {
@@ -2288,7 +2288,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 90
+        "y": 138
       },
       "id": 37,
       "options": {
@@ -2422,7 +2422,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 99
+        "y": 147
       },
       "id": 89,
       "options": {
@@ -2611,7 +2611,7 @@
         "h": 5,
         "w": 4,
         "x": 12,
-        "y": 99
+        "y": 147
       },
       "id": 95,
       "options": {
@@ -2758,7 +2758,7 @@
         "h": 5,
         "w": 8,
         "x": 16,
-        "y": 99
+        "y": 147
       },
       "id": 90,
       "options": {
@@ -2864,7 +2864,7 @@
         "h": 4,
         "w": 4,
         "x": 12,
-        "y": 104
+        "y": 152
       },
       "id": 96,
       "options": {
@@ -2952,7 +2952,7 @@
         "h": 4,
         "w": 8,
         "x": 16,
-        "y": 104
+        "y": 152
       },
       "id": 94,
       "options": {
@@ -3086,7 +3086,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 108
+        "y": 156
       },
       "id": 86,
       "options": {
@@ -3149,7 +3149,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 117
+        "y": 165
       },
       "id": 44,
       "panels": [],
@@ -3218,7 +3218,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 118
+        "y": 166
       },
       "id": 65,
       "options": {
@@ -3334,7 +3334,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 118
+        "y": 166
       },
       "id": 47,
       "options": {
@@ -3454,7 +3454,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 127
+        "y": 175
       },
       "id": 80,
       "options": {
@@ -3574,8 +3574,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3604,7 +3603,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 136
+        "y": 184
       },
       "id": 91,
       "options": {
@@ -3767,8 +3766,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3812,7 +3810,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 136
+        "y": 184
       },
       "id": 92,
       "options": {
@@ -3935,8 +3933,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3983,7 +3980,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 145
+        "y": 193
       },
       "id": 97,
       "options": {
@@ -4084,8 +4081,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4156,7 +4152,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 154
+        "y": 202
       },
       "id": 98,
       "options": {
@@ -4219,8 +4215,8 @@
       {
         "current": {
           "selected": false,
-          "text": "example_02c_dam",
-          "value": "example_02c_dam"
+          "text": "example_01a_base",
+          "value": "example_01a_base"
         },
         "datasource": {
           "type": "postgres",
@@ -4291,13 +4287,9 @@
       },
       {
         "current": {
-          "selected": true,
-          "text": [
-            "demand_EOM"
-          ],
-          "value": [
-            "demand_EOM"
-          ]
+          "selected": false,
+          "text": "demand_EOM",
+          "value": "demand_EOM"
         },
         "datasource": {
           "type": "postgres",
@@ -4348,7 +4340,7 @@
   },
   "time": {
     "from": "2018-12-31T23:00:00.000Z",
-    "to": "2019-01-15T22:59:59.000Z"
+    "to": "2019-01-31T22:59:59.000Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -4362,6 +4354,6 @@
   "timezone": "",
   "title": "ASSUME: Main overview",
   "uid": "mQ3Lvkr4k",
-  "version": 21,
+  "version": 5,
   "weekStart": ""
 }

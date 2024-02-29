@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+from datetime import timedelta
 from typing import List, Tuple
 
 import numpy as np
@@ -221,15 +222,15 @@ class NodalMarketRole(MarketRole):
         costs.reset_index(inplace=True, drop=True)
 
         # Update the network parameters
-
+        nodal_network = self.network.copy()
         # Update p_max_pu for generators with _up and _down suffixes
-        self.network.generators_t.p_max_pu.update(p_max_pu)
-        self.network.generators_t.p_min_pu.update(p_min_pu)
+        nodal_network.generators_t.p_max_pu.update(p_max_pu)
+        nodal_network.generators_t.p_min_pu.update(p_min_pu)
 
         # Add _up and _down suffix to costs and update the network
-        self.network.generators_t.marginal_cost.update(costs)
+        nodal_network.generators_t.marginal_cost.update(costs)
 
-        status, termination_condition = self.network.optimize(
+        status, termination_condition = nodal_network.optimize(
             solver_name=self.solver,
             env=self.env,
         )
@@ -239,7 +240,7 @@ class NodalMarketRole(MarketRole):
             raise Exception("Solver in redispatch market did not converge")
 
         # process dispatch data
-        self.process_dispatch_data(orderbook_df)
+        self.process_dispatch_data(network=nodal_network, orderbook_df=orderbook_df)
 
         # return orderbook_df back to orderbook format as list of dicts
         accepted_orders = orderbook_df.to_dict("records")
@@ -249,15 +250,14 @@ class NodalMarketRole(MarketRole):
         # calculate meta data such as total upwared and downward redispatch, total backup dispatch
         # and total redispatch cost
         for i, product in enumerate(market_products):
-            orders = orderbook_df[orderbook_df["start_time"] == product[0]]
-            meta.append(self.calculate_meta_data(orders=orders, product=product, i=i))
+            meta.extend(calculate_meta(network=nodal_network, product=product, i=i))
 
         # remove all orders to clean up the orderbook and avoid double clearing
         self.all_orders = []
 
         return accepted_orders, rejected_orders, meta
 
-    def process_dispatch_data(self, orderbook_df: pd.DataFrame):
+    def process_dispatch_data(self, network: pypsa.Network, orderbook_df: pd.DataFrame):
         """
         This function processes the dispatch data to calculate the redispatch volumes and prices
         and update the orderbook with the accepted volumes and prices.
@@ -267,7 +267,7 @@ class NodalMarketRole(MarketRole):
         """
 
         # Get all generators except for _backup generators
-        generators_t_p = self.network.generators_t.p.filter(regex="^(?!.*_backup)")
+        generators_t_p = network.generators_t.p.filter(regex="^(?!.*_backup)")
 
         # select demand units as those with negative volume in orderbook
         demand_units = orderbook_df[orderbook_df["volume"] < 0]["unit_id"].unique()
@@ -299,7 +299,7 @@ class NodalMarketRole(MarketRole):
 
             elif self.market_clearing_mechanism == "pay_as_clear":
                 # set accepted price as the nodal marginal price
-                nodal_marginal_prices = abs(self.network.buses_t.marginal_price)
+                nodal_marginal_prices = abs(network.buses_t.marginal_price)
                 unit_node = orderbook_df.loc[unit_orders, "node"].values[0]
 
                 orderbook_df.loc[unit_orders, "accepted_price"] = np.where(
@@ -308,32 +308,52 @@ class NodalMarketRole(MarketRole):
                     0,
                 )
 
-    def calculate_meta_data(self, orders, product: MarketProduct, i: int):
-        """
-        This function calculates the meta data such as total upward and downward redispatch,
-        total backup dispatch, and total redispatch cost.
 
-        Args:
-            product (MarketProduct): The product for which clearing happens.
-            i (int): The index of the product in the market products list.
+def calculate_meta(network, product: MarketProduct, i: int):
+    """
+    This function calculates the meta data such as total upward and downward redispatch,
+    total backup dispatch, and total redispatch cost.
 
-        Returns:
-            dict: The meta data.
-        """
+    Args:
+        product (MarketProduct): The product for which clearing happens.
+        i (int): The index of the product in the market products list.
 
-        total_redispatch = self.network.generators_t.p.iloc[i].sum()
+    Returns:
+        dict: The meta data.
+    """
+    meta = []
+    duration_hours = (product[1] - product[0]) / timedelta(hours=1)
+    # iterate over buses
+    for bus in network.buses.index:
+        # add backup dispatch to dispatch
+        # Step 1: Identify generators connected to the specified bus
+        generators_connected_to_bus = network.generators[
+            network.generators.bus == bus
+        ].index
 
-        total_backup_dispatch = (
-            self.network.generators_t.p.iloc[i].filter(regex="_backup").sum()
+        # Step 2: Select dispatch levels for these generators from network.generators_t.p
+        dispatch_for_bus = network.generators_t.p[generators_connected_to_bus].iloc[i]
+        # multiple by network.generators.sign to get the correct sign for dispatch
+        dispatch_for_bus = (
+            dispatch_for_bus * network.generators.sign[generators_connected_to_bus]
         )
 
-        total_dispatch_cost = orders["accepted_volume"].dot(orders["accepted_price"])
+        supply_volume = dispatch_for_bus[dispatch_for_bus > 0].sum()
+        demand_volume = dispatch_for_bus[dispatch_for_bus < 0].sum()
+        price = network.buses_t.marginal_price[bus].iat[i]
 
-        return {
-            "total_dispatch": round(total_redispatch, 3),
-            "total_backup_dispatch": round(total_backup_dispatch, 3),
-            "total_dispatch_cost": round(total_dispatch_cost, 3),
-            "product_start": product[0],
-            "product_end": product[1],
-            "only_hours": product[2],
-        }
+        meta.append(
+            {
+                "supply_volume": supply_volume,
+                "demand_volume": demand_volume,
+                "demand_volume_energy": demand_volume * duration_hours,
+                "supply_volume_energy": supply_volume * duration_hours,
+                "price": price,
+                "node_id": bus,
+                "product_start": product[0],
+                "product_end": product[1],
+                "only_hours": product[2],
+            }
+        )
+
+    return meta
