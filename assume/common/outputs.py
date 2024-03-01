@@ -274,7 +274,7 @@ class WriteOutput(Role):
             try:
                 db.execute(text("CREATE EXTENSION IF NOT EXISTS postgis;"))
             except Exception:
-                logger.exception("tried writing grid data to non postGIS database")
+                logger.info("tried writing grid data to non postGIS database")
                 return
 
         grid["buses"]["wkt_srid_4326"] = grid["buses"].agg(
