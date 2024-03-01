@@ -365,9 +365,9 @@ async def load_scenario_folder_async(
     learning_config["evaluation_mode"] = perform_evaluation
 
     if not learning_config.get("trained_policies_save_path"):
-        learning_config["trained_policies_save_path"] = (
-            f"{inputs_path}/learned_strategies/{sim_id}"
-        )
+        learning_config[
+            "trained_policies_save_path"
+        ] = f"{inputs_path}/learned_strategies/{sim_id}"
 
     config = replace_paths(config, path)
 

@@ -138,9 +138,9 @@ class World:
 
             self.bidding_strategies["learning"] = RLStrategy
             self.bidding_strategies["pp_learning"] = RLStrategy
-            self.bidding_strategies["learning_advanced_orders"] = (
-                RLAdvancedOrderStrategy
-            )
+            self.bidding_strategies[
+                "learning_advanced_orders"
+            ] = RLAdvancedOrderStrategy
 
         except ImportError as e:
             self.logger.info(

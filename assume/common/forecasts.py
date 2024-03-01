@@ -201,14 +201,14 @@ class CsvForecaster(Forecaster):
                 continue
 
             if f"price_{market_id}" not in self.forecasts.columns:
-                self.forecasts[f"price_{market_id}"] = (
-                    self.calculate_market_price_forecast(market_id=market_id)
-                )
+                self.forecasts[
+                    f"price_{market_id}"
+                ] = self.calculate_market_price_forecast(market_id=market_id)
 
             if f"residual_load_{market_id}" not in self.forecasts.columns:
-                self.forecasts[f"residual_load_{market_id}"] = (
-                    self.calculate_residual_load_forecast(market_id=market_id)
-                )
+                self.forecasts[
+                    f"residual_load_{market_id}"
+                ] = self.calculate_residual_load_forecast(market_id=market_id)
 
     def get_registered_market_participants(self, market_id):
         """
