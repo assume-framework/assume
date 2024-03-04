@@ -30,6 +30,7 @@ except ImportError:
 # try importing pypsa if it is installed
 try:
     from .redispatch import RedispatchMarketRole
+
     clearing_mechanisms["redispatch"] = RedispatchMarketRole
 except ImportError:
     pass
