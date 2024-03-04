@@ -40,6 +40,7 @@ class PayAsBidContractRole(MarketRole):
         limitation (str): a string for limitations - either being "only_co2emissionless" or "only_renewables"
 
     """
+
     required_fields = [
         "sender_id",
         "contract",
