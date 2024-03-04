@@ -27,6 +27,19 @@ log = logging.getLogger(__name__)
 
 
 class PayAsBidContractRole(MarketRole):
+    """
+    This market role handles contracts between agents.
+    Contracts can be long term agreements which are valid for a longer period of time.
+    Each contract has an evaluation frequency in which the actual cashflow of the contract is executed.
+    This can include a calculation depending on the market result and dispatched energy.
+    It can be limited which agent can agree to a offered contract at this market by using an `eligible_lambda` in the contract properties.
+    The available contracts can be configured through the `available_contracts` dictionary.
+
+    Args:
+        marketconfig (MarketConfig): The market configuration.
+        limitation (str): a string for limitations - either being "only_co2emissionless" or "only_renewables"
+
+    """
     required_fields = [
         "sender_id",
         "contract",
@@ -38,11 +51,9 @@ class PayAsBidContractRole(MarketRole):
         self,
         marketconfig: MarketConfig,
         limitation: str = "only_co2emissionless",
-        market_indices: dict[str, str] = {},
     ):
         super().__init__(marketconfig)
         self.limitation = limitation
-        self.market_indices = market_indices
         self.futures = {}
 
     def setup(self):
@@ -92,6 +103,8 @@ class PayAsBidContractRole(MarketRole):
                 ]
             elif self.limitation == "only_renewables":
                 requirement = lambda x: x in ["demand", "wind", "solar", "biomass"]
+            else:
+                log.error(f"unknown limitation {self.limitation}")
             return all(
                 [requirement(info["technology"]) for info in content["information"]]
             )
@@ -162,8 +175,6 @@ class PayAsBidContractRole(MarketRole):
                     if supply_order["price"] <= demand_order[
                         "price"
                     ] and self.check_working(supply_order, demand_order):
-                        # TODO this might match a different demand, if different policies are available
-                        # so we should not reject only if check_working is false but check compatibility beforehand?
                         supply_order["accepted_volume"] = supply_order["volume"]
                         to_commit.append(supply_order)
                         gen_vol += supply_order["volume"]
