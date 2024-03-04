@@ -314,7 +314,7 @@ def calculate_meta(network, product: MarketProduct, i: int):
                 "demand_volume_energy": demand_volume * duration_hours,
                 "supply_volume_energy": supply_volume * duration_hours,
                 "price": price,
-                "node_id": bus,
+                "node": bus,
                 "product_start": product[0],
                 "product_end": product[1],
                 "only_hours": product[2],

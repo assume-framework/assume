@@ -472,7 +472,7 @@ class World:
         if mm_class := self.clearing_mechanisms.get(market_config.market_mechanism):
             market_role = mm_class(market_config)
         else:
-            raise Exception(f"invalid {market_config.market_mechanism=}")
+            raise Exception(f"invalid {market_config.market_mechanism=} - full version installed?")
 
         market_operator = self.market_operators.get(market_operator_id)
 

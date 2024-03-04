@@ -284,7 +284,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  demand_volume AS \"Demand volume\",\n  supply_volume AS \"Supply volume\",\n  node_id\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, demand_volume, supply_volume, node_id\nORDER BY product_start, node_id;\n",
+          "rawSql": "SELECT\n  product_start AS \"time\",\n  demand_volume AS \"Demand volume\",\n  supply_volume AS \"Supply volume\",\n  node\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, demand_volume, supply_volume, node\nORDER BY product_start, node;\n",
           "refId": "Volume",
           "select": [
             [
@@ -317,7 +317,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  price AS \"Price\",\n  node_id\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, price, node_id\nORDER BY product_start, node_id;\n",
+          "rawSql": "SELECT\n  product_start AS \"time\",\n  price AS \"Price\",\n  node\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, price, node\nORDER BY product_start, node;\n",
           "refId": "Price",
           "select": [
             [
