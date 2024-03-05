@@ -512,7 +512,7 @@ def extract_results(
                 "price": clear_price,
                 "max_price": clear_price,
                 "min_price": clear_price,
-                "node_id": None,
+                "node": None,
                 "product_start": product[0],
                 "product_end": product[1],
                 "only_hours": product[2],

@@ -17,7 +17,7 @@ from .utils import create_orderbook, extend_orderbook
 simple_dayahead_auction_config = MarketConfig(
     market_id="simple_dayahead_auction",
     market_products=[MarketProduct(rd(hours=+1), 1, rd(hours=1))],
-    additional_fields=["node_id"],
+    additional_fields=["node"],
     opening_hours=rr.rrule(
         rr.HOURLY,
         dtstart=datetime(2005, 6, 1),
@@ -64,7 +64,7 @@ def test_market():
 async def test_simple_market_mechanism():
     for name, role in clearing_mechanisms.items():
         skip = False
-        for skip_name in ["complex", "redispatch", "contract"]:
+        for skip_name in ["complex", "nodal_pricing", "redispatch", "contract"]:
             if skip_name in name:
                 skip = True
         if skip:

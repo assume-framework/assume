@@ -14,6 +14,12 @@ def test_cli():
 
 
 @pytest.mark.slow
+def test_cli_network():
+    args = "-s example_01d -c base -db sqlite:///./examples/local_db/test_mini.db"
+    cli(args.split(" "))
+
+
+@pytest.mark.slow
 @pytest.mark.require_learning
 def test_cli_learning():
     args = "-s example_02a -c tiny -db sqlite:///./examples/local_db/test_mini_rl.db"
