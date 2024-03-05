@@ -2,16 +2,19 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import calendar
 import logging
 from datetime import timedelta
 
 import dateutil.rrule as rr
 import pandas as pd
 import yaml
+from dateutil.relativedelta import relativedelta as rd
 from yamlinclude import YamlIncludeConstructor
 
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
+from assume.strategies.extended import SupportStrategy
 from assume.world import World
 
 logger = logging.getLogger(__name__)
@@ -48,7 +51,20 @@ def read_csv(base_path, filename):
     )["load"]
 
 
-def get_send_receive_msgs_per_id(agent_id, contracts_config: list):
+def get_send_receive_msgs_per_id(agent_id: int, contracts_config: list[dict]):
+    """
+    AMIRIS contract conversion function which finds the list of ids which receive or send a message from/to the agent with agent_id.
+
+    Args:
+        agent_id (int): the agent id to which the contracts are found
+        contracts_config (list[dict]): whole contracts dict read from yaml
+
+    Returns:
+        tuple: A tuple containing the following:
+            - list: A list containing the ids of sending agents.
+            - list: A list containing the ids of receiving agents
+    """
+
     sends = []
     receives = []
     for contracts in contracts_config:
@@ -118,11 +134,50 @@ def add_agent_to_world(
     contracts: list,
     base_path: str,
     markups: dict = {},
+    supports: dict = {},
 ):
+    """
+    Adds an agent from a amiris agent definition to the ASSUME world.
+    It should be called in load_amiris_async, which loads agents in the correct order.
+
+    Args:
+        agent (dict): AMIRIS agent dict
+        world (World): ASSUME world to add the agent to
+        prices (dict): prices read from amiris scenario beforehand
+        contracts (list): contracts read from the amiris scenario beforehand
+        base_path (str): base path to load profile csv files from
+        markups (dict, optional): markups read from former agents. Defaults to {}.
+    """
     strategies = {m: "naive_eom" for m in list(world.markets.keys())}
     storage_strategies = {m: "flexable_eom_storage" for m in list(world.markets.keys())}
     match agent["Type"]:
+        case "SupportPolicy":
+            support_data = agent["Attributes"]["SetSupportData"]
+            supports |= {x.pop("Set"): x for x in support_data}
+            world.add_unit_operator(agent["Id"])
+
+            for name, support in supports.items():
+                contract = list(support.keys())[0]
+                value = list(support[contract].values())[0]
+                # TODO
+                world.add_unit(
+                    f"{name}_{agent['Id']}",
+                    "demand",
+                    agent["Id"],
+                    {
+                        "min_power": 0,
+                        "max_power": 100000,
+                        "bidding_strategies": {
+                            "energy": "support",
+                            "financial_support": "support",
+                        },
+                        "technology": "demand",
+                        "price": value,
+                    },
+                    NaiveForecast(world.index, demand=100000),
+                )
         case "EnergyExchange" | "DayAheadMarketSingleZone":
+            clearing_section = agent["Attributes"].get("Clearing", agent["Attributes"])
             market_config = MarketConfig(
                 market_id=f"Market_{agent['Id']}",
                 opening_hours=rr.rrule(
@@ -130,7 +185,7 @@ def add_agent_to_world(
                 ),
                 opening_duration=timedelta(hours=1),
                 market_mechanism=translate_clearing[
-                    agent["Attributes"]["DistributionMethod"]
+                    clearing_section["DistributionMethod"]
                 ],
                 market_products=[
                     MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))
@@ -139,6 +194,30 @@ def add_agent_to_world(
             )
             world.add_market_operator(f"Market_{agent['Id']}")
             world.add_market(f"Market_{agent['Id']}", market_config)
+
+            if supports:
+                support_config = MarketConfig(
+                    name=f"SupportMarket_{agent['Id']}",
+                    opening_hours=rr.rrule(
+                        rr.YEARLY, dtstart=world.start, until=world.end
+                    ),
+                    opening_duration=timedelta(hours=1),
+                    market_mechanism="pay_as_bid_contract",
+                    market_products=[
+                        MarketProduct(rd(months=12), 1, timedelta(hours=1))
+                    ],
+                    additional_fields=[
+                        "sender_id",
+                        "contract",  # one of MPVAR, MPFIX, CFD
+                        "eligible_lambda",
+                        "evaluation_frequency",  # monthly
+                    ],
+                    product_type="financial_support",
+                    supports_get_unmatched=True,
+                    maximum_bid_volume=1e6,
+                )
+                world.add_market_operator(f"SupportMarket_{agent['Id']}")
+                world.add_market(f"SupportMarket_{agent['Id']}", support_config)
         case "CarbonMarket":
             co2_price = agent["Attributes"]["Co2Prices"]
             if isinstance(co2_price, str):
@@ -181,7 +260,10 @@ def add_agent_to_world(
             world.add_unit_operator(operator_id)
             device = agent["Attributes"]["Device"]
             strategy = agent["Attributes"]["Strategy"]
-            if strategy["StrategistType"] != "SINGLE_AGENT_MIN_SYSTEM_COST":
+            if strategy["StrategistType"] not in [
+                "SINGLE_AGENT_MIN_SYSTEM_COST",
+                "SINGLE_AGENT_MAX_PROFIT",
+            ]:
                 logger.warning(f"unknown strategy for storage trader: {strategy}")
 
             forecast_price = prices.get("co2", 20)
@@ -221,6 +303,7 @@ def add_agent_to_world(
         case "NoSupportTrader":
             # does not get support - just trades renewables
             # has a ShareOfRevenues (how much of the profit he keeps)
+            # can also have a ForecastError
             world.add_unit_operator(f"Operator_{agent['Id']}")
         case "SystemOperatorTrader":
             world.add_unit_operator(f"Operator_{agent['Id']}")
@@ -233,12 +316,16 @@ def add_agent_to_world(
             max_markup = agent["Attributes"]["maxMarkup"]
             markups[agent["Id"]] = (min_markup, max_markup)
         case "PredefinedPlantBuilder":
-            # this is the actual powerplant
+            # this is the actual powerplant/PlantBuilder
             prototype = agent["Attributes"]["Prototype"]
             attr = agent["Attributes"]
+            # first get send and receives for our PlantBuilder
             send, receive = get_send_receive_msgs_per_id(agent["Id"], contracts)
+            # the first multi send includes message from us to our operator/portfolio
             raw_operator_id = get_matching_send_one_or_multi(agent["Id"], send[0])
+            # we need to find send and receive for the raw operator too
             send_t, receive_t = get_send_receive_msgs_per_id(raw_operator_id, contracts)
+            # the third entry here is the multi send to the actual trader
             raw_trader_id = get_matching_send_one_or_multi(raw_operator_id, send_t[2])
             operator_id = f"Operator_{raw_operator_id}"
             fuel_price = prices.get(translate_fuel_type[prototype["FuelType"]], 0)
@@ -253,6 +340,7 @@ def add_agent_to_world(
             )
             # TODO UnplannedAvailabilityFactor is not respected
 
+            # we get the markups from the trader id:
             min_markup, max_markup = markups.get(raw_trader_id, (0, 0))
             # Amiris interpolates blocks linearly
             interpolated_values = interpolate_blocksizes(
@@ -308,7 +396,25 @@ def add_agent_to_world(
                 fuel_price=fuel_price,
                 co2_price=prices.get("co2", 0),
             )
-            # TODO attr["SupportInstrument"] and
+            support_instrument = attr.get("SupportInstrument")
+            support_conf = supports.get(attr.get("Set"))
+            bidding_params = {}
+            if support_instrument and support_conf:
+                for market in world.markets.keys():
+                    if "SupportMarket" in market:
+                        strategies[market] = "support"
+                if support_instrument == "FIT":
+                    conf_key = "TsFit"
+                elif support_instrument in ["CFD", "MPVAR"]:
+                    conf_key = "Lcoe"
+                else:
+                    conf_key = "Premium"
+                value = support_conf[support_instrument][conf_key]
+                bidding_params["contract_types"] = support_instrument
+                bidding_params["support_value"] = value
+                # ASSUME evaluates contracts on a monthly schedule
+                bidding_params["evaluation_frequency"] = rr.MONTHLY
+
             world.add_unit(
                 f"VariableRenewableOperator_{agent['Id']}",
                 "power_plant",
@@ -321,6 +427,7 @@ def add_agent_to_world(
                     "fuel_type": translate_fuel_type[attr["EnergyCarrier"]],
                     "emission_factor": 0,
                     "efficiency": 1,
+                    "bidding_params": bidding_params,
                 },
                 forecast,
             )
@@ -342,25 +449,31 @@ async def load_amiris_async(
     study_case: str,
     base_path: str,
 ):
+    """
+    Loads an Amiris scenario
+
+    Args:
+        world (World): the ASSUME world
+        scenario (str): the scenario name
+        study_case (str): study case to define
+        base_path (str): base path from where to load the amrisi scenario
+    """
     amiris_scenario = read_amiris_yaml(base_path)
     # DeliveryIntervalInSteps = 3600
     # In practice - this seems to be a fixed number in AMIRIS
-    if study_case.lower() == "simple":
-        print("is simple - adjusting start time")
-        amiris_scenario["GeneralProperties"]["Simulation"][
-            "StartTime"
-        ] = "2020-12-31_23:58:00"
-
     start = amiris_scenario["GeneralProperties"]["Simulation"]["StartTime"]
     start = pd.to_datetime(start, format="%Y-%m-%d_%H:%M:%S")
+    if calendar.isleap(start.year):
+        start += timedelta(days=1)
     end = amiris_scenario["GeneralProperties"]["Simulation"]["StopTime"]
     end = pd.to_datetime(end, format="%Y-%m-%d_%H:%M:%S")
     # AMIRIS caveat: start and end is always two minutes before actual start
     start += timedelta(minutes=2)
     sim_id = f"{scenario}_{study_case}"
-    save_interval = amiris_scenario["GeneralProperties"]["Output"]["Interval"] // 2
+    save_interval = amiris_scenario["GeneralProperties"]["Output"]["Interval"] // 4
     prices = {}
     index = pd.date_range(start=start, end=end, freq="1h", inclusive="left")
+    world.bidding_strategies["support"] = SupportStrategy
     await world.setup(
         start=start,
         end=end,
@@ -370,11 +483,13 @@ async def load_amiris_async(
     )
     # helper dict to map trader markups/markdowns to powerplants
     markups = {}
+    supports = {}
     keyorder = [
         "EnergyExchange",
         "DayAheadMarketSingleZone",
         "CarbonMarket",
         "FuelsMarket",
+        "SupportPolicy",
         "DemandTrader",
         "StorageTrader",
         "RenewableTrader",
@@ -386,7 +501,6 @@ async def load_amiris_async(
         "VariableRenewableOperator",
         "Biogas",
         "MeritOrderForecaster",
-        "SupportPolicy",
     ]
     agents_sorted = sorted(
         amiris_scenario["Agents"], key=lambda agent: keyorder.index((agent["Type"]))
@@ -399,6 +513,7 @@ async def load_amiris_async(
             amiris_scenario["Contracts"],
             base_path,
             markups,
+            supports,
         )
     # calculate market price before simulation
     world
@@ -408,7 +523,7 @@ if __name__ == "__main__":
     # To use this with amiris run:
     # git clone https://gitlab.com/dlr-ve/esy/amiris/examples.git amiris-examples
     # next to the assume folder
-    scenario = "Simple"  # Germany2019 or Austria2019 or Simple
+    scenario = "Germany2019"  # Germany2019 or Austria2019 or Simple
     base_path = f"../amiris-examples/{scenario}/"
     amiris_scenario = read_amiris_yaml(base_path)
     sends, receives = get_send_receive_msgs_per_id(
@@ -427,7 +542,7 @@ if __name__ == "__main__":
         load_amiris_async(
             world,
             "amiris",
-            scenario,
+            scenario.lower(),
             base_path,
         )
     )

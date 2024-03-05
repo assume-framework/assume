@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import copy
 from datetime import datetime, timedelta
 
 from dateutil import rrule as rr
@@ -60,11 +61,13 @@ def test_market():
     print(meta)
 
 
-def test_simple_market_mechanism():
-    import copy
-
+async def test_simple_market_mechanism():
     for name, role in clearing_mechanisms.items():
-        if "complex" in name or "redispatch" in name:
+        skip = False
+        for skip_name in ["complex", "redispatch", "contract"]:
+            if skip_name in name:
+                skip = True
+        if skip:
             continue
 
         print(name)
