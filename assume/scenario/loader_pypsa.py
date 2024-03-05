@@ -85,7 +85,7 @@ async def load_pypsa_async(
             {
                 "min_power": generator.p_nom_min,
                 "max_power": max_power,
-                "bidding_strategies": bidding_strategies["gas"],
+                "bidding_strategies": bidding_strategies[generator.name],
                 "technology": "demand",
                 "node": generator.bus,
                 "efficiency": generator.efficiency,
@@ -118,7 +118,7 @@ async def load_pypsa_async(
             {
                 "min_power": 0,
                 "max_power": load_t.max(),
-                "bidding_strategies": bidding_strategies["demand"],
+                "bidding_strategies": bidding_strategies[load.name],
                 "technology": "demand",
                 "node": load.bus,
                 "price": 1e3,
@@ -149,7 +149,7 @@ async def load_pypsa_async(
                 "efficiency_discharge": storage.efficiency_dispatch,
                 "initial_soc": storage.state_of_charge_initial,
                 "max_volume": storage.p_nom,
-                "bidding_strategies": bidding_strategies["storage"],
+                "bidding_strategies": bidding_strategies[storage.name],
                 "technology": "hydro",
                 "emission_factor": 0,
                 "node": storage.bus,
@@ -191,24 +191,16 @@ if __name__ == "__main__":
             maximum_bid_price=1e9,
         )
     ]
-    default_strategy = {
+    default_strategies = {
         mc.market_id: (
             "naive_redispatch" if mc.market_mechanism == "redispatch" else "naive_eom"
         )
         for mc in marketdesign
     }
+    from collections import defaultdict
 
-    bidding_strategies = {
-        "hard coal": default_strategy,
-        "lignite": default_strategy,
-        "oil": default_strategy,
-        "gas": default_strategy,
-        "biomass": default_strategy,
-        "nuclear": default_strategy,
-        "wind": default_strategy,
-        "solar": default_strategy,
-        "demand": default_strategy,
-    }
+    bidding_strategies = defaultdict(lambda: default_strategies)
+
     world.loop.run_until_complete(
         load_pypsa_async(
             world, scenario, study_case, network, marketdesign, bidding_strategies
