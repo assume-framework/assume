@@ -2,9 +2,8 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import shutil
-from datetime import datetime, timedelta
-from pathlib import Path
+import logging
+from datetime import timedelta
 
 import pandas as pd
 import pypsa
@@ -14,6 +13,8 @@ from assume import World
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 
+log = logging.getLogger(__name__)
+
 
 async def load_pypsa_async(
     world: World,
@@ -21,15 +22,19 @@ async def load_pypsa_async(
     study_case: str,
     network: pypsa.Network,
     marketdesign: list[MarketConfig],
+    bidding_strategies: dict[str, str],
+    save_frequency_hours: int = 4,
 ):
     """
     This initializes a scenario from the given pypsa grid.
+    One can load a grid from pypsa `import_from_csv_folder`, adjust its properties and add it to this function to create an energy market scenario from it.
+    This is also compatible with netCDF, PyPower, PandaPower and HDF5 pypsa-compatible datasets.
 
     Args:
         world (World): the world to add this scenario to
         scenario (str): scenario name
         study_case (str): study case name
-        network (str): database uri to connect to the OEDS
+        network (pypsa.Network): pypsa Network from which the simulation properties and timeseries data is extracted
         marketdesign (list[MarketConfig]): description of the market design which will be used with the scenario
     """
     index = network.snapshots
@@ -37,12 +42,12 @@ async def load_pypsa_async(
     start = index[0]
     end = index[-1]
     sim_id = f"{scenario}_{study_case}"
-    print(f"loading scenario {sim_id}")
+    log.info(f"loading scenario {sim_id}")
 
     await world.setup(
         start=start,
         end=end,
-        save_frequency_hours=4,
+        save_frequency_hours=save_frequency_hours,
         simulation_id=sim_id,
         index=index,
     )
@@ -59,21 +64,6 @@ async def load_pypsa_async(
     for market_config in marketdesign:
         market_config.param_dict["grid_data"] = grid_data
         world.add_market(mo_id, market_config)
-
-    # naive_eom
-    default_strategy = {mc.market_id: "naive_redispatch" for mc in marketdesign}
-
-    bidding_strategies = {
-        "hard coal": default_strategy,
-        "lignite": default_strategy,
-        "oil": default_strategy,
-        "gas": default_strategy,
-        "biomass": default_strategy,
-        "nuclear": default_strategy,
-        "wind": default_strategy,
-        "solar": default_strategy,
-        "demand": default_strategy,
-    }
 
     world.add_unit_operator("powerplant_operator")
     for _, generator in network.generators.iterrows():
@@ -149,7 +139,7 @@ async def load_pypsa_async(
         max_power_discharge = storage.p_nom * storage.p_max_pu
 
         world.add_unit(
-            f"StorageTrader_{agent['Id']}",
+            f"StorageTrader_{storage.name}",
             unit_type,
             "storage_operator",
             {
@@ -168,40 +158,13 @@ async def load_pypsa_async(
         )
 
 
-def load_pypsa(
-    world: World,
-    scenario: str,
-    study_case: str,
-    network: pypsa.Network,
-    marketdesign: list[MarketConfig],
-):
-    """
-    Load a scenario from a given path.
-
-    Args:
-        world (World): the world to add the oeds scenario to
-        scenario (str): the scenario name of the simulation
-        study_case (str): the study case name of the simulation
-        network (str): the pypsa network to create the config from
-        marketdesign (list[MarketConfig]): the list of marketconfigs, which form the market design
-    """
-    world.loop.run_until_complete(
-        load_pypsa_async(
-            world=world,
-            scenario=scenario,
-            study_case=study_case,
-            network=network,
-            marketdesign=marketdesign,
-        )
-    )
-
-
 if __name__ == "__main__":
     db_uri = "postgresql://assume:assume@localhost:5432/assume"
     world = World(database_uri=db_uri)
     scenario = "world_pypsa"
     study_case = "scigrid_de"
-    market_mechanism = "redispatch"  # "pay_as_clear"
+    # "pay_as_clear" or "redispatch"
+    market_mechanism = "redispatch"
 
     match study_case:
         case "ac_dc_meshed":
@@ -228,5 +191,27 @@ if __name__ == "__main__":
             maximum_bid_price=1e9,
         )
     ]
-    load_pypsa(world, scenario, study_case, network, marketdesign)
+    default_strategy = {
+        mc.market_id: (
+            "naive_redispatch" if mc.market_mechanism == "redispatch" else "naive_eom"
+        )
+        for mc in marketdesign
+    }
+
+    bidding_strategies = {
+        "hard coal": default_strategy,
+        "lignite": default_strategy,
+        "oil": default_strategy,
+        "gas": default_strategy,
+        "biomass": default_strategy,
+        "nuclear": default_strategy,
+        "wind": default_strategy,
+        "solar": default_strategy,
+        "demand": default_strategy,
+    }
+    world.loop.run_until_complete(
+        load_pypsa_async(
+            world, scenario, study_case, network, marketdesign, bidding_strategies
+        )
+    )
     world.run()

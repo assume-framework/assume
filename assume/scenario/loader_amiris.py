@@ -450,7 +450,9 @@ async def load_amiris_async(
     base_path: str,
 ):
     """
-    Loads an Amiris scenario
+    Loads an Amiris scenario.
+    Markups and markdowns are handled by linearly interpolating the agents volume.
+    This mimicks the behavior of the way it is done in AMIRIS.
 
     Args:
         world (World): the ASSUME world
