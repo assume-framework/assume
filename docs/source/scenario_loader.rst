@@ -115,4 +115,43 @@ An example configuration of how this can be used is shown here:
     # Run the scenario
     world.run()
 
-If there are different
+This creates operators each per NUTS areas and creates a single EOM market, just as the [DMAS simulation](https://github.com/NOWUM/dmas) from FH Aachen.
+
+.. _pypsa:
+
+PyPSA
+---
+
+The [PyPSA](https://github.com/PyPSA/pypsa) loader can be used to load a scenario from a configured PyPSA network.
+
+The components for `generators`, `loads`, `buses`, `lines`, `storage_operators` and so on have to be configured.
+Operation values have to be given through the `generators_t` and `loads_t` param of the pypsa network.
+
+An example can be seen from the pypsa scigrid case:
+
+.. code-block:: python
+    from assume.scenario.loader_pypsa import load_pypsa
+    from assume import World
+    import pypsa
+
+    db_uri = "postgresql://assume:assume@localhost:5432/assume"
+    world = World(database_uri=db_uri)
+    network = pypsa.examples.scigrid_de(from_master=True)
+    start = network.snapshots[0]
+    end = network.snapshots[-1]
+    marketdesign = [
+        MarketConfig(
+            "EOM",
+            rr.rrule(rr.HOURLY, interval=1, dtstart=start, until=end),
+            timedelta(hours=1),
+            "redispatch",
+            [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+            additional_fields=["node"],
+            maximum_bid_volume=1e9,
+            maximum_bid_price=1e9,
+        )
+    ]
+    load_pypsa(world, "world_pypsa", "scigrid_de", network, marketdesign)
+    world.run()
+
+You can also create and use your own existing scenarios in pypsa format to convert these into a market simulation too.
