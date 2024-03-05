@@ -307,6 +307,8 @@ class WriteOutput(Role):
 
             try:
                 # try to use geopandas
+                # needed for postGIS writing
+                import geoalchemy2
                 import geopandas as gpd
                 from shapely.wkt import loads
 
