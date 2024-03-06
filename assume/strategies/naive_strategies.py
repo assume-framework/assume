@@ -148,7 +148,10 @@ class NaiveDASteelplantStrategy(BaseStrategy):
         electricity_price = unit.forecaster["price_EOM"]
 
         if unit.power_requirement is None:
-            unit.determine_optimal_operation()
+            if unit.objective == "max_flexibility":
+                unit.determine_optimal_operation_with_flex()
+            else:
+                unit.determine_optimal_operation_without_flex()
 
         # unit.run_modified_optimization()
 

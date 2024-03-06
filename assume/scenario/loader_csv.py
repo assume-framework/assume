@@ -123,7 +123,7 @@ def load_dsm_units(path: str, config: dict, file_name: str) -> pd.DataFrame:
         file_name=file_name,
     )
     # convert dsm_units into a components dict where each technology has values with non nan values
-    columns = ["unit_operator", "objective"]
+    columns = ["unit_operator", "objective", "demand", "cost_tolerance"]
     dsm_units_dict = {}
     for name, data in dsm_units.groupby(dsm_units.index):
         dsm_unit = {}
@@ -421,6 +421,14 @@ async def load_scenario_folder_async(
         path=path,
         config=config,
         file_name="forecasts_df",
+        index=index,
+    )
+    forecaster.set_forecast(forecasts_df)
+
+    forecasts_df = load_file(
+        path=path,
+        config=config,
+        file_name="operation_states_df",
         index=index,
     )
     forecaster.set_forecast(forecasts_df)

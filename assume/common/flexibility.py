@@ -1,113 +1,92 @@
 import pyomo.environ as pyo
 import pandas as pd
 
-def modify_model_for_flexibility(self, id):
+def flexibility_cost_tolerance(self):
     """
     Modify the optimization model to include constraints for flexibility within cost tolerance.
     """     
-    # Load values from operation_states.csv and total_cost.csv
-    operation_states_df = pd.read_csv("C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04\\operation_states.csv", index_col=0)
-    total_cost_df = pd.read_csv("C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04\\total_cost.csv")
 
-    # Get the ID for the plant
-    component_id = self.components[id].id
+    self.prev_power = self.forecaster[f"{self.id}_power"]
+    self.prev_variable_cost = self.forecaster[f"{self.id}_variable_cost"]
 
-    # Variables
-
-    self.model.max_ramp_up_electrolyser = pyo.Var(
-            self.model.time_steps, within=pyo.NonNegativeReals
-        )
-    
-    self.model.max_ramp_down_electrolyser = pyo.Var(
-            self.model.time_steps, within=pyo.NonNegativeReals
-        )
-    
-    self.model.max_ramp_up_eaf = pyo.Var(
-            self.model.time_steps, within=pyo.NonNegativeReals
-        )
-    
-    self.model.max_ramp_down_eaf = pyo.Var(
-            self.model.time_steps, within=pyo.NonNegativeReals
-        )
-    
     # Parameters
+    self.model.prev_variable_cost = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.prev_variable_cost)}
+        )
+        
+    self.model.cost_tolerance = pyo.Param(
+            initialize=(self.cost_tolerance)
+        )
 
-    self.model.prev_power_in_electrolyser = pyo.Param(
-        self.model.time_steps,
-        initialize={t: operation_states_df.at[t, f'{component_id}_power'] for t in self.model.time_steps},
-    )
+    self.model.prev_power = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.prev_power)}
+        )
+    
+    # Variables
+    self.model.positive_flex = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
+    self.model.negetive_flex = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
 
-    self.model.prev_power_in_eaf = pyo.Param(
-        self.model.time_steps,
-        initialize={t: operation_states_df.at[t, f'{component_id}_power'] for t in self.model.time_steps},
-    )
-
-    # Set the total cost
-    self.model.total_cost = pyo.Param(
-        initialize=total_cost_df.at[0, component_id]
-    )   
+    self.model.ramp_up_power = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
+    self.model.ramp_down_power = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
+    
+    self.model.upper_cost_limit = pyo.Var(within=pyo.NonNegativeReals)  
+    self.model.flex_switch = pyo.Var(self.model.time_steps, within=pyo.Boolean) 
 
     # Calculate the upper limit of the total cost that the steel plant can bear with flexibility
-    upper_cost_limit = self.model.total_cost + (self.model.tolerance_percentage / 100) * self.model.total_cost
 
-    # Add constraints to limit the total cost within the upper cost limit
-    self.model.total_cost_upper_limit = pyo.Constraint(expr=sum(
-        self.components["electrolyser"].b.start_cost[t]
-        + self.components["electrolyser"].b.electricity_cost[t]
-        + self.components["dri_plant"].b.dri_operating_cost[t]
-        + self.components["eaf"].b.eaf_operating_cost[t]
-        + self.iron_ore_price.iat[t] * self.components["dri_plant"].b.iron_ore_in[t]
-        for t in self.model.time_steps) <= upper_cost_limit)
+    @self.model.Constraint()
+    def determine_upper_cost_limit(m):
+        return self.model.upper_cost_limit == sum(self.model.prev_variable_cost[t] 
+                                                    for t in self.model.time_steps) + (self.model.cost_tolerance / 100) * sum(self.model.prev_variable_cost[t]                                                                                                                        for t in self.model.time_steps)
 
-    # Add constraints for electrolyser ramp-up and ramp-down flexibility
-    self.model.electrolyser_ramp_up_constraint = pyo.Constraint(
-        self.model.time_steps,
-        rule=lambda m, t: self.components["electrolyser"].b.power_in[t]
-                        <= self.model.prev_power_in_electrolyser[t] + (self.components["electrolyser"].b.rated_power - self.model.prev_power_in_electrolyser[t])
-    )
-    self.model.electrolyser_ramp_down_constraint = pyo.Constraint(
-        self.model.time_steps,
-        rule=lambda m, t: self.components["electrolyser"].b.power_in[t]
-                        >= self.model.prev_power_in_electrolyser[t] - (self.model.prev_power_in_electrolyser[t] - self.components["electrolyser"].b.min_power)
-    )
-
-    # Add constraints for EAF ramp-up and ramp-down flexibility
     @self.model.Constraint(self.model.time_steps)
-    def max_ramp_up_electrolyser_constraint(m, t):
-            return (
-                m.max_ramp_up_electrolyser[t]
-                == self.components["eaf"].b.rated_power_eaf - self.model.prev_power_in_eaf[t]
-            )
+    def total_cost_upper_limit(m, t):
+        return sum(self.model.variable_cost[t] for t in self.model.time_steps) <= self.model.upper_cost_limit
+
+    # Ramp up power electrolyser
+
     @self.model.Constraint(self.model.time_steps)
-    def max_ramp_down_electrolyser_constraint(m, t):
-            return (
-            m.max_ramp_up_electrolyser[t]
-                == self.components["electrolyser"].b.power_in[t] - self.components["electrolyser"].b.min_power
-            )
+    def ramp_up_flex_min_bound(m, t):
+        return m.ramp_up_power[t] >= m.prev_power[t]
+    
+    # Negetive flexibility
+
+    @self.model.Constraint(self.model.time_steps)
+    def negetive_flex_electrolyser_constraint(m, t):
+        return m.negetive_flex[t] == m.ramp_up_power[t] * (1 - m.flex_switch[t]) - m.prev_power[t] 
+    
+    # Ramp down power
+    
+    @self.model.Constraint(self.model.time_steps)
+    def ramp_down_flex_max_bound(m, t):
+        return m.ramp_down_power[t] <= m.prev_power[t]
+
+    @self.model.Constraint(self.model.time_steps)
+    def positive_flex_constraint(m, t):
+        return m.positive_flex[t] == (m.prev_power[t] - m.ramp_down_power[t]) * m.flex_switch[t]
+    
+    @self.model.Constraint(self.model.time_steps)
+    def total_power_flex_relation_constrint(m, t):
+        return m.total_power_input[t] == m.ramp_up_power[t] + m.ramp_down_power[t]
+
+# Load data from CSV file
+df = pd.read_csv('C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04\\accepted_offers.csv')
+
+prefixes = set(col.split('_')[0] for col in df.columns if '_' in col)
+
+# Iterate over each prefix
+for prefix in prefixes:
+    # Identify columns with the current prefix for 'power' and 'accepted'
+    power_col = f'{prefix}_power'
+    accepted_col = f'{prefix}_accepted'
+    
+    # Perform subtraction only if both 'power' and 'accepted' columns exist
+    if power_col in df.columns and accepted_col in df.columns:
+        df[f'{prefix}_recalculated_power'] = df[power_col] + df[accepted_col]
+
+# Save the DataFrame to a new CSV file, overwriting if columns with the same name already exist
+df.to_csv('C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04\\accepted_offers.csv', index=False)
 
     
-        # max_ramp_down_electrolyser = {
-        #     t: self.components["electrolyser"].b.power_in[t] - self.components["electrolyser"].b.min_power
-        #     for t in self.model.time_steps
-        # }
-        # max_ramp_up_eaf = {
-        #     t: self.components["eaf"].b.rated_power_eaf - self.components["eaf"].b.power_eaf[t]
-        #     for t in self.model.time_steps
-        # }
-        # max_ramp_down_eaf = {
-        #     t: self.components["eaf"].b.power_eaf[t] - self.components["eaf"].b.min_power_eaf
-        #     for t in self.model.time_steps
-        # }
-    self.model.eaf_ramp_up_constraint = pyo.Constraint(
-        self.model.time_steps,
-        rule=lambda m, t: self.components["eaf"].b.power_eaf[t]
-                        <=  self.model.prev_power_in_eaf[t] + (self.components["eaf"].b.rated_power_eaf - self.model.prev_power_in_eaf[t])
-    )
-    self.model.eaf_ramp_down_constraint = pyo.Constraint(
-        self.model.time_steps,
-        rule=lambda m, t: self.components["eaf"].b.power_eaf[t]
-                        >=  self.model.prev_power_in_eaf[t] - (self.model.prev_power_in_eaf[t] - self.components["eaf"].b.min_power_eaf)
-    )
-
-
-        

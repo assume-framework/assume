@@ -337,6 +337,7 @@ class DriPlant:
         efficiency,
         specific_hydrogen_consumption,
         specific_natural_gas_consumption,
+        specific_electricity_consumption,
         fuel_type,
         ramp_up,
         ramp_down,
@@ -355,6 +356,7 @@ class DriPlant:
         self.efficiency = efficiency
         self.specific_hydrogen_consumption = specific_hydrogen_consumption
         self.specific_natural_gas_consumption = specific_natural_gas_consumption
+        self.specific_electricity_consumption = specific_electricity_consumption
         # Flexibility parameters
         self.ramp_up = ramp_up
         self.ramp_down = ramp_down
@@ -378,6 +380,9 @@ class DriPlant:
         self.b.specific_natural_gas_consumption = Param(
             initialize=self.specific_natural_gas_consumption
         )
+        self.b.specific_electricity_consumption_dri = Param(
+            initialize=self.specific_electricity_consumption
+        )
         # Flexibility parameters
         self.b.ramp_up_dri = Param(initialize=self.ramp_up)
         self.b.ramp_down_dri = Param(initialize=self.ramp_down)
@@ -391,6 +396,7 @@ class DriPlant:
         self.b.hydrogen_in = Var(time_steps, within=NonNegativeReals)
         self.b.operational_status = Var(time_steps, within=Binary)
         self.b.dri_output = Var(time_steps, within=NonNegativeReals)
+        self.b.electricity_demand_drp = Var(time_steps, within=NonNegativeReals)
 
     def function_of_hydrogen(self, hydrogen_in):
         # Assuming a simple linear relationship
@@ -401,12 +407,12 @@ class DriPlant:
     def define_constraints(self, time_steps):
         @self.b.Constraint(time_steps)
         def iron_ore_throughput_constraint(b, t):
-            return b.iron_ore_in[t] <= b.max_iron_ore_throughput * self.model.holiday[t]
+            return b.iron_ore_in[t] <= b.max_iron_ore_throughput
 
         @self.b.Constraint(time_steps)
         def hydrogen_input_constraint(b, t):
             if self.fuel_type == "hydrogen" or self.fuel_type == "both":
-                return b.hydrogen_in[t] <= b.max_hydrogen_input * self.model.holiday[t]
+                return b.hydrogen_in[t] <= b.max_hydrogen_input
             else:
                 return Constraint.Skip
 
@@ -420,6 +426,13 @@ class DriPlant:
         @self.b.Constraint(time_steps)
         def iron_ore_constraint(b, t):
             return b.iron_ore_in[t] == b.dri_output[t] / b.efficiency_dri
+        
+        @self.b.Constraint(time_steps)
+        def dri_output_electricity_constraint(b, t):
+            return (
+                b.electricity_demand_drp[t]
+                == b.dri_output[t] * b.specific_electricity_consumption_dri
+            )
 
         @self.b.Constraint(time_steps)
         def dri_output_constraint(b, t):
@@ -523,7 +536,7 @@ class ElectricArcFurnace:
         rated_power,
         min_power,
         max_dri_input,
-        specific_electricity_demand,
+        specific_electricity_consumption,
         specific_dri_demand,
         ramp_up,
         ramp_down,
@@ -538,7 +551,7 @@ class ElectricArcFurnace:
         self.min_power = min_power
         self.max_dri_input = max_dri_input
         # Additional operational characteristics
-        self.specific_electricity_demand = specific_electricity_demand
+        self.specific_electricity_consumption = specific_electricity_consumption
         self.specific_dri_demand = specific_dri_demand
         # Flexibility parameters
         self.ramp_up = ramp_up
@@ -556,8 +569,8 @@ class ElectricArcFurnace:
         self.b.rated_power_eaf = Param(initialize=self.rated_power)
         self.b.min_power_eaf = Param(initialize=self.min_power)
         self.b.max_dri_input = Param(initialize=self.max_dri_input)
-        self.b.specific_electricity_demand = Param(
-            initialize=self.specific_electricity_demand
+        self.b.specific_electricity_consumption_eaf = Param(
+            initialize=self.specific_electricity_consumption
         )
         self.b.specific_dri_demand = Param(initialize=self.specific_dri_demand)
         # Flexibility parameters
@@ -576,21 +589,21 @@ class ElectricArcFurnace:
         # Power bounds constraints
         @self.b.Constraint(time_steps)
         def electricity_input_upper_bound(b, t):
-            return b.power_eaf[t] <= b.rated_power_eaf * self.model.holiday[t]
+            return b.power_eaf[t] <= b.rated_power_eaf 
 
         @self.b.Constraint(time_steps)
         def electricity_input_lower_bound(b, t):
-            return b.power_eaf[t] >= b.min_power_eaf * self.model.holiday[t]
+            return b.power_eaf[t] >= b.min_power_eaf
 
         @self.b.Constraint(time_steps)
         def steel_output_dri_relation(b, t):
             # This constraint defines the steel output based on inputs and efficiency
-            return b.dri_input[t] == b.steel_output[t] * b.specific_dri_demand * self.model.holiday[t]
+            return b.dri_input[t] == b.steel_output[t] * b.specific_dri_demand
 
         @self.b.Constraint(time_steps)
         def steel_output_power_relation(b, t):
             # This constraint defines the steel output based on inputs and efficiency
-            return b.power_eaf[t] == b.steel_output[t] * b.specific_electricity_demand
+            return b.power_eaf[t] == b.steel_output[t] * b.specific_electricity_consumption_eaf
 
         # Flexibility constraints
         @self.b.Constraint(time_steps)

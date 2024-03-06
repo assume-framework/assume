@@ -381,7 +381,7 @@ class CsvForecaster(Forecaster):
         """
 
         try:
-            self.forecasts.to_csv(f"{path}/forecasts_df.csv", index=True)
+            self.forecasts.to_csv(f"{path}/forecasts_df.csv", index=True) # operation_states_df.csv
         except ValueError:
             self.logger.error(
                 f"No forecasts for {self.market_id} provided, so none saved."
@@ -596,31 +596,25 @@ class OperationStatesForecaster(Forecaster):
         # Save the concatenated data to a CSV file
         concatenated_data.to_csv(csv_file)
 
-    def save_total_cost(self, total_cost: float, id, path: str):
+    def save_operation_states_with_flex(self, path: str):
         """
-        Saves the total cost to a CSV file at the specified path.
+        Saves the operation states data to a single CSV file located at the specified path.
 
         Args:
-            total_cost (float): The total cost value to save.
-            path (str): The path to save the CSV file.
+            path (str): The path to save the operation states data to.
         """
-        # Create a DataFrame with the total cost and steel plant ID as header
-        total_cost_df = pd.DataFrame({id: [total_cost]})
-        
+        # Concatenate all operation states dataframes along the columns axis
+        concatenated_data = pd.concat(self.operation_states.values(), axis=0)
+        concatenated_data.index = self.index
         # Check if the CSV file already exists
-        csv_file = f"{path}/total_cost.csv"
+        csv_file = f"{path}/operation_states_with_flex.csv"
         if os.path.exists(csv_file):
             # Load existing CSV file
             existing_df = pd.read_csv(csv_file, index_col=0)
-            # Check if the header already exists
-            if id in existing_df.columns:
-                # If header exists, overwrite the existing value
-                existing_df[id] = total_cost
-                # Update the DataFrame
-                total_cost_df = existing_df
-            else:
-                # If header does not exist, append a new column
-                total_cost_df = pd.concat([existing_df, total_cost_df], axis=1)
-        
-        # Save the DataFrame to a CSV file
-        total_cost_df.to_csv(csv_file)
+            # Update existing DataFrame with new data
+            existing_df.update(concatenated_data)
+            # Update the DataFrame
+            concatenated_data = existing_df
+
+        # Save the concatenated data to a CSV file
+        concatenated_data.to_csv(csv_file)
