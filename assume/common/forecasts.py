@@ -573,7 +573,7 @@ class OperationStatesForecaster(Forecaster):
             # Set the operational state data for the unit
             self.operation_states[unit] = data
 
-    def save_operation_states(self, path: str):
+    def save_operation_states(self, unit,  path: str):
         """
         Saves the operation states data to a single CSV file located at the specified path.
 
@@ -584,7 +584,7 @@ class OperationStatesForecaster(Forecaster):
         concatenated_data = pd.concat(self.operation_states.values(), axis=0)
         concatenated_data.index = self.index
         # Check if the CSV file already exists
-        csv_file = f"{path}/operation_states.csv"
+        csv_file = f"{path}/{unit}_operation_states.csv"
         if os.path.exists(csv_file):
             # Load existing CSV file
             existing_df = pd.read_csv(csv_file, index_col=0)

@@ -153,7 +153,6 @@ class AirConditioner:
         # Define the objective function specific to HeatPump if needed
         pass
 
-
 class Electrolyser:
     def __init__(
         self,
@@ -208,6 +207,8 @@ class Electrolyser:
 
         self.b.electricity_cost = Var(time_steps, within=pyo.NonNegativeReals)
         self.b.start_cost = Var(time_steps, within=pyo.NonNegativeReals)
+        if self.objective == "max_flexibility":
+            self.b.reserve_electrolyser = Var(time_steps, within=pyo.NonNegativeReals)
 
     def define_constraints(self, time_steps):
         # Power bounds constraints
@@ -325,19 +326,17 @@ class Electrolyser:
 
         return operational_state
 
-
 class DriPlant:
     def __init__(
         self,
         model,
         id,
-        max_iron_ore_throughput,
-        max_natural_gas_input,
-        max_hydrogen_input,
-        efficiency,
         specific_hydrogen_consumption,
         specific_natural_gas_consumption,
         specific_electricity_consumption,
+        specific_iron_ore_consumption,
+        rated_power,
+        min_power,
         fuel_type,
         ramp_up,
         ramp_down,
@@ -348,15 +347,12 @@ class DriPlant:
         self.model = model
         self.id = id
         self.fuel_type = fuel_type
-        # Operational parameters
-        self.max_iron_ore_throughput = max_iron_ore_throughput
-        self.max_natural_gas_input = max_natural_gas_input
-        self.max_hydrogen_input = max_hydrogen_input
-        # Additional operational characteristics
-        self.efficiency = efficiency
+        self.min_power = min_power
+        self.rated_power = rated_power
         self.specific_hydrogen_consumption = specific_hydrogen_consumption
         self.specific_natural_gas_consumption = specific_natural_gas_consumption
         self.specific_electricity_consumption = specific_electricity_consumption
+        self.specific_iron_ore_consumption = specific_iron_ore_consumption
         # Flexibility parameters
         self.ramp_up = ramp_up
         self.ramp_down = ramp_down
@@ -370,10 +366,6 @@ class DriPlant:
         self.define_constraints(time_steps)
 
     def define_parameters(self):
-        self.b.max_iron_ore_throughput = Param(initialize=self.max_iron_ore_throughput)
-        self.b.max_natural_gas_input = Param(initialize=self.max_natural_gas_input)
-        self.b.max_hydrogen_input = Param(initialize=self.max_hydrogen_input)
-        self.b.efficiency_dri = Param(initialize=self.efficiency)
         self.b.specific_hydrogen_consumption = Param(
             initialize=self.specific_hydrogen_consumption
         )
@@ -383,7 +375,12 @@ class DriPlant:
         self.b.specific_electricity_consumption_dri = Param(
             initialize=self.specific_electricity_consumption
         )
+        self.b.specific_iron_ore_consumption = Param(
+            initialize=self.specific_iron_ore_consumption
+        )
         # Flexibility parameters
+        self.b.min_power_dri = Param(initialize=self.min_power)
+        self.b.rated_power_dri = Param(initialize=self.rated_power)
         self.b.ramp_up_dri = Param(initialize=self.ramp_up)
         self.b.ramp_down_dri = Param(initialize=self.ramp_down)
         self.b.min_operating_time_dri = Param(initialize=self.min_operating_time)
@@ -396,62 +393,45 @@ class DriPlant:
         self.b.hydrogen_in = Var(time_steps, within=NonNegativeReals)
         self.b.operational_status = Var(time_steps, within=Binary)
         self.b.dri_output = Var(time_steps, within=NonNegativeReals)
-        self.b.electricity_demand_drp = Var(time_steps, within=NonNegativeReals)
-
-    def function_of_hydrogen(self, hydrogen_in):
-        # Assuming a simple linear relationship
-        # Replace with more accurate representation as needed
-        efficiency_factor = self.dri_production_efficiency  # example efficiency factor
-        return hydrogen_in * efficiency_factor
+        self.b.power_dri = Var(time_steps, within=NonNegativeReals)
 
     def define_constraints(self, time_steps):
-        @self.b.Constraint(time_steps)
-        def iron_ore_throughput_constraint(b, t):
-            return b.iron_ore_in[t] <= b.max_iron_ore_throughput
-
-        @self.b.Constraint(time_steps)
-        def hydrogen_input_constraint(b, t):
-            if self.fuel_type == "hydrogen" or self.fuel_type == "both":
-                return b.hydrogen_in[t] <= b.max_hydrogen_input
-            else:
-                return Constraint.Skip
-
-        @self.b.Constraint(time_steps)
-        def natural_gas_input_constraint(b, t):
-            if self.fuel_type == "natural_gas" or self.fuel_type == "both":
-                return b.natural_gas_in[t] <= b.max_natural_gas_input
-            else:
-                return Constraint.Skip
-
-        @self.b.Constraint(time_steps)
-        def iron_ore_constraint(b, t):
-            return b.iron_ore_in[t] == b.dri_output[t] / b.efficiency_dri
         
         @self.b.Constraint(time_steps)
-        def dri_output_electricity_constraint(b, t):
-            return (
-                b.electricity_demand_drp[t]
-                == b.dri_output[t] * b.specific_electricity_consumption_dri
-            )
+        def dri_power_lower_bound(b, t):
+            return b.power_dri[t] >= b.min_power_dri
+        
+        @self.b.Constraint(time_steps)
+        def dri_power_upper_bound(b, t):
+            return b.power_dri[t] <= b.rated_power_dri
 
         @self.b.Constraint(time_steps)
         def dri_output_constraint(b, t):
             if self.fuel_type == "hydrogen":
                 return (
-                    b.dri_output[t]
-                    == b.hydrogen_in[t] * b.specific_hydrogen_consumption
+                    b.dri_output[t] == b.hydrogen_in[t] / b.specific_hydrogen_consumption
                 )
             elif self.fuel_type == "natural_gas":
                 return (
                     b.dri_output[t]
-                    == b.natural_gas_in[t] * b.specific_natural_gas_consumption
+                    == b.natural_gas_in[t] / b.specific_natural_gas_consumption
                 )
             elif self.fuel_type == "both":
                 return (
-                    b.dri_output[t]
-                    == b.hydrogen_in[t] * b.specific_hydrogen_consumption
-                    + b.natural_gas_in[t] * b.specific_natural_gas_consumption
+                    b.dri_output[t] == (b.hydrogen_in[t] / b.specific_hydrogen_consumption) +
+                      (b.natural_gas_in[t] / b.specific_natural_gas_consumption)
                 )
+        
+        @self.b.Constraint(time_steps)
+        def dri_output_electricity_constraint(b, t):
+            return (
+                b.power_dri[t]
+                == b.dri_output[t] * b.specific_electricity_consumption_dri
+            )
+        
+        @self.b.Constraint(time_steps)
+        def iron_ore_constraint(b, t):
+            return b.iron_ore_in[t] == b.dri_output[t] * b.specific_iron_ore_consumption
 
         # Flexibility constraints
         @self.b.Constraint(time_steps)
@@ -459,14 +439,14 @@ class DriPlant:
             if t == 0:
                 return Constraint.Skip
             else:
-                return b.dri_output[t] - b.dri_output[t - 1] <= b.ramp_up
+                return b.power_dri[t] - b.power_dri[t - 1] <= b.ramp_up_dri
 
         @self.b.Constraint(time_steps)
         def ramp_down_dri_constraint(b, t):
             if t == 0:
                 return Constraint.Skip
             else:
-                return b.dri_output[t - 1] - b.dri_output[t] <= b.ramp_down
+                return b.power_dri[t - 1] - b.power_dri[t] <= b.ramp_down_dri
 
         @self.b.Constraint(time_steps)
         def min_operating_time_dri__constraint(b, t):
@@ -482,18 +462,18 @@ class DriPlant:
                 # Ensure that the cumulative sum of DRI production over the past min_operating_time_units time steps is at least min_operating_time_units times the production at time step t
                 return (
                     sum(
-                        b.dri_output[i]
+                        b.power_dri[i]
                         for i in range(t - min_operating_time_units + 1, t + 1)
                     )
-                    >= min_operating_time_units * b.dri_output[t]
+                    >= min_operating_time_units * b.power_dri[t]
                 )
             else:
                 return (
                     sum(
-                        b.dri_output[i]
+                        b.power_dri[i]
                         for i in range(t - min_operating_time_units + 1, t + 1)
                     )
-                    >= min_operating_time_units * b.dri_output[t]
+                    >= min_operating_time_units * b.power_dri[t]
                 )
 
         @self.b.Constraint(time_steps)
@@ -509,13 +489,13 @@ class DriPlant:
             if t < min_downtime_units:
                 # Ensure that the cumulative sum of DRI production over the past min_downtime_units time steps is at least min_downtime_units times the production at time step t
                 return (
-                    sum(b.dri_output[t - i] for i in range(min_downtime_units))
-                    >= min_downtime_units * b.dri_output[t]
+                    sum(b.power_dri[t - i] for i in range(min_downtime_units))
+                    >= min_downtime_units * b.power_dri[t]
                 )
             else:
                 return (
                     sum(b.dri_output[t - i] for i in range(min_downtime_units))
-                    >= min_downtime_units * b.dri_output[t]
+                    >= min_downtime_units * b.power_dri[t]
                 )
 
         # Operational cost
@@ -524,9 +504,10 @@ class DriPlant:
             # This constraint defines the steel output based on inputs and efficiency
             return (
                 b.dri_operating_cost[t]
-                == b.natural_gas_in[t] * self.model.natural_gas_price[t]
+                == b.natural_gas_in[t] * self.model.natural_gas_price[t] + \
+                    b.power_dri[t] * self.model.electricity_price[t] + \
+                    b.iron_ore_in[t] * self.model.iron_ore_price
             )
-
 
 class ElectricArcFurnace:
     def __init__(
@@ -535,9 +516,10 @@ class ElectricArcFurnace:
         id,
         rated_power,
         min_power,
-        max_dri_input,
+        # max_dri_input,
         specific_electricity_consumption,
         specific_dri_demand,
+        specific_lime_demand,
         ramp_up,
         ramp_down,
         min_operating_time,
@@ -549,10 +531,10 @@ class ElectricArcFurnace:
         # Operational parameters
         self.rated_power = rated_power
         self.min_power = min_power
-        self.max_dri_input = max_dri_input
         # Additional operational characteristics
         self.specific_electricity_consumption = specific_electricity_consumption
         self.specific_dri_demand = specific_dri_demand
+        self.specific_lime_demand = specific_lime_demand
         # Flexibility parameters
         self.ramp_up = ramp_up
         self.ramp_down = ramp_down
@@ -568,11 +550,13 @@ class ElectricArcFurnace:
     def define_parameters(self):
         self.b.rated_power_eaf = Param(initialize=self.rated_power)
         self.b.min_power_eaf = Param(initialize=self.min_power)
-        self.b.max_dri_input = Param(initialize=self.max_dri_input)
         self.b.specific_electricity_consumption_eaf = Param(
             initialize=self.specific_electricity_consumption
         )
         self.b.specific_dri_demand = Param(initialize=self.specific_dri_demand)
+        self.b.specific_lime_demand = Param(
+            initialize=self.specific_lime_demand
+        )
         # Flexibility parameters
         self.b.ramp_up_eaf = pyo.Param(initialize=self.ramp_up)
         self.b.ramp_down_eaf = pyo.Param(initialize=self.ramp_down)
@@ -584,6 +568,8 @@ class ElectricArcFurnace:
         self.b.dri_input = Var(time_steps, within=NonNegativeReals)
         self.b.steel_output = Var(time_steps, within=NonNegativeReals)
         self.b.eaf_operating_cost = Var(time_steps, within=NonNegativeReals)
+        self.b.emission_eaf = Var(time_steps, within=NonNegativeReals)
+        self.b.lime_demand = Var(time_steps, within=NonNegativeReals)
 
     def define_constraints(self, time_steps):
         # Power bounds constraints
@@ -598,12 +584,26 @@ class ElectricArcFurnace:
         @self.b.Constraint(time_steps)
         def steel_output_dri_relation(b, t):
             # This constraint defines the steel output based on inputs and efficiency
-            return b.dri_input[t] == b.steel_output[t] * b.specific_dri_demand
+            return b.steel_output[t] == b.dri_input[t] / b.specific_dri_demand
 
         @self.b.Constraint(time_steps)
         def steel_output_power_relation(b, t):
             # This constraint defines the steel output based on inputs and efficiency
             return b.power_eaf[t] == b.steel_output[t] * b.specific_electricity_consumption_eaf
+        
+        @self.b.Constraint(time_steps)
+        def eaf_lime_demand(b, t):
+            return (
+                b.lime_demand[t]
+                == b.steel_output[t] * b.specific_lime_demand
+            )
+
+        @self.b.Constraint(time_steps)
+        def eaf_co2_emission(b, t):
+            return (
+                b.emission_eaf[t]
+                == b.lime_demand[t] * self.model.lime_co2_factor
+            )
 
         # Flexibility constraints
         @self.b.Constraint(time_steps)
@@ -671,7 +671,8 @@ class ElectricArcFurnace:
             # This constraint defines the steel output based on inputs and efficiency
             return (
                 b.eaf_operating_cost[t]
-                == b.power_eaf[t] * self.model.electricity_price[t]
+                == b.power_eaf[t] * self.model.electricity_price[t] + \
+                    b.emission_eaf[t] * self.model.co2_price + b.lime_demand[t] * self.model.lime_price
             )
 
     def calculate_operational_state(self, time_steps):

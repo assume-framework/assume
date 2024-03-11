@@ -61,10 +61,14 @@ class SteelPlant(SupportsMinMax):
 
         self.natural_gas_price = self.forecaster["fuel_price_natural_gas"]
         self.electricity_price = self.forecaster["price_EOM"]
-        self.iron_ore_price = self.forecaster["iron_ore_price"]
+        self.iron_ore_price = self.forecaster.get_price('iron_ore')
         self.steel_demand = demand
         self.steel_price = self.forecaster.get_price('steel')
-        self.dri_price = self.forecaster["dri_price"]
+        self.lime_co2_factor = self.forecaster.get_price('lime_co2_factor')
+        self.lime_price = self.forecaster.get_price('lime')
+        self.co2_price = self.forecaster.get_price('co2')
+
+        self.recalculated_power = self.forecaster[f"{self.id}_recalculated_power"]
 
         self.location = location
         self.objective = objective
@@ -164,16 +168,17 @@ class SteelPlant(SupportsMinMax):
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.natural_gas_price)},
         )
-        self.model.iron_ore_price = pyo.Param(
-            self.model.time_steps,
-            initialize={t: value for t, value in enumerate(self.iron_ore_price)},
-        )
-        self.model.dri_price = pyo.Param(
-            self.model.time_steps,
-            initialize={t: value for t, value in enumerate(self.dri_price)},
-        )
         self.model.steel_demand = pyo.Param(initialize=self.steel_demand)
         self.model.steel_price = pyo.Param(initialize=self.steel_price.mean(), within=pyo.NonNegativeReals)
+        self.model.lime_co2_factor = pyo.Param(initialize=self.lime_co2_factor.mean(), within=pyo.NonNegativeReals)
+        self.model.co2_price = pyo.Param(initialize=self.co2_price.mean(), within=pyo.NonNegativeReals)
+        self.model.lime_price = pyo.Param(initialize=self.lime_price.mean(), within=pyo.NonNegativeReals)
+        self.model.iron_ore_price = pyo.Param(initialize=self.iron_ore_price.mean(), within=pyo.NonNegativeReals)
+
+        if self.objective == 'recalculate':
+            self.model.recalculated_power = pyo.Param(self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.recalculated_power)},
+        )
 
     def define_variables(self):
         self.model.total_power_input = pyo.Var(
@@ -184,17 +189,31 @@ class SteelPlant(SupportsMinMax):
             self.model.time_steps, within=pyo.NonNegativeReals
         )
 
+        self.model.reserved_power = pyo.Var(
+            self.model.time_steps, within=pyo.NonNegativeReals
+        ) 
+
     def define_constraints(self):
         @self.model.Constraint(self.model.time_steps)
         def dri_output_association_constraint(m, t):
             return sum(self.components["eaf"].b.steel_output[t] for t in self.model.time_steps) >= self.model.steel_demand
 
-        @self.model.Constraint(self.model.time_steps)
-        def total_power_input_constraint(m, t):
-            return (
-                m.total_power_input[t]
-                == self.components["electrolyser"].b.power_in[t] + self.components["eaf"].b.power_eaf[t]
-            )
+        if self.objective == 'min_variable_cost':
+            @self.model.Constraint(self.model.time_steps)
+            def total_power_input_constraint(m, t):
+                return (
+                    m.total_power_input[t]
+                    == self.components["electrolyser"].b.power_in[t] + \
+                        self.components["eaf"].b.power_eaf[t] + self.components["dri_plant"].b.power_dri[t]
+                )
+        elif self.objective == 'recalculate':
+             @self.model.Constraint(self.model.time_steps)
+             def recalculated_total_power_input_constraint(m, t):
+                return (
+                    m.total_power_input[t] + m.recalculated_power[t]
+                    == self.components["electrolyser"].b.power_in[t] + self.components["eaf"].b.power_eaf[t] + \
+                          self.components["dri_plant"].b.power_dri[t]
+                )
         
         @self.model.Constraint(self.model.time_steps)
         def cost_per_time_step(m, t):
@@ -202,11 +221,10 @@ class SteelPlant(SupportsMinMax):
                 self.components["electrolyser"].b.start_cost[t] + \
                     self.components["electrolyser"].b.electricity_cost[t] + \
                     self.components["dri_plant"].b.dri_operating_cost[t] + \
-                    self.components["eaf"].b.eaf_operating_cost[t] + \
-                    self.iron_ore_price.iat[t] * self.components["dri_plant"].b.iron_ore_in[t]
+                    self.components["eaf"].b.eaf_operating_cost[t]
             
     def define_objective(self):
-        if self.objective == "min_variable_cost":
+        if self.objective == "min_variable_cost" or "recalculate":
 
             @self.model.Objective(sense=pyo.minimize)
             def obj_rule(m):
@@ -267,8 +285,7 @@ class SteelPlant(SupportsMinMax):
             )
             for t in self.model.time_steps
         }
-
-        # Calculate the total cost of the optimal operation
+        
         total_variable_costs = {
             t: (
                 value(self.model.variable_cost[t])
@@ -279,10 +296,27 @@ class SteelPlant(SupportsMinMax):
         # Instantiate an OperationStatesForecaster object
         operation_states_forecaster = OperationStatesForecaster(index=self.index)
 
-        for time_step, total_power_input in total_power_input.items():
+        for time_step, power_input in total_power_input.items():
             unit_id = self.id
-            prefixed_power = {f"{unit_id}_power": [total_power_input]}
-            operation_states_forecaster.set_operation_states(time_step, pd.DataFrame(prefixed_power, index=[0]))
+            prefixed_total_power_input = {f"{unit_id}_power": [power_input]}
+            operation_states_forecaster.set_operation_states(time_step, pd.DataFrame(prefixed_total_power_input, index=[0]))
+     
+        # Extract power values for electrolyser, eaf, and dri for each time step
+        for t in self.model.time_steps:
+            # Electrolyser power input
+            electrolyser_power_input_value = value(self.components["electrolyser"].b.power_in[t])
+            prefixed_electrolyser_power_input = {f"{unit_id}_electrolyser": electrolyser_power_input_value}
+            operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_electrolyser_power_input, index=[0]))
+            
+            # DRI power input
+            dri_power_input_value = value(self.components["dri_plant"].b.power_dri[t])
+            prefixed_dri_power_input = {f"{unit_id}_dri": dri_power_input_value}
+            operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_dri_power_input, index=[0]))
+            
+            # EAF power input
+            eaf_power_input_value = value(self.components["eaf"].b.power_eaf[t])
+            prefixed_eaf_power_input = {f"{unit_id}_eaf": eaf_power_input_value}
+            operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_eaf_power_input, index=[0]))
 
         # Set the total cost data for each unit with unit ID as prefix
         for time_step, total_variable_cost in total_variable_costs.items():
@@ -291,7 +325,7 @@ class SteelPlant(SupportsMinMax):
             operation_states_forecaster.set_operation_states(time_step, pd.DataFrame(prefixed_total_variable_cost, index=[0]))
 
         # Save the operation states data to a CSV file
-        operation_states_forecaster.save_operation_states(path="C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04")
+        operation_states_forecaster.save_operation_states(path="C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04", unit=unit_id)
 
     def determine_optimal_operation_with_flex(self):
         """
