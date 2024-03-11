@@ -55,6 +55,20 @@ The AMIRIS loader can be used to run examples configured for usage with the ener
     # Create a simulation world
     world = World(database_uri=db_uri)
 
+    default_strategy = {mc.market_id: "naive_eom" for mc in marketdesign}
+
+    bidding_strategies = {
+        "hard coal": default_strategy,
+        "lignite": default_strategy,
+        "oil": default_strategy,
+        "gas": default_strategy,
+        "biomass": default_strategy,
+        "nuclear": default_strategy,
+        "wind": default_strategy,
+        "solar": default_strategy,
+        "demand": default_strategy,
+    }
+
     # Let the loader add everything to the world
     world.loop.run_until_complete(
         load_amiris_async(
@@ -111,6 +125,21 @@ An example configuration of how this can be used is shown here:
             maximum_bid_price=1e9,
         )
     ]
+
+    default_strategy = {mc.market_id: "naive_eom" for mc in marketdesign}
+
+    bidding_strategies = {
+        "hard coal": default_strategy,
+        "lignite": default_strategy,
+        "oil": default_strategy,
+        "gas": default_strategy,
+        "biomass": default_strategy,
+        "nuclear": default_strategy,
+        "wind": default_strategy,
+        "solar": default_strategy,
+        "demand": default_strategy,
+    }
+
     # load the dataset from the database
     world.loop.run_until_complete(
         load_oeds_async(world, "oeds_mastr_simulation", "my_studycase", infra_uri, marketdesign, nuts_config)
@@ -177,7 +206,7 @@ An example can be seen from the pypsa scigrid case:
     world.loop.run_until_complete(
         load_pypsa_async(world, "world_pypsa", "scigrid_de", network, marketdesign)
     )
-    
+
     world.run()
 
 You can also create and use your own existing scenarios in pypsa format to convert these into a market simulation too.
