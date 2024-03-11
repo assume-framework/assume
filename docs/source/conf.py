@@ -45,6 +45,7 @@ intersphinx_mapping = {
     "torch": ("https://pytorch.org/docs/stable/", None),
     "dateutil": ("https://dateutil.readthedocs.io/en/stable/", None),
     "pyomo": ("https://pyomo.readthedocs.io/en/stable/", None),
+    "pypsa": ("https://pypsa.readthedocs.io/en/latest/", None),
 }
 intersphinx_disabled_domains = ["std"]
 
