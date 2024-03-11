@@ -370,6 +370,13 @@ class PayAsBidContractRole(MarketRole):
         )
 
 
+# 1. multi-stage market -> clears locally, rejected_bids are pushed up a layer
+# 2. nodal pricing -> centralized market which handles different node_ids different - can also be used for country coupling
+# 3. nodal limited market -> clear by node_id, select cheapest generation orders from surrounding area up to max_capacity, clear market
+# 4. one sided market? - fixed demand as special case of two sided market
+# 5.
+
+
 def ppa(
     contract: dict,
     market_index: pd.Series,
@@ -666,6 +673,85 @@ available_contracts: dict[str, Callable] = {
     "ppa": ppa,
     "CFD": cfd,
     "FIT": feed_in_tariff,
+    "market_premium": market_premium,
     "MPFIX": market_premium,
 }
-contract_needs_market = ["CFD", "MPFIX"]
+contract_needs_market = ["CFD", "MPFIX", "MPVAR"]
+
+
+if __name__ == "__main__":
+    from dateutil import rrule as rr
+    from dateutil.relativedelta import relativedelta as rd
+
+    from assume.common.utils import get_available_products
+
+    simple_dayahead_auction_config = MarketConfig(
+        "simple_dayahead_auction",
+        market_products=[MarketProduct(rd(hours=+1), 1, rd(hours=1))],
+        opening_hours=rr.rrule(
+            rr.HOURLY,
+            dtstart=datetime(2005, 6, 1),
+            cache=True,
+        ),
+        opening_duration=timedelta(hours=1),
+        amount_unit="MW",
+        amount_tick=0.1,
+        price_unit="€/MW",
+        market_mechanism="pay_as_clear",
+    )
+    mr_class = available_clearing_strategies[
+        simple_dayahead_auction_config.market_mechanism
+    ]
+    mr: MarketRole = mr_class(simple_dayahead_auction_config)
+    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
+    products = get_available_products(
+        simple_dayahead_auction_config.market_products, next_opening
+    )
+    assert len(products) == 1
+
+    print(products)
+    start = products[0][0]
+    end = products[0][1]
+    only_hours = products[0][2]
+
+    orderbook: Orderbook = [
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": 120,
+            "price": 120,
+            "agent_id": "gen1",
+            "only_hours": None,
+        },
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": 80,
+            "price": 58,
+            "agent_id": "gen1",
+            "only_hours": None,
+        },
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": 100,
+            "price": 53,
+            "agent_id": "gen1",
+            "only_hours": None,
+        },
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": -180,
+            "price": 70,
+            "agent_id": "dem1",
+            "only_hours": None,
+        },
+    ]
+
+    accepted, rejected, meta = mr.clear(orderbook, products)
+    import pandas as pd
+
+    print(pd.DataFrame.from_dict(rejected))
+    print(pd.DataFrame.from_dict(clearing_result))
+    print(meta)
