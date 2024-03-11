@@ -140,7 +140,6 @@ class RedispatchMarketRole(MarketRole):
         p_max_pu_down = (volume_pivot - min_power_pivot).div(
             max_power_pivot.where(max_power_pivot != 0, np.inf)
         )
-        p_max_pu_down = p_max_pu_down.clip(lower=0)  # Ensure no negative values
 
         # Determine the costs directly from the price pivot
         costs = price_pivot

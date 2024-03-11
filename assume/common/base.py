@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TypedDict
 
 import numpy as np
@@ -68,6 +68,7 @@ class BaseUnit:
         self.location = location
         self.bidding_strategies: dict[str, BaseStrategy] = bidding_strategies
         self.index = index
+        self.freq = (index[1] - index[0]).astype(timedelta)
         self.outputs = defaultdict(lambda: pd.Series(0.0, index=self.index))
         # series does not like to convert from tensor to float otherwise
 
@@ -161,7 +162,7 @@ class BaseUnit:
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
-            end_excl = end - self.index.freq
+            end_excl = end - self.freq
             if isinstance(order["accepted_volume"], dict):
                 added_volume = list(order["accepted_volume"].values())
             else:
@@ -233,10 +234,10 @@ class BaseUnit:
         Returns:
             The output before the given datetime.
         """
-        if dt - self.index.freq < self.index[0]:
+        if dt - self.freq < self.index[0]:
             return 0
         else:
-            return self.outputs[product_type].at[dt - self.index.freq]
+            return self.outputs[product_type].at[dt - self.freq]
 
     def as_dict(self) -> dict[str, str | int]:
         """
@@ -264,7 +265,7 @@ class BaseUnit:
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
-            end_excl = end - self.index.freq
+            end_excl = end - self.freq
 
             if isinstance(order["accepted_volume"], dict):
                 cashflow = [
@@ -272,7 +273,7 @@ class BaseUnit:
                     for i in order["accepted_volume"].keys()
                 ]
                 self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
-                    cashflow * self.index.freq.n
+                    cashflow * 1  # self.index.freq.n
                 )
             else:
                 cashflow = float(
@@ -407,10 +408,10 @@ class SupportsMinMax(BaseUnit):
         Returns:
             int: The operation time.
         """
-        before = start - self.index.freq
+        before = start - self.freq
 
         max_time = max(self.min_operating_time, self.min_down_time)
-        begin = start - self.index.freq * max_time
+        begin = start - self.freq * max_time
         end = before
         arr = self.outputs["energy"][begin:end][::-1] > 0
         if len(arr) < 1:
@@ -439,7 +440,7 @@ class SupportsMinMax(BaseUnit):
         """
         op_series = []
 
-        before = start - self.index.freq
+        before = start - self.freq
         arr = self.outputs["energy"][self.index[0] : before][::-1] > 0
 
         if len(arr) < 1:
@@ -578,10 +579,10 @@ class SupportsMinMaxCharge(BaseUnit):
         Returns:
             float: The SoC before the given datetime.
         """
-        if dt - self.index.freq <= self.index[0]:
+        if dt - self.freq <= self.index[0]:
             return self.initial_soc
         else:
-            return self.outputs["soc"].at[dt - self.index.freq]
+            return self.outputs["soc"].at[dt - self.freq]
 
     def get_clean_spread(self, prices: pd.DataFrame) -> float:
         """

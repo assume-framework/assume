@@ -7,6 +7,7 @@ import logging
 from datetime import timedelta
 
 import dateutil.rrule as rr
+import numpy as np
 import pandas as pd
 import yaml
 from dateutil.relativedelta import relativedelta as rd
@@ -481,7 +482,7 @@ def load_amiris(
     sim_id = f"{scenario}_{study_case}"
     save_interval = amiris_scenario["GeneralProperties"]["Output"]["Interval"]
     prices = {}
-    index = pd.date_range(start=start, end=end, freq="1h", inclusive="left")
+    index = np.arange(start, end, 3600 * 1_000_000)
     world.bidding_strategies["support"] = SupportStrategy
     world.setup(
         start=start,

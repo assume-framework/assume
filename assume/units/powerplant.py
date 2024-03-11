@@ -107,11 +107,9 @@ class PowerPlant(SupportsMinMax):
 
         self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
         self.min_down_time = min_down_time if min_down_time > 0 else 1
-        self.downtime_hot_start = downtime_hot_start / (
-            self.index.freq / timedelta(hours=1)
-        )
+        self.downtime_hot_start = downtime_hot_start / (self.freq / timedelta(hours=1))
         self.downtime_warm_start = downtime_warm_start / (
-            self.index.freq / timedelta(hours=1)
+            self.freq / timedelta(hours=1)
         )
 
         self.init_marginal_cost()
@@ -149,7 +147,7 @@ class PowerPlant(SupportsMinMax):
         )
 
         for t in self.outputs["energy"][start:end].index:
-            current_power = self.outputs["energy"][t]
+            current_power = self.outputs["energy"].at[t]
 
             previous_power = self.get_output_before(t)
             op_time = self.get_operation_time(t)
@@ -160,7 +158,7 @@ class PowerPlant(SupportsMinMax):
                 current_power = min(current_power, max_power[t])
                 current_power = max(current_power, self.min_power)
 
-            self.outputs["energy"][t] = current_power
+            self.outputs["energy"].at[t] = current_power
 
         return self.outputs["energy"].loc[start:end]
 
@@ -186,7 +184,7 @@ class PowerPlant(SupportsMinMax):
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
-            end_excl = end - self.index.freq
+            end_excl = end - self.freq
             if isinstance(order["accepted_volume"], dict):
                 self.outputs[product_type].loc[start:end_excl] += [
                     order["accepted_volume"][key]
@@ -200,7 +198,7 @@ class PowerPlant(SupportsMinMax):
         self.calculate_cashflow(product_type, orderbook)
 
         for start in products_index:
-            current_power = self.outputs[product_type][start]
+            current_power = self.outputs[product_type].at[start]
 
             previous_power = self.get_output_before(start)
             op_time = self.get_operation_time(start)
@@ -211,7 +209,7 @@ class PowerPlant(SupportsMinMax):
                 current_power = min(current_power, max_power[start])
                 current_power = max(current_power, self.min_power)
 
-            self.outputs[product_type][start] = current_power
+            self.outputs[product_type].at[start] = current_power
 
         self.bidding_strategies[marketconfig.market_id].calculate_reward(
             unit=self,
@@ -322,18 +320,18 @@ class PowerPlant(SupportsMinMax):
         Note:
             The calculation does not include ramping constraints and can be used for arbitrary start times in the future.
         """
-        end_excl = end - self.index.freq
+        end_excl = end - self.freq
 
-        base_load = self.outputs["energy"][start:end_excl]
-        heat_demand = self.outputs["heat"][start:end_excl]
+        base_load = self.outputs["energy"].loc[start:end_excl]
+        heat_demand = self.outputs["heat"].loc[start:end_excl]
+        # assert heat_demand.min() >= 0
 
-        capacity_neg = self.outputs["capacity_neg"][start:end_excl]
+        capacity_neg = self.outputs["capacity_neg"].loc[start:end_excl]
         # needed minimum + capacity_neg - what is already sold is actual minimum
         min_power = self.min_power + capacity_neg - base_load
         # min_power should be at least the heat demand at that time
-        min_power = min_power.clip(lower=heat_demand)
 
-        available_power = self.forecaster.get_availability(self.id)[start:end_excl]
+        available_power = self.forecaster.get_availability(self.id).loc[start:end_excl]
         # check if available power is larger than max_power and raise an error if so
         if (available_power > self.max_power).any():
             raise ValueError(
@@ -341,11 +339,10 @@ class PowerPlant(SupportsMinMax):
             )
         max_power = available_power * self.max_power
         # provide reserve for capacity_pos
-        max_power = max_power - self.outputs["capacity_pos"][start:end_excl]
+        max_power = (-self.outputs["capacity_pos"].loc[start:end_excl]).add(max_power)
         # remove what has already been bid
         max_power = max_power - base_load
         # make sure that max_power is > 0 for all timesteps
-        max_power = max_power.clip(lower=0)
 
         return min_power, max_power
 

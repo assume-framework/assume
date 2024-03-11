@@ -107,7 +107,7 @@ class CsvForecaster(Forecaster):
 
     def __init__(
         self,
-        index: pd.Series,
+        index: np.array,
         powerplants_units: dict[str, pd.Series] = {},
         demand_units: dict[str, pd.Series] = {},
         market_configs: dict[str, pd.Series] = {},

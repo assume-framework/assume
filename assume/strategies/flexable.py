@@ -137,7 +137,7 @@ class flexableEOM(BaseStrategy):
                     "start_time": start,
                     "end_time": end,
                     "only_hours": None,
-                    "price": bid_price_inflex,
+                    "price": min(bid_price_inflex, -40),
                     "volume": bid_quantity_inflex,
                     "node": unit.node,
                 }
