@@ -5,7 +5,7 @@
 version: "3.9"
 services:
   assume_db:
-    image: timescaledev/timescaledb-ha:pg15-all-oss
+    image: timescaledev/timescaledb-ha:pg15-oss
     # smaller without postgis support:
     # image: timescale/timescaledb:latest-pg15
     container_name: assume_db
@@ -18,8 +18,8 @@ services:
     volumes:
       # needed for normal image
       #- ./assume-db:/var/lib/postgresql/data
-      # ~/data is path for timescaledev image
-      - ./assume-db:~/data
+      # /home/postgres/data is path for timescaledev image
+      - ./assume-db:/home/postgres/pgdata
     ports:
       - 5432:5432
     deploy:
