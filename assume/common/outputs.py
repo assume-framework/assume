@@ -13,6 +13,7 @@ import pandas as pd
 from dateutil import rrule as rr
 from mango import Role
 from pandas.api.types import is_numeric_dtype
+from psycopg2.errors import UndefinedColumn
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 
@@ -55,11 +56,12 @@ class WriteOutput(Role):
         self.save_frequency_hours = save_frequency_hours or (end - start).days * 24
 
         # make directory if not already present
-        self.export_csv_path = export_csv_path
-        if self.export_csv_path:
-            self.p = Path(self.export_csv_path, simulation_id)
-            shutil.rmtree(self.p, ignore_errors=True)
-            self.p.mkdir(parents=True)
+        if export_csv_path:
+            self.export_csv_path = Path(export_csv_path, simulation_id)
+            shutil.rmtree(self.export_csv_path, ignore_errors=True)
+            self.export_csv_path.mkdir(parents=True)
+        else:
+            self.export_csv_path = None
 
         self.db = db_engine
 
@@ -99,6 +101,9 @@ class WriteOutput(Role):
         table_names = inspect(self.db).get_table_names()
         # Iterate through each table
         for table_name in table_names:
+            # ignore postgis table
+            if "spatial_ref_sys" == table_name:
+                continue
             try:
                 with self.db.begin() as db:
                     # create index on table
@@ -185,6 +190,9 @@ class WriteOutput(Role):
         elif content.get("type") == "rl_learning_params":
             self.write_rl_params(content.get("data"))
 
+        elif content.get("type") == "grid_topology":
+            self.store_grid(content.get("data"), content.get("market_id"))
+
     def write_rl_params(self, rl_params: dict):
         """
         Writes the RL parameters such as reward, regret, and profit to the corresponding data frame.
@@ -235,7 +243,7 @@ class WriteOutput(Role):
             df = df.apply(self.check_for_tensors)
 
             if self.export_csv_path:
-                data_path = self.p.joinpath(f"{table}.csv")
+                data_path = self.export_csv_path / f"{table}.csv"
                 df.to_csv(data_path, mode="a", header=not data_path.exists())
 
             if self.db is not None:
@@ -250,7 +258,84 @@ class WriteOutput(Role):
 
             self.write_dfs[table] = []
 
-    def check_columns(self, table: str, df: pd.DataFrame):
+    def store_grid(
+        self,
+        grid: dict[str, pd.DataFrame],
+        market_id: str,
+    ):
+        """
+        Stores the grid data to the database.
+        This is done once at the beginning for every agent which takes care of a grid.
+        """
+        if self.db is None:
+            return
+
+        with self.db.begin() as db:
+            try:
+                db.execute(text("CREATE EXTENSION IF NOT EXISTS postgis;"))
+            except Exception:
+                logger.info("tried writing grid data to non postGIS database")
+                return
+
+        grid["buses"]["wkt_srid_4326"] = grid["buses"].agg(
+            "SRID=4326;POINT ({0[x]} {0[y]})".format, axis=1
+        )
+        translate_point_dict = grid["buses"]["wkt_srid_4326"].to_dict()
+        translate_dict = grid["buses"].agg("{0[x]} {0[y]}".format, axis=1).to_dict()
+
+        def create_line(row):
+            return f"SRID=4326;LINESTRING ({translate_dict[row['bus0']]}, {translate_dict[row['bus1']]})"
+
+        # Apply the function to each row
+        grid["lines"]["wkt_srid_4326"] = grid["lines"].apply(create_line, axis=1)
+
+        grid_col = "node" if "node" in grid["generators"].columns else "bus"
+        grid["generators"]["wkt_srid_4326"] = grid["generators"][grid_col].apply(
+            translate_point_dict.get
+        )
+        grid_col = "node" if "node" in grid["loads"].columns else "bus"
+        grid["loads"]["wkt_srid_4326"] = grid["loads"][grid_col].apply(
+            translate_point_dict.get
+        )
+
+        for table, df in grid.items():
+            geo_table = f"{table}_geo"
+            if df.empty:
+                continue
+            df["simulation"] = self.simulation_id
+            df.reset_index()
+
+            try:
+                # try to use geopandas
+                # needed for postGIS writing
+                import geoalchemy2
+                import geopandas as gpd
+                from shapely.wkt import loads
+
+                def load_wkt(string: str):
+                    return loads(string.split(";")[1])
+
+                df["geometry"] = df["wkt_srid_4326"].apply(load_wkt)
+                df = gpd.GeoDataFrame(df, geometry="geometry")
+                df.set_crs(crs="EPSG:4326", inplace=True)
+                # postgis does not lowercase tablenames
+                df.columns = map(str.lower, df.columns)
+                try:
+                    # try to input as geodataframe
+                    with self.db.begin() as db:
+                        df.to_postgis(geo_table, db, if_exists="append", index=True)
+                except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
+                    # if a column is missing, check and try again
+                    self.check_columns(geo_table, df)
+                    # now try again
+                    with self.db.begin() as db:
+                        df.to_postgis(geo_table, db, if_exists="append", index=True)
+            except ImportError:
+                # otherwise, just use plain SQL anyway
+                with self.db.begin() as db:
+                    df.to_sql(geo_table, db, if_exists="append")
+
+    def check_columns(self, table: str, df: pd.DataFrame, index: bool = True):
         """
         Checks and adds columns to the database table if necessary.
 
@@ -262,8 +347,9 @@ class WriteOutput(Role):
             # Read table into Pandas DataFrame
             query = f"select * from {table} where 1=0"
             db_columns = pd.read_sql(query, db).columns
+
         for column in df.columns:
-            if column not in db_columns:
+            if column.lower() not in db_columns:
                 try:
                     # TODO this only works for float and text
                     column_type = "float" if is_numeric_dtype(df[column]) else "text"
@@ -272,6 +358,15 @@ class WriteOutput(Role):
                         db.execute(text(query))
                 except Exception:
                     logger.exception("Error converting column")
+
+        if index and df.index.name:
+            df.index.name = df.index.name.lower()
+            if df.index.name in db_columns:
+                return
+            column_type = "float" if is_numeric_dtype(df.index) else "text"
+            query = f"ALTER TABLE {table} ADD COLUMN {df.index.name} {column_type}"
+            with self.db.begin() as db:
+                db.execute(text(query))
 
     def check_for_tensors(self, data: pd.Series):
         """
@@ -414,7 +509,7 @@ class WriteOutput(Role):
         df["simulation"] = self.simulation_id
 
         if self.export_csv_path:
-            kpi_data_path = self.p.joinpath("kpis.csv")
+            kpi_data_path = self.export_csv_path / "kpis.csv"
             df.to_csv(
                 kpi_data_path,
                 mode="a",

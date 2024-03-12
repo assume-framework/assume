@@ -399,7 +399,7 @@ def test_plot_function(mock_pyplot):
 
 
 @patch("matplotlib.pyplot.show")
-def test_plot_function(mock_pyplot):
+def test_visualize_function(mock_pyplot):
     orderbook = create_orderbook()
     i = -1
     for o in orderbook:

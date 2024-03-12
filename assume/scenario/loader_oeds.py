@@ -217,37 +217,6 @@ async def load_oeds_async(
                 )
 
 
-def load_oeds(
-    world: World,
-    scenario: str,
-    study_case: str,
-    infra_uri: str,
-    marketdesign: list[MarketConfig],
-    nuts_config: list[str] = [],
-):
-    """
-    Load a scenario from a given path.
-
-    Args:
-        world (World): the world to add the oeds scenario to
-        scenario (str): the scenario name of the simulation
-        study_case (str): the study case name of the simulation
-        infra_uri (str): database uri for the infrastructure
-        marketdesign (list[MarketConfig]): the list of marketconfigs, which form the market design
-        nuts_config (list[str], optional): The list of NUTS areas which are loaded in the scenario. Defaults to [].
-    """
-    world.loop.run_until_complete(
-        load_oeds_async(
-            world=world,
-            scenario=scenario,
-            study_case=study_case,
-            infra_uri=infra_uri,
-            marketdesign=marketdesign,
-            nuts_config=nuts_config,
-        )
-    )
-
-
 if __name__ == "__main__":
     db_uri = "postgresql://assume:assume@localhost:5432/assume"
     world = World(database_uri=db_uri)
@@ -272,5 +241,15 @@ if __name__ == "__main__":
             maximum_bid_price=1e9,
         )
     ]
-    load_oeds(world, scenario, study_case, infra_uri, marketdesign, nuts_config)
+    world.loop.run_until_complete(
+        load_oeds_async(
+            world,
+            scenario,
+            study_case,
+            infra_uri,
+            marketdesign,
+            nuts_config,
+        )
+    )
+
     world.run()

@@ -10,6 +10,11 @@ import numpy as np
 import pandas as pd
 import pypsa
 
+from assume.common.grid_utils import (
+    add_redispatch_generators,
+    add_redispatch_loads,
+    read_pypsa_grid,
+)
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.markets.base_market import MarketRole
 
@@ -38,16 +43,28 @@ class RedispatchMarketRole(MarketRole):
 
     """
 
+    required_fields = ["node"]
+
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
-
         self.network = pypsa.Network()
         # set snapshots as list from the value marketconfig.producs.count converted to list
         self.network.snapshots = range(marketconfig.market_products[0].count)
+        assert self.grid_data
+
+        # set backup marginal cost
+        backup_marginal_cost = marketconfig.param_dict.get("backup_marginal_cost", 10e4)
+
+        read_pypsa_grid(self.network, self.grid_data)
+        add_redispatch_generators(
+            self.network,
+            self.grid_data["generators"],
+            backup_marginal_cost,
+        )
+        add_redispatch_loads(self.network, self.grid_data["loads"])
+
         self.solver = marketconfig.param_dict.get("solver", "glpk")
-        network_path = marketconfig.param_dict.get("network_path")
         self.env = None
-        assert network_path
 
         if self.solver == "gurobi":
             try:
@@ -59,11 +76,6 @@ class RedispatchMarketRole(MarketRole):
                 log.error("gurobi not installed - using GLPK")
                 self.solver = "glpk"
 
-        # set backup marginal cost
-        self.backup_marginal_cost = marketconfig.param_dict.get(
-            "backup_marginal_cost", 10e4
-        )
-
         # set the market clearing principle
         # as pay as bid or pay as clear
         self.market_clearing_mechanism = marketconfig.param_dict.get(
@@ -71,137 +83,8 @@ class RedispatchMarketRole(MarketRole):
         )
         assert self.market_clearing_mechanism in ["pay_as_bid", "pay_as_clear"]
 
-        # setup the network
-        # add buses
-        self.add_buses(f"{network_path}/buses.csv")
-
-        # add lines
-        self.add_lines(f"{network_path}/lines.csv")
-
-        # add generators
-        self.add_generators(f"{network_path}/powerplant_units.csv")
-
-        # add loads
-        self.add_loads(f"{network_path}/demand_units.csv")
-
-    def add_buses(self, filename: str):
-        """
-        This adds nodes in the PyPSA network to which the generators and loads are connected
-
-        """
-        buses = pd.read_csv(filename, index_col=0)
-
-        self.network.madd(
-            "Bus",
-            names=buses.index,
-            **buses,
-        )
-
-    def add_lines(self, filename: str):
-        """
-        This creates transmission network in PyPSA by connecting buses with predefined line capacities
-        """
-        lines = pd.read_csv(filename, index_col=0)
-
-        self.network.madd(
-            "Line",
-            names=lines.index,
-            **lines,
-        )
-
-    def add_generators(self, filename: str):
-        """
-        This adds generators in the PyPSA network with respective bus data to which they are connected.
-        It creates upward and downward redispatch generators for each generator and adds backup generators at each node
-        """
-        generators = pd.read_csv(filename, index_col=0)
-
-        # make dataframe for p_set as zeros for data and index as snapshots
-        # and coliumns as generator names
-        p_set = pd.DataFrame(
-            np.zeros((len(self.network.snapshots), len(generators.index))),
-            index=self.network.snapshots,
-            columns=generators.index,
-        )
-
-        # add generators and their sold capacities as load with reversed sign to have fixed feed in
-        self.network.madd(
-            "Load",
-            names=generators.index,
-            bus=generators["node"],  # bus to which the generator is connected to
-            p_set=p_set,
-            sign=1,
-        )
-
-        # add upward redispatch generators
-        self.network.madd(
-            "Generator",
-            names=generators.index,
-            suffix="_up",
-            bus=generators["node"],  # bus to which the generator is connected to
-            p_nom=generators[
-                "max_power"
-            ],  # Nominal capacity of the powerplant/generator
-            p_min_pu=p_set,
-            p_max_pu=p_set + 1,
-            marginal_cost=p_set,
-        )
-
-        # add downward redispatch generators
-        self.network.madd(
-            "Generator",
-            names=generators.index,
-            suffix="_down",
-            bus=generators["node"],  # bus to which the generator is connected to
-            p_nom=generators[
-                "max_power"
-            ],  # Nominal capacity of the powerplant/generator
-            p_min_pu=p_set,
-            p_max_pu=p_set + 1,
-            marginal_cost=p_set,
-            sign=-1,
-        )
-
-        # add upward and downward backup generators at each node
-        self.network.madd(
-            "Generator",
-            names=self.network.buses.index,
-            suffix="_backup_up",
-            bus=self.network.buses.index,  # bus to which the generator is connected to
-            p_nom=10e4,
-            marginal_cost=self.backup_marginal_cost,
-        )
-
-        self.network.madd(
-            "Generator",
-            names=self.network.buses.index,
-            suffix="_backup_down",
-            bus=self.network.buses.index,  # bus to which the generator is connected to
-            p_nom=10e4,
-            marginal_cost=self.backup_marginal_cost,
-            sign=-1,
-        )
-
-    def add_loads(self, filename: str):
-        """
-        This adds loads in the PyPSA network with respective bus data to which they are connected
-        """
-        loads = pd.read_csv(filename, index_col=0)
-
-        p_set = pd.DataFrame(
-            np.zeros((len(self.network.snapshots), len(loads.index))),
-            index=self.network.snapshots,
-            columns=loads.index,
-        )
-
-        # add loads with reversed sign as demand is modeled with negative values
-        self.network.madd(
-            "Load",
-            names=loads.index,
-            bus=loads["node"],  # bus to which the generator is connected to
-            p_set=p_set,
-            sign=1,
-        )
+    def setup(self):
+        super().setup()
 
     def clear(
         self, orderbook: Orderbook, market_products
@@ -273,7 +156,6 @@ class RedispatchMarketRole(MarketRole):
 
         # Update the network parameters
         redispatch_network = self.network.copy()
-
         redispatch_network.loads_t.p_set = p_set
 
         # Update p_max_pu for generators with _up and _down suffixes
@@ -326,14 +208,8 @@ class RedispatchMarketRole(MarketRole):
         # calculate meta data such as total upwared and downward redispatch, total backup dispatch
         # and total redispatch cost
         for i, product in enumerate(market_products):
-            orders = orderbook_df[orderbook_df["start_time"] == product[0]]
             meta.extend(
-                calculate_meta(
-                    network=redispatch_network,
-                    orders=orders,
-                    product=product,
-                    i=i,
-                )
+                calculate_meta(network=redispatch_network, product=product, i=i)
             )
 
         # remove all orders to clean up the orderbook and avoid double clearing
@@ -397,7 +273,7 @@ class RedispatchMarketRole(MarketRole):
                 )
 
 
-def calculate_meta(network, orders, product: MarketProduct, i: int):
+def calculate_meta(network, product: MarketProduct, i: int):
     """
     This function calculates the meta data such as total upward and downward redispatch,
     total backup dispatch, and total redispatch cost.
@@ -438,19 +314,11 @@ def calculate_meta(network, orders, product: MarketProduct, i: int):
                 "demand_volume_energy": demand_volume * duration_hours,
                 "supply_volume_energy": supply_volume * duration_hours,
                 "price": price,
-                "node_id": bus,
+                "node": bus,
                 "product_start": product[0],
                 "product_end": product[1],
                 "only_hours": product[2],
             }
         )
-
-    # total_upward_redispatch = network.generators_t.p.iloc[i].filter(regex="_up").sum()
-    # total_downward_redispatch = (
-    #     network.generators_t.p.iloc[i].filter(regex="_down").sum()
-    # )
-    # total_backup_dispatch = network.generators_t.p.iloc[i].filter(regex="_backup").sum()
-
-    # total_redispatch_cost = orders["accepted_volume"].dot(orders["accepted_price"])
 
     return meta

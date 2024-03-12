@@ -10,6 +10,7 @@ For compatibility with other simulation tools, ASSUME provides a variety of scen
 - :ref:`csv` - File based scenarios (most flexible)
 - :ref:`amiris` - used to create comparative studies
 - :ref:`oeds` - create scenarios with the Open Energy Data Server
+- :ref:`pypsa_loader_doc` - create scenarios from imported PyPSA networks
 
 
 The possibilities and a short usage guide of the different scenario loaders are explained below:
@@ -72,6 +73,7 @@ If you want to adjust the scenario or change bidding strategies, you currently h
 as it currently does not use reinforcement learning or different bidding strategies at all.
 It tries to resemble the behavior of AMIRIS in the best way possible.
 As AMIRIS currently only supports a single market design (with different support mechanisms), the market design can not be adjusted.
+For more information consult the methods documentation :py:meth:`assume.scenario.loader_amiris.load_amiris_async`.
 
 .. _oeds:
 
@@ -110,9 +112,74 @@ An example configuration of how this can be used is shown here:
         )
     ]
     # load the dataset from the database
-    load_oeds(world, "oeds_mastr_simulation", "my_studycase", infra_uri, marketdesign, nuts_config)
+    world.loop.run_until_complete(
+        load_oeds_async(world, "oeds_mastr_simulation", "my_studycase", infra_uri, marketdesign, nuts_config)
+    )
 
     # Run the scenario
     world.run()
 
-If there are different
+This creates operators each per NUTS areas and creates a single EOM market, just as the `DMAS simulation <https://github.com/NOWUM/dmas/>`_ from FH Aachen.
+For more information consult the methods documentation :py:meth:`assume.scenario.loader_oeds.load_oeds`.
+
+.. _pypsa_loader_doc:
+
+PyPSA
+-----
+
+The `PyPSA <https://github.com/PyPSA/pypsa/>`_ loader can be used to load a scenario from a configured PyPSA network.
+
+The components for `generators`, `loads`, `buses`, `lines`, `storage_operators` and so on have to be configured.
+Operation values have to be given through the `generators_t` and `loads_t` param of the pypsa network.
+
+It makes it possible to load for example from PyPSA CSV files using :py:meth:`pypsa.Network.import_from_csv_folder`
+
+An example can be seen from the pypsa scigrid case:
+
+.. code-block:: python
+
+    from assume.scenario.loader_pypsa import load_pypsa
+    from assume import World
+    import pypsa
+
+    db_uri = "postgresql://assume:assume@localhost:5432/assume"
+    world = World(database_uri=db_uri)
+    network = pypsa.examples.scigrid_de(from_master=True)
+    start = network.snapshots[0]
+    end = network.snapshots[-1]
+    marketdesign = [
+        MarketConfig(
+            "EOM",
+            rr.rrule(rr.HOURLY, interval=1, dtstart=start, until=end),
+            timedelta(hours=1),
+            "redispatch",
+            [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+            additional_fields=["node"],
+            maximum_bid_volume=1e9,
+            maximum_bid_price=1e9,
+        )
+    ]
+
+    bidding_strategies = {
+        "hard coal": "naive_redispatch",
+        "lignite": "naive_redispatch",
+        "oil": "naive_redispatch",
+        "gas": "naive_redispatch",
+        "biomass": "naive_redispatch",
+        "nuclear": "naive_redispatch",
+        "wind": "naive_redispatch",
+        "solar": "naive_redispatch",
+        "demand": "naive_redispatch",
+    }
+    world.loop.run_until_complete(
+        load_pypsa_async(world, scenario, study_case, network, marketdesign, bidding_strategies)
+    )
+    world.loop.run_until_complete(
+        load_pypsa_async(world, "world_pypsa", "scigrid_de", network, marketdesign)
+    )
+    
+    world.run()
+
+You can also create and use your own existing scenarios in pypsa format to convert these into a market simulation too.
+
+For more information consult the methods documentation :py:meth:`assume.scenario.loader_pypsa.load_pypsa`.

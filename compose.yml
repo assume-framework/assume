@@ -5,7 +5,9 @@
 version: "3.9"
 services:
   assume_db:
-    image: timescale/timescaledb:latest-pg15
+    image: timescaledev/timescaledb-ha:pg15-all-oss
+    # smaller without postgis support:
+    # image: timescale/timescaledb:latest-pg15
     container_name: assume_db
     restart: always
     environment:
@@ -14,7 +16,10 @@ services:
       - POSTGRES_DB=assume
       - TS_TUNE_MAX_CONNS=500
     volumes:
-      - ./assume-db:/var/lib/postgresql/data
+      # needed for normal image
+      #- ./assume-db:/var/lib/postgresql/data
+      # ~/data is path for timescaledev image
+      - ./assume-db:~/data
     ports:
       - 5432:5432
     deploy:
@@ -24,7 +29,7 @@ services:
         constraints: [node.role == manager]
 
   grafana:
-    image: grafana/grafana-oss:9.2.15
+    image: grafana/grafana-oss:latest
     container_name: assume_grafana
     user: "104"
     depends_on:
@@ -34,7 +39,7 @@ services:
     environment:
       GF_SECURITY_ALLOW_EMBEDDING: "true"
       GF_AUTH_ANONYMOUS_ENABLED: "true"
-      GF_INSTALL_PLUGINS: "marcusolsson-dynamictext-panel"
+      GF_INSTALL_PLUGINS: "marcusolsson-dynamictext-panel,orchestracities-map-panel"
       GF_SECURITY_ADMIN_USER: assume
       GF_SECURITY_ADMIN_PASSWORD: "assume"
       GF_RENDERING_SERVER_URL: http://renderer:8081/render
