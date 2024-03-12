@@ -83,10 +83,10 @@ class NodalMarketRole(MarketRole):
 
         # set the market clearing principle
         # as pay as bid or pay as clear
-        self.market_clearing_mechanism = marketconfig.param_dict.get(
-            "market_clearing_mechanism", "pay_as_bid"
+        self.payment_mechanism = marketconfig.param_dict.get(
+            "payment_mechanism", "pay_as_bid"
         )
-        assert self.market_clearing_mechanism in ["pay_as_bid", "pay_as_clear"]
+        assert self.payment_mechanism in ["pay_as_bid", "pay_as_clear"]
 
     def setup(self):
         super().setup()
@@ -188,13 +188,13 @@ class NodalMarketRole(MarketRole):
         """
 
         # Get all generators except for _backup generators
-        generators_t_p = network.generators_t.p.filter(regex="^(?!.*_backup)")
+        generators_t_p = network.generators_t.p.filter(regex="^(?!.*_backup)").copy()
 
         # select demand units as those with negative volume in orderbook
         demand_units = orderbook_df[orderbook_df["volume"] < 0]["unit_id"].unique()
 
         # change values to negative for demand units
-        generators_t_p.loc[:, demand_units] = -generators_t_p.loc[:, demand_units]
+        generators_t_p.loc[:, demand_units] *= -1
 
         # Find intersection of unit_ids in orderbook_df and columns in redispatch_volumes for direct mapping
         valid_units = orderbook_df["unit_id"].unique()
@@ -206,7 +206,7 @@ class NodalMarketRole(MarketRole):
                 unit
             ].values
 
-            if self.market_clearing_mechanism == "pay_as_bid":
+            if self.payment_mechanism == "pay_as_bid":
                 # set accepted price as the price bid price from the orderbook
                 orderbook_df.loc[unit_orders, "accepted_price"] = np.where(
                     orderbook_df.loc[unit_orders, "accepted_volume"] > 0,
@@ -218,7 +218,7 @@ class NodalMarketRole(MarketRole):
                     ),
                 )
 
-            elif self.market_clearing_mechanism == "pay_as_clear":
+            elif self.payment_mechanism == "pay_as_clear":
                 # set accepted price as the nodal marginal price
                 nodal_marginal_prices = -network.buses_t.marginal_price
                 unit_node = orderbook_df.loc[unit_orders, "node"].values[0]

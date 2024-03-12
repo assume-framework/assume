@@ -47,7 +47,7 @@ base:
       param_dict:
         network_path: .
         solver: glpk
-        market_clearing_mechanism: pay_as_bid
+        payment_mechanism: pay_as_bid
         backup_marginal_cost: 10000
 
 
@@ -74,8 +74,10 @@ nodal_case:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: nodal
+      additional_fields:
+        - node
       param_dict:
         network_path: .
         solver: glpk
-        market_clearing_mechanism: pay_as_clear
+        payment_mechanism: pay_as_clear
         backup_marginal_cost: 10000

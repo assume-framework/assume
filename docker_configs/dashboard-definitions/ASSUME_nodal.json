@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 7,
+  "id": 4,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -351,7 +351,8 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "Price"
+                  "Price north",
+                  "Price south"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -372,9 +373,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
+        "w": 24,
+        "x": 0,
+        "y": 16
       },
       "id": 11,
       "maxPerRow": 4,
@@ -409,7 +410,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  demand_volume AS \"Demand volume\",\n  supply_volume AS \"Supply volume\"\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, demand_volume, supply_volume\nORDER BY 1;\n",
+          "rawSql": "SELECT\n  product_start AS \"time\",\n  demand_volume AS \"Demand volume\",\n  supply_volume AS \"Supply volume\",\n  node_id as \"Node\"\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, demand_volume, supply_volume, node_id\nORDER BY 1;\n",
           "refId": "Volume",
           "select": [
             [
@@ -442,7 +443,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  price AS \"Price\"\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, price\nORDER BY 1;\n",
+          "rawSql": "SELECT\n  product_start AS \"time\",\n  price AS \"Price\",\n  node_id as \"Node\"\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, price, node_id\nORDER BY 1;\n",
           "refId": "Price",
           "select": [
             [
@@ -532,7 +533,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 16
+        "y": 56
       },
       "id": 19,
       "options": {
@@ -709,7 +710,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 16
+        "y": 56
       },
       "id": 20,
       "options": {
@@ -832,9 +833,9 @@
     "list": [
       {
         "current": {
-          "selected": false,
-          "text": "example_01d_base",
-          "value": "example_01d_base"
+          "selected": true,
+          "text": "example_01d_nodal_case",
+          "value": "example_01d_nodal_case"
         },
         "datasource": {
           "type": "postgres",
@@ -857,8 +858,8 @@
       {
         "current": {
           "selected": false,
-          "text": "EOM",
-          "value": "EOM"
+          "text": "nodal",
+          "value": "nodal"
         },
         "datasource": {
           "type": "postgres",

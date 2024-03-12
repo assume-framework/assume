@@ -82,10 +82,10 @@ class RedispatchMarketRole(MarketRole):
 
         # set the market clearing principle
         # as pay as bid or pay as clear
-        self.market_clearing_mechanism = marketconfig.param_dict.get(
-            "market_clearing_mechanism", "pay_as_bid"
+        self.payment_mechanism = marketconfig.param_dict.get(
+            "payment_mechanism", "pay_as_bid"
         )
-        assert self.market_clearing_mechanism in ["pay_as_bid", "pay_as_clear"]
+        assert self.payment_mechanism in ["pay_as_bid", "pay_as_clear"]
 
     def setup(self):
         super().setup()
@@ -253,7 +253,7 @@ class RedispatchMarketRole(MarketRole):
                     f"{unit}_down"
                 ].values
 
-            if self.market_clearing_mechanism == "pay_as_bid":
+            if self.payment_mechanism == "pay_as_bid":
                 # set accepted price as the price bid price from the orderbook
                 orderbook_df.loc[unit_orders, "accepted_price"] = np.where(
                     orderbook_df.loc[unit_orders, "accepted_volume"] > 0,
@@ -265,7 +265,7 @@ class RedispatchMarketRole(MarketRole):
                     ),
                 )
 
-            elif self.market_clearing_mechanism == "pay_as_clear":
+            elif self.payment_mechanism == "pay_as_clear":
                 # set accepted price as the nodal marginal price
                 nodal_marginal_prices = -network.buses_t.marginal_price
                 unit_node = orderbook_df.loc[unit_orders, "node"].values[0]
