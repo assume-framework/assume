@@ -177,7 +177,7 @@ An example can be seen from the pypsa scigrid case:
     world.loop.run_until_complete(
         load_pypsa_async(world, "world_pypsa", "scigrid_de", network, marketdesign)
     )
-    
+
     world.run()
 
 You can also create and use your own existing scenarios in pypsa format to convert these into a market simulation too.
