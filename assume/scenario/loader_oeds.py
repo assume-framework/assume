@@ -14,15 +14,17 @@ from assume import World
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.scenario.oeds.infrastructure import InfrastructureInterface
-from assume.strategies.dmas_powerplant import DmasPowerplantStrategy
 
 
 async def load_oeds_async(
     world: World,
     scenario: str,
     study_case: str,
+    start: datetime,
+    end: datetime,
     infra_uri: str,
     marketdesign: list[MarketConfig],
+    bidding_strategies: dict[str, str],
     nuts_config: list[str] = [],
 ):
     """
@@ -39,9 +41,6 @@ async def load_oeds_async(
         marketdesign (list[MarketConfig]): description of the market design which will be used with the scenario
         nuts_config (list[str], optional): list of NUTS areas from which the simulation data is taken. Defaults to [].
     """
-    year = 2019
-    start = datetime(year, 1, 1)
-    end = datetime(year + 1, 1, 1) - timedelta(hours=1)
     index = pd.date_range(
         start=start,
         end=end,
@@ -77,21 +76,6 @@ async def load_oeds_async(
         "biomass": 20,
         "nuclear": 1,
         "co2": 20,
-    }
-
-    default_strategy = {mc.market_id: "naive_eom" for mc in marketdesign}
-
-    world.bidding_strategies["dmas_pwp"] = DmasPowerplantStrategy
-    bidding_strategies = {
-        "hard coal": default_strategy,
-        "lignite": default_strategy,
-        "oil": default_strategy,
-        "gas": default_strategy,
-        "biomass": default_strategy,
-        "nuclear": default_strategy,
-        "wind": default_strategy,
-        "solar": default_strategy,
-        "demand": default_strategy,
     }
 
     # for each area - add demand and generation
@@ -140,6 +124,7 @@ async def load_oeds_async(
                 "technology": "demand",
                 "location": (lat, lon),
                 "node": area,
+                "price": 1e3,
             },
             NaiveForecast(index, demand=sum_demand),
         )
@@ -229,6 +214,9 @@ if __name__ == "__main__":
     )
 
     nuts_config = ["DE1", "DEA", "DEB", "DEC", "DED", "DEE", "DEF"]
+    year = 2019
+    start = datetime(year, 1, 1)
+    end = datetime(year + 1, 1, 1) - timedelta(hours=1)
     marketdesign = [
         MarketConfig(
             "EOM",
@@ -241,13 +229,30 @@ if __name__ == "__main__":
             maximum_bid_price=1e9,
         )
     ]
+
+    default_strategy = {mc.market_id: "naive_eom" for mc in marketdesign}
+
+    bidding_strategies = {
+        "hard coal": default_strategy,
+        "lignite": default_strategy,
+        "oil": default_strategy,
+        "gas": default_strategy,
+        "biomass": default_strategy,
+        "nuclear": default_strategy,
+        "wind": default_strategy,
+        "solar": default_strategy,
+        "demand": default_strategy,
+    }
     world.loop.run_until_complete(
         load_oeds_async(
             world,
             scenario,
             study_case,
+            start,
+            end,
             infra_uri,
             marketdesign,
+            bidding_strategies,
             nuts_config,
         )
     )

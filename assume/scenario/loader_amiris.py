@@ -36,7 +36,7 @@ translate_fuel_type = {
     "WindOn": "wind_onshore",
     "WindOff": "wind_offshore",
     "RunOfRiver": "hydro",
-    "Other": "hydro,",
+    "Other": "other",
 }
 
 
@@ -148,8 +148,9 @@ def add_agent_to_world(
         base_path (str): base path to load profile csv files from
         markups (dict, optional): markups read from former agents. Defaults to {}.
     """
-    strategies = {m: "naive_eom" for m in list(world.markets.keys())}
+    strategies = {m: "flexable_eom" for m in list(world.markets.keys())}
     storage_strategies = {m: "flexable_eom_storage" for m in list(world.markets.keys())}
+    demand_strategies = {m: "naive_eom" for m in list(world.markets.keys())}
     match agent["Type"]:
         case "SupportPolicy":
             support_data = agent["Attributes"]["SetSupportData"]
@@ -181,14 +182,14 @@ def add_agent_to_world(
             market_config = MarketConfig(
                 market_id=f"Market_{agent['Id']}",
                 opening_hours=rr.rrule(
-                    rr.HOURLY, interval=1, dtstart=world.start, until=world.end
+                    rr.HOURLY, interval=24, dtstart=world.start, until=world.end
                 ),
                 opening_duration=timedelta(hours=1),
                 market_mechanism=translate_clearing[
                     clearing_section["DistributionMethod"]
                 ],
                 market_products=[
-                    MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))
+                    MarketProduct(timedelta(hours=1), 24, timedelta(hours=1))
                 ],
                 maximum_bid_volume=1e6,
             )
@@ -248,7 +249,7 @@ def add_agent_to_world(
                     {
                         "min_power": 0,
                         "max_power": 100000,
-                        "bidding_strategies": strategies,
+                        "bidding_strategies": demand_strategies,
                         "technology": "demand",
                         "price": load["ValueOfLostLoad"],
                     },
@@ -332,9 +333,15 @@ def add_agent_to_world(
             fuel_price += prototype.get("OpexVarInEURperMWH", 0)
             # TODO CyclingCostInEURperMW
             # costs due to plant start up
+            availability = prototype["PlannedAvailability"]
+            if isinstance(availability, str):
+                availability = read_csv(base_path, availability)
+                availability = availability.reindex(world.index).ffill()
+            availability *= prototype.get("UnplannedAvailabilityFactor", 1)
+
             forecast = NaiveForecast(
                 world.index,
-                availability=prototype["PlannedAvailability"],
+                availability=availability,
                 fuel_price=fuel_price,
                 co2_price=prices.get("co2", 2),
             )
@@ -403,6 +410,7 @@ def add_agent_to_world(
                 for market in world.markets.keys():
                     if "SupportMarket" in market:
                         strategies[market] = "support"
+                strategies["financial_support"] = "support"
                 if support_instrument == "FIT":
                     conf_key = "TsFit"
                 elif support_instrument in ["CFD", "MPVAR"]:
