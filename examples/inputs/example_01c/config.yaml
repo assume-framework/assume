@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 eom_only:
-  start_date: 2019-01-01 00:00
-  end_date: 2019-02-01 00:00
+  start_date: 2019-01-01T00:00:00
+  end_date: 2019-02-01T00:00:00
   time_step: 1h
   save_frequency_hours: 24
 
@@ -26,8 +26,8 @@ eom_only:
       market_mechanism: pay_as_clear
 
 eom_and_crm:
-  start_date: 2019-01-01 00:00
-  end_date: 2019-01-21 00:00
+  start_date: 2019-01-01T00:00:00
+  end_date: 2019-01-21T00:00:00
   time_step: 1h
 
   bidding_strategy_params:
@@ -54,7 +54,7 @@ eom_and_crm:
     CRM_pos:
       operator: CRM_operator
       product_type: capacity_pos
-      start_date: 2019-01-01 00:00
+      start_date: 2019-01-01T00:00:00
       products:
         - duration: 4h
           count: 1
@@ -71,7 +71,7 @@ eom_and_crm:
     CRM_neg:
       operator: CRM_operator
       product_type: capacity_neg
-      start_date: 2019-01-01 00:00
+      start_date: 2019-01-01T00:00:00
       products:
         - duration: 4h
           count: 1
@@ -86,8 +86,8 @@ eom_and_crm:
       market_mechanism: pay_as_bid
 
 dam_with_complex_opt_clearing:
-  start_date: 2019-01-01 00:00
-  end_date: 2019-04-01 00:00
+  start_date: 2019-01-01T00:00:00
+  end_date: 2019-04-01T00:00:00
   time_step: 1h
   save_frequency_hours: 24
 

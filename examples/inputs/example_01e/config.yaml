@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 sho_case:
-  start_date: 2020-01-01 00:00
+  start_date: 2020-01-01T00:00:00
   end_date: 2020-01-30 23:00
   time_step: 1h
   save_frequency_hours: 24
@@ -30,7 +30,7 @@ sho_case:
         - parent_bid_id
 
 bo_case:
-  start_date: 2020-01-01 00:00
+  start_date: 2020-01-01T00:00:00
   end_date: 2020-01-30 23:00
   time_step: 1h
   save_frequency_hours: 24
@@ -56,7 +56,7 @@ bo_case:
         - parent_bid_id
 
 lo_case:
-  start_date: 2020-01-01 00:00
+  start_date: 2020-01-01T00:00:00
   end_date: 2020-01-30 23:00
   time_step: 1h
   save_frequency_hours: 24
