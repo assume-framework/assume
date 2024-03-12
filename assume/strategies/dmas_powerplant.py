@@ -269,7 +269,7 @@ class DmasPowerplantStrategy(BaseStrategy):
         self.opt_results[step]["obj"] = value(self.model.obj)
 
         if step == 0:
-            end = start + unit.index.freq * (hour_count - 1)
+            end = start + unit.freq * (hour_count - 1)
             unit.outputs["fuel"].loc[start:end] = self.opt_results[step]["fuel"]
             unit.outputs["emission"].loc[start:end] = self.opt_results[step]["emission"]
             unit.outputs["start_ups"].loc[start:end] = self.opt_results[step]["start"]
@@ -766,7 +766,7 @@ class DmasPowerplantStrategy(BaseStrategy):
                 lambda o: start + timedelta(hours=o["hour"]), axis=1
             )
             df["end_time"] = df.apply(
-                lambda o: start + timedelta(hours=o["hour"]) + unit.index.freq, axis=1
+                lambda o: start + timedelta(hours=o["hour"]) + unit.freq, axis=1
             )
             del df["hour"]
             df["exclusive_id"] = None

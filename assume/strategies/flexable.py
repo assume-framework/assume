@@ -566,9 +566,9 @@ def calculate_reward_EOM(
     for order in orderbook:
         start = order["start_time"]
         end = order["end_time"]
-        end_excl = end - unit.index.freq
+        end_excl = end - unit.freq
 
-        order_times = pd.date_range(start, end_excl, freq=unit.index.freq)
+        order_times = pd.date_range(start, end_excl, freq=unit.freq)
 
         for start in order_times:
             marginal_cost = unit.calculate_marginal_cost(

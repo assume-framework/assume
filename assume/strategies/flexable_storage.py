@@ -192,8 +192,8 @@ class flexableEOMStorage(BaseStrategy):
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
-            end_excl = end - unit.index.freq
-            index = pd.date_range(start, end_excl, freq=unit.index.freq)
+            end_excl = end - unit.freq
+            index = pd.date_range(start, end_excl, freq=unit.freq)
             costs = pd.Series(0.0, index=index)
             for start in index:
                 if unit.outputs[product_type][start] != 0:
@@ -489,12 +489,12 @@ def get_specific_revenue(unit, marginal_cost, t, foresight, price_forecast):
     if t + foresight > price_forecast.index[-1]:
         price_forecast = price_forecast.loc[t:]
         _, max_power_discharge = unit.calculate_min_max_discharge(
-            start=t, end=price_forecast.index[-1] + unit.index.freq
+            start=t, end=price_forecast.index[-1] + unit.freq
         )
     else:
         price_forecast = price_forecast.loc[t : t + foresight]
         _, max_power_discharge = unit.calculate_min_max_discharge(
-            start=t, end=t + foresight + unit.index.freq
+            start=t, end=t + foresight + unit.freq
         )
 
     possible_revenue = 0
