@@ -3,283 +3,228 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-from itertools import groupby
-from operator import itemgetter
+from typing import List, Tuple
 
+import numpy as np
 import pandas as pd
-from pyomo.environ import (
-    ConcreteModel,
-    ConstraintList,
-    NonNegativeReals,
-    Objective,
-    Reals,
-    Set,
-    Suffix,
-    Var,
-    maximize,
-)
-from pyomo.opt import SolverFactory, check_available_solvers
+import pypsa
 
-from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
+from assume.common.grid_utils import (
+    add_backup_generators,
+    add_generators,
+    add_nodal_loads,
+    calculate_network_meta,
+    read_pypsa_grid,
+)
+from assume.common.market_objects import MarketConfig, Orderbook
 from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)
 
-SOLVERS = ["glpk", "cbc", "gurobi", "cplex"]
+logging.getLogger("linopy").setLevel(logging.WARNING)
 
 
-def lines_to_dict(lines):
-    result = {}
-    for idx, row in lines.iterrows():
-        result[row.name] = (row.bus0, row.bus1, row.s_nom)
-    return result
+class NodalMarketRole(MarketRole):
+    """
 
+    A market role that performs market clearing at each node (bus) in an electricity network.
+    It uses PyPSA to model the electricity network and perform market clearing.
 
-class NodalPyomoMarketRole(MarketRole):
+    Args:
+        marketconfig (MarketConfig): The market configuration.
+
+    Notes:
+        Users can also configure the path to the network data, the solver to be used,
+        and the backup marginal cost in the param_dict of the market configuration.
+
+    """
+
     required_fields = ["node"]
 
-    def __init__(
-        self,
-        marketconfig: MarketConfig,
-    ):
-        """
-        Network can be for example:
-
-        defined as connections between nodes as a tuple of (node1, node2, capacity)
-        network = {"Line_0": (0, 1, 0), "Line_1": (1, 2, 0), "Line_2": (2, 0, 0)}
-
-        or with added congestion
-        network = {"Line_0": (0, 1, 100), "Line_1": (1, 2, 100), "Line_2": (2, 0, 100)}
-        """
+    def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
+
+        self.network = pypsa.Network()
+        # set snapshots as list from the value marketconfig.producs.count converted to list
+        self.network.snapshots = range(marketconfig.market_products[0].count)
         assert self.grid_data
 
-        self.nodes = list(self.grid_data["buses"].index)
-        self.network = lines_to_dict(self.grid_data["lines"])
+        read_pypsa_grid(
+            network=self.network,
+            grid_dict=self.grid_data,
+        )
+        add_generators(
+            network=self.network,
+            generators=self.grid_data["generators"],
+        )
+        add_backup_generators(
+            network=self.network,
+            backup_marginal_cost=marketconfig.param_dict.get(
+                "backup_marginal_cost", 10e4
+            ),
+        )
+        add_nodal_loads(
+            network=self.network,
+            loads=self.grid_data["loads"],
+        )
 
-        self.incidence_matrix = pd.DataFrame(0, index=self.nodes, columns=self.network)
-        for i, (node1, node2, capacity) in self.network.items():
-            self.incidence_matrix.at[node1, i] = 1
-            self.incidence_matrix.at[node2, i] = -1
+        self.solver = marketconfig.param_dict.get("solver", "glpk")
+        self.env = None
+
+        if self.solver == "gurobi":
+            try:
+                from gurobipy import Env
+
+                self.env = Env()
+                self.env.setParam("LogToConsole", 0)
+            except ImportError:
+                log.error("gurobi not installed - using GLPK")
+                self.solver = "glpk"
+
+        # set the market clearing principle
+        # as pay as bid or pay as clear
+        self.payment_mechanism = marketconfig.param_dict.get(
+            "payment_mechanism", "pay_as_bid"
+        )
+        assert self.payment_mechanism in ["pay_as_bid", "pay_as_clear"]
 
     def setup(self):
         super().setup()
 
     def clear(
-        self, orderbook: Orderbook, market_products: list[MarketProduct]
-    ) -> (Orderbook, Orderbook, list[dict]):
+        self, orderbook: Orderbook, market_products
+    ) -> tuple[Orderbook, Orderbook, list[dict]]:
         """
-        Performs a nodal pricing optimization using the Pyomo library.
-        It takes market orders, simulates network congestion, and computes optimal power generation and
-        consumption at different nodes while considering constraints and objectives.
-        The results are used to update order information and collect meta-information for reporting.
+        Clears the market by running a linear optimal power flow (LOPF) with PyPSA.
 
         Args:
-            orderbook (Orderbook): the orders to be cleared as an orderbook
-            market_products (list[MarketProduct]): the list of products which are cleared in this clearing
+            orderbook (Orderbook): The orderbook to be cleared.
+            market_products (list[MarketProduct]): The products for which clearing happens.
 
         Returns:
-            tuple[Orderbook, Orderbook, list[dict]]: accepted orderbook, rejected orderbook and clearing meta data
+            Tuple[Orderbook, Orderbook, List[dict]]: The accepted orderbook, rejected orderbook and market metadata.
         """
-        market_getter = itemgetter("start_time", "end_time", "only_hours")
-        accepted_orders: Orderbook = []
-        rejected_orders: Orderbook = []
+
+        orderbook_df = pd.DataFrame(orderbook)
+        orderbook_df["accepted_volume"] = 0.0
+        orderbook_df["accepted_price"] = 0.0
+
+        # Now you can pivot the DataFrame
+        volume_pivot = orderbook_df.pivot(
+            index="start_time", columns="unit_id", values="volume"
+        )
+        max_power_pivot = orderbook_df.pivot(
+            index="start_time", columns="unit_id", values="max_power"
+        )
+        min_power_pivot = orderbook_df.pivot(
+            index="start_time", columns="unit_id", values="min_power"
+        )
+        costs = orderbook_df.pivot(
+            index="start_time", columns="unit_id", values="price"
+        )
+        # change costs to negative where volume is negative
+        costs = costs.where(volume_pivot > 0, -costs)
+
+        # Calculate p_max_pu_up as difference between max_power and accepted volume
+        p_max_pu = volume_pivot.div(max_power_pivot.where(max_power_pivot != 0, np.inf))
+
+        # Calculate p_max_pu_down as difference between accepted volume and min_power
+        p_min_pu = min_power_pivot.div(
+            max_power_pivot.where(max_power_pivot != 0, np.inf)
+        )
+        p_min_pu = p_min_pu.clip(lower=0)  # Ensure no negative values
+
+        # reset indexes for all dataframes
+        p_max_pu.reset_index(inplace=True, drop=True)
+        p_min_pu.reset_index(inplace=True, drop=True)
+        costs.reset_index(inplace=True, drop=True)
+
+        # Update the network parameters
+        nodal_network = self.network.copy()
+
+        # Update p_max_pu for generators with _up and _down suffixes
+        nodal_network.generators_t.p_max_pu.update(p_max_pu)
+        nodal_network.generators_t.p_min_pu.update(p_min_pu)
+
+        # Add _up and _down suffix to costs and update the network
+        nodal_network.generators_t.marginal_cost.update(costs)
+
+        status, termination_condition = nodal_network.optimize(
+            solver_name=self.solver,
+            env=self.env,
+        )
+
+        if status != "ok":
+            log.error(f"Solver exited with {termination_condition}")
+            raise Exception("Solver in redispatch market did not converge")
+
+        # process dispatch data
+        self.process_dispatch_data(network=nodal_network, orderbook_df=orderbook_df)
+
+        # return orderbook_df back to orderbook format as list of dicts
+        accepted_orders = orderbook_df.to_dict("records")
+        rejected_orders = []
         meta = []
-        orderbook.sort(key=market_getter)
-        for product, product_orders in groupby(orderbook, market_getter):
-            product_orders = list(product_orders)
-            if product[0:3] not in market_products:
-                rejected_orders.extend(product_orders)
-                # log.debug(f'found unwanted bids for {product} should be {market_products}')
-                continue
 
-            supply_orders = [x for x in product_orders if x["volume"] > 0]
-            demand_orders = [x for x in product_orders if x["volume"] < 0]
-            # volume 0 is ignored/invalid
-
-            if "acceptance_ratio" in self.marketconfig.additional_fields:
-                supply_bids = list(
-                    map(
-                        itemgetter(
-                            "node", "price", "volume", "agent_id", "acceptance_ratio"
-                        ),
-                        supply_orders,
-                    )
-                )
-                demand_bids = []
-                for order in demand_orders:
-                    demand_bids.append(
-                        (
-                            order["node"],
-                            order["price"],
-                            -order["volume"],
-                            order["agent_id"],
-                            order["acceptance_ratio"],
-                        )
-                    )
-            else:
-                supply_bids = list(
-                    map(
-                        itemgetter("node", "price", "volume", "agent_id"),
-                        supply_orders,
-                    )
-                )
-                demand_bids = []
-                for order in demand_orders:
-                    demand_bids.append(
-                        (
-                            order["node"],
-                            order["price"],
-                            -order["volume"],
-                            order["agent_id"],
-                        )
-                    )
-            # Create a model
-            model = ConcreteModel()
-
-            model.dual = Suffix(direction=Suffix.IMPORT_EXPORT)
-
-            # Create power variable for generation and consumption
-            model.p_generation = Var(range(len(supply_bids)), domain=NonNegativeReals)
-            model.p_consumption = Var(range(len(demand_bids)), domain=NonNegativeReals)
-
-            # Create a set for the lines in the network
-            model.lines = Set(initialize=self.network.keys())
-            # Create a variable for the flow over each line
-            model.flow = Var(model.lines, domain=Reals)
-
-            # Create a constraint that the flow over each line must be less than or equal to the capacity of the line
-            model.capacity_constraint = ConstraintList()
-            for i, (node1, node2, capacity) in self.network.items():
-                model.capacity_constraint.add(model.flow[i] <= capacity)
-                model.capacity_constraint.add(model.flow[i] >= -capacity)
-
-            # Create a constraint that the flow over each line must be less than or equal to the capacity of the line
-            model.balance_constraint = ConstraintList()
-            for node in self.nodes:
-                model.balance_constraint.add(
-                    sum(
-                        model.p_generation[i]
-                        for i in range(len(supply_bids))
-                        if supply_bids[i][0] == node
-                    )
-                    - sum(
-                        self.incidence_matrix.at[node, i] * model.flow[i]
-                        for i in self.network.keys()
-                    )
-                    - sum(
-                        model.p_consumption[i]
-                        for i in range(len(demand_bids))
-                        if demand_bids[i][0] == node
-                    )
-                    == 0
-                )
-
-            if "acceptance_ratio" in self.marketconfig.additional_fields:
-                # Maximum power generation constraint
-                model.max_generation = ConstraintList()
-                for i, (node, price, volume, bid_id, ratio) in enumerate(supply_bids):
-                    model.max_generation.add(model.p_generation[i] <= volume)
-
-                # Maximum power consumption constraint
-                model.max_consumption = ConstraintList()
-                for i, (node, price, volume, bid_id, ratio) in enumerate(demand_bids):
-                    model.max_consumption.add(model.p_consumption[i] <= volume)
-
-                # Minimum power generation constraint
-                model.min_generation = ConstraintList()
-                for i, (node, price, volume, bid_id, ratio) in enumerate(supply_bids):
-                    model.max_generation.add(
-                        model.p_generation[i] == 0
-                        or model.p_generation[i] >= volume * ratio
-                    )
-
-                # Minimum power consumption constraint
-                model.min_consumption = ConstraintList()
-                for i, (node, price, volume, bid_id, ratio) in enumerate(demand_bids):
-                    model.max_consumption.add(
-                        model.p_consumption[i] == 0
-                        or model.p_generation[i] >= volume * ratio
-                    )
-            else:
-                # Maximum power generation constraint
-                model.max_generation = ConstraintList()
-                for i, (node, price, volume, bid_id) in enumerate(supply_bids):
-                    model.max_generation.add(model.p_generation[i] <= volume)
-
-                # Maximum power consumption constraint
-                model.max_consumption = ConstraintList()
-                for i, (node, price, volume, bid_id) in enumerate(demand_bids):
-                    model.max_consumption.add(model.p_consumption[i] <= volume)
-
-            # Obective function
-            model.obj = Objective(
-                expr=sum(
-                    model.p_consumption[i] * demand_bids[i][1]
-                    for i in range(len(demand_bids))
-                )
-                - sum(
-                    model.p_generation[i] * supply_bids[i][1]
-                    for i in range(len(supply_bids))
-                ),
-                sense=maximize,
+        # calculate meta data such as total upwared and downward redispatch, total backup dispatch
+        # and total redispatch cost
+        for i, product in enumerate(market_products):
+            meta.extend(
+                calculate_network_meta(network=nodal_network, product=product, i=i)
             )
 
-            # Create a solver
-            solvers = check_available_solvers(*SOLVERS)
-            if len(solvers) < 1:
-                raise Exception(f"None of {SOLVERS} are available")
-            solver = SolverFactory(solvers[0])
+        # remove all orders to clean up the orderbook and avoid double clearing
+        self.all_orders = []
 
-            # Solve the model
-            result = solver.solve(model)
+        return accepted_orders, rejected_orders, meta
 
-            if not result["Solver"][0]["Status"] == "ok":
-                raise Exception("infeasible")
+    def process_dispatch_data(self, network: pypsa.Network, orderbook_df: pd.DataFrame):
+        """
+        This function processes the dispatch data to calculate the dispatch volumes and prices
+        and update the orderbook with the accepted volumes and prices.
 
-            # Find the dual variable for the balance constraint
-            duals_dict = {str(key): -model.dual[key] for key in model.dual.keys()}
+        Args:
+            orderbook_df (pd.DataFrame): The orderbook to be cleared.
+        """
 
-            # Find sum of generation per node
-            generation = {node: 0 for node in self.nodes}
-            consumption = {node: 0 for node in self.nodes}
-            # add demand to accepted orders with confirmed volume
-            for i in range(len(demand_orders)):
-                node = demand_orders[i]["node"]
-                opt_volume = model.p_consumption[i].value
-                consumption[node] += opt_volume
-                demand_orders[i]["volume"] = -opt_volume
-                demand_orders[i]["price"] = duals_dict[f"balance_constraint[{node+1}]"]
-                if opt_volume != 0:
-                    accepted_orders.append(demand_orders[i])
+        # Get all generators except for _backup generators
+        generators_t_p = network.generators_t.p.filter(regex="^(?!.*_backup)").copy()
 
-            for i in range(len(supply_orders)):
-                node = supply_orders[i]["node"]
-                opt_volume = model.p_generation[i].value
-                generation[node] += opt_volume
-                supply_orders[i]["volume"] = opt_volume
-                supply_orders[i]["price"] = duals_dict[f"balance_constraint[{node+1}]"]
-                if opt_volume != 0:
-                    accepted_orders.append(supply_orders[i])
+        # select demand units as those with negative volume in orderbook
+        demand_units = orderbook_df[orderbook_df["volume"] < 0]["unit_id"].unique()
 
-            # calculate meta
-            for node in self.nodes:
-                # Find sum of power flowing into each node
-                power_in = sum(
-                    self.incidence_matrix.at[node, i] * model.flow[i]()
-                    for i in self.network.keys()
+        # change values to negative for demand units
+        generators_t_p.loc[:, demand_units] *= -1
+
+        # Find intersection of unit_ids in orderbook_df and columns in redispatch_volumes for direct mapping
+        valid_units = orderbook_df["unit_id"].unique()
+
+        for unit in valid_units:
+            unit_orders = orderbook_df["unit_id"] == unit
+
+            orderbook_df.loc[unit_orders, "accepted_volume"] += generators_t_p[
+                unit
+            ].values
+
+            if self.payment_mechanism == "pay_as_bid":
+                # set accepted price as the price bid price from the orderbook
+                orderbook_df.loc[unit_orders, "accepted_price"] = np.where(
+                    orderbook_df.loc[unit_orders, "accepted_volume"] > 0,
+                    orderbook_df.loc[unit_orders, "price"],
+                    np.where(
+                        orderbook_df.loc[unit_orders, "accepted_volume"] < 0,
+                        orderbook_df.loc[unit_orders, "price"],
+                        0,  # This sets accepted_price to 0 when accepted_volume is exactly 0
+                    ),
                 )
-                meta.append(
-                    {
-                        "supply_volume": generation[node],
-                        "demand_volume": consumption[node],
-                        "uniform_price": duals_dict[f"balance_constraint[{node+1}]"],
-                        "price": duals_dict[f"balance_constraint[{node+1}]"],
-                        "node": node,
-                        "flow": power_in,
-                        "product_start": product[0],
-                        "product_end": product[1],
-                        "only_hours": product[2],
-                    }
+
+            elif self.payment_mechanism == "pay_as_clear":
+                # set accepted price as the nodal marginal price
+                nodal_marginal_prices = -network.buses_t.marginal_price
+                unit_node = orderbook_df.loc[unit_orders, "node"].values[0]
+
+                orderbook_df.loc[unit_orders, "accepted_price"] = np.where(
+                    orderbook_df.loc[unit_orders, "accepted_volume"] != 0,
+                    nodal_marginal_prices[unit_node],
+                    0,
                 )
-        return accepted_orders, [], meta

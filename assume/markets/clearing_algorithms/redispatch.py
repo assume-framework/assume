@@ -13,6 +13,7 @@ import pypsa
 from assume.common.grid_utils import (
     add_redispatch_generators,
     add_redispatch_loads,
+    calculate_network_meta,
     read_pypsa_grid,
 )
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
@@ -31,9 +32,6 @@ class RedispatchMarketRole(MarketRole):
     This allows this to be a cost based redispatch if units submit their marginal costs as prices.
     Or it can be a price based redispatch if units submit actual bid prices.
 
-    Parameters:
-        marketconfig (MarketConfig): The market configuration.
-
     Args:
         marketconfig (MarketConfig): The market configuration.
 
@@ -47,21 +45,27 @@ class RedispatchMarketRole(MarketRole):
 
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
+
         self.network = pypsa.Network()
         # set snapshots as list from the value marketconfig.producs.count converted to list
         self.network.snapshots = range(marketconfig.market_products[0].count)
         assert self.grid_data
 
-        # set backup marginal cost
-        backup_marginal_cost = marketconfig.param_dict.get("backup_marginal_cost", 10e4)
-
-        read_pypsa_grid(self.network, self.grid_data)
-        add_redispatch_generators(
-            self.network,
-            self.grid_data["generators"],
-            backup_marginal_cost,
+        read_pypsa_grid(
+            network=self.network,
+            grid_dict=self.grid_data,
         )
-        add_redispatch_loads(self.network, self.grid_data["loads"])
+        add_redispatch_generators(
+            network=self.network,
+            generators=self.grid_data["generators"],
+            backup_marginal_cost=marketconfig.param_dict.get(
+                "backup_marginal_cost", 10e4
+            ),
+        )
+        add_redispatch_loads(
+            network=self.network,
+            loads=self.grid_data["loads"],
+        )
 
         self.solver = marketconfig.param_dict.get("solver", "glpk")
         self.env = None
@@ -78,17 +82,17 @@ class RedispatchMarketRole(MarketRole):
 
         # set the market clearing principle
         # as pay as bid or pay as clear
-        self.market_clearing_mechanism = marketconfig.param_dict.get(
-            "market_clearing_mechanism", "pay_as_bid"
+        self.payment_mechanism = marketconfig.param_dict.get(
+            "payment_mechanism", "pay_as_bid"
         )
-        assert self.market_clearing_mechanism in ["pay_as_bid", "pay_as_clear"]
+        assert self.payment_mechanism in ["pay_as_bid", "pay_as_clear"]
 
     def setup(self):
         super().setup()
 
     def clear(
         self, orderbook: Orderbook, market_products
-    ) -> Tuple[Orderbook, Orderbook, List[dict]]:
+    ) -> tuple[Orderbook, Orderbook, list[dict]]:
         """
         Performs redispatch to resolve congestion in the electricity market.
         It first checks for congestion in the network and if it finds any, it performs redispatch to resolve it.
@@ -209,7 +213,7 @@ class RedispatchMarketRole(MarketRole):
         # and total redispatch cost
         for i, product in enumerate(market_products):
             meta.extend(
-                calculate_meta(network=redispatch_network, product=product, i=i)
+                calculate_network_meta(network=redispatch_network, product=product, i=i)
             )
 
         # remove all orders to clean up the orderbook and avoid double clearing
@@ -249,7 +253,7 @@ class RedispatchMarketRole(MarketRole):
                     f"{unit}_down"
                 ].values
 
-            if self.market_clearing_mechanism == "pay_as_bid":
+            if self.payment_mechanism == "pay_as_bid":
                 # set accepted price as the price bid price from the orderbook
                 orderbook_df.loc[unit_orders, "accepted_price"] = np.where(
                     orderbook_df.loc[unit_orders, "accepted_volume"] > 0,
@@ -261,9 +265,9 @@ class RedispatchMarketRole(MarketRole):
                     ),
                 )
 
-            elif self.market_clearing_mechanism == "pay_as_clear":
+            elif self.payment_mechanism == "pay_as_clear":
                 # set accepted price as the nodal marginal price
-                nodal_marginal_prices = abs(network.buses_t.marginal_price)
+                nodal_marginal_prices = -network.buses_t.marginal_price
                 unit_node = orderbook_df.loc[unit_orders, "node"].values[0]
 
                 orderbook_df.loc[unit_orders, "accepted_price"] = np.where(
@@ -271,54 +275,3 @@ class RedispatchMarketRole(MarketRole):
                     nodal_marginal_prices[unit_node],
                     0,
                 )
-
-
-def calculate_meta(network, product: MarketProduct, i: int):
-    """
-    This function calculates the meta data such as total upward and downward redispatch,
-    total backup dispatch, and total redispatch cost.
-
-    Args:
-        product (MarketProduct): The product for which clearing happens.
-        i (int): The index of the product in the market products list.
-
-    Returns:
-        dict: The meta data.
-    """
-
-    meta = []
-    duration_hours = (product[1] - product[0]) / timedelta(hours=1)
-    # iterate over buses
-    for bus in network.buses.index:
-        # add backup dispatch to dispatch
-        # Step 1: Identify generators connected to the specified bus
-        generators_connected_to_bus = network.generators[
-            network.generators.bus == bus
-        ].index
-
-        # Step 2: Select dispatch levels for these generators from network.generators_t.p
-        dispatch_for_bus = network.generators_t.p[generators_connected_to_bus].iloc[i]
-        # multiple by network.generators.sign to get the correct sign for dispatch
-        dispatch_for_bus = (
-            dispatch_for_bus * network.generators.sign[generators_connected_to_bus]
-        )
-
-        supply_volume = dispatch_for_bus[dispatch_for_bus > 0].sum()
-        demand_volume = dispatch_for_bus[dispatch_for_bus < 0].sum()
-        price = network.buses_t.marginal_price[bus].iat[i]
-
-        meta.append(
-            {
-                "supply_volume": supply_volume,
-                "demand_volume": demand_volume,
-                "demand_volume_energy": demand_volume * duration_hours,
-                "supply_volume_energy": supply_volume * duration_hours,
-                "price": price,
-                "node": bus,
-                "product_start": product[0],
-                "product_end": product[1],
-                "only_hours": product[2],
-            }
-        )
-
-    return meta

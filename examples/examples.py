@@ -43,6 +43,10 @@ availabe_examples = {
         "scenario": "example_01d",
         "study_case": "base",
     },
+    "small_with_nodal_clearing": {
+        "scenario": "example_01d",
+        "study_case": "nodal_case",
+    },
     "large_2019_eom": {"scenario": "example_02", "study_case": "base_case_2019"},
     "large_2019_eom_crm": {
         "scenario": "example_02",

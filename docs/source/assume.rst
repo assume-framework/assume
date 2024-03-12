@@ -26,7 +26,7 @@ Units
 
    assume.units
 
-Scenario Loaders
+Scenario loaders
 ----------------
 .. toctree::
    :maxdepth: 4

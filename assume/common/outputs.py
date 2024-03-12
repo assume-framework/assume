@@ -500,7 +500,7 @@ class WriteOutput(Role):
             dfs.append(df)
 
         # remove all empty dataframes
-        dfs = [df for df in dfs if not df.empty]
+        dfs = [df for df in dfs if not df.empty and df["value"].notna().all()]
         if not dfs:
             return
 
