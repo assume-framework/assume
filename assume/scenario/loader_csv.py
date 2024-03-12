@@ -317,8 +317,8 @@ async def load_scenario_folder_async(
 
     world.reset()
 
-    start = pd.Timestamp(config["start_date"])
-    end = pd.Timestamp(config["end_date"])
+    start = config["start_date"]
+    end = config["end_date"]
 
     index = pd.date_range(
         start=start,

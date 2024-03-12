@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 dam:
-  start_date: 2019-01-01 00:00
+  start_date: 2019-01-01T00:00:00
   end_date: 2019-01-15 23:00
   time_step: 1h
   save_frequency_hours: Null
@@ -53,8 +53,8 @@ dam:
 
 
 tiny:
-  start_date: 2019-01-01 00:00
-  end_date: 2019-01-02 00:00
+  start_date: 2019-01-01T00:00:00
+  end_date: 2019-01-02T00:00:00
   time_step: 1h
   save_frequency_hours: 24
   learning_mode: True
