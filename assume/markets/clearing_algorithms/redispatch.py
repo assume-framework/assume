@@ -92,7 +92,7 @@ class RedispatchMarketRole(MarketRole):
 
     def clear(
         self, orderbook: Orderbook, market_products
-    ) -> Tuple[Orderbook, Orderbook, List[dict]]:
+    ) -> tuple[Orderbook, Orderbook, list[dict]]:
         """
         Performs redispatch to resolve congestion in the electricity market.
         It first checks for congestion in the network and if it finds any, it performs redispatch to resolve it.

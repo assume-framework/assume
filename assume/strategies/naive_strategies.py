@@ -43,6 +43,9 @@ class NaiveSingleBidStrategy(BaseStrategy):
             start, end_all
         )  # minimum and maximum power output of the unit between the start time of the first product and the end time of the last product
 
+        if "node" in market_config.additional_fields:
+            node = unit.node
+
         bids = []
         for product in product_tuples:
             # for each product, calculate the marginal cost of the unit at the start time of the product
@@ -67,15 +70,23 @@ class NaiveSingleBidStrategy(BaseStrategy):
                 }
             )
 
+            if "node" in market_config.additional_fields:
+                bids[-1]["max_power"] = unit.max_power if volume > 0 else unit.min_power
+                bids[-1]["min_power"] = (
+                    min_power[start] if volume > 0 else unit.max_power
+                )
+                bids[-1]["node"] = node
+
             previous_power = volume + current_power
             if previous_power > 0:
                 op_time = max(op_time, 0) + 1
             else:
                 op_time = min(op_time, 0) - 1
 
-        bids = self.remove_empty_bids(bids)
-
-        return bids
+        if "node" in market_config.additional_fields:
+            return bids
+        else:
+            return self.remove_empty_bids(bids)
 
 
 class NaiveProfileStrategy(BaseStrategy):
@@ -317,84 +328,5 @@ class NaiveRedispatchStrategy(BaseStrategy):
                     "node": node,
                 }
             )
-
-        return bids
-
-
-class NaiveNodalStrategy(BaseStrategy):
-    """
-    A naive strategy that simply submits all information about the unit and
-    currently dispatched power for the following hours to the redispatch market.
-    Information incldes the marginal cost, the ramp up and down values, and the dispatch.
-
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def calculate_bids(
-        self,
-        unit: SupportsMinMax,
-        market_config: MarketConfig,
-        product_tuples: list[Product],
-        **kwargs,
-    ) -> Orderbook:
-        """
-        Takes information from a unit that the unit operator manages and
-        defines how it is dispatched to the market
-
-        :param unit: the unit to be dispatched
-        :type unit: SupportsMinMax
-        :param market_config: the market configuration
-        :type market_config: MarketConfig
-        :param product_tuples: list of all products the unit can offer
-        :type product_tuples: list[Product]
-        :return: the bids consisting of the start time, end time, only hours, price and volume.
-        :rtype: Orderbook
-        """
-
-        start = product_tuples[0][0]  # start time of the first product
-        end_all = product_tuples[-1][1]  # end time of the last product
-        previous_power = unit.get_output_before(
-            start
-        )  # power output of the unit before the start time of the first product
-        op_time = unit.get_operation_time(start)
-        min_power, max_power = unit.calculate_min_max_power(
-            start, end_all
-        )  # minimum and maximum power output of the unit between the start time of the first product and the end time of the last product
-        node = unit.node
-
-        bids = []
-        for product in product_tuples:
-            # for each product, calculate the marginal cost of the unit at the start time of the product
-            # and the volume of the product. Dispatch the order to the market.
-            start = product[0]
-            current_power = unit.outputs["energy"].at[
-                start
-            ]  # power output of the unit at the start time of the current product
-            marginal_cost = unit.calculate_marginal_cost(
-                start, previous_power
-            )  # calculation of the marginal costs
-            volume = unit.calculate_ramp(
-                op_time, previous_power, max_power[start], current_power
-            )
-            bids.append(
-                {
-                    "start_time": product[0],
-                    "end_time": product[1],
-                    "only_hours": product[2],
-                    "price": marginal_cost,
-                    "volume": volume,
-                    "max_power": unit.max_power if volume > 0 else unit.min_power,
-                    "min_power": min_power[start] if volume > 0 else unit.max_power,
-                    "node": node,
-                }
-            )
-
-            previous_power = volume + current_power
-            if previous_power > 0:
-                op_time = max(op_time, 0) + 1
-            else:
-                op_time = min(op_time, 0) - 1
 
         return bids
