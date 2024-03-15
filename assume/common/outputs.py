@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 from dateutil import rrule as rr
 from mango import Role
-from pandas.api.types import is_numeric_dtype
+from pandas.api.types import is_numeric_dtype, is_bool_dtype
 from psycopg2.errors import UndefinedColumn
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
@@ -352,7 +352,12 @@ class WriteOutput(Role):
             if column.lower() not in db_columns:
                 try:
                     # TODO this only works for float and text
-                    column_type = "float" if is_numeric_dtype(df[column]) else "text"
+                    if is_bool_dtype(df[column]):
+                        column_type = "boolean"
+                    elif is_numeric_dtype(df[column]):
+                        column_type = "float"
+                    else:
+                        column_type = "text"
                     query = f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"
                     with self.db.begin() as db:
                         db.execute(text(query))
@@ -410,6 +415,12 @@ class WriteOutput(Role):
 
         del df["only_hours"]
         del df["agent_id"]
+
+        if "bid_type" not in df.columns:
+            df["bid_type"] = None
+
+        if "node" not in df.columns:
+            df["node"] = None
 
         df["simulation"] = self.simulation_id
         df["market_id"] = market_id

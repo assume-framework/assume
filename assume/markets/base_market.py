@@ -208,7 +208,9 @@ class MarketRole(MarketMechanism, Role):
         self.marketconfig.aid = self.context.aid
 
         for field in self.required_fields:
-            assert field in self.marketconfig.additional_fields, "missing field"
+            assert (
+                field in self.marketconfig.additional_fields
+            ), f"{field} missing from additional_fiels"
 
         def accept_orderbook(content: OrderBookMessage, meta: MetaDict):
             if not isinstance(content, dict):

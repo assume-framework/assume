@@ -235,18 +235,10 @@ def read_pypsa_grid(
     """
 
     def add_buses(network: pypsa.Network, buses: pd.DataFrame) -> None:
-        network.madd(
-            "Bus",
-            names=buses.index,
-            **buses,
-        )
+        network.import_components_from_dataframe(buses, "Bus")
 
     def add_lines(network: pypsa.Network, lines: pd.DataFrame) -> None:
-        network.madd(
-            "Line",
-            names=lines.index,
-            **lines,
-        )
+        network.import_components_from_dataframe(lines, "Line")
 
     # setup the network
     add_buses(network, grid_dict["buses"])

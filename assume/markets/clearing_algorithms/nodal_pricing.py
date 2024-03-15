@@ -39,7 +39,7 @@ class NodalMarketRole(MarketRole):
 
     """
 
-    required_fields = ["node"]
+    required_fields = ["node", "max_power", "min_power"]
 
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
