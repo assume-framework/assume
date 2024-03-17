@@ -175,11 +175,6 @@ class SteelPlant(SupportsMinMax):
         self.model.lime_price = pyo.Param(initialize=self.lime_price.mean(), within=pyo.NonNegativeReals)
         self.model.iron_ore_price = pyo.Param(initialize=self.iron_ore_price.mean(), within=pyo.NonNegativeReals)
 
-        if self.objective == 'recalculate':
-            self.model.recalculated_power = pyo.Param(self.model.time_steps,
-            initialize={t: value for t, value in enumerate(self.recalculated_power)},
-        )
-
     def define_variables(self):
         self.model.total_power_input = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
@@ -189,14 +184,10 @@ class SteelPlant(SupportsMinMax):
             self.model.time_steps, within=pyo.NonNegativeReals
         )
 
-        self.model.reserved_power = pyo.Var(
-            self.model.time_steps, within=pyo.NonNegativeReals
-        ) 
-
     def define_constraints(self):
         @self.model.Constraint(self.model.time_steps)
         def dri_output_association_constraint(m, t):
-            return sum(self.components["eaf"].b.steel_output[t] for t in self.model.time_steps) >= self.model.steel_demand
+            return sum(self.components["eaf"].b.steel_output[t] for t in self.model.time_steps) == self.model.steel_demand
 
         if self.objective == 'min_variable_cost':
             @self.model.Constraint(self.model.time_steps)
@@ -205,14 +196,6 @@ class SteelPlant(SupportsMinMax):
                     m.total_power_input[t]
                     == self.components["electrolyser"].b.power_in[t] + \
                         self.components["eaf"].b.power_eaf[t] + self.components["dri_plant"].b.power_dri[t]
-                )
-        elif self.objective == 'recalculate':
-             @self.model.Constraint(self.model.time_steps)
-             def recalculated_total_power_input_constraint(m, t):
-                return (
-                    m.total_power_input[t] + m.recalculated_power[t]
-                    == self.components["electrolyser"].b.power_in[t] + self.components["eaf"].b.power_eaf[t] + \
-                          self.components["dri_plant"].b.power_dri[t]
                 )
         
         @self.model.Constraint(self.model.time_steps)
@@ -224,7 +207,7 @@ class SteelPlant(SupportsMinMax):
                     self.components["eaf"].b.eaf_operating_cost[t]
             
     def define_objective(self):
-        if self.objective == "min_variable_cost" or "recalculate":
+        if self.objective == "min_variable_cost":
 
             @self.model.Objective(sense=pyo.minimize)
             def obj_rule(m):
@@ -236,11 +219,7 @@ class SteelPlant(SupportsMinMax):
         elif self.objective == "max_flexibility":
             @self.model.Objective(sense=pyo.maximize)
             def obj_rule(m):
-                maximise_flexibility = sum(
-                    self.model.positive_flex[t] 
-                    +  self.model.negetive_flex[t]
-                    for t in self.model.time_steps
-                )
+                maximise_flexibility = sum(m.load_shift[t] for t in self.model.time_steps)
                 return maximise_flexibility
 
         else:
@@ -318,6 +297,37 @@ class SteelPlant(SupportsMinMax):
             prefixed_eaf_power_input = {f"{unit_id}_eaf": eaf_power_input_value}
             operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_eaf_power_input, index=[0]))
 
+            # EAF steel output
+            eaf_steel_output_value = value(self.components["eaf"].b.steel_output[t])
+            prefixed_eaf_steel_output = {f"{unit_id}_steel_output": eaf_steel_output_value}
+            operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_eaf_steel_output, index=[0]))
+
+            # # DRI Storage
+            # dri_charge_value = value(self.components["dri_storage"].b.charge_dri[t])
+            # prefixed_dri_charge_value = {f"{unit_id}_dri_charge": dri_charge_value}
+            # operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_dri_charge_value, index=[0]))
+
+            # dri_discharge_value = value(self.components["dri_storage"].b.discharge_dri[t])
+            # prefixed_dri_discharge_value = {f"{unit_id}_dri_discharge": dri_discharge_value}
+            # operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_dri_discharge_value, index=[0]))
+
+            # dri_soc_value = value(self.components["dri_storage"].b.soc_dri[t])
+            # prefixed_dri_soc_value = {f"{unit_id}_dri_soc": dri_soc_value}
+            # operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_dri_soc_value, index=[0]))
+
+            # # H2 Storage
+            # charge_value = value(self.components["h2storage"].b.charge[t])
+            # prefixed_charge_value = {f"{unit_id}_h2_charge": charge_value}
+            # operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_charge_value, index=[0]))
+
+            # discharge_value = value(self.components["h2storage"].b.discharge[t])
+            # prefixed_discharge_value = {f"{unit_id}_h2_discharge": discharge_value}
+            # operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_discharge_value, index=[0]))
+
+            # soc_value = value(self.components["h2storage"].b.soc[t])
+            # prefixed_soc_value = {f"{unit_id}_h2_soc": soc_value}
+            # operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_soc_value, index=[0]))
+
         # Set the total cost data for each unit with unit ID as prefix
         for time_step, total_variable_cost in total_variable_costs.items():
             unit_id = self.id
@@ -326,6 +336,7 @@ class SteelPlant(SupportsMinMax):
 
         # Save the operation states data to a CSV file
         operation_states_forecaster.save_operation_states(path="C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04", unit=unit_id)
+
 
     def determine_optimal_operation_with_flex(self):
         """
@@ -345,6 +356,7 @@ class SteelPlant(SupportsMinMax):
             # Display the Objective Function Value
             objective_value = self.model.obj_rule()
             logger.debug(f"The value of the objective function is {objective_value}.")
+            print(f"The objective value is: {objective_value}")
 
         elif results.solver.termination_condition == TerminationCondition.infeasible:
             logger.debug("The model is infeasible.")
@@ -361,9 +373,9 @@ class SteelPlant(SupportsMinMax):
             self.power_requirement.loc[date] = temp[i]
 
         # Collect total power input, positive flex, and negative flex values
-        total_power_input = {t: value(self.model.total_power_input[t]) for t in self.model.time_steps}
-        positive_flex = {t: value(self.model.positive_flex[t]) for t in self.model.time_steps}
-        negetive_flex = {t: value(self.model.negetive_flex[t]) for t in self.model.time_steps}
+        load_shifts = {t: value(self.model.load_shift[t]) for t in self.model.time_steps}
+        # Calculate total energy consumption for the current time step
+
         variable_costs = {t: value(self.model.variable_cost[t]) for t in self.model.time_steps}
 
         # Instantiate an OperationStatesForecaster object
@@ -372,20 +384,14 @@ class SteelPlant(SupportsMinMax):
         # Loop over time steps
         for time_step in self.model.time_steps:
             unit_id = self.id
-            power_input = total_power_input[time_step]
-            power_positive_flex = -positive_flex[time_step]
-            power_negative_flex = negetive_flex[time_step]
             total_variable_cost = variable_costs[time_step]
-
-            threshold = 1e-10
-            # Adjust negative flex to zero if it's below the threshold
-            if power_negative_flex < threshold:
-                power_negative_flex = 0
+            eaf_steel_output_value = value(self.components["eaf"].b.steel_output[time_step])
 
             # Calculate total energy consumption for the current time step
             total_power_consumption = (
                 value(self.components["electrolyser"].b.power_in[time_step])
                 + value(self.components["eaf"].b.power_eaf[time_step])
+                + value(self.components["dri_plant"].b.power_dri[time_step])
             )
 
             # Calculate marginal cost per unit of energy
@@ -394,10 +400,24 @@ class SteelPlant(SupportsMinMax):
             else:
                 marginal_cost_per_unit_power = 0  # Avoid division by zero
 
-            # Set the operation states data including total power input, positive flex, and negative flex
-            prefixed_power = {f"{unit_id}_power": [power_input]}
-            prefixed_positive_flex = {f"{unit_id}_positive_flex": [power_positive_flex]}
-            prefixed_negative_flex = {f"{unit_id}_negative_flex": [power_negative_flex]}
+            positive_reserve = (value(self.model.prev_power[time_step])- total_power_consumption)
+            negetive_reserve = (total_power_consumption - value(self.model.prev_power[time_step]))
+
+            threshold = 1e-10
+            # Adjust negative flex to zero if it's below the threshold
+
+            if positive_reserve < threshold:
+                positive_reserve = 0
+            if negetive_reserve < threshold:
+                negetive_reserve = 0
+            
+            prefixed_power = {f"{unit_id}_power": [total_power_consumption]}
+            prefixed_pos_res = {f"{unit_id}_pos_res": [positive_reserve]}
+            prefixed_neg_res = {f"{unit_id}_neg_res": [negetive_reserve]}
+            # EAF steel output
+            prefixed_eaf_steel_output = {f"{unit_id}_steel_output": eaf_steel_output_value}
+
+            
 
             # Save marginal costs in the operation states
             operation_states_forecaster.set_operation_states(
@@ -409,7 +429,7 @@ class SteelPlant(SupportsMinMax):
             )
 
             operation_states_data = pd.DataFrame(
-                {**prefixed_power, **prefixed_positive_flex, **prefixed_negative_flex},
+                {**prefixed_power, **prefixed_pos_res, **prefixed_neg_res, **prefixed_eaf_steel_output},
                 index=[0],
             )
 
@@ -417,8 +437,7 @@ class SteelPlant(SupportsMinMax):
 
         # Save the operation states data to a CSV file
         operation_states_forecaster.save_operation_states_with_flex(
-            path="C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04"
-        )
+            path="C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04", unit=unit_id)
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         """
@@ -438,13 +457,13 @@ class SteelPlant(SupportsMinMax):
                 + value(self.components["electrolyser"].b.electricity_cost[t])
                 + value(self.components["dri_plant"].b.dri_operating_cost[t])
                 + value(self.components["eaf"].b.eaf_operating_cost[t])
-                + value(self.iron_ore_price.iat[t] * self.components["dri_plant"].b.iron_ore_in[t])
             )
             
             # Calculate total energy consumption for the current time step
             total_energy_consumption = (
                 value(self.components["electrolyser"].b.power_in[t])
                 + value(self.components["eaf"].b.power_eaf[t])
+                + + value(self.components["dri_plant"].b.power_dri[t])
             )
             
             # Calculate marginal cost per unit of energy

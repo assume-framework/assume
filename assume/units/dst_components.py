@@ -207,8 +207,6 @@ class Electrolyser:
 
         self.b.electricity_cost = Var(time_steps, within=pyo.NonNegativeReals)
         self.b.start_cost = Var(time_steps, within=pyo.NonNegativeReals)
-        if self.objective == "max_flexibility":
-            self.b.reserve_electrolyser = Var(time_steps, within=pyo.NonNegativeReals)
 
     def define_constraints(self, time_steps):
         # Power bounds constraints

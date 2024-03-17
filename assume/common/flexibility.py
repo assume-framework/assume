@@ -25,14 +25,10 @@ def flexibility_cost_tolerance(self):
         )
     
     # Variables
-    self.model.positive_flex = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
-    self.model.negetive_flex = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
-
-    self.model.ramp_up_power = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
-    self.model.ramp_down_power = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
+    self.model.load_shift = pyo.Var(self.model.time_steps, within=pyo.Reals)
     
     self.model.upper_cost_limit = pyo.Var(within=pyo.NonNegativeReals)  
-    self.model.flex_switch = pyo.Var(self.model.time_steps, within=pyo.Boolean) 
+    self.model.flex_switch = pyo.Var(self.model.time_steps, within=pyo.Binary) 
 
     # Calculate the upper limit of the total cost that the steel plant can bear with flexibility
 
@@ -45,48 +41,27 @@ def flexibility_cost_tolerance(self):
     def total_cost_upper_limit(m, t):
         return sum(self.model.variable_cost[t] for t in self.model.time_steps) <= self.model.upper_cost_limit
 
-    # Ramp up power electrolyser
-
     @self.model.Constraint(self.model.time_steps)
-    def ramp_up_flex_min_bound(m, t):
-        return m.ramp_up_power[t] >= m.prev_power[t]
+    def total_power_flex_relation_constraint(m, t):
+        return  m.prev_power[t] - m.load_shift[t] == self.components["electrolyser"].b.power_in[t] + \
+            self.components["eaf"].b.power_eaf[t] + self.components["dri_plant"].b.power_dri[t]
+
+# # Load data from CSV file
+# df = pd.read_csv('C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04\\accepted_offers.csv')
+
+# prefixes = set(col.split('_')[0] for col in df.columns if '_' in col)
+
+# # Iterate over each prefix
+# for prefix in prefixes:
+#     # Identify columns with the current prefix for 'power' and 'accepted'
+#     power_col = f'{prefix}_power'
+#     accepted_col = f'{prefix}_accepted'
     
-    # Negetive flexibility
+#     # Perform subtraction only if both 'power' and 'accepted' columns exist
+#     if power_col in df.columns and accepted_col in df.columns:
+#         df[f'{prefix}_recalculated_power'] = df[power_col] + df[accepted_col]
 
-    @self.model.Constraint(self.model.time_steps)
-    def negetive_flex_electrolyser_constraint(m, t):
-        return m.negetive_flex[t] == m.ramp_up_power[t] * (1 - m.flex_switch[t]) - m.prev_power[t] 
-    
-    # Ramp down power
-    
-    @self.model.Constraint(self.model.time_steps)
-    def ramp_down_flex_max_bound(m, t):
-        return m.ramp_down_power[t] <= m.prev_power[t]
-
-    @self.model.Constraint(self.model.time_steps)
-    def positive_flex_constraint(m, t):
-        return m.positive_flex[t] == (m.prev_power[t] - m.ramp_down_power[t]) * m.flex_switch[t]
-    
-    @self.model.Constraint(self.model.time_steps)
-    def total_power_flex_relation_constrint(m, t):
-        return m.total_power_input[t] == m.ramp_up_power[t] + m.ramp_down_power[t]
-
-# Load data from CSV file
-df = pd.read_csv('C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04\\accepted_offers.csv')
-
-prefixes = set(col.split('_')[0] for col in df.columns if '_' in col)
-
-# Iterate over each prefix
-for prefix in prefixes:
-    # Identify columns with the current prefix for 'power' and 'accepted'
-    power_col = f'{prefix}_power'
-    accepted_col = f'{prefix}_accepted'
-    
-    # Perform subtraction only if both 'power' and 'accepted' columns exist
-    if power_col in df.columns and accepted_col in df.columns:
-        df[f'{prefix}_recalculated_power'] = df[power_col] + df[accepted_col]
-
-# Save the DataFrame to a new CSV file, overwriting if columns with the same name already exist
-df.to_csv('C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04\\accepted_offers.csv', index=False)
+# # Save the DataFrame to a new CSV file, overwriting if columns with the same name already exist
+# df.to_csv('C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04\\accepted_offers.csv', index=False)
 
     
