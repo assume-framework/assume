@@ -306,36 +306,15 @@ class WriteOutput(Role):
             df.reset_index()
 
             try:
-                # try to use geopandas
-                # needed for postGIS writing
-                import geoalchemy2
-                import geopandas as gpd
-                from shapely.wkt import loads
-
-                def load_wkt(string: str):
-                    return loads(string.split(";")[1])
-
-                df["geometry"] = df["wkt_srid_4326"].apply(load_wkt)
-                df = gpd.GeoDataFrame(df, geometry="geometry")
-                df.set_crs(crs="EPSG:4326", inplace=True)
-                # postgis does not lowercase tablenames
-                df.columns = map(str.lower, df.columns)
-                try:
-                    # try to input as geodataframe
-                    with self.db.begin() as db:
-                        df.to_postgis(geo_table, db, if_exists="append", index=True)
-                except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
-                    # if a column is missing, check and try again
-                    self.check_columns(geo_table, df)
-                    # now try again
-                    with self.db.begin() as db:
-                        df.to_postgis(geo_table, db, if_exists="append", index=True)
-            except (ImportError, InvalidTextRepresentation):
-                # otherwise, just use plain SQL anyway
-                # this is also needed if Int/Float is bad configured in the database
-                # try to input as normal dataframe
                 with self.db.begin() as db:
                     df.to_sql(geo_table, db, if_exists="append")
+            except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
+                # if a column is missing, check and try again
+                self.check_columns(geo_table, df)
+                # now try again
+                with self.db.begin() as db:
+                    df.to_sql(geo_table, db, if_exists="append")
+            
 
     def check_columns(self, table: str, df: pd.DataFrame, index: bool = True):
         """

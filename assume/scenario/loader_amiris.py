@@ -189,7 +189,7 @@ def add_agent_to_world(
                     clearing_section["DistributionMethod"]
                 ],
                 market_products=[
-                    MarketProduct(timedelta(hours=1), 24, timedelta(hours=1))
+                    MarketProduct(timedelta(hours=1), 24, timedelta(hours=0))
                 ],
                 maximum_bid_volume=1e6,
             )
@@ -471,18 +471,21 @@ async def load_amiris_async(
     amiris_scenario = read_amiris_yaml(base_path)
     # DeliveryIntervalInSteps = 3600
     # In practice - this seems to be a fixed number in AMIRIS
-    start = amiris_scenario["GeneralProperties"]["Simulation"]["StartTime"]
-    start = pd.to_datetime(start, format="%Y-%m-%d_%H:%M:%S")
+    simulation = amiris_scenario["GeneralProperties"]["Simulation"]
+    start = pd.to_datetime(simulation["StartTime"], format="%Y-%m-%d_%H:%M:%S")
     if calendar.isleap(start.year):
+        # AMIRIS does not considerate leap years
         start += timedelta(days=1)
-    end = amiris_scenario["GeneralProperties"]["Simulation"]["StopTime"]
-    end = pd.to_datetime(end, format="%Y-%m-%d_%H:%M:%S")
+    end = pd.to_datetime(simulation["StopTime"], format="%Y-%m-%d_%H:%M:%S")
     # AMIRIS caveat: start and end is always two minutes before actual start
     start += timedelta(minutes=2)
+    end += timedelta(minutes=2)
     sim_id = f"{scenario}_{study_case}"
-    save_interval = amiris_scenario["GeneralProperties"]["Output"]["Interval"] // 4
+    save_interval = amiris_scenario["GeneralProperties"]["Output"]["Interval"]
+    print(save_interval)
+    #save_interval = 1
     prices = {}
-    index = pd.date_range(start=start, end=end, freq="1h")
+    index = pd.date_range(start=start, end=end, freq="1h", inclusive="left")
     world.bidding_strategies["support"] = SupportStrategy
     await world.setup(
         start=start,
