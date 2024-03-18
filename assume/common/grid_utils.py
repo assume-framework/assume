@@ -150,18 +150,18 @@ def add_loads(
         network (pypsa.Network): the pypsa network to which the loads are
         loads (pandas.DataFrame): the loads dataframe
     """
-    p_set = pd.DataFrame(
-        np.zeros((len(network.snapshots), len(loads.index))),
-        index=network.snapshots,
-        columns=loads.index,
-    )
+    if "p_set" not in loads.columns:
+        loads["p_set"] = pd.DataFrame(
+            np.zeros((len(network.snapshots), len(loads.index))),
+            index=network.snapshots,
+            columns=loads.index,
+        )
 
     # add loads
     network.madd(
         "Load",
         names=loads.index,
         bus=loads["node"],  # bus to which the generator is connected to
-        p_set=p_set,
         **loads,
     )
 
@@ -173,21 +173,23 @@ def add_redispatch_loads(
     """
     This adds loads to the redispatch PyPSA network with respective bus data to which they are connected
     """
+    loads_c = loads.copy()
+    if "sign" in loads_c.columns:
+       del loads_c["sign"]
 
-    p_set = pd.DataFrame(
-        np.zeros((len(network.snapshots), len(loads.index))),
-        index=network.snapshots,
-        columns=loads.index,
-    )
-
-    # add loads with opposite sing (default for loads is -1). This is needed to properly model the redispatch
+    if "p_set" not in loads.columns:
+        loads["p_set"] = pd.DataFrame(
+            np.zeros((len(network.snapshots), len(loads.index))),
+            index=network.snapshots,
+            columns=loads.index,
+        )
+    # add loads with opposite sign (default for loads is -1). This is needed to properly model the redispatch
     network.madd(
         "Load",
         names=loads.index,
         bus=loads["node"],  # bus to which the generator is connected to
-        p_set=p_set,
         sign=1,
-        **loads,
+        **loads_c,
     )
 
 
@@ -200,7 +202,6 @@ def add_nodal_loads(
     The loads are added as generators with negative sign so their dispatch can be also curtailed,
     since regular load in PyPSA represents only an inelastic demand.
     """
-
     p_set = pd.DataFrame(
         np.zeros((len(network.snapshots), len(loads.index))),
         index=network.snapshots,
@@ -287,7 +288,7 @@ def calculate_network_meta(network, product: MarketProduct, i: int):
                 "demand_volume_energy": demand_volume * duration_hours,
                 "supply_volume_energy": supply_volume * duration_hours,
                 "price": price,
-                "node_id": bus,
+                "node": bus,
                 "product_start": product[0],
                 "product_end": product[1],
                 "only_hours": product[2],

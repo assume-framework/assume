@@ -837,6 +837,7 @@
   },
   "timepicker": {
     "refresh_intervals": [
+      "5s",
       "1m",
       "5m",
       "15m",
