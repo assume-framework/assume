@@ -12,8 +12,8 @@ import numpy as np
 import pandas as pd
 from dateutil import rrule as rr
 from mango import Role
-from pandas.api.types import is_numeric_dtype, is_bool_dtype
-from psycopg2.errors import UndefinedColumn, InvalidTextRepresentation
+from pandas.api.types import is_bool_dtype, is_numeric_dtype
+from psycopg2.errors import InvalidTextRepresentation, UndefinedColumn
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 
@@ -314,7 +314,6 @@ class WriteOutput(Role):
                 # now try again
                 with self.db.begin() as db:
                     df.to_sql(geo_table, db, if_exists="append")
-            
 
     def check_columns(self, table: str, df: pd.DataFrame, index: bool = True):
         """

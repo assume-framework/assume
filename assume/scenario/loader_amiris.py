@@ -482,8 +482,6 @@ async def load_amiris_async(
     end += timedelta(minutes=2)
     sim_id = f"{scenario}_{study_case}"
     save_interval = amiris_scenario["GeneralProperties"]["Output"]["Interval"]
-    print(save_interval)
-    #save_interval = 1
     prices = {}
     index = pd.date_range(start=start, end=end, freq="1h", inclusive="left")
     world.bidding_strategies["support"] = SupportStrategy

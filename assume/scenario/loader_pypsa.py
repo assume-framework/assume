@@ -60,6 +60,8 @@ async def load_pypsa_async(
         columns={"bus": "node", "p_nom": "max_power"}, inplace=True
     )
     network.loads.rename(columns={"bus": "node", "p_set": "min_power"}, inplace=True)
+    if "max_power" not in network.loads.columns:
+        network.loads["max_power"] = 0
     grid_data = {
         "buses": network.buses,
         "lines": network.lines,

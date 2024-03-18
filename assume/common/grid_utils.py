@@ -27,16 +27,19 @@ def add_generators(
         index=network.snapshots,
         columns=generators.index,
     )
-
+    gen_c = generators.copy()
+    if "p_min_pu" not in gen_c.columns:
+        gen_c["p_min_pu"] = p_set
+    if "p_max_pu" not in gen_c.columns:
+        gen_c["p_max_pu"] = p_set + 1
+    if "marginal_cost" not in gen_c.columns:
+        gen_c["marginal_cost"] = p_set
     # add generators
     network.madd(
         "Generator",
         names=generators.index,
         bus=generators["node"],  # bus to which the generator is connected to
         p_nom=generators["max_power"],  # Nominal capacity of the powerplant/generator
-        #p_min_pu=p_set,
-        #p_max_pu=p_set + 1,
-        #marginal_cost=p_set,
         **generators,
     )
 
@@ -150,12 +153,6 @@ def add_loads(
         network (pypsa.Network): the pypsa network to which the loads are
         loads (pandas.DataFrame): the loads dataframe
     """
-    if "p_set" not in loads.columns:
-        loads["p_set"] = pd.DataFrame(
-            np.zeros((len(network.snapshots), len(loads.index))),
-            index=network.snapshots,
-            columns=loads.index,
-        )
 
     # add loads
     network.madd(
@@ -164,6 +161,13 @@ def add_loads(
         bus=loads["node"],  # bus to which the generator is connected to
         **loads,
     )
+
+    if "p_set" not in loads.columns:
+        network.loads_t["p_set"] = pd.DataFrame(
+            np.zeros((len(network.snapshots), len(loads.index))),
+            index=network.snapshots,
+            columns=loads.index,
+        )
 
 
 def add_redispatch_loads(
@@ -177,12 +181,6 @@ def add_redispatch_loads(
     if "sign" in loads_c.columns:
         del loads_c["sign"]
 
-    if "p_set" not in loads.columns:
-        loads["p_set"] = pd.DataFrame(
-            np.zeros((len(network.snapshots), len(loads.index))),
-            index=network.snapshots,
-            columns=loads.index,
-        )
     # add loads with opposite sign (default for loads is -1). This is needed to properly model the redispatch
     network.madd(
         "Load",
@@ -191,6 +189,13 @@ def add_redispatch_loads(
         sign=1,
         **loads_c,
     )
+
+    if "p_set" not in loads.columns:
+        network.loads_t["p_set"] = pd.DataFrame(
+            np.zeros((len(network.snapshots), len(loads.index))),
+            index=network.snapshots,
+            columns=loads.index,
+        )
 
 
 def add_nodal_loads(
@@ -248,6 +253,7 @@ def read_pypsa_grid(
     # setup the network
     add_buses(network, grid_dict["buses"])
     add_lines(network, grid_dict["lines"])
+    add_loads(network, grid_dict["loads"])
 
     return network
 
