@@ -59,8 +59,7 @@ async def load_pypsa_async(
     network.generators.rename(
         columns={"bus": "node", "p_nom": "max_power"}, inplace=True
     )
-
-    network.loads.rename(columns={"bus": "node", "p_nom": "max_power"}, inplace=True)
+    network.loads.rename(columns={"bus": "node", "p_set": "min_power"}, inplace=True)
     grid_data = {
         "buses": network.buses,
         "lines": network.lines,
@@ -170,8 +169,8 @@ if __name__ == "__main__":
     world = World(database_uri=db_uri)
     scenario = "world_pypsa"
     study_case = "scigrid_de"
-    # "pay_as_clear" or "redispatch"
-    market_mechanism = "redispatch"
+    # "pay_as_clear", "redispatch" or "nodal"
+    market_mechanism = "nodal"
 
     match study_case:
         case "ac_dc_meshed":

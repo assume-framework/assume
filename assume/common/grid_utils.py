@@ -34,9 +34,9 @@ def add_generators(
         names=generators.index,
         bus=generators["node"],  # bus to which the generator is connected to
         p_nom=generators["max_power"],  # Nominal capacity of the powerplant/generator
-        p_min_pu=p_set,
-        p_max_pu=p_set + 1,
-        marginal_cost=p_set,
+        #p_min_pu=p_set,
+        #p_max_pu=p_set + 1,
+        #marginal_cost=p_set,
         **generators,
     )
 
@@ -175,7 +175,7 @@ def add_redispatch_loads(
     """
     loads_c = loads.copy()
     if "sign" in loads_c.columns:
-       del loads_c["sign"]
+        del loads_c["sign"]
 
     if "p_set" not in loads.columns:
         loads["p_set"] = pd.DataFrame(
@@ -207,6 +207,10 @@ def add_nodal_loads(
         index=network.snapshots,
         columns=loads.index,
     )
+    loads_c = loads.copy()
+
+    if "sign" in loads_c.columns:
+        del loads_c["sign"]
 
     # add loads as negative generators
     network.madd(
@@ -218,7 +222,7 @@ def add_nodal_loads(
         p_max_pu=p_set + 1,
         marginal_cost=p_set,
         sign=-1,
-        **loads,
+        **loads_c,
     )
 
 
@@ -279,7 +283,10 @@ def calculate_network_meta(network, product: MarketProduct, i: int):
 
         supply_volume = dispatch_for_bus[dispatch_for_bus > 0].sum()
         demand_volume = dispatch_for_bus[dispatch_for_bus < 0].sum()
-        price = network.buses_t.marginal_price[bus].iat[i]
+        if not network.buses_t.marginal_price.empty:
+            price = network.buses_t.marginal_price[str(bus)].iat[i]
+        else:
+            price = 0
 
         meta.append(
             {
