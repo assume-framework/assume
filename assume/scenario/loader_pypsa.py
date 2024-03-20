@@ -55,12 +55,20 @@ async def load_pypsa_async(
 
     mo_id = "market_operator"
     world.add_market_operator(id=mo_id)
+
+    network.generators.rename(
+        columns={"bus": "node", "p_nom": "max_power"}, inplace=True
+    )
+    network.loads.rename(columns={"bus": "node", "p_set": "min_power"}, inplace=True)
+    if "max_power" not in network.loads.columns:
+        network.loads["max_power"] = 0
     grid_data = {
         "buses": network.buses,
         "lines": network.lines,
         "generators": network.generators,
         "loads": network.loads,
     }
+
     for market_config in marketdesign:
         market_config.param_dict["grid_data"] = grid_data
         world.add_market(mo_id, market_config)
@@ -74,7 +82,7 @@ async def load_pypsa_async(
 
         unit_type = "power_plant"
 
-        max_power = generator.p_nom or 1000
+        max_power = generator.max_power or 1000
         # if p_nom is not set, generator.p_nom_extendable must be
         ramp_up = generator.ramp_limit_start_up * max_power
         ramp_down = generator.ramp_limit_shut_down * max_power
@@ -86,8 +94,8 @@ async def load_pypsa_async(
                 "min_power": generator.p_nom_min,
                 "max_power": max_power,
                 "bidding_strategies": bidding_strategies[generator.name],
-                "technology": "demand",
-                "node": generator.bus,
+                "technology": "conventional",
+                "node": generator.node,
                 "efficiency": generator.efficiency,
                 "fuel_type": generator.carrier,
                 "ramp_up": ramp_up,
@@ -120,7 +128,7 @@ async def load_pypsa_async(
                 "max_power": load_t.max(),
                 "bidding_strategies": bidding_strategies[load.name],
                 "technology": "demand",
-                "node": load.bus,
+                "node": load.node,
                 "price": 1e3,
             },
             NaiveForecast(index, demand=load_t),
@@ -163,8 +171,8 @@ if __name__ == "__main__":
     world = World(database_uri=db_uri)
     scenario = "world_pypsa"
     study_case = "scigrid_de"
-    # "pay_as_clear" or "redispatch"
-    market_mechanism = "redispatch"
+    # "pay_as_clear", "redispatch" or "nodal"
+    market_mechanism = "nodal"
 
     match study_case:
         case "ac_dc_meshed":
@@ -177,6 +185,8 @@ if __name__ == "__main__":
             print("invalid studycase")
             network = pd.DataFrame()
 
+    study_case += market_mechanism
+
     start = network.snapshots[0]
     end = network.snapshots[-1]
     marketdesign = [
@@ -186,7 +196,7 @@ if __name__ == "__main__":
             timedelta(hours=1),
             market_mechanism,
             [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
-            additional_fields=["node"],
+            additional_fields=["node", "max_power", "min_power"],
             maximum_bid_volume=1e9,
             maximum_bid_price=1e9,
         )

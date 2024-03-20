@@ -171,7 +171,10 @@ class CsvForecaster(Forecaster):
                     self.forecasts[column] = data[column].item()
             else:
                 # Add new columns to the existing DataFrame, overwriting any existing columns with the same names
-                self.forecasts = self.forecasts.assign(**data)
+                new_columns = set(data.columns) - set(self.forecasts.columns)
+                self.forecasts = pd.concat(
+                    [self.forecasts, data[list(new_columns)]], axis=1
+                )
         else:
             self.forecasts[prefix + data.name] = data
 

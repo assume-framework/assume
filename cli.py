@@ -16,8 +16,6 @@ import argcomplete
 import yaml
 from sqlalchemy import make_url
 
-from assume.common.exceptions import AssumeException
-
 os.makedirs("./examples/outputs", exist_ok=True)
 os.makedirs("./examples/local_db", exist_ok=True)
 

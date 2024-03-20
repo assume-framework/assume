@@ -44,6 +44,8 @@ base:
       market_mechanism: redispatch
       additional_fields:
         - node
+        - min_power
+        - max_power
       param_dict:
         network_path: .
         solver: glpk
@@ -76,6 +78,8 @@ nodal_case:
       market_mechanism: nodal
       additional_fields:
         - node
+        - min_power
+        - max_power
       param_dict:
         network_path: .
         solver: glpk

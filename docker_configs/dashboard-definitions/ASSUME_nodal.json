@@ -50,7 +50,7 @@
         "content": "# Nodal Analysing Board\n\nThis board can be used to visualize the Grid statistics and usage.\nAs well as the prices at different locations of the grid.",
         "mode": "markdown"
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "10.4.0",
       "title": "Nodal Dashboard",
       "type": "text"
     },
@@ -88,7 +88,7 @@
         "content": "# Market-specific Data\n\nData specific for the market depending on the choice made at te top of the panel\n\n",
         "mode": "markdown"
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
           "datasource": {
@@ -253,7 +253,7 @@
     },
     {
       "datasource": {
-        "type": "postgres",
+        "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
       "description": "Overview of market results for the chossen market",
@@ -263,6 +263,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -276,6 +277,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "stepAfter",
             "lineStyle": {
               "fill": "solid"
@@ -314,58 +316,17 @@
         "overrides": [
           {
             "matcher": {
-              "id": "byFrameRefID",
-              "options": "Volume"
+              "id": "byRegexp",
+              "options": "/Price .*/"
             },
             "properties": [
-              {
-                "id": "custom.axisPlacement",
-                "value": "right"
-              },
               {
                 "id": "unit",
-                "value": "MWh"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byFrameRefID",
-              "options": "Price"
-            },
-            "properties": [
-              {
-                "id": "custom.axisPlacement",
-                "value": "left"
+                "value": "€/MWh"
               },
               {
-                "id": "unit",
-                "value": "EUR/MWh"
-              }
-            ]
-          },
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "Price north",
-                  "Price south"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
+                "id": "custom.axisPlacement",
+                "value": "auto"
               }
             ]
           }
@@ -406,11 +367,13 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
+          "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  demand_volume AS \"Demand volume\",\n  supply_volume AS \"Supply volume\",\n  node_id as \"Node\"\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, demand_volume, supply_volume, node_id\nORDER BY 1;\n",
+          "rawSql": "SELECT\n  $__timeGroupAlias(product_start,$__interval),\n  node as \"Node\",\n  avg(demand_volume) AS \"Demand volume\",\n  avg(supply_volume) AS \"Supply volume\",\n  avg(price) AS \"Price\"\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND \"market_id\" = '$market' AND $__timeFilter(product_start)\nGROUP BY 1, node\nORDER BY 1;\n",
           "refId": "Volume",
           "select": [
             [
@@ -422,39 +385,23 @@
               }
             ]
           ],
-          "table": "market_meta",
-          "timeColumn": "product_start",
-          "timeColumnType": "timestamp",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        },
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "format": "time_series",
-          "group": [],
-          "hide": false,
-          "metricColumn": "none",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  price AS \"Price\",\n  node_id as \"Node\"\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, price, node_id\nORDER BY 1;\n",
-          "refId": "Price",
-          "select": [
-            [
+          "sql": {
+            "columns": [
               {
-                "params": [
-                  "supply_volume"
-                ],
-                "type": "column"
+                "parameters": [],
+                "type": "function"
               }
-            ]
-          ],
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_meta",
           "timeColumn": "product_start",
           "timeColumnType": "timestamp",
@@ -482,6 +429,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -495,6 +443,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -533,7 +482,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 56
+        "y": 144
       },
       "id": 19,
       "options": {
@@ -659,6 +608,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -672,6 +622,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -710,7 +661,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 56
+        "y": 144
       },
       "id": 20,
       "options": {
@@ -825,17 +776,16 @@
       "type": "timeseries"
     }
   ],
-  "refresh": false,
-  "schemaVersion": 37,
-  "style": "dark",
+  "refresh": "",
+  "schemaVersion": 39,
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
-          "selected": true,
-          "text": "example_01d_nodal_case",
-          "value": "example_01d_nodal_case"
+          "selected": false,
+          "text": "world_pypsa_scigrid_deredispatch",
+          "value": "world_pypsa_scigrid_deredispatch"
         },
         "datasource": {
           "type": "postgres",
@@ -858,8 +808,8 @@
       {
         "current": {
           "selected": false,
-          "text": "nodal",
-          "value": "nodal"
+          "text": "EOM",
+          "value": "EOM"
         },
         "datasource": {
           "type": "postgres",
@@ -878,91 +828,16 @@
         "skipUrlSync": false,
         "sort": 1,
         "type": "query"
-      },
-      {
-        "current": {
-          "selected": false,
-          "text": "Unit 1",
-          "value": "Unit 1"
-        },
-        "datasource": {
-          "type": "postgres",
-          "uid": "P7B13B9DF907EC40C"
-        },
-        "definition": "SELECT index\nFROM power_plant_meta\nwhere simulation = '$simulation';",
-        "description": "Can choose which units we want to display ",
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
-        "multi": true,
-        "name": "Gen_Units",
-        "options": [],
-        "query": "SELECT index\nFROM power_plant_meta\nwhere simulation = '$simulation';",
-        "refresh": 2,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "current": {
-          "selected": false,
-          "text": "demand_north",
-          "value": "demand_north"
-        },
-        "datasource": {
-          "type": "postgres",
-          "uid": "P7B13B9DF907EC40C"
-        },
-        "definition": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
-        "description": "Can choose which units we want to display ",
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
-        "multi": true,
-        "name": "Demand_Units",
-        "options": [],
-        "query": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
-        "refresh": 2,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "current": {
-          "isNone": true,
-          "selected": false,
-          "text": "None",
-          "value": ""
-        },
-        "datasource": {
-          "type": "postgres",
-          "uid": "P7B13B9DF907EC40C"
-        },
-        "definition": "SELECT index\nFROM storage_meta\nwhere simulation = '$simulation';",
-        "description": "Can choose which storage units we want to display ",
-        "hide": 0,
-        "includeAll": false,
-        "label": "",
-        "multi": true,
-        "name": "Storage_Units",
-        "options": [],
-        "query": "SELECT index\nFROM storage_meta\nwhere simulation = '$simulation';",
-        "refresh": 2,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
       }
     ]
   },
   "time": {
-    "from": "2018-12-31T23:00:00.000Z",
-    "to": "2019-01-15T22:59:59.000Z"
+    "from": "2011-01-01T00:23:03.353Z",
+    "to": "2011-01-01T03:42:03.926Z"
   },
   "timepicker": {
     "refresh_intervals": [
+      "5s",
       "1m",
       "5m",
       "15m",
@@ -973,6 +848,6 @@
   "timezone": "",
   "title": "ASSUME - Nodal view",
   "uid": "nodalview",
-  "version": 2,
+  "version": 5,
   "weekStart": ""
 }

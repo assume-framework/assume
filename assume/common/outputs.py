@@ -12,8 +12,8 @@ import numpy as np
 import pandas as pd
 from dateutil import rrule as rr
 from mango import Role
-from pandas.api.types import is_numeric_dtype
-from psycopg2.errors import UndefinedColumn
+from pandas.api.types import is_bool_dtype, is_numeric_dtype
+from psycopg2.errors import InvalidTextRepresentation, UndefinedColumn
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 
@@ -306,32 +306,12 @@ class WriteOutput(Role):
             df.reset_index()
 
             try:
-                # try to use geopandas
-                # needed for postGIS writing
-                import geoalchemy2
-                import geopandas as gpd
-                from shapely.wkt import loads
-
-                def load_wkt(string: str):
-                    return loads(string.split(";")[1])
-
-                df["geometry"] = df["wkt_srid_4326"].apply(load_wkt)
-                df = gpd.GeoDataFrame(df, geometry="geometry")
-                df.set_crs(crs="EPSG:4326", inplace=True)
-                # postgis does not lowercase tablenames
-                df.columns = map(str.lower, df.columns)
-                try:
-                    # try to input as geodataframe
-                    with self.db.begin() as db:
-                        df.to_postgis(geo_table, db, if_exists="append", index=True)
-                except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
-                    # if a column is missing, check and try again
-                    self.check_columns(geo_table, df)
-                    # now try again
-                    with self.db.begin() as db:
-                        df.to_postgis(geo_table, db, if_exists="append", index=True)
-            except ImportError:
-                # otherwise, just use plain SQL anyway
+                with self.db.begin() as db:
+                    df.to_sql(geo_table, db, if_exists="append")
+            except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
+                # if a column is missing, check and try again
+                self.check_columns(geo_table, df)
+                # now try again
                 with self.db.begin() as db:
                     df.to_sql(geo_table, db, if_exists="append")
 
@@ -352,7 +332,12 @@ class WriteOutput(Role):
             if column.lower() not in db_columns:
                 try:
                     # TODO this only works for float and text
-                    column_type = "float" if is_numeric_dtype(df[column]) else "text"
+                    if is_bool_dtype(df[column]):
+                        column_type = "boolean"
+                    elif is_numeric_dtype(df[column]):
+                        column_type = "float"
+                    else:
+                        column_type = "text"
                     query = f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"
                     with self.db.begin() as db:
                         db.execute(text(query))
@@ -410,6 +395,12 @@ class WriteOutput(Role):
 
         del df["only_hours"]
         del df["agent_id"]
+
+        if "bid_type" not in df.columns:
+            df["bid_type"] = None
+
+        if "node" not in df.columns:
+            df["node"] = None
 
         df["simulation"] = self.simulation_id
         df["market_id"] = market_id

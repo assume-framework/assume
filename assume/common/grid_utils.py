@@ -27,17 +27,20 @@ def add_generators(
         index=network.snapshots,
         columns=generators.index,
     )
-
+    gen_c = generators.copy()
+    if "p_min_pu" not in gen_c.columns:
+        gen_c["p_min_pu"] = p_set
+    if "p_max_pu" not in gen_c.columns:
+        gen_c["p_max_pu"] = p_set + 1
+    if "marginal_cost" not in gen_c.columns:
+        gen_c["marginal_cost"] = p_set
     # add generators
     network.madd(
         "Generator",
         names=generators.index,
         bus=generators["node"],  # bus to which the generator is connected to
         p_nom=generators["max_power"],  # Nominal capacity of the powerplant/generator
-        p_min_pu=p_set,
-        p_max_pu=p_set + 1,
-        marginal_cost=p_set,
-        **generators,
+        **gen_c,
     )
 
 
@@ -150,20 +153,21 @@ def add_loads(
         network (pypsa.Network): the pypsa network to which the loads are
         loads (pandas.DataFrame): the loads dataframe
     """
-    p_set = pd.DataFrame(
-        np.zeros((len(network.snapshots), len(loads.index))),
-        index=network.snapshots,
-        columns=loads.index,
-    )
 
     # add loads
     network.madd(
         "Load",
         names=loads.index,
         bus=loads["node"],  # bus to which the generator is connected to
-        p_set=p_set,
         **loads,
     )
+
+    if "p_set" not in loads.columns:
+        network.loads_t["p_set"] = pd.DataFrame(
+            np.zeros((len(network.snapshots), len(loads.index))),
+            index=network.snapshots,
+            columns=loads.index,
+        )
 
 
 def add_redispatch_loads(
@@ -173,22 +177,25 @@ def add_redispatch_loads(
     """
     This adds loads to the redispatch PyPSA network with respective bus data to which they are connected
     """
+    loads_c = loads.copy()
+    if "sign" in loads_c.columns:
+        del loads_c["sign"]
 
-    p_set = pd.DataFrame(
-        np.zeros((len(network.snapshots), len(loads.index))),
-        index=network.snapshots,
-        columns=loads.index,
-    )
-
-    # add loads with opposite sing (default for loads is -1). This is needed to properly model the redispatch
+    # add loads with opposite sign (default for loads is -1). This is needed to properly model the redispatch
     network.madd(
         "Load",
         names=loads.index,
         bus=loads["node"],  # bus to which the generator is connected to
-        p_set=p_set,
         sign=1,
-        **loads,
+        **loads_c,
     )
+
+    if "p_set" not in loads.columns:
+        network.loads_t["p_set"] = pd.DataFrame(
+            np.zeros((len(network.snapshots), len(loads.index))),
+            index=network.snapshots,
+            columns=loads.index,
+        )
 
 
 def add_nodal_loads(
@@ -200,12 +207,15 @@ def add_nodal_loads(
     The loads are added as generators with negative sign so their dispatch can be also curtailed,
     since regular load in PyPSA represents only an inelastic demand.
     """
-
     p_set = pd.DataFrame(
         np.zeros((len(network.snapshots), len(loads.index))),
         index=network.snapshots,
         columns=loads.index,
     )
+    loads_c = loads.copy()
+
+    if "sign" in loads_c.columns:
+        del loads_c["sign"]
 
     # add loads as negative generators
     network.madd(
@@ -217,7 +227,7 @@ def add_nodal_loads(
         p_max_pu=p_set + 1,
         marginal_cost=p_set,
         sign=-1,
-        **loads,
+        **loads_c,
     )
 
 
@@ -235,23 +245,14 @@ def read_pypsa_grid(
     """
 
     def add_buses(network: pypsa.Network, buses: pd.DataFrame) -> None:
-        network.madd(
-            "Bus",
-            names=buses.index,
-            **buses,
-        )
+        network.import_components_from_dataframe(buses, "Bus")
 
     def add_lines(network: pypsa.Network, lines: pd.DataFrame) -> None:
-        network.madd(
-            "Line",
-            names=lines.index,
-            **lines,
-        )
+        network.import_components_from_dataframe(lines, "Line")
 
     # setup the network
     add_buses(network, grid_dict["buses"])
     add_lines(network, grid_dict["lines"])
-
     return network
 
 
@@ -286,7 +287,10 @@ def calculate_network_meta(network, product: MarketProduct, i: int):
 
         supply_volume = dispatch_for_bus[dispatch_for_bus > 0].sum()
         demand_volume = dispatch_for_bus[dispatch_for_bus < 0].sum()
-        price = network.buses_t.marginal_price[bus].iat[i]
+        if not network.buses_t.marginal_price.empty:
+            price = network.buses_t.marginal_price[str(bus)].iat[i]
+        else:
+            price = 0
 
         meta.append(
             {
@@ -295,7 +299,7 @@ def calculate_network_meta(network, product: MarketProduct, i: int):
                 "demand_volume_energy": demand_volume * duration_hours,
                 "supply_volume_energy": supply_volume * duration_hours,
                 "price": price,
-                "node_id": bus,
+                "node": bus,
                 "product_start": product[0],
                 "product_end": product[1],
                 "only_hours": product[2],
