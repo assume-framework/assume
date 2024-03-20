@@ -40,7 +40,7 @@ def add_generators(
         names=generators.index,
         bus=generators["node"],  # bus to which the generator is connected to
         p_nom=generators["max_power"],  # Nominal capacity of the powerplant/generator
-        **generators,
+        **gen_c,
     )
 
 
