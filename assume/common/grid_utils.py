@@ -253,8 +253,6 @@ def read_pypsa_grid(
     # setup the network
     add_buses(network, grid_dict["buses"])
     add_lines(network, grid_dict["lines"])
-    add_loads(network, grid_dict["loads"])
-
     return network
 
 
