@@ -45,7 +45,37 @@ def flexibility_cost_tolerance(self):
     def total_power_flex_relation_constraint(m, t):
         return  m.prev_power[t] - m.load_shift[t] == self.components["electrolyser"].b.power_in[t] + \
             self.components["eaf"].b.power_eaf[t] + self.components["dri_plant"].b.power_dri[t]
+    
+def recalculate_with_accepted_offers(self):
+    self.reference_power = self.forecaster[f"{self.id}_power"]
+    self.accepted_pos_capacity = self.forecaster[f"{self.id}_accepted_pos_res"]
 
+    # Parameters
+    self.model.reference_power = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.reference_power)}
+        )
+
+    self.model.accepted_pos_capacity = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.accepted_pos_capacity)}
+        )
+    
+    # Variables
+    self.model.capacity_upper_bound = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
+
+    # Constraints
+    @self.model.Constraint(self.model.time_steps)
+    def capacity_upper_bound_constraint(m,t):
+        return m.capacity_upper_bound[t] == m.reference_power[t] - m.accepted_pos_capacity[t]
+    
+    @self.model.Constraint(self.model.time_steps)
+    def total_power_upper_limit(m,t):
+        if m.accepted_pos_capacity[t] > 0:
+            return  m.total_power_input[t] <= m.capacity_upper_bound[t]
+        else:
+            return pyo.Constraint.Skip
+        
 # # Load data from CSV file
 # df = pd.read_csv('C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04\\accepted_offers.csv')
 

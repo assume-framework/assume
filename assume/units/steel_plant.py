@@ -62,7 +62,7 @@ class SteelPlant(SupportsMinMax):
         self.natural_gas_price = self.forecaster["fuel_price_natural_gas"]
         self.electricity_price = self.forecaster["price_EOM"]
         self.iron_ore_price = self.forecaster.get_price('iron_ore')
-        self.steel_demand = demand
+        self.steel_demand = demand #/ 672
         self.steel_price = self.forecaster.get_price('steel')
         self.lime_co2_factor = self.forecaster.get_price('lime_co2_factor')
         self.lime_price = self.forecaster.get_price('lime')
@@ -85,6 +85,8 @@ class SteelPlant(SupportsMinMax):
         self.define_variables()
         if self.objective == "max_flexibility":
             flex.flexibility_cost_tolerance(self)
+        if self.objective == "recalculate":
+            flex.recalculate_with_accepted_offers(self)
         self.define_constraints()
         self.define_objective()
 
@@ -186,12 +188,18 @@ class SteelPlant(SupportsMinMax):
 
     def define_constraints(self):
         @self.model.Constraint(self.model.time_steps)
-        def dri_output_association_constraint(m, t):
+        def steel_output_association_constraint(m, t):
             return sum(self.components["eaf"].b.steel_output[t] for t in self.model.time_steps) == self.model.steel_demand
+        
+        # @self.model.Constraint(self.model.time_steps)
+        # def steel_output_association_constraint(m, t):
+        #     return self.components["eaf"].b.steel_output[t] == self.model.steel_demand
 
-        if self.objective == 'min_variable_cost':
-            @self.model.Constraint(self.model.time_steps)
-            def total_power_input_constraint(m, t):
+        @self.model.Constraint(self.model.time_steps)
+        def total_power_input_constraint(m, t):
+            if self.objective == 'max_flexibility':
+                return pyo.Constraint.Skip
+            else:
                 return (
                     m.total_power_input[t]
                     == self.components["electrolyser"].b.power_in[t] + \
@@ -207,7 +215,7 @@ class SteelPlant(SupportsMinMax):
                     self.components["eaf"].b.eaf_operating_cost[t]
             
     def define_objective(self):
-        if self.objective == "min_variable_cost":
+        if self.objective == "min_variable_cost" or "recalculate":
 
             @self.model.Objective(sense=pyo.minimize)
             def obj_rule(m):
@@ -302,31 +310,35 @@ class SteelPlant(SupportsMinMax):
             prefixed_eaf_steel_output = {f"{unit_id}_steel_output": eaf_steel_output_value}
             operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_eaf_steel_output, index=[0]))
 
-            # # DRI Storage
-            # dri_charge_value = value(self.components["dri_storage"].b.charge_dri[t])
-            # prefixed_dri_charge_value = {f"{unit_id}_dri_charge": dri_charge_value}
-            # operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_dri_charge_value, index=[0]))
+            if "dri_storage" in self.components:
 
-            # dri_discharge_value = value(self.components["dri_storage"].b.discharge_dri[t])
-            # prefixed_dri_discharge_value = {f"{unit_id}_dri_discharge": dri_discharge_value}
-            # operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_dri_discharge_value, index=[0]))
+                # DRI Storage
+                dri_charge_value = value(self.components["dri_storage"].b.charge_dri[t])
+                prefixed_dri_charge_value = {f"{unit_id}_dri_charge": dri_charge_value}
+                operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_dri_charge_value, index=[0]))
 
-            # dri_soc_value = value(self.components["dri_storage"].b.soc_dri[t])
-            # prefixed_dri_soc_value = {f"{unit_id}_dri_soc": dri_soc_value}
-            # operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_dri_soc_value, index=[0]))
+                dri_discharge_value = value(self.components["dri_storage"].b.discharge_dri[t])
+                prefixed_dri_discharge_value = {f"{unit_id}_dri_discharge": dri_discharge_value}
+                operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_dri_discharge_value, index=[0]))
 
-            # # H2 Storage
-            # charge_value = value(self.components["h2storage"].b.charge[t])
-            # prefixed_charge_value = {f"{unit_id}_h2_charge": charge_value}
-            # operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_charge_value, index=[0]))
+                dri_soc_value = value(self.components["dri_storage"].b.soc_dri[t])
+                prefixed_dri_soc_value = {f"{unit_id}_dri_soc": dri_soc_value}
+                operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_dri_soc_value, index=[0]))
 
-            # discharge_value = value(self.components["h2storage"].b.discharge[t])
-            # prefixed_discharge_value = {f"{unit_id}_h2_discharge": discharge_value}
-            # operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_discharge_value, index=[0]))
+            if "h2storage" in self.components:
 
-            # soc_value = value(self.components["h2storage"].b.soc[t])
-            # prefixed_soc_value = {f"{unit_id}_h2_soc": soc_value}
-            # operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_soc_value, index=[0]))
+                # H2 Storage
+                charge_value = value(self.components["h2storage"].b.charge[t])
+                prefixed_charge_value = {f"{unit_id}_h2_charge": charge_value}
+                operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_charge_value, index=[0]))
+
+                discharge_value = value(self.components["h2storage"].b.discharge[t])
+                prefixed_discharge_value = {f"{unit_id}_h2_discharge": discharge_value}
+                operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_discharge_value, index=[0]))
+
+                soc_value = value(self.components["h2storage"].b.soc[t])
+                prefixed_soc_value = {f"{unit_id}_h2_soc": soc_value}
+                operation_states_forecaster.set_operation_states(t, pd.DataFrame(prefixed_soc_value, index=[0]))
 
         # Set the total cost data for each unit with unit ID as prefix
         for time_step, total_variable_cost in total_variable_costs.items():
@@ -412,6 +424,7 @@ class SteelPlant(SupportsMinMax):
                 negetive_reserve = 0
             
             prefixed_power = {f"{unit_id}_power": [total_power_consumption]}
+            prefixed_variable_cost = {f"{unit_id}_total_variable_cost": [total_variable_cost]}
             prefixed_pos_res = {f"{unit_id}_pos_res": [positive_reserve]}
             prefixed_neg_res = {f"{unit_id}_neg_res": [negetive_reserve]}
             # EAF steel output
@@ -428,8 +441,34 @@ class SteelPlant(SupportsMinMax):
                 ),
             )
 
+            if "dri_storage" in self.components:
+
+                # DRI Storage
+                dri_charge_value = value(self.components["dri_storage"].b.charge_dri[time_step])
+                prefixed_dri_charge_value = {f"{unit_id}_dri_charge": dri_charge_value}
+
+                dri_discharge_value = value(self.components["dri_storage"].b.discharge_dri[time_step])
+                prefixed_dri_discharge_value = {f"{unit_id}_dri_discharge": dri_discharge_value}
+
+                dri_soc_value = value(self.components["dri_storage"].b.soc_dri[time_step])
+                prefixed_dri_soc_value = {f"{unit_id}_dri_soc": dri_soc_value}
+
+            if "h2storage" in self.components:
+
+                # H2 Storage
+                charge_value = value(self.components["h2storage"].b.charge[time_step])
+                prefixed_charge_value = {f"{unit_id}_h2_charge": charge_value}
+
+                discharge_value = value(self.components["h2storage"].b.discharge[time_step])
+                prefixed_discharge_value = {f"{unit_id}_h2_discharge": discharge_value}
+
+                soc_value = value(self.components["h2storage"].b.soc[time_step])
+                prefixed_soc_value = {f"{unit_id}_h2_soc": soc_value}
+
             operation_states_data = pd.DataFrame(
-                {**prefixed_power, **prefixed_pos_res, **prefixed_neg_res, **prefixed_eaf_steel_output},
+                {**prefixed_power, **prefixed_variable_cost, **prefixed_pos_res, **prefixed_neg_res, **prefixed_eaf_steel_output,
+                 **prefixed_dri_charge_value, **prefixed_dri_discharge_value,**prefixed_dri_soc_value,
+                 **prefixed_charge_value, **prefixed_discharge_value, **prefixed_soc_value},
                 index=[0],
             )
 
