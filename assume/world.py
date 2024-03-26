@@ -7,6 +7,7 @@ import logging
 import sys
 import time
 from datetime import datetime
+from pathlib import Path
 from sys import platform
 from typing import Optional, Union
 
@@ -36,7 +37,6 @@ from assume.units import BaseUnit, Demand, PowerPlant, Storage
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
 stdout_handler = logging.StreamHandler(stream=sys.stdout)
-stdout_handler.setLevel(logging.WARNING)
 handlers = [file_handler, stdout_handler]
 logging.basicConfig(level=logging.INFO, handlers=handlers)
 logging.getLogger("mango").setLevel(logging.WARNING)
@@ -101,6 +101,9 @@ class World:
         self.export_csv_path = export_csv_path
         # intialize db connection at beginning of simulation
         if database_uri:
+            if str(database_uri).startswith("sqlite:///"):
+                db_path = Path(str(database_uri).replace("sqlite:///", ""))
+                db_path.parent.mkdir(exist_ok=True)
             self.db = create_engine(make_url(database_uri))
             connected = False
             while not connected:

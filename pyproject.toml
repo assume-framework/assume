@@ -26,6 +26,7 @@ classifiers=[
 
 packages = [
     { include="assume", from="." },
+    { include="assume_cli", from="." },
 ]
 
 [tool.poetry.dependencies]
@@ -73,7 +74,7 @@ full = ["torch", "glpk","pyomo", "pypsa", "windpowerlib", "pvlib", "demandlib", 
 test = ["black", "isort", "matplotlib", "pytest", "pytest-cov", "pytest-asyncio", "glpk", "mypy"]
 
 [tool.poetry.scripts]
-assume = "cli:cli"
+assume = "assume_cli.cli:cli"
 
 [build-system]
 requires = ["poetry-core"]

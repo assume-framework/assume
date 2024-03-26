@@ -4,7 +4,7 @@
 
 import pytest
 
-from cli import cli
+from assume_cli.cli import cli
 
 
 @pytest.mark.slow
