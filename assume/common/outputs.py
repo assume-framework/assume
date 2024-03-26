@@ -244,7 +244,12 @@ class WriteOutput(Role):
 
             if self.export_csv_path:
                 data_path = self.export_csv_path / f"{table}.csv"
-                df.to_csv(data_path, mode="a", header=not data_path.exists())
+                df.to_csv(
+                    data_path,
+                    mode="a",
+                    header=not data_path.exists(),
+                    float_format="%.5g",
+                )
 
             if self.db is not None:
                 try:
@@ -506,6 +511,7 @@ class WriteOutput(Role):
                 mode="a",
                 header=not kpi_data_path.exists(),
                 index=None,
+                float_format="%.5g",
             )
 
         if self.db is not None and not df.empty:
