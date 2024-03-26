@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-FROM python:3.11-bookworm
+FROM python:3.12-slim
 
 RUN useradd -m -s /bin/bash admin
 
