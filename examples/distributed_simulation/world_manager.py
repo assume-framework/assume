@@ -40,5 +40,6 @@ async def create_worker(world: World, marketdesign: list[MarketConfig]):
     )
 
 
-world = World(database_uri=db_uri, addr=manager_addr, distributed_role=True)
-world.loop.run_until_complete(worker(world, marketdesign, create_worker))
+if __name__ == "__main__":
+    world = World(database_uri=db_uri, addr=manager_addr, distributed_role=True)
+    world.loop.run_until_complete(worker(world, marketdesign, create_worker))

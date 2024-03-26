@@ -4,7 +4,6 @@
 
 from config import (
     agent_adress,
-    db_uri,
     index,
     market_operator_addr,
     market_operator_aid,
@@ -38,5 +37,6 @@ async def create_worker(world: World, marketdesign: list[MarketConfig]):
     )
 
 
-world = World(database_uri=db_uri, addr=agent_adress, distributed_role=False)
-world.loop.run_until_complete(worker(world, marketdesign, create_worker))
+if __name__ == "__main__":
+    world = World(addr=agent_adress, distributed_role=False)
+    world.loop.run_until_complete(worker(world, marketdesign, create_worker))

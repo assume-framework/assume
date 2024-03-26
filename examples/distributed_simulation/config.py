@@ -21,22 +21,24 @@ db_uri = os.getenv("DB_URI", "postgresql://assume:assume@localhost:5432/assume")
 
 use_mqtt = False
 
+tcp_host = os.getenv("TCP_HOST", "0.0.0.0")
+tcp_port = int(os.getenv("TCP_PORT", "9099"))
 if use_mqtt:
     manager_addr = "manager"
     agent_adress = "agent"
     agent_adresses = ["agent"]
     market_operator_addr = "manager"
 else:
-    manager_addr = ("0.0.0.0", 9099)
-    agent_adress = ("0.0.0.0", 9098)
-    agent_adresses = [("0.0.0.0", 9098)]
-    market_operator_addr = ("0.0.0.0", 9099)
+    manager_addr = (tcp_host, tcp_port)
+    agent_adress = (tcp_host, 9098)
+    agent_adresses = [(tcp_host, 9098)]
+    market_operator_addr = (tcp_host, tcp_port)
 
 market_operator_aid = "market_operator"
 broker_addr = os.getenv("MQTT_BROKER", ("0.0.0.0", 1883, 600))
 
-start = datetime(2023, 10, 4)
-end = datetime(2023, 12, 5)
+start = datetime(2019, 1, 1)
+end = datetime(2019, 3, 1)
 index = pd.date_range(
     start=start,
     end=end + timedelta(hours=24),
