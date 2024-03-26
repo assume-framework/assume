@@ -75,7 +75,7 @@ services:
     build: .
     depends_on:
       - assume_db
-    command: -s example_02 -db "postgresql://assume:assume@assume_db:5432/assume"
+    command: -s example_01a -c tiny -db "postgresql://assume:assume@assume_db:5432/assume"
 
   # to run the simulation distributed with MQTT
   mqtt-broker:
@@ -104,7 +104,7 @@ services:
     environment:
       DB_URI: "postgresql://assume:assume@assume_db:5432/assume"
       MQTT_BROKER: mqtt-broker
-    entrypoint: python3 ./examples/distributed_world_manager.py
+    entrypoint: python3 ./examples/distributed_simulation/world_manager.py
 
   simulation_client01:
     container_name: simulation_client01
@@ -117,4 +117,4 @@ services:
     depends_on:
       - assume_db
       - mqtt-broker
-    entrypoint: python3 ./examples/distributed_world_agent.py
+    entrypoint: python3 ./examples/distributed_simulation/world_agent.py
