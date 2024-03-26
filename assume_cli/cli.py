@@ -128,6 +128,8 @@ def cli(args=None):
             database_uri=db_uri,
             export_csv_path=args.csv_export_path,
             log_level=args.loglevel,
+            #distributed_role=True,
+            #addr=("0.0.0.0", 9099)
         )
         load_scenario_folder(
             world,
