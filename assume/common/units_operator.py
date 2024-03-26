@@ -292,7 +292,7 @@ class UnitsOperator(Role):
         self, product_type: str, last: datetime
     ) -> tuple[pd.DataFrame, list[pd.DataFrame]]:
         """
-        Retrieves the actual dispatch without interfering with other functions.
+        Retrieves the actual dispatch and commits it in the unit.
         We calculate the series of the actual market results dataframe with accepted bids.
         And the unit_dispatch for all units taken care of in the UnitsOperator.
 
@@ -303,8 +303,8 @@ class UnitsOperator(Role):
         Returns:
             tuple[pd.DataFrame, list[pd.DataFrame]]: market_dispatch and unit_dispatch dataframes
         """
-        now = timestamp2datetime(self.context.current_timestamp - 1)
-        start = timestamp2datetime(last)
+        now = timestamp2datetime(self.context.current_timestamp)
+        start = timestamp2datetime(last + 1)
 
         market_dispatch = aggregate_step_amount(
             self.valid_orders[product_type],
@@ -314,7 +314,6 @@ class UnitsOperator(Role):
         )
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
-            # now = now_a - unit.index.freq
             current_dispatch = unit.execute_current_dispatch(start, now)
             end = now
             current_dispatch.name = "power"
