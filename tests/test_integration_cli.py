@@ -3,8 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
-
-from cli import cli
+from assume_cli.cli import cli
 
 
 @pytest.mark.slow
