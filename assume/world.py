@@ -89,7 +89,7 @@ class World:
         addr: Union[tuple[str, int], str] = "world",
         database_uri: str = "",
         export_csv_path: str = "",
-        log_level: str = "WARNING",
+        log_level: str = "INFO",
         distributed_role: Optional[bool] = None,
     ) -> None:
         logging.getLogger("assume").setLevel(log_level)
