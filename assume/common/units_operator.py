@@ -303,7 +303,7 @@ class UnitsOperator(Role):
         Returns:
             tuple[pd.DataFrame, list[pd.DataFrame]]: market_dispatch and unit_dispatch dataframes
         """
-        now = timestamp2datetime(self.context.current_timestamp)
+        now = timestamp2datetime(self.context.current_timestamp - 1)
         start = timestamp2datetime(last)
 
         market_dispatch = aggregate_step_amount(
