@@ -31,7 +31,7 @@ With Conda
 
 After installing conda, you can create an environment for assume like::
 
-    conda create -n assume python=3.11
+    conda create -n assume python=3.12
 
 accept the installed packages and activate the newly created environment::
 
