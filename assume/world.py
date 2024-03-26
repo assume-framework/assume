@@ -37,7 +37,6 @@ from assume.units import BaseUnit, Demand, PowerPlant, Storage
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
 stdout_handler = logging.StreamHandler(stream=sys.stdout)
-stdout_handler.setLevel(logging.WARNING)
 handlers = [file_handler, stdout_handler]
 logging.basicConfig(level=logging.INFO, handlers=handlers)
 logging.getLogger("mango").setLevel(logging.WARNING)
@@ -90,7 +89,7 @@ class World:
         addr: Union[tuple[str, int], str] = "world",
         database_uri: str = "",
         export_csv_path: str = "",
-        log_level: str = "INFO",
+        log_level: str = "WARNING",
         distributed_role: Optional[bool] = None,
     ) -> None:
         logging.getLogger("assume").setLevel(log_level)

@@ -98,7 +98,7 @@ def cli(args=None):
         "-l",
         "--loglevel",
         help="logging level used for file log",
-        default="INFO",
+        default="WARNING",
         type=str,
         metavar="LOGLEVEL",
         choices=set(logging._nameToLevel.keys()),
