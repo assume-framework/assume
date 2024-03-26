@@ -64,7 +64,7 @@ def test_market():
 async def test_simple_market_mechanism():
     for name, role in clearing_mechanisms.items():
         skip = False
-        for skip_name in ["complex", "nodal_pricing", "redispatch", "contract"]:
+        for skip_name in ["complex", "nodal", "redispatch", "contract"]:
             if skip_name in name:
                 skip = True
         if skip:
