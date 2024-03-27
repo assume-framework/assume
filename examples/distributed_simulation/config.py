@@ -22,7 +22,7 @@ db_uri = os.getenv("DB_URI", "postgresql://assume:assume@localhost:5432/assume")
 use_mqtt = False
 
 tcp_host = os.getenv("TCP_HOST", "0.0.0.0")
-tcp_port = int(os.getenv("TCP_PORT", "9099"))
+tcp_port = int(os.getenv("TCP_PORT", "9097"))
 if use_mqtt:
     manager_addr = "manager"
     agent_adress = "agent"
@@ -58,7 +58,9 @@ marketdesign = [
 ]
 
 
-async def worker(world: World, marketdesign: list[MarketConfig], create_worker, i=0, n=1):
+async def worker(
+    world: World, marketdesign: list[MarketConfig], create_worker, i=0, n=1
+):
     if world.distributed_role:
         world.addresses.extend(agent_adresses)
 

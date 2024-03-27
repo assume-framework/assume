@@ -16,10 +16,8 @@ log = logging.getLogger(__name__)
 
 db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
-world = World(database_uri=db_uri)
 
-
-async def init():
+async def init(world, n=1):
     start = datetime(2019, 1, 1)
     end = datetime(2019, 3, 1)
     index = pd.date_range(
@@ -65,11 +63,10 @@ async def init():
             "bidding_strategies": {"EOM": "naive_eom"},
             "technology": "demand",
         },
-        NaiveForecast(index, demand=100),
+        NaiveForecast(index, demand=1000),
     )
 
     nuclear_forecast = NaiveForecast(index, availability=1, fuel_price=3, co2_price=0.1)
-    n = 20
     for i in range(n):
         world.add_unit_operator(f"my_operator{i}")
         world.add_unit(
@@ -77,8 +74,8 @@ async def init():
             "power_plant",
             f"my_operator{i}",
             {
-                "min_power": 200/n,
-                "max_power": 1000/n,
+                "min_power": 200 / n,
+                "max_power": 1000 / n,
                 "bidding_strategies": {"EOM": "naive_eom"},
                 "technology": "nuclear",
             },
@@ -86,5 +83,7 @@ async def init():
         )
 
 
-world.loop.run_until_complete(init())
-world.run()
+if __name__ == "__main__":
+    world = World(database_uri=db_uri)
+    world.loop.run_until_complete(init(world))
+    world.run()
