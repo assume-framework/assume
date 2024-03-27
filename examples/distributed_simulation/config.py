@@ -58,7 +58,7 @@ marketdesign = [
 ]
 
 
-async def worker(world: World, marketdesign: list[MarketConfig], create_worker):
+async def worker(world: World, marketdesign: list[MarketConfig], create_worker, i=0, n=1):
     if world.distributed_role:
         world.addresses.extend(agent_adresses)
 
@@ -72,7 +72,7 @@ async def worker(world: World, marketdesign: list[MarketConfig], create_worker):
         broker_addr=broker_addr,
     )
 
-    await create_worker(world, marketdesign)
+    await create_worker(world, marketdesign, i, n)
 
     await asyncio.sleep(0)
 

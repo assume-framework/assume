@@ -25,15 +25,19 @@ def manager():
     world.loop.run_until_complete(worker(world, marketdesign, create_manager))
 
 
-def agent():
+def agent(i: int, n: int):
     world = World(addr=agent_adress, distributed_role=False)
-    world.loop.run_until_complete(worker(world, marketdesign, create_agent))
+    world.loop.run_until_complete(worker(world, marketdesign, create_agent, i, n))
 
 if __name__ == "__main__":
     man = Process(target=manager)
-    ag = Process(target=agent)
-
-    ag.start()
+    n = 1
+    ags = []
+    for i in range(n):
+        ag = Process(target=agent, args=(i, n))
+        ags.append(ag)
+        ag.start()
     manager()
 
-    ag.join()
+    for ag in ags:
+        ag.join()
