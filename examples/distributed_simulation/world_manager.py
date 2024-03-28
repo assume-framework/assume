@@ -25,20 +25,6 @@ async def create_worker(world: World, marketdesign: list[MarketConfig], i: int, 
 
     world.add_unit_operator(f"my_operator{i}")
 
-    nuclear_forecast = NaiveForecast(index, availability=1, fuel_price=3, co2_price=0.1)
-    world.add_unit(
-        f"nuclear{i}",
-        "power_plant",
-        f"my_operator{i}",
-        {
-            "min_power": 20,
-            "max_power": 100,
-            "bidding_strategies": {market_config.market_id: "naive_eom"},
-            "technology": "nuclear",
-        },
-        nuclear_forecast,
-    )
-
     world.add_unit_operator(f"my_demand{i}")
     world.add_unit(
         f"demand{i}",

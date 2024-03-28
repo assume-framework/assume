@@ -189,6 +189,7 @@ class UnitsOperator(Role):
         logger.debug(
             f'{self.id} received opening from: {opening["market_id"]} {opening["start_time"]} until: {opening["end_time"]}.'
         )
+
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening, meta))
 
     def handle_market_feedback(self, content: ClearingMessage, meta: MetaDict) -> None:
@@ -208,6 +209,9 @@ class UnitsOperator(Role):
             order["market_id"] = content["market_id"]
 
         marketconfig = self.registered_markets[content["market_id"]]
+
+        from math import factorial
+        list1 = [factorial(i) for i in range(4000)]
         self.valid_orders[marketconfig.product_type].extend(orderbook)
         self.set_unit_dispatch(orderbook, marketconfig)
         self.write_learning_params(orderbook, marketconfig)
@@ -391,6 +395,8 @@ class UnitsOperator(Role):
         Note:
             This function will accomodate the portfolio optimization in the future.
         """
+        from math import factorial
+        list1 = [factorial(i) for i in range(3000)]
 
         products = opening["products"]
         market = self.registered_markets[opening["market_id"]]
