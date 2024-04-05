@@ -19,6 +19,12 @@ from assume.world import World
 from pathlib import Path
 import importlib
 
+# must be installed for import path to work
+import calliope
+
+#model = calliope.Model("path/to/model.yaml", override_dict=override_dict)
+model = calliope.examples.urban_scale()
+
 
 def read_csv(base_path, filename):
     return pd.read_csv(
@@ -30,33 +36,11 @@ def read_csv(base_path, filename):
         index_col="time",
     )["load"]
 
-_EXAMPLE_MODEL_DIR = Path(importlib.resources.files("calliope") / "example_models")
 
-path = _EXAMPLE_MODEL_DIR / "urban_scale" / "model.yaml"
-
-model_data["data_sources"]
-
-model = calliope.Model('path/to/model.yaml', override_dict=override_dict)
-    
-
-
-model = calliope.examples.urban_scale()
-
-with open(path, "r") as f:
-    # TODO also load imported files in yaml
-    model_data = yaml.safe_load(f)
-    # TODO replace data_sources with actual data
-
-    time_subset = model_data["config"]["init"]["time_subset"]
-
-    start, end = time_subset
-
-
-override_dict = {
-    "config": {
-        "init": { "time_subset": ["2005-07-07", "2005-07-08"] }
-    }
-}
+input_path = Path(importlib.resources.files("calliope") / "example_models")
+name = "urban_scale"
+model_path = input_path / name
+override_dict = {"config": {"init": {"time_subset": ["2005-07-07", "2005-07-08"]}}}
 
 
 def update_dict_keys(initial_dict: dict, override_dict: dict):
@@ -70,13 +54,18 @@ def update_dict_keys(initial_dict: dict, override_dict: dict):
             initial_dict[key] = value
 
 
-async def load_calliope_async(world: World, name: str, input_path: Path, override_dict: dict = {}):
-
-    path = input_path / name / "model.yaml"
-    with open(path, "r") as f:
+async def load_calliope_async(
+    world: World, name: str, input_path: Path, override_dict: dict = {}
+):
+    model_path = input_path / name
+    with open(model_path / "model.yaml", "r") as f:
         model_data = yaml.safe_load(f)
-    model_data.update(override_dict)
-    model_data["config"]
+
+    for path in model_data["import"]:
+        with open(model_path / path, "r") as f:
+            import_dict = yaml.safe_load(f)
+            update_dict_keys(model_data, import_dict)
+
     update_dict_keys(model_data, override_dict)
 
     if model_data["config"]["mode"] == "plan":
@@ -102,9 +91,8 @@ async def load_calliope_async(world: World, name: str, input_path: Path, overrid
 
     # TODO add market operator
 
-
     # todo merge techs with data_sources
-    model_data["techs"] 
+    model_data["techs"]
     for source_name, data_source in model_data["data_sources"].items():
         # add assume agent
         await world.add_agent(
@@ -113,23 +101,26 @@ async def load_calliope_async(world: World, name: str, input_path: Path, overrid
             data_source["agent_name"],
             data_source["agent_type"],
             data_source["agent_config"],
-        )    
+        )
 
         world.add_unit_operator(source_name)
         world.add_unit(
             f"{source_name}1",
-            "demand", # TODO - power_plant?
-            source_name, # units_operator name
+            "demand",  # TODO - power_plant?
+            source_name,  # units_operator name
             # the unit_params have no hints
             {
                 "min_power": 0,
                 "max_power": 1000,
                 "bidding_strategies": {"EOM": "naive_eom"},
                 "technology": "demand",
-                "node": "location1"
+                "node": "location1",
             },
-            NaiveForecast(index, demand=100, availability=1), # hier zeitreihen hinterlegen
+            NaiveForecast(
+                index, demand=100, availability=1
+            ),  # hier zeitreihen hinterlegen
         )
+
 
 if __name__ == "__main__":
     db_uri = "postgresql://assume:assume@localhost:5432/assume"
