@@ -22,9 +22,11 @@ clearing_mechanisms: dict[str, MarketRole] = {
 try:
     from .complex_clearing import ComplexClearingRole
     from .complex_clearing_dmas import ComplexDmasClearingRole
+    from .uc_clearing import UCClearingRole
 
     clearing_mechanisms["pay_as_clear_complex"] = ComplexClearingRole
     clearing_mechanisms["pay_as_clear_complex_dmas"] = ComplexDmasClearingRole
+    clearing_mechanisms["uc_clearing"] = UCClearingRole
 except ImportError:
     pass
 

@@ -223,7 +223,7 @@ class UCClearingRole(MarketRole):
 
     def clear(
         self, orderbook: Orderbook, market_products
-    ) -> (Orderbook, Orderbook, list[dict]):
+    ) -> tuple[Orderbook, Orderbook, list[dict]]:
         """
         This implements pay-as-clear with more complex bid structures, including acceptance ratios, bid types, and profiled volumes.
 
