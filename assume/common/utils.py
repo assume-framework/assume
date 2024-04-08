@@ -2,10 +2,11 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import calendar
 import inspect
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from itertools import groupby
 from operator import itemgetter
@@ -98,8 +99,8 @@ def plot_orderbook(orderbook: Orderbook, results: list[dict]):
     from matplotlib.lines import Line2D
 
     bids = defaultdict(list)
-    orderbook.sort(key=itemgetter("node_id"))
-    for node_id, orders in groupby(orderbook, itemgetter("node_id")):
+    orderbook.sort(key=itemgetter("node"))
+    for node_id, orders in groupby(orderbook, itemgetter("node")):
         bids[node_id].extend(list(map(itemgetter("price", "volume"), orders)))
     number_of_nodes = len(bids.keys()) or 1
 
@@ -416,14 +417,22 @@ def get_products_index(orderbook: Orderbook) -> pd.DatetimeIndex:
         if order["start_time"] < start_time:
             start_time = order["start_time"]
         if order["end_time"] > end_time:
-            end_time = order["start_time"]
+            end_time = order["end_time"]
         if order["end_time"] - order["start_time"] < duration:
             duration = order["end_time"] - order["start_time"]
 
     index_products = pd.date_range(
         start_time,
-        end_time,
+        end_time - duration,
         freq=duration,
     )
 
     return index_products
+
+
+def timestamp2datetime(timestamp: float):
+    return datetime.fromtimestamp(timestamp, tz=timezone.utc).replace(tzinfo=None)
+
+
+def datetime2timestamp(datetime: datetime):
+    return calendar.timegm(datetime.utctimetuple())

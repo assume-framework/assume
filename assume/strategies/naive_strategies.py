@@ -43,6 +43,9 @@ class NaiveSingleBidStrategy(BaseStrategy):
             start, end_all
         )  # minimum and maximum power output of the unit between the start time of the first product and the end time of the last product
 
+        if "node" in market_config.additional_fields:
+            node = unit.node
+
         bids = []
         for product in product_tuples:
             # for each product, calculate the marginal cost of the unit at the start time of the product
@@ -67,15 +70,23 @@ class NaiveSingleBidStrategy(BaseStrategy):
                 }
             )
 
+            if "node" in market_config.additional_fields:
+                bids[-1]["max_power"] = unit.max_power if volume > 0 else unit.min_power
+                bids[-1]["min_power"] = (
+                    min_power[start] if volume > 0 else unit.max_power
+                )
+                bids[-1]["node"] = node
+
             previous_power = volume + current_power
             if previous_power > 0:
                 op_time = max(op_time, 0) + 1
             else:
                 op_time = min(op_time, 0) - 1
 
-        bids = self.remove_empty_bids(bids)
-
-        return bids
+        if "node" in market_config.additional_fields:
+            return bids
+        else:
+            return self.remove_empty_bids(bids)
 
 
 class NaiveProfileStrategy(BaseStrategy):

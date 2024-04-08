@@ -23,8 +23,8 @@ availabe_examples = {
         "study_case": "dam_with_complex_clearing",
     },
     "small_with_BB_and_LB": {
-        "scenario": "example_01d",
-        "study_case": "dam_with_complex_clearing",
+        "scenario": "example_01c",
+        "study_case": "dam_with_complex_opt_clearing",
     },
     "small_with_vre": {"scenario": "example_01b", "study_case": "base"},
     "small_with_vre_and_storage": {
@@ -42,6 +42,10 @@ availabe_examples = {
     "small_with_redispatch": {
         "scenario": "example_01d",
         "study_case": "base",
+    },
+    "small_with_nodal_clearing": {
+        "scenario": "example_01d",
+        "study_case": "nodal_case",
     },
     "large_2019_eom": {"scenario": "example_02", "study_case": "base_case_2019"},
     "large_2019_eom_crm": {

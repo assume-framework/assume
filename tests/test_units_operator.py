@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import calendar
 from datetime import datetime
 
 import pandas as pd
@@ -16,6 +15,7 @@ from mango.util.termination_detection import tasks_complete_or_sleeping
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
+from assume.common.utils import datetime2timestamp
 from assume.strategies.naive_strategies import NaiveSingleBidStrategy
 from assume.units.demand import Demand
 from assume.units.powerplant import PowerPlant
@@ -53,12 +53,12 @@ async def units_operator() -> UnitsOperator:
     unit = Demand("testdemand", index=index, **params_dict)
     await units_role.add_unit(unit)
 
-    start_ts = calendar.timegm(start.utctimetuple())
+    start_ts = datetime2timestamp(start)
     clock.set_time(start_ts)
 
     yield units_role
 
-    end_ts = calendar.timegm(end.utctimetuple())
+    end_ts = datetime2timestamp(end)
     clock.set_time(end_ts)
     await tasks_complete_or_sleeping(container)
     await container.shutdown()
@@ -176,3 +176,37 @@ async def test_write_learning_params(units_operator: UnitsOperator):
     units_operator.write_learning_params(orderbook, marketconfig)
 
     assert len(units_operator.context._scheduler._scheduled_tasks) == open_tasks + 2
+
+
+async def test_get_actual_dispatch(units_operator: UnitsOperator):
+    # GIVEN the first hour happened
+    # the UnitOperator does not
+    clock = units_operator.context._agent_context._container.clock
+
+    last = clock.time
+    clock.set_time(clock.time + 3600)
+    # WHEN actual_dispatch is called
+    market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
+    # THEN resulting unit dispatch dataframe contains one row
+    # which is for the current time - as we must know our current dispatch
+    assert unit_dfs[0].index[0].timestamp() == clock.time
+    assert len(unit_dfs[0]) == 1
+    assert len(market_dispatch) == 0
+
+    # WHEN another hour passes
+    clock.set_time(clock.time + 3600)
+    last = clock.time - 3600
+
+    # THEN resulting unit dispatch dataframe contains only one row with current dispatch
+    market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
+    assert unit_dfs[0].index[0].timestamp() == clock.time
+    assert len(unit_dfs[0]) == 1
+    assert len(market_dispatch) == 0
+
+    clock.set_time(clock.time + 3600)
+    last = clock.time - 3600
+
+    market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
+    assert unit_dfs[0].index[0].timestamp() == clock.time
+    assert len(unit_dfs[0]) == 1
+    assert len(market_dispatch) == 0

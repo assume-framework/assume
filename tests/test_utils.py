@@ -2,21 +2,25 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from datetime import datetime, timedelta
+import calendar
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pandas as pd
 import pytest
 from dateutil import rrule as rr
+from dateutil.tz import tzlocal
 
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
     aggregate_step_amount,
+    datetime2timestamp,
     get_available_products,
     get_products_index,
     initializer,
     plot_orderbook,
     separate_orders,
+    timestamp2datetime,
     visualize_orderbook,
 )
 from assume.scenario.loader_csv import convert_to_rrule_freq, make_market_config
@@ -395,7 +399,7 @@ def test_plot_function(mock_pyplot):
 
 
 @patch("matplotlib.pyplot.show")
-def test_plot_function(mock_pyplot):
+def test_visualize_function(mock_pyplot):
     orderbook = create_orderbook()
     i = -1
     for o in orderbook:
@@ -403,6 +407,43 @@ def test_plot_function(mock_pyplot):
         o["block_id"] = i + 1
         i += 1
     visualize_orderbook(orderbook)
+
+
+def test_broken_timestamps():
+    # timestamp is not in UTC, but is timezone-independent
+    # in general, we expect timestamps to be unix-epoch timestamps
+    unix_start = datetime(1970, 1, 1)
+
+    unix_epoch_start = datetime.fromtimestamp(0)
+    true_unix_epoch_start = unix_start
+    offset = tzlocal().utcoffset(datetime.now())
+    # this should be 1970-01-01-00-00 but it isn't (when run in CET locale)
+    # so we always have this offset
+    assert true_unix_epoch_start + offset == unix_epoch_start
+    # however, we want to have everything in UTC
+    # so we need this approach to get a datetime
+    assert unix_start == datetime.fromtimestamp(0, tz=timezone.utc).replace(tzinfo=None)
+    # and for the utc timestamp
+    assert 0 == calendar.timegm(unix_start.utctimetuple())
+
+    # pandas fromtimestamp has this problem too:
+    assert offset + unix_start == pd.Timestamp.fromtimestamp(0)
+
+    # though this can work
+    assert unix_start == pd.Timestamp(0)
+
+    # the other way works with pandas
+    assert pd.Timestamp(unix_start).timestamp() == 0
+
+
+def test_timestamp2datetime():
+    unix_start = datetime(1970, 1, 1)
+    assert unix_start == timestamp2datetime(0)
+
+
+def test_datetime2timestamp():
+    unix_start = datetime(1970, 1, 1)
+    assert 0 == datetime2timestamp(unix_start)
 
 
 if __name__ == "__main__":

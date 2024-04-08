@@ -166,20 +166,21 @@ class flexableEOMBlock(BaseStrategy):
         for i in range(len(bid_price_block)):
             price += bid_price_block[i] * list(bid_quantity_block.values())[i]
             volume += list(bid_quantity_block.values())[i]
-        mean_price = price / volume
+        if volume != 0:
+            mean_price = price / volume
 
-        bids.append(
-            {
-                "start_time": product_tuples[0][0],
-                "end_time": product_tuples[-1][1],
-                "only_hours": product_tuples[0][2],
-                "price": mean_price,
-                "volume": bid_quantity_block,
-                "bid_type": "BB",
-                "min_acceptance_ratio": 1,
-                "accepted_volume": {product[0]: 0 for product in product_tuples},
-            }
-        )
+            bids.append(
+                {
+                    "start_time": product_tuples[0][0],
+                    "end_time": product_tuples[-1][1],
+                    "only_hours": product_tuples[0][2],
+                    "price": mean_price,
+                    "volume": bid_quantity_block,
+                    "bid_type": "BB",
+                    "min_acceptance_ratio": 1,
+                    "accepted_volume": {product[0]: 0 for product in product_tuples},
+                }
+            )
 
         bids = self.remove_empty_bids(bids)
 
@@ -358,21 +359,23 @@ class flexableEOMLinked(BaseStrategy):
         for i in range(len(bid_price_block)):
             price += bid_price_block[i] * list(bid_quantity_block.values())[i]
             volume += list(bid_quantity_block.values())[i]
-        mean_price = price / volume
 
-        bids.append(
-            {
-                "start_time": product_tuples[0][0],
-                "end_time": product_tuples[-1][1],
-                "only_hours": product_tuples[0][2],
-                "price": mean_price,
-                "volume": bid_quantity_block,
-                "bid_type": "BB",
-                "min_acceptance_ratio": 1,
-                "accepted_volume": {product[0]: 0 for product in product_tuples},
-                "bid_id": block_id,
-            }
-        )
+        if volume != 0:
+            mean_price = price / volume
+
+            bids.append(
+                {
+                    "start_time": product_tuples[0][0],
+                    "end_time": product_tuples[-1][1],
+                    "only_hours": product_tuples[0][2],
+                    "price": mean_price,
+                    "volume": bid_quantity_block,
+                    "bid_type": "BB",
+                    "min_acceptance_ratio": 1,
+                    "accepted_volume": {product[0]: 0 for product in product_tuples},
+                    "bid_id": block_id,
+                }
+            )
 
         bids = self.remove_empty_bids(bids)
 

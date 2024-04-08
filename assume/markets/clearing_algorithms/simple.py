@@ -34,7 +34,7 @@ def calculate_meta(accepted_supply_orders, accepted_demand_orders, product):
         "price": avg_price,
         "max_price": max(prices),
         "min_price": min(prices),
-        "node_id": None,
+        "node": None,
         "product_start": product[0],
         "product_end": product[1],
         "only_hours": product[2],

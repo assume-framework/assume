@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import copy
 from datetime import datetime, timedelta
 
 from dateutil import rrule as rr
@@ -16,7 +17,7 @@ from .utils import create_orderbook, extend_orderbook
 simple_dayahead_auction_config = MarketConfig(
     market_id="simple_dayahead_auction",
     market_products=[MarketProduct(rd(hours=+1), 1, rd(hours=1))],
-    additional_fields=["node_id"],
+    additional_fields=["node"],
     opening_hours=rr.rrule(
         rr.HOURLY,
         dtstart=datetime(2005, 6, 1),
@@ -60,11 +61,13 @@ def test_market():
     print(meta)
 
 
-def test_simple_market_mechanism():
-    import copy
-
+async def test_simple_market_mechanism():
     for name, role in clearing_mechanisms.items():
-        if "complex" in name or "redispatch" in name:
+        skip = False
+        for skip_name in ["complex", "nodal", "redispatch", "contract"]:
+            if skip_name in name:
+                skip = True
+        if skip:
             continue
 
         print(name)

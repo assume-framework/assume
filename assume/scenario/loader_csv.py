@@ -142,12 +142,14 @@ def replace_paths(config: dict, inputs_path: str):
     Returns:
         dict: the adjusted config dict
     """
+
     if isinstance(config, dict):
         for key, value in config.items():
             if isinstance(value, (dict, list)):
                 config[key] = replace_paths(value, inputs_path)
             elif isinstance(key, str) and key.endswith("_path"):
-                config[key] = inputs_path + "/" + value
+                if not value.startswith(inputs_path):
+                    config[key] = inputs_path + "/" + value
     elif isinstance(config, list):
         for i, item in enumerate(config):
             config[i] = replace_paths(item, inputs_path)
@@ -217,6 +219,21 @@ def make_market_config(
     )
 
     return market_config
+
+
+def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame]:
+    network_path = Path(network_path)
+    buses = pd.read_csv(network_path / "buses.csv", index_col=0)
+    lines = pd.read_csv(network_path / "lines.csv", index_col=0)
+    generators = pd.read_csv(network_path / "powerplant_units.csv", index_col=0)
+    loads = pd.read_csv(network_path / "demand_units.csv", index_col=0)
+
+    return {
+        "buses": buses,
+        "lines": lines,
+        "generators": generators,
+        "loads": loads,
+    }
 
 
 def add_units(
@@ -298,8 +315,6 @@ async def load_scenario_folder_async(
     config = config[study_case]
     logger.info(f"Starting Scenario {scenario}/{study_case} from {inputs_path}")
 
-    config = replace_paths(config, path)
-
     world.reset()
 
     start = pd.Timestamp(config["start_date"])
@@ -353,6 +368,8 @@ async def load_scenario_folder_async(
         learning_config[
             "trained_policies_save_path"
         ] = f"{inputs_path}/learned_strategies/{sim_id}"
+
+    config = replace_paths(config, path)
 
     if learning_config.get("learning_mode", False):
         sim_id = f"{sim_id}_{episode}"
@@ -446,6 +463,9 @@ async def load_scenario_folder_async(
             world_start=start,
             world_end=end,
         )
+        if "network_path" in market_config.param_dict.keys():
+            grid_data = read_grid(market_config.param_dict["network_path"])
+            market_config.param_dict["grid_data"] = grid_data
 
         operator_id = str(market_params["operator"])
         if operator_id not in world.market_operators:
@@ -791,3 +811,7 @@ def run_learning(
         study_case,
         perform_learning=False,
     )
+
+
+if __name__ == "__main__":
+    data = read_grid(Path("examples/inputs/example_01d"))

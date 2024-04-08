@@ -63,7 +63,11 @@ def market_clearing_opt(
     """
 
     model = pyo.ConcreteModel()
-    model.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT_EXPORT)
+
+    # add dual suffix to the model (we need this to extract the market clearing prices later)
+    # if mode is not 'with_min_acceptance_ratio', otherwise the dual suffix is added later
+    if mode != "with_min_acceptance_ratio":
+        model.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT_EXPORT)
 
     model.T = pyo.Set(
         initialize=[market_product[0] for market_product in market_products],
@@ -226,13 +230,14 @@ def market_clearing_opt(
 
     # fix all model.x to the values in the solution
     if mode == "with_min_acceptance_ratio":
+        # add dual suffix to the model (we need this to extract the market clearing prices later)
+        instance.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT_EXPORT)
+
         for bid_id in instance.Bids:
             instance.x[bid_id].fix(instance.x[bid_id].value)
 
         # resolve the model
         results = solver.solve(instance, options=options)
-
-    # pr.print_stats(sort='cumulative')
 
     return instance, results
 
@@ -267,7 +272,6 @@ class ComplexClearingRole(MarketRole):
         Checks whether the bid types are valid and whether the volumes are within the maximum bid volume.
 
         Args:
-            sel: The instance of the ComplexClearingRole.
             orderbook (Orderbook): The orderbook to be validated.
             agent_tuple (tuple[str, str]): The agent tuple of the market (agend_adrr, agent_id).
 
@@ -304,7 +308,7 @@ class ComplexClearingRole(MarketRole):
                 order["node_id"] = self.notes[0]
 
     def clear(
-        self, orderbook: Orderbook, market_products: list[MarketProduct]
+        self, orderbook: Orderbook, market_products
     ) -> tuple[Orderbook, Orderbook, list[dict]]:
         """
         Implements pay-as-clear with more complex bid structures, including acceptance ratios, bid types, and profiled volumes.
@@ -585,7 +589,7 @@ def extract_results(
                 "price": clear_price,
                 "max_price": clear_price,
                 "min_price": clear_price,
-                "node_id": None,
+                "node": None,
                 "product_start": product[0],
                 "product_end": product[1],
                 "only_hours": product[2],

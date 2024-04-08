@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import asyncio
-import calendar
 import logging
 import os
 from datetime import datetime, timedelta
@@ -13,6 +12,7 @@ from dateutil import rrule as rr
 
 from assume import World
 from assume.common.market_objects import MarketConfig, MarketProduct
+from assume.common.utils import datetime2timestamp
 
 log = logging.getLogger(__name__)
 
@@ -80,8 +80,8 @@ async def worker(world: World, marketdesign: list[MarketConfig], create_worker):
         await asyncio.sleep(2)
         world.logger.info("starting simulation")
         await world.async_run(
-            start_ts=calendar.timegm(world.start.utctimetuple()),
-            end_ts=calendar.timegm(world.end.utctimetuple()),
+            start_ts=datetime2timestamp(world.start),
+            end_ts=datetime2timestamp(world.end),
         )
     elif world.distributed_role is False:
         await world.clock_agent.stopped
