@@ -17,7 +17,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 [![](https://img.shields.io/pypi/status/assume-framework.svg)](https://pypi.org/pypi/assume-framework/)
 [![](https://img.shields.io/readthedocs/assume)](https://assume.readthedocs.io/)
 
-[![Open Tutorials In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1LISiM1QvDIMXU68pJH-NqrMw5w7Awb24?usp=sharing)
+[![Try examples in Collab](https://colab.research.google.com/assets/colab-badge.svg)](https://github.com/assume-framework/assume/tree/main/examples/notebooks)
 
 **ASSUME** is an open-source toolbox for agent-based simulations of European electricity markets, with a primary focus on the German market setup. Developed as an open-source model, its primary objectives are to ensure usability and customizability for a wide range of users and use cases in the energy system modeling community.
 
@@ -41,6 +41,18 @@ To install the core package:
 
 ```bash
 pip install assume-framework
+```
+
+To install with reinforcement learning capabilities:
+
+```bash
+pip install assume-framework[learning]
+```
+
+We also include market clearing algorithms for complex bids. These clearing algorithms require pyomo and a solver (we use GLPK). To install the package with these capabilities, use:
+
+```bash
+pip install assume-framework[optimization]
 ```
 
 To install with testing capabilities:
@@ -87,9 +99,9 @@ The tutorials work completly detached from your own machine on google colab. The
 How to configure a new unit in ASSUME?
 **Coming Soon**
 
-How to intorduce reinforcement learning to ASSUME?
+How to introduce reinforcement learning to ASSUME?
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1LISiM1QvDIMXU68pJH-NqrMw5w7Awb24?usp=sharing)
+[![Open Learning Tutorial in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/assume-framework/assume/blob/main/examples/notebooks/04_reinforcement_learning_example.ipynb)
 
 
 
@@ -171,6 +183,6 @@ ASSUME is funded by the Federal Ministry for Economic Affairs and Climate Action
 
 ## License
 
-Copyright 2022-2023 [ASSUME developers](https://assume.readthedocs.io/en/latest/developers.html).
+Copyright 2022-2024 [ASSUME developers](https://assume.readthedocs.io/en/latest/developers.html).
 
 ASSUME is licensed under the [GNU Affero General Public License v3.0](./LICENSES/AGPL-3.0-or-later.txt). This license is a strong copyleft license that requires that any derivative work be licensed under the same terms as the original work. It is approved by the [Open Source Initiative](https://opensource.org/licenses/AGPL-3.0).

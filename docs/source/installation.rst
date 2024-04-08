@@ -17,7 +17,7 @@ ASSUME and train your agents, make sure to install Torch. Detailed
 installation instructions can be found `here <https://pytorch.org/get-started/locally/>`_.
 
 Using Pip/Python
-==============
+================
 
 In general most people use an environment manager for python.
 Here, Install instructions for Conda and Venv are given.
@@ -76,7 +76,7 @@ To install with testing capabilities::
     pip install assume-framework[test]
 
 Install Tab-Completion
------------------
+----------------------
 
 ASSUME uses `argcomplete` for argument completion on the CLI.
 
@@ -122,4 +122,12 @@ Follow these steps:
 
 This will launch a container for TimescaleDB and Grafana with
 preconfigured dashboards for analysis. You can access the Grafana
-dashboards at `http://localhost:3000`.
+dashboards at `http://localhost:3000`. Here are some exampels of the general grafana dashboard.
+
+.. image:: ./img/Grafana_General.png
+   :width: 100%
+   :alt: Grafana Dashboard
+
+.. image:: ./img/Grafana_General_2.png
+   :width: 100%
+   :alt: Grafana Dashboard 2

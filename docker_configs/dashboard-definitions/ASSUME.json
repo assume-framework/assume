@@ -225,6 +225,7 @@
               "options": {
                 "mode": "exclude",
                 "names": [
+                  "Supply volume",
                   "Price"
                 ],
                 "prefix": "All except:",
@@ -283,7 +284,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  demand_volume AS \"Demand volume\",\n  supply_volume AS \"Supply volume\"\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, demand_volume, supply_volume\nORDER BY 1;\n",
+          "rawSql": "SELECT\n  product_start AS \"time\",\n  demand_volume AS \"Demand volume\",\n  supply_volume AS \"Supply volume\",\n  node\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, demand_volume, supply_volume, node\nORDER BY product_start, node;\n",
           "refId": "Volume",
           "select": [
             [
@@ -316,7 +317,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  price AS \"Price\"\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, price\nORDER BY 1;\n",
+          "rawSql": "SELECT\n  product_start AS \"time\",\n  price AS \"Price\",\n  node\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, price, node\nORDER BY product_start, node;\n",
           "refId": "Price",
           "select": [
             [
@@ -406,7 +407,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 116
+        "y": 128
       },
       "id": 19,
       "options": {
@@ -447,13 +448,13 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_price::float) AS \" \",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_id\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_price::float) AS \"Price\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_id\nORDER BY 1",
           "refId": "A",
           "select": [
             [
               {
                 "params": [
-                  "original_price"
+                  "price"
                 ],
                 "type": "column"
               },
@@ -517,7 +518,7 @@
           ]
         }
       ],
-      "title": "Accepted Bid Prices",
+      "title": "Average Accepted Bid Price",
       "type": "timeseries"
     },
     {
@@ -583,7 +584,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 116
+        "y": 128
       },
       "id": 20,
       "options": {
@@ -624,7 +625,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_volume) AS \" \",\n  bid_id AS \"bid_id\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_id\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_volume) AS \"Volume\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_id\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -694,7 +695,7 @@
           ]
         }
       ],
-      "title": "Accepted Bid Volume",
+      "title": "Average Accepted Bid Volume",
       "type": "timeseries"
     },
     {
@@ -703,7 +704,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 125
+        "y": 137
       },
       "id": 74,
       "panels": [],
@@ -792,7 +793,7 @@
         "h": 12,
         "w": 10,
         "x": 0,
-        "y": 126
+        "y": 138
       },
       "id": 72,
       "options": {
@@ -911,7 +912,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "total_cost"
+              "options": "total_costs"
             },
             "properties": [
               {
@@ -926,7 +927,7 @@
         "h": 12,
         "w": 9,
         "x": 10,
-        "y": 126
+        "y": 138
       },
       "id": 76,
       "options": {
@@ -1011,7 +1012,7 @@
         "h": 12,
         "w": 5,
         "x": 19,
-        "y": 126
+        "y": 138
       },
       "id": 7,
       "options": {
@@ -1100,7 +1101,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 138
+        "y": 150
       },
       "id": 41,
       "panels": [],
@@ -1117,7 +1118,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 139
+        "y": 151
       },
       "id": 22,
       "options": {
@@ -1231,7 +1232,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 142
+        "y": 154
       },
       "id": 24,
       "options": {
@@ -1348,10 +1349,11 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 142
+        "y": 154
       },
       "id": 26,
       "options": {
+        "afterRender": "",
         "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
         "defaultContent": "The query didn't return any results.",
         "editor": {
@@ -1360,12 +1362,14 @@
           "language": "markdown"
         },
         "editors": [],
-        "everyRow": true,
         "externalScripts": [],
         "externalStyles": [],
         "helpers": "",
-        "styles": ""
+        "renderMode": "everyRow",
+        "styles": "",
+        "wrap": true
       },
+      "pluginVersion": "4.3.0",
       "targets": [
         {
           "datasource": {
@@ -1479,7 +1483,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 151
+        "y": 163
       },
       "id": 70,
       "options": {
@@ -1721,7 +1725,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 151
+        "y": 163
       },
       "id": 78,
       "options": {
@@ -1892,7 +1896,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 159
+        "y": 171
       },
       "id": 93,
       "options": {
@@ -2041,7 +2045,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 168
+        "y": 180
       },
       "id": 99,
       "options": {
@@ -2100,7 +2104,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 173
+        "y": 185
       },
       "id": 39,
       "panels": [],
@@ -2169,7 +2173,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 174
+        "y": 186
       },
       "id": 36,
       "options": {
@@ -2285,10 +2289,11 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 174
+        "y": 186
       },
       "id": 37,
       "options": {
+        "afterRender": "",
         "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
         "defaultContent": "The query didn't return any results.",
         "editor": {
@@ -2297,12 +2302,14 @@
           "language": "markdown"
         },
         "editors": [],
-        "everyRow": true,
         "externalScripts": [],
         "externalStyles": [],
         "helpers": "",
-        "styles": ""
+        "renderMode": "everyRow",
+        "styles": "",
+        "wrap": true
       },
+      "pluginVersion": "4.3.0",
       "targets": [
         {
           "datasource": {
@@ -2386,8 +2393,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2416,7 +2422,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 183
+        "y": 195
       },
       "id": 89,
       "options": {
@@ -2548,8 +2554,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2605,7 +2610,7 @@
         "h": 5,
         "w": 4,
         "x": 12,
-        "y": 183
+        "y": 195
       },
       "id": 95,
       "options": {
@@ -2707,8 +2712,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2752,7 +2756,7 @@
         "h": 5,
         "w": 8,
         "x": 16,
-        "y": 183
+        "y": 195
       },
       "id": 90,
       "options": {
@@ -2841,8 +2845,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2858,7 +2861,7 @@
         "h": 4,
         "w": 4,
         "x": 12,
-        "y": 188
+        "y": 200
       },
       "id": 96,
       "options": {
@@ -2929,8 +2932,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2946,7 +2948,7 @@
         "h": 4,
         "w": 8,
         "x": 16,
-        "y": 188
+        "y": 200
       },
       "id": 94,
       "options": {
@@ -3047,8 +3049,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3080,7 +3081,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 192
+        "y": 204
       },
       "id": 86,
       "options": {
@@ -3143,7 +3144,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 201
+        "y": 213
       },
       "id": 44,
       "panels": [],
@@ -3195,8 +3196,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3212,7 +3212,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 202
+        "y": 214
       },
       "id": 65,
       "options": {
@@ -3312,8 +3312,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3328,10 +3327,11 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 202
+        "y": 214
       },
       "id": 47,
       "options": {
+        "afterRender": "",
         "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power Disharge: {{max_power_discharge}} MW <br>\nMinimum Power Discharge: {{min_power_discharge}} MW <br>\nEfficiency Discharge: {{efficiency_discharge}} <br>\n\nMaximum Power Charge: {{max_power_charge}} MW <br>\nMinimum Power Charge: {{min_power_charge}} MW <br>\nEfficiency Charge: {{efficiency_charge}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
         "defaultContent": "The query didn't return any results.",
         "editor": {
@@ -3340,12 +3340,14 @@
           "language": "markdown"
         },
         "editors": [],
-        "everyRow": true,
         "externalScripts": [],
         "externalStyles": [],
         "helpers": "",
-        "styles": ""
+        "renderMode": "everyRow",
+        "styles": "",
+        "wrap": true
       },
+      "pluginVersion": "4.3.0",
       "targets": [
         {
           "datasource": {
@@ -3428,8 +3430,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3445,7 +3446,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 211
+        "y": 223
       },
       "id": 80,
       "options": {
@@ -3594,7 +3595,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 220
+        "y": 232
       },
       "id": 91,
       "options": {
@@ -3801,7 +3802,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 220
+        "y": 232
       },
       "id": 92,
       "options": {
@@ -3971,7 +3972,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 229
+        "y": 241
       },
       "id": 97,
       "options": {
@@ -4143,7 +4144,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 238
+        "y": 250
       },
       "id": 98,
       "options": {
@@ -4206,8 +4207,8 @@
       {
         "current": {
           "selected": false,
-          "text": "example_02_dam_case_2019",
-          "value": "example_02_dam_case_2019"
+          "text": "example_01a_base",
+          "value": "example_01a_base"
         },
         "datasource": {
           "type": "postgres",
@@ -4253,21 +4254,9 @@
       },
       {
         "current": {
-          "selected": true,
-          "text": [
-            "Biomass",
-            "Hydro",
-            "Solar",
-            "Wind offshore",
-            "Wind onshore"
-          ],
-          "value": [
-            "Biomass",
-            "Hydro",
-            "Solar",
-            "Wind offshore",
-            "Wind onshore"
-          ]
+          "selected": false,
+          "text": "Unit 1",
+          "value": "Unit 1"
         },
         "datasource": {
           "type": "postgres",
@@ -4290,13 +4279,9 @@
       },
       {
         "current": {
-          "selected": true,
-          "text": [
-            "demand_EOM"
-          ],
-          "value": [
-            "demand_EOM"
-          ]
+          "selected": false,
+          "text": "demand_EOM",
+          "value": "demand_EOM"
         },
         "datasource": {
           "type": "postgres",
@@ -4319,13 +4304,10 @@
       },
       {
         "current": {
-          "selected": true,
-          "text": [
-            "Bleiloch"
-          ],
-          "value": [
-            "Bleiloch"
-          ]
+          "isNone": true,
+          "selected": false,
+          "text": "None",
+          "value": ""
         },
         "datasource": {
           "type": "postgres",
@@ -4349,11 +4331,12 @@
     ]
   },
   "time": {
-    "from": "2019-01-05T04:24:23.217Z",
-    "to": "2019-01-05T14:38:48.092Z"
+    "from": "2019-01-01T00:00:00.000Z",
+    "to": "2019-01-15T23:59:59.000Z"
   },
   "timepicker": {
     "refresh_intervals": [
+      "5s",
       "1m",
       "5m",
       "15m",
@@ -4361,9 +4344,9 @@
       "1h"
     ]
   },
-  "timezone": "",
+  "timezone": "utc",
   "title": "ASSUME: Main overview",
   "uid": "mQ3Lvkr4k",
-  "version": 21,
+  "version": 6,
   "weekStart": ""
 }

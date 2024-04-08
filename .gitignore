@@ -136,11 +136,16 @@ dmypy.json
 *.orig
 .idea
 .vscode
-examples/inputs/learned_strategies
-examples/outputs
-examples/local_db/
-workshop/inputs/learned_strategies
-workshop/local_db/
 
+local_db
 assume-db
 forecasts_df.csv
+examples/inputs/learned_strategies
+examples/outputs
+
+examples/notebooks/inputs
+examples/notebooks/outputs
+**/scenario/*.csv
+*.pb
+*.jar
+fameSetup.yaml

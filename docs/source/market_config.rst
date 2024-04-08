@@ -12,7 +12,7 @@ A full list of configurations and explanation is given here.
  ============================= =====================================================
   market config item            description
  ============================= =====================================================
-  name                          string name
+  market_id                     string name
   product_type                  energy or capacity or heat
   market_products               list of available products to be traded
   opening_hours                 recurrence rule of openings
@@ -29,6 +29,7 @@ A full list of configurations and explanation is given here.
   supports_get_unmatched        boolean
   maximum_gradient              max allowed change between bids
   eligible_obligations_lambda   function checking if agent is allowed to trade here
+  param_dict                    additional dict with params for grid and other configs
  ============================= =====================================================
 
 

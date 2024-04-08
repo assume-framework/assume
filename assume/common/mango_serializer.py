@@ -2,19 +2,20 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import calendar
 import pickle
 from datetime import datetime
 
 from mango.messages.codecs import JSON, GenericProtoMsg
 
+from assume.common.utils import datetime2timestamp, timestamp2datetime
+
 
 def datetime_json_serializer():
     def __tostring__(dt: datetime):
-        return calendar.timegm(dt.utctimetuple())
+        return datetime2timestamp(dt)
 
-    def __fromstring__(dt: datetime):
-        return datetime.utcfromtimestamp(dt)
+    def __fromstring__(ts: float | str):
+        return timestamp2datetime(ts)
 
     return datetime, __tostring__, __fromstring__
 

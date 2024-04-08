@@ -5,69 +5,48 @@
 import logging
 from datetime import datetime, timedelta
 from functools import lru_cache
+from typing import Tuple, Union
 
 import pandas as pd
 
 from assume.common.base import SupportsMinMax
+from assume.common.market_objects import MarketConfig, Orderbook
+from assume.common.utils import get_products_index
 
 logger = logging.getLogger(__name__)
 
 
 class PowerPlant(SupportsMinMax):
     """
-    A class for a powerplant unit
+    A class for a power plant unit.
 
-    :param id: The ID of the storage unit.
-    :type id: str
-    :param technology: The technology of the storage unit.
-    :type technology: str
-    :param bidding_strategies: The bidding strategies of the storage unit.
-    :type bidding_strategies: dict
-    :param index: The index of the storage unit.
-    :type index: pd.DatetimeIndex
-    :param max_power: The maximum power output capacity of the power plant in MW.
-    :type max_power: float
-    :param min_power: The minimum power output capacity of the power plant in MW. (Defaults to 0.0 MW)
-    :type min_power: float, optional
-    :param efficiency: The efficiency of the poewr plant in converting fuel to electricity (Defaults to 1.0)
-    :type efficiency: float, optional
-    :param fixed_cost: The fixed operating cost of the power plant, independent of the power output (Defaults to 0.0 monetary units)
-    :type fixed_cost: float, optional
-    :param partial_load_eff: Does the efficiency varies at part loads? (Defaults to False)
-    :type partial_load_eff: bool, optional
-    :param fuel_type: The type of fuel used by the power plant for power generation (Defaults to "others")
-    :type fuel_type: str, optional
-    :param emission_factor: The emission factor associated with the power plants fuel type -> CO2 emissions per unit of energy produced (Defaults to 0.0.)
-    :type emission_factor: float, optional
-    :param ramp_up: The ramp-up rate of the power plant, indicating how quickly it can increase power output (Defaults to -1)
-    :type ramp_up: float, optional
-    :param ramp_down: The ramp-down rate of the power plant, indicating how quickly it can decrease power output. (Defaults to -1)
-    :type ramp_down: float, optional
-    :param hot_start_cost: The cost of a hot start, where the power plant is restarted after a recent shutdown.(Defaults to 0 monetary units.)
-    :type hot_start_cost: float, optional
-    :param warm_start_cost: The cost of a warm start, where the power plant is restarted after a moderate downtime.(Defaults to 0 monetary units.)
-    :type warm_start_cost: float, optional
-    :param cold_start_cost: The cost of a cold start, where the power plant is restarted after a prolonged downtime.(Defaults to 0 monetary units.)
-    :type cold_start_cost: float, optional
-    :param min_operating_time: The minimum duration that the power plant must operate once started, in hours.(Defaults to 0 hours.)
-    :type min_operating_time: float, optional
-    :param min_down_time: The minimum downtime required after a shutdown before the power plant can be restarted, in hours.(Defaults to 0 hours.)
-    :type min_down_time: float, optional
-    :param downtime_hot_start: The downtime required after a hot start before the power plant can be restarted, in hours.(Defaults to 8 hours.)
-    :type downtime_hot_start: int, optional
-    :param downtime_warm_start: The downtime required after a warm start before the power plant can be restarted, in hours.( Defaults to 48 hours.)
-    :type downtime_warm_start: int, optional
-    :param heat_extraction: A boolean indicating whether the power plant can extract heat for external purposes.(Defaults to False.)
-    :type heat_extraction: bool, optional
-    :param max_heat_extraction: The maximum amount of heat that the power plant can extract for external use, in some suitable unit.(Defaults to 0.)
-    :type max_heat_extraction: float, optional
-    :param location: The geographical coordinates (latitude and longitude) of the power plant's location.(Defaults to (0.0, 0.0).)
-    :type location: tuple[float, float], optional
-    :param node: The identifier of the electrical bus or network node to which the power plant is connected.(Defaults to "bus0".)
-    :type node: str, optional
-    :param kwargs: Additional keyword arguments to be passed to the base class.
-    :type kwargs: dict, optional
-
+    Args:
+        id (str): The ID of the storage unit.
+        unit_operator (str): The operator of the unit.
+        technology (str): The technology of the unit.
+        bidding_strategies (dict): The bidding strategies of the unit.
+        index (pandas.DatetimeIndex): The index of the unit.
+        max_power (float): The maximum power output capacity of the power plant in MW.
+        min_power (float, optional): The minimum power output capacity of the power plant in MW. Defaults to 0.0 MW.
+        efficiency (float, optional): The efficiency of the power plant in converting fuel to electricity. Defaults to 1.0.
+        additional_cost (Union[float, pd.Series], optional): Additional costs associated with power generation, in EUR/MWh. Defaults to 0.
+        partial_load_eff (bool, optional): Does the efficiency vary at part loads? Defaults to False.
+        fuel_type (str, optional): The type of fuel used by the power plant for power generation. Defaults to "others".
+        emission_factor (float, optional): The emission factor associated with the power plant's fuel type (CO2 emissions per unit of energy produced). Defaults to 0.0.
+        ramp_up (Union[float, None], optional): The ramp-up rate of the power plant, indicating how quickly it can increase power output. Defaults to None.
+        ramp_down (Union[float, None], optional): The ramp-down rate of the power plant, indicating how quickly it can decrease power output. Defaults to None.
+        hot_start_cost (float, optional): The cost of a hot start, where the power plant is restarted after a recent shutdown. Defaults to 0.
+        warm_start_cost (float, optional): The cost of a warm start, where the power plant is restarted after a moderate downtime. Defaults to 0.
+        cold_start_cost (float, optional): The cost of a cold start, where the power plant is restarted after a prolonged downtime. Defaults to 0.
+        min_operating_time (float, optional): The minimum duration that the power plant must operate once started, in hours. Defaults to 0.
+        min_down_time (float, optional): The minimum downtime required after a shutdown before the power plant can be restarted, in hours. Defaults to 0.
+        downtime_hot_start (int, optional): The downtime required after a hot start before the power plant can be restarted, in hours. Defaults to 8.
+        downtime_warm_start (int, optional): The downtime required after a warm start before the power plant can be restarted, in hours. Defaults to 48.
+        heat_extraction (bool, optional): A boolean indicating whether the power plant can extract heat for external purposes. Defaults to False.
+        max_heat_extraction (float, optional): The maximum amount of heat that the power plant can extract for external use, in some suitable unit. Defaults to 0.
+        location (Tuple[float, float], optional): The geographical coordinates (latitude and longitude) of the power plant's location. Defaults to (0.0, 0.0).
+        node (str, optional): The identifier of the electrical bus or network node to which the power plant is connected. Defaults to "bus0".
+        **kwargs (dict, optional): Additional keyword arguments to be passed to the base class. Defaults to {}.
     """
 
     def __init__(
@@ -81,12 +60,12 @@ class PowerPlant(SupportsMinMax):
         min_power: float = 0.0,
         init_power: float = -1,
         efficiency: float = 1.0,
-        fixed_cost: float = 0.0,
+        additional_cost: Union[float, pd.Series] = 0.0,
         partial_load_eff: bool = False,
         fuel_type: str = "others",
         emission_factor: float = 0.0,
-        ramp_up: float | None = None,
-        ramp_down: float | None = None,
+        ramp_up: Union[float, None] = None,
+        ramp_down: Union[float, None] = None,
         hot_start_cost: float = 0,
         warm_start_cost: float = 0,
         cold_start_cost: float = 0,
@@ -97,7 +76,7 @@ class PowerPlant(SupportsMinMax):
         downtime_warm_start: int = 48,  # hours
         heat_extraction: bool = False,
         max_heat_extraction: float = 0,
-        location: tuple[float, float] = (0.0, 0.0),
+        location: Tuple[float, float] = (0.0, 0.0),
         node: str = "bus0",
         **kwargs,
     ):
@@ -108,6 +87,7 @@ class PowerPlant(SupportsMinMax):
             bidding_strategies=bidding_strategies,
             index=index,
             node=node,
+            location=location,
             **kwargs,
         )
 
@@ -115,13 +95,21 @@ class PowerPlant(SupportsMinMax):
         self.min_power = min_power
         self.init_power = init_power
         self.efficiency = efficiency
+        self.additional_cost = additional_cost
         self.partial_load_eff = partial_load_eff
         self.fuel_type = fuel_type
         self.emission_factor = emission_factor
+        self.heat_extraction = heat_extraction
+        self.max_heat_extraction = max_heat_extraction
+        self.hot_start_cost = hot_start_cost * max_power
+        self.warm_start_cost = warm_start_cost * max_power
+        self.cold_start_cost = cold_start_cost * max_power
+        self.shut_down_cost = shut_down_cost
 
         # check ramping enabled
         self.ramp_down = max_power if ramp_down == 0 or ramp_down is None else ramp_down
         self.ramp_up = max_power if ramp_up == 0 or ramp_up is None else ramp_up
+
         self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
         self.min_down_time = min_down_time if min_down_time > 0 else 1
         self.downtime_hot_start = downtime_hot_start / (
@@ -130,12 +118,6 @@ class PowerPlant(SupportsMinMax):
         self.downtime_warm_start = downtime_warm_start / (
             self.index.freq / timedelta(hours=1)
         )
-
-        self.fixed_cost = fixed_cost
-        self.hot_start_cost = hot_start_cost
-        self.warm_start_cost = warm_start_cost
-        self.cold_start_cost = cold_start_cost
-        self.shut_down_cost = shut_down_cost
 
         self.heat_extraction = heat_extraction
         self.max_heat_extraction = max_heat_extraction
@@ -146,7 +128,9 @@ class PowerPlant(SupportsMinMax):
 
     def init_marginal_cost(self):
         """
-        Initialize the marginal cost of the unit.
+        Initializes the marginal cost of the unit using calc_cimple_marginal_cost().
+
+        Args:
         """
         self.marginal_cost = self.calc_simple_marginal_cost()
 
@@ -157,16 +141,18 @@ class PowerPlant(SupportsMinMax):
     ):
         """
         Executes the current dispatch of the unit based on the provided timestamps.
+
         The dispatch is only executed, if it is in the constraints given by the unit.
         Returns the volume of the unit within the given time range.
 
-        :param start: the start time of the dispatch
-        :type start: pd.Timestamp
-        :param end: the end time of the dispatch
-        :type end: pd.Timestamp
-        :return: the volume of the unit within the given time range
-        :rtype: float
+        Args:
+            start (pandas.Timestamp): The start time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch.
+
+        Returns:
+            pd.Series: The volume of the unit within the given time range.
         """
+        start = max(start, self.index[0])
 
         max_power = (
             self.forecaster.get_availability(self.id)[start:end] * self.max_power
@@ -174,34 +160,89 @@ class PowerPlant(SupportsMinMax):
 
         for t in self.outputs["energy"][start:end].index:
             current_power = self.outputs["energy"][t]
+
             previous_power = self.get_output_before(t)
+            op_time = self.get_operation_time(t)
 
-            max_power_t = self.calculate_ramp(previous_power, max_power[t])
-            min_power_t = self.calculate_ramp(previous_power, self.min_power)
+            current_power = self.calculate_ramp(op_time, previous_power, current_power)
 
-            if current_power > max_power_t:
-                self.outputs["energy"][t] = max_power_t
+            if current_power > 0:
+                current_power = min(current_power, max_power[t])
+                current_power = max(current_power, self.min_power)
 
-            elif current_power < min_power_t and current_power > 0:
-                self.outputs["energy"][t] = 0
+            self.outputs["energy"][t] = current_power
 
         return self.outputs["energy"].loc[start:end]
+
+    def set_dispatch_plan(
+        self,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ) -> None:
+        """
+        Adds the dispatch plan from the current market result to the total dispatch plan and calculates the cashflow.
+
+        Args:
+            marketconfig (MarketConfig): The market configuration.
+            orderbook (Orderbook): The orderbook.
+        """
+        products_index = get_products_index(orderbook)
+
+        max_power = (
+            self.forecaster.get_availability(self.id)[products_index] * self.max_power
+        )
+
+        product_type = marketconfig.product_type
+        for order in orderbook:
+            start = order["start_time"]
+            end = order["end_time"]
+            end_excl = end - self.index.freq
+            if isinstance(order["accepted_volume"], dict):
+                self.outputs[product_type].loc[start:end_excl] += [
+                    order["accepted_volume"][key]
+                    for key in order["accepted_volume"].keys()
+                ]
+            else:
+                self.outputs[product_type].loc[start:end_excl] += order[
+                    "accepted_volume"
+                ]
+
+        self.calculate_cashflow(product_type, orderbook)
+
+        for start in products_index:
+            current_power = self.outputs[product_type][start]
+
+            previous_power = self.get_output_before(start)
+            op_time = self.get_operation_time(start)
+
+            current_power = self.calculate_ramp(op_time, previous_power, current_power)
+
+            if current_power > 0:
+                current_power = min(current_power, max_power[start])
+                current_power = max(current_power, self.min_power)
+
+            self.outputs[product_type][start] = current_power
+
+        self.bidding_strategies[marketconfig.market_id].calculate_reward(
+            unit=self,
+            marketconfig=marketconfig,
+            orderbook=orderbook,
+        )
 
     def calc_simple_marginal_cost(
         self,
     ):
         """
-        Calculate the marginal cost of the unit (simple method)
-        Returns the marginal cost of the unit.
+        Calculates the marginal cost of the unit (simple method) and returns the marginal cost of the unit.
 
-        :return: the marginal cost of the unit
-        :rtype: float
+        Returns:
+            float: The marginal cost of the unit.
         """
         fuel_price = self.forecaster.get_price(self.fuel_type)
         marginal_cost = (
             fuel_price / self.efficiency
             + self.forecaster.get_price("co2") * self.emission_factor / self.efficiency
-            + self.fixed_cost
+            + self.additional_cost
         )
 
         return marginal_cost
@@ -216,12 +257,12 @@ class PowerPlant(SupportsMinMax):
         Calculates the marginal cost of the unit based on power output and timestamp, considering partial efficiency.
         Returns the marginal cost of the unit.
 
-        :param power_output: the power output of the unit
-        :type power_output: float
-        :param timestep: the timestamp of the unit
-        :type timestep: pd.Timestamp, optional
-        :return: the marginal cost of the unit
-        :rtype: float | pd.Series
+        Args:
+            power_output (float): The power output of the unit.
+            timestep (pd.Timestamp, optional): The timestamp of the unit. Defaults to None.
+
+        Returns:
+            float | pd.Series: The marginal cost of the unit.
         """
         fuel_price = self.forecaster.get_price(self.fuel_type).at[timestep]
 
@@ -260,10 +301,16 @@ class PowerPlant(SupportsMinMax):
         efficiency = self.efficiency - eta_loss
         co2_price = self.forecaster.get_price("co2").at[timestep]
 
+        additional_cost = (
+            self.additional_cost.at[timestep]
+            if isinstance(self.additional_cost, pd.Series)
+            else self.additional_cost
+        )
+
         marginal_cost = (
             fuel_price / efficiency
             + co2_price * self.emission_factor / efficiency
-            + self.fixed_cost
+            + additional_cost
         )
 
         return marginal_cost
@@ -272,25 +319,24 @@ class PowerPlant(SupportsMinMax):
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series, pd.Series]:
         """
-        Calculate the minimum and maximum power output of the unit.
-        Returns the minimum and maximum power output of the unit.
-        does not include ramping
-        can be used for arbitrary start times in the future
+        Calculates the minimum and maximum power output of the unit and returns it.
 
-        :param start: the start time of the dispatch
-        :type start: pd.Timestamp
-        :param end: the end time of the dispatch
-        :type end: pd.Timestamp
-        :param product_type: the product type of the unit
-        :type product_type: str
-        :return: the minimum and maximum power output of the unit
-        :rtype: tuple[pd.Series, pd.Series]
+        Args:
+            start (pandas.Timestamp): The start time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch.
+            product_type (str, optional): The product type of the unit. Defaults to "energy".
+
+        Returns:
+            tuple[pandas.Series, pandas.Series]: The minimum and maximum power output of the unit.
+
+        Note:
+            The calculation does not include ramping constraints and can be used for arbitrary start times in the future.
         """
         end_excl = end - self.index.freq
 
         base_load = self.outputs["energy"][start:end_excl]
         heat_demand = self.outputs["heat"][start:end_excl]
-        assert heat_demand.min() >= 0
+        # assert heat_demand.min() >= 0
 
         capacity_neg = self.outputs["capacity_neg"][start:end_excl]
         # needed minimum + capacity_neg - what is already sold is actual minimum
@@ -312,19 +358,23 @@ class PowerPlant(SupportsMinMax):
 
     def calculate_marginal_cost(self, start: datetime, power: float):
         """
-        Calculates the marginal cost of the unit based on the provided start time and power output.
+        Calculates the marginal cost of the unit based on the provided start time and power output and returns it.
         Returns the marginal cost of the unit.
 
-        :param start: the start time of the dispatch
-        :type start: datetime
-        :param power: the power output of the unit
-        :type power: float
-        :return: the marginal cost of the unit
-        :rtype: float
+        Args:
+            start (datetime.datetime): The start time of the dispatch.
+            power (float): The power output of the unit.
+
+        Returns:
+            float: The marginal cost of the unit.
         """
         # if marginal costs already exists, return it
         if self.marginal_cost is not None:
-            return self.marginal_cost[start]
+            return (
+                self.marginal_cost[start]
+                if len(self.marginal_cost) > 1
+                else self.marginal_cost
+            )
         # if not, calculate it
         else:
             return self.calc_marginal_cost_with_partial_eff(
@@ -336,8 +386,8 @@ class PowerPlant(SupportsMinMax):
         """
         Returns the attributes of the unit as a dictionary, including specific attributes.
 
-        :return: the attributes of the unit as a dictionary
-        :rtype: dict
+        Returns:
+            dict: The attributes of the unit as a dictionary.
         """
         unit_dict = super().as_dict()
         unit_dict.update(

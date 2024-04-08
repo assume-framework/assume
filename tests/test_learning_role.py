@@ -29,6 +29,8 @@ def test_learning_init():
         "algorithm": "matd3",
         "learning_mode": False,
         "training_episodes": 3,
+        "continue_learning": False,
+        "trained_policies_save_path": None,
     }
     # test init
     l = Learning(learning_config, start, end)
@@ -38,19 +40,18 @@ def test_learning_init():
     l.rl_strats["test_id"] = LearningStrategy(**learning_config)
 
     # test creating actors
-    l.create_actors()
+    l.initialize_policy()
     # now we have an actor for every strategy
     for strategy in l.rl_strats.values():
         assert isinstance(strategy.actor, Actor)
         assert isinstance(strategy.actor_target, Actor)
 
-    l.create_critics()
     # now we have a critic for every strategy
     for str_id in l.rl_strats.keys():
         assert isinstance(l.critics[str_id], CriticTD3)
         assert isinstance(l.target_critics[str_id], CriticTD3)
 
-    ac = l.extract_actors_and_critics()
+    ac = l.rl_algorithm.extract_policy()
 
     assert ac["target_critics"] == l.target_critics
     assert ac["critics"] == l.critics

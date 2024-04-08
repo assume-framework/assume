@@ -2,8 +2,8 @@
 ..
 .. SPDX-License-Identifier: AGPL-3.0-or-later
 
-assume.common package
-=====================
+Common components and methods
+=============================
 
 Submodules
 ----------
@@ -56,14 +56,6 @@ assume.common.outputs module
    :undoc-members:
    :show-inheritance:
 
-assume.common.scenario\_loader module
--------------------------------------
-
-.. automodule:: assume.common.scenario_loader
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 assume.common.units\_operator module
 ------------------------------------
 
@@ -76,6 +68,14 @@ assume.common.utils module
 --------------------------
 
 .. automodule:: assume.common.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+assume.common.grid\_utils module
+------------------------------------
+
+.. automodule:: assume.common.grid_utils
    :members:
    :undoc-members:
    :show-inheritance:

@@ -2,33 +2,12 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-dam:
-  start_date: 2019-01-01 00:00
-  end_date: 2019-04-01 00:00
+sho_case:
+  start_date: 2020-01-01 00:00
+  end_date: 2020-01-30 23:00
   time_step: 1h
   save_frequency_hours: 24
-  markets_config:
-    EOM:
-      operator: EOM_operator
-      product_type: energy
-      products:
-        - duration: 1h
-          count: 24
-          first_delivery: 1h
-      opening_frequency: 24h
-      opening_duration: 24h
-      volume_unit: MWh
-      maximum_bid_volume: 100000
-      maximum_bid_price: 3000
-      minimum_bid_price: -500
-      price_unit: EUR/MWh
-      market_mechanism: pay_as_clear
 
-dam_with_complex_clearing:
-  start_date: 2019-01-01 00:00
-  end_date: 2019-04-01 00:00
-  time_step: 1h
-  save_frequency_hours: 24
   markets_config:
     EOM:
       operator: EOM_operator
@@ -36,7 +15,7 @@ dam_with_complex_clearing:
       products:
         - duration: 1h
           count: 24
-          first_delivery: 1h
+          first_delivery: 24h
       opening_frequency: 24h
       opening_duration: 24h
       volume_unit: MWh
@@ -44,7 +23,60 @@ dam_with_complex_clearing:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: pay_as_clear_complex
+      market_mechanism: pay_as_clear_advanced
       additional_fields:
         - bid_type
         - min_acceptance_ratio
+        - parent_bid_id
+
+bo_case:
+  start_date: 2020-01-01 00:00
+  end_date: 2020-01-30 23:00
+  time_step: 1h
+  save_frequency_hours: 24
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear_advanced
+      additional_fields:
+        - bid_type
+        - min_acceptance_ratio
+        - parent_bid_id
+
+lo_case:
+  start_date: 2020-01-01 00:00
+  end_date: 2020-01-30 23:00
+  time_step: 1h
+  save_frequency_hours: 24
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 24h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear_advanced
+      additional_fields:
+        - bid_type
+        - min_acceptance_ratio
+        - parent_bid_id

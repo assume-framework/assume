@@ -8,7 +8,8 @@ from datetime import timedelta
 import pandas as pd
 import pytest
 
-from assume.strategies.naive_strategies import NaiveStrategy
+from assume.strategies.flexable_storage import flexableEOMStorage
+from assume.strategies.naive_strategies import NaiveSingleBidStrategy
 from assume.units import Storage
 
 
@@ -18,20 +19,20 @@ def storage_unit() -> Storage:
         id="Test_Storage",
         unit_operator="TestOperator",
         technology="TestTechnology",
-        bidding_strategies={"energy": NaiveStrategy()},
+        bidding_strategies={"EOM": NaiveSingleBidStrategy()},
         max_power_charge=-100,
         max_power_discharge=100,
         max_volume=1000,
         efficiency_charge=0.9,
         efficiency_discharge=0.95,
-        index=pd.date_range("2022-01-01", periods=4, freq="H"),
+        index=pd.date_range("2022-01-01", periods=4, freq="h"),
         ramp_down_charge=-50,
         ramp_down_discharge=50,
         ramp_up_charge=-60,
         ramp_up_discharge=60,
-        variable_cost_charge=3,
-        variable_cost_discharge=4,
-        fixed_cost=1,
+        additional_cost_charge=3,
+        additional_cost_discharge=4,
+        additional_cost=1,
         initial_soc=0.5,
     )
 
@@ -54,17 +55,17 @@ def test_init_function(storage_unit):
 def test_reset_function(storage_unit):
     # check if total_power_output is reset
     assert storage_unit.outputs["energy"].equals(
-        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
+        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     )
     # the same for pos and neg capacity reserve
     assert storage_unit.outputs["pos_capacity"].equals(
-        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
+        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     )
     assert storage_unit.outputs["neg_capacity"].equals(
-        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="H"))
+        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     )
     assert storage_unit.outputs["soc"].equals(
-        pd.Series(0.5, index=pd.date_range("2022-01-01", periods=4, freq="H"))
+        pd.Series(0.5, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     )
 
 
@@ -317,7 +318,7 @@ def test_execute_dispatch(storage_unit):
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy.iloc[0] == 100
     assert math.isclose(
-        storage_unit.outputs["soc"][start + storage_unit.index.freq],
+        storage_unit.outputs["soc"][end],
         0.5 - 100 / storage_unit.efficiency_discharge / storage_unit.max_volume,
     )
 
@@ -330,15 +331,15 @@ def test_execute_dispatch(storage_unit):
         storage_unit.outputs["soc"][end],
         0.5 + 100 * storage_unit.efficiency_charge / storage_unit.max_volume,
     )
+    # adjust dispatch to soc limit for discharge
     storage_unit.outputs["energy"][start] = 100
-    storage_unit.outputs["soc"][start] = 0.05
     storage_unit.outputs["soc"][start] = 0.05
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert math.isclose(
         dispatched_energy.iloc[0], 50 * storage_unit.efficiency_discharge, abs_tol=0.1
     )
+    # adjust dispatch to soc limit for charging
     storage_unit.outputs["energy"][start] = -100
-    storage_unit.outputs["soc"][start] = 0.95
     storage_unit.outputs["soc"][start] = 0.95
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert math.isclose(
@@ -346,11 +347,96 @@ def test_execute_dispatch(storage_unit):
     )
     assert math.isclose(storage_unit.outputs["soc"][end], 1, abs_tol=0.001)
 
+    # step into the next hour
     start = start + storage_unit.index.freq
     end = end + storage_unit.index.freq
     storage_unit.outputs["energy"][start] = -100
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy.iloc[0] == 0
+    assert math.isclose(storage_unit.outputs["soc"][end], 1, abs_tol=0.001)
+
+
+def test_set_dispatch_plan(mock_market_config, storage_unit):
+    product_tuple = (
+        pd.Timestamp("2022-01-01 01:00:00"),
+        pd.Timestamp("2022-01-01 02:00:00"),
+        None,
+    )
+    start = product_tuple[0]
+    end = product_tuple[1]
+
+    mc = mock_market_config
+
+    strategy = flexableEOMStorage()
+    product_tuples = [(start, end, None)]
+
+    storage_unit.outputs["energy"][start] = 100
+    storage_unit.outputs["soc"][start] = 0.5
+
+    bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
+    assert len(bids) == 0
+
+    # dispatch full discharge
+    storage_unit.set_dispatch_plan(mc, bids)
+    storage_unit.execute_current_dispatch(start, end)
+
+    assert storage_unit.outputs["energy"][start] == 100
+    assert math.isclose(
+        storage_unit.outputs["soc"][end],
+        0.5 - 100 / storage_unit.efficiency_discharge / storage_unit.max_volume,
+    )
+    # dispatch full charging
+    storage_unit.outputs["energy"][start] = -100
+    storage_unit.outputs["soc"][start] = 0.5
+
+    storage_unit.set_dispatch_plan(mc, bids)
+    storage_unit.execute_current_dispatch(start, end)
+
+    assert storage_unit.outputs["energy"][start] == -100
+    assert math.isclose(
+        storage_unit.outputs["soc"][end],
+        0.5 + 100 * storage_unit.efficiency_charge / storage_unit.max_volume,
+    )
+    # adjust dispatch to soc limit for discharge
+    storage_unit.outputs["energy"][start] = 100
+    storage_unit.outputs["soc"][start] = 0.05
+
+    storage_unit.set_dispatch_plan(mc, bids)
+    storage_unit.execute_current_dispatch(start, end)
+
+    assert math.isclose(
+        storage_unit.outputs["energy"][start],
+        50 * storage_unit.efficiency_discharge,
+        abs_tol=0.1,
+    )
+    # adjust dispatch to soc limit for charging
+    storage_unit.outputs["energy"][start] = -100
+    storage_unit.outputs["soc"][start] = 0.95
+
+    storage_unit.set_dispatch_plan(mc, bids)
+    storage_unit.execute_current_dispatch(start, end)
+
+    assert math.isclose(
+        storage_unit.outputs["energy"][start],
+        -50 / storage_unit.efficiency_charge,
+        abs_tol=0.1,
+    )
+    assert math.isclose(storage_unit.outputs["soc"][end], 1, abs_tol=0.001)
+
+    # step into the next hour
+    start = start + storage_unit.index.freq
+    end = end + storage_unit.index.freq
+    product_tuples = [(start, end, None)]
+
+    bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
+    assert len(bids) == 0
+
+    storage_unit.outputs["energy"][start] = -100
+
+    storage_unit.set_dispatch_plan(mc, bids)
+    storage_unit.execute_current_dispatch(start, end)
+
+    assert storage_unit.outputs["energy"][start] == 0
     assert math.isclose(storage_unit.outputs["soc"][end], 1, abs_tol=0.001)
 
 

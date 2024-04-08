@@ -6,15 +6,17 @@ name: assume-framework
 channels:
 - conda-forge
 dependencies:
-- python>=3.11
+- python>=3.10
 - pip
-- python
 - ipykernel
 - pandas
 - numpy
 - tqdm
 - SQLAlchemy
 - matplotlib
+- pyomo
+- pypsa>=0.26.3
+- pyyaml
 
 - pip:
   - .

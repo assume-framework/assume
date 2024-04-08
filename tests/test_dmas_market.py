@@ -17,7 +17,7 @@ start = datetime(2020, 1, 1)
 end = datetime(2020, 12, 2)
 
 simple_dayahead_auction_config = MarketConfig(
-    "simple_dayahead_auction",
+    market_id="simple_dayahead_auction",
     market_products=[MarketProduct(rd(hours=+1), 24, rd(hours=1))],
     additional_fields=["exclusive_id", "link", "block_id"],
     opening_hours=rr.rrule(

@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import calendar
 from datetime import datetime
 
 import pandas as pd
@@ -14,6 +13,7 @@ from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 
 from assume.common.market_objects import MarketConfig
+from assume.common.utils import datetime2timestamp
 from assume.markets.base_market import MarketProduct, MarketRole
 
 start = datetime(2020, 1, 1)
@@ -22,13 +22,13 @@ end = datetime(2020, 12, 2)
 
 @pytest.fixture
 async def market_role() -> MarketRole:
-    market_name = "Test"
+    market_id = "Test"
     marketconfig = MarketConfig(
-        market_name,
-        rr.rrule(rr.HOURLY, dtstart=start, until=end),
-        rd(hours=1),
-        "pay_as_clear",
-        [MarketProduct(rd(hours=1), 1, rd(hours=1))],
+        market_id=market_id,
+        opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
+        opening_duration=rd(hours=1),
+        market_mechanism="pay_as_clear",
+        market_products=[MarketProduct(rd(hours=1), 1, rd(hours=1))],
     )
     clock = ExternalClock(0)
     container = await create_container(addr=("0.0.0.0", 9098), clock=clock)
@@ -38,7 +38,7 @@ async def market_role() -> MarketRole:
 
     yield market_role
 
-    end_ts = calendar.timegm(end.utctimetuple())
+    end_ts = datetime2timestamp(end)
     clock.set_time(end_ts)
     await tasks_complete_or_sleeping(container)
     await container.shutdown()
@@ -181,7 +181,7 @@ async def test_market_for_BB(market_role: MarketRole):
     market_role.marketconfig.maximum_bid_volume = 9090
 
     end = start + rd(hours=24)
-    time_range = pd.date_range(start, end - pd.Timedelta("1H"), freq="1H")
+    time_range = pd.date_range(start, end - pd.Timedelta("1h"), freq="1h")
     market_role.open_auctions |= {
         (time, time + rd(hours=1), None) for time in time_range
     }
@@ -210,7 +210,8 @@ async def test_market_registration(market_role: MarketRole):
     assert market_role.registered_agents == {}
     info = [{"technology": "nuclear", "max_power": 2}]
     market_role.handle_registration(
-        {"market_id": market_role.marketconfig.name, "information": info}, meta=meta
+        {"market_id": market_role.marketconfig.market_id, "information": info},
+        meta=meta,
     )
     assert len(market_role.registered_agents.keys()) == 1
     assert market_role.registered_agents[tuple(meta.values())] == info

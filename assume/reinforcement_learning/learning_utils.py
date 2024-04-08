@@ -23,51 +23,63 @@ observation_dict = dict[list[datetime], ObsActRew]
 class CriticTD3(nn.Module):
     """Initialize parameters and build model.
 
-    :param n_agents: Number of agents
-    :type n_agents: int
-    :param obs_dim: Dimension of each state
-    :type obs_dim: int
-    :param act_dim: Dimension of each action
-    :type act_dim: int
+    Args:
+        n_agents (int): Number of agents
+        obs_dim (int): Dimension of each state
+        act_dim (int): Dimension of each action
     """
 
-    def __init__(self, n_agents, obs_dim, act_dim, float_type, unique_obs_len=16):
+    def __init__(
+        self,
+        n_agents: int,
+        obs_dim: int,
+        act_dim: int,
+        float_type,
+        unique_obs_len: int = 16,
+    ):
         super(CriticTD3, self).__init__()
 
-        self.obs_dim = obs_dim
+        self.obs_dim = obs_dim  # + unique_obs_len * (n_agents - 1)
         self.act_dim = act_dim * n_agents
 
         # Q1 architecture
+        # if n_agents <= 50:
         self.FC1_1 = nn.Linear(self.obs_dim + self.act_dim, 512, dtype=float_type)
-        self.LN1_1 = nn.LayerNorm(512)
         self.FC1_2 = nn.Linear(512, 256, dtype=float_type)
-        self.LN1_2 = nn.LayerNorm(256)
         self.FC1_3 = nn.Linear(256, 128, dtype=float_type)
-        self.LN1_3 = nn.LayerNorm(128)
         self.FC1_4 = nn.Linear(128, 1, dtype=float_type)
+        # else:
+        #     self.FC1_1 = nn.Linear(self.obs_dim + self.act_dim, 1024, dtype = float_type)
+        #     self.FC1_2 = nn.Linear(1024, 512, dtype = float_type)
+        #     self.FC1_3 = nn.Linear(512, 128, dtype = float_type)
+        #     self.FC1_4 = nn.Linear(128, 1, dtype = float_type)
 
         # Q2 architecture
+        # if n_agents <= 50:
         self.FC2_1 = nn.Linear(self.obs_dim + self.act_dim, 512, dtype=float_type)
-        self.LN2_1 = nn.LayerNorm(512)
         self.FC2_2 = nn.Linear(512, 256, dtype=float_type)
-        self.LN2_2 = nn.LayerNorm(256)
         self.FC2_3 = nn.Linear(256, 128, dtype=float_type)
-        self.LN2_3 = nn.LayerNorm(128)
         self.FC2_4 = nn.Linear(128, 1, dtype=float_type)
+        # else:
+        #     self.FC2_1 = nn.Linear(self.obs_dim + self.act_dim, 1024, dtype = float_type)
+        #     self.FC2_2 = nn.Linear(1024, 512, dtype = float_type)
+        #     self.FC2_3 = nn.Linear(512, 128, dtype = float_type)
+        #     self.FC2_4 = nn.Linear(128, 1, dtype = float_type)
 
     def forward(self, obs, actions):
+        """
+        Forward pass through the network, from observation to actions.
+        """
         xu = th.cat([obs, actions], 1)
 
-        # Forward pass through Q1 network
-        x1 = F.relu(self.LN1_1(self.FC1_1(xu)))
-        x1 = F.relu(self.LN1_2(self.FC1_2(x1)))
-        x1 = F.relu(self.LN1_3(self.FC1_3(x1)))
+        x1 = F.relu(self.FC1_1(xu))
+        x1 = F.relu(self.FC1_2(x1))
+        x1 = F.relu(self.FC1_3(x1))
         x1 = self.FC1_4(x1)
 
-        # Forward pass through Q2 network
-        x2 = F.relu(self.LN2_1(self.FC2_1(xu)))
-        x2 = F.relu(self.LN2_2(self.FC2_2(x2)))
-        x2 = F.relu(self.LN2_3(self.FC2_3(x2)))
+        x2 = F.relu(self.FC2_1(xu))
+        x2 = F.relu(self.FC2_2(x2))
+        x2 = F.relu(self.FC2_3(x2))
         x2 = self.FC2_4(x2)
 
         return x1, x2
@@ -77,32 +89,38 @@ class CriticTD3(nn.Module):
         Only predict the Q-value using the first network.
         This allows to reduce computation when all the estimates are not needed
         (e.g. when updating the policy in TD3).
+
+        Args:
+            obs (torch.Tensor): The observations
+            actions (torch.Tensor): The actions
+
         """
-        xu = th.cat([obs, actions], 1)
+        x = th.cat([obs, actions], 1)
+        x = F.relu(self.FC1_1(x))
+        x = F.relu(self.FC1_2(x))
+        x = F.relu(self.FC1_3(x))
+        x = self.FC1_4(x)
 
-        # Forward pass through Q1 network
-        x1 = F.relu(self.LN1_1(self.FC1_1(xu)))
-        x1 = F.relu(self.LN1_2(self.FC1_2(x1)))
-        x1 = F.relu(self.LN1_3(self.FC1_3(x1)))
-        x1 = self.FC1_4(x1)
-
-        return x1
+        return x
 
 
 class Actor(nn.Module):
-    def __init__(self, obs_dim, act_dim, float_type):
+    """
+    The neurnal network for the actor.
+    """
+
+    def __init__(self, obs_dim: int, act_dim: int, float_type):
         super(Actor, self).__init__()
 
         self.FC1 = nn.Linear(obs_dim, 256, dtype=float_type)
-        self.LN1 = nn.LayerNorm(256)
         self.FC2 = nn.Linear(256, 128, dtype=float_type)
-        self.LN2 = nn.LayerNorm(128)
         self.FC3 = nn.Linear(128, act_dim, dtype=float_type)
 
     def forward(self, obs):
-        x = F.relu(self.LN1(self.FC1(obs)))
-        x = F.relu(self.LN2(self.FC2(x)))
+        x = F.relu(self.FC1(obs))
+        x = F.relu(self.FC2(x))
         x = F.softsign(self.FC3(x))
+        # x = th.tanh(self.FC3(x))
 
         return x
 
@@ -110,6 +128,10 @@ class Actor(nn.Module):
 # Ornstein-Uhlenbeck Noise
 # from https://github.com/songrotek/DDPG/blob/master/ou_noise.py
 class OUNoise:
+    """
+    A class that implements Ornstein-Uhlenbeck noise.
+    """
+
     def __init__(self, action_dimension, mu=0, sigma=0.5, theta=0.15, dt=1e-2):
         self.action_dimension = action_dimension
         self.mu = mu
@@ -137,6 +159,10 @@ class OUNoise:
 
 
 class NormalActionNoise:
+    """
+    A gaussian action noise
+    """
+
     def __init__(self, action_dimension, mu=0.0, sigma=0.1, scale=1.0, dt=0.9998):
         self.act_dimension = action_dimension
         self.mu = mu
@@ -150,7 +176,7 @@ class NormalActionNoise:
         return noise
 
 
-def polyak_update(params, target_params, tau):
+def polyak_update(params, target_params, tau: float):
     """
     Perform a Polyak average update on ``target_params`` using ``params``:
     target parameters are slowly updated towards the main parameters.
@@ -162,9 +188,10 @@ def polyak_update(params, target_params, tau):
     params (in place).
     See https://github.com/DLR-RM/stable-baselines3/issues/93
 
-    :param params: parameters to use to update the target params
-    :param target_params: parameters to update
-    :param tau: the soft update coefficient ("Polyak update", between 0 and 1)
+    Args:
+        params: parameters to use to update the target params
+        target_params: parameters to update
+        tau: the soft update coefficient ("Polyak update", between 0 and 1)
     """
     with th.no_grad():
         # zip does not raise an exception if length of parameters does not match.

@@ -9,7 +9,13 @@ import pandas as pd
 import pytest
 
 from assume.common.forecasts import NaiveForecast
-from assume.strategies import flexableEOM, flexableNegCRM, flexablePosCRM
+from assume.strategies import (
+    flexableEOM,
+    flexableEOMBlock,
+    flexableEOMLinked,
+    flexableNegCRM,
+    flexablePosCRM,
+)
 from assume.units import PowerPlant
 
 start = datetime(2023, 7, 1)
@@ -19,17 +25,17 @@ end = datetime(2023, 7, 2)
 @pytest.fixture
 def power_plant() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
-    index = pd.date_range("2023-07-01", periods=24, freq="H")
+    index = pd.date_range("2023-07-01", periods=48, freq="h")
     ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
-        technology="coal",
+        technology="hard coal",
         index=index,
         max_power=1000,
         min_power=200,
         efficiency=0.5,
-        fixed_cost=10,
+        additional_cost=10,
         bidding_strategies={},
         fuel_type="lignite",
         emission_factor=0.5,
@@ -112,7 +118,7 @@ def test_flexable_neg_reserve(mock_market_config, power_plant):
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
     assert len(bids) == 1
     assert bids[0]["price"] == -40
-    assert bids[0]["volume"] == -300
+    assert bids[0]["volume"] == 300
 
     # Calculations for negative capacity
     mc.product_type = "capacity_neg"
@@ -129,7 +135,7 @@ def test_flexable_neg_reserve(mock_market_config, power_plant):
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
     assert len(bids) == 1
     assert bids[0]["price"] == 0
-    assert bids[0]["volume"] == -300
+    assert bids[0]["volume"] == 300
 
     # increase the marginal cost to ensure specific_revenue < 0
     power_plant.marginal_cost[start + pd.Timedelta(hours=1)] = 60
@@ -137,7 +143,7 @@ def test_flexable_neg_reserve(mock_market_config, power_plant):
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
     assert len(bids) == 1
     assert math.isclose(bids[0]["price"], 50 / 3)
-    assert bids[0]["volume"] == -300
+    assert bids[0]["volume"] == 300
 
 
 if __name__ == "__main__":

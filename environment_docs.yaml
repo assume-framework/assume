@@ -15,11 +15,12 @@ dependencies:
 - SQLAlchemy
 - pytorch
 - pyomo
+- pypsa
 
 - pip:
-  - .
+  - .[oeds]
   - sphinx<7
   - sphinx-book-theme
   - nbsphinx
   - nbsphinx_link
-  - sphinxcontrib-mermaid
+  - git+https://github.com/maurerle/sphinxcontrib-mermaid@maurerle

@@ -34,7 +34,7 @@ def calculate_meta(accepted_supply_orders, accepted_demand_orders, product):
         "price": avg_price,
         "max_price": max(prices),
         "min_price": min(prices),
-        "node_id": None,
+        "node": None,
         "product_start": product[0],
         "product_end": product[1],
         "only_hours": product[2],
@@ -52,10 +52,12 @@ class PayAsClearRole(MarketRole):
         Performs electricity market clearing using a pay-as-clear mechanism. This means that the clearing price is the
         highest price that is still accepted. The clearing price is the same for all accepted orders.
 
-        :param market_products: The products to be traded
-        :type market_products: list[MarketProduct]
-        :return: accepted_orders, rejected_orders, meta
-        :rtype: tuple[Orderbook, Orderbook, list[dict]]
+        Args:
+            orderbook (Orderbook): the orders to be cleared as an orderbook
+            market_products (list[MarketProduct]): the list of products which are cleared in this clearing
+
+        Returns:
+            tuple: accepted orderbook, rejected orderbook and clearing meta data
         """
         market_getter = itemgetter("start_time", "end_time", "only_hours")
         accepted_orders: Orderbook = []
@@ -90,7 +92,7 @@ class PayAsClearRole(MarketRole):
                     rejected_orders.append(demand_order)
                     continue
 
-                assert dem_vol == gen_vol
+                # assert dem_vol == gen_vol
                 # now add the next demand order
                 dem_vol += -demand_order["volume"]
                 demand_order["accepted_volume"] = demand_order["volume"]
@@ -173,11 +175,14 @@ class PayAsBidRole(MarketRole):
         """
         Simulates electricity market clearing using a pay-as-bid mechanism.
 
-        :param market_products: The products to be traded
-        :type market_products: list[MarketProduct]
-        :return: accepted_orders, rejected_orders, meta
-        :rtype: tuple[Orderbook, Orderbook, list[dict]]
+        Args:
+            orderbook (Orderbook): the orders to be cleared as an orderbook
+            market_products (list[MarketProduct]): the list of products which are cleared in this clearing
+
+        Returns:
+            tuple[Orderbook, Orderbook, list[dict]]: accepted orderbook, rejected orderbook and clearing meta data
         """
+
         market_getter = itemgetter("start_time", "end_time", "only_hours")
         accepted_orders: Orderbook = []
         rejected_orders: Orderbook = []

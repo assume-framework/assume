@@ -23,7 +23,7 @@ def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
             "volume": 0,
             "price": 0,
             "only_hours": None,
-            "node_id": 0,
+            "node": 0,
         }
     orders = []
     np.random.seed(seed)
@@ -38,7 +38,7 @@ def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
             agent_id = f"dem_{i}"
         new_order["agent_id"] = agent_id
         new_order["bid_id"] = f"bid_{i}"
-        new_order["node_id"] = node_id
+        new_order["node"] = node_id
         orders.append(new_order)
     return orders
 
@@ -50,6 +50,7 @@ def extend_orderbook(
     orderbook=None,
     bid_type="SB",
     min_acceptance_ratio=None,
+    parent_bid_id=None,
 ):
     """
     Creates constant bids over the time span of all products
@@ -61,7 +62,7 @@ def extend_orderbook(
     if volume == 0:
         return orderbook
 
-    if bid_type == "BB":
+    if bid_type == "BB" or bid_type == "LB":
         if volume < 0:
             agent_id = f"block_dem{len(orderbook)+1}"
         else:
@@ -69,7 +70,7 @@ def extend_orderbook(
 
         order: Order = {
             "start_time": products[0][0],
-            "end_time": products[0][1],
+            "end_time": products[-1][1],
             "agent_id": agent_id,
             "bid_id": f"bid_{len(orderbook)+1}",
             "volume": {product[0]: volume for product in products},
@@ -78,6 +79,7 @@ def extend_orderbook(
             "accepted_price": {},
             "only_hours": None,
             "bid_type": bid_type,
+            "parent_bid_id": parent_bid_id,
         }
 
         if min_acceptance_ratio is not None:
@@ -105,6 +107,7 @@ def extend_orderbook(
                 "accepted_price": None,
                 "only_hours": None,
                 "bid_type": bid_type,
+                "parent_bid_id": parent_bid_id,
             }
 
             if min_acceptance_ratio is not None:

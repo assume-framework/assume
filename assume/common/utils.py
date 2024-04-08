@@ -2,10 +2,11 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import calendar
 import inspect
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from itertools import groupby
 from operator import itemgetter
@@ -22,13 +23,21 @@ logger = logging.getLogger(__name__)
 def initializer(func):
     """
     Automatically assigns the parameters.
-    >>> class process:
-    ...     @initializer
-    ...     def __init__(self, cmd, reachable=False, user='root'):
-    ...         pass
-    >>> p = process('halt', True)
-    >>> p.cmd, p.reachable, p.user
-    ('halt', True, 'root')
+
+    Args:
+        func (callable): The function to be initialized.
+
+    Returns:
+        callable: The wrapper function.
+
+    Examples:
+        >>> class process:
+        ...     @initializer
+        ...     def __init__(self, cmd, reachable=False, user='root'):
+        ...         pass
+        >>> p = process('halt', True)
+        >>> p.cmd, p.reachable, p.user
+        ('halt', True, 'root')
     """
     names, varargs, keywords, defaults, *_ = inspect.getfullargspec(func)
 
@@ -48,14 +57,14 @@ def initializer(func):
 
 def get_available_products(market_products: list[MarketProduct], startdate: datetime):
     """
-    Get all available products for a given startdate
+    Get all available products for a given startdate.
 
-    :param market_products: list of market products
-    :type market_products: list[MarketProduct]
-    :param startdate: the startdate
-    :type startdate: datetime
-    :return: list of available products
-    :rtype: list[MarketProduct]
+    Args:
+        market_products (list[MarketProduct]): List of market products.
+        startdate (datetime.datetime): The startdate.
+
+    Returns:
+        list[MarketProduct]: List of available products.
     """
     options = []
     for product in market_products:
@@ -76,21 +85,22 @@ def get_available_products(market_products: list[MarketProduct], startdate: date
 
 def plot_orderbook(orderbook: Orderbook, results: list[dict]):
     """
-    Plot the merit order of bids for each node in a separate subplot
+    Plot the merit order of bids for each node in a separate subplot.
 
-    :param orderbook: the orderbook
-    :type orderbook: Orderbook
-    :param results: the results of the clearing
-    :type results: list[dict]
-    :return: the figure and axes of the plot
-    :rtype: tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]
+    Args:
+        orderbook (Orderbook): The orderbook.
+        results (list[dict]): The results of the clearing.
+
+    Returns:
+        tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]: The figure and axes of the plot.
     """
+
     import matplotlib.pyplot as plt
     from matplotlib.lines import Line2D
 
     bids = defaultdict(list)
-    orderbook.sort(key=itemgetter("node_id"))
-    for node_id, orders in groupby(orderbook, itemgetter("node_id")):
+    orderbook.sort(key=itemgetter("node"))
+    for node_id, orders in groupby(orderbook, itemgetter("node")):
         bids[node_id].extend(list(map(itemgetter("price", "volume"), orders)))
     number_of_nodes = len(bids.keys()) or 1
 
@@ -197,11 +207,12 @@ def plot_orderbook(orderbook: Orderbook, results: list[dict]):
 
 def visualize_orderbook(order_book: Orderbook):
     """
-    Visualize the orderbook
+    Visualize the orderbook.
 
-    :param order_book: the orderbook
-    :type order_book: Orderbook
+    Args:
+        order_book (Orderbook): The orderbook.
     """
+
     import matplotlib.pyplot as plt
     from matplotlib.colors import ListedColormap
 
@@ -210,13 +221,13 @@ def visualize_orderbook(order_book: Orderbook):
 
     order_book.sort(key=itemgetter("block_id", "link"))
     start_times = sorted(set(o["start_time"] for o in order_book))
-    y_past = pd.Series(0, index=start_times)
+    y_past = pd.Series(0.0, index=start_times)
     for i, bids_grouped in groupby(order_book, itemgetter("block_id")):
         my_cmap_raw = np.array(tab20_cmap.colors) * i / max_block_count
         my_cmap = ListedColormap(my_cmap_raw)
 
         for j, o in groupby(bids_grouped, itemgetter("link")):
-            s = pd.Series(0, index=start_times)
+            s = pd.Series(0.0, index=start_times)
             ys = np.zeros(24)
             o = list(o)
             for order in o:
@@ -235,27 +246,21 @@ def visualize_orderbook(order_book: Orderbook):
 
 def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=None):
     """
-    step function with bought volume
-    allows setting timeframe through begin and end
-    and group by columns in groupby.
-    This allows to have separate time series per market and bid_id/unit_id.
-    The orderbook must contain all relevant orders.
-    E.g. to calculate the current volume from 01.06 to 02.06, a yearly base
-    order from 01.01-31.12 must also be given, to be considered.
+    Step function with bought volume, allows setting timeframe through begin and end, and group by columns in groupby.
 
-    If called without groupby, this returns the aggregated orderbook timeseries
+    Args:
+        orderbook (Orderbook): The orderbook.
+        begin (datetime, optional): The begin time. Defaults to None.
+        end (datetime, optional): The end time. Defaults to None.
+        groupby (list[str], optional): The columns to group by. Defaults to None.
 
-    :param orderbook: the orderbook
-    :type orderbook: Orderbook
-    :param begin: the begin time
-    :type begin: datetime | None
-    :param end: the end time
-    :type end: datetime | None
-    :param groupby: the columns to group by
-    :type groupby: list[str] | None
-    :return: the aggregated orderbook timeseries
-    :rtype: list[tuple[datetime, float, str, str]]
+    Returns:
+        list[tuple[datetime, float, str, str]]: The aggregated orderbook timeseries.
+
+    Examples:
+        If called without groupby, this returns the aggregated orderbook timeseries
     """
+
     if groupby is None:
         groupby = []
     deltas = []
@@ -305,7 +310,7 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=No
         # as a new order with this start point might be added
         # afterwards - so the end is excluded here
         # this also makes sure that each timestamp is only written
-        # once when iterativley calling this function
+        # once when iteratively calling this function
         if (not begin or time >= begin) and (not end or time < end):
             if aggregation[groupdata_str] and aggregation[groupdata_str][-1][0] == time:
                 aggregation[groupdata_str][-1][1] = current_power[groupdata_str]
@@ -317,7 +322,21 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=No
     return [j for sub in list(aggregation.values()) for j in sub]
 
 
-def get_test_demand_orders(power: np.array):
+def get_test_demand_orders(power: np.ndarray):
+    """
+    Get test demand orders.
+
+    Args:
+        power (numpy.ndarray): Power array.
+
+    Returns:
+        pandas.DataFrame: DataFrame of demand orders.
+
+    Examples:
+        >>> power = np.array([100, 200, 150])
+        >>> get_test_demand_orders(power)
+    """
+
     order_book = {}
     for t in range(len(power)):
         order_book[t] = dict(
@@ -328,7 +347,20 @@ def get_test_demand_orders(power: np.array):
     return demand_order
 
 
-def separate_orders(orderbook):
+def separate_orders(orderbook: Orderbook):
+    """
+    Separate orders with several hours into single hour orders.
+
+    Args:
+        orderbook (Orderbook): The orderbook.
+
+    Returns:
+        list: The updated orderbook.
+
+    Notes:
+        This function separates orders with several hours into single hour orders and modifies the orderbook in place.
+    """
+
     # separate orders with several hours into single hour orders
     delete_orders = []
     for order in orderbook:
@@ -339,9 +371,8 @@ def separate_orders(orderbook):
                 len(value) for value in order.values() if isinstance(value, dict)
             )
             duration = (end_hour - start_hour) / order_len
-            for _, start in enumerate(
-                pd.date_range(start_hour, end_hour - duration, freq=duration), start=1
-            ):
+
+            for start in pd.date_range(start_hour, end_hour - duration, freq=duration):
                 single_order = order.copy()
                 for key in order.keys():
                     if isinstance(order[key], dict):
@@ -357,9 +388,53 @@ def separate_orders(orderbook):
                         single_order["bid_id"] = order["bid_id"]
 
                 orderbook.append(single_order)
+
             delete_orders.append(order)
 
     for order in delete_orders:
         orderbook.remove(order)
 
     return orderbook
+
+
+def get_products_index(orderbook: Orderbook) -> pd.DatetimeIndex:
+    """
+    Creates an index containing all start times of orders in orderbook and all inbetween.
+
+    Args:
+        orderbook (Orderbook): The orderbook.
+
+    Returns:
+        pd.DatetimeIndex: The index containing all start times of orders in orderbook and all inbetween.
+    """
+    if orderbook == []:
+        return []
+
+    # get the minimum and maximum "start_time" for all orders in orderbook
+    start_time = orderbook[0]["start_time"]
+    end_time = orderbook[0]["start_time"]
+    duration = orderbook[0]["end_time"] - orderbook[0]["start_time"]
+
+    for order in orderbook:
+        if order["start_time"] < start_time:
+            start_time = order["start_time"]
+        if order["end_time"] > end_time:
+            end_time = order["end_time"]
+        if order["end_time"] - order["start_time"] < duration:
+            duration = order["end_time"] - order["start_time"]
+
+    index_products = pd.date_range(
+        start_time,
+        end_time - duration,
+        freq=duration,
+    )
+
+    return index_products
+
+
+def timestamp2datetime(timestamp: float):
+    return datetime.fromtimestamp(timestamp, tz=timezone.utc).replace(tzinfo=None)
+
+
+def datetime2timestamp(datetime: datetime):
+    return calendar.timegm(datetime.utctimetuple())

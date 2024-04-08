@@ -104,7 +104,7 @@ def test_output_market_results():
                 "price": 0.0,
                 "max_price": 0,
                 "min_price": 0,
-                "node_id": None,
+                "node": None,
                 "product_start": datetime(2019, 1, 1, 2),
                 "product_end": datetime(2019, 1, 1, 6),
                 "only_hours": None,

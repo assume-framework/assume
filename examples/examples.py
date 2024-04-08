@@ -6,7 +6,8 @@
 import logging
 import os
 
-from assume import World, load_scenario_folder, run_learning
+from assume import World
+from assume.scenario.loader_csv import load_scenario_folder, run_learning
 
 log = logging.getLogger(__name__)
 # set log level to info
@@ -23,9 +24,9 @@ availabe_examples = {
         "scenario": "example_01a",
         "study_case": "dam_with_complex_clearing",
     },
-    "small_with_BB": {
-        "scenario": "example_01e",
-        "study_case": "dam_with_complex_clearing",
+    "small_with_BB_and_LB": {
+        "scenario": "example_01c",
+        "study_case": "dam_with_complex_opt_clearing",
     },
     "small_with_vre": {"scenario": "example_01b", "study_case": "base"},
     "small_with_vre_and_storage": {
@@ -40,6 +41,14 @@ availabe_examples = {
         "scenario": "example_01c",
         "study_case": "eom_and_crm",
     },
+    "small_with_redispatch": {
+        "scenario": "example_01d",
+        "study_case": "base",
+    },
+    "small_with_nodal_clearing": {
+        "scenario": "example_01d",
+        "study_case": "nodal_case",
+    },
     "large_2019_eom": {"scenario": "example_02", "study_case": "base_case_2019"},
     "large_2019_eom_crm": {
         "scenario": "example_02",
@@ -49,7 +58,9 @@ availabe_examples = {
         "scenario": "example_02",
         "study_case": "dam_case_2019",
     },
-    "rl": {"scenario": "example_01_rl", "study_case": "base"},
+    "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
+    "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
+    "small_learning_3": {"scenario": "example_02c", "study_case": "dam"},
     "uc_clearing": {
         "scenario": "example_01_uc",
         "study_case": "dam_with_uc_clearing",
@@ -85,6 +96,11 @@ if __name__ == "__main__":
         scenario=availabe_examples[example]["scenario"],
         study_case=availabe_examples[example]["study_case"],
     )
+
+    # to add custom bidding strategies, you need to import them
+    # and add them to the world as follows:
+    # from custom_bidding_strategy import CustomBiddingStrategy
+    # world.bidding_strategies["custom_bidding_strategy"] = CustomBiddingStrategy
 
     # to add a custom unit type, you need to import it
     # and add it to the world as follows:

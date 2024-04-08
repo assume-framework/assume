@@ -13,7 +13,7 @@ base:
     observation_dimension: 50
     action_dimension: 2
     continue_learning: False
-    load_model_path: None
+    trained_policies_save_path: learned_strategies/example_02b_base
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.001

@@ -1,0 +1,2 @@
+name,technology,bidding_EOM,fuel_type,emission_factor,max_power,min_power,efficiency,additional_cost,unit_operator
+power_plant_01,wind turbine,naive_eom,renewable,0.0,100.0,0,1,5,power_plant_operator

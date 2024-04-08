@@ -15,9 +15,9 @@ from assume.markets.clearing_algorithms import ComplexClearingRole
 from .utils import extend_orderbook
 
 simple_dayahead_auction_config = MarketConfig(
-    "simple_dayahead_auction",
+    market_id="simple_dayahead_auction",
     market_products=[MarketProduct(rd(hours=+1), 1, rd(hours=1))],
-    additional_fields=["node_id"],
+    additional_fields=["node"],
     opening_hours=rr.rrule(
         rr.HOURLY,
         dtstart=datetime(2005, 6, 1),
@@ -213,6 +213,108 @@ def test_complex_clearing_BB():
         accepted_orders[2]["accepted_price"][products[1][0]], 50, abs_tol=eps
     )
     assert mr.all_orders == []
+
+
+def test_complex_clearing_LB():
+    import copy
+
+    market_config = copy.copy(simple_dayahead_auction_config)
+    market_config.market_products = [MarketProduct(rd(hours=+1), 2, rd(hours=1))]
+    market_config.additional_fields = [
+        "bid_type",
+        "min_acceptance_ratio",
+        "parent_bid_id",
+    ]
+    next_opening = market_config.opening_hours.after(datetime.now())
+    products = get_available_products(market_config.market_products, next_opening)
+    assert len(products) == 2
+
+    """
+    Create Orderbook with constant order volumes and prices:
+        - dem1: volume = -1000, price = 3000
+        - gen1: volume = 1000, price = 100
+        - gen2: volume = 1000, price = 50, linked to block_gen3
+        - block_gen3: volume = 100, price = 75
+    """
+    orderbook = []
+    orderbook = extend_orderbook(
+        products,
+        volume=-999,
+        price=3000,
+        orderbook=orderbook,
+    )
+    orderbook = extend_orderbook(products, 1000, 100, orderbook)
+    orderbook = extend_orderbook(
+        products, 100, 75, orderbook, bid_type="BB", min_acceptance_ratio=1
+    )
+    orderbook = extend_orderbook(
+        products,
+        100,
+        75,
+        orderbook,
+        bid_type="LB",
+        min_acceptance_ratio=1,
+        parent_bid_id=orderbook[-1]["bid_id"],
+    )
+
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    # accept only cheapes simple bids
+    assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
+    assert rejected_orders == []
+    assert mr.all_orders == []
+
+    # change the price of the block order to be out-of-the-money, but saved by child bid
+    assert orderbook[2]["agent_id"] == "block_gen5"
+    orderbook[2]["price"] = 120
+
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    # accept block order and part of cheaper simple order
+    assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
+    assert rejected_orders == []
+    assert mr.all_orders == []
+
+    # change the price of the block order to be out-of-the-money, not saved by child bid
+    assert orderbook[2]["agent_id"] == "block_gen5"
+    orderbook[2]["price"] = 130
+
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    # accept block order and part of cheaper simple order
+    assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
+    assert rejected_orders[0]["agent_id"] == "block_gen5"
+    assert rejected_orders[1]["agent_id"] == "block_gen6"
+
+    # change the price of the block order to be in-the-money and child bid out-of-the-money
+    assert orderbook[2]["agent_id"] == "block_gen5"
+    orderbook[2]["price"] = 90
+    assert orderbook[3]["agent_id"] == "block_gen6"
+    orderbook[3]["price"] = 120
+
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+
+    assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
+    assert rejected_orders[0]["agent_id"] == "block_gen6"
+    assert accepted_orders[2]["agent_id"] == "block_gen5"
+
+    # add second level of child bids
+    orderbook = extend_orderbook(
+        products,
+        100,
+        50,
+        orderbook,
+        bid_type="LB",
+        min_acceptance_ratio=1,
+        parent_bid_id=orderbook[3]["bid_id"],
+    )
+
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+
+    assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
+    assert rejected_orders == []
 
 
 if __name__ == "__main__":
