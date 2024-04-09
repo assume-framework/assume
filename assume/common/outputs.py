@@ -7,6 +7,7 @@ import logging
 import shutil
 from collections import defaultdict
 from datetime import datetime
+from multiprocessing import Lock
 from pathlib import Path
 from typing import TypedDict
 
@@ -94,6 +95,7 @@ class WriteOutput(Role):
         self.end = end
         # initalizes dfs for storing and writing asynchron
         self.write_dfs: dict = defaultdict(list)
+        self.locks = defaultdict(lambda: Lock())
 
         if self.db is not None:
             self.delete_db_scenario(self.simulation_id)
@@ -192,7 +194,9 @@ class WriteOutput(Role):
             until=self.end,
             cache=True,
         )
-        self.context.schedule_recurrent_task(self.store_dfs, recurrency_task)
+        self.context.schedule_recurrent_task(
+            self.store_dfs, recurrency_task, src="no_wait"
+        )
 
     def handle_message(self, content: dict, meta: MetaDict):
         """
@@ -261,38 +265,41 @@ class WriteOutput(Role):
         """
         Stores the data frames to CSV files and the database. Is scheduled as a recurrent task based on the frequency.
         """
+        if not self.db and not self.export_csv_path:
+            return
 
         for table in self.write_dfs.keys():
-            if len(self.write_dfs[table]) == 0:
-                continue
+            with self.locks[table]:
+                if len(self.write_dfs[table]) == 0:
+                    continue
 
-            df = pd.concat(self.write_dfs[table], axis=0)
-            df.reset_index()
-            if df.empty:
-                continue
+                df = pd.concat(self.write_dfs[table], axis=0)
+                df.reset_index()
+                if df.empty:
+                    continue
 
-            df = df.apply(self.check_for_tensors)
+                df = df.apply(self.check_for_tensors)
 
-            if self.export_csv_path:
-                data_path = self.export_csv_path / f"{table}.csv"
-                df.to_csv(
-                    data_path,
-                    mode="a",
-                    header=not data_path.exists(),
-                    float_format="%.5g",
-                )
+                if self.export_csv_path:
+                    data_path = self.export_csv_path / f"{table}.csv"
+                    df.to_csv(
+                        data_path,
+                        mode="a",
+                        header=not data_path.exists(),
+                        float_format="%.5g",
+                    )
 
-            if self.db is not None:
-                try:
-                    with self.db.begin() as db:
-                        df.to_sql(table, db, if_exists="append")
-                except (ProgrammingError, OperationalError, DataError):
-                    self.check_columns(table, df)
-                    # now try again
-                    with self.db.begin() as db:
-                        df.to_sql(table, db, if_exists="append")
+                if self.db is not None:
+                    try:
+                        with self.db.begin() as db:
+                            df.to_sql(table, db, if_exists="append")
+                    except (ProgrammingError, OperationalError, DataError):
+                        self.check_columns(table, df)
+                        # now try again
+                        with self.db.begin() as db:
+                            df.to_sql(table, db, if_exists="append")
 
-            self.write_dfs[table] = []
+                self.write_dfs[table] = []
 
     def store_grid(
         self,
@@ -441,7 +448,8 @@ class WriteOutput(Role):
         df["simulation"] = self.simulation_id
         df["market_id"] = market_id
 
-        self.write_dfs["market_orders"].append(df)
+        with self.locks["market_orders"]:
+            self.write_dfs["market_orders"].append(df)
 
     def write_units_definition(self, unit_info: dict):
         """
@@ -461,7 +469,8 @@ class WriteOutput(Role):
         u_info = {unit_info["id"]: unit_info}
         del unit_info["id"]
 
-        self.write_dfs[table_name].append(pd.DataFrame(u_info).T)
+        with self.locks[table_name]:
+            self.write_dfs[table_name].append(pd.DataFrame(u_info).T)
 
     def write_market_dispatch(self, data: any):
         """
