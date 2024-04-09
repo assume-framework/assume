@@ -3,8 +3,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-from datetime import timedelta
-from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -16,7 +14,7 @@ from assume.common.grid_utils import (
     calculate_network_meta,
     read_pypsa_grid,
 )
-from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
+from assume.common.market_objects import MarketConfig, Orderbook
 from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)

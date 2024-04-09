@@ -6,6 +6,7 @@ import logging
 from datetime import timedelta
 from operator import itemgetter
 
+import numpy as np
 import pandas as pd
 import pyomo.environ as pyo
 from pyomo.opt import SolverFactory, TerminationCondition, check_available_solvers
@@ -24,7 +25,6 @@ def market_clearing_opt(
     market_products: list[MarketProduct],
     mode: str,
     with_linked_bids: bool,
-    nodes: list[str],
     incidence_matrix: pd.DataFrame = None,
 ):
     """
@@ -73,8 +73,6 @@ def market_clearing_opt(
         initialize=[market_product[0] for market_product in market_products],
         doc="timesteps",
     )
-    # assuming the orders contain the node_id and are collected in nodes
-    model.N = pyo.Set(initialize=nodes, doc="nodes")
 
     model.sBids = pyo.Set(
         initialize=[order["bid_id"] for order in orders if order["bid_type"] == "SB"],
@@ -99,11 +97,6 @@ def market_clearing_opt(
         domain=pyo.NonNegativeReals,
         bounds=(0, 1),
         doc="block_bid_acceptance",
-    )
-
-    # decision variables that define flows between nodes
-    model.flows = pyo.Var(
-        model.T, model.N, model.N, domain=pyo.Reals, doc="power_flows"
     )
 
     if mode == "with_min_acceptance_ratio":
@@ -140,28 +133,6 @@ def market_clearing_opt(
                     model.xb[order["bid_id"]] <= model.x[order["bid_id"]]
                 )
 
-    # add energy balance constraint for each node
-    model.energy_balance = pyo.ConstraintList()
-    balance_expr = {node: {t: 0.0 for t in model.T} for node in nodes}
-    for node in nodes:
-        for order in orders:
-            if order["bid_type"] == "SB" and order["node_id"] == node:
-                balance_expr[node][order["start_time"]] += (
-                    order["volume"] * model.xs[order["bid_id"]]
-                )
-            elif order["bid_type"] in ["BB", "LB"] and order["node_id"] == node:
-                for start_time, volume in order["volume"].items():
-                    balance_expr[node][start_time] += volume * model.xb[order["bid_id"]]
-
-        # TODO: what about losses on the lines?
-        for node2 in nodes:
-            if node == node2:
-                continue
-            for t in model.T:
-                # add outflow of node
-                balance_expr[node][t] -= model.flows[t, node, node2]
-                model.energy_balance.add(balance_expr[node][t] == 0)
-
     # limit the acceptance of child bids by the acceptance of their parent bid
     if with_linked_bids:
         model.linked_bid_constr = pyo.ConstraintList()
@@ -172,26 +143,71 @@ def market_clearing_opt(
                     model.xb[order["bid_id"]] <= model.xb[parent_bid_id]
                 )
 
-    # limit the transmission between nodes with the incidence matrix
+    # decision variables that define flows between nodes
+    # assuming the orders contain the node and are collected in nodes
     if incidence_matrix is not None:
-        model.transmission_constr = pyo.ConstraintList()
-        model.flows_constr = pyo.ConstraintList()
-        for t in model.T:
-            for node1 in nodes:
-                for node2 in nodes:
-                    if node1 == node2:
-                        continue
-                    # transmission contains negative values for opposite directions and is otherwise symmetric,
-                    # the incidence matrix contatains positive values only
-                    model.flows_constr.add(
-                        model.flows[t, node1, node2] == -model.flows[t, node2, node1]
-                    )
-                    model.transmission_constr.add(
-                        model.flows[t, node1, node2]
-                        <= incidence_matrix.loc[node2, node1]
-                    )
+        nodes = incidence_matrix.index.values
+        model.flows = pyo.Var(
+            model.T, model.nodes, model.nodes, domain=pyo.Reals, doc="power_flows"
+        )
+    else:
+        nodes = ["bus0"]
 
-    # TODO: Add a term for flow to minize the transmission losses/costs
+    model.nodes = pyo.Set(initialize=nodes, doc="nodes")
+
+    # Function to calculate the balance for each node and time
+    def energy_balance_rule(model, node, t):
+        balance_expr = 0.0  # Initialize the balance expression
+        # Iterate over orders to adjust the balance expression based on bid type
+        for order in orders:
+            if (
+                order["bid_type"] == "SB"
+                and order["node"] == node
+                and order["start_time"] == t
+            ):
+                balance_expr += order["volume"] * model.xs[order["bid_id"]]
+            elif order["bid_type"] in ["BB", "LB"] and order["node"] == node:
+                for start_time, volume in order["volume"].items():
+                    if start_time == t:
+                        balance_expr += volume * model.xb[order["bid_id"]]
+
+        if incidence_matrix is not None:
+            # Adjust flow subtraction to account for actual connections
+            for node2, capacity in incidence_matrix.loc[node].items():
+                if node != node2 and capacity != 0:
+                    balance_expr -= model.flows[t, node, node2]
+
+        # The balance for each node and time must equal zero
+        return balance_expr == 0
+
+    # Add the energy balance constraints for each node and time period using the rule
+    # Define the energy balance constraint using two indices (node and time)
+    model.energy_balance = pyo.Constraint(
+        model.nodes, model.T, rule=energy_balance_rule
+    )
+
+    if incidence_matrix is not None:
+        # Transmission constraints based on the incidence matrix
+        model.transmission_constr = pyo.ConstraintList()
+        for t in model.T:
+            # Iterate only over non-zero entries
+            for node1, node2 in zip(*np.where(incidence_matrix > 0)):
+                capacity = incidence_matrix.iloc[node1, node2]
+                # Limit flow based on the incidence matrix
+                model.transmission_constr.add(
+                    model.flows[t, nodes[node1], nodes[node2]] <= capacity
+                )
+                # Ensure flow is non-negative if capacity is positive
+                model.transmission_constr.add(
+                    model.flows[t, nodes[node1], nodes[node2]] >= -capacity
+                )
+
+                # Add the flow in the opposite direction as negative
+                model.transmission_constr.add(
+                    model.flows[t, nodes[node2], nodes[node1]]
+                    == -model.flows[t, nodes[node1], nodes[node2]]
+                )
+
     # define the objective function as cost minimization
     obj_expr = 0
     for order in orders:
@@ -257,15 +273,36 @@ class ComplexClearingRole(MarketRole):
 
     required_fields = ["bid_type"]
 
-    def __init__(
-        self,
-        marketconfig: MarketConfig,
-        nodes=[0, 1, 2],
-        network={"Line_0": (0, 1, 100), "Line_1": (1, 2, 100), "Line_2": (2, 0, 100)},
-    ):
+    def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
-        self.network = network
-        self.nodes = nodes
+
+        self.incidence_matrix = None
+        self.nodes = ["bus0"]
+
+        if self.grid_data:
+            self.lines = self.grid_data["lines"]
+            # Combine 'bus0' and 'bus1' columns into a set of unique nodes
+            self.nodes = self.grid_data["buses"].index.values
+
+            # Initialize an empty matrix with zeros. Dimensions: number of nodes x number of nodes
+            incidence_matrix = np.zeros((len(self.nodes), len(self.nodes)))
+
+            # Create a dictionary mapping each node to its index for faster lookup
+            node_index = {node: idx for idx, node in enumerate(self.nodes)}
+
+            # Iterate over the lines to fill the incidence matrix
+            for _, line in self.lines.iterrows():
+                bus0, bus1, s_nom = line["bus0"], line["bus1"], line["s_nom"]
+
+                # Update the incidence matrix with s_nom values
+                # s_nom is positive for bus0 to bus1 and negative for bus1 to bus0
+                incidence_matrix[node_index[bus0], node_index[bus1]] = s_nom
+                incidence_matrix[node_index[bus1], node_index[bus0]] = -s_nom
+
+            # Convert the numpy array to a DataFrame for readability and to use nodes as both index and columns
+            self.incidence_matrix = pd.DataFrame(
+                incidence_matrix, index=self.nodes, columns=self.nodes
+            )
 
     def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> None:
         """
@@ -298,14 +335,17 @@ class ComplexClearingRole(MarketRole):
                     abs(order["volume"]) <= max_volume
                 ), f"max_volume {order['volume']}"
 
-            # check if the node_id is in the network
-            if "node_id" in order.keys():
+            # check if the node is in the network
+            if "node" in order.keys():
                 assert (
-                    order["node_id"] in self.nodes
-                ), f"node_id {order['node_id']} not in {self.nodes}"
-            # if not, set the node_id to the first node in the network
+                    order["node"] in self.nodes
+                ), f"node {order['node']} not in {self.nodes}"
+            # if not, set the node to the first node in the network
             else:
-                order["node_id"] = self.notes[0]
+                log.warning(
+                    "Order without a node, setting node to the first node. Please check the bidding strategy if correct node is set."
+                )
+                order["node"] = self.nodes[0]
 
     def clear(
         self, orderbook: Orderbook, market_products
@@ -330,7 +370,7 @@ class ComplexClearingRole(MarketRole):
             Then the market clearing prices are extracted from the solved model as dual variables of the energy balance constraint.
             Next the surplus of each order and its children is calculated and orders with negative surplus are removed from the orderbook.
             This is repeated until all orders remaining in the orderbook have positive surplus.
-            Optional additional fields are: min_acceptance_ratio, parent_bid_id, node_id
+            Optional additional fields are: min_acceptance_ratio, parent_bid_id, node
         """
 
         if len(orderbook) == 0:
@@ -358,13 +398,6 @@ class ComplexClearingRole(MarketRole):
 
         with_linked_bids = bool(child_orders)
 
-        # convert network to pd.Dataframe incidence matrix
-        incidence_matrix = pd.DataFrame(index=self.nodes, columns=self.nodes)
-        incidence_matrix = incidence_matrix.fillna(0)
-        for line, (node1, node2, capacity) in self.network.items():
-            incidence_matrix.loc[node1, node2] = capacity
-            incidence_matrix.loc[node2, node1] = capacity
-
         rejected_orders: Orderbook = []
 
         mode = "default"
@@ -379,8 +412,7 @@ class ComplexClearingRole(MarketRole):
                 market_products=market_products,
                 mode=mode,
                 with_linked_bids=with_linked_bids,
-                nodes=self.nodes,
-                incidence_matrix=incidence_matrix,
+                incidence_matrix=self.incidence_matrix,
             )
 
             if results.solver.termination_condition == TerminationCondition.infeasible:
@@ -391,7 +423,7 @@ class ComplexClearingRole(MarketRole):
             market_clearing_prices = {}
             for node in self.nodes:
                 market_clearing_prices[node] = {
-                    t: instance.dual[instance.energy_balance[node][t]]
+                    t: instance.dual[instance.energy_balance[node, t]]
                     for t in instance.T
                 }
 
@@ -428,13 +460,15 @@ class ComplexClearingRole(MarketRole):
             if all(order_surplus >= 0 for order_surplus in orders_surplus):
                 break
 
-        return extract_results(
+        accepted_orders, rejected_orders, meta = extract_results(
             model=instance,
             orders=orderbook,
             rejected_orders=rejected_orders,
             market_products=market_products,
             market_clearing_prices=market_clearing_prices,
         )
+
+        return accepted_orders, rejected_orders, meta
 
 
 def calculate_order_surplus(
@@ -465,12 +499,19 @@ def calculate_order_surplus(
     if order["bid_type"] == "SB":
         if (
             pyo.value(instance.xs[order["bid_id"]]) < EPS
-            or abs(market_clearing_prices[order["start_time"]] - order["price"]) < EPS
+            or abs(
+                market_clearing_prices[order["node"]][order["start_time"]]
+                - order["price"]
+            )
+            < EPS
         ):
             order_surplus = 0
         else:
             order_surplus = (
-                (market_clearing_prices[order["start_time"]] - order["price"])
+                (
+                    market_clearing_prices[order["node"]][order["start_time"]]
+                    - order["price"]
+                )
                 * order["volume"]
                 * pyo.value(instance.xs[order["bid_id"]])
             )
@@ -481,7 +522,10 @@ def calculate_order_surplus(
             order_surplus = 0
         else:
             order_surplus = (
-                sum(market_clearing_prices[t] * v for t, v in order["volume"].items())
+                sum(
+                    market_clearing_prices[order["node"]][t] * v
+                    for t, v in order["volume"].items()
+                )
                 - order["price"] * bid_volume
             ) * pyo.value(instance.xb[order["bid_id"]])
 
@@ -489,7 +533,7 @@ def calculate_order_surplus(
         for child_order in children:
             child_surplus = (
                 sum(
-                    market_clearing_prices[t] * v
+                    market_clearing_prices[child_order["node"]][t] * v
                     for t, v in child_order["volume"].items()
                 )
                 - child_order["price"] * bid_volume
@@ -538,7 +582,9 @@ def extract_results(
 
             # set the accepted volume and price for each simple bid
             order["accepted_volume"] = acceptance * order["volume"]
-            order["accepted_price"] = market_clearing_prices[order["start_time"]]
+            order["accepted_price"] = market_clearing_prices[order["node"]][
+                order["start_time"]
+            ]
 
             # calculate the total cleared supply and demand volume
             if order["accepted_volume"] > 0:
@@ -553,7 +599,9 @@ def extract_results(
             # set the accepted volume and price for each block bid
             for start_time, volume in order["volume"].items():
                 order["accepted_volume"][start_time] = acceptance * volume
-                order["accepted_price"][start_time] = market_clearing_prices[start_time]
+                order["accepted_price"][start_time] = market_clearing_prices[
+                    order["node"]
+                ][start_time]
 
                 # calculate the total cleared supply and demand volume
                 if order["accepted_volume"][start_time] > 0:
@@ -571,29 +619,30 @@ def extract_results(
             rejected_orders.append(order)
 
     # write the meta information for each hour of the clearing period
-    for product in market_products:
-        t = product[0]
+    for node in market_clearing_prices.keys():
+        for product in market_products:
+            t = product[0]
 
-        clear_price = market_clearing_prices[t]
+            clear_price = market_clearing_prices[node][t]
 
-        supply_volume = supply_volume_dict[t]
-        demand_volume = demand_volume_dict[t]
-        duration_hours = (product[1] - product[0]) / timedelta(hours=1)
+            supply_volume = supply_volume_dict[t]
+            demand_volume = demand_volume_dict[t]
+            duration_hours = (product[1] - product[0]) / timedelta(hours=1)
 
-        meta.append(
-            {
-                "supply_volume": supply_volume,
-                "demand_volume": -demand_volume,
-                "demand_volume_energy": -demand_volume * duration_hours,
-                "supply_volume_energy": supply_volume * duration_hours,
-                "price": clear_price,
-                "max_price": clear_price,
-                "min_price": clear_price,
-                "node": None,
-                "product_start": product[0],
-                "product_end": product[1],
-                "only_hours": product[2],
-            }
-        )
+            meta.append(
+                {
+                    "supply_volume": supply_volume,
+                    "demand_volume": -demand_volume,
+                    "demand_volume_energy": -demand_volume * duration_hours,
+                    "supply_volume_energy": supply_volume * duration_hours,
+                    "price": clear_price,
+                    "max_price": clear_price,
+                    "min_price": clear_price,
+                    "node": node,
+                    "product_start": product[0],
+                    "product_end": product[1],
+                    "only_hours": product[2],
+                }
+            )
 
     return accepted_orders, rejected_orders, meta
