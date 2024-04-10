@@ -60,8 +60,7 @@ nodal_case:
   save_frequency_hours: 24
 
   markets_config:
-    nodal:
-      start_date: 2019-01-01 00:00
+    DAM:
       operator: EOM_operator
       product_type: energy
       products:
@@ -99,7 +98,7 @@ zonal_case:
       products:
         - duration: 1h
           count: 24
-          first_delivery: 1h
+          first_delivery: 24h
       opening_frequency: 24h
       opening_duration: 24h
       volume_unit: MWh

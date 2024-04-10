@@ -29,7 +29,7 @@ services:
         constraints: [node.role == manager]
 
   grafana:
-    image: grafana/grafana-oss:latest
+    image: grafana/grafana-oss:9.2.0
     container_name: assume_grafana
     user: "104"
     depends_on:

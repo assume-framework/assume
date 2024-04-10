@@ -25,6 +25,7 @@ def market_clearing_opt(
     market_products: list[MarketProduct],
     mode: str,
     with_linked_bids: bool,
+    nodes: list[str] = ["bus0"],
     incidence_matrix: pd.DataFrame = None,
 ):
     """
@@ -85,6 +86,8 @@ def market_clearing_opt(
         doc="block_bids",
     )
 
+    model.nodes = pyo.Set(initialize=nodes, doc="nodes")
+
     # decision variables for the acceptance ratio of simple and block bids (including linked bids)
     model.xs = pyo.Var(
         model.sBids,
@@ -98,6 +101,13 @@ def market_clearing_opt(
         bounds=(0, 1),
         doc="block_bid_acceptance",
     )
+
+    # decision variables that define flows between nodes
+    # assuming the orders contain the node and are collected in nodes
+    if incidence_matrix is not None:
+        model.flows = pyo.Var(
+            model.T, model.nodes, model.nodes, domain=pyo.Reals, doc="power_flows"
+        )
 
     if mode == "with_min_acceptance_ratio":
         model.Bids = pyo.Set(
@@ -142,18 +152,6 @@ def market_clearing_opt(
                 model.linked_bid_constr.add(
                     model.xb[order["bid_id"]] <= model.xb[parent_bid_id]
                 )
-
-    # decision variables that define flows between nodes
-    # assuming the orders contain the node and are collected in nodes
-    if incidence_matrix is not None:
-        nodes = incidence_matrix.index.values
-        model.flows = pyo.Var(
-            model.T, model.nodes, model.nodes, domain=pyo.Reals, doc="power_flows"
-        )
-    else:
-        nodes = ["bus0"]
-
-    model.nodes = pyo.Set(initialize=nodes, doc="nodes")
 
     # Function to calculate the balance for each node and time
     def energy_balance_rule(model, node, t):
@@ -412,13 +410,13 @@ class ComplexClearingRole(MarketRole):
                 market_products=market_products,
                 mode=mode,
                 with_linked_bids=with_linked_bids,
+                nodes=self.nodes,
                 incidence_matrix=self.incidence_matrix,
             )
 
             if results.solver.termination_condition == TerminationCondition.infeasible:
                 raise Exception("infeasible")
 
-            # TODO:Adjust for several nodes!
             # extract dual from model.energy_balance
             market_clearing_prices = {}
             for node in self.nodes:
@@ -467,6 +465,8 @@ class ComplexClearingRole(MarketRole):
             market_products=market_products,
             market_clearing_prices=market_clearing_prices,
         )
+
+        self.all_orders = []
 
         return accepted_orders, rejected_orders, meta
 
@@ -572,8 +572,8 @@ def extract_results(
     accepted_orders: Orderbook = []
     meta = []
 
-    supply_volume_dict = {t: 0.0 for t in model.T}
-    demand_volume_dict = {t: 0.0 for t in model.T}
+    supply_volume_dict = {node: {t: 0.0 for t in model.T} for node in model.nodes}
+    demand_volume_dict = {node: {t: 0.0 for t in model.T} for node in model.nodes}
 
     for order in orders:
         if order["bid_type"] == "SB":
@@ -588,9 +588,13 @@ def extract_results(
 
             # calculate the total cleared supply and demand volume
             if order["accepted_volume"] > 0:
-                supply_volume_dict[order["start_time"]] += order["accepted_volume"]
+                supply_volume_dict[order["node"]][order["start_time"]] += order[
+                    "accepted_volume"
+                ]
             else:
-                demand_volume_dict[order["start_time"]] += order["accepted_volume"]
+                demand_volume_dict[order["node"]][order["start_time"]] += order[
+                    "accepted_volume"
+                ]
 
         elif order["bid_type"] in ["BB", "LB"]:
             acceptance = model.xb[order["bid_id"]].value
@@ -605,13 +609,13 @@ def extract_results(
 
                 # calculate the total cleared supply and demand volume
                 if order["accepted_volume"][start_time] > 0:
-                    supply_volume_dict[start_time] += order["accepted_volume"][
-                        start_time
-                    ]
+                    supply_volume_dict[order["node"]][start_time] += order[
+                        "accepted_volume"
+                    ][start_time]
                 else:
-                    demand_volume_dict[start_time] += order["accepted_volume"][
-                        start_time
-                    ]
+                    demand_volume_dict[order["node"]][start_time] += order[
+                        "accepted_volume"
+                    ][start_time]
 
         if acceptance > 0:
             accepted_orders.append(order)
@@ -625,8 +629,8 @@ def extract_results(
 
             clear_price = market_clearing_prices[node][t]
 
-            supply_volume = supply_volume_dict[t]
-            demand_volume = demand_volume_dict[t]
+            supply_volume = supply_volume_dict[node][t]
+            demand_volume = demand_volume_dict[node][t]
             duration_hours = (product[1] - product[0]) / timedelta(hours=1)
 
             meta.append(

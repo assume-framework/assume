@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -22,6 +21,7 @@ from assume.markets.base_market import MarketRole
 log = logging.getLogger(__name__)
 
 logging.getLogger("linopy").setLevel(logging.WARNING)
+logging.getLogger("pypsa").setLevel(logging.WARNING)
 
 
 class NodalMarketRole(MarketRole):
@@ -142,11 +142,11 @@ class NodalMarketRole(MarketRole):
         # Update the network parameters
         nodal_network = self.network.copy()
 
-        # Update p_max_pu for generators with _up and _down suffixes
+        # Update p_max_pu for generators
         nodal_network.generators_t.p_max_pu.update(p_max_pu)
         nodal_network.generators_t.p_min_pu.update(p_min_pu)
 
-        # Add _up and _down suffix to costs and update the network
+        # Update marginal costs for generators
         nodal_network.generators_t.marginal_cost.update(costs)
 
         status, termination_condition = nodal_network.optimize(
