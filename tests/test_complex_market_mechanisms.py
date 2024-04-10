@@ -5,6 +5,7 @@
 import math
 from datetime import datetime, timedelta
 
+import pandas as pd
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
 
@@ -34,9 +35,7 @@ eps = 1e-4
 
 
 def test_complex_clearing():
-    import copy
-
-    market_config = copy.copy(simple_dayahead_auction_config)
+    market_config = simple_dayahead_auction_config
     h = 24
     market_config.market_products = [MarketProduct(rd(hours=+1), h, rd(hours=1))]
     market_config.additional_fields = [
@@ -73,18 +72,35 @@ def test_complex_clearing():
 
 
 def test_market_coupling():
-    import copy
-
-    market_config = copy.copy(simple_dayahead_auction_config)
+    market_config = simple_dayahead_auction_config
     h = 2
     market_config.market_products = [MarketProduct(rd(hours=+1), h, rd(hours=1))]
     market_config.additional_fields = [
         "bid_type",
         "node_id",
     ]
-    # add nodes and network to market_config
-    nodes = ["node1", "node2"]
-    network = {"line_1": ("node1", "node2", 500)}
+    # Create a dictionary with the data
+    nodes = {
+        "name": ["node1", "node2"],
+        "v_nom": [380.0, 380.0],
+    }
+
+    # Convert the dictionary to a Pandas DataFrame with 'name' as the index
+    nodes = pd.DataFrame(nodes).set_index("name")
+
+    # Create a dictionary with the data
+    lines = {
+        "name": ["line_1"],
+        "bus0": ["node1"],
+        "bus1": ["node2"],
+        "s_nom": [500.0],
+    }
+
+    # Convert the dictionary to a Pandas DataFrame
+    lines = pd.DataFrame(lines)
+
+    grid_data = {"buses": nodes, "lines": lines}
+    market_config.param_dict["grid_data"] = grid_data
 
     next_opening = market_config.opening_hours.after(datetime.now())
     products = get_available_products(market_config.market_products, next_opening)
@@ -107,25 +123,38 @@ def test_market_coupling():
     orderbook = extend_orderbook(products, 1000, 100, orderbook, node="node1")
     orderbook = extend_orderbook(products, 1000, 50, orderbook, node="node2")
 
-    mr = ComplexClearingRole(market_config, nodes, network)
+    mr = ComplexClearingRole(market_config)
     accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
 
-    assert math.isclose(meta[0]["supply_volume"], 1000, abs_tol=eps)
+    assert meta[0]["node"] == "node1"
+    assert math.isclose(meta[0]["supply_volume"], 500, abs_tol=eps)
     assert math.isclose(meta[0]["demand_volume"], 1000, abs_tol=eps)
     assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
+
+    assert meta[2]["node"] == "node2"
+    assert math.isclose(meta[2]["supply_volume"], 700, abs_tol=eps)
+    assert math.isclose(meta[2]["demand_volume"], 200, abs_tol=eps)
+    assert math.isclose(meta[2]["price"], 50, abs_tol=eps)
+
     assert rejected_orders == []
     assert accepted_orders[0]["agent_id"] == "dem1"
     assert math.isclose(accepted_orders[0]["accepted_volume"], -1000, abs_tol=eps)
-    assert accepted_orders[1]["agent_id"] == f"gen{h+1}"
-    assert math.isclose(accepted_orders[1]["accepted_volume"], 100, abs_tol=eps)
-    assert accepted_orders[2]["agent_id"] == f"gen{2*h+1}"
-    assert math.isclose(accepted_orders[2]["volume"], 900, abs_tol=eps)
+    assert accepted_orders[1]["agent_id"] == "dem3"
+    assert math.isclose(accepted_orders[1]["accepted_volume"], -200, abs_tol=eps)
+
+    assert accepted_orders[2]["agent_id"] == "gen5"
+    assert math.isclose(accepted_orders[2]["accepted_volume"], 500, abs_tol=eps)
+    assert math.isclose(accepted_orders[2]["accepted_price"], 100, abs_tol=eps)
+
+    assert accepted_orders[3]["agent_id"] == "gen7"
+    assert math.isclose(accepted_orders[3]["accepted_volume"], 700, abs_tol=eps)
+    assert math.isclose(accepted_orders[3]["accepted_price"], 50, abs_tol=eps)
+
+    market_config.param_dict = {}
 
 
 def test_complex_clearing_BB():
-    import copy
-
-    market_config = copy.copy(simple_dayahead_auction_config)
+    market_config = simple_dayahead_auction_config
     market_config.market_products = [MarketProduct(rd(hours=+1), 2, rd(hours=1))]
     market_config.additional_fields = [
         "bid_type",
@@ -266,9 +295,7 @@ def test_complex_clearing_BB():
 
 
 def test_complex_clearing_LB():
-    import copy
-
-    market_config = copy.copy(simple_dayahead_auction_config)
+    market_config = simple_dayahead_auction_config
     market_config.market_products = [MarketProduct(rd(hours=+1), 2, rd(hours=1))]
     market_config.additional_fields = [
         "bid_type",
