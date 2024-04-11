@@ -7,7 +7,7 @@ dam_with_uc_clearing_rl:
   end_date: 2019-03-02 23:00
   time_step: 1h
   save_frequency_hours: Null
-  learning_mode: False
+  learning_mode: True
 
   learning_config:
     observation_dimension: 50

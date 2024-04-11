@@ -364,12 +364,12 @@ async def load_scenario_folder_async(
     )
     learning_config["evaluation_mode"] = perform_evaluation
 
-    config = replace_paths(config, path)
-
     if not learning_config.get("trained_policies_save_path"):
         learning_config[
             "trained_policies_save_path"
-        ] = f"{inputs_path}/learned_strategies/{sim_id}"
+        ] = f"./learned_strategies/{study_case}"
+
+    config = replace_paths(config, path)
 
     if learning_config.get("learning_mode", False):
         sim_id = f"{sim_id}_{episode}"
@@ -679,7 +679,11 @@ def load_custom_units(
 
 
 def run_learning(
-    world: World, inputs_path: str, scenario: str, study_case: str
+    world: World,
+    inputs_path: str,
+    scenario: str,
+    study_case: str,
+    verbose: bool = False,
 ) -> None:
     """
     Train Deep Reinforcement Learning (DRL) agents to act in a simulated market environment.
@@ -701,7 +705,8 @@ def run_learning(
     """
     from assume.reinforcement_learning.buffer import ReplayBuffer
 
-    logger.setLevel(logging.WARNING)
+    if not verbose:
+        logger.setLevel(logging.WARNING)
 
     # remove csv path so that nothing is written while learning
     temp_csv_path = world.export_csv_path

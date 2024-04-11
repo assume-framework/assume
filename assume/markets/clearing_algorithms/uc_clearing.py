@@ -263,13 +263,15 @@ class UCClearingRole(MarketRole):
 
         self.all_orders = []
 
-        return extract_results(
+        accepted_orders, rejected_orders, meta = extract_results(
             model=instance,
             orders=orderbook,
             rejected_orders=rejected_orders,
             market_products=market_products,
             market_clearing_prices=market_clearing_prices,
         )
+
+        return accepted_orders, rejected_orders, meta
 
 
 def extract_results(
