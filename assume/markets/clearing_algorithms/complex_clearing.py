@@ -25,7 +25,7 @@ def market_clearing_opt(
     market_products: list[MarketProduct],
     mode: str,
     with_linked_bids: bool,
-    nodes: list[str] = ["bus0"],
+    nodes: list[str] = ["node0"],
     incidence_matrix: pd.DataFrame = None,
 ):
     """
@@ -275,7 +275,7 @@ class ComplexClearingRole(MarketRole):
         super().__init__(marketconfig)
 
         self.incidence_matrix = None
-        self.nodes = ["bus0"]
+        self.nodes = ["node0"]
 
         if self.grid_data:
             self.lines = self.grid_data["lines"]
@@ -290,7 +290,7 @@ class ComplexClearingRole(MarketRole):
 
             # Iterate over the lines to fill the incidence matrix
             for _, line in self.lines.iterrows():
-                bus0, bus1, s_nom = line["bus0"], line["bus1"], line["s_nom"]
+                bus0, bus1, s_nom = line["node0"], line["bus1"], line["s_nom"]
 
                 # Update the incidence matrix with s_nom values
                 # s_nom is positive for bus0 to bus1 and negative for bus1 to bus0

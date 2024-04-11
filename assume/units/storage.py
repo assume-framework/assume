@@ -83,7 +83,7 @@ class Storage(SupportsMinMaxCharge):
         downtime_warm_start: int = 48,  # hours
         index: pd.DatetimeIndex = None,
         location: tuple[float, float] = (0, 0),
-        node: str = "bus0",
+        node: str = "node0",
         **kwargs,
     ):
         super().__init__(

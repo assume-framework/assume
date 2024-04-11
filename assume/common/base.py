@@ -50,7 +50,7 @@ class BaseUnit:
         technology: str,
         bidding_strategies: dict[str, BaseStrategy],
         index: pd.DatetimeIndex,
-        node: str = "bus0",
+        node: str = "node0",
         forecaster: Forecaster = None,
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs,

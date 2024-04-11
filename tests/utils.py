@@ -51,7 +51,7 @@ def extend_orderbook(
     bid_type="SB",
     min_acceptance_ratio=None,
     parent_bid_id=None,
-    node="bus0",
+    node="node0",
 ):
     """
     Creates constant bids over the time span of all products

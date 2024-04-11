@@ -91,7 +91,7 @@ def test_market_coupling():
     # Create a dictionary with the data
     lines = {
         "name": ["line_1"],
-        "bus0": ["node1"],
+        "node0": ["node1"],
         "bus1": ["node2"],
         "s_nom": [500.0],
     }

@@ -21,7 +21,7 @@ class Demand(SupportsMinMax):
         index (pandas.DatetimeIndex): The index of the unit.
         max_power (float): The maximum power output capacity of the power plant in MW.
         min_power (float, optional): The minimum power output capacity of the power plant in MW. Defaults to 0.0 MW.
-        node (str, optional): The node of the unit. Defaults to "bus0".
+        node (str, optional): The node of the unit. Defaults to "node0".
         price (float): The price of the unit.
         location (tuple[float, float], optional): The location of the unit. Defaults to (0.0, 0.0).
 
@@ -38,7 +38,7 @@ class Demand(SupportsMinMax):
         index: pd.DatetimeIndex,
         max_power: float,
         min_power: float,
-        node: str = "bus0",
+        node: str = "node0",
         price: float | pd.Series = 3000.0,
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs

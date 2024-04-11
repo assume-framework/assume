@@ -180,7 +180,7 @@ def test_clearing_non_convex_1():
         "price": 100,
         "only_hours": None,
         "bid_type": "BB",
-        "node": "bus0",
+        "node": "node0",
     }
     orderbook_demand.append(order)
 
@@ -197,7 +197,7 @@ def test_clearing_non_convex_1():
         "price": 100,
         "only_hours": None,
         "bid_type": "BB",
-        "node": "bus0",
+        "node": "node0",
     }
     orderbook_demand.append(order)
 
@@ -293,7 +293,7 @@ def test_clearing_non_convex_2():
         "only_hours": None,
         "bid_type": "BB",
         "min_acceptance_ratio": 0,
-        "node": "bus0",
+        "node": "node0",
     }
     orderbook.append(order)
 
@@ -311,7 +311,7 @@ def test_clearing_non_convex_2():
         "only_hours": None,
         "bid_type": "BB",
         "min_acceptance_ratio": 0,
-        "node": "bus0",
+        "node": "node0",
     }
     orderbook.append(order)
 
@@ -411,7 +411,7 @@ def test_clearing_non_convex_3():
         "only_hours": None,
         "bid_type": "BB",
         "min_acceptance_ratio": 0,
-        "node": "bus0",
+        "node": "node0",
     }
     orderbook.append(order)
 
@@ -429,7 +429,7 @@ def test_clearing_non_convex_3():
         "only_hours": None,
         "bid_type": "BB",
         "min_acceptance_ratio": 0,
-        "node": "bus0",
+        "node": "node0",
     }
     orderbook.append(order)
 
@@ -447,7 +447,7 @@ def test_clearing_non_convex_3():
         "only_hours": None,
         "bid_type": "BB",
         "min_acceptance_ratio": 0,
-        "node": "bus0",
+        "node": "node0",
     }
     orderbook.append(order)
 
@@ -465,7 +465,7 @@ def test_clearing_non_convex_3():
         "only_hours": None,
         "bid_type": "BB",
         "min_acceptance_ratio": 0,
-        "node": "bus0",
+        "node": "node0",
     }
     orderbook.append(order)
 
