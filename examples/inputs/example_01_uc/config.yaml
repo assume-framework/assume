@@ -2,42 +2,18 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-base:
-  start_date: 2019-01-01 00:00
-  end_date: 2019-01-31 00:00
-  time_step: 1h
-  save_frequency_hours: 24
-  markets_config:
-    EOM:
-      operator: EOM_operator
-      product_type: energy
-      products:
-        - duration: 1h
-          count: 1
-          first_delivery: 1h
-      opening_frequency: 1h
-      opening_duration: 1h
-      volume_unit: MWh
-      maximum_bid_volume: 100000
-      maximum_bid_price: 3000
-      minimum_bid_price: -500
-      price_unit: EUR/MWh
-      market_mechanism: pay_as_clear
-
 dam_with_uc_clearing_rl:
-  sim_id: "uc_unit_all_conv"
   start_date: 2019-03-01 23:00
   end_date: 2019-03-02 23:00
   time_step: 1h
   save_frequency_hours: Null
-  # learning_mode: True
+  learning_mode: False
 
   learning_config:
-    trained_actors_path: examples/inputs/learned_strategies/uc_unit_all_converged
     observation_dimension: 50
     action_dimension: 24
     continue_learning: False
-    load_learned_path: null
+    trained_policies_save_path: null
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.001
@@ -68,7 +44,7 @@ dam_with_uc_clearing_rl:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: complex_uc_clearing
+      market_mechanism: uc_clearing
 
 dam_with_uc_clearing:
   start_date: 2019-03-01 00:00
@@ -91,4 +67,4 @@ dam_with_uc_clearing:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: complex_uc_clearing
+      market_mechanism: uc_clearing

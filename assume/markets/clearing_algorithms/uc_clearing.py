@@ -187,7 +187,7 @@ def market_clearing_opt(orders, market_products):
         raise Exception(f"None of {SOLVERS} are available")
 
     solver = SolverFactory(solvers[0])
-    options = {"eps": EPS} if solver.name == "gurobi" else {}
+    options = {"OptimalityTol": EPS} if solver.name == "gurobi" else {}
 
     # Solve the model
     instance = model.create_instance()

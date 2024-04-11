@@ -147,7 +147,7 @@ def replace_paths(config: dict, inputs_path: str):
         for key, value in config.items():
             if isinstance(value, (dict, list)):
                 config[key] = replace_paths(value, inputs_path)
-            elif isinstance(key, str) and key.endswith("_path"):
+            elif isinstance(key, str) and key.endswith("_path") and value is not None:
                 if not value.startswith(inputs_path):
                     config[key] = inputs_path + "/" + value
     elif isinstance(config, list):
@@ -364,12 +364,12 @@ async def load_scenario_folder_async(
     )
     learning_config["evaluation_mode"] = perform_evaluation
 
+    config = replace_paths(config, path)
+
     if not learning_config.get("trained_policies_save_path"):
         learning_config[
             "trained_policies_save_path"
         ] = f"{inputs_path}/learned_strategies/{sim_id}"
-
-    config = replace_paths(config, path)
 
     if learning_config.get("learning_mode", False):
         sim_id = f"{sim_id}_{episode}"
@@ -700,6 +700,8 @@ def run_learning(
         - The best policies are chosen based on the average reward obtained during the evaluation runs, and they are saved for future use.
     """
     from assume.reinforcement_learning.buffer import ReplayBuffer
+
+    logger.setLevel(logging.WARNING)
 
     # remove csv path so that nothing is written while learning
     temp_csv_path = world.export_csv_path

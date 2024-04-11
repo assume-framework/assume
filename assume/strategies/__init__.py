@@ -17,6 +17,7 @@ from assume.strategies.naive_strategies import (
     NaiveProfileStrategy,
     NaiveRedispatchStrategy,
     NaiveSingleBidStrategy,
+    NaiveUCStrategy,
 )
 
 bidding_strategies: dict[str, BaseStrategy] = {
@@ -34,6 +35,7 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "flexable_neg_crm_storage": flexableNegCRMStorage,
     "flexable_pos_crm_storage": flexablePosCRMStorage,
     "naive_redispatch": NaiveRedispatchStrategy,
+    "naive_uc": NaiveUCStrategy,
 }
 
 try:
@@ -42,6 +44,17 @@ try:
 
     bidding_strategies["dmas_powerplant"] = DmasPowerplantStrategy
     bidding_strategies["dmas_storage"] = DmasStorageStrategy
+
+except ImportError:
+    pass
+
+try:
+    from assume.strategies.learning_advanced_orders import RLAdvancedOrderStrategy
+    from assume.strategies.learning_strategies import RLStrategy, RlUCStrategy
+
+    bidding_strategies["pp_learning"] = RLStrategy
+    bidding_strategies["learning_uc"] = RlUCStrategy
+    bidding_strategies["learning_advanced_orders"] = RLAdvancedOrderStrategy
 
 except ImportError:
     pass

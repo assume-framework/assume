@@ -134,16 +134,7 @@ class World:
         self.bidding_strategies = bidding_strategies
 
         try:
-            from assume.strategies.learning_advanced_orders import (
-                RLAdvancedOrderStrategy,
-            )
             from assume.strategies.learning_strategies import RLStrategy
-
-            self.bidding_strategies["learning"] = RLStrategy
-            self.bidding_strategies["pp_learning"] = RLStrategy
-            self.bidding_strategies[
-                "learning_advanced_orders"
-            ] = RLAdvancedOrderStrategy
 
         except ImportError as e:
             self.logger.info(

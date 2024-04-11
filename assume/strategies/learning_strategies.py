@@ -497,9 +497,11 @@ class RlUCStrategy(RLStrategy):
 
         next_observation = self.create_observation(
             unit=unit,
+            market_id=market_config.market_id,
             start=start,
             end=end,
         )
+
         initial_output = unit.get_output_before(start)
         marginal_cost = unit.calculate_marginal_cost(start, initial_output)
         current_status = 1 if initial_output > 0 else 0
