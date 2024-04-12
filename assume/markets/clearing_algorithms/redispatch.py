@@ -216,9 +216,6 @@ class RedispatchMarketRole(MarketRole):
                 calculate_network_meta(network=redispatch_network, product=product, i=i)
             )
 
-        # remove all orders to clean up the orderbook and avoid double clearing
-        self.all_orders = []
-
         return accepted_orders, rejected_orders, meta
 
     def process_dispatch_data(self, network: pypsa.Network, orderbook_df: pd.DataFrame):

@@ -261,8 +261,6 @@ class UCClearingRole(MarketRole):
             t: instance.dual[instance.energy_balance[t]] for t in instance.T
         }
 
-        self.all_orders = []
-
         accepted_orders, rejected_orders, meta = extract_results(
             model=instance,
             orders=orderbook,
