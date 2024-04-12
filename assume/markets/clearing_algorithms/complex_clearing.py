@@ -290,7 +290,7 @@ class ComplexClearingRole(MarketRole):
 
             # Iterate over the lines to fill the incidence matrix
             for _, line in self.lines.iterrows():
-                bus0, bus1, s_nom = line["node0"], line["bus1"], line["s_nom"]
+                bus0, bus1, s_nom = line["bus0"], line["bus1"], line["s_nom"]
 
                 # Update the incidence matrix with s_nom values
                 # s_nom is positive for bus0 to bus1 and negative for bus1 to bus0
