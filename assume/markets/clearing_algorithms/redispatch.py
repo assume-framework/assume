@@ -3,8 +3,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-from datetime import timedelta
-from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -16,12 +14,13 @@ from assume.common.grid_utils import (
     calculate_network_meta,
     read_pypsa_grid,
 )
-from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
+from assume.common.market_objects import MarketConfig, Orderbook
 from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)
 
 logging.getLogger("linopy").setLevel(logging.WARNING)
+logging.getLogger("pypsa").setLevel(logging.WARNING)
 
 
 class RedispatchMarketRole(MarketRole):
@@ -215,9 +214,6 @@ class RedispatchMarketRole(MarketRole):
             meta.extend(
                 calculate_network_meta(network=redispatch_network, product=product, i=i)
             )
-
-        # remove all orders to clean up the orderbook and avoid double clearing
-        self.all_orders = []
 
         return accepted_orders, rejected_orders, meta
 
