@@ -20,6 +20,7 @@ from assume.markets.base_market import MarketRole
 log = logging.getLogger(__name__)
 
 logging.getLogger("linopy").setLevel(logging.WARNING)
+logging.getLogger("pypsa").setLevel(logging.WARNING)
 
 
 class RedispatchMarketRole(MarketRole):
@@ -213,9 +214,6 @@ class RedispatchMarketRole(MarketRole):
             meta.extend(
                 calculate_network_meta(network=redispatch_network, product=product, i=i)
             )
-
-        # remove all orders to clean up the orderbook and avoid double clearing
-        self.all_orders = []
 
         return accepted_orders, rejected_orders, meta
 
