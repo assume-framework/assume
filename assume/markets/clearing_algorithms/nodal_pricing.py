@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -22,6 +21,7 @@ from assume.markets.base_market import MarketRole
 log = logging.getLogger(__name__)
 
 logging.getLogger("linopy").setLevel(logging.WARNING)
+logging.getLogger("pypsa").setLevel(logging.WARNING)
 
 
 class NodalMarketRole(MarketRole):
@@ -172,9 +172,6 @@ class NodalMarketRole(MarketRole):
             meta.extend(
                 calculate_network_meta(network=nodal_network, product=product, i=i)
             )
-
-        # remove all orders to clean up the orderbook and avoid double clearing
-        self.all_orders = []
 
         return accepted_orders, rejected_orders, meta
 
