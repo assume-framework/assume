@@ -60,6 +60,7 @@ availabe_examples = {
     "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
     "small_learning_3": {"scenario": "example_02c", "study_case": "dam"},
 }
+print(test)
 
 # %%
 if __name__ == "__main__":
