@@ -14,6 +14,7 @@ from mango import Role
 from assume.common.base import LearningConfig, LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
+from assume.reinforcement_learning.algorithms.lstm_matd3 import LSTM_TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
 
 logger = logging.getLogger(__name__)
@@ -167,6 +168,15 @@ class Learning(Role):
         """
         if algorithm == "matd3":
             self.rl_algorithm = TD3(
+                learning_role=self,
+                learning_rate=self.learning_rate,
+                episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,
+                gradient_steps=self.gradient_steps,
+                batch_size=self.batch_size,
+                gamma=self.gamma,
+            )
+        elif algorithm == "LSTM-matd3":
+            self.rl_algorithm = LSTM_TD3(
                 learning_role=self,
                 learning_rate=self.learning_rate,
                 episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,

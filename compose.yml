@@ -19,7 +19,7 @@ services:
       # needed for normal image
       #- ./assume-db:/var/lib/postgresql/data
       # /home/postgres/data is path for timescaledev image
-      - ./assume-db:/home/postgres/pgdata
+      - ./assume-db:/home/postgres/data
     ports:
       - 5432:5432
     deploy:

@@ -123,6 +123,53 @@ class Actor(nn.Module):
         # x = th.tanh(self.FC3(x))
 
         return x
+    
+class LSTM_Actor(nn.Module):
+    """
+    The LSTM recurrent neurnal network for the actor.
+
+    Based on: "Multi-Period and Multi-Spatial Equilibrium Analysis in Imperfect Electricity Markets"
+    by Ye at al. (2019)
+    """
+
+    def __init__(self, obs_dim: int, act_dim: int, float_type):
+        super(LSTM_Actor, self).__init__()
+        self.float_type = float_type
+        self.no_of_timeseries = 2 #TODO: variable no. of input timeseries
+        self.forecast_horizon = 24 #TODO: variable forecast horizon
+        #forecast_dim = (obs_dim - 2)/ no_of_timeseries 
+
+        self.LSTM1 = nn.LSTMCell(self.no_of_timeseries, 8, dtype=float_type)
+        self.LSTM2 = nn.LSTMCell(8, 16, dtype=float_type)
+
+        # input size defined by forecast horizon and concatenated with capacity and marginal cost values
+        self.FC1 = nn.Linear(self.forecast_horizon * 16 + 2, 128, dtype=float_type)
+        self.FC2 = nn.Linear(128, act_dim, dtype=float_type)
+
+    def forward(self, obs):
+        x1, x2 = obs.split([obs.shape[0] - 2, 2], dim=1) #TODO: variable no. of mc and capacity values, currently 2
+        x1 = x1.reshape(self.no_of_timeseries, x1.shape[1] / self.no_of_timeseries) #Shape: [no_of_timeseries, forecast_horizon]
+
+        outputs = []
+        h_t = th.zeros(x1.size(0), 8, dtype=self.float_type)
+        c_t = th.zeros(x1.size(0), 8, dtype=self.float_type)
+
+        h_t2 = th.zeros(x1.size(0), 16, dtype=self.float_type)
+        c_t2 = th.zeros(x1.size(0), 16, dtype=self.float_type)
+
+        for time_step in x1.split(1, dim=1):
+            h_t, c_t = self.LSTM1(time_step, (h_t, c_t))
+            h_t2, c_t2 = self.LSTM2(h_t, (h_t2, c_t2))
+            outputs += [h_t2]
+
+        outputs = th.cat(outputs, dim=1).flatten() 
+        x = th.cat((outputs, x2)) #TODO: check if shape [(batch_size), 16*forecast_horizon + 2], e.g. [16*24 + 2] = [386]
+
+        x = F.relu(self.FC1(x))
+        x = F.softsign(self.FC2(x))
+        # x = th.tanh(self.FC3(x))
+
+        return x
 
 
 # Ornstein-Uhlenbeck Noise

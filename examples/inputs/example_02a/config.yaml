@@ -49,9 +49,9 @@ tiny:
 
 base:
   start_date: 2019-03-01 00:00
-  end_date: 2019-04-01 00:00
+  end_date: 2019-03-05 00:00
   time_step: 1h
-  save_frequency_hours: Null
+  save_frequency_hours: 24
   learning_mode: True
 
   learning_config:
@@ -60,7 +60,7 @@ base:
     continue_learning: False
     trained_policies_save_path: null
     max_bid_price: 100
-    algorithm: matd3
+    algorithm: LSTM-matd3
     learning_rate: 0.001
     training_episodes: 10
     episodes_collecting_initial_experience: 5
@@ -68,7 +68,7 @@ base:
     gradient_steps: -1
     batch_size: 256
     gamma: 0.99
-    device: cpu
+    device: cuda
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
