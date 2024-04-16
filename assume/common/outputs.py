@@ -2,25 +2,33 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import asyncio
 import logging
 import shutil
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
+from typing import TypedDict
 
 import numpy as np
 import pandas as pd
 from dateutil import rrule as rr
 from mango import Role
 from pandas.api.types import is_bool_dtype, is_numeric_dtype
-from psycopg2.errors import InvalidTextRepresentation, UndefinedColumn
+from psycopg2.errors import UndefinedColumn
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 
-logger = logging.getLogger(__name__)
-
 from assume.common.market_objects import MetaDict
 from assume.common.utils import separate_orders
+
+logger = logging.getLogger(__name__)
+
+
+class OutputDef(TypedDict):
+    name: str
+    value: str
+    from_table: str
 
 
 class WriteOutput(Role):
@@ -36,6 +44,7 @@ class WriteOutput(Role):
         save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to None.
         learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
         evaluation_mode (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
+        additional_kpis (dict[str, OutputDef], optional): makes it possible to define additional kpis evaluated
     """
 
     def __init__(
@@ -48,6 +57,7 @@ class WriteOutput(Role):
         save_frequency_hours: int = None,
         learning_mode: bool = False,
         evaluation_mode: bool = False,
+        additional_kpis: dict[str, OutputDef] = {},
     ):
         super().__init__()
 
@@ -87,6 +97,27 @@ class WriteOutput(Role):
 
         if self.db is not None:
             self.delete_db_scenario(self.simulation_id)
+
+        self.kpi_defs: dict[str, OutputDef] = {
+            "avg_price": {
+                "value": "avg(price)",
+                "from_table": "market_meta",
+            },
+            "total_cost": {
+                "value": "sum(price*demand_volume_energy)",
+                "from_table": "market_meta",
+            },
+            "total_volume": {
+                "value": "sum(demand_volume_energy)",
+                "from_table": "market_meta",
+            },
+            "capacity_factor": {
+                "value": "avg(power/max_power)",
+                "from_table": 'market_dispatch ud join power_plant_meta um on ud.unit_id = um."index" and ud.simulation=um.simulation',
+                "group_bys": ["market_id", "variable"],
+            },
+        }
+        self.kpi_defs.update(additional_kpis)
 
     def delete_db_scenario(self, simulation_id: str):
         """
@@ -468,12 +499,13 @@ class WriteOutput(Role):
         if self.db is None:
             return
 
-        queries = [
-            f"select 'avg_price' as variable, market_id as ident, avg(price) as value from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select 'total_cost' as variable, market_id as ident, sum(price*demand_volume_energy) as value from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select 'total_volume' as variable, market_id as ident, sum(demand_volume_energy) as value from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select 'capacity_factor' as variable, market_id as ident, avg(power/max_power) as value from market_dispatch ud join power_plant_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by variable, market_id",
-        ]
+        queries = []
+        for variable, kpi_def in self.kpi_defs.items():
+            group_bys = ",".join(kpi_def.get("group_bys", ["market_id"]))
+            queries.append(
+                f"select '{variable}' as variable, market_id as ident, {kpi_def['value']} as value from {kpi_def['from_table']} where simulation = '{self.simulation_id}' group by {group_bys}"
+            )
+
         if self.episode:
             queries.extend(
                 [
