@@ -3,17 +3,18 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 dam_with_uc_clearing_rl:
+  sim_id: run_all
   start_date: 2019-03-01 23:00
   end_date: 2019-03-02 23:00
   time_step: 1h
   save_frequency_hours: Null
-  learning_mode: True
+  learning_mode: False
 
   learning_config:
     observation_dimension: 50
     action_dimension: 24
     continue_learning: False
-    trained_policies_save_path: null
+    trained_policies_save_path: learned_strategies/run-all/best_avg_reward
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.001
@@ -23,7 +24,7 @@ dam_with_uc_clearing_rl:
     gradient_steps: 2
     batch_size: 16
     gamma: 0.7
-    device: cpu
+    device: cpu`
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1

@@ -244,7 +244,7 @@ class Learning(Role):
                     first_has_new_max = True
                 # store the best for our current metric in its folder
                 self.rl_algorithm.save_params(
-                    directory=f"{self.trained_policies_save_path}/{metric}"
+                    directory=f"{self.trained_policies_save_path}/best_{metric}"
                 )
 
         # use last metric as default

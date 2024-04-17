@@ -354,7 +354,7 @@ async def load_scenario_folder_async(
         raise ValueError("No power plant or no demand units were provided!")
 
     save_frequency_hours = config.get("save_frequency_hours", 48)
-    sim_id = f"{scenario}_{study_case}"
+    sim_id = config.get("sim_id", f"{scenario}_{study_case}")
 
     learning_config: LearningConfig = config.get("learning_config", {})
     bidding_strategy_params = config.get("bidding_strategy_params", {})
@@ -734,11 +734,11 @@ def run_learning(
     if Path(save_path).is_dir():
         # we are in learning mode and about to train new policies, which might overwrite existing ones
         accept = input(
-            f"{save_path=} exists - should we overwrite current learnings? (y/N)"
+            f"{save_path=} exists - should we overwrite current learnings? (y/n) "
         )
         if not accept.lower().startswith("y"):
             # stop here - do not start learning or save anything
-            raise AssumeException("don't overwrite existing strategies")
+            raise AssumeException("Don't overwrite existing strategies!")
 
     for episode in tqdm(
         range(1, world.learning_role.training_episodes + 1),
