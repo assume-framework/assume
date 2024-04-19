@@ -147,30 +147,41 @@ class LSTM_Actor(nn.Module):
         self.FC2 = nn.Linear(128, act_dim, dtype=float_type)
 
     def forward(self, obs):
-        x1, x2 = obs.split([obs.shape[0] - 2, 2], dim=1) #TODO: variable no. of mc and capacity values, currently 2
-        x1 = x1.reshape(self.no_of_timeseries, x1.shape[1] / self.no_of_timeseries) #Shape: [no_of_timeseries, forecast_horizon]
+        if obs.dim() not in (1, 2):
+            raise ValueError(f"LSTMCell: Expected input to be 1D or 2D, got {obs.dim()}D instead")
+        
+        is_batched = obs.dim() == 2
+        if not is_batched:
+            obs = obs.unsqueeze(0)
 
-        outputs = []
+        x1, x2 = obs.split([obs.shape[1] - 2, 2], dim=1) #TODO: variable no. of mc and capacity values, currently 2
+        x1 = x1.reshape(-1, self.no_of_timeseries, int(x1.shape[1] / self.no_of_timeseries)) #Shape: [no_of_timeseries, forecast_horizon] TODO: error handling for division
+        
         h_t = th.zeros(x1.size(0), 8, dtype=self.float_type)
         c_t = th.zeros(x1.size(0), 8, dtype=self.float_type)
 
         h_t2 = th.zeros(x1.size(0), 16, dtype=self.float_type)
         c_t2 = th.zeros(x1.size(0), 16, dtype=self.float_type)
+        
+        outputs = []
 
-        for time_step in x1.split(1, dim=1):
+        for time_step in x1.split(1, dim=2):
+            time_step = time_step.reshape(-1, 2)
             h_t, c_t = self.LSTM1(time_step, (h_t, c_t))
             h_t2, c_t2 = self.LSTM2(h_t, (h_t2, c_t2))
             outputs += [h_t2]
 
-        outputs = th.cat(outputs, dim=1).flatten() 
-        x = th.cat((outputs, x2)) #TODO: check if shape [(batch_size), 16*forecast_horizon + 2], e.g. [16*24 + 2] = [386]
+        outputs = th.cat(outputs, dim=1)
+        x = th.cat((outputs, x2), dim=1)
 
         x = F.relu(self.FC1(x))
         x = F.softsign(self.FC2(x))
         # x = th.tanh(self.FC3(x))
 
-        return x
+        if not is_batched:
+            x = x.squeeze(0)
 
+        return x
 
 # Ornstein-Uhlenbeck Noise
 # from https://github.com/songrotek/DDPG/blob/master/ou_noise.py

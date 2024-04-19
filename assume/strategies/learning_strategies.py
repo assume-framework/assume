@@ -13,10 +13,9 @@ import torch as th
 from assume.common.base import LearningStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_products_index
-from assume.reinforcement_learning.learning_utils import Actor, NormalActionNoise
+from assume.reinforcement_learning.learning_utils import Actor, LSTM_Actor, NormalActionNoise
 
 logger = logging.getLogger(__name__)
-
 
 class RLStrategy(LearningStrategy):
     """
@@ -32,6 +31,7 @@ class RLStrategy(LearningStrategy):
         device (str): Device to run on. Defaults to "cpu".
         float_type (str): Float type to use. Defaults to "float32".
         learning_mode (bool): Whether to use learning mode. Defaults to False.
+        actor_type (str): Actor network architecture. Defaults to "matd3".
         actor (torch.nn.Module): Actor network. Defaults to None.
         order_types (list[str]): Order types to use. Defaults to ["SB"].
         action_noise (NormalActionNoise): Action noise. Defaults to None.
@@ -53,6 +53,9 @@ class RLStrategy(LearningStrategy):
 
         # tells us whether we are training the agents or just executing per-learnind stategies
         self.learning_mode = kwargs.get("learning_mode", False)
+
+        # based on learning config
+        self.actor_type = kwargs.get("algorithm", "matd3")
 
         # sets the devide of the actor network
         device = kwargs.get("device", "cpu")
@@ -455,7 +458,10 @@ class RLStrategy(LearningStrategy):
 
         params = th.load(directory, map_location=self.device)
 
-        self.actor = Actor(self.obs_dim, self.act_dim, self.float_type)
+        if self.actor_type == "LSTM-matd3":
+            self.actor = LSTM_Actor(self.obs_dim, self.act_dim, self.float_type)
+        else: 
+            self.actor = Actor(self.obs_dim, self.act_dim, self.float_type)
         self.actor.load_state_dict(params["actor"])
 
         if self.learning_mode:
