@@ -36,6 +36,8 @@ def market_clearing_opt(
         market_products (list[MarketProduct]): The products to be traded.
         mode (str): The mode of the market clearing determining whether the minimum acceptance ratio is considered.
         with_linked_bids (bool): Whether the market clearing should include linked bids.
+        nodes (list[str]): The list of nodes in the network.
+        incidence_matrix (pd.DataFrame): The incidence matrix of the network. (HSows the connections between nodes.)
 
     Returns:
         tuple[pyomo.core.base.PyomoModel.ConcreteModel, pyomo.opt.results.SolverResults]: The solved pyomo model and the solver results
@@ -155,6 +157,19 @@ def market_clearing_opt(
 
     # Function to calculate the balance for each node and time
     def energy_balance_rule(model, node, t):
+        """
+        Calculate the energy balance for a given node and time.
+
+        This function calculates the energy balance for a specific node and time in a complex clearing algorithm. It iterates over the orders and adjusts the balance expression based on the bid type. It also adjusts the flow subtraction to account for actual connections if an incidence matrix is provided.
+
+        Args:
+            model: The complex clearing model.
+            node: The node for which to calculate the energy balance.
+            t: The time for which to calculate the energy balance.
+
+        Returns:
+            bool: True if the energy balance is zero, False otherwise.
+        """
         balance_expr = 0.0  # Initialize the balance expression
         # Iterate over orders to adjust the balance expression based on bid type
         for order in orders:
