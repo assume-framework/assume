@@ -154,6 +154,7 @@ class flexableEOMBlock(BaseStrategy):
                     "price": bid_price_flex,
                     "volume": bid_quantity_flex,
                     "bid_type": "SB",
+                    "node": unit.node,
                 },
             )
             # calculate previous power with planned dispatch (bid_quantity)
@@ -178,7 +179,7 @@ class flexableEOMBlock(BaseStrategy):
                     "volume": bid_quantity_block,
                     "bid_type": "BB",
                     "min_acceptance_ratio": 1,
-                    "accepted_volume": {product[0]: 0 for product in product_tuples},
+                    "node": unit.node,
                 }
             )
 
@@ -347,6 +348,7 @@ class flexableEOMLinked(BaseStrategy):
                     "volume": {start: bid_quantity_flex},
                     "bid_type": "LB",
                     "parent_bid_id": parent_id,
+                    "node": unit.node,
                 },
             )
             # calculate previous power with planned dispatch (bid_quantity)
@@ -372,8 +374,8 @@ class flexableEOMLinked(BaseStrategy):
                     "volume": bid_quantity_block,
                     "bid_type": "BB",
                     "min_acceptance_ratio": 1,
-                    "accepted_volume": {product[0]: 0 for product in product_tuples},
                     "bid_id": block_id,
+                    "node": unit.node,
                 }
             )
 

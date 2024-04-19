@@ -196,6 +196,7 @@ class RLAdvancedOrderStrategy(LearningStrategy):
                         "volume": bid_quantity_inflex,
                         "bid_type": "SB",
                         "bid_id": f"{unit.id}_SB_{len(bids) + 1}",
+                        "node": unit.node,
                     },
                 )
 
@@ -216,6 +217,7 @@ class RLAdvancedOrderStrategy(LearningStrategy):
                         "bid_type": "LB",
                         "parent_bid_id": parent_bid_id,
                         "bid_id": f"{unit.id}_LB_{len(bids) + 1}",
+                        "node": unit.node,
                     },
                 )
             # otherwise just add the flex bid as SB
@@ -229,6 +231,7 @@ class RLAdvancedOrderStrategy(LearningStrategy):
                         "volume": bid_quantity_flex,
                         "bid_type": "SB",
                         "bid_id": f"{unit.id}_SB_{len(bids) + 1}",
+                        "node": unit.node,
                     },
                 )
 
@@ -250,8 +253,8 @@ class RLAdvancedOrderStrategy(LearningStrategy):
                     "volume": bid_quantity_block,
                     "bid_type": "BB",
                     "min_acceptance_ratio": 1,
-                    "accepted_volume": {product[0]: 0 for product in product_tuples},
                     "bid_id": unit.id + "_block",
+                    "node": unit.node,
                 }
             )
 

@@ -144,6 +144,7 @@ class flexableEOMStorage(BaseStrategy):
                     "only_hours": None,
                     "price": price,
                     "volume": bid_quantity,
+                    "node": unit.node,
                 }
             )
 
@@ -311,6 +312,7 @@ class flexablePosCRMStorage(BaseStrategy):
                         "only_hours": None,
                         "price": capacity_price,
                         "volume": bid_quantity,
+                        "node": unit.node,
                     }
                 )
                 previous_power = current_power
@@ -323,6 +325,7 @@ class flexablePosCRMStorage(BaseStrategy):
                         "only_hours": None,
                         "price": energy_price,
                         "volume": bid_quantity,
+                        "node": unit.node,
                     }
                 )
                 # calculate theoretic SOC
@@ -419,6 +422,7 @@ class flexableNegCRMStorage(BaseStrategy):
                         "only_hours": None,
                         "price": 0,
                         "volume": bid_quantity,
+                        "node": unit.node,
                     }
                 )
                 previous_power = current_power
@@ -431,6 +435,7 @@ class flexableNegCRMStorage(BaseStrategy):
                         "only_hours": None,
                         "price": 0,
                         "volume": bid_quantity,
+                        "node": unit.node,
                     }
                 )
                 # calculate theoretic SOC

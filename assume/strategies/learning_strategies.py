@@ -160,6 +160,7 @@ class RLStrategy(LearningStrategy):
                 "only_hours": None,
                 "price": bid_price_inflex,
                 "volume": bid_quantity_inflex,
+                "node": unit.node,
             },
             {
                 "start_time": start,
@@ -167,6 +168,7 @@ class RLStrategy(LearningStrategy):
                 "only_hours": None,
                 "price": bid_price_flex,
                 "volume": bid_quantity_flex,
+                "node": unit.node,
             },
         ]
 

@@ -58,7 +58,7 @@ def test_init_function(base_unit, mock_market_config):
         "id": "test_pp",
         "technology": "base",
         "unit_operator": "test_operator",
-        "node": "",
+        "node": "node0",
         "unit_type": "base_unit",
     }
 
