@@ -25,6 +25,7 @@ from tqdm import tqdm
 from assume.common import (
     Forecaster,
     MarketConfig,
+    OutputDef,
     UnitsOperator,
     WriteOutput,
     mango_codec_factory,
@@ -151,6 +152,7 @@ class World:
                 e,
             )
         self.clearing_mechanisms: dict[str, MarketRole] = clearing_mechanisms
+        self.additional_kpis: dict[str, OutputDef] = {}
         self.addresses = []
         nest_asyncio.apply()
         self.loop = asyncio.get_event_loop()
@@ -288,6 +290,7 @@ class World:
             save_frequency_hours=save_frequency_hours,
             learning_mode=self.learning_mode,
             evaluation_mode=self.evaluation_mode,
+            additional_kpis=self.additional_kpis,
         )
 
         # mango multiprocessing is currently only supported on linux
