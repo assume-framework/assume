@@ -33,7 +33,7 @@ from assume.common.market_objects import MarketConfig, Orderbook, Product
 log = logging.getLogger(__name__)
 
 
-def get_solver_factory(solvers_str=["cbc", "glpk", "cbc", "gurobi", "cplex"]):
+def get_solver_factory(solvers_str=["glpk", "cbc", "gurobi", "cplex"]):
     """
     select the first available solver from the list
 
