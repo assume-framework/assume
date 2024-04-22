@@ -110,9 +110,7 @@ class ComplexDmasClearingRole(MarketRole):
             if order_type is not None:
                 tt = (order["start_time"] - start) / duration
                 # block_id, hour, name
-                name = (
-                    f'{order["agent_id"]} {order.get("unit_id", "")}'
-                )
+                name = f'{order["agent_id"]} {order.get("unit_id", "")}'
                 if "exclusive" in order_type:
                     idx = (order["exclusive_id"], tt, name)
                 elif "linked" in order_type:
@@ -270,8 +268,8 @@ class ComplexDmasClearingRole(MarketRole):
                     if orders[type_][block, hour, name][1] > 0
                 )
             else:
-                # TODO actually for linked order in the same hour, 
-                # the maximum price of all its prior required blocks 
+                # TODO actually for linked order in the same hour,
+                # the maximum price of all its prior required blocks
                 # should be used to determine the cost of the additional block
                 return quicksum(
                     orders[type_][block, hour, name][0]
