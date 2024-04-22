@@ -36,8 +36,10 @@ order_types = ["single_ask", "single_bid", "linked_ask", "exclusive_ask"]
 class ComplexDmasClearingRole(MarketRole):
     required_fields = ["link", "block_id", "exclusive_id"]
 
-    def __init__(self, marketconfig: MarketConfig):
+    def __init__(self, marketconfig: MarketConfig, verbose: bool = False):
         super().__init__(marketconfig)
+        if not verbose:
+            log.setLevel(logging.WARNING)
 
     def clear(
         self, orderbook: Orderbook, market_products: list[MarketProduct]
@@ -45,7 +47,14 @@ class ComplexDmasClearingRole(MarketRole):
         """
         This performs the process of "market clearing" for a given market agent and its orders.
         During this process, incoming orders are matched against each other and allocations are determined to adhere to market rules.
+        Linked orders are respected to be only taken if the prior block was also taken.
+        Orders with the same exclusive ID from the same agent can only be taken together, in which case no other exclusive blocks can be taken.
         The result are an orderbook, the rejected orders and market metadata.
+
+        Limitations:
+            * The clearing is currently one-sided, in the way that the price of the demand is not respected
+            * A per-agent-unique bid_id is required for standard bids
+            * The cost of taking additional blocks is taken individually instead (like pay-as-bid) instead of applying uniform pricing during the calculation
 
         Args:
             orderbook (Orderbook): the orders to be cleared as an orderbook
@@ -54,7 +63,9 @@ class ComplexDmasClearingRole(MarketRole):
         Returns:
             tuple[Orderbook, Orderbook, list[dict]]: accepted orderbook, rejected orderbook and clearing meta data
         """
+        # assumes same duration for all given products
         start = market_products[0][0]
+        duration = market_products[0][1] - start
         T = len(market_products)
         t_range = np.arange(T)
         # Orders have (block, hour, name) as key and (price, volume, link) as values
@@ -72,6 +83,8 @@ class ComplexDmasClearingRole(MarketRole):
         opt = SolverFactory(solvers[0])
 
         bid_ids = {}
+        agent_ids = {}
+        unit_ids = {}
 
         for order in orderbook:
             order_type = None
@@ -95,16 +108,22 @@ class ComplexDmasClearingRole(MarketRole):
                 else:
                     order_type = None
             if order_type is not None:
-                tt = (order["start_time"] - start) / timedelta(hours=1)
+                tt = (order["start_time"] - start) / duration
                 # block_id, hour, name
-                name = order["agent_id"]
-                bid_ids[name] = order["bid_id"]
+                name = (
+                    f'{order["agent_id"]} {order.get("unit_id", "")}'
+                )
                 if "exclusive" in order_type:
                     idx = (order["exclusive_id"], tt, name)
                 elif "linked" in order_type:
                     idx = (order["block_id"], tt, name)
                 else:
-                    idx = (order["bid_id"], tt, name)
+                    # needs bid_id to distinguish orders in the set
+                    name += str(order["bid_id"])
+                    idx = (None, tt, name)
+                agent_ids[name] = order["agent_id"]
+                bid_ids[name] = order["bid_id"]
+                unit_ids[name] = order.get("unit_id", "")
 
                 index_orders[order_type][tt].append((idx[0], idx[2]))
 
@@ -251,6 +270,9 @@ class ComplexDmasClearingRole(MarketRole):
                     if orders[type_][block, hour, name][1] > 0
                 )
             else:
+                # TODO actually for linked order in the same hour, 
+                # the maximum price of all its prior required blocks 
+                # should be used to determine the cost of the additional block
                 return quicksum(
                     orders[type_][block, hour, name][0]
                     * orders[type_][block, hour, name][1]
@@ -266,7 +288,7 @@ class ComplexDmasClearingRole(MarketRole):
             for t in t_range
         ]
 
-        # generation must be smaller than demand
+        # generation +- magic_source must match demand
         model.gen_dem = ConstraintList()
         for t in t_range:
             if not index_orders["single_bid"][t]:
@@ -278,15 +300,20 @@ class ComplexDmasClearingRole(MarketRole):
                 model.gen_dem.add(magic_source[t] == model.source[t] - model.sink[t])
 
         # Step 9 set constraint: Cost for each hour
+        # add magic_cost as very expensive, to overbid bids with marketconfig.maximum_bid_price
         generation_cost = quicksum(
             quicksum(
                 get_cost(type_=order_type, hour=t)
                 for order_type in order_types
                 if "bid" not in order_type
             )
-            + (model.source[t] + model.sink[t]) * 1e12
+            + (model.source[t] + model.sink[t])
+            * self.marketconfig.maximum_bid_price
+            * 1e3
             for t in t_range
         )
+        # TODO currently, this does not represent a two-sided clearing, as demand has to be taken
+        # and is magically filled if not
 
         model.obj = Objective(expr=generation_cost, sense=minimize)
         log.info(f"built model in {time.time() - t1:.2f} seconds")
@@ -310,7 +337,7 @@ class ComplexDmasClearingRole(MarketRole):
         # -> determine price at each hour
         prices = []
         for t in t_range:
-            max_price = -1000
+            max_price = self.marketconfig.minimum_bid_price
             for type_ in model_vars.keys():
                 for block, name in index_orders[type_][t]:
                     if type_ == "exclusive_ask":
@@ -324,12 +351,17 @@ class ComplexDmasClearingRole(MarketRole):
                         order_used = model_vars[type_][block, t, name].value
                     if order_used:
                         price = orders[type_][block, t, name][0]
-                    else:
-                        price = -1000
-                    if price > max_price:
-                        max_price = price
+                        if price > max_price:
+                            max_price = price
+
             prices += [max_price]
         prices = pd.DataFrame(data=dict(price=prices))
+
+        # check volume in price in
+        # orders["single_ask"]
+        # {k: v.value for k, v in list(model_vars["single_ask"].items())}
+        # watch order
+
         # -> determine volume at each hour
         volumes = []
         sum_magic_source = 0
@@ -353,8 +385,9 @@ class ComplexDmasClearingRole(MarketRole):
         orderbook = []
         for t in t_range:
             t = int(t)
-            bstart = start + timedelta(hours=t)
-            end = start + timedelta(hours=t + 1)
+            bstart = start + duration * t
+            end = start + duration * (t + 1)
+            clear_price = prices["price"][t]
             for type_ in model_vars.keys():
                 for block, name in index_orders[type_][t]:
                     if type_ in ["single_ask", "linked_ask"]:
@@ -363,12 +396,12 @@ class ComplexDmasClearingRole(MarketRole):
                             link = None
                             if "linked" in type_:
                                 prc, vol, link = orders[type_][block, t, name]
-                                vol *= f
-                                p = (prc, vol, link)
+                                accepted_volume = vol * f
+                                p = (prc, accepted_volume, link)
                             else:
                                 prc, vol = orders[type_][block, t, name]
-                                vol *= f
-                                p = (prc, vol)
+                                accepted_volume = vol * f
+                                p = (prc, accepted_volume)
                             used_orders[type_][(block, t, name)] = p
                             o: Order = {
                                 "start_time": bstart,
@@ -376,11 +409,14 @@ class ComplexDmasClearingRole(MarketRole):
                                 "only_hours": None,
                                 "price": prc,
                                 "volume": vol,
+                                "accepted_price": clear_price,
+                                "accepted_volume": accepted_volume,
                                 "block_id": block,
                                 "link": link,
                                 "exclusive_id": None,
-                                "agent_id": name,
+                                "agent_id": agent_ids[name],
                                 "bid_id": bid_ids[name],
+                                "unit_id": unit_ids[name],
                             }
                             orderbook.append(o)
 
@@ -394,19 +430,23 @@ class ComplexDmasClearingRole(MarketRole):
                                 "only_hours": None,
                                 "price": prc,
                                 "volume": vol,
+                                "accepted_price": prc,
+                                "accepted_volume": vol,
                                 "block_id": None,
                                 "link": None,
                                 "exclusive_id": block,
-                                "agent_id": name,
+                                "agent_id": agent_ids[name],
                                 "bid_id": bid_ids[name],
+                                "unit_id": unit_ids[name],
                             }
                             orderbook.append(o)
 
         for key, val in orders["single_bid"].items():
             block, hour, name = key
-            prc, vol = val
-            bstart = start + timedelta(hours=hour)
-            end = start + timedelta(hours=hour + 1)
+            _, vol = val
+            prc = prices["price"][hour]
+            bstart = start + duration * t
+            end = start + duration * (t + 1)
             orderbook.append(
                 {
                     "start_time": bstart,
@@ -414,11 +454,14 @@ class ComplexDmasClearingRole(MarketRole):
                     "only_hours": None,
                     "price": prc,
                     "volume": vol,
+                    "accepted_price": prc,
+                    "accepted_volume": vol,
                     "block_id": None,
                     "link": None,
                     "exclusive_id": None,
-                    "agent_id": name,
+                    "agent_id": agent_ids[name],
                     "bid_id": bid_ids[name],
+                    "unit_id": unit_ids[name],
                 }
             )
 
@@ -429,17 +472,19 @@ class ComplexDmasClearingRole(MarketRole):
                 orders_df.index, names=["block_id", "hour", "name"]
             )
 
-            if "linked" in type_ and orders_df.empty:
-                orders_df["price"] = []
-                orders_df["volume"] = []
-                orders_df["link"] = []
-            elif orders_df.empty:
-                orders_df["price"] = []
-                orders_df["volume"] = []
-            elif "linked" in type_:
-                orders_df.columns = ["price", "volume", "link"]
+            if "linked" in type_:
+                if orders_df.empty:
+                    orders_df["price"] = []
+                    orders_df["volume"] = []
+                    orders_df["link"] = []
+                else:
+                    orders_df.columns = ["price", "volume", "link"]
             else:
-                orders_df.columns = ["price", "volume"]
+                if orders_df.empty:
+                    orders_df["price"] = []
+                    orders_df["volume"] = []
+                else:
+                    orders_df.columns = ["price", "volume"]
 
             used_orders[type_] = orders_df.copy()
         # -> return all bid orders
@@ -456,47 +501,20 @@ class ComplexDmasClearingRole(MarketRole):
         prices["volume"] = volumes
         prices["magic_source"] = [get_real_number(m) for m in magic_source]
 
-        # -> build merit order
-        merit_order = {hour: dict(price=[], volume=[], type=[]) for hour in t_range}
-
-        def add_to_merit_order(hour, price, volume, type_):
-            pass
-            # merit_order[hour]["price"].append(price)
-            # merit_order[hour]["volume"].append(volume)
-            # merit_order[hour]["type"].append(type_)
-
-        for index, values in orders["linked_ask"].items():
-            price, volume, _ = values
-            _, hour, _ = index
-            add_to_merit_order(hour, price, volume, "ask")
-        for index, values in orders["exclusive_ask"].items():
-            price, volume = values
-            _, hour, _ = index
-            if volume > 0:
-                add_to_merit_order(hour, price, volume, "ask")
-            else:
-                add_to_merit_order(hour, price, -volume, "bid")
-        for index, values in orders["single_ask"].items():
-            price, volume = values
-            _, hour, _ = index
-            add_to_merit_order(hour, price, volume, "ask")
-        for index, values in orders["single_bid"].items():
-            price, volume = values
-            _, hour, _ = index
-            add_to_merit_order(hour, price, -volume, "bid")
         rejected = []
         meta = []
         for t in t_range:
             t = int(t)
-            bstart = start + timedelta(hours=t)
-            end = start + timedelta(hours=t + 1)
+            bstart = start + duration * t
+            end = start + duration * (t + 1)
             prc = prices["price"][t]
+            supply = volumes[t] - prices["magic_source"][t]
             meta.append(
                 {
-                    "supply_volume": volumes[t],
+                    "supply_volume": supply,
                     "demand_volume": volumes[t],
                     "demand_volume_energy": volumes[t],
-                    "supply_volume_energy": volumes[t],
+                    "supply_volume_energy": supply,
                     "price": prc,
                     "max_price": prc,
                     "min_price": prc,
