@@ -23,7 +23,7 @@ base:
     gradient_steps: -1
     batch_size: 256
     gamma: 0.99
-    device: cpu
+    device: cuda
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
