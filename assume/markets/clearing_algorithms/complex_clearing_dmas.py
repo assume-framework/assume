@@ -307,7 +307,7 @@ class ComplexDmasClearingRole(MarketRole):
             )
             + (model.source[t] + model.sink[t])
             * self.marketconfig.maximum_bid_price
-            * 1e3
+            * 10
             for t in t_range
         )
         # TODO currently, this does not represent a two-sided clearing, as demand has to be taken
