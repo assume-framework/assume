@@ -157,11 +157,11 @@ class LSTM_Actor(nn.Module):
         x1, x2 = obs.split([obs.shape[1] - 2, 2], dim=1) #TODO: variable no. of mc and capacity values, currently 2
         x1 = x1.reshape(-1, self.no_of_timeseries, int(x1.shape[1] / self.no_of_timeseries)) #Shape: [no_of_timeseries, forecast_horizon] TODO: error handling for division
         
-        h_t = th.zeros(x1.size(0), 8, dtype=self.float_type)
-        c_t = th.zeros(x1.size(0), 8, dtype=self.float_type)
+        h_t = th.zeros(x1.size(0), 8, dtype=self.float_type, device=obs.device)
+        c_t = th.zeros(x1.size(0), 8, dtype=self.float_type, device=obs.device)
 
-        h_t2 = th.zeros(x1.size(0), 16, dtype=self.float_type)
-        c_t2 = th.zeros(x1.size(0), 16, dtype=self.float_type)
+        h_t2 = th.zeros(x1.size(0), 16, dtype=self.float_type, device=obs.device)
+        c_t2 = th.zeros(x1.size(0), 16, dtype=self.float_type, device=obs.device)
         
         outputs = []
 
