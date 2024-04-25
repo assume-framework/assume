@@ -325,10 +325,10 @@ class DmasPowerplantStrategy(BaseStrategy):
             )
             self.model.obj = Objective(expr=quicksum(cashflow), sense=maximize)
             r = self.opt.solve(self.model)
-            if (r.solver.status == SolverStatus.ok) & (
+            if (r.solver.status == SolverStatus.ok) and (
                 r.solver.termination_condition == TerminationCondition.optimal
             ):
-                log.info(f"find optimal solution in step: {step}")
+                log.debug("find optimal solution in step: %s", step)
 
                 self._set_results(
                     unit,
@@ -463,30 +463,39 @@ class DmasPowerplantStrategy(BaseStrategy):
             return (p / unit.efficiency) * (f + e * unit.emission_factor)
 
         def get_marginal(p0: float, p1: float, t: int):
+            if p0 == p1:
+                return 1, 0
             marginal = (get_cost(p=p0, t=t) - get_cost(p=p1, t=t)) / (p0 - p1)
             return marginal, p1 - p0
 
-        def get_maximal_profit_hours(base_price):
+        def get_maximal_profit_hours(base_price, start=0):
+            """
+            decides when to turn the powerplant on if it is currently off
+
+            we calculate the sliding window and see when the most profitable time is to turn on.
+            This does search the most profitable hours, even if the first hour might be sufficient to match our marginal costs
+            """
             max_profit, start_hour = 0, 0
             run_time = unit.min_operating_time
-            for t in range(hour_count - run_time):
+            for t in range(start, hour_count - run_time):
                 p = np.sum(unit.min_power * base_price[t : t + run_time])
+
                 if p > max_profit:
                     max_profit = p
                     start_hour = t
-            return [
-                *range(
+            return list(
+                range(
                     start_hour,
-                    min(start_hour + unit.min_operating_time, hour_count),
+                    min(start_hour + run_time, hour_count),
                 )
-            ]
+            )
 
         order_book, last_power, block_number = {}, np.zeros(hour_count), 0
         tr = np.arange(hour_count)
         links = {i: None for i in tr}
 
         max_hours = get_maximal_profit_hours(base_price)
-        start_cost = unit.cold_start_cost / unit.min_power**2
+        start_cost = unit.cold_start_cost / max(unit.min_power, 10) ** 2
 
         yesterday = start.date() - timedelta(days=1)
 
@@ -505,7 +514,7 @@ class DmasPowerplantStrategy(BaseStrategy):
                     reduction = 0
                     hours_needed_to_run = unit.min_operating_time - runtime
                     hours = (
-                        [*range(hours_needed_to_run)]
+                        list(range(hours_needed_to_run))
                         if hours_needed_to_run > 0
                         else [0]
                     )
@@ -641,6 +650,9 @@ class DmasPowerplantStrategy(BaseStrategy):
             for hour in last_on_hours:
                 if links[hour - 1] is None:
                     # we need to start mid day
+                    # first update the next efficient start
+                    max_hours = get_maximal_profit_hours(base_price, hour)
+
                     if all(result["power"][max_hours] > 0):
                         # pwp is on and must runtime is not reached or it is turned off and started later
                         for t in max_hours:
@@ -759,4 +771,5 @@ class DmasPowerplantStrategy(BaseStrategy):
             )
             del df["hour"]
             df["exclusive_id"] = None
+        df["unit_id"] = unit.id
         return df.to_dict("records")

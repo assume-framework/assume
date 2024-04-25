@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 import os
 import shutil
 from datetime import datetime, timedelta
@@ -14,6 +15,8 @@ from assume import World
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.scenario.oeds.infrastructure import InfrastructureInterface
+
+log = logging.getLogger(__name__)
 
 
 async def load_oeds_async(
@@ -47,7 +50,7 @@ async def load_oeds_async(
         freq="h",
     )
     sim_id = f"{scenario}_{study_case}"
-    print(f"loading scenario {sim_id}")
+    log.info(f"loading scenario {sim_id}")
     infra_interface = InfrastructureInterface("test", infra_uri)
 
     if not nuts_config:
@@ -80,10 +83,10 @@ async def load_oeds_async(
 
     # for each area - add demand and generation
     for area in nuts_config:
-        print(f"loading config {area} for {year}")
+        log.info(f"loading config {area} for {year}")
         config_path = Path.home() / ".assume" / f"{area}_{year}"
         if not config_path.is_dir():
-            print(f"query database time series")
+            log.info(f"query database time series")
             demand = infra_interface.get_demand_series_in_area(area, year)
             demand = demand.resample("h").mean()
             # demand in MW
@@ -97,12 +100,12 @@ async def load_oeds_async(
                 demand.to_csv(config_path / "demand.csv")
                 solar.to_csv(config_path / "solar.csv")
                 if isinstance(wind, float):
-                    print(wind, area, year)
+                    log.info(wind, area, year)
                 wind.to_csv(config_path / "wind.csv")
             except Exception:
                 shutil.rmtree(config_path, ignore_errors=True)
         else:
-            print(f"use existing local time series")
+            log.info("use existing local time series")
             demand = pd.read_csv(config_path / "demand.csv", index_col=0).squeeze()
             solar = pd.read_csv(config_path / "solar.csv", index_col=0).squeeze()
             wind = pd.read_csv(config_path / "wind.csv", index_col=0).squeeze()
@@ -222,7 +225,7 @@ if __name__ == "__main__":
             "EOM",
             rr.rrule(rr.HOURLY, interval=24, dtstart=start, until=end),
             timedelta(hours=1),
-            "pay_as_clear",
+            "pay_as_clear_complex_dmas",
             [MarketProduct(timedelta(hours=1), 24, timedelta(hours=1))],
             additional_fields=["block_id", "link", "exclusive_id"],
             maximum_bid_volume=1e9,
@@ -230,7 +233,8 @@ if __name__ == "__main__":
         )
     ]
 
-    default_strategy = {mc.market_id: "naive_eom" for mc in marketdesign}
+    default_strategy = {mc.market_id: "dmas_powerplant" for mc in marketdesign}
+    default_naive_strategy = {mc.market_id: "naive_eom" for mc in marketdesign}
 
     bidding_strategies = {
         "hard coal": default_strategy,
@@ -239,9 +243,9 @@ if __name__ == "__main__":
         "gas": default_strategy,
         "biomass": default_strategy,
         "nuclear": default_strategy,
-        "wind": default_strategy,
-        "solar": default_strategy,
-        "demand": default_strategy,
+        "wind": default_naive_strategy,
+        "solar": default_naive_strategy,
+        "demand": default_naive_strategy,
     }
     world.loop.run_until_complete(
         load_oeds_async(
