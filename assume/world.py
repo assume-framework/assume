@@ -232,6 +232,11 @@ class World:
         if self.distributed_role is False:
             self.clock_agent = DistributedClockAgent(self.container)
             self.output_agent_addr = (manager_address, "export_agent_1")
+
+            def stop(fut):
+                self.loop.run_until_complete(self.container.shutdown())
+
+            self.clock_agent.stopped.add_done_callback(stop)
         else:
             await self.setup_learning()
             await self.setup_output_agent(simulation_id, save_frequency_hours)
