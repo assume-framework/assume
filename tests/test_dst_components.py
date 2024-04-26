@@ -8,9 +8,10 @@ import pytest
 from pyomo.core.base import Constraint
 from pyomo.environ import Boolean
 
-from assume.units.dst_components import DriPlant, Electrolyser
+from assume.units.dst_components import DriPlant, ElectricArcFurnace, Electrolyser
 
 
+# Test Electrolyser class
 @pytest.fixture
 def electrolyser_unit() -> Electrolyser:
     return Electrolyser(
@@ -75,6 +76,7 @@ def test_constraints(electrolyser_unit):
     assert hasattr(electrolyser_unit.b, "operating_cost_with_el_price")
 
 
+# Test driplant class
 @pytest.fixture
 def driplant_unit() -> DriPlant:
     return DriPlant(
@@ -150,6 +152,80 @@ def test_constraints(driplant_unit):
     assert hasattr(driplant_unit.b, "dri_operating_cost_constraint")
 
 
+# Test ElectricArcFurnace class
+@pytest.fixture
+def electric_arc_furnace_unit() -> ElectricArcFurnace:
+    return ElectricArcFurnace(
+        model=pyo.ConcreteModel(),
+        id="Test_EAF",
+        rated_power=200,
+        min_power=50,
+        specific_electricity_consumption=0.5,
+        specific_dri_demand=0.7,
+        specific_lime_demand=0.2,
+        ramp_up=30,
+        ramp_down=30,
+        min_operating_time=3,
+        min_down_time=2,
+    )
+
+
+def test_init_function_electric_arc_furnace(electric_arc_furnace_unit):
+    assert electric_arc_furnace_unit.id == "Test_EAF"
+    assert electric_arc_furnace_unit.rated_power == 200
+    assert electric_arc_furnace_unit.min_power == 50
+    assert electric_arc_furnace_unit.specific_electricity_consumption == 0.5
+    assert electric_arc_furnace_unit.specific_dri_demand == 0.7
+    assert electric_arc_furnace_unit.specific_lime_demand == 0.2
+    assert electric_arc_furnace_unit.ramp_up == 30
+    assert electric_arc_furnace_unit.ramp_down == 30
+    assert electric_arc_furnace_unit.min_operating_time == 3
+    assert electric_arc_furnace_unit.min_down_time == 2
+
+
+def test_add_to_model_electric_arc_furnace(electric_arc_furnace_unit):
+    electric_arc_furnace_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
+    assert hasattr(electric_arc_furnace_unit, "b")
+
+
+def test_parameters_electric_arc_furnace(electric_arc_furnace_unit):
+    electric_arc_furnace_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
+    assert hasattr(electric_arc_furnace_unit.b, "rated_power_eaf")
+    assert hasattr(electric_arc_furnace_unit.b, "min_power_eaf")
+    assert hasattr(electric_arc_furnace_unit.b, "specific_electricity_consumption_eaf")
+    assert hasattr(electric_arc_furnace_unit.b, "specific_dri_demand")
+    assert hasattr(electric_arc_furnace_unit.b, "specific_lime_demand")
+    assert hasattr(electric_arc_furnace_unit.b, "ramp_up_eaf")
+    assert hasattr(electric_arc_furnace_unit.b, "ramp_down_eaf")
+    assert hasattr(electric_arc_furnace_unit.b, "min_operating_time_eaf")
+    assert hasattr(electric_arc_furnace_unit.b, "min_down_time_eaf")
+
+
+def test_variables_electric_arc_furnace(electric_arc_furnace_unit):
+    electric_arc_furnace_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
+    assert hasattr(electric_arc_furnace_unit.b, "power_eaf")
+    assert hasattr(electric_arc_furnace_unit.b, "dri_input")
+    assert hasattr(electric_arc_furnace_unit.b, "steel_output")
+    assert hasattr(electric_arc_furnace_unit.b, "eaf_operating_cost")
+    assert hasattr(electric_arc_furnace_unit.b, "emission_eaf")
+    assert hasattr(electric_arc_furnace_unit.b, "lime_demand")
+
+
+def test_constraints_electric_arc_furnace(electric_arc_furnace_unit):
+    electric_arc_furnace_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
+    assert hasattr(electric_arc_furnace_unit.b, "electricity_input_upper_bound")
+    assert hasattr(electric_arc_furnace_unit.b, "electricity_input_lower_bound")
+    assert hasattr(electric_arc_furnace_unit.b, "steel_output_dri_relation")
+    assert hasattr(electric_arc_furnace_unit.b, "steel_output_power_relation")
+    assert hasattr(electric_arc_furnace_unit.b, "eaf_lime_demand")
+    assert hasattr(electric_arc_furnace_unit.b, "eaf_co2_emission")
+    assert hasattr(electric_arc_furnace_unit.b, "ramp_up_eaf_constraint")
+    assert hasattr(electric_arc_furnace_unit.b, "ramp_down_eaf_constraint")
+    assert hasattr(electric_arc_furnace_unit.b, "min_operating_time_eaf_constraint")
+    assert hasattr(electric_arc_furnace_unit.b, "min_down_time_eaf_constraint")
+    assert hasattr(electric_arc_furnace_unit.b, "eaf_operating_cost_cosntraint")
+
+
 if __name__ == "__main__":
-    # run pytest and enable prints
+    # Run pytest and enable prints
     pytest.main(["-s", __file__])

@@ -396,3 +396,188 @@ class DriPlant:
                 + b.power_dri[t] * self.model.electricity_price[t]
                 + b.iron_ore_in[t] * self.model.iron_ore_price
             )
+
+
+class ElectricArcFurnace:
+    """
+    Represents an Electric Arc Furnace (EAF) in a steel production process.
+
+    Parameters:
+    - model: A Pyomo ConcreteModel object representing the optimization model.
+    - id: A unique identifier for the ElectricArcFurnace instance.
+    - rated_power: The rated power capacity of the electric arc furnace (in MW).
+    - min_power: The minimum power requirement of the electric arc furnace (in MW).
+    - specific_electricity_consumption: The specific electricity consumption of the electric arc furnace (in kWh per ton of steel produced).
+    - specific_dri_demand: The specific demand for Direct Reduced Iron (DRI) in the electric arc furnace (in tons per ton of steel produced).
+    - specific_lime_demand: The specific demand for lime in the electric arc furnace (in tons per ton of steel produced).
+    - ramp_up: The ramp-up rate of the electric arc furnace (in MW per hour).
+    - ramp_down: The ramp-down rate of the electric arc furnace (in MW per hour).
+    - min_operating_time: The minimum operating time requirement for the electric arc furnace (in hours).
+    - min_down_time: The minimum downtime requirement for the electric arc furnace (in hours).
+
+    Methods:
+    - add_to_model(unit_block, time_steps): Adds the ElectricArcFurnace instance to the optimization model.
+    - define_parameters(): Defines the parameters for the ElectricArcFurnace instance.
+    - define_variables(time_steps): Defines the decision variables for the ElectricArcFurnace instance.
+    - define_constraints(time_steps): Defines the constraints for the ElectricArcFurnace instance.
+    """
+
+    def __init__(
+        self,
+        model,
+        id,
+        rated_power,
+        min_power,
+        specific_electricity_consumption,
+        specific_dri_demand,
+        specific_lime_demand,
+        ramp_up,
+        ramp_down,
+        min_operating_time,
+        min_down_time,
+        **kwargs,
+    ):
+        self.model = model
+        self.id = id
+        # Operational parameters
+        self.rated_power = rated_power
+        self.min_power = min_power
+        # Additional operational characteristics
+        self.specific_electricity_consumption = specific_electricity_consumption
+        self.specific_dri_demand = specific_dri_demand
+        self.specific_lime_demand = specific_lime_demand
+        # Flexibility parameters
+        self.ramp_up = ramp_up
+        self.ramp_down = ramp_down
+        self.min_operating_time = min_operating_time
+        self.min_down_time = min_down_time
+
+    def add_to_model(self, unit_block, time_steps):
+        self.b = unit_block
+        self.define_parameters()
+        self.define_variables(time_steps)
+        self.define_constraints(time_steps)
+
+    def define_parameters(self):
+        self.b.rated_power_eaf = Param(initialize=self.rated_power)
+        self.b.min_power_eaf = Param(initialize=self.min_power)
+        self.b.specific_electricity_consumption_eaf = Param(
+            initialize=self.specific_electricity_consumption
+        )
+        self.b.specific_dri_demand = Param(initialize=self.specific_dri_demand)
+        self.b.specific_lime_demand = Param(initialize=self.specific_lime_demand)
+        # Flexibility parameters
+        self.b.ramp_up_eaf = pyo.Param(initialize=self.ramp_up)
+        self.b.ramp_down_eaf = pyo.Param(initialize=self.ramp_down)
+        self.b.min_operating_time_eaf = pyo.Param(initialize=self.min_operating_time)
+        self.b.min_down_time_eaf = pyo.Param(initialize=self.min_down_time)
+
+    def define_variables(self, time_steps):
+        self.b.power_eaf = Var(time_steps, within=NonNegativeReals)
+        self.b.dri_input = Var(time_steps, within=NonNegativeReals)
+        self.b.steel_output = Var(time_steps, within=NonNegativeReals)
+        self.b.eaf_operating_cost = Var(time_steps, within=NonNegativeReals)
+        self.b.emission_eaf = Var(time_steps, within=NonNegativeReals)
+        self.b.lime_demand = Var(time_steps, within=NonNegativeReals)
+
+    def define_constraints(self, time_steps):
+        # Power bounds constraints
+        @self.b.Constraint(time_steps)
+        def electricity_input_upper_bound(b, t):
+            return b.power_eaf[t] <= b.rated_power_eaf
+
+        @self.b.Constraint(time_steps)
+        def electricity_input_lower_bound(b, t):
+            return b.power_eaf[t] >= b.min_power_eaf
+
+        @self.b.Constraint(time_steps)
+        def steel_output_dri_relation(b, t):
+            # This constraint defines the steel output based on inputs and efficiency
+            return b.steel_output[t] == b.dri_input[t] / b.specific_dri_demand
+
+        @self.b.Constraint(time_steps)
+        def steel_output_power_relation(b, t):
+            # This constraint defines the steel output based on inputs and efficiency
+            return (
+                b.power_eaf[t]
+                == b.steel_output[t] * b.specific_electricity_consumption_eaf
+            )
+
+        @self.b.Constraint(time_steps)
+        def eaf_lime_demand(b, t):
+            return b.lime_demand[t] == b.steel_output[t] * b.specific_lime_demand
+
+        @self.b.Constraint(time_steps)
+        def eaf_co2_emission(b, t):
+            return b.emission_eaf[t] == b.lime_demand[t] * self.model.lime_co2_factor
+
+        # Flexibility constraints
+        @self.b.Constraint(time_steps)
+        def ramp_up_eaf_constraint(b, t):
+            if t == 0:
+                return pyo.Constraint.Skip
+            return b.power_eaf[t] - b.power_eaf[t - 1] <= b.ramp_up_eaf
+
+        @self.b.Constraint(time_steps)
+        def ramp_down_eaf_constraint(b, t):
+            if t == 0:
+                return pyo.Constraint.Skip
+            return b.power_eaf[t - 1] - b.power_eaf[t] <= b.ramp_down_eaf
+
+        @self.b.Constraint(time_steps)
+        def min_operating_time_eaf_constraint(b, t):
+            if t == 0:
+                return pyo.Constraint.Skip  # No constraint for the first time step
+            # Calculate the time step duration dynamically
+            delta_t = t - (t - 1)
+            # Convert minimum operating time to the time unit of your choice
+            min_operating_time_units = int(self.min_operating_time / delta_t)
+
+            if t < min_operating_time_units:
+                # Ensure that the cumulative sum of DRI production over the past min_operating_time_units time steps is at least min_operating_time_units times the production at time step t
+                return (
+                    sum(
+                        b.steed_output[i]
+                        for i in range(t - min_operating_time_units + 1, t + 1)
+                    )
+                    >= min_operating_time_units * b.steel_output[t]
+                )
+            else:
+                return (
+                    sum(
+                        b.steel_output[i]
+                        for i in range(t - min_operating_time_units + 1, t + 1)
+                    )
+                    >= min_operating_time_units * b.steel_output[t]
+                )
+
+        @self.b.Constraint(time_steps)
+        def min_down_time_eaf_constraint(b, t):
+            if t == 0:
+                return pyo.Constraint.Skip  # No constraint for the first time step
+            # Calculate the time step duration dynamically
+            delta_t = t - (t - 1)
+            # Convert minimum downtime to the time unit of your choice
+            min_downtime_units = int(self.min_down_time / delta_t)
+
+            if t < min_downtime_units:
+                return (
+                    sum(b.steel_output[t - i] for i in range(min_downtime_units))
+                    >= min_downtime_units * b.steel_output[t]
+                )
+            else:
+                return (
+                    sum(b.steel_output[t - i] for i in range(min_downtime_units))
+                    >= min_downtime_units * b.steel_output[t]
+                )
+
+        # operational cost
+        @self.b.Constraint(time_steps)
+        def eaf_operating_cost_cosntraint(b, t):
+            # This constraint defines the steel output based on inputs and efficiency
+            return (
+                b.eaf_operating_cost[t]
+                == b.power_eaf[t] * self.model.electricity_price[t]
+                + b.emission_eaf[t] * self.model.co2_price
+                + b.lime_demand[t] * self.model.lime_price
+            )
