@@ -3,14 +3,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-from collections import defaultdict
-
+from datetime import datetime
 import pandas as pd
 import pyomo.environ as pyo
 from pyomo.environ import *
 
-from assume.common.forecasts import Forecaster
-
+# Residential Units
 
 class HeatPump:
     def __init__(
@@ -148,10 +146,69 @@ class AirConditioner:
         @self.b.Constraint(time_steps)
         def cooling_factor_constraint(b, t):
             return b.power_in[t] == b.cool_out[t] / b.cooling_factor
+        
+class Dishwasher:
+    def __init__(
+        self,
+        id: str,
+        model,
+        start_time_str: str,  # Start time as a string in the format "1/1/2019 0:00"
+        duration_hours: float,  # Duration of the job in hours
+        time_step_duration_minutes: float = 60,  # Duration of each time step in minutes
+        **kwargs,
+    ):
+        self.model = model
+        self.id = id
+        self.start_time_str = start_time_str
+        self.duration_hours = duration_hours
+        self.time_step_duration_minutes = time_step_duration_minutes
 
-    def define_objective(self):
-        # Define the objective function specific to HeatPump if needed
-        pass
+        # Convert start time string to datetime object
+        self.start_time = datetime.strptime(start_time_str, "%m/%d/%Y %H:%M")
+
+    def convert_start_time_to_time_step(self, index):
+        # Get the start time of the index (assuming index is a DatetimeIndex)
+        index_start_time = index[0]
+
+        # Calculate the time difference between start time and index start time
+        time_diff = self.start_time - index_start_time
+
+        # Convert time difference to minutes
+        time_diff_minutes = time_diff.total_seconds() / 60
+
+        # Convert minutes to time steps
+        time_step = int(round(time_diff_minutes / self.time_step_duration_minutes))
+
+        return time_step
+
+    def add_to_model(self, unit_block, index):
+        self.b = unit_block
+        self.define_parameters()
+        self.define_variables(index)
+        self.define_constraints(index)
+
+    def define_parameters(self) -> None:
+        pass  # Define any parameters needed for the dishwasher
+
+    def define_variables(self, index):
+        # Define variables for dishwasher operation
+        self.b.dishwasher_operation = pyo.Var(index, within=pyo.Binary)
+
+    def define_constraints(self, index) -> None:
+        # Define constraints for dishwasher operation
+        self.b.dishwasher_constraint = pyo.Constraint(index, rule=self.dishwasher_rule)
+
+    def dishwasher_rule(self, b, t):
+        # Rule for dishwasher operation
+        time_step_start = self.convert_start_time_to_time_step(self.index)
+        time_step_end = time_step_start + int(self.duration_hours * 60 / self.time_step_duration_minutes)
+
+        if time_step_start <= t <= time_step_end:
+            return b.dishwasher_operation[t] == 1
+        else:
+            return b.dishwasher_operation[t] == 0
+
+# Industrial Units
 
 class Electrolyser:
     def __init__(

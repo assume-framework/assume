@@ -48,7 +48,7 @@ def flexibility_cost_tolerance(self):
     
 def recalculate_with_accepted_offers(self):
     self.reference_power = self.forecaster[f"{self.id}_power"]
-    self.accepted_pos_capacity = self.forecaster[f"{self.id}_accepted_pos_res"]
+    self.accepted_pos_capacity = self.forecaster[f"{self.id}_power_steelneg"]  #_accepted_pos_res
 
     # Parameters
     self.model.reference_power = pyo.Param(
