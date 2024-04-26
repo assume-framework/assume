@@ -10,7 +10,7 @@ import pyomo.environ as pyo
 from pyomo.environ import value
 from pyomo.opt import SolverFactory, SolverStatus, TerminationCondition
 
-import assume.common.flexibility as flex
+import assume.strategies.dsm_flexibility as flex
 from assume.common.base import SupportsMinMax
 from assume.common.forecasts import OperationStatesForecaster, Forecaster, CsvForecaster
 from assume.units.dst_components import (
