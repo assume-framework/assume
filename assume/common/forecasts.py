@@ -381,7 +381,9 @@ class CsvForecaster(Forecaster):
         """
 
         try:
-            self.forecasts.to_csv(f"{path}/forecasts_df.csv", index=True) # operation_states_df.csv
+            self.forecasts.to_csv(
+                f"{path}/forecasts_df.csv", index=True
+            )  # operation_states_df.csv
         except ValueError:
             self.logger.error(
                 f"No forecasts for {self.market_id} provided, so none saved."
@@ -531,8 +533,11 @@ class NaiveForecast(Forecaster):
             value.index = self.index
         return pd.Series(value, self.index)
 
+
 class OperationStatesForecaster(Forecaster):
-    def __init__(self, index: pd.Series, operation_states: dict[str, pd.DataFrame] = None):
+    def __init__(
+        self, index: pd.Series, operation_states: dict[str, pd.DataFrame] = None
+    ):
         super().__init__(index)
         self.operation_states = operation_states if operation_states is not None else {}
 
@@ -568,12 +573,14 @@ class OperationStatesForecaster(Forecaster):
         # Check if the unit already exists in the operation_states dictionary
         if unit in self.operation_states:
             # Append the new data to the existing DataFrame for the unit
-            self.operation_states[unit] = pd.concat([self.operation_states[unit], data], axis=1)
+            self.operation_states[unit] = pd.concat(
+                [self.operation_states[unit], data], axis=1
+            )
         else:
             # Set the operational state data for the unit
             self.operation_states[unit] = data
 
-    def save_operation_states(self, unit,  path: str):
+    def save_operation_states(self, unit, path: str):
         """
         Saves the operation states data to a single CSV file located at the specified path.
 
