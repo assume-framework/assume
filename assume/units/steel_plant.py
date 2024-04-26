@@ -10,7 +10,7 @@ import pyomo.environ as pyo
 from pyomo.environ import value
 from pyomo.opt import SolverFactory, SolverStatus, TerminationCondition
 
-import assume.strategies.dsm_flexibility as flex
+# import assume.strategies.dsm_flexibility as flex
 from assume.common.base import SupportsMinMax
 from assume.common.forecasts import CsvForecaster, Forecaster, OperationStatesForecaster
 from assume.units.dst_components import (  # DriPlant,; DRIStorage,; ElectricArcFurnace,; GenericStorage,
@@ -79,10 +79,10 @@ class SteelPlant(SupportsMinMax):
         self.initialize_components(components)
         self.initialize_process_sequence()
         self.define_variables()
-        if self.objective == "max_flexibility":
-            flex.flexibility_cost_tolerance(self)
-        if self.objective == "recalculate":
-            flex.recalculate_with_accepted_offers(self)
+        # if self.objective == "max_flexibility":
+        #     flex.flexibility_cost_tolerance(self)
+        # if self.objective == "recalculate":
+        #     flex.recalculate_with_accepted_offers(self)
         self.define_constraints()
         self.define_objective()
 
