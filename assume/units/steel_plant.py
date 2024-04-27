@@ -13,7 +13,10 @@ from pyomo.opt import SolverFactory, SolverStatus, TerminationCondition
 # import assume.strategies.dsm_flexibility as flex
 from assume.common.base import SupportsMinMax
 from assume.common.forecasts import CsvForecaster, Forecaster, OperationStatesForecaster
-from assume.units.dst_components import (  # DriPlant,; DRIStorage,; ElectricArcFurnace,; GenericStorage,
+from assume.units.dst_components import (  # , GenericStorage
+    DriPlant,
+    DRIStorage,
+    ElectricArcFurnace,
     Electrolyser,
 )
 
@@ -23,9 +26,9 @@ logger = logging.getLogger(__name__)
 dst_components = {
     "electrolyser": Electrolyser,
     # "h2storage": GenericStorage,
-    # "dri_plant": DriPlant,
-    # "dri_storage": DRIStorage,
-    # "eaf": ElectricArcFurnace,
+    "dri_plant": DriPlant,
+    "dri_storage": DRIStorage,
+    "eaf": ElectricArcFurnace,
 }
 
 

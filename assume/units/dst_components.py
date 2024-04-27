@@ -581,3 +581,109 @@ class ElectricArcFurnace:
                 + b.emission_eaf[t] * self.model.co2_price
                 + b.lime_demand[t] * self.model.lime_price
             )
+
+
+class DRIStorage:
+    """
+    Represents a Direct Reduced Iron (DRI) storage unit.
+
+    Parameters:
+    - model: A Pyomo ConcreteModel object representing the optimization model.
+    - id: A unique identifier for the DRI storage unit.
+    - max_capacity: The maximum capacity of the DRI storage unit.
+    - min_capacity: The minimum capacity of the DRI storage unit.
+    - initial_soc: The initial state of charge (SOC) of the DRI storage unit.
+    - storage_loss_rate: The rate of DRI loss due to storage over time.
+    - charge_loss_rate: The rate of DRI loss during charging.
+    - discharge_loss_rate: The rate of DRI loss during discharging.
+
+    Constraints:
+    - storage_min_capacity_dri_constraint: Ensures the SOC of the DRI storage unit stays above the minimum capacity.
+    - storage_max_capacity_dri_constraint: Ensures the SOC of the DRI storage unit stays below the maximum capacity.
+    - energy_in_max_capacity_dri_constraint: Limits the charging of the DRI storage unit to its maximum capacity.
+    - energy_out_max_capacity_dri_constraint: Limits the discharging of the DRI storage unit to its maximum capacity.
+    - energy_in_uniformity_dri_constraint: Ensures uniformity in charging the DRI storage unit.
+    - energy_out_uniformity_dri_constraint: Ensures uniformity in discharging the DRI storage unit.
+    - storage_capacity_change_dri_constraint: Defines the change in SOC of the DRI storage unit over time.
+    """
+
+    def __init__(
+        self,
+        model,
+        id,
+        max_capacity,
+        min_capacity,
+        initial_soc,
+        storage_loss_rate,
+        charge_loss_rate,
+        discharge_loss_rate,
+        **kwargs,
+    ):
+        self.model = model
+        self.id = id
+        self.max_capacity = max_capacity
+        self.min_capacity = min_capacity
+        self.initial_soc = initial_soc
+        self.storage_loss_rate = storage_loss_rate
+        self.charge_loss_rate = charge_loss_rate
+        self.discharge_loss_rate = discharge_loss_rate
+
+    def add_to_model(self, unit_block, time_steps):
+        self.b = unit_block
+        self.define_parameters()
+        self.define_variables(time_steps)
+        self.define_constraints(time_steps)
+
+    def define_parameters(self):
+        self.b.max_capacity_dri = Param(initialize=self.max_capacity)
+        self.b.min_capacity_dri = Param(initialize=self.min_capacity)
+        self.b.initial_soc_dri = Param(initialize=self.initial_soc)
+        self.b.storage_loss_rate_dri = Param(initialize=self.storage_loss_rate)
+        self.b.charge_loss_rate_dri = Param(initialize=self.charge_loss_rate)
+        self.b.discharge_loss_rate_dri = Param(initialize=self.discharge_loss_rate)
+
+    def define_variables(self, time_steps):
+        self.b.soc_dri = Var(time_steps, within=NonNegativeReals)
+        self.b.uniformity_indicator_dri = Var(time_steps, within=Binary)
+
+        # Define the variables for power and hydrogen
+        self.b.charge_dri = Var(time_steps, within=NonNegativeReals)
+        self.b.discharge_dri = Var(time_steps, within=NonNegativeReals)
+
+    def define_constraints(self, time_steps):
+        @self.b.Constraint(time_steps)
+        def storage_min_capacity_dri_constraint(b, t):
+            return b.soc_dri[t] >= b.min_capacity_dri
+
+        @self.b.Constraint(time_steps)
+        def storage_max_capacity_dri_constraint(b, t):
+            return b.soc_dri[t] <= b.max_capacity_dri
+
+        @self.b.Constraint(time_steps)
+        def energy_in_max_capacity_dri_constraint(b, t):
+            return b.charge_dri[t] <= b.max_capacity_dri
+
+        @self.b.Constraint(time_steps)
+        def energy_out_max_capacity_dri_constraint(b, t):
+            return b.discharge_dri[t] <= b.max_capacity_dri
+
+        @self.b.Constraint(time_steps)
+        def energy_in_uniformity_dri_constraint(b, t):
+            return b.charge_dri[t] <= b.max_capacity_dri * b.uniformity_indicator_dri[t]
+
+        @self.b.Constraint(time_steps)
+        def energy_out_uniformity_dri_constraint(b, t):
+            return b.discharge_dri[t] <= b.max_capacity_dri * (
+                1 - b.uniformity_indicator_dri[t]
+            )
+
+        @self.b.Constraint(time_steps)
+        def storage_capacity_change_dri_constraint(b, t):
+            return b.soc_dri[t] == (
+                (
+                    (b.soc_dri[t - 1] if t > 0 else b.initial_soc_dri)
+                    * (1 - b.storage_loss_rate_dri)
+                )
+                + ((1 - b.charge_loss_rate_dri) * b.charge_dri[t])
+                - ((1 + b.discharge_loss_rate_dri) * b.discharge_dri[t])
+            )

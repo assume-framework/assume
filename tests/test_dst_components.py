@@ -8,7 +8,12 @@ import pytest
 from pyomo.core.base import Constraint
 from pyomo.environ import Boolean
 
-from assume.units.dst_components import DriPlant, ElectricArcFurnace, Electrolyser
+from assume.units.dst_components import (
+    DriPlant,
+    DRIStorage,
+    ElectricArcFurnace,
+    Electrolyser,
+)
 
 
 # Test Electrolyser class
@@ -226,6 +231,64 @@ def test_constraints_electric_arc_furnace(electric_arc_furnace_unit):
     assert hasattr(electric_arc_furnace_unit.b, "eaf_operating_cost_cosntraint")
 
 
+@pytest.fixture
+def dri_storage_unit() -> DRIStorage:
+    return DRIStorage(
+        model=pyo.ConcreteModel(),
+        id="Test_DRI_Storage",
+        max_capacity=1000,
+        min_capacity=100,
+        initial_soc=500,
+        storage_loss_rate=0.1,
+        charge_loss_rate=0.05,
+        discharge_loss_rate=0.07,
+        index=pd.date_range("2022-01-01", periods=4, freq="h"),
+    )
+
+
+def test_init_function(dri_storage_unit):
+    assert dri_storage_unit.id == "Test_DRI_Storage"
+    assert dri_storage_unit.max_capacity == 1000
+    assert dri_storage_unit.min_capacity == 100
+    assert dri_storage_unit.initial_soc == 500
+    assert dri_storage_unit.storage_loss_rate == 0.1
+    assert dri_storage_unit.charge_loss_rate == 0.05
+    assert dri_storage_unit.discharge_loss_rate == 0.07
+
+
+def test_add_to_model(dri_storage_unit):
+    dri_storage_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
+    assert hasattr(dri_storage_unit, "b")
+
+
+def test_parameters(dri_storage_unit):
+    dri_storage_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
+    assert hasattr(dri_storage_unit.b, "max_capacity_dri")
+    assert hasattr(dri_storage_unit.b, "min_capacity_dri")
+    assert hasattr(dri_storage_unit.b, "initial_soc_dri")
+    assert hasattr(dri_storage_unit.b, "storage_loss_rate_dri")
+    assert hasattr(dri_storage_unit.b, "charge_loss_rate_dri")
+    assert hasattr(dri_storage_unit.b, "discharge_loss_rate_dri")
+
+
+def test_variables(dri_storage_unit):
+    dri_storage_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
+    assert hasattr(dri_storage_unit.b, "soc_dri")
+    assert hasattr(dri_storage_unit.b, "uniformity_indicator_dri")
+    assert hasattr(dri_storage_unit.b, "charge_dri")
+    assert hasattr(dri_storage_unit.b, "discharge_dri")
+
+
+def test_constraints(dri_storage_unit):
+    dri_storage_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
+    assert hasattr(dri_storage_unit.b, "storage_min_capacity_dri_constraint")
+    assert hasattr(dri_storage_unit.b, "storage_max_capacity_dri_constraint")
+    assert hasattr(dri_storage_unit.b, "energy_in_max_capacity_dri_constraint")
+    assert hasattr(dri_storage_unit.b, "energy_out_max_capacity_dri_constraint")
+    assert hasattr(dri_storage_unit.b, "energy_in_uniformity_dri_constraint")
+    assert hasattr(dri_storage_unit.b, "energy_out_uniformity_dri_constraint")
+    assert hasattr(dri_storage_unit.b, "storage_capacity_change_dri_constraint")
+
+
 if __name__ == "__main__":
-    # Run pytest and enable prints
     pytest.main(["-s", __file__])
