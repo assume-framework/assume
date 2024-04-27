@@ -583,6 +583,120 @@ class ElectricArcFurnace:
             )
 
 
+class GenericStorage:
+    """
+    Represents a generic energy storage unit.
+
+    Attributes:
+        model: A Pyomo ConcreteModel object representing the optimization model.
+        id (str): A unique identifier for the storage unit.
+        max_capacity (float): The maximum storage capacity of the unit.
+        min_capacity (float): The minimum storage capacity of the unit.
+        initial_soc (float): The initial state of charge (SOC) of the storage unit.
+        storage_loss_rate (float): The rate of energy loss due to storage inefficiency.
+        charge_loss_rate (float): The rate of energy loss during charging.
+        discharge_loss_rate (float): The rate of energy loss during discharging.
+
+    Methods:
+        add_to_model(unit_block, time_steps):
+            Adds the storage unit to the optimization model.
+        define_parameters():
+            Defines the parameters of the storage unit in the optimization model.
+        define_variables(time_steps):
+            Defines the variables of the storage unit in the optimization model.
+        define_constraints(time_steps):
+            Defines the constraints of the storage unit in the optimization model.
+    """
+
+    def __init__(
+        self,
+        model,
+        id,
+        max_capacity,
+        min_capacity,
+        initial_soc,
+        storage_loss_rate,
+        charge_loss_rate,
+        discharge_loss_rate,
+        **kwargs,
+    ):
+        """
+        Initializes a GenericStorage object with the specified parameters.
+
+        Args:
+            model: A Pyomo ConcreteModel object representing the optimization model.
+            id (str): A unique identifier for the storage unit.
+            max_capacity (float): The maximum storage capacity of the unit.
+            min_capacity (float): The minimum storage capacity of the unit.
+            initial_soc (float): The initial state of charge (SOC) of the storage unit.
+            storage_loss_rate (float): The rate of energy loss due to storage inefficiency.
+            charge_loss_rate (float): The rate of energy loss during charging.
+            discharge_loss_rate (float): The rate of energy loss during discharging.
+            **kwargs: Additional keyword arguments.
+        """
+        self.model = model
+        self.id = id
+        self.max_capacity = max_capacity
+        self.min_capacity = min_capacity
+        self.initial_soc = initial_soc
+        self.storage_loss_rate = storage_loss_rate
+        self.charge_loss_rate = charge_loss_rate
+        self.discharge_loss_rate = discharge_loss_rate
+
+    def add_to_model(self, unit_block, time_steps):
+        self.b = unit_block
+        self.define_parameters()
+        self.define_variables(time_steps)
+        self.define_constraints(time_steps)
+
+    def define_parameters(self):
+        self.b.max_capacity = Param(initialize=self.max_capacity)
+        self.b.min_capacity = Param(initialize=self.min_capacity)
+        self.b.initial_soc = Param(initialize=self.initial_soc)
+        self.b.storage_loss_rate = Param(initialize=self.storage_loss_rate)
+        self.b.charge_loss_rate = Param(initialize=self.charge_loss_rate)
+        self.b.discharge_loss_rate = Param(initialize=self.discharge_loss_rate)
+
+    def define_variables(self, time_steps):
+        self.b.soc = Var(time_steps, within=NonNegativeReals)
+        self.b.uniformity_indicator = Var(time_steps, within=Binary)
+        self.b.charge = Var(time_steps, within=NonNegativeReals)
+        self.b.discharge = Var(time_steps, within=NonNegativeReals)
+
+    def define_constraints(self, time_steps):
+        @self.b.Constraint(time_steps)
+        def storage_min_capacity_constraint(b, t):
+            return b.soc[t] >= b.min_capacity
+
+        @self.b.Constraint(time_steps)
+        def storage_max_capacity_constraint(b, t):
+            return b.soc[t] <= b.max_capacity
+
+        @self.b.Constraint(time_steps)
+        def energy_in_max_capacity_constraint(b, t):
+            return b.charge[t] <= b.max_capacity
+
+        @self.b.Constraint(time_steps)
+        def energy_out_max_capacity_constraint(b, t):
+            return b.discharge[t] <= b.max_capacity
+
+        @self.b.Constraint(time_steps)
+        def energy_in_uniformity_constraint(b, t):
+            return b.charge[t] <= b.max_capacity * b.uniformity_indicator[t]
+
+        @self.b.Constraint(time_steps)
+        def energy_out_uniformity_constraint(b, t):
+            return b.discharge[t] <= b.max_capacity * (1 - b.uniformity_indicator[t])
+
+        @self.b.Constraint(time_steps)
+        def storage_capacity_change_constraint(b, t):
+            return b.soc[t] == (
+                ((b.soc[t - 1] if t > 0 else b.initial_soc) * (1 - b.storage_loss_rate))
+                + ((1 - b.charge_loss_rate) * b.charge[t])
+                - ((1 + b.discharge_loss_rate) * b.discharge[t])
+            )
+
+
 class DRIStorage:
     """
     Represents a Direct Reduced Iron (DRI) storage unit.

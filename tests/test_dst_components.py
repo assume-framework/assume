@@ -13,6 +13,7 @@ from assume.units.dst_components import (
     DRIStorage,
     ElectricArcFurnace,
     Electrolyser,
+    GenericStorage,
 )
 
 
@@ -288,6 +289,64 @@ def test_constraints(dri_storage_unit):
     assert hasattr(dri_storage_unit.b, "energy_in_uniformity_dri_constraint")
     assert hasattr(dri_storage_unit.b, "energy_out_uniformity_dri_constraint")
     assert hasattr(dri_storage_unit.b, "storage_capacity_change_dri_constraint")
+
+
+@pytest.fixture
+def generic_storage_unit() -> GenericStorage:
+    return GenericStorage(
+        model=pyo.ConcreteModel(),
+        id="Test_Generic_Storage",
+        max_capacity=1000,
+        min_capacity=100,
+        initial_soc=500,
+        storage_loss_rate=0.1,
+        charge_loss_rate=0.05,
+        discharge_loss_rate=0.07,
+    )
+
+
+def test_init_function(generic_storage_unit):
+    assert generic_storage_unit.id == "Test_Generic_Storage"
+    assert generic_storage_unit.max_capacity == 1000
+    assert generic_storage_unit.min_capacity == 100
+    assert generic_storage_unit.initial_soc == 500
+    assert generic_storage_unit.storage_loss_rate == 0.1
+    assert generic_storage_unit.charge_loss_rate == 0.05
+    assert generic_storage_unit.discharge_loss_rate == 0.07
+
+
+def test_add_to_model(generic_storage_unit):
+    generic_storage_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
+    assert hasattr(generic_storage_unit, "b")
+
+
+def test_parameters(generic_storage_unit):
+    generic_storage_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
+    assert hasattr(generic_storage_unit.b, "max_capacity")
+    assert hasattr(generic_storage_unit.b, "min_capacity")
+    assert hasattr(generic_storage_unit.b, "initial_soc")
+    assert hasattr(generic_storage_unit.b, "storage_loss_rate")
+    assert hasattr(generic_storage_unit.b, "charge_loss_rate")
+    assert hasattr(generic_storage_unit.b, "discharge_loss_rate")
+
+
+def test_variables(generic_storage_unit):
+    generic_storage_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
+    assert hasattr(generic_storage_unit.b, "soc")
+    assert hasattr(generic_storage_unit.b, "uniformity_indicator")
+    assert hasattr(generic_storage_unit.b, "charge")
+    assert hasattr(generic_storage_unit.b, "discharge")
+
+
+def test_constraints(generic_storage_unit):
+    generic_storage_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
+    assert hasattr(generic_storage_unit.b, "storage_min_capacity_constraint")
+    assert hasattr(generic_storage_unit.b, "storage_max_capacity_constraint")
+    assert hasattr(generic_storage_unit.b, "energy_in_max_capacity_constraint")
+    assert hasattr(generic_storage_unit.b, "energy_out_max_capacity_constraint")
+    assert hasattr(generic_storage_unit.b, "energy_in_uniformity_constraint")
+    assert hasattr(generic_storage_unit.b, "energy_out_uniformity_constraint")
+    assert hasattr(generic_storage_unit.b, "storage_capacity_change_constraint")
 
 
 if __name__ == "__main__":
