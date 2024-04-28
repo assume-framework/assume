@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 from datetime import datetime, timedelta
 
 import holidays
@@ -28,6 +29,8 @@ WEATHER_PARAMS_ECMWF = [
     "ghi",
     "wind_speed",
 ]
+
+log = logging.getLogger(__name__)
 
 
 class InfrastructureInterface:
@@ -560,7 +563,6 @@ class InfrastructureInterface:
             f'"EinheitBetriebsstatus" = 35 AND "Technologie" = 1537 AND "EinheitSystemstatus"=472 AND "Land"=84 '
             f'AND "Nettonennleistung" > 500'
         )
-        # print(query)
         # Get Data from Postgres
         with self.databases["mastr"].connect() as conn:
             df = pd.read_sql(query, conn)
@@ -569,7 +571,7 @@ class InfrastructureInterface:
         if df.empty:
             return df
 
-        print(df["name"])
+        log.info(df["name"])
         # set charge and discharge power
         df["PPlus_max"] = df["PPlus_max"].fillna(
             df["PMinus_max"]
@@ -852,7 +854,7 @@ def get_solar_series(solar_systems: pd.DataFrame, weather_df: pd.DataFrame):
 def get_pwp_agents(interface, areas):
     pwp_agents = []
     for area in areas:
-        print(area)
+        log.info(area)
         plants = False
         for fuel in ["lignite", "gas", "oil", "hard coal", "nuclear"]:
             df = interface.get_power_plant_in_area(area=area, fuel_type=fuel)
@@ -867,7 +869,7 @@ def get_pwp_agents(interface, areas):
 def get_res_agents(interface, areas):
     res_agents = []
     for area in areas:
-        print(area)
+        log.info(area)
         wind = interface.get_wind_turbines_in_area(area=area)
         solar = interface.get_solar_storage_systems_in_area(area=area)
         bio = interface.get_biomass_systems_in_area(area=area)
@@ -880,13 +882,12 @@ def get_res_agents(interface, areas):
 def get_storage_agents(interface, areas):
     str_agents = []
     for area in areas:
-        print(area)
+        log.info(area)
         str = interface.get_water_storage_systems(area)
         if str.empty:
             continue
-        # print(str['name'])
         if any(str["PMinus_max"] > 1) and any(str["VMax"] > 1):
-            print(f"add {area}")
+            log.info(f"add {area}")
             str_agents.append(area)
     return str_agents
 
