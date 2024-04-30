@@ -309,7 +309,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%'\nand learning_mode is true",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+'\nand learning_mode is true",
           "refId": "A",
           "select": [
             [
@@ -507,7 +507,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%'\nand evaluation_mode is true",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+'\nand evaluation_mode is true",
           "refId": "A",
           "select": [
             [
@@ -1241,7 +1241,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit' AND learning_mode is true",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true",
           "refId": "A",
           "select": [
             [
@@ -1472,7 +1472,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  regret\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit' AND learning_mode is true",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  regret\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true",
           "refId": "A",
           "select": [
             [
@@ -1708,7 +1708,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit' and evaluation_mode is True",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+' AND\n      unit = '$rl_unit' and evaluation_mode is True",
           "refId": "A",
           "select": [
             [
@@ -1922,7 +1922,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  profit\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit' AND learning_mode is true",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  profit\nFROM rl_params\nWHERE simulation ~ '^${simulation}_[1-9]+'  AND\n      unit = '$rl_unit' AND learning_mode is true",
           "refId": "A",
           "select": [
             [
@@ -2730,7 +2730,7 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT DISTINCT unit\nFROM rl_params\nwhere simulation like '${simulation}' || '_%'",
+        "definition": "SELECT DISTINCT unit\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+'",
         "description": "All units that have an reinforcment learning strategy and hence have the Rl specific parameteres logged",
         "hide": 0,
         "includeAll": false,
@@ -2738,7 +2738,7 @@
         "multi": false,
         "name": "rl_unit",
         "options": [],
-        "query": "SELECT DISTINCT unit\nFROM rl_params\nwhere simulation like '${simulation}' || '_%'",
+        "query": "SELECT DISTINCT unit\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+'",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
