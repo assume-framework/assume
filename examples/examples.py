@@ -96,26 +96,6 @@ if __name__ == "__main__":
         study_case=availabe_examples[example]["study_case"],
     )
 
-    # to add custom bidding strategies, you need to import them
-    # and add them to the world as follows:
-    # from custom_bidding_strategy import CustomBiddingStrategy
-    # world.bidding_strategies["custom_bidding_strategy"] = CustomBiddingStrategy
-
-    # to add a custom unit type, you need to import it
-    # and add it to the world as follows:
-    # from custom_unit import CustomUnit
-    # world.unit_types["custom_unit"] = CustomUnit
-
-    # next you need to load and add the custom units to the scenario
-    # from assume import load_custom_units
-    # load_custom_units(
-    #     world,
-    #     inputs_path="examples/inputs",
-    #     scenario=availabe_examples[example]["scenario"],
-    #     file_name="custom_units",
-    #     unit_type="custom_unit",
-    # )
-
     if world.learning_config.get("learning_mode", False):
         # run learning if learning mode is enabled
         run_learning(

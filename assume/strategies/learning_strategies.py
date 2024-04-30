@@ -206,10 +206,9 @@ class RLStrategy(LearningStrategy):
             if self.collect_initial_experience_mode:
                 # define current action as soley noise
                 noise = (
-                    # th.normal(
-                    #     mean=0.0, std=0.2, size=(1, self.act_dim), dtype=self.float_type
-                    # )
-                    self.action_noise.noise()
+                    th.normal(
+                        mean=0.0, std=0.2, size=(1, self.act_dim), dtype=self.float_type
+                    )
                     .to(self.device)
                     .squeeze()
                 )
@@ -445,7 +444,7 @@ class RLStrategy(LearningStrategy):
         # store results in unit outputs which are written to database by unit operator
         unit.outputs["profit"].loc[start:end_excl] += profit
         unit.outputs["reward"].loc[start:end_excl] = reward
-        unit.outputs["regret"].loc[start:end_excl] = opportunity_cost
+        unit.outputs["regret"].loc[start:end_excl] = regret_scale * opportunity_cost
         unit.outputs["total_costs"].loc[start:end_excl] = costs
 
     def load_actor_params(self, load_path):

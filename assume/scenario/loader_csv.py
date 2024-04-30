@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -720,6 +721,9 @@ def run_learning(
         device=world.learning_role.device,
         float_type=world.learning_role.float_type,
     )
+
+    max_eval = world.learning_role.max_eval
+
     actors_and_critics = None
     world.output_role.del_similar_runs()
 
@@ -760,6 +764,7 @@ def run_learning(
 
         world.learning_role.buffer = buffer
         world.learning_role.episodes_done = episode
+        world.learning_role.max_eval = max_eval
 
         if episode > world.learning_role.episodes_collecting_initial_experience:
             world.learning_role.turn_off_initial_exploration()

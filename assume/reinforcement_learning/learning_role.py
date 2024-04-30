@@ -261,5 +261,5 @@ class Learning(Role):
         if first_has_new_max:
             self.rl_algorithm.save_params(directory=self.trained_policies_save_path)
             logger.info(
-                f"Policies saved, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
+                f"Policies saved, episode: {self.eval_episodes_done}, {metric=}, value={value:.2f}"
             )
