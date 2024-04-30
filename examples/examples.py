@@ -61,8 +61,8 @@ availabe_examples = {
         "study_case": "base"
     },
     "small_learning_1_lstm": {
-        "scenario": "example_02a_lstm",
-        "study_case": "base"
+        "scenario": "example_02a",
+        "study_case": "base_lstm"
     },
     "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
     "small_learning_3": {"scenario": "example_02c", "study_case": "dam"},
@@ -88,6 +88,7 @@ if __name__ == "__main__":
     world = World(database_uri=db_uri, export_csv_path=csv_path)
 
     # load scenario
+    # TODO: loop over examples
     load_scenario_folder(
         world,
         inputs_path="examples/inputs",
