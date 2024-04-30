@@ -206,9 +206,10 @@ class RLStrategy(LearningStrategy):
             if self.collect_initial_experience_mode:
                 # define current action as soley noise
                 noise = (
-                    th.normal(
-                        mean=0.0, std=0.2, size=(1, self.act_dim), dtype=self.float_type
-                    )
+                    # th.normal(
+                    #     mean=0.0, std=0.2, size=(1, self.act_dim), dtype=self.float_type
+                    # )
+                    self.action_noise.noise()
                     .to(self.device)
                     .squeeze()
                 )
