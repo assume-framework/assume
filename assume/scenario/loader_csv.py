@@ -793,6 +793,7 @@ def run_learning(
             avg_reward = np.mean(total_rewards)
             # check reward improvement in validation run
             # and store best run in eval folder
+            world.learning_role.eval_episodes_done = eval_episode
             world.learning_role.compare_and_save_policies({"avg_reward": avg_reward})
 
             eval_episode += 1
