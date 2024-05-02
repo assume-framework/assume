@@ -182,7 +182,7 @@ if __name__ == "__main__":
         case "storage_hvdc":
             network = pypsa.examples.storage_hvdc(True)
         case _:
-            print("invalid studycase")
+            log.info(f"invalid studycase: {study_case}")
             network = pd.DataFrame()
 
     study_case += market_mechanism
