@@ -25,7 +25,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 4,
+  "id": 3,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -51,7 +51,7 @@
         "content": "# Welcome to ASSUMES Learning Dashboard\n",
         "mode": "markdown"
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
           "datasource": {
@@ -96,7 +96,7 @@
       "description": "",
       "gridPos": {
         "h": 10,
-        "w": 6,
+        "w": 5,
         "x": 0,
         "y": 2
       },
@@ -110,7 +110,7 @@
         "content": "#### Introduction\n\nHere we visualize the results of the reinforcement learning process for the specified units that use a learning strategy. \nReinforcement Learning is a machine learning paradigm where an agent learns to make a sequence of decisions in an environment to maximize a reward signal. \nThe agent explores the environment, takes actions, and receives feedback in the form of rewards. \nThe goal is to learn a strategy (policy) that guides the agent to make actions that lead to the highest cumulative reward over time. \nTo better understand the agent's learning process, we use visualizations that illustrate key aspects of its journey.",
         "mode": "markdown"
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
           "datasource": {
@@ -156,8 +156,8 @@
       "description": "",
       "gridPos": {
         "h": 10,
-        "w": 18,
-        "x": 6,
+        "w": 19,
+        "x": 5,
         "y": 2
       },
       "id": 12,
@@ -167,10 +167,10 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "#### How to use the dashboard\n\nThis interactive tool is designed to help you gain insights into the learning journey of our reinforcement learning (RL) agent. \nTo understand the dashboard take note of the following three points:\n\n##### 1. Division of the Dashboard:\nThe dashboard is divided into two parts. \nThe upper part summarizes the results for all learning units over all simulated episodes. \nThe lower part focuses the results on specific units and episodes, which you can select according to the second point.\n\n\n##### 2. Selection of Metrics and Simulation Subsets:\nThe dashboard is devided in system wide plots and specific plots for certain episodes, timeframes and learning units.\nOn the top of the dashboard, you'll find a list of available choices for the episode of the simualtion and a list of RL units. \nChoose the ones you're interested in by selecting their names in the list. The selected metrics will be displayed on the choice-specific visualization area.\n\n\n##### 3. Interaction with Plots:\nThe plots are interactive. You can zoom in and out, click on data points to view specific details etc.\nIn the upper left corner of each plot you find additional information about the depicted data.\n\nIf you need some guidance for interpreting the results, you can orient yourself on the follwing steps:\n\n1. Understand Learning Trends: \nObserve how reward, exploration, and other metrics change over time. \nLook for trends such as increasing rewards, decreasing episode length, and changes in exploration patterns.\n2. Examine Policy and Action Patterns: \nVisualize the agent's learned policy and action distribution. \nDarker shades indicate preferred actions, while lighter shades show less preferred ones.\n3. Monitor Learning Curve and Loss: \nKeep an eye on the learning curve to see how the agent's performance evolves. \nIf applicable, check the loss curve to understand the convergence of the learning algorithm.\n4. Track Success Rate: \nIf success/failure in an auction is relevant, track the success rate plot to gauge the agent's success in completing a trade. \nNote that sometimes the circumstances might not allow a successfull trade.\n5. Compare Different Strategies: \nIf multiple algorithms or learning parameter sets are available, use the comparison plot to assess their performance. \nSelect the ones you want to compare, and observe how their learning trajectories differ.\n6. Experiment and Learn: \nUse this tool to experiment with different settings and learn about RL agent behavior. \nIt's a great way to develop a deeper understanding of reinforcement learning concepts.",
+        "content": "#### How to use the dashboard\n\nThis interactive tool is designed to help you gain insights into the learning journey of our reinforcement learning (RL) agent. \nTo understand the dashboard take note of the following three points:\n\n##### 1. Division of the Dashboard:\nThe dashboard is divided into two parts. \nThe upper part summarizes the results for all learning units over all simulated episodes. \nThe lower part focuses the results on specific units and episodes, which you can select according to the second point.\n\n\n##### 2. Selection of Metrics and Simulation Subsets:\nThe dashboard is devided in system wide plots and specific plots for certain episodes, timeframes and learning units.\nOn the top of the dashboard, you'll find a list of available choices for the episode of the simualtion and a list of RL units. \nChoose the ones you're interested in by selecting their names in the list. The selected metrics will be displayed on the choice-specific visualization area.\n\n\n##### 3. Interaction with Plots:\nThe plots are interactive. You can zoom in and out, click on data points to view specific details etc.\nIn the upper left corner of each plot you find additional information about the depicted data.\n\nIf you need some guidance for interpreting the results, you can orient yourself on the follwing steps:\n\n1. Understand Learning Trends: \nObserve how reward, regret, and other metrics change over time. \nLook for trends such as increasing rewards, or decreasing regret. Take note of the evaluation runs, which are done every x episodes. There the exploration isturned off and a \"normal run\" with the currently learned policies is made. \nWhile the reward in all learning episodes can fluctuate you should see a clear rising trend in the evaluation reward. the \n2. Examine Policy and Action Patterns: \nVisualize the agent's learned policy and action distribution. Do you see some pattern in the agents actions. Do these patterns make sense with regard to your domain knowledge?\n5. Compare Different Strategies: \nFor an easy comparison we introduced the ASSUME Comparison dashboard. There you can easily compare two runs with and without learning. Analyse different behaviour of the agents there. \n6. Experiment and Learn: \nUse this tool to experiment with different settings and learn about RL agent behavior. \nIt's a great way to develop a deeper understanding of RL concepts.",
         "mode": "markdown"
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
           "datasource": {
@@ -232,6 +232,7 @@
             "mode": "thresholds"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -246,6 +247,9 @@
             "lineWidth": 1,
             "scaleDistribution": {
               "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
             }
           },
           "mappings": [],
@@ -275,6 +279,7 @@
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
+        "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
           "calcs": [],
@@ -304,7 +309,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%'\nand learning_mode is true",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+'\nand learning_mode is true",
           "refId": "A",
           "select": [
             [
@@ -362,7 +367,7 @@
           ]
         }
       ],
-      "title": "Average reward of all learning units",
+      "title": "Average REWARD of all learning units",
       "transformations": [
         {
           "id": "calculateField",
@@ -425,6 +430,7 @@
             "mode": "thresholds"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -439,6 +445,9 @@
             "lineWidth": 1,
             "scaleDistribution": {
               "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
             }
           },
           "mappings": [],
@@ -468,6 +477,7 @@
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
+        "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
           "calcs": [],
@@ -497,7 +507,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%'\nand evaluation_mode is true",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation ~ '^${simulation}_eval_[1-9]+'\nand evaluation_mode is true",
           "refId": "A",
           "select": [
             [
@@ -555,7 +565,7 @@
           ]
         }
       ],
-      "title": "Average evaluation reward of all learning units",
+      "title": "Average EVALUATION REWARD of all learning units",
       "transformations": [
         {
           "id": "calculateField",
@@ -618,6 +628,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -631,6 +642,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -754,7 +766,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "-- this query creates a cumulative sum of the reward until now\r\nSELECT \r\n  $__timeGroupAlias(datetime,$__interval),\r\n  'episode ' || episode AS \"episode\",\r\n  sum(sum(reward)) OVER (PARTITION BY episode ORDER BY datetime) AS \"reward\"\r\nFROM\r\n  rl_params\r\nWHERE\r\n  $__timeFilter(datetime) \r\n  and simulation like '${simulation}' || '_%'\r\nGROUP BY 1, datetime, episode\r\nORDER BY 1",
+          "rawSql": "-- this query creates a cumulative sum of the reward until now\r\nSELECT \r\n  $__timeGroupAlias(datetime,$__interval),\r\n  'episode ' || episode AS \"episode\",\r\n  sum(sum(reward)) OVER (PARTITION BY episode ORDER BY datetime) AS \"reward\"\r\nFROM\r\n  rl_params\r\nWHERE\r\n  $__timeFilter(datetime) \r\n  and (simulation ~ '^${simulation}_[1-9]+' OR simulation ~ '^${simulation}_eval_[1-9]+')\r\nGROUP BY 1, datetime, episode\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -778,8 +790,7 @@
           ]
         }
       ],
-      "title": "Cumulative avergage REWARD over all Units per episode",
-      "transformations": [],
+      "title": "Cumulative average REWARD over all units per episode",
       "type": "timeseries"
     },
     {
@@ -793,6 +804,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -806,6 +818,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -827,7 +840,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -893,7 +907,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT \r\n  $__timeGroupAlias(datetime,$__interval),\r\n  'episode ' || episode AS \"episode\",\r\n  sum(sum(profit)) OVER (PARTITION BY episode ORDER BY datetime) AS \"profit\"\r\nFROM\r\n  rl_params\r\nWHERE\r\n  $__timeFilter(datetime)\r\n  and simulation like '${simulation}' || '_%'\r\nGROUP BY 1, datetime, episode\r\nORDER BY 1",
+          "rawSql": "SELECT \r\n  $__timeGroupAlias(datetime,$__interval),\r\n  'episode ' || episode AS \"episode\",\r\n  sum(sum(profit)) OVER (PARTITION BY episode ORDER BY datetime) AS \"profit\"\r\nFROM\r\n  rl_params\r\nWHERE\r\n  $__timeFilter(datetime)\r\n  and (simulation ~ '^${simulation}_[1-9]+' OR simulation ~ '^${simulation}_eval_[1-9]+')\r\nGROUP BY 1, datetime, episode\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -917,7 +931,7 @@
           ]
         }
       ],
-      "title": "Cumulative avergage PROFIT over all Units per episode",
+      "title": "Cumulative average PROFIT over all units per episode",
       "type": "timeseries"
     },
     {
@@ -932,7 +946,9 @@
           },
           "custom": {
             "align": "auto",
-            "displayMode": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
             "inspect": false
           },
           "mappings": [],
@@ -940,7 +956,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1056,7 +1073,9 @@
       },
       "id": 6,
       "options": {
+        "cellHeight": "sm",
         "footer": {
+          "countRows": false,
           "fields": "",
           "reducer": [
             "sum"
@@ -1066,7 +1085,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
           "datasource": {
@@ -1077,7 +1096,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT \r\n*\r\nFROM rl_params\r\nlimit 50;\r\n  \r\n",
+          "rawSql": "SELECT \r\n*\r\nFROM rl_params TABLESAMPLE BERNOULLI(1)\r\nwhere simulation ~ '^${simulation}_[1-9]+'\r\nlimit 50;",
           "refId": "A",
           "select": [
             [
@@ -1101,7 +1120,7 @@
           ]
         }
       ],
-      "title": "Exemplary Subset of RL Parameters",
+      "title": "Exemplary subset of RL parameters",
       "type": "table"
     },
     {
@@ -1119,7 +1138,7 @@
     },
     {
       "datasource": {
-        "type": "postgres",
+        "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
       "fieldConfig": {
@@ -1128,6 +1147,7 @@
             "mode": "thresholds"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -1142,6 +1162,9 @@
             "lineWidth": 1,
             "scaleDistribution": {
               "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
             }
           },
           "mappings": [],
@@ -1149,7 +1172,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1186,6 +1210,7 @@
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
+        "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
           "calcs": [],
@@ -1211,11 +1236,12 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "table",
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit'",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true",
           "refId": "A",
           "select": [
             [
@@ -1261,6 +1287,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "rl_params",
           "timeColumn": "index",
           "timeColumnType": "timestamp",
@@ -1273,7 +1316,7 @@
           ]
         }
       ],
-      "title": "Avg. reward of unit $rl_unit",
+      "title": "Avg. REWARD of unit $rl_unit",
       "transformations": [
         {
           "id": "calculateField",
@@ -1326,7 +1369,7 @@
     },
     {
       "datasource": {
-        "type": "postgres",
+        "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
       "fieldConfig": {
@@ -1335,6 +1378,7 @@
             "mode": "thresholds"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -1349,6 +1393,9 @@
             "lineWidth": 1,
             "scaleDistribution": {
               "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
             }
           },
           "mappings": [],
@@ -1356,7 +1403,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1393,6 +1441,7 @@
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
+        "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
           "calcs": [],
@@ -1418,11 +1467,12 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "table",
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  regret\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit'",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  regret\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true",
           "refId": "A",
           "select": [
             [
@@ -1468,6 +1518,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "rl_params",
           "timeColumn": "index",
           "timeColumnType": "timestamp",
@@ -1480,7 +1547,7 @@
           ]
         }
       ],
-      "title": "Avg. regret of unit $rl_unit",
+      "title": "Avg. REGRET of unit $rl_unit",
       "transformations": [
         {
           "id": "calculateField",
@@ -1548,6 +1615,7 @@
             "mode": "thresholds"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -1562,6 +1630,9 @@
             "lineWidth": 1,
             "scaleDistribution": {
               "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
             }
           },
           "mappings": [],
@@ -1607,6 +1678,7 @@
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
+        "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
           "calcs": [],
@@ -1636,7 +1708,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit' and evaluation_mode is True",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation ~ '^${simulation}_eval_[1-9]+' AND\n      unit = '$rl_unit' and evaluation_mode is True",
           "refId": "A",
           "select": [
             [
@@ -1694,7 +1766,7 @@
           ]
         }
       ],
-      "title": "Avg.evaluation  reward of unit $rl_unit",
+      "title": "Avg. EVALUATION REWARD of unit $rl_unit",
       "transformations": [
         {
           "id": "calculateField",
@@ -1747,7 +1819,7 @@
     },
     {
       "datasource": {
-        "type": "postgres",
+        "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
       "fieldConfig": {
@@ -1756,6 +1828,7 @@
             "mode": "thresholds"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -1770,6 +1843,9 @@
             "lineWidth": 1,
             "scaleDistribution": {
               "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
             }
           },
           "mappings": [],
@@ -1815,6 +1891,7 @@
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
+        "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
           "calcs": [],
@@ -1840,11 +1917,12 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "table",
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  profit\nFROM rl_params\nwhere simulation like '${simulation}' || '_%' AND\n      unit = '$rl_unit'",
+          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  profit\nFROM rl_params\nWHERE simulation ~ '^${simulation}_[1-9]+'  AND\n      unit = '$rl_unit' AND learning_mode is true",
           "refId": "A",
           "select": [
             [
@@ -1890,6 +1968,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "rl_params",
           "timeColumn": "index",
           "timeColumnType": "timestamp",
@@ -1902,7 +1997,7 @@
           ]
         }
       ],
-      "title": "Total profit of unit $rl_unit",
+      "title": "Total PROFIT of unit $rl_unit",
       "transformations": [
         {
           "id": "calculateField",
@@ -1967,7 +2062,7 @@
     },
     {
       "datasource": {
-        "type": "postgres",
+        "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
       "fieldConfig": {
@@ -1976,6 +2071,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -1989,6 +2085,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "stepAfter",
             "lineWidth": 1,
             "pointSize": 5,
@@ -2010,7 +2107,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2027,7 +2125,8 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "action_Pinflex learning_scenario_1_base_1"
+                  "action_Pinflex example_02a_base_1",
+                  "action_Pinflex example_02a_base_6"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -2071,11 +2170,12 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n    case\n    when actions_0 >= actions_1 then actions_1\n    when actions_0 < actions_1 then actions_0 \n  end as \"action_Pinflex\",\n  case\n    when actions_0 >= actions_1 then actions_1 + exploration_noise_1\n    when actions_0 < actions_1 then actions_0 + exploration_noise_0\n  end as \"noisy_action_Pinflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime)\n  and simulation like '${simulation}' || '_%' AND\n  unit = '$rl_unit'\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n    case\n    when actions_0 >= actions_1 then actions_1\n    when actions_0 < actions_1 then actions_0 \n  end as \"noisy_action_Pinflex\",\n  case\n    when actions_0 >= actions_1 then GREATEST(-1, LEAST(1, actions_1 - exploration_noise_1))\n    when actions_0 < actions_1 then GREATEST(-1, LEAST(1, actions_0 - exploration_noise_0))\n  end as \"action_Pinflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime)\n  and (simulation ~ '^${simulation}_[1-9]+' OR simulation ~ '^${simulation}_eval_[1-9]+') AND\n  unit = '$rl_unit'\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2087,6 +2187,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -2100,12 +2217,11 @@
         }
       ],
       "title": "Normalized Action values - P_inflex",
-      "transformations": [],
       "type": "timeseries"
     },
     {
       "datasource": {
-        "type": "postgres",
+        "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
       "fieldConfig": {
@@ -2114,6 +2230,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -2127,6 +2244,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "stepAfter",
             "lineWidth": 1,
             "pointSize": 5,
@@ -2148,7 +2266,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2165,8 +2284,8 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "action_Pflex learning_scenario_1_base_1",
-                  "noisy_action_Pflex learning_scenario_1_base_1"
+                  "action_Pflex example_02a_base_1",
+                  "noisy_action_Pflex example_02a_base_2"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -2210,11 +2329,12 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  case\n    when actions_0 <= actions_1 then actions_1\n    when actions_0 > actions_1 then actions_0 \n  end as \"action_Pflex\",\n  case\n    when actions_0 <= actions_1 then actions_1 + exploration_noise_1\n    when actions_0 > actions_1 then actions_0 + exploration_noise_0\n  end as \"noisy_action_Pflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime)\n  and simulation like '${simulation}' || '_%' AND\n  unit = '$rl_unit'\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  case\n    when actions_0 <= actions_1 then actions_1\n    when actions_0 > actions_1 then actions_0 \n  end as \"noisy_action_Pflex\",\n  case\n    when actions_0 <= actions_1 then GREATEST(-1, LEAST(1, actions_1 - exploration_noise_1)) \n    when actions_0 > actions_1 then GREATEST(-1, LEAST(1, actions_0 - exploration_noise_0))\n  end as \"action_Pflex\",\n  simulation AS \"simulation\"\nFROM rl_params\nWHERE\n  $__timeFilter(datetime)\n  and (simulation ~ '^${simulation}_[1-9]+' OR simulation ~ '^${simulation}_eval_[1-9]+') AND\n  unit = '$rl_unit'\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2226,6 +2346,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -2239,7 +2376,6 @@
         }
       ],
       "title": "Normalized Action values - P_flex",
-      "transformations": [],
       "type": "timeseries"
     },
     {
@@ -2254,6 +2390,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -2267,6 +2404,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -2301,7 +2439,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
+        "h": 3,
         "w": 2,
         "x": 0,
         "y": 93
@@ -2368,6 +2506,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -2381,6 +2520,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -2415,7 +2555,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
+        "h": 3,
         "w": 2,
         "x": 2,
         "y": 93
@@ -2482,6 +2622,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -2495,6 +2636,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -2529,7 +2671,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
+        "h": 3,
         "w": 2,
         "x": 4,
         "y": 93
@@ -2586,17 +2728,16 @@
       "type": "timeseries"
     }
   ],
-  "refresh": false,
-  "schemaVersion": 37,
-  "style": "dark",
+  "refresh": "",
+  "schemaVersion": 39,
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
           "selected": false,
-          "text": "learning_scenario_1_base",
-          "value": "learning_scenario_1_base"
+          "text": "example_02a_base",
+          "value": "example_02a_base"
         },
         "datasource": {
           "type": "postgres",
@@ -2626,7 +2767,7 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT DISTINCT unit\nFROM rl_params\nwhere simulation like '${simulation}' || '_%'",
+        "definition": "SELECT DISTINCT unit\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+'",
         "description": "All units that have an reinforcment learning strategy and hence have the Rl specific parameteres logged",
         "hide": 0,
         "includeAll": false,
@@ -2634,8 +2775,35 @@
         "multi": false,
         "name": "rl_unit",
         "options": [],
-        "query": "SELECT DISTINCT unit\nFROM rl_params\nwhere simulation like '${simulation}' || '_%'",
+        "query": "SELECT DISTINCT unit\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+'",
         "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "1551402000000"
+          ],
+          "value": [
+            "1551402000000"
+          ]
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "P7B13B9DF907EC40C"
+        },
+        "definition": "",
+        "hide": 2,
+        "includeAll": false,
+        "multi": false,
+        "name": "timeRange",
+        "options": [],
+        "query": "SELECT MIN(datetime), MAX(datetime) FROM rl_params",
+        "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "sort": 0,
@@ -2644,8 +2812,8 @@
     ]
   },
   "time": {
-    "from": "2019-03-10T22:06:13.914Z",
-    "to": "2019-03-11T20:17:49.579Z"
+    "from": "2019-02-28T23:00:00.000Z",
+    "to": "2019-03-01T22:59:59.000Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -2661,6 +2829,6 @@
   "timezone": "",
   "title": "Assume: Training progress",
   "uid": "JKQzx0q4k",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }

@@ -13,6 +13,8 @@ One can differentiate between support policies which influence the available mar
 
 If the product_type is `energy`, the volume used for the contract can not be additionally bid on the EOM.
 
+All the support policies are only available when using a Market with the MarketMechanism :meth:`assume.markets.clearing_algorithms.contracts.PayAsBidContractRole`
+
 
 Example Policies
 =====================================
@@ -61,7 +63,7 @@ It allows to influence the financial flow of plants which would not be profitabl
 Contract for Differences - CfD
 ------------------------------
 
-A fixed LCoE is set as a price, if an Agent accepts the CfD contract,
+A fixed LCoE (Levelized Cost of Energy) is set as a price, if an Agent accepts the CfD contract,
 it has to bid at the hourly EOM - the difference of the market result is paid/received to/from the contractor.
 
 
