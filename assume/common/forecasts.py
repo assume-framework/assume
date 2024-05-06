@@ -431,9 +431,12 @@ class CsvForecaster(Forecaster):
         Args:
             path (str): The path to save the operation states data to.
         """
+
+        os.makedirs(path, exist_ok=True)
+
         # Concatenate all operation states dataframes along the columns axis
-        concatenated_data = pd.concat(self.operation_states.values(), axis=0)
-        concatenated_data.index = self.index
+        df = self.operation_states[unit]
+        df.index = self.index
         # Check if the CSV file already exists
         csv_file = (
             f"{path}/{unit}_operation_states{'_with_flex' if flexibility else ''}.csv"

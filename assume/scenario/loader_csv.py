@@ -85,27 +85,25 @@ def load_file(
                 df.index, pd.DatetimeIndex
             ):
                 logger.warning(
-                    f"{file_name}: simulation time line does not match length of dataframe and index is not a datetimeindex."
+                    f"{file_name}: simulation time line does not match length of dataframe and index is not a datetimeindex. Returning None."
                 )
-                raise ValueError
+                return None
 
             df.index.freq = df.index.inferred_freq
 
             if len(df.index) < len(index) and df.index.freq == index.freq:
                 logger.warning(
-                    f"{file_name}: simulation time line is longer than length of the dataframe."
+                    f"{file_name}: simulation time line is longer than length of the dataframe. Returning None."
                 )
-                raise ValueError
+                return None
 
             if df.index.freq < index.freq:
                 df = df.resample(index.freq).mean()
                 logger.info(f"Downsampling {file_name} successful.")
 
             elif df.index.freq > index.freq or len(df.index) < len(index):
-                logger.warning(
-                    f"{file_name}: frequency of dataframe is higher than index."
-                )
-                raise ValueError
+                logger.warning("Upsampling not implemented yet. Returning None.")
+                return None
 
             df = df.loc[index]
 
@@ -481,13 +479,13 @@ async def load_scenario_folder_async(
     )
     forecaster.set_forecast(forecasts_df)
 
-    forecasts_df = load_file(
-        path=path,
-        config=config,
-        file_name="operation_states_df",
-        index=index,
-    )
-    forecaster.set_forecast(forecasts_df)
+    # forecasts_df = load_file(
+    #     path=path,
+    #     config=config,
+    #     file_name="operation_states_df",
+    #     index=index,
+    # )
+    # forecaster.set_forecast(forecasts_df)
 
     demand_df = load_file(
         path=path,
