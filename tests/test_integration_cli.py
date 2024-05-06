@@ -4,12 +4,18 @@
 
 import pytest
 
-from cli import cli
+from assume_cli.cli import cli
 
 
 @pytest.mark.slow
 def test_cli():
     args = "-s example_01a -c tiny -db sqlite:///./examples/local_db/test_mini.db"
+    cli(args.split(" "))
+
+
+@pytest.mark.slow
+def test_cli_network():
+    args = "-s example_01d -c base -db sqlite:///./examples/local_db/test_mini.db"
     cli(args.split(" "))
 
 

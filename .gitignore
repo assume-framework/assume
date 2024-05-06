@@ -140,7 +140,7 @@ dmypy.json
 local_db
 assume-db
 forecasts_df.csv
-examples/inputs/learned_strategies
+learned_strategies
 examples/outputs
 
 examples/notebooks/inputs

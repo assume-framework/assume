@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 import os
 import shutil
 from datetime import datetime, timedelta
@@ -14,15 +15,19 @@ from assume import World
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.scenario.oeds.infrastructure import InfrastructureInterface
-from assume.strategies.dmas_powerplant import DmasPowerplantStrategy
+
+log = logging.getLogger(__name__)
 
 
 async def load_oeds_async(
     world: World,
     scenario: str,
     study_case: str,
+    start: datetime,
+    end: datetime,
     infra_uri: str,
     marketdesign: list[MarketConfig],
+    bidding_strategies: dict[str, str],
     nuts_config: list[str] = [],
 ):
     """
@@ -39,16 +44,13 @@ async def load_oeds_async(
         marketdesign (list[MarketConfig]): description of the market design which will be used with the scenario
         nuts_config (list[str], optional): list of NUTS areas from which the simulation data is taken. Defaults to [].
     """
-    year = 2019
-    start = datetime(year, 1, 1)
-    end = datetime(year + 1, 1, 1) - timedelta(hours=1)
     index = pd.date_range(
         start=start,
         end=end,
         freq="h",
     )
     sim_id = f"{scenario}_{study_case}"
-    print(f"loading scenario {sim_id}")
+    log.info(f"loading scenario {sim_id}")
     infra_interface = InfrastructureInterface("test", infra_uri)
 
     if not nuts_config:
@@ -79,27 +81,12 @@ async def load_oeds_async(
         "co2": 20,
     }
 
-    default_strategy = {mc.market_id: "naive_eom" for mc in marketdesign}
-
-    world.bidding_strategies["dmas_pwp"] = DmasPowerplantStrategy
-    bidding_strategies = {
-        "hard coal": default_strategy,
-        "lignite": default_strategy,
-        "oil": default_strategy,
-        "gas": default_strategy,
-        "biomass": default_strategy,
-        "nuclear": default_strategy,
-        "wind": default_strategy,
-        "solar": default_strategy,
-        "demand": default_strategy,
-    }
-
     # for each area - add demand and generation
     for area in nuts_config:
-        print(f"loading config {area} for {year}")
+        log.info(f"loading config {area} for {year}")
         config_path = Path.home() / ".assume" / f"{area}_{year}"
         if not config_path.is_dir():
-            print(f"query database time series")
+            log.info(f"query database time series")
             demand = infra_interface.get_demand_series_in_area(area, year)
             demand = demand.resample("h").mean()
             # demand in MW
@@ -113,12 +100,12 @@ async def load_oeds_async(
                 demand.to_csv(config_path / "demand.csv")
                 solar.to_csv(config_path / "solar.csv")
                 if isinstance(wind, float):
-                    print(wind, area, year)
+                    log.info(wind, area, year)
                 wind.to_csv(config_path / "wind.csv")
             except Exception:
                 shutil.rmtree(config_path, ignore_errors=True)
         else:
-            print(f"use existing local time series")
+            log.info("use existing local time series")
             demand = pd.read_csv(config_path / "demand.csv", index_col=0).squeeze()
             solar = pd.read_csv(config_path / "solar.csv", index_col=0).squeeze()
             wind = pd.read_csv(config_path / "wind.csv", index_col=0).squeeze()
@@ -140,6 +127,7 @@ async def load_oeds_async(
                 "technology": "demand",
                 "location": (lat, lon),
                 "node": area,
+                "price": 1e3,
             },
             NaiveForecast(index, demand=sum_demand),
         )
@@ -217,37 +205,6 @@ async def load_oeds_async(
                 )
 
 
-def load_oeds(
-    world: World,
-    scenario: str,
-    study_case: str,
-    infra_uri: str,
-    marketdesign: list[MarketConfig],
-    nuts_config: list[str] = [],
-):
-    """
-    Load a scenario from a given path.
-
-    Args:
-        world (World): the world to add the oeds scenario to
-        scenario (str): the scenario name of the simulation
-        study_case (str): the study case name of the simulation
-        infra_uri (str): database uri for the infrastructure
-        marketdesign (list[MarketConfig]): the list of marketconfigs, which form the market design
-        nuts_config (list[str], optional): The list of NUTS areas which are loaded in the scenario. Defaults to [].
-    """
-    world.loop.run_until_complete(
-        load_oeds_async(
-            world=world,
-            scenario=scenario,
-            study_case=study_case,
-            infra_uri=infra_uri,
-            marketdesign=marketdesign,
-            nuts_config=nuts_config,
-        )
-    )
-
-
 if __name__ == "__main__":
     db_uri = "postgresql://assume:assume@localhost:5432/assume"
     world = World(database_uri=db_uri)
@@ -260,17 +217,48 @@ if __name__ == "__main__":
     )
 
     nuts_config = ["DE1", "DEA", "DEB", "DEC", "DED", "DEE", "DEF"]
+    year = 2019
+    start = datetime(year, 1, 1)
+    end = datetime(year + 1, 1, 1) - timedelta(hours=1)
     marketdesign = [
         MarketConfig(
             "EOM",
             rr.rrule(rr.HOURLY, interval=24, dtstart=start, until=end),
             timedelta(hours=1),
-            "pay_as_clear",
+            "pay_as_clear_complex_dmas",
             [MarketProduct(timedelta(hours=1), 24, timedelta(hours=1))],
             additional_fields=["block_id", "link", "exclusive_id"],
             maximum_bid_volume=1e9,
             maximum_bid_price=1e9,
         )
     ]
-    load_oeds(world, scenario, study_case, infra_uri, marketdesign, nuts_config)
+
+    default_strategy = {mc.market_id: "dmas_powerplant" for mc in marketdesign}
+    default_naive_strategy = {mc.market_id: "naive_eom" for mc in marketdesign}
+
+    bidding_strategies = {
+        "hard coal": default_strategy,
+        "lignite": default_strategy,
+        "oil": default_strategy,
+        "gas": default_strategy,
+        "biomass": default_strategy,
+        "nuclear": default_strategy,
+        "wind": default_naive_strategy,
+        "solar": default_naive_strategy,
+        "demand": default_naive_strategy,
+    }
+    world.loop.run_until_complete(
+        load_oeds_async(
+            world,
+            scenario,
+            study_case,
+            start,
+            end,
+            infra_uri,
+            marketdesign,
+            bidding_strategies,
+            nuts_config,
+        )
+    )
+
     world.run()
