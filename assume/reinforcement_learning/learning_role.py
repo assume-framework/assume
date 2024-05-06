@@ -45,6 +45,8 @@ class Learning(Role):
         self.buffer: ReplayBuffer = None
         self.obs_dim = learning_config["observation_dimension"]
         self.act_dim = learning_config["action_dimension"]
+        self.early_stopping_steps = learning_config["early_stopping_steps"]
+        self.early_stopping_threshold = learning_config["early_stopping_threshold"]
         self.episodes_done = 0
         self.rl_strats: dict[int, LearningStrategy] = {}
         self.rl_algorithm = learning_config["algorithm"]
@@ -250,3 +252,17 @@ class Learning(Role):
                     logger.info(
                         f"New best policy saved, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
                     )
+
+            # if we do not see any improvment in the last x evaluation runs we stop the training
+            if len(self.rl_eval[metric]) >= self.early_stopping_steps:
+                avg_change = (
+                    max(self.rl_eval[metric][: self.early_stopping_steps])
+                    - min(self.rl_eval[metric][: self.early_stopping_steps])
+                ) / max(self.rl_eval[metric][: self.early_stopping_steps])
+
+                if avg_change < (1 + self.early_stopping_threshold):
+                    logger.info(
+                        f"Stopping training as no improvement above {self.early_stopping_threshold} in last {self.early_stopping_steps} evaluations for {metric}"
+                    )
+                    return True
+            return False

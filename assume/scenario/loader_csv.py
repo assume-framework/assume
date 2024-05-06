@@ -806,10 +806,16 @@ def run_learning(
             avg_reward = np.mean(total_rewards)
             # check reward improvement in evaluation run
             # and store best run in eval folder
-            world.learning_role.compare_and_save_policies({"avg_reward": avg_reward})
+            terminate = world.learning_role.compare_and_save_policies(
+                {"avg_reward": avg_reward}
+            )
 
             max_eval = world.learning_role.max_eval
             all_eval = world.learning_role.rl_eval
+
+            # if we have not improved in the last 5 evaluations, we stop
+            if terminate:
+                break
 
             eval_episode += 1
         world.reset()
