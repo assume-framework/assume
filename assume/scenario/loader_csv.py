@@ -763,7 +763,9 @@ def run_learning(
 
         # -----------------------------------------
         # Give the newly initliazed learning role the needed information across episodes
+        last_policies_path = save_path + "/last_eval_policies"
         world.learning_role.initialize_policy(actors_and_critics=actors_and_critics)
+        # worl.learning_startegies intitalize policy
         world.learning_role.buffer = buffer
         world.learning_role.episodes_done = episode
         # -----------------------------------------
@@ -775,15 +777,16 @@ def run_learning(
 
         # they are change implicitly anyhow do to our function call
         actors_and_critics = world.learning_role.rl_algorithm.extract_policy()
+        #
+        # save current params in training path
+
+        world.learning_role.rl_algorithm.save_params(directory=last_policies_path)
 
         # evaluation run:
         if (
             episode % validation_interval == 0
             and episode > world.learning_role.episodes_collecting_initial_experience
         ):
-            # save current params in training path
-            last_policies_path = save_path + "/last_eval_policies"
-            world.learning_role.rl_algorithm.save_params(directory=last_policies_path)
             world.reset()
 
             # load evaluation run
