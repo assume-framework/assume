@@ -12,7 +12,6 @@ from pyomo.opt import SolverFactory, SolverStatus, TerminationCondition
 
 # import assume.strategies.dsm_flexibility as flex
 from assume.common.base import SupportsMinMax
-from assume.common.forecasts import CsvForecaster, Forecaster, OperationStatesForecaster
 from assume.units.dst_components import (
     DriPlant,
     DRIStorage,
@@ -297,13 +296,10 @@ class SteelPlant(SupportsMinMax):
             t: (value(self.model.variable_cost[t])) for t in self.model.time_steps
         }
 
-        # Instantiate an OperationStatesForecaster object
-        operation_states_forecaster = OperationStatesForecaster(index=self.index)
-
         for time_step, power_input in total_power_input.items():
             unit_id = self.id
             prefixed_total_power_input = {f"{unit_id}_power": [power_input]}
-            operation_states_forecaster.set_operation_states(
+            self.forecaster.set_operation_states(
                 time_step, pd.DataFrame(prefixed_total_power_input, index=[0])
             )
 
@@ -316,21 +312,21 @@ class SteelPlant(SupportsMinMax):
             prefixed_electrolyser_power_input = {
                 f"{unit_id}_electrolyser": electrolyser_power_input_value
             }
-            operation_states_forecaster.set_operation_states(
+            self.forecaster.set_operation_states(
                 t, pd.DataFrame(prefixed_electrolyser_power_input, index=[0])
             )
 
             # DRI power input
             dri_power_input_value = value(self.components["dri_plant"].b.power_dri[t])
             prefixed_dri_power_input = {f"{unit_id}_dri": dri_power_input_value}
-            operation_states_forecaster.set_operation_states(
+            self.forecaster.set_operation_states(
                 t, pd.DataFrame(prefixed_dri_power_input, index=[0])
             )
 
             # EAF power input
             eaf_power_input_value = value(self.components["eaf"].b.power_eaf[t])
             prefixed_eaf_power_input = {f"{unit_id}_eaf": eaf_power_input_value}
-            operation_states_forecaster.set_operation_states(
+            self.forecaster.set_operation_states(
                 t, pd.DataFrame(prefixed_eaf_power_input, index=[0])
             )
 
@@ -339,7 +335,7 @@ class SteelPlant(SupportsMinMax):
             prefixed_eaf_steel_output = {
                 f"{unit_id}_steel_output": eaf_steel_output_value
             }
-            operation_states_forecaster.set_operation_states(
+            self.forecaster.set_operation_states(
                 t, pd.DataFrame(prefixed_eaf_steel_output, index=[0])
             )
 
@@ -347,7 +343,7 @@ class SteelPlant(SupportsMinMax):
                 # DRI Storage
                 dri_charge_value = value(self.components["dri_storage"].b.charge_dri[t])
                 prefixed_dri_charge_value = {f"{unit_id}_dri_charge": dri_charge_value}
-                operation_states_forecaster.set_operation_states(
+                self.forecaster.set_operation_states(
                     t, pd.DataFrame(prefixed_dri_charge_value, index=[0])
                 )
 
@@ -357,13 +353,13 @@ class SteelPlant(SupportsMinMax):
                 prefixed_dri_discharge_value = {
                     f"{unit_id}_dri_discharge": dri_discharge_value
                 }
-                operation_states_forecaster.set_operation_states(
+                self.forecaster.set_operation_states(
                     t, pd.DataFrame(prefixed_dri_discharge_value, index=[0])
                 )
 
                 dri_soc_value = value(self.components["dri_storage"].b.soc_dri[t])
                 prefixed_dri_soc_value = {f"{unit_id}_dri_soc": dri_soc_value}
-                operation_states_forecaster.set_operation_states(
+                self.forecaster.set_operation_states(
                     t, pd.DataFrame(prefixed_dri_soc_value, index=[0])
                 )
 
@@ -371,19 +367,19 @@ class SteelPlant(SupportsMinMax):
                 # H2 Storage
                 charge_value = value(self.components["h2storage"].b.charge[t])
                 prefixed_charge_value = {f"{unit_id}_h2_charge": charge_value}
-                operation_states_forecaster.set_operation_states(
+                self.forecaster.set_operation_states(
                     t, pd.DataFrame(prefixed_charge_value, index=[0])
                 )
 
                 discharge_value = value(self.components["h2storage"].b.discharge[t])
                 prefixed_discharge_value = {f"{unit_id}_h2_discharge": discharge_value}
-                operation_states_forecaster.set_operation_states(
+                self.forecaster.set_operation_states(
                     t, pd.DataFrame(prefixed_discharge_value, index=[0])
                 )
 
                 soc_value = value(self.components["h2storage"].b.soc[t])
                 prefixed_soc_value = {f"{unit_id}_h2_soc": soc_value}
-                operation_states_forecaster.set_operation_states(
+                self.forecaster.set_operation_states(
                     t, pd.DataFrame(prefixed_soc_value, index=[0])
                 )
 
@@ -393,12 +389,12 @@ class SteelPlant(SupportsMinMax):
             prefixed_total_variable_cost = {
                 f"{unit_id}_variable_cost": [total_variable_cost]
             }
-            operation_states_forecaster.set_operation_states(
+            self.forecaster.set_operation_states(
                 time_step, pd.DataFrame(prefixed_total_variable_cost, index=[0])
             )
 
         # Save the operation states data to a CSV file
-        operation_states_forecaster.save_operation_states(
+        self.forecaster.save_operation_states(
             path="C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04", unit=unit_id
         )
 
@@ -445,9 +441,6 @@ class SteelPlant(SupportsMinMax):
         variable_costs = {
             t: value(self.model.variable_cost[t]) for t in self.model.time_steps
         }
-
-        # Instantiate an OperationStatesForecaster object
-        operation_states_forecaster = OperationStatesForecaster(index=self.index)
 
         # Loop over time steps
         for time_step in self.model.time_steps:
@@ -499,7 +492,7 @@ class SteelPlant(SupportsMinMax):
             }
 
             # Save marginal costs in the operation states
-            operation_states_forecaster.set_operation_states(
+            self.forecaster.set_operation_states(
                 time_step,
                 pd.DataFrame(
                     {f"{unit_id}_marginal_cost": [marginal_cost_per_unit_power]},
@@ -556,13 +549,13 @@ class SteelPlant(SupportsMinMax):
                 index=[0],
             )
 
-            operation_states_forecaster.set_operation_states(
-                time_step, operation_states_data
-            )
+            self.forecaster.set_operation_states(time_step, operation_states_data)
 
         # Save the operation states data to a CSV file
-        operation_states_forecaster.save_operation_states_with_flex(
-            path="C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04", unit=unit_id
+        self.forecaster.save_operation_states(
+            path="C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04",
+            unit=unit_id,
+            flexibility=True,
         )
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:

@@ -116,43 +116,82 @@ def load_file(
         return None
 
 
-def load_dsm_units(path: str, config: dict, file_name: str) -> pd.DataFrame:
+def load_dsm_units(
+    path: str,
+    config: dict,
+    file_name: str,
+) -> pd.DataFrame:
+    """
+    Loads and processes a CSV file containing DSM unit data, where each unit may consist of multiple components
+    (technologies) under the same plant name. The function groups data by plant name, processes each group to
+    handle different technologies, and organizes the data into a structured DataFrame.
+
+    Parameters:
+        path (str): The directory path where the CSV file is located.
+        config (dict): Configuration dictionary, potentially used for specifying additional options or behaviors
+                       (not used in the current implementation but provides flexibility for future enhancements).
+        file_name (str): The name of the CSV file to be loaded.
+
+    Returns:
+        pd.DataFrame: A DataFrame where each row represents a plant with its components organized into nested
+                      dictionaries under the 'components' column. Each plant's common attributes like unit operator
+                      and objective are directly in the row.
+
+    Notes:
+        - The CSV file is expected to have columns such as 'name', 'technology', and other operational parameters.
+        - The function assumes that the first non-null value in common and bidding columns is representative if multiple
+          entries exist for the same plant.
+        - It is crucial that the input CSV file follows the expected structure for the function to process it correctly.
+
+    Example:
+        >>> dsm_units_df = load_dsm_units('/path/to/directory', {}, 'example.csv')
+        >>> print(dsm_units_df.head())
+
+    This will output a DataFrame where each row corresponds to a different plant, with details about each technology
+    component structured within the row.
+    """
+
     dsm_units = load_file(
         path=path,
         config=config,
         file_name=file_name,
     )
-    # convert dsm_units into a components dict where each technology has values with non nan values
-    columns = ["unit_operator", "objective", "demand", "cost_tolerance"]
+
+    if dsm_units is None:
+        return None
+
+    # Define columns that are common across different technologies within the same plant
+    common_columns = ["unit_operator", "objective", "demand", "cost_tolerance"]
+    bidding_columns = [col for col in dsm_units.columns if col.startswith("bidding_")]
+
+    # Initialize the dictionary to hold the final structured data
     dsm_units_dict = {}
-    for name, data in dsm_units.groupby(dsm_units.index):
+
+    # Process each group of components by plant name
+    for name, group in dsm_units.groupby(dsm_units.index):
         dsm_unit = {}
-        # add other columns to dsm_unit
-        dsm_unit.update(data[columns].iloc[0].to_dict())
-        # remove the columns from the dataframe
-        data = data.drop(columns=columns)
 
-        # also add all values from columns starting with bidding_
-        for key, value in data.items():
-            if key.startswith("bidding_"):
-                dsm_unit[key] = value.iloc[0]
-                # remove the column from the dataframe
-                data = data.drop(columns=[key])
+        # Aggregate or select appropriate data for common and bidding columns
+        # We take the first non-null entry
+        for col in common_columns + bidding_columns:
+            non_null_values = group[col].dropna()
+            if not non_null_values.empty:
+                dsm_unit[col] = non_null_values.iloc[0]
 
+        # Process each technology within the plant
         components = {}
-        for tech in data["technology"].unique():
-            tech_df = data[data["technology"] == tech]
-            tech_df = tech_df.dropna(axis=1, how="all")
-            # drop technology column
-            tech_df = tech_df.drop(columns=["technology"])
-            components[tech] = tech_df.to_dict(orient="records")[0]
+        for tech, tech_data in group.groupby("technology"):
+            # Clean the technology-specific data: drop all-NaN columns and 'technology' column
+            cleaned_data = tech_data.dropna(axis=1, how="all").drop(
+                columns=["technology"]
+            )
+            components[tech] = cleaned_data.to_dict(orient="records")[0]
 
         dsm_unit["components"] = components
-
         dsm_units_dict[name] = dsm_unit
 
+    # Convert the structured dictionary into a DataFrame
     dsm_units = pd.DataFrame.from_dict(dsm_units_dict, orient="index")
-
     return dsm_units
 
 
