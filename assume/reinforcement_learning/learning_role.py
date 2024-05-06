@@ -233,23 +233,20 @@ class Learning(Role):
             logger.error("tried to save policies but did not get any metrics")
             return
         # if the current values are a new max in one of the metrics - we store them in the default folder
-        first_has_new_max = False
 
         # add current reward to list of all rewards
         for metric, value in metrics.items():
             self.rl_eval[metric].append(value)
             if self.rl_eval[metric][-1] > self.max_eval[metric]:
                 self.max_eval[metric] = self.rl_eval[metric][-1]
-                if metric == list(metrics.keys())[0]:
-                    first_has_new_max = True
-                # store the best for our current metric in its folder
-                self.rl_algorithm.save_params(
-                    directory=f"{self.trained_policies_save_path}/{metric}"
-                )
 
-        # use last metric as default
-        if first_has_new_max:
-            self.rl_algorithm.save_params(directory=self.trained_policies_save_path)
-            logger.info(
-                f"Policies saved, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
-            )
+                # use first metric as default
+                if metric == list(metrics.keys())[0]:
+                    # store the best for our current metric in its folder
+                    self.rl_algorithm.save_params(
+                        directory=f"{self.trained_policies_save_path}/{metric}_eval_policies"
+                    )
+
+                    logger.info(
+                        f"New best policy saved, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
+                    )
