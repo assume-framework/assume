@@ -13,7 +13,6 @@ import pandas as pd
 from mango import Role
 from mango.messages.message import Performatives
 
-from assume.common.base import BaseUnit
 from assume.common.market_objects import (
     ClearingMessage,
     DataRequestMessage,
@@ -29,6 +28,7 @@ from assume.common.utils import (
     timestamp2datetime,
 )
 from assume.strategies import BaseStrategy, LearningStrategy
+from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
 

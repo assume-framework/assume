@@ -14,7 +14,7 @@ from pyomo.opt import SolverFactory, TerminationCondition, check_available_solve
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.markets.base_market import MarketRole
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 SOLVERS = ["gurobi", "glpk"]
 EPS = 1e-4
