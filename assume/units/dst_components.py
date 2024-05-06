@@ -2,14 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import logging
-from datetime import datetime
-
-import pandas as pd
 import pyomo.environ as pyo
-from pyomo.environ import *
-
-# Industrial Units
 
 
 class Electrolyser:
@@ -84,18 +77,18 @@ class Electrolyser:
         self.define_constraints(time_steps)
 
     def define_parameters(self):
-        self.b.rated_power = Param(initialize=self.rated_power)
-        self.b.min_power = Param(initialize=self.min_power)
-        self.b.ramp_up = Param(initialize=self.ramp_up)
-        self.b.ramp_down = Param(initialize=self.ramp_down)
-        self.b.min_operating_time = Param(initialize=self.min_operating_time)
-        self.b.min_down_time = Param(initialize=self.min_down_time)
-        self.b.efficiency = Param(initialize=self.efficiency)
+        self.b.rated_power = pyo.Param(initialize=self.rated_power)
+        self.b.min_power = pyo.Param(initialize=self.min_power)
+        self.b.ramp_up = pyo.Param(initialize=self.ramp_up)
+        self.b.ramp_down = pyo.Param(initialize=self.ramp_down)
+        self.b.min_operating_time = pyo.Param(initialize=self.min_operating_time)
+        self.b.min_down_time = pyo.Param(initialize=self.min_down_time)
+        self.b.efficiency = pyo.Param(initialize=self.efficiency)
 
     def define_variables(self, time_steps):
-        self.b.power_in = Var(time_steps, within=pyo.NonNegativeReals)
-        self.b.hydrogen_out = Var(time_steps, within=pyo.NonNegativeReals)
-        self.b.electricity_cost = Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.power_in = pyo.Var(time_steps, within=pyo.pyo.NonNegativeReals)
+        self.b.hydrogen_out = pyo.Var(time_steps, within=pyo.pyo.NonNegativeReals)
+        self.b.electricity_cost = pyo.Var(time_steps, within=pyo.pyo.NonNegativeReals)
 
     def define_constraints(self, time_steps):
         # Power bounds constraints
@@ -123,7 +116,7 @@ class Electrolyser:
 
             """
             if t == 0:
-                return Constraint.Skip
+                return pyo.Constraint.Skip
             return b.power_in[t] - b.power_in[t - 1] <= b.ramp_up
 
         # Ramp-down constraint
@@ -134,7 +127,7 @@ class Electrolyser:
 
             """
             if t == 0:
-                return Constraint.Skip
+                return pyo.Constraint.Skip
             return b.power_in[t - 1] - b.power_in[t] <= b.ramp_down
 
         @self.b.Constraint(time_steps)
@@ -255,34 +248,34 @@ class DriPlant:
         self.define_constraints(time_steps)
 
     def define_parameters(self):
-        self.b.specific_hydrogen_consumption = Param(
+        self.b.specific_hydrogen_consumption = pyo.Param(
             initialize=self.specific_hydrogen_consumption
         )
-        self.b.specific_natural_gas_consumption = Param(
+        self.b.specific_natural_gas_consumption = pyo.Param(
             initialize=self.specific_natural_gas_consumption
         )
-        self.b.specific_electricity_consumption_dri = Param(
+        self.b.specific_electricity_consumption_dri = pyo.Param(
             initialize=self.specific_electricity_consumption
         )
-        self.b.specific_iron_ore_consumption = Param(
+        self.b.specific_iron_ore_consumption = pyo.Param(
             initialize=self.specific_iron_ore_consumption
         )
         # Flexibility parameters
-        self.b.min_power_dri = Param(initialize=self.min_power)
-        self.b.rated_power_dri = Param(initialize=self.rated_power)
-        self.b.ramp_up_dri = Param(initialize=self.ramp_up)
-        self.b.ramp_down_dri = Param(initialize=self.ramp_down)
-        self.b.min_operating_time_dri = Param(initialize=self.min_operating_time)
-        self.b.min_down_time_dri = Param(initialize=self.min_down_time)
+        self.b.min_power_dri = pyo.Param(initialize=self.min_power)
+        self.b.rated_power_dri = pyo.Param(initialize=self.rated_power)
+        self.b.ramp_up_dri = pyo.Param(initialize=self.ramp_up)
+        self.b.ramp_down_dri = pyo.Param(initialize=self.ramp_down)
+        self.b.min_operating_time_dri = pyo.Param(initialize=self.min_operating_time)
+        self.b.min_down_time_dri = pyo.Param(initialize=self.min_down_time)
 
     def define_variables(self, time_steps):
-        self.b.iron_ore_in = Var(time_steps, within=NonNegativeReals)
-        self.b.natural_gas_in = Var(time_steps, within=NonNegativeReals)
-        self.b.dri_operating_cost = Var(time_steps, within=NonNegativeReals)
-        self.b.hydrogen_in = Var(time_steps, within=NonNegativeReals)
-        self.b.operational_status = Var(time_steps, within=Binary)
-        self.b.dri_output = Var(time_steps, within=NonNegativeReals)
-        self.b.power_dri = Var(time_steps, within=NonNegativeReals)
+        self.b.iron_ore_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.natural_gas_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.dri_operating_cost = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.hydrogen_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.operational_status = pyo.Var(time_steps, within=pyo.Binary)
+        self.b.dri_output = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.power_dri = pyo.Var(time_steps, within=pyo.NonNegativeReals)
 
     def define_constraints(self, time_steps):
         @self.b.Constraint(time_steps)
@@ -325,14 +318,14 @@ class DriPlant:
         @self.b.Constraint(time_steps)
         def ramp_up_dri_constraint(b, t):
             if t == 0:
-                return Constraint.Skip
+                return pyo.Constraint.Skip
             else:
                 return b.power_dri[t] - b.power_dri[t - 1] <= b.ramp_up_dri
 
         @self.b.Constraint(time_steps)
         def ramp_down_dri_constraint(b, t):
             if t == 0:
-                return Constraint.Skip
+                return pyo.Constraint.Skip
             else:
                 return b.power_dri[t - 1] - b.power_dri[t] <= b.ramp_down_dri
 
@@ -459,26 +452,28 @@ class ElectricArcFurnace:
         self.define_constraints(time_steps)
 
     def define_parameters(self):
-        self.b.rated_power_eaf = Param(initialize=self.rated_power)
-        self.b.min_power_eaf = Param(initialize=self.min_power)
-        self.b.specific_electricity_consumption_eaf = Param(
+        self.b.rated_power_eaf = pyo.Param(initialize=self.rated_power)
+        self.b.min_power_eaf = pyo.Param(initialize=self.min_power)
+        self.b.specific_electricity_consumption_eaf = pyo.Param(
             initialize=self.specific_electricity_consumption
         )
-        self.b.specific_dri_demand = Param(initialize=self.specific_dri_demand)
-        self.b.specific_lime_demand = Param(initialize=self.specific_lime_demand)
+        self.b.specific_dri_demand = pyo.Param(initialize=self.specific_dri_demand)
+        self.b.specific_lime_demand = pyo.Param(initialize=self.specific_lime_demand)
         # Flexibility parameters
-        self.b.ramp_up_eaf = pyo.Param(initialize=self.ramp_up)
-        self.b.ramp_down_eaf = pyo.Param(initialize=self.ramp_down)
-        self.b.min_operating_time_eaf = pyo.Param(initialize=self.min_operating_time)
-        self.b.min_down_time_eaf = pyo.Param(initialize=self.min_down_time)
+        self.b.ramp_up_eaf = pyo.pyo.Param(initialize=self.ramp_up)
+        self.b.ramp_down_eaf = pyo.pyo.Param(initialize=self.ramp_down)
+        self.b.min_operating_time_eaf = pyo.pyo.Param(
+            initialize=self.min_operating_time
+        )
+        self.b.min_down_time_eaf = pyo.pyo.Param(initialize=self.min_down_time)
 
     def define_variables(self, time_steps):
-        self.b.power_eaf = Var(time_steps, within=NonNegativeReals)
-        self.b.dri_input = Var(time_steps, within=NonNegativeReals)
-        self.b.steel_output = Var(time_steps, within=NonNegativeReals)
-        self.b.eaf_operating_cost = Var(time_steps, within=NonNegativeReals)
-        self.b.emission_eaf = Var(time_steps, within=NonNegativeReals)
-        self.b.lime_demand = Var(time_steps, within=NonNegativeReals)
+        self.b.power_eaf = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.dri_input = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.steel_output = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.eaf_operating_cost = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.emission_eaf = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.lime_demand = pyo.Var(time_steps, within=pyo.NonNegativeReals)
 
     def define_constraints(self, time_steps):
         # Power bounds constraints
@@ -650,18 +645,18 @@ class GenericStorage:
         self.define_constraints(time_steps)
 
     def define_parameters(self):
-        self.b.max_capacity = Param(initialize=self.max_capacity)
-        self.b.min_capacity = Param(initialize=self.min_capacity)
-        self.b.initial_soc = Param(initialize=self.initial_soc)
-        self.b.storage_loss_rate = Param(initialize=self.storage_loss_rate)
-        self.b.charge_loss_rate = Param(initialize=self.charge_loss_rate)
-        self.b.discharge_loss_rate = Param(initialize=self.discharge_loss_rate)
+        self.b.max_capacity = pyo.Param(initialize=self.max_capacity)
+        self.b.min_capacity = pyo.Param(initialize=self.min_capacity)
+        self.b.initial_soc = pyo.Param(initialize=self.initial_soc)
+        self.b.storage_loss_rate = pyo.Param(initialize=self.storage_loss_rate)
+        self.b.charge_loss_rate = pyo.Param(initialize=self.charge_loss_rate)
+        self.b.discharge_loss_rate = pyo.Param(initialize=self.discharge_loss_rate)
 
     def define_variables(self, time_steps):
-        self.b.soc = Var(time_steps, within=NonNegativeReals)
-        self.b.uniformity_indicator = Var(time_steps, within=Binary)
-        self.b.charge = Var(time_steps, within=NonNegativeReals)
-        self.b.discharge = Var(time_steps, within=NonNegativeReals)
+        self.b.soc = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.uniformity_indicator = pyo.Var(time_steps, within=pyo.Binary)
+        self.b.charge = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.discharge = pyo.Var(time_steps, within=pyo.NonNegativeReals)
 
     def define_constraints(self, time_steps):
         @self.b.Constraint(time_steps)
@@ -749,20 +744,20 @@ class DRIStorage:
         self.define_constraints(time_steps)
 
     def define_parameters(self):
-        self.b.max_capacity_dri = Param(initialize=self.max_capacity)
-        self.b.min_capacity_dri = Param(initialize=self.min_capacity)
-        self.b.initial_soc_dri = Param(initialize=self.initial_soc)
-        self.b.storage_loss_rate_dri = Param(initialize=self.storage_loss_rate)
-        self.b.charge_loss_rate_dri = Param(initialize=self.charge_loss_rate)
-        self.b.discharge_loss_rate_dri = Param(initialize=self.discharge_loss_rate)
+        self.b.max_capacity_dri = pyo.Param(initialize=self.max_capacity)
+        self.b.min_capacity_dri = pyo.Param(initialize=self.min_capacity)
+        self.b.initial_soc_dri = pyo.Param(initialize=self.initial_soc)
+        self.b.storage_loss_rate_dri = pyo.Param(initialize=self.storage_loss_rate)
+        self.b.charge_loss_rate_dri = pyo.Param(initialize=self.charge_loss_rate)
+        self.b.discharge_loss_rate_dri = pyo.Param(initialize=self.discharge_loss_rate)
 
     def define_variables(self, time_steps):
-        self.b.soc_dri = Var(time_steps, within=NonNegativeReals)
-        self.b.uniformity_indicator_dri = Var(time_steps, within=Binary)
+        self.b.soc_dri = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.uniformity_indicator_dri = pyo.Var(time_steps, within=pyo.Binary)
 
         # Define the variables for power and hydrogen
-        self.b.charge_dri = Var(time_steps, within=NonNegativeReals)
-        self.b.discharge_dri = Var(time_steps, within=NonNegativeReals)
+        self.b.charge_dri = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.discharge_dri = pyo.Var(time_steps, within=pyo.NonNegativeReals)
 
     def define_constraints(self, time_steps):
         @self.b.Constraint(time_steps)

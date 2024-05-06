@@ -5,8 +5,6 @@
 import pandas as pd
 import pyomo.environ as pyo
 import pytest
-from pyomo.core.base import Constraint
-from pyomo.environ import Boolean
 
 from assume.units.dst_components import (
     DriPlant,

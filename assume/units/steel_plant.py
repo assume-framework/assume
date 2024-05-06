@@ -3,14 +3,13 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-from typing import Dict, List
+from typing import Dict
 
 import pandas as pd
 import pyomo.environ as pyo
 from pyomo.environ import value
 from pyomo.opt import SolverFactory, SolverStatus, TerminationCondition
 
-# import assume.strategies.dsm_flexibility as flex
 from assume.common.base import SupportsMinMax
 from assume.units.dst_components import (
     DriPlant,
@@ -39,7 +38,7 @@ class SteelPlant(SupportsMinMax):
         unit_operator: str,
         bidding_strategies: dict,
         technology: str = "steel_plant",
-        node: str = "bus0",
+        node: str = "node0",
         index: pd.DatetimeIndex = None,
         location: tuple[float, float] = (0.0, 0.0),
         components: Dict[str, Dict] = None,
@@ -55,6 +54,7 @@ class SteelPlant(SupportsMinMax):
             bidding_strategies=bidding_strategies,
             index=index,
             node=node,
+            location=location,
             **kwargs,
         )
 
@@ -394,9 +394,9 @@ class SteelPlant(SupportsMinMax):
             )
 
         # Save the operation states data to a CSV file
-        self.forecaster.save_operation_states(
-            path="C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04", unit=unit_id
-        )
+        # self.forecaster.save_operation_states(
+        #     path="C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04", unit=unit_id
+        # )
 
     def determine_optimal_operation_with_flex(self):
         """
@@ -552,11 +552,11 @@ class SteelPlant(SupportsMinMax):
             self.forecaster.set_operation_states(time_step, operation_states_data)
 
         # Save the operation states data to a CSV file
-        self.forecaster.save_operation_states(
-            path="C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04",
-            unit=unit_id,
-            flexibility=True,
-        )
+        # self.forecaster.save_operation_states(
+        #     path="C:\\Manish_REPO\\ASSUME\\examples\\inputs\\example_04",
+        #     unit=unit_id,
+        #     flexibility=True,
+        # )
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         """

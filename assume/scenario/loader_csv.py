@@ -140,13 +140,6 @@ def load_dsm_units(
         - The function assumes that the first non-null value in common and bidding columns is representative if multiple
           entries exist for the same plant.
         - It is crucial that the input CSV file follows the expected structure for the function to process it correctly.
-
-    Example:
-        >>> dsm_units_df = load_dsm_units('/path/to/directory', {}, 'example.csv')
-        >>> print(dsm_units_df.head())
-
-    This will output a DataFrame where each row corresponds to a different plant, with details about each technology
-    component structured within the row.
     """
 
     dsm_units = load_file(
