@@ -86,9 +86,9 @@ class Electrolyser:
         self.b.efficiency = pyo.Param(initialize=self.efficiency)
 
     def define_variables(self, time_steps):
-        self.b.power_in = pyo.Var(time_steps, within=pyo.pyo.NonNegativeReals)
-        self.b.hydrogen_out = pyo.Var(time_steps, within=pyo.pyo.NonNegativeReals)
-        self.b.electricity_cost = pyo.Var(time_steps, within=pyo.pyo.NonNegativeReals)
+        self.b.power_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.hydrogen_out = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.electricity_cost = pyo.Var(time_steps, within=pyo.NonNegativeReals)
 
     def define_constraints(self, time_steps):
         # Power bounds constraints
@@ -460,12 +460,10 @@ class ElectricArcFurnace:
         self.b.specific_dri_demand = pyo.Param(initialize=self.specific_dri_demand)
         self.b.specific_lime_demand = pyo.Param(initialize=self.specific_lime_demand)
         # Flexibility parameters
-        self.b.ramp_up_eaf = pyo.pyo.Param(initialize=self.ramp_up)
-        self.b.ramp_down_eaf = pyo.pyo.Param(initialize=self.ramp_down)
-        self.b.min_operating_time_eaf = pyo.pyo.Param(
-            initialize=self.min_operating_time
-        )
-        self.b.min_down_time_eaf = pyo.pyo.Param(initialize=self.min_down_time)
+        self.b.ramp_up_eaf = pyo.Param(initialize=self.ramp_up)
+        self.b.ramp_down_eaf = pyo.Param(initialize=self.ramp_down)
+        self.b.min_operating_time_eaf = pyo.Param(initialize=self.min_operating_time)
+        self.b.min_down_time_eaf = pyo.Param(initialize=self.min_down_time)
 
     def define_variables(self, time_steps):
         self.b.power_eaf = pyo.Var(time_steps, within=pyo.NonNegativeReals)
