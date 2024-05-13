@@ -66,8 +66,32 @@ available_examples = {
         "scenario": "example_02a",
         "study_case": "base_lstm"
     },
-    "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
-    "small_learning_3": {"scenario": "example_02c", "study_case": "dam"},
+    "small_learning_2": {
+        "scenario": "example_02b", 
+        "study_case": "base"
+    }    ,
+    "small_learning_3": {
+        "scenario": "example_02c", 
+        "study_case": "dam"
+        },
+
+    #Cases resembling Harder et al. 2023
+    "harder_case1": {
+        "scenario": "example_02a", 
+        "study_case": "harder_case1"
+    },
+    "harder_case1_lstm": {
+        "scenario": "example_02a",
+        "study_case": "harder_case1_lstm"
+    },
+    "harder_case2": {
+        "scenario": "example_02b", 
+        "study_case": "harder_case2"
+    },
+    "harder_case2_lstm": {
+        "scenario": "example_02b", 
+        "study_case": "harder_case2_lstm"
+    },
 }
 
 
@@ -81,7 +105,7 @@ if __name__ == "__main__":
     data_format = "timescale"  # "local_db" or "timescale"
     examples = ["small_learning_1", "small_learning_1_lstm"]
     inputs_path = "examples/inputs"
-    no_runs = 2 # later: no_runs = 10 for assessing robustness of model training
+    no_runs = 1 # later: no_runs = 10 for assessing robustness of model training
 
     for example in examples:
         # temporarily store original config file to restore it after runs
@@ -95,6 +119,8 @@ if __name__ == "__main__":
 
         # simulate the same example [no_runs] times
         for run in range(1, no_runs + 1):
+            #TODO: set.seed(run)
+
             if data_format == "local_db":
                 db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
             elif data_format == "timescale":
