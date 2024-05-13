@@ -45,8 +45,10 @@ class Learning(Role):
         self.buffer: ReplayBuffer = None
         self.obs_dim = learning_config["observation_dimension"]
         self.act_dim = learning_config["action_dimension"]
-        self.early_stopping_steps = learning_config["early_stopping_steps"]
-        self.early_stopping_threshold = learning_config["early_stopping_threshold"]
+        self.early_stopping_steps = learning_config.get("early_stopping_steps", 10)
+        self.early_stopping_threshold = learning_config.get(
+            "early_stopping_threshold", 0.05
+        )
         self.episodes_done = 0
         self.rl_strats: dict[int, LearningStrategy] = {}
         self.rl_algorithm = learning_config["algorithm"]

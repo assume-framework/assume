@@ -328,7 +328,7 @@ class TD3(RLAlgorithm):
             This function implements the TD3 algorithm's key step for policy improvement and exploration.
         """
 
-        # logger.info(f"Updating Policy")
+        logger.info(f"Updating Policy")
         n_rl_agents = len(self.learning_role.rl_strats.keys())
         for _ in range(self.gradient_steps):
             self.n_updates += 1
