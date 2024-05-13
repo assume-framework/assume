@@ -102,6 +102,8 @@ class Learning(Role):
         # store evaluation values
         self.max_eval = defaultdict(lambda: -1e9)
         self.rl_eval = defaultdict(list)
+        # list of avg_changes
+        self.avg_rewards = []
 
     def setup(self) -> None:
         """
@@ -254,16 +256,21 @@ class Learning(Role):
                     )
 
             # if we do not see any improvment in the last x evaluation runs we stop the training
-            # TODO avg_change in list und dann Veränderung von average reward berechnen
             if len(self.rl_eval[metric]) >= self.early_stopping_steps:
-                avg_change = (
-                    max(self.rl_eval[metric][: self.early_stopping_steps])
-                    - min(self.rl_eval[metric][: self.early_stopping_steps])
-                ) / min(self.rl_eval[metric][: self.early_stopping_steps])
+                self.avg_rewards.append(
+                    sum(self.rl_eval[metric][-self.early_stopping_steps :])
+                    / self.early_stopping_steps
+                )
 
-                if avg_change < self.early_stopping_threshold:
-                    logger.info(
-                        f"Stopping training as no improvement above {self.early_stopping_threshold} in last {self.early_stopping_steps} evaluations for {metric}"
-                    )
-                    return True
+                if len(self.avg_rewards) >= self.early_stopping_steps:
+                    avg_change = (
+                        max(self.avg_rewards[-self.early_stopping_steps :])
+                        - min(self.avg_rewards[-self.early_stopping_steps :])
+                    ) / min(self.avg_rewards[-self.early_stopping_steps :])
+
+                    if avg_change < self.early_stopping_threshold:
+                        logger.info(
+                            f"Stopping training as no improvement above {self.early_stopping_threshold} in last {self.early_stopping_steps} evaluations for {metric}"
+                        )
+                        return True
             return False

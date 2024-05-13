@@ -728,6 +728,7 @@ def run_learning(
     actors_and_critics = None
     max_eval = defaultdict(lambda: -1e9)
     all_eval = defaultdict(list)
+    avg_eval = []
     # -----------------------------------------
 
     validation_interval = min(
@@ -804,6 +805,7 @@ def run_learning(
 
             world.learning_role.max_eval = max_eval
             world.learning_role.rl_eval = all_eval
+            world.learning_role.avg_rewards = avg_eval
 
             total_rewards = world.output_role.get_sum_reward()
             avg_reward = np.mean(total_rewards)
@@ -815,6 +817,7 @@ def run_learning(
 
             max_eval = world.learning_role.max_eval
             all_eval = world.learning_role.rl_eval
+            avg_eval = world.learning_role.avg_rewards
 
             # if we have not improved in the last x evaluations, we stop
             if terminate:
