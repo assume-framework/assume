@@ -254,6 +254,7 @@ class Learning(Role):
                     )
 
             # if we do not see any improvment in the last x evaluation runs we stop the training
+            # TODO avg_change in list und dann Veränderung von average reward berechnen
             if len(self.rl_eval[metric]) >= self.early_stopping_steps:
                 avg_change = (
                     max(self.rl_eval[metric][: self.early_stopping_steps])

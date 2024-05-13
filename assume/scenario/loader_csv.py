@@ -368,7 +368,7 @@ async def load_scenario_folder_async(
     if not learning_config.get("trained_policies_save_path"):
         learning_config[
             "trained_policies_save_path"
-        ] = f"./learned_strategies/{study_case}"
+        ] = f"./learned_strategies/{study_case}/last_policies"
 
     config = replace_paths(config, path)
 
@@ -777,7 +777,7 @@ def run_learning(
 
         # they are change implicitly anyhow do to our function call
         actors_and_critics = world.learning_role.rl_algorithm.extract_policy()
-        #
+
         # save current params in training path
 
         world.learning_role.rl_algorithm.save_params(directory=last_policies_path)
@@ -836,6 +836,7 @@ def run_learning(
     world.export_csv_path = temp_csv_path
 
     # load scenario for evaluation
+    # TODO which policies of the actors are used here? change to last
     load_scenario_folder(
         world,
         inputs_path,
