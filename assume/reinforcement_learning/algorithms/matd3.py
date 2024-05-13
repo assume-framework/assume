@@ -232,6 +232,11 @@ class TD3(RLAlgorithm):
         The actors are designed to map observations to action probabilities in a reinforcement learning setting.
 
         The created actor networks are associated with each unit strategy and stored as attributes.
+
+        Notes:
+            The observation dimension need to be the same, due to the centralized criic that all actors share.
+            If you have units with different observation dimensions. They need to have different critics and hence learning roles.
+
         """
 
         obs_dim_list = []
@@ -276,6 +281,10 @@ class TD3(RLAlgorithm):
         Create critic networks for reinforcement learning.
 
         This method initializes critic networks for each agent in the reinforcement learning setup.
+
+        Notes:
+            The observation dimension need to be the same, due to the centralized criic that all actors share.
+            If you have units with different observation dimensions. They need to have different critics and hence learning roles.
         """
         n_agents = len(self.learning_role.rl_strats)
         strategy: LearningStrategy
