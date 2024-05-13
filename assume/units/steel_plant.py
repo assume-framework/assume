@@ -62,7 +62,7 @@ class SteelPlant(SupportsMinMax):
         self.natural_gas_price = self.forecaster["fuel_price_natural_gas"]
         self.electricity_price = self.forecaster["price_EOM"]
         self.iron_ore_price = self.forecaster.get_price("iron_ore")
-        self.steel_demand = demand  # / 672
+        self.steel_demand = demand
         self.steel_price = self.forecaster.get_price("steel")
         self.lime_co2_factor = self.forecaster.get_price("lime_co2_factor")
         self.lime_price = self.forecaster.get_price("lime")
@@ -226,8 +226,7 @@ class SteelPlant(SupportsMinMax):
         def cost_per_time_step(m, t):
             return (
                 self.model.variable_cost[t]
-                == self.components["electrolyser"].b.start_cost[t]
-                + self.components["electrolyser"].b.electricity_cost[t]
+                == self.components["electrolyser"].b.electricity_cost[t]
                 + self.components["dri_plant"].b.dri_operating_cost[t]
                 + self.components["eaf"].b.eaf_operating_cost[t]
             )
@@ -579,8 +578,7 @@ class SteelPlant(SupportsMinMax):
         for t in self.model.time_steps:
             # Calculate total variable costs for the current time step
             total_variable_costs = (
-                value(self.components["electrolyser"].b.start_cost[t])
-                + value(self.components["electrolyser"].b.electricity_cost[t])
+                +value(self.components["electrolyser"].b.electricity_cost[t])
                 + value(self.components["dri_plant"].b.dri_operating_cost[t])
                 + value(self.components["eaf"].b.eaf_operating_cost[t])
             )

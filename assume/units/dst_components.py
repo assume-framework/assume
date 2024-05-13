@@ -105,7 +105,7 @@ class Electrolyser:
             Ensures that the power input to the electrolyser does not exceed its rated power capacity.
 
             """
-            return b.power_in[t] <= b.rated_power * b.in_operation[t]
+            return b.power_in[t] <= b.rated_power
 
         @self.b.Constraint(time_steps)
         def power_lower_bound(b, t):
@@ -113,7 +113,7 @@ class Electrolyser:
             Ensures that the power input to the electrolyser does not fall below the minimum required power.
 
             """
-            return b.power_in[t] >= b.min_power * b.in_operation[t]
+            return b.power_in[t] >= b.min_power
 
         # Ramp-up constraint
         @self.b.Constraint(time_steps)
