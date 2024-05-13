@@ -46,7 +46,7 @@ base:
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
 
-harder_case2:
+harder:
   start_date: 2019-03-01 00:00
   end_date: 2019-04-01 00:00
   time_step: 1h
@@ -63,12 +63,12 @@ harder_case2:
     learning_rate: 0.0001
     training_episodes: 100
     episodes_collecting_initial_experience: 5
-    train_freq: 24
+    train_freq: 10
     gradient_steps: -1
     batch_size: 256
     gamma: 0.999
     device: cuda
-    noise_sigma: 0.1
+    noise_sigma: 0.2
     noise_scale: 1
     noise_dt: 0.9998
     validation_episodes_interval: 5
@@ -90,7 +90,7 @@ harder_case2:
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
 
-harder_case2_lstm:
+harder_lstm:
   start_date: 2019-03-01 00:00
   end_date: 2019-04-01 00:00
   time_step: 1h
@@ -104,15 +104,15 @@ harder_case2_lstm:
     trained_policies_save_path:
     max_bid_price: 100
     algorithm: LSTM-matd3
-    learning_rate: 0.0001
+    learning_rate: 0.001
     training_episodes: 100
     episodes_collecting_initial_experience: 5
-    train_freq: 24
+    train_freq: 10
     gradient_steps: -1
     batch_size: 256
-    gamma: 0.999
+    gamma: 0.95
     device: cuda
-    noise_sigma: 0.1
+    noise_sigma: 0.2
     noise_scale: 1
     noise_dt: 0.9998
     validation_episodes_interval: 5
