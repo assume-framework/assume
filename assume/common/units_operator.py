@@ -578,7 +578,7 @@ class UnitsOperator(Role):
         learning_unit_count: int,
     ) -> None:
         """
-        Writes learning results to the learning agent.
+        Writes learning results to the learning agent so that it is stored in the buffer.
 
         Args:
             products_index (pandas.DatetimeIndex): The index of all products.
@@ -649,7 +649,7 @@ class UnitsOperator(Role):
         self, orderbook: Orderbook, marketconfig: MarketConfig
     ) -> None:
         """
-        Sends the current rl_strategy update to the output agent.
+        Sends the current rl_strategy update to the output agent and to the learning agent for the buffer handling.
 
         Args:
             orderbook (Orderbook): The orderbook of the market.

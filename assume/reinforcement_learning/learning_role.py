@@ -248,6 +248,8 @@ class Learning(Role):
         # add current reward to list of all rewards
         for metric, value in metrics.items():
             self.rl_eval[metric].append(value)
+
+            # check if the current value is the best value
             if self.rl_eval[metric][-1] > self.max_eval[metric]:
                 self.max_eval[metric] = self.rl_eval[metric][-1]
                 if metric == list(metrics.keys())[0]:

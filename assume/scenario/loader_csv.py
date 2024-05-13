@@ -778,6 +778,7 @@ def run_learning(
             and episode > world.learning_role.episodes_collecting_initial_experience
         ):
             # save current params in training path
+            # save last policy
             world.learning_role.rl_algorithm.save_params(directory=save_path)
             world.reset()
 
