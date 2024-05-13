@@ -31,6 +31,8 @@ def test_learning_init():
         "training_episodes": 3,
         "continue_learning": False,
         "trained_policies_save_path": None,
+        "early_stopping_steps": 10,
+        "early_stopping_threshold": 0.05,
     }
     # test init
     l = Learning(learning_config, start, end)

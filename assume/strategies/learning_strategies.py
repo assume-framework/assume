@@ -453,7 +453,7 @@ class RLStrategy(LearningStrategy):
         Args:
             load_path (str): Path to load from.
         """
-        directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
+        directory = f"{load_path}/last_policies/actors/actor_{self.unit_id}.pt"
 
         params = th.load(directory, map_location=self.device)
 
