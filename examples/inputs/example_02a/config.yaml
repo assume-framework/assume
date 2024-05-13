@@ -46,6 +46,51 @@ tiny:
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
 
+tiny:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-03 00:00
+  time_step: 1h
+  save_frequency_hours: Null
+  learning_mode: True
+
+  learning_config:
+    observation_dimension: 50
+    action_dimension: 2
+    continue_learning: False
+    trained_policies_save_path: null
+    trained_policies_load_path: "./learned_strategies/example_02a_tiny/avg_reward"
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 2
+    episodes_collecting_initial_experience: 1
+    train_freq: 24
+    gradient_steps: -1
+    batch_size: 256
+    gamma: 0.99
+    device: cpu
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 1
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
 
 base:
   start_date: 2019-03-01 00:00
@@ -58,12 +103,12 @@ base:
     observation_dimension: 50
     action_dimension: 2
     continue_learning: False
-    trained_policies_save_path: learned_strategies/example_02a_base
+    trained_policies_save_path: null
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.001
-    training_episodes: 100
-    episodes_collecting_initial_experience: 5
+    training_episodes: 10
+    episodes_collecting_initial_experience: 2
     train_freq: 24
     gradient_steps: -1
     batch_size: 256
@@ -72,7 +117,7 @@ base:
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 0.9998
-    validation_episodes_interval: 5
+    validation_episodes_interval: 2
 
   markets_config:
     EOM:
@@ -102,18 +147,62 @@ base_lstm:
     observation_dimension: 50
     action_dimension: 2
     continue_learning: False
-    trained_policies_save_path: learned_strategies/example_02a_base_lstm
+    trained_policies_save_path: null
     max_bid_price: 100
     algorithm: LSTM-matd3
     learning_rate: 0.001
-    training_episodes: 100
-    episodes_collecting_initial_experience: 5
+    training_episodes: 10
+    episodes_collecting_initial_experience: 2
     train_freq: 24
     gradient_steps: -1
     batch_size: 256
     gamma: 0.99
     device: cuda
     noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 0.9998
+    validation_episodes_interval: 2
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+harder:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-04-01 00:00
+  time_step: 1h
+  save_frequency_hours: Null
+  learning_mode: True
+
+  learning_config:
+    observation_dimension: 50
+    action_dimension: 2
+    continue_learning: False
+    trained_policies_save_path: null
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.0001
+    training_episodes: 100
+    episodes_collecting_initial_experience: 5
+    train_freq: 10
+    gradient_steps: -1
+    batch_size: 256
+    gamma: 0.999
+    device: cuda
+    noise_sigma: 0.2
     noise_scale: 1
     noise_dt: 0.9998
     validation_episodes_interval: 5
@@ -135,10 +224,9 @@ base_lstm:
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
 
-
-tiny:
+harder_lstm:
   start_date: 2019-03-01 00:00
-  end_date: 2019-03-03 00:00
+  end_date: 2019-04-01 00:00
   time_step: 1h
   save_frequency_hours: Null
   learning_mode: True
@@ -148,21 +236,20 @@ tiny:
     action_dimension: 2
     continue_learning: False
     trained_policies_save_path: null
-    trained_policies_load_path: "./learned_strategies/example_02a_tiny/avg_reward"
     max_bid_price: 100
-    algorithm: matd3
+    algorithm: LSTM-matd3
     learning_rate: 0.001
-    training_episodes: 2
-    episodes_collecting_initial_experience: 1
-    train_freq: 24
+    training_episodes: 100
+    episodes_collecting_initial_experience: 5
+    train_freq: 10
     gradient_steps: -1
     batch_size: 256
-    gamma: 0.99
-    device: cpu
-    noise_sigma: 0.1
+    gamma: 0.95
+    device: cuda
+    noise_sigma: 0.2
     noise_scale: 1
-    noise_dt: 1
-    validation_episodes_interval: 1
+    noise_dt: 0.9998
+    validation_episodes_interval: 5
 
   markets_config:
     EOM:

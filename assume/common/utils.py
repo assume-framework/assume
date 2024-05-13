@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 from itertools import groupby
 from operator import itemgetter
+import yaml
 
 import dateutil.rrule as rr
 import numpy as np
@@ -436,3 +437,30 @@ def timestamp2datetime(timestamp: float):
 
 def datetime2timestamp(datetime: datetime):
     return calendar.timegm(datetime.utctimetuple())
+
+def rename_study_case(
+        path: str, 
+        old_key: str, 
+        new_key: str
+):
+    """
+    Rename key in config file and save changes.
+     
+    This function makes changes to the config file. 
+    Background is so that study cases can be simulated multiple times under different names with the same configuration.
+
+    Args:
+        path (str): The path to the config file.
+        old_key (str): The orginal name of the key without adjustments. E.g. study_case from available_examples: "base".
+        new_key (str): The name of the key with adjustments. E.g. added run number: "base_run_1".
+    """
+    # Read the YAML file
+    with open(path, "r") as file:
+        data = yaml.safe_load(file)
+
+    # store modifications to the config file
+    data[new_key]= data.pop(old_key)
+
+    # Write the modified data back to the file
+    with open(path, "w") as file:
+        yaml.safe_dump(data, file, sort_keys=False)
