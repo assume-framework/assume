@@ -258,9 +258,9 @@ class Learning(Role):
                 avg_change = (
                     max(self.rl_eval[metric][: self.early_stopping_steps])
                     - min(self.rl_eval[metric][: self.early_stopping_steps])
-                ) / max(self.rl_eval[metric][: self.early_stopping_steps])
+                ) / min(self.rl_eval[metric][: self.early_stopping_steps])
 
-                if avg_change < (1 + self.early_stopping_threshold):
+                if avg_change < self.early_stopping_threshold:
                     logger.info(
                         f"Stopping training as no improvement above {self.early_stopping_threshold} in last {self.early_stopping_steps} evaluations for {metric}"
                     )

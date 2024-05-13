@@ -763,7 +763,7 @@ def run_learning(
 
         # -----------------------------------------
         # Give the newly initliazed learning role the needed information across episodes
-        last_policies_path = save_path + "/last_eval_policies"
+        last_policies_path = save_path + "/last_policies"
         world.learning_role.initialize_policy(actors_and_critics=actors_and_critics)
         # worl.learning_startegies intitalize policy
         world.learning_role.buffer = buffer
@@ -816,7 +816,7 @@ def run_learning(
             max_eval = world.learning_role.max_eval
             all_eval = world.learning_role.rl_eval
 
-            # if we have not improved in the last 5 evaluations, we stop
+            # if we have not improved in the last x evaluations, we stop
             if terminate:
                 break
 
