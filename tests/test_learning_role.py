@@ -24,8 +24,9 @@ end = datetime(2023, 7, 2)
 @pytest.mark.require_learning
 def test_learning_init():
     learning_config: LearningConfig = {
-        "observation_dimension": 3,
-        "action_dimension": 2,
+        "obs_dim": 3,
+        "act_dim": 2,
+        "unique_obs_dim": 0,
         "algorithm": "matd3",
         "learning_mode": False,
         "training_episodes": 3,

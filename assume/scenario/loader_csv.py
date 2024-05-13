@@ -712,15 +712,18 @@ def run_learning(
     temp_csv_path = world.export_csv_path
     world.export_csv_path = ""
 
+    # initialize policies already here to set the obs_dim and act_dim in the learning role
+    actors_and_critics = None
+    world.learning_role.initialize_policy(actors_and_critics=actors_and_critics)
+
     buffer = ReplayBuffer(
         buffer_size=int(world.learning_config.get("replay_buffer_size", 5e5)),
-        obs_dim=world.learning_role.obs_dim,
-        act_dim=world.learning_role.act_dim,
+        obs_dim=world.learning_role.rl_algorithm.obs_dim,
+        act_dim=world.learning_role.rl_algorithm.act_dim,
         n_rl_units=len(world.learning_role.rl_strats),
         device=world.learning_role.device,
         float_type=world.learning_role.float_type,
     )
-    actors_and_critics = None
     world.output_role.del_similar_runs()
 
     validation_interval = min(

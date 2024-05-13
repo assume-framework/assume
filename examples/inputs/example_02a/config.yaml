@@ -10,8 +10,6 @@ tiny:
   learning_mode: True
 
   learning_config:
-    observation_dimension: 50
-    action_dimension: 2
     continue_learning: False
     trained_policies_save_path: null
     max_bid_price: 100
@@ -55,8 +53,6 @@ base:
   learning_mode: True
 
   learning_config:
-    observation_dimension: 50
-    action_dimension: 2
     continue_learning: False
     trained_policies_save_path: null
     max_bid_price: 100
@@ -99,8 +95,6 @@ tiny:
   learning_mode: True
 
   learning_config:
-    observation_dimension: 50
-    action_dimension: 2
     continue_learning: False
     trained_policies_save_path: null
     trained_policies_load_path: "./learned_strategies/example_02a_tiny/avg_reward"

@@ -51,7 +51,7 @@ class RLAdvancedOrderStrategy(LearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(obs_dim=51, act_dim=2, unique_obs_dim=3, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
 

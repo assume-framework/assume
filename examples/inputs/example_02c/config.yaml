@@ -10,8 +10,6 @@ dam:
   learning_mode: True
 
   learning_config:
-    observation_dimension: 97
-    action_dimension: 2
     continue_learning: False
     trained_policies_save_path: null
     max_bid_price: 200
@@ -60,8 +58,6 @@ tiny:
   learning_mode: True
 
   learning_config:
-    observation_dimension: 50
-    action_dimension: 2
     continue_learning: True
     trained_policies_save_path: null
     max_bid_price: 100

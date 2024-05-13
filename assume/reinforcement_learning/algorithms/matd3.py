@@ -220,6 +220,10 @@ class TD3(RLAlgorithm):
                 unit_strategy.actor = actors_and_critics["actors"][u_id]
                 unit_strategy.actor_target = actors_and_critics["actor_targets"][u_id]
 
+            self.obs_dim = actors_and_critics["obs_dim"]
+            self.act_dim = actors_and_critics["act_dim"]
+            self.unique_obs_dim = actors_and_critics["unique_obs_dim"]
+
     def create_actors(self) -> None:
         """
         Create actor networks for reinforcement learning for each unit strategy.
@@ -229,16 +233,20 @@ class TD3(RLAlgorithm):
 
         The created actor networks are associated with each unit strategy and stored as attributes.
         """
+
+        obs_dim_list = []
+        act_dim_list = []
+
         for _, unit_strategy in self.learning_role.rl_strats.items():
             unit_strategy.actor = Actor(
-                obs_dim=self.obs_dim,
-                act_dim=self.act_dim,
+                obs_dim=unit_strategy.obs_dim,
+                act_dim=unit_strategy.act_dim,
                 float_type=self.float_type,
             ).to(self.device)
 
             unit_strategy.actor_target = Actor(
-                obs_dim=self.obs_dim,
-                act_dim=self.act_dim,
+                obs_dim=unit_strategy.obs_dim,
+                act_dim=unit_strategy.act_dim,
                 float_type=self.float_type,
             ).to(self.device)
             unit_strategy.actor_target.load_state_dict(unit_strategy.actor.state_dict())
@@ -248,6 +256,21 @@ class TD3(RLAlgorithm):
                 unit_strategy.actor.parameters(), lr=self.learning_rate
             )
 
+            obs_dim_list.append(unit_strategy.obs_dim)
+            act_dim_list.append(unit_strategy.act_dim)
+
+        if len(set(obs_dim_list)) > 1:
+            raise ValueError(
+                "All observation dimensions must be the same for all RL agents"
+            )
+        else:
+            self.obs_dim = obs_dim_list[0]
+
+        if len(set(act_dim_list)) > 1:
+            raise ValueError("All action dimensions must be the same for all RL agents")
+        else:
+            self.act_dim = act_dim_list[0]
+
     def create_critics(self) -> None:
         """
         Create critic networks for reinforcement learning.
@@ -256,13 +279,22 @@ class TD3(RLAlgorithm):
         """
         n_agents = len(self.learning_role.rl_strats)
         strategy: LearningStrategy
+        unique_obs_dim_list = []
 
         for u_id, strategy in self.learning_role.rl_strats.items():
             self.learning_role.critics[u_id] = CriticTD3(
-                n_agents, strategy.obs_dim, strategy.act_dim, self.float_type
+                n_agents=n_agents,
+                obs_dim=strategy.obs_dim,
+                act_dim=strategy.act_dim,
+                unique_obs_dim=strategy.unique_obs_dim,
+                float_type=self.float_type,
             )
             self.learning_role.target_critics[u_id] = CriticTD3(
-                n_agents, strategy.obs_dim, strategy.act_dim, self.float_type
+                n_agents=n_agents,
+                obs_dim=strategy.obs_dim,
+                act_dim=strategy.act_dim,
+                unique_obs_dim=strategy.unique_obs_dim,
+                float_type=self.float_type,
             )
 
             self.learning_role.critics[u_id].optimizer = Adam(
@@ -280,6 +312,17 @@ class TD3(RLAlgorithm):
             self.learning_role.target_critics[u_id] = self.learning_role.target_critics[
                 u_id
             ].to(self.device)
+
+            unique_obs_dim_list.append(strategy.unique_obs_dim)
+
+        # check if all unique_obs_dim are the same and raise an error if not
+        # if they are all the same, set the unique_obs_dim attribute
+        if len(set(unique_obs_dim_list)) > 1:
+            raise ValueError(
+                "All unique_obs_dim values must be the same for all RL agents"
+            )
+        else:
+            self.unique_obs_dim = unique_obs_dim_list[0]
 
     def extract_policy(self) -> dict:
         """
@@ -304,6 +347,9 @@ class TD3(RLAlgorithm):
             "actor_targets": actor_targets,
             "critics": self.learning_role.critics,
             "target_critics": self.learning_role.target_critics,
+            "obs_dim": self.obs_dim,
+            "act_dim": self.act_dim,
+            "unique_obs_dim": self.unique_obs_dim,
         }
 
         return actors_and_critics
@@ -328,7 +374,7 @@ class TD3(RLAlgorithm):
             This function implements the TD3 algorithm's key step for policy improvement and exploration.
         """
 
-        logger.info(f"Updating Policy")
+        logger.debug(f"Updating Policy")
         n_rl_agents = len(self.learning_role.rl_strats.keys())
         for _ in range(self.gradient_steps):
             self.n_updates += 1
@@ -369,17 +415,39 @@ class TD3(RLAlgorithm):
 
                 all_actions = actions.view(self.batch_size, -1)
 
-                # temp = th.cat((states[:, :i, self.obs_dim-self.unique_obs_len:].reshape(self.batch_size, -1),
-                #                 states[:, i+1:, self.obs_dim-self.unique_obs_len:].reshape(self.batch_size, -1)), axis=1)
+                temp = th.cat(
+                    (
+                        states[:, :i, self.obs_dim - self.unique_obs_dim :].reshape(
+                            self.batch_size, -1
+                        ),
+                        states[
+                            :, i + 1 :, self.obs_dim - self.unique_obs_dim :
+                        ].reshape(self.batch_size, -1),
+                    ),
+                    axis=1,
+                )
 
-                # all_states = th.cat((states[:, i, :].reshape(self.batch_size, -1), temp), axis = 1).view(self.batch_size, -1)
-                all_states = states[:, i, :].reshape(self.batch_size, -1)
+                all_states = th.cat(
+                    (states[:, i, :].reshape(self.batch_size, -1), temp), axis=1
+                ).view(self.batch_size, -1)
+                # all_states = states[:, i, :].reshape(self.batch_size, -1)
 
-                # temp = th.cat((next_states[:, :i, self.obs_dim-self.unique_obs_len:].reshape(self.batch_size, -1),
-                #                 next_states[:, i+1:, self.obs_dim-self.unique_obs_len:].reshape(self.batch_size, -1)), axis=1)
+                temp = th.cat(
+                    (
+                        next_states[
+                            :, :i, self.obs_dim - self.unique_obs_dim :
+                        ].reshape(self.batch_size, -1),
+                        next_states[
+                            :, i + 1 :, self.obs_dim - self.unique_obs_dim :
+                        ].reshape(self.batch_size, -1),
+                    ),
+                    axis=1,
+                )
 
-                # all_next_states = th.cat((next_states[:, i, :].reshape(self.batch_size, -1), temp), axis = 1).view(self.batch_size, -1)
-                all_next_states = next_states[:, i, :].reshape(self.batch_size, -1)
+                all_next_states = th.cat(
+                    (next_states[:, i, :].reshape(self.batch_size, -1), temp), axis=1
+                ).view(self.batch_size, -1)
+                # all_next_states = next_states[:, i, :].reshape(self.batch_size, -1)
 
                 with th.no_grad():
                     # Compute the next Q-values: min over all critics targets

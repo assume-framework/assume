@@ -25,6 +25,10 @@ class RLStrategy(LearningStrategy):
     The agent submittes two price bids
     - one for the infelxible (P_min) and one for the flexible part (P_max-P_min) of ist capacity.
 
+    This strategy utilizes a total of 50 observations, which are used to calculate the actions.
+    The actions are then transformed into bids. Actions are formulated as 2 values.
+    The unique observation space is 2 comprising of marginal cost and current capacity.
+
     Attributes:
         foresight (int): Number of time steps to look ahead. Defaults to 24.
         max_bid_price (float): Maximum bid price. Defaults to 100.
@@ -43,7 +47,7 @@ class RLStrategy(LearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(obs_dim=50, act_dim=2, unique_obs_dim=2, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
 

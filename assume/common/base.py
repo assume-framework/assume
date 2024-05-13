@@ -746,13 +746,20 @@ class LearningStrategy(BaseStrategy):
         **kwargs (dict): The keyword arguments.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self, obs_dim: int, act_dim: int, unique_obs_dim: int = 0, *args, **kwargs
+    ):
         """
         Initializes the learning strategy.
         """
         super().__init__(*args, **kwargs)
-        self.obs_dim = kwargs.get("observation_dimension", 50)
-        self.act_dim = kwargs.get("action_dimension", 2)
+
+        self.obs_dim = obs_dim
+        self.act_dim = act_dim
+
+        # this defines the number of unique observations, which are not the same for all units
+        # this is used by the centralised critic and will return an error if not matched
+        self.unique_obs_dim = unique_obs_dim
 
 
 class LearningConfig(TypedDict):
@@ -760,8 +767,6 @@ class LearningConfig(TypedDict):
     A class for the learning configuration.
     """
 
-    observation_dimension: int
-    action_dimension: int
     continue_learning: bool
     max_bid_price: float
     learning_mode: bool
