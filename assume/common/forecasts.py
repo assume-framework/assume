@@ -29,8 +29,9 @@ class Forecaster:
 
     """
 
-    def __init__(self, index: pd.Series):
+    def __init__(self, index: pd.Series, base_path: str = ""):
         self.index = index
+        self.base_path = base_path
 
     def __getitem__(self, column: str) -> pd.Series:
         """
@@ -112,6 +113,7 @@ class CsvForecaster(Forecaster):
         powerplants_units: dict[str, pd.Series] = {},
         demand_units: dict[str, pd.Series] = {},
         market_configs: dict[str, pd.Series] = {},
+        operation_states: dict[str, pd.DataFrame] = {},
         *args,
         **kwargs,
     ):
@@ -120,6 +122,8 @@ class CsvForecaster(Forecaster):
         self.powerplants_units = powerplants_units
         self.demand_units = demand_units
         self.market_configs = market_configs
+        self.operation_states = operation_states
+
         self.forecasts = pd.DataFrame(index=index)
 
     def __getitem__(self, column: str) -> pd.Series:
@@ -142,6 +146,18 @@ class CsvForecaster(Forecaster):
             return pd.Series(0.0, self.index)
 
         return self.forecasts[column]
+
+    def get_operational_state(self, unit: str) -> pd.DataFrame:
+        """
+        Returns the operational state for a given unit.
+
+        Args:
+            unit (str): The unit for which the operational state is requested.
+
+        Returns:
+            pd.DataFrame: The operational state data for the specified unit.
+        """
+        return self.operation_states.get(unit, pd.DataFrame(index=self.index))
 
     def set_forecast(self, data: pd.DataFrame | pd.Series | None, prefix=""):
         """
@@ -172,9 +188,30 @@ class CsvForecaster(Forecaster):
                     self.forecasts[column] = data[column].item()
             else:
                 # Add new columns to the existing DataFrame, overwriting any existing columns with the same names
-                self.forecasts = self.forecasts.assign(**data)
+                new_columns = set(data.columns) - set(self.forecasts.columns)
+                self.forecasts = pd.concat(
+                    [self.forecasts, data[list(new_columns)]], axis=1
+                )
         else:
             self.forecasts[prefix + data.name] = data
+
+    def set_operation_states(self, unit: str, data: pd.DataFrame):
+        """
+        Sets the operational state data for a given unit.
+
+        Args:
+            unit (str): The unit for which the operational state data is provided.
+            data (pd.DataFrame): The operational state data.
+        """
+        # Check if the unit already exists in the operation_states dictionary
+        if unit in self.operation_states:
+            # Append the new data to the existing DataFrame for the unit
+            self.operation_states[unit] = pd.concat(
+                [self.operation_states[unit], data], axis=1
+            )
+        else:
+            # Set the operational state data for the unit
+            self.operation_states[unit] = data
 
     def calc_forecast_if_needed(self):
         """
@@ -381,13 +418,39 @@ class CsvForecaster(Forecaster):
         """
 
         try:
-            self.forecasts.to_csv(
-                f"{path}/forecasts_df.csv", index=True
-            )  # operation_states_df.csv
+            self.forecasts.to_csv(f"{path}/forecasts_df.csv", index=True)
         except ValueError:
             self.logger.error(
                 f"No forecasts for {self.market_id} provided, so none saved."
             )
+
+    def save_operation_states(self, unit, path: str, flexibility=False):
+        """
+        Saves the operation states data to a single CSV file located at the specified path.
+
+        Args:
+            path (str): The path to save the operation states data to.
+        """
+
+        os.makedirs(path, exist_ok=True)
+
+        # Concatenate all operation states dataframes along the columns axis
+        df = self.operation_states[unit]
+        df.index = self.index
+        # Check if the CSV file already exists
+        csv_file = (
+            f"{path}/{unit}_operation_states{'_with_flex' if flexibility else ''}.csv"
+        )
+        if os.path.exists(csv_file):
+            # Load existing CSV file
+            existing_df = pd.read_csv(csv_file, index_col=0)
+            # Update existing DataFrame with new data
+            existing_df.update(concatenated_data)
+            # Update the DataFrame
+            concatenated_data = existing_df
+
+        # Save the concatenated data to a CSV file
+        concatenated_data.to_csv(csv_file)
 
 
 class RandomForecaster(CsvForecaster):
@@ -532,96 +595,3 @@ class NaiveForecast(Forecaster):
         if isinstance(value, pd.Series):
             value.index = self.index
         return pd.Series(value, self.index)
-
-
-class OperationStatesForecaster(Forecaster):
-    def __init__(
-        self, index: pd.Series, operation_states: dict[str, pd.DataFrame] = None
-    ):
-        super().__init__(index)
-        self.operation_states = operation_states if operation_states is not None else {}
-
-    def get_operational_state(self, unit: str) -> pd.DataFrame:
-        """
-        Returns the operational state for a given unit.
-
-        Args:
-            unit (str): The unit for which the operational state is requested.
-
-        Returns:
-            pd.DataFrame: The operational state data for the specified unit.
-
-        Example:
-            >>> forecaster = OperationStatesForecaster(index=pd.Series([1, 2, 3]))
-            >>> operational_state = forecaster.get_operational_state('unit_1')
-            >>> print(operational_state)
-        """
-        return self.operation_states.get(unit, pd.DataFrame(index=self.index))
-
-    def set_operation_states(self, unit: str, data: pd.DataFrame):
-        """
-        Sets the operational state data for a given unit.
-
-        Args:
-            unit (str): The unit for which the operational state data is provided.
-            data (pd.DataFrame): The operational state data.
-
-        Example:
-            >>> forecaster = OperationStatesForecaster(index=pd.Series([1, 2, 3]))
-            >>> forecaster.set_operation_states('unit_1', pd.DataFrame(...))
-        """
-        # Check if the unit already exists in the operation_states dictionary
-        if unit in self.operation_states:
-            # Append the new data to the existing DataFrame for the unit
-            self.operation_states[unit] = pd.concat(
-                [self.operation_states[unit], data], axis=1
-            )
-        else:
-            # Set the operational state data for the unit
-            self.operation_states[unit] = data
-
-    def save_operation_states(self, unit, path: str):
-        """
-        Saves the operation states data to a single CSV file located at the specified path.
-
-        Args:
-            path (str): The path to save the operation states data to.
-        """
-        # Concatenate all operation states dataframes along the columns axis
-        concatenated_data = pd.concat(self.operation_states.values(), axis=0)
-        concatenated_data.index = self.index
-        # Check if the CSV file already exists
-        csv_file = f"{path}/{unit}_operation_states.csv"
-        if os.path.exists(csv_file):
-            # Load existing CSV file
-            existing_df = pd.read_csv(csv_file, index_col=0)
-            # Update existing DataFrame with new data
-            existing_df.update(concatenated_data)
-            # Update the DataFrame
-            concatenated_data = existing_df
-
-        # Save the concatenated data to a CSV file
-        concatenated_data.to_csv(csv_file)
-
-    def save_operation_states_with_flex(self, unit, path: str):
-        """
-        Saves the operation states data to a single CSV file located at the specified path.
-
-        Args:
-            path (str): The path to save the operation states data to.
-        """
-        # Concatenate all operation states dataframes along the columns axis
-        concatenated_data = pd.concat(self.operation_states.values(), axis=0)
-        concatenated_data.index = self.index
-        # Check if the CSV file already exists
-        csv_file = f"{path}/{unit}_operation_states_with_flex.csv"
-        if os.path.exists(csv_file):
-            # Load existing CSV file
-            existing_df = pd.read_csv(csv_file, index_col=0)
-            # Update existing DataFrame with new data
-            existing_df.update(concatenated_data)
-            # Update the DataFrame
-            concatenated_data = existing_df
-
-        # Save the concatenated data to a CSV file
-        concatenated_data.to_csv(csv_file)

@@ -7,6 +7,7 @@ import logging
 import sys
 import time
 from datetime import datetime
+from pathlib import Path
 from sys import platform
 from typing import Optional, Union
 
@@ -24,6 +25,7 @@ from tqdm import tqdm
 from assume.common import (
     Forecaster,
     MarketConfig,
+    OutputDef,
     UnitsOperator,
     WriteOutput,
     mango_codec_factory,
@@ -36,7 +38,6 @@ from assume.units import BaseUnit, Demand, PowerPlant, SteelPlant, Storage
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
 stdout_handler = logging.StreamHandler(stream=sys.stdout)
-stdout_handler.setLevel(logging.WARNING)
 handlers = [file_handler, stdout_handler]
 logging.basicConfig(level=logging.INFO, handlers=handlers)
 logging.getLogger("mango").setLevel(logging.WARNING)
@@ -101,6 +102,9 @@ class World:
         self.export_csv_path = export_csv_path
         # intialize db connection at beginning of simulation
         if database_uri:
+            if str(database_uri).startswith("sqlite:///"):
+                db_path = Path(str(database_uri).replace("sqlite:///", ""))
+                db_path.parent.mkdir(exist_ok=True)
             self.db = create_engine(make_url(database_uri))
             connected = False
             while not connected:
@@ -149,6 +153,7 @@ class World:
                 e,
             )
         self.clearing_mechanisms: dict[str, MarketRole] = clearing_mechanisms
+        self.additional_kpis: dict[str, OutputDef] = {}
         self.addresses = []
         nest_asyncio.apply()
         self.loop = asyncio.get_event_loop()
@@ -286,6 +291,7 @@ class World:
             save_frequency_hours=save_frequency_hours,
             learning_mode=self.learning_mode,
             evaluation_mode=self.evaluation_mode,
+            additional_kpis=self.additional_kpis,
         )
 
         # mango multiprocessing is currently only supported on linux
@@ -473,7 +479,9 @@ class World:
         if mm_class := self.clearing_mechanisms.get(market_config.market_mechanism):
             market_role = mm_class(market_config)
         else:
-            raise Exception(f"invalid {market_config.market_mechanism=}")
+            raise Exception(
+                f"invalid {market_config.market_mechanism=} - full version installed?"
+            )
 
         market_operator = self.market_operators.get(market_operator_id)
 

@@ -17,7 +17,7 @@ from .utils import extend_orderbook
 simple_dayahead_auction_config = MarketConfig(
     market_id="simple_dayahead_auction",
     market_products=[MarketProduct(rd(hours=+1), 1, rd(hours=1))],
-    additional_fields=["node_id"],
+    additional_fields=["node"],
     opening_hours=rr.rrule(
         rr.HOURLY,
         dtstart=datetime(2005, 6, 1),
@@ -180,6 +180,7 @@ def test_clearing_non_convex_1():
         "price": 100,
         "only_hours": None,
         "bid_type": "BB",
+        "node": "node0",
     }
     orderbook_demand.append(order)
 
@@ -196,6 +197,7 @@ def test_clearing_non_convex_1():
         "price": 100,
         "only_hours": None,
         "bid_type": "BB",
+        "node": "node0",
     }
     orderbook_demand.append(order)
 
@@ -291,6 +293,7 @@ def test_clearing_non_convex_2():
         "only_hours": None,
         "bid_type": "BB",
         "min_acceptance_ratio": 0,
+        "node": "node0",
     }
     orderbook.append(order)
 
@@ -308,6 +311,7 @@ def test_clearing_non_convex_2():
         "only_hours": None,
         "bid_type": "BB",
         "min_acceptance_ratio": 0,
+        "node": "node0",
     }
     orderbook.append(order)
 
@@ -407,6 +411,7 @@ def test_clearing_non_convex_3():
         "only_hours": None,
         "bid_type": "BB",
         "min_acceptance_ratio": 0,
+        "node": "node0",
     }
     orderbook.append(order)
 
@@ -424,6 +429,7 @@ def test_clearing_non_convex_3():
         "only_hours": None,
         "bid_type": "BB",
         "min_acceptance_ratio": 0,
+        "node": "node0",
     }
     orderbook.append(order)
 
@@ -441,6 +447,7 @@ def test_clearing_non_convex_3():
         "only_hours": None,
         "bid_type": "BB",
         "min_acceptance_ratio": 0,
+        "node": "node0",
     }
     orderbook.append(order)
 
@@ -458,6 +465,7 @@ def test_clearing_non_convex_3():
         "only_hours": None,
         "bid_type": "BB",
         "min_acceptance_ratio": 0,
+        "node": "node0",
     }
     orderbook.append(order)
 

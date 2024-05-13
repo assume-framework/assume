@@ -2,24 +2,34 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import asyncio
 import logging
 import shutil
 from collections import defaultdict
 from datetime import datetime
+from multiprocessing import Lock
 from pathlib import Path
+from typing import TypedDict
 
 import numpy as np
 import pandas as pd
 from dateutil import rrule as rr
 from mango import Role
-from pandas.api.types import is_numeric_dtype
+from pandas.api.types import is_bool_dtype, is_numeric_dtype
+from psycopg2.errors import UndefinedColumn
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 
-logger = logging.getLogger(__name__)
-
 from assume.common.market_objects import MetaDict
 from assume.common.utils import separate_orders
+
+logger = logging.getLogger(__name__)
+
+
+class OutputDef(TypedDict):
+    name: str
+    value: str
+    from_table: str
 
 
 class WriteOutput(Role):
@@ -35,6 +45,7 @@ class WriteOutput(Role):
         save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to None.
         learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
         evaluation_mode (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
+        additional_kpis (dict[str, OutputDef], optional): makes it possible to define additional kpis evaluated
     """
 
     def __init__(
@@ -47,6 +58,7 @@ class WriteOutput(Role):
         save_frequency_hours: int = None,
         learning_mode: bool = False,
         evaluation_mode: bool = False,
+        additional_kpis: dict[str, OutputDef] = {},
     ):
         super().__init__()
 
@@ -55,11 +67,12 @@ class WriteOutput(Role):
         self.save_frequency_hours = save_frequency_hours or (end - start).days * 24
 
         # make directory if not already present
-        self.export_csv_path = export_csv_path
-        if self.export_csv_path:
-            self.p = Path(self.export_csv_path, simulation_id)
-            shutil.rmtree(self.p, ignore_errors=True)
-            self.p.mkdir(parents=True)
+        if export_csv_path:
+            self.export_csv_path = Path(export_csv_path, simulation_id)
+            shutil.rmtree(self.export_csv_path, ignore_errors=True)
+            self.export_csv_path.mkdir(parents=True)
+        else:
+            self.export_csv_path = None
 
         self.db = db_engine
 
@@ -82,9 +95,31 @@ class WriteOutput(Role):
         self.end = end
         # initalizes dfs for storing and writing asynchron
         self.write_dfs: dict = defaultdict(list)
+        self.locks = defaultdict(lambda: Lock())
 
         if self.db is not None:
             self.delete_db_scenario(self.simulation_id)
+
+        self.kpi_defs: dict[str, OutputDef] = {
+            "avg_price": {
+                "value": "avg(price)",
+                "from_table": "market_meta",
+            },
+            "total_cost": {
+                "value": "sum(price*demand_volume_energy)",
+                "from_table": "market_meta",
+            },
+            "total_volume": {
+                "value": "sum(demand_volume_energy)",
+                "from_table": "market_meta",
+            },
+            "capacity_factor": {
+                "value": "avg(power/max_power)",
+                "from_table": 'market_dispatch ud join power_plant_meta um on ud.unit_id = um."index" and ud.simulation=um.simulation',
+                "group_bys": ["market_id", "variable"],
+            },
+        }
+        self.kpi_defs.update(additional_kpis)
 
     def delete_db_scenario(self, simulation_id: str):
         """
@@ -99,6 +134,9 @@ class WriteOutput(Role):
         table_names = inspect(self.db).get_table_names()
         # Iterate through each table
         for table_name in table_names:
+            # ignore postgis table
+            if "spatial_ref_sys" == table_name:
+                continue
             try:
                 with self.db.begin() as db:
                     # create index on table
@@ -156,7 +194,9 @@ class WriteOutput(Role):
             until=self.end,
             cache=True,
         )
-        self.context.schedule_recurrent_task(self.store_dfs, recurrency_task)
+        self.context.schedule_recurrent_task(
+            self.store_dfs, recurrency_task, src="no_wait"
+        )
 
     def handle_message(self, content: dict, meta: MetaDict):
         """
@@ -184,6 +224,9 @@ class WriteOutput(Role):
 
         elif content.get("type") == "rl_learning_params":
             self.write_rl_params(content.get("data"))
+
+        elif content.get("type") == "grid_topology":
+            self.store_grid(content.get("data"), content.get("market_id"))
 
     def write_rl_params(self, rl_params: dict):
         """
@@ -222,35 +265,100 @@ class WriteOutput(Role):
         """
         Stores the data frames to CSV files and the database. Is scheduled as a recurrent task based on the frequency.
         """
+        if not self.db and not self.export_csv_path:
+            return
 
         for table in self.write_dfs.keys():
-            if len(self.write_dfs[table]) == 0:
-                continue
+            with self.locks[table]:
+                if len(self.write_dfs[table]) == 0:
+                    continue
 
-            df = pd.concat(self.write_dfs[table], axis=0)
-            df.reset_index()
+                df = pd.concat(self.write_dfs[table], axis=0)
+                df.reset_index()
+                if df.empty:
+                    continue
+
+                df = df.apply(self.check_for_tensors)
+
+                if self.export_csv_path:
+                    data_path = self.export_csv_path / f"{table}.csv"
+                    df.to_csv(
+                        data_path,
+                        mode="a",
+                        header=not data_path.exists(),
+                        float_format="%.5g",
+                    )
+
+                if self.db is not None:
+                    try:
+                        with self.db.begin() as db:
+                            df.to_sql(table, db, if_exists="append")
+                    except (ProgrammingError, OperationalError, DataError):
+                        self.check_columns(table, df)
+                        # now try again
+                        with self.db.begin() as db:
+                            df.to_sql(table, db, if_exists="append")
+
+                self.write_dfs[table] = []
+
+    def store_grid(
+        self,
+        grid: dict[str, pd.DataFrame],
+        market_id: str,
+    ):
+        """
+        Stores the grid data to the database.
+        This is done once at the beginning for every agent which takes care of a grid.
+        """
+        if self.db is None:
+            return
+
+        with self.db.begin() as db:
+            try:
+                db.execute(text("CREATE EXTENSION IF NOT EXISTS postgis;"))
+            except Exception:
+                logger.info("tried writing grid data to non postGIS database")
+                return
+
+        grid["buses"]["wkt_srid_4326"] = grid["buses"].agg(
+            "SRID=4326;POINT ({0[x]} {0[y]})".format, axis=1
+        )
+        translate_point_dict = grid["buses"]["wkt_srid_4326"].to_dict()
+        translate_dict = grid["buses"].agg("{0[x]} {0[y]}".format, axis=1).to_dict()
+
+        def create_line(row):
+            return f"SRID=4326;LINESTRING ({translate_dict[row['bus0']]}, {translate_dict[row['bus1']]})"
+
+        # Apply the function to each row
+        grid["lines"]["wkt_srid_4326"] = grid["lines"].apply(create_line, axis=1)
+
+        grid_col = "node" if "node" in grid["generators"].columns else "bus"
+        grid["generators"]["wkt_srid_4326"] = grid["generators"][grid_col].apply(
+            translate_point_dict.get
+        )
+        grid_col = "node" if "node" in grid["loads"].columns else "bus"
+        grid["loads"]["wkt_srid_4326"] = grid["loads"][grid_col].apply(
+            translate_point_dict.get
+        )
+
+        for table, df in grid.items():
+            geo_table = f"{table}_geo"
             if df.empty:
                 continue
+            df["simulation"] = self.simulation_id
+            df.reset_index()
 
-            df = df.apply(self.check_for_tensors)
+            try:
+                with self.db.begin() as db:
+                    df.to_sql(geo_table, db, if_exists="append")
+            except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
+                # if a column is missing, check and try again
+                self.check_columns(geo_table, df)
+                # now try again
+                with self.db.begin() as db:
+                    df.to_sql(geo_table, db, if_exists="append")
 
-            if self.export_csv_path:
-                data_path = self.p.joinpath(f"{table}.csv")
-                df.to_csv(data_path, mode="a", header=not data_path.exists())
-
-            if self.db is not None:
-                try:
-                    with self.db.begin() as db:
-                        df.to_sql(table, db, if_exists="append")
-                except (ProgrammingError, OperationalError, DataError):
-                    self.check_columns(table, df)
-                    # now try again
-                    with self.db.begin() as db:
-                        df.to_sql(table, db, if_exists="append")
-
-            self.write_dfs[table] = []
-
-    def check_columns(self, table: str, df: pd.DataFrame):
+    def check_columns(self, table: str, df: pd.DataFrame, index: bool = True):
         """
         Checks and adds columns to the database table if necessary.
 
@@ -262,16 +370,31 @@ class WriteOutput(Role):
             # Read table into Pandas DataFrame
             query = f"select * from {table} where 1=0"
             db_columns = pd.read_sql(query, db).columns
+
         for column in df.columns:
-            if column not in db_columns:
+            if column.lower() not in db_columns:
                 try:
                     # TODO this only works for float and text
-                    column_type = "float" if is_numeric_dtype(df[column]) else "text"
+                    if is_bool_dtype(df[column]):
+                        column_type = "boolean"
+                    elif is_numeric_dtype(df[column]):
+                        column_type = "float"
+                    else:
+                        column_type = "text"
                     query = f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"
                     with self.db.begin() as db:
                         db.execute(text(query))
                 except Exception:
                     logger.exception("Error converting column")
+
+        if index and df.index.name:
+            df.index.name = df.index.name.lower()
+            if df.index.name in db_columns:
+                return
+            column_type = "float" if is_numeric_dtype(df.index) else "text"
+            query = f"ALTER TABLE {table} ADD COLUMN {df.index.name} {column_type}"
+            with self.db.begin() as db:
+                db.execute(text(query))
 
     def check_for_tensors(self, data: pd.Series):
         """
@@ -316,10 +439,17 @@ class WriteOutput(Role):
         del df["only_hours"]
         del df["agent_id"]
 
+        if "bid_type" not in df.columns:
+            df["bid_type"] = None
+
+        if "node" not in df.columns:
+            df["node"] = None
+
         df["simulation"] = self.simulation_id
         df["market_id"] = market_id
 
-        self.write_dfs["market_orders"].append(df)
+        with self.locks["market_orders"]:
+            self.write_dfs["market_orders"].append(df)
 
     def write_units_definition(self, unit_info: dict):
         """
@@ -339,7 +469,8 @@ class WriteOutput(Role):
         u_info = {unit_info["id"]: unit_info}
         del unit_info["id"]
 
-        self.write_dfs[table_name].append(pd.DataFrame(u_info).T)
+        with self.locks[table_name]:
+            self.write_dfs[table_name].append(pd.DataFrame(u_info).T)
 
     def write_market_dispatch(self, data: any):
         """
@@ -377,12 +508,13 @@ class WriteOutput(Role):
         if self.db is None:
             return
 
-        queries = [
-            f"select 'avg_price' as variable, market_id as ident, avg(price) as value from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select 'total_cost' as variable, market_id as ident, sum(price*demand_volume_energy) as value from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select 'total_volume' as variable, market_id as ident, sum(demand_volume_energy) as value from market_meta where simulation = '{self.simulation_id}' group by market_id",
-            f"select 'capacity_factor' as variable, market_id as ident, avg(power/max_power) as value from market_dispatch ud join power_plant_meta um on ud.unit_id = um.\"index\" and ud.simulation=um.simulation where um.simulation = '{self.simulation_id}' group by variable, market_id",
-        ]
+        queries = []
+        for variable, kpi_def in self.kpi_defs.items():
+            group_bys = ",".join(kpi_def.get("group_bys", ["market_id"]))
+            queries.append(
+                f"select '{variable}' as variable, market_id as ident, {kpi_def['value']} as value from {kpi_def['from_table']} where simulation = '{self.simulation_id}' group by {group_bys}"
+            )
+
         if self.episode:
             queries.extend(
                 [
@@ -405,7 +537,7 @@ class WriteOutput(Role):
             dfs.append(df)
 
         # remove all empty dataframes
-        dfs = [df for df in dfs if not df.empty]
+        dfs = [df for df in dfs if not df.empty and df["value"].notna().all()]
         if not dfs:
             return
 
@@ -414,12 +546,13 @@ class WriteOutput(Role):
         df["simulation"] = self.simulation_id
 
         if self.export_csv_path:
-            kpi_data_path = self.p.joinpath("kpis.csv")
+            kpi_data_path = self.export_csv_path / "kpis.csv"
             df.to_csv(
                 kpi_data_path,
                 mode="a",
                 header=not kpi_data_path.exists(),
                 index=None,
+                float_format="%.5g",
             )
 
         if self.db is not None and not df.empty:

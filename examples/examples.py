@@ -39,6 +39,25 @@ availabe_examples = {
         "scenario": "example_01c",
         "study_case": "eom_and_crm",
     },
+    "small_with_redispatch": {
+        "scenario": "example_01d",
+        "study_case": "base",
+    },
+    "small_with_nodal_clearing": {
+        "scenario": "example_01d",
+        "study_case": "nodal_case",
+    },
+    "small_with_zonal_clearing": {
+        "scenario": "example_01d",
+        "study_case": "zonal_case",
+    },
+    "small_with_steel_plant": {
+        "scenario": "example_04",
+        "study_case": "base_case_steel_plant_2019",
+    },
+    "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
+    "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
+    "small_learning_3": {"scenario": "example_02c", "study_case": "dam"},
     "large_2019_eom": {"scenario": "example_02", "study_case": "base_case_2019"},
     "large_2019_eom_crm": {
         "scenario": "example_02",
@@ -47,10 +66,6 @@ availabe_examples = {
     "large_2019_day_ahead": {
         "scenario": "example_02",
         "study_case": "dam_case_2019",
-    },
-    "small_with_steel_plant": {
-        "scenario": "example_04",
-        "study_case": "base_case_steel_plant_2019",
     },
 }
 

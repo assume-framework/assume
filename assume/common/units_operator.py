@@ -13,7 +13,6 @@ import pandas as pd
 from mango import Role
 from mango.messages.message import Performatives
 
-from assume.common.base import BaseUnit
 from assume.common.market_objects import (
     ClearingMessage,
     DataRequestMessage,
@@ -29,6 +28,7 @@ from assume.common.utils import (
     timestamp2datetime,
 )
 from assume.strategies import BaseStrategy, LearningStrategy
+from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
 
@@ -288,22 +288,23 @@ class UnitsOperator(Role):
                 orderbook=orderbook,
             )
 
-    def write_actual_dispatch(self, product_type: str) -> None:
+    def get_actual_dispatch(
+        self, product_type: str, last: datetime
+    ) -> tuple[pd.DataFrame, list[pd.DataFrame]]:
         """
-        Sends the actual aggregated dispatch curve.
+        Retrieves the actual dispatch and commits it in the unit.
+        We calculate the series of the actual market results dataframe with accepted bids.
+        And the unit_dispatch for all units taken care of in the UnitsOperator.
 
         Args:
-            product_type (str): The type of the product.
+            product_type (str): The product type for which this is done
+            last (datetime): the last date until which the dispatch was already sent
+
+        Returns:
+            tuple[pd.DataFrame, list[pd.DataFrame]]: market_dispatch and unit_dispatch dataframes
         """
-
-        last = self.last_sent_dispatch[product_type]
-        if self.context.current_timestamp == last:
-            # stop if we exported at this time already
-            return
-        self.last_sent_dispatch[product_type] = self.context.current_timestamp
-
         now = timestamp2datetime(self.context.current_timestamp)
-        start = timestamp2datetime(last)
+        start = timestamp2datetime(last + 1)
 
         market_dispatch = aggregate_step_amount(
             self.valid_orders[product_type],
@@ -327,7 +328,27 @@ class UnitsOperator(Role):
 
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
+        return market_dispatch, unit_dispatch_dfs
 
+    def write_actual_dispatch(self, product_type: str) -> None:
+        """
+        Sends the actual aggregated dispatch curve to the output agent.
+
+        Args:
+            product_type (str): The type of the product.
+        """
+
+        last = self.last_sent_dispatch[product_type]
+        if self.context.current_timestamp == last:
+            # stop if we exported at this time already
+            return
+        self.last_sent_dispatch[product_type] = self.context.current_timestamp
+
+        market_dispatch, unit_dispatch_dfs = self.get_actual_dispatch(
+            product_type, last
+        )
+
+        now = timestamp2datetime(self.context.current_timestamp)
         self.valid_orders[product_type] = list(
             filter(
                 lambda x: x["end_time"] > now,

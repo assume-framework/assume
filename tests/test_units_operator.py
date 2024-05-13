@@ -176,3 +176,37 @@ async def test_write_learning_params(units_operator: UnitsOperator):
     units_operator.write_learning_params(orderbook, marketconfig)
 
     assert len(units_operator.context._scheduler._scheduled_tasks) == open_tasks + 2
+
+
+async def test_get_actual_dispatch(units_operator: UnitsOperator):
+    # GIVEN the first hour happened
+    # the UnitOperator does not
+    clock = units_operator.context._agent_context._container.clock
+
+    last = clock.time
+    clock.set_time(clock.time + 3600)
+    # WHEN actual_dispatch is called
+    market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
+    # THEN resulting unit dispatch dataframe contains one row
+    # which is for the current time - as we must know our current dispatch
+    assert unit_dfs[0].index[0].timestamp() == clock.time
+    assert len(unit_dfs[0]) == 1
+    assert len(market_dispatch) == 0
+
+    # WHEN another hour passes
+    clock.set_time(clock.time + 3600)
+    last = clock.time - 3600
+
+    # THEN resulting unit dispatch dataframe contains only one row with current dispatch
+    market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
+    assert unit_dfs[0].index[0].timestamp() == clock.time
+    assert len(unit_dfs[0]) == 1
+    assert len(market_dispatch) == 0
+
+    clock.set_time(clock.time + 3600)
+    last = clock.time - 3600
+
+    market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
+    assert unit_dfs[0].index[0].timestamp() == clock.time
+    assert len(unit_dfs[0]) == 1
+    assert len(market_dispatch) == 0

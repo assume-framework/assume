@@ -399,7 +399,7 @@ def test_plot_function(mock_pyplot):
 
 
 @patch("matplotlib.pyplot.show")
-def test_plot_function(mock_pyplot):
+def test_visualize_function(mock_pyplot):
     orderbook = create_orderbook()
     i = -1
     for o in orderbook:
@@ -416,7 +416,7 @@ def test_broken_timestamps():
 
     unix_epoch_start = datetime.fromtimestamp(0)
     true_unix_epoch_start = unix_start
-    offset = tzlocal().utcoffset(datetime.now())
+    offset = tzlocal().utcoffset(datetime.fromtimestamp(0))
     # this should be 1970-01-01-00-00 but it isn't (when run in CET locale)
     # so we always have this offset
     assert true_unix_epoch_start + offset == unix_epoch_start

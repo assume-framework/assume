@@ -37,6 +37,7 @@ class Order(TypedDict):
         price (Number): the price of the order
         accepted_price (Number | dict[datetime, Number]): the accepted price of the order
         agent_id (str): the id of the agent
+        node (str): the node of market where the order is placed
         only_hours (OnlyHours | None): tuple of hours from which this order is available, on multi day products
     """
 
@@ -48,6 +49,7 @@ class Order(TypedDict):
     price: Number
     accepted_price: Number | dict[datetime, Number]
     agent_id: str
+    node: str
     only_hours: Optional[OnlyHours]
 
 

@@ -85,27 +85,25 @@ def load_file(
                 df.index, pd.DatetimeIndex
             ):
                 logger.warning(
-                    f"{file_name}: simulation time line does not match length of dataframe and index is not a datetimeindex."
+                    f"{file_name}: simulation time line does not match length of dataframe and index is not a datetimeindex. Returning None."
                 )
-                raise ValueError
+                return None
 
             df.index.freq = df.index.inferred_freq
 
             if len(df.index) < len(index) and df.index.freq == index.freq:
                 logger.warning(
-                    f"{file_name}: simulation time line is longer than length of the dataframe."
+                    f"{file_name}: simulation time line is longer than length of the dataframe. Returning None."
                 )
-                raise ValueError
+                return None
 
             if df.index.freq < index.freq:
                 df = df.resample(index.freq).mean()
                 logger.info(f"Downsampling {file_name} successful.")
 
             elif df.index.freq > index.freq or len(df.index) < len(index):
-                logger.warning(
-                    f"{file_name}: frequency of dataframe is higher than index."
-                )
-                raise ValueError
+                logger.warning("Upsampling not implemented yet. Returning None.")
+                return None
 
             df = df.loc[index]
 
@@ -116,43 +114,75 @@ def load_file(
         return None
 
 
-def load_dsm_units(path: str, config: dict, file_name: str) -> pd.DataFrame:
+def load_dsm_units(
+    path: str,
+    config: dict,
+    file_name: str,
+) -> pd.DataFrame:
+    """
+    Loads and processes a CSV file containing DSM unit data, where each unit may consist of multiple components
+    (technologies) under the same plant name. The function groups data by plant name, processes each group to
+    handle different technologies, and organizes the data into a structured DataFrame.
+
+    Parameters:
+        path (str): The directory path where the CSV file is located.
+        config (dict): Configuration dictionary, potentially used for specifying additional options or behaviors
+                       (not used in the current implementation but provides flexibility for future enhancements).
+        file_name (str): The name of the CSV file to be loaded.
+
+    Returns:
+        pd.DataFrame: A DataFrame where each row represents a plant with its components organized into nested
+                      dictionaries under the 'components' column. Each plant's common attributes like unit operator
+                      and objective are directly in the row.
+
+    Notes:
+        - The CSV file is expected to have columns such as 'name', 'technology', and other operational parameters.
+        - The function assumes that the first non-null value in common and bidding columns is representative if multiple
+          entries exist for the same plant.
+        - It is crucial that the input CSV file follows the expected structure for the function to process it correctly.
+    """
+
     dsm_units = load_file(
         path=path,
         config=config,
         file_name=file_name,
     )
-    # convert dsm_units into a components dict where each technology has values with non nan values
-    columns = ["unit_operator", "objective", "demand", "cost_tolerance"]
+
+    if dsm_units is None:
+        return None
+
+    # Define columns that are common across different technologies within the same plant
+    common_columns = ["unit_operator", "objective", "demand", "cost_tolerance"]
+    bidding_columns = [col for col in dsm_units.columns if col.startswith("bidding_")]
+
+    # Initialize the dictionary to hold the final structured data
     dsm_units_dict = {}
-    for name, data in dsm_units.groupby(dsm_units.index):
+
+    # Process each group of components by plant name
+    for name, group in dsm_units.groupby(dsm_units.index):
         dsm_unit = {}
-        # add other columns to dsm_unit
-        dsm_unit.update(data[columns].iloc[0].to_dict())
-        # remove the columns from the dataframe
-        data = data.drop(columns=columns)
 
-        # also add all values from columns starting with bidding_
-        for key, value in data.items():
-            if key.startswith("bidding_"):
-                dsm_unit[key] = value.iloc[0]
-                # remove the column from the dataframe
-                data = data.drop(columns=[key])
+        # Aggregate or select appropriate data for common and bidding columns
+        # We take the first non-null entry
+        for col in common_columns + bidding_columns:
+            non_null_values = group[col].dropna()
+            if not non_null_values.empty:
+                dsm_unit[col] = non_null_values.iloc[0]
 
+        # Process each technology within the plant
         components = {}
-        for tech in data["technology"].unique():
-            tech_df = data[data["technology"] == tech]
-            tech_df = tech_df.dropna(axis=1, how="all")
-            # drop technology column
-            tech_df = tech_df.drop(columns=["technology"])
-            components[tech] = tech_df.to_dict(orient="records")[0]
+        for tech, tech_data in group.groupby("technology"):
+            # Clean the technology-specific data: drop all-NaN columns and 'technology' column
+            cleaned_data = tech_data.dropna(axis=1, how="all").drop(
+                columns=["technology"]
+            )
+            components[tech] = cleaned_data.to_dict(orient="records")[0]
 
         dsm_unit["components"] = components
-
         dsm_units_dict[name] = dsm_unit
 
+    # Convert the structured dictionary into a DataFrame
     dsm_units = pd.DataFrame.from_dict(dsm_units_dict, orient="index")
-
     return dsm_units
 
 
@@ -184,12 +214,14 @@ def replace_paths(config: dict, inputs_path: str):
     Returns:
         dict: the adjusted config dict
     """
+
     if isinstance(config, dict):
         for key, value in config.items():
             if isinstance(value, (dict, list)):
                 config[key] = replace_paths(value, inputs_path)
             elif isinstance(key, str) and key.endswith("_path"):
-                config[key] = inputs_path + "/" + value
+                if not value.startswith(inputs_path):
+                    config[key] = inputs_path + "/" + value
     elif isinstance(config, list):
         for i, item in enumerate(config):
             config[i] = replace_paths(item, inputs_path)
@@ -259,6 +291,21 @@ def make_market_config(
     )
 
     return market_config
+
+
+def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame]:
+    network_path = Path(network_path)
+    buses = pd.read_csv(network_path / "buses.csv", index_col=0)
+    lines = pd.read_csv(network_path / "lines.csv", index_col=0)
+    generators = pd.read_csv(network_path / "powerplant_units.csv", index_col=0)
+    loads = pd.read_csv(network_path / "demand_units.csv", index_col=0)
+
+    return {
+        "buses": buses,
+        "lines": lines,
+        "generators": generators,
+        "loads": loads,
+    }
 
 
 def add_units(
@@ -340,8 +387,6 @@ async def load_scenario_folder_async(
     config = config[study_case]
     logger.info(f"Starting Scenario {scenario}/{study_case} from {inputs_path}")
 
-    config = replace_paths(config, path)
-
     world.reset()
 
     start = pd.Timestamp(config["start_date"])
@@ -400,7 +445,9 @@ async def load_scenario_folder_async(
     if not learning_config.get("trained_policies_save_path"):
         learning_config[
             "trained_policies_save_path"
-        ] = f"{inputs_path}/learned_strategies/{sim_id}"
+        ] = f"./learned_strategies/{study_case}"
+
+    config = replace_paths(config, path)
 
     if learning_config.get("learning_mode", False):
         sim_id = f"{sim_id}_{episode}"
@@ -425,13 +472,13 @@ async def load_scenario_folder_async(
     )
     forecaster.set_forecast(forecasts_df)
 
-    forecasts_df = load_file(
-        path=path,
-        config=config,
-        file_name="operation_states_df",
-        index=index,
-    )
-    forecaster.set_forecast(forecasts_df)
+    # forecasts_df = load_file(
+    #     path=path,
+    #     config=config,
+    #     file_name="operation_states_df",
+    #     index=index,
+    # )
+    # forecaster.set_forecast(forecasts_df)
 
     demand_df = load_file(
         path=path,
@@ -501,6 +548,9 @@ async def load_scenario_folder_async(
             world_start=start,
             world_end=end,
         )
+        if "network_path" in market_config.param_dict.keys():
+            grid_data = read_grid(market_config.param_dict["network_path"])
+            market_config.param_dict["grid_data"] = grid_data
 
         operator_id = str(market_params["operator"])
         if operator_id not in world.market_operators:
@@ -726,7 +776,11 @@ def load_custom_units(
 
 
 def run_learning(
-    world: World, inputs_path: str, scenario: str, study_case: str
+    world: World,
+    inputs_path: str,
+    scenario: str,
+    study_case: str,
+    verbose: bool = False,
 ) -> None:
     """
     Train Deep Reinforcement Learning (DRL) agents to act in a simulated market environment.
@@ -747,6 +801,9 @@ def run_learning(
         - The best policies are chosen based on the average reward obtained during the evaluation runs, and they are saved for future use.
     """
     from assume.reinforcement_learning.buffer import ReplayBuffer
+
+    if not verbose:
+        logger.setLevel(logging.WARNING)
 
     # remove csv path so that nothing is written while learning
     temp_csv_path = world.export_csv_path
@@ -858,3 +915,7 @@ def run_learning(
         study_case,
         perform_learning=False,
     )
+
+
+if __name__ == "__main__":
+    data = read_grid(Path("examples/inputs/example_01d"))

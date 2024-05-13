@@ -1,11 +1,3 @@
-<<<<<<<< HEAD:examples/inputs/example_04/config.yml
-base_case_steel_plant_2019:
-  start_date: 2019-01-01 00:00
-  end_date: 2019-01-02 23:00
-  time_step: 1h
-  save_frequency_hours: 24
-========
-
 # SPDX-FileCopyrightText: ASSUME Developers
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
@@ -16,16 +8,15 @@ base:
   time_step: 1h
   save_frequency_hours: 24
 
->>>>>>>> main:examples/inputs/example_01b/config.yaml
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
       products:
         - duration: 1h
-          count: 24
+          count: 1
           first_delivery: 1h
-      opening_frequency: 24h
+      opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh
       maximum_bid_volume: 100000

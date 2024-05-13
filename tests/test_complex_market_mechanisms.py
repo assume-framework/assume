@@ -5,6 +5,7 @@
 import math
 from datetime import datetime, timedelta
 
+import pandas as pd
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
 
@@ -17,7 +18,7 @@ from .utils import extend_orderbook
 simple_dayahead_auction_config = MarketConfig(
     market_id="simple_dayahead_auction",
     market_products=[MarketProduct(rd(hours=+1), 1, rd(hours=1))],
-    additional_fields=["node_id"],
+    additional_fields=["node"],
     opening_hours=rr.rrule(
         rr.HOURLY,
         dtstart=datetime(2005, 6, 1),
@@ -34,9 +35,7 @@ eps = 1e-4
 
 
 def test_complex_clearing():
-    import copy
-
-    market_config = copy.copy(simple_dayahead_auction_config)
+    market_config = simple_dayahead_auction_config
     h = 24
     market_config.market_products = [MarketProduct(rd(hours=+1), h, rd(hours=1))]
     market_config.additional_fields = [
@@ -72,10 +71,220 @@ def test_complex_clearing():
     assert math.isclose(accepted_orders[2]["volume"], 900, abs_tol=eps)
 
 
-def test_complex_clearing_BB():
-    import copy
+def test_market_coupling():
+    market_config = simple_dayahead_auction_config
+    h = 2
+    market_config.market_products = [MarketProduct(rd(hours=+1), h, rd(hours=1))]
+    market_config.additional_fields = [
+        "bid_type",
+        "node_id",
+    ]
+    # Create a dictionary with the data
+    nodes = {
+        "name": ["node1", "node2"],
+        "v_nom": [380.0, 380.0],
+    }
 
-    market_config = copy.copy(simple_dayahead_auction_config)
+    # Convert the dictionary to a Pandas DataFrame with 'name' as the index
+    nodes = pd.DataFrame(nodes).set_index("name")
+
+    # Create a dictionary with the data
+    lines = {
+        "name": ["line_1"],
+        "bus0": ["node1"],
+        "bus1": ["node2"],
+        "s_nom": [500.0],
+    }
+
+    # Convert the dictionary to a Pandas DataFrame
+    lines = pd.DataFrame(lines)
+
+    grid_data = {"buses": nodes, "lines": lines}
+    market_config.param_dict["grid_data"] = grid_data
+
+    next_opening = market_config.opening_hours.after(datetime.now())
+    products = get_available_products(market_config.market_products, next_opening)
+    assert len(products) == h
+
+    """
+    Create Orderbook with constant order volumes and prices:
+        - dem1: volume = -1000, price = 3000, node1
+        - dem2: volume = -200, price = 3000, node2
+        - gen1: volume = 1000, price = 100, node1
+        - gen2: volume = 1000, price = 50, node2
+    """
+    orderbook = []
+    orderbook = extend_orderbook(
+        products, volume=-1000, price=3000, orderbook=orderbook, node="node1"
+    )
+    orderbook = extend_orderbook(
+        products, volume=-200, price=3000, orderbook=orderbook, node="node2"
+    )
+    orderbook = extend_orderbook(products, 1000, 100, orderbook, node="node1")
+    orderbook = extend_orderbook(products, 1000, 50, orderbook, node="node2")
+
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+
+    assert meta[0]["node"] == "node1"
+    assert math.isclose(meta[0]["supply_volume"], 500, abs_tol=eps)
+    assert math.isclose(meta[0]["demand_volume"], 1000, abs_tol=eps)
+    assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
+
+    assert meta[2]["node"] == "node2"
+    assert math.isclose(meta[2]["supply_volume"], 700, abs_tol=eps)
+    assert math.isclose(meta[2]["demand_volume"], 200, abs_tol=eps)
+    assert math.isclose(meta[2]["price"], 50, abs_tol=eps)
+
+    assert rejected_orders == []
+    assert accepted_orders[0]["agent_id"] == "dem1"
+    assert math.isclose(accepted_orders[0]["accepted_volume"], -1000, abs_tol=eps)
+    assert accepted_orders[1]["agent_id"] == "dem3"
+    assert math.isclose(accepted_orders[1]["accepted_volume"], -200, abs_tol=eps)
+
+    assert accepted_orders[2]["agent_id"] == "gen5"
+    assert math.isclose(accepted_orders[2]["accepted_volume"], 500, abs_tol=eps)
+    assert math.isclose(accepted_orders[2]["accepted_price"], 100, abs_tol=eps)
+
+    assert accepted_orders[3]["agent_id"] == "gen7"
+    assert math.isclose(accepted_orders[3]["accepted_volume"], 700, abs_tol=eps)
+    assert math.isclose(accepted_orders[3]["accepted_price"], 50, abs_tol=eps)
+
+    market_config.param_dict = {}
+
+
+def test_market_coupling_with_island():
+    market_config = simple_dayahead_auction_config
+    h = 2
+    market_config.market_products = [MarketProduct(rd(hours=+1), h, rd(hours=1))]
+    market_config.additional_fields = [
+        "bid_type",
+        "node_id",
+    ]
+    # Create a dictionary with the data
+    nodes = {
+        "name": ["node1", "node2", "node3"],
+        "v_nom": [380.0, 380.0, 380.0],
+    }
+
+    # Convert the dictionary to a Pandas DataFrame with 'name' as the index
+    nodes = pd.DataFrame(nodes).set_index("name")
+
+    # Create a dictionary with the data
+    lines = {
+        "name": ["line_1"],
+        "bus0": ["node1"],
+        "bus1": ["node2"],
+        "s_nom": [500.0],
+    }
+
+    # Convert the dictionary to a Pandas DataFrame
+    lines = pd.DataFrame(lines)
+
+    grid_data = {"buses": nodes, "lines": lines}
+    market_config.param_dict["grid_data"] = grid_data
+
+    next_opening = market_config.opening_hours.after(datetime.now())
+    products = get_available_products(market_config.market_products, next_opening)
+    assert len(products) == h
+
+    """
+    Create Orderbook with constant order volumes and prices:
+        - dem1: volume = -1000, price = 3000, node1
+        - dem2: volume = -200, price = 3000, node2
+        - dem3: volume = -500, price = 3000, node3
+        - gen1: volume = 1000, price = 100, node1
+        - gen2: volume = 1000, price = 50, node2
+        - gen3: volume = 400, price = 75, node3
+    """
+    orderbook = []
+    orderbook = extend_orderbook(
+        products, volume=-1000, price=3000, orderbook=orderbook, node="node1"
+    )
+    orderbook = extend_orderbook(
+        products, volume=-200, price=3000, orderbook=orderbook, node="node2"
+    )
+    orderbook = extend_orderbook(
+        products, volume=-500, price=3000, orderbook=orderbook, node="node3"
+    )
+    orderbook = extend_orderbook(
+        products, volume=1000, price=100, orderbook=orderbook, node="node1"
+    )
+    orderbook = extend_orderbook(
+        products, volume=1000, price=50, orderbook=orderbook, node="node2"
+    )
+    orderbook = extend_orderbook(
+        products, volume=400, price=75, orderbook=orderbook, node="node3"
+    )
+
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+
+    assert rejected_orders == []
+    assert accepted_orders[0]["node"] == "node1"
+    assert math.isclose(accepted_orders[0]["accepted_volume"], -1000, abs_tol=eps)
+    assert accepted_orders[1]["node"] == "node2"
+    assert math.isclose(accepted_orders[1]["accepted_volume"], -200, abs_tol=eps)
+    assert accepted_orders[2]["node"] == "node3"
+    assert math.isclose(accepted_orders[2]["accepted_volume"], -400, abs_tol=eps)
+
+    assert accepted_orders[3]["node"] == "node1"
+    assert math.isclose(accepted_orders[3]["accepted_volume"], 500, abs_tol=eps)
+    assert math.isclose(accepted_orders[3]["accepted_price"], 100, abs_tol=eps)
+
+    assert accepted_orders[4]["node"] == "node2"
+    assert math.isclose(accepted_orders[4]["accepted_volume"], 700, abs_tol=eps)
+    assert math.isclose(accepted_orders[4]["accepted_price"], 50, abs_tol=eps)
+
+    assert accepted_orders[5]["node"] == "node3"
+    assert math.isclose(accepted_orders[5]["accepted_volume"], 400, abs_tol=eps)
+    assert math.isclose(accepted_orders[5]["accepted_price"], 3000, abs_tol=eps)
+
+    # add a new line between node2 and node3
+    lines = pd.concat(
+        [
+            lines,
+            pd.DataFrame(
+                {
+                    "name": ["line_2"],
+                    "bus0": ["node2"],
+                    "bus1": ["node3"],
+                    "s_nom": [200.0],
+                }
+            ),
+        ]
+    )
+    grid_data = {"buses": nodes, "lines": lines}
+    market_config.param_dict["grid_data"] = grid_data
+
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+
+    assert rejected_orders == []
+    assert accepted_orders[0]["node"] == "node1"
+    assert math.isclose(accepted_orders[0]["accepted_volume"], -1000, abs_tol=eps)
+    assert accepted_orders[1]["node"] == "node2"
+    assert math.isclose(accepted_orders[1]["accepted_volume"], -200, abs_tol=eps)
+    assert accepted_orders[2]["node"] == "node3"
+    assert math.isclose(accepted_orders[2]["accepted_volume"], -500, abs_tol=eps)
+
+    assert accepted_orders[3]["node"] == "node1"
+    assert math.isclose(accepted_orders[3]["accepted_volume"], 500, abs_tol=eps)
+    assert math.isclose(accepted_orders[3]["accepted_price"], 100, abs_tol=eps)
+
+    assert accepted_orders[4]["node"] == "node2"
+    assert math.isclose(accepted_orders[4]["accepted_volume"], 900, abs_tol=eps)
+    assert math.isclose(accepted_orders[4]["accepted_price"], 50, abs_tol=eps)
+
+    assert accepted_orders[5]["node"] == "node3"
+    assert math.isclose(accepted_orders[5]["accepted_volume"], 300, abs_tol=eps)
+    assert math.isclose(accepted_orders[5]["accepted_price"], 75, abs_tol=eps)
+
+    market_config.param_dict = {}
+
+
+def test_complex_clearing_BB():
+    market_config = simple_dayahead_auction_config
     market_config.market_products = [MarketProduct(rd(hours=+1), 2, rd(hours=1))]
     market_config.additional_fields = [
         "bid_type",
@@ -216,9 +425,7 @@ def test_complex_clearing_BB():
 
 
 def test_complex_clearing_LB():
-    import copy
-
-    market_config = copy.copy(simple_dayahead_auction_config)
+    market_config = simple_dayahead_auction_config
     market_config.market_products = [MarketProduct(rd(hours=+1), 2, rd(hours=1))]
     market_config.additional_fields = [
         "bid_type",
