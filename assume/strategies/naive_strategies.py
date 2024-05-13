@@ -156,12 +156,53 @@ class NaiveDASteelplantStrategy(BaseStrategy):
         electricity_price = unit.forecaster["price_EOM"]
 
         if unit.power_requirement is None:
-            if unit.objective == "max_flexibility":
-                unit.determine_optimal_operation_with_flex()
-            else:
+            if unit.objective == "min_variable_cost":
                 unit.determine_optimal_operation_without_flex()
 
         # unit.run_modified_optimization()
+
+        bids = []
+        for product in product_tuples:
+            """
+            for each product, calculate the marginal cost of the unit at the start time of the product
+            and the volume of the product. Dispatch the order to the market.
+            """
+            start = product[0]
+            volume = unit.power_requirement.loc[start]
+            price = 3000
+            bids.append(
+                {
+                    "start_time": product[0],
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": price,
+                    "volume": -volume,
+                }
+            )
+
+        return bids
+
+
+class NaiveRedispatchSteelplantStrategy(BaseStrategy):
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        bids = []
+        start = product_tuples[0][0]  # start time of the first product
+        end_all = product_tuples[-1][1]  # end time of the last product
+
+        hydrogen_price = unit.forecaster["hydrogen_price"]
+        electricity_price = unit.forecaster["price_EOM"]
+
+        if unit.power_requirement is None:
+            if unit.flexibility_measure == "max_load_shift":
+                unit.determine_optimal_operation_with_flex()
+
+        # introduce marginal cost
 
         bids = []
         for product in product_tuples:

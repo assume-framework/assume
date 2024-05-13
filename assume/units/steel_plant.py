@@ -43,6 +43,7 @@ class SteelPlant(SupportsMinMax):
         location: tuple[float, float] = (0.0, 0.0),
         components: Dict[str, Dict] = None,
         objective: str = None,
+        flexibility_measure: str = None,
         demand: float = 0,
         cost_tolerance: float = 10,
         **kwargs,
@@ -82,7 +83,7 @@ class SteelPlant(SupportsMinMax):
         self.initialize_components(components)
         self.initialize_process_sequence()
         self.define_variables()
-        # if self.objective == "max_flexibility":
+        # if self.flexibility_measure == "max_load_shift":
         #     flex.flexibility_cost_tolerance(self)
         # if self.objective == "recalculate":
         #     flex.recalculate_with_accepted_offers(self)
@@ -211,7 +212,7 @@ class SteelPlant(SupportsMinMax):
 
         @self.model.Constraint(self.model.time_steps)
         def total_power_input_constraint(m, t):
-            if self.objective == "max_flexibility":
+            if self.objective == "max_load_shift":
                 return pyo.Constraint.Skip
             else:
                 return (
@@ -242,14 +243,17 @@ class SteelPlant(SupportsMinMax):
 
                 return total_variable_cost
 
-        elif self.objective == "max_flexibility":
+        elif self.flexibility_measure == "max_load_shift":
 
             @self.model.Objective(sense=pyo.maximize)
             def obj_rule(m):
-                maximise_flexibility = sum(
+                maximise_load_shift = sum(
                     m.load_shift[t] for t in self.model.time_steps
                 )
-                return maximise_flexibility
+                return maximise_load_shift
+
+        elif self.flexibility_measure == "":
+            pass
 
         else:
             raise ValueError(f"Unknown objective: {self.objective}")
