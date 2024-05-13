@@ -28,8 +28,6 @@ The following table shows the options that can be adjusted and gives a short exp
  ======================================== ==========================================================================================================
   learning config item                    description
  ======================================== ==========================================================================================================
-  observation_dimension                   The dimension of the observations given to the actor in the bidding strategy.
-  action_dimension                        The dimension of the actors made by the actor, which equals the output neurons of the actor neural net.
   continue_learning                       Whether to use pre-learned strategies and then continue learning.
   trained_policies_save_path              Where to store the newly trained rl strategies - only needed when learning_mode is set
   trained_policies_load_path              If pre-learned strategies should be used, where are they stored? - only needed when continue_learning
