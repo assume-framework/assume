@@ -188,6 +188,7 @@ class World:
             None
         """
 
+        self.realtime_start = time.time()
         self.clock = ExternalClock(0)
         self.start = start
         self.end = end
@@ -283,6 +284,7 @@ class World:
             simulation_id=simulation_id,
             start=self.start,
             end=self.end,
+            run_time=None, 
             db_engine=self.db,
             export_csv_path=self.export_csv_path,
             save_frequency_hours=save_frequency_hours,
@@ -531,6 +533,8 @@ class World:
             else:
                 self.clock.set_time(end_ts)
         pbar.close()
+        self.realtime_end = time.time()
+        self.output_role.run_time = self.realtime_end - self.realtime_start
         await self.container.shutdown()
 
     def run(self):

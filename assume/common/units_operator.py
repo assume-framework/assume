@@ -540,6 +540,8 @@ class UnitsOperator(Role):
             ):
                 output_dict = {
                     "datetime": start,
+                    "bidding_time": unit.outputs["rl_bidding_time"].loc[start],
+                    "updating_time": unit.outputs["rl_updating_time"].loc[start],
                     "profit": unit.outputs["profit"].loc[start],
                     "reward": unit.outputs["reward"].loc[start],
                     "regret": unit.outputs["regret"].loc[start],

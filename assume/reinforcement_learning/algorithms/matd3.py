@@ -4,6 +4,7 @@
 
 import logging
 import os
+import time
 
 import torch as th
 from torch.nn import functional as F
@@ -54,6 +55,9 @@ class TD3(RLAlgorithm):
             target_noise_clip,
         )
         self.n_updates = 0
+        self.total_updating_time = {}
+        self.avg_updating_time = {}
+
 
     def save_params(self, directory):
         """
@@ -327,6 +331,7 @@ class TD3(RLAlgorithm):
 
             This function implements the TD3 algorithm's key step for policy improvement and exploration.
         """
+        
 
         #logger.info(f"Updating Policy")
         n_rl_agents = len(self.learning_role.rl_strats.keys())
@@ -336,6 +341,8 @@ class TD3(RLAlgorithm):
             strategy: LearningStrategy
 
             for u_id, strategy in self.learning_role.rl_strats.items():
+                realtime_start = time.time()
+                
                 critic_target = self.learning_role.target_critics[u_id]
                 critic = self.learning_role.critics[u_id]
                 actor = self.learning_role.rl_strats[u_id].actor
@@ -430,5 +437,11 @@ class TD3(RLAlgorithm):
                     polyak_update(
                         actor.parameters(), actor_target.parameters(), self.tau
                     )
-
-                i += 1
+                
+                realtime_end = time.time()
+                # TODO: how to write from here to output role?
+                # self.learning_role.rl_strats[u_id].outputs["rl_updating_time"][self.learning_role.simulation_start] = realtime_end - realtime_start
+                self.total_updating_time[u_id] += realtime_end - realtime_start
+                self.avg_updating_time[u_id] = self.total_updating_time[u_id] / self.n_updates
+                
+                i += 1 
