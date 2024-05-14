@@ -710,6 +710,10 @@ def run_learning(
     # remove csv path so that nothing is written while learning
     temp_csv_path = world.export_csv_path
     world.export_csv_path = ""
+
+    # initialize policies already here to set the obs_dim and act_dim in the learning role
+    actors_and_critics = None
+    world.learning_role.initialize_policy(actors_and_critics=actors_and_critics)
     world.output_role.del_similar_runs()
 
     # check if we already stored policies for this simualtion
@@ -743,7 +747,7 @@ def run_learning(
         "episodes_done": 0,
         "eval_episodes_done": 0,
     }
-
+  
     # -----------------------------------------
 
     validation_interval = min(

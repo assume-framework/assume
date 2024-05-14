@@ -10,8 +10,6 @@ base:
   learning_mode: True
 
   learning_config:
-    observation_dimension: 50
-    action_dimension: 2
     continue_learning: False
     trained_policies_save_path: learned_strategies/example_02b_base
     max_bid_price: 100
