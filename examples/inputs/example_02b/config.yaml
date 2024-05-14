@@ -26,6 +26,8 @@ base:
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 5
+    early_stopping_steps: 10
+    early_stopping_threshold: 0.05
 
   markets_config:
     EOM:

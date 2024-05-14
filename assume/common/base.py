@@ -783,3 +783,5 @@ class LearningConfig(TypedDict):
     noise_scale: int
     noise_dt: int
     trained_policies_save_path: str
+    early_stopping_steps: int
+    early_stopping_threshold: float

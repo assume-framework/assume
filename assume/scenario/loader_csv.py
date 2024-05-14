@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -715,7 +716,11 @@ def run_learning(
     # initialize policies already here to set the obs_dim and act_dim in the learning role
     actors_and_critics = None
     world.learning_role.initialize_policy(actors_and_critics=actors_and_critics)
+    world.output_role.del_similar_runs()
+    save_path = world.learning_config["trained_policies_save_path"]
 
+    # -----------------------------------------
+    # Information That needs to be stored across episodes, aka one simulation run
     buffer = ReplayBuffer(
         buffer_size=int(world.learning_config.get("replay_buffer_size", 5e5)),
         obs_dim=world.learning_role.rl_algorithm.obs_dim,
@@ -724,7 +729,11 @@ def run_learning(
         device=world.learning_role.device,
         float_type=world.learning_role.float_type,
     )
-    world.output_role.del_similar_runs()
+    actors_and_critics = None
+    max_eval = defaultdict(lambda: -1e9)
+    all_eval = defaultdict(list)
+    avg_eval = []
+    # -----------------------------------------
 
     validation_interval = min(
         world.learning_role.training_episodes,
@@ -732,7 +741,6 @@ def run_learning(
     )
 
     eval_episode = 1
-    save_path = world.learning_config["trained_policies_save_path"]
 
     if Path(save_path).is_dir():
         # we are in learning mode and about to train new policies, which might overwrite existing ones
@@ -758,28 +766,35 @@ def run_learning(
                 episode=episode,
             )
 
-        # give the newly created rl_agent the buffer that we stored from the beginning
+        # -----------------------------------------
+        # Give the newly initliazed learning role the needed information across episodes
+        last_policies_path = save_path + "/last_policies"
         world.learning_role.initialize_policy(actors_and_critics=actors_and_critics)
-
+        # worl.learning_startegies intitalize policy
         world.learning_role.buffer = buffer
         world.learning_role.episodes_done = episode
+        # -----------------------------------------
 
         if episode > world.learning_role.episodes_collecting_initial_experience:
             world.learning_role.turn_off_initial_exploration()
 
         world.run()
 
+        # they are change implicitly anyhow do to our function call
         actors_and_critics = world.learning_role.rl_algorithm.extract_policy()
 
+        # save current params in training path
+
+        world.learning_role.rl_algorithm.save_params(directory=last_policies_path)
+
+        # evaluation run:
         if (
             episode % validation_interval == 0
             and episode > world.learning_role.episodes_collecting_initial_experience
         ):
-            # save current params in training path
-            world.learning_role.rl_algorithm.save_params(directory=save_path)
             world.reset()
 
-            # load validation run
+            # load evaluation run
             load_scenario_folder(
                 world,
                 inputs_path,
@@ -792,11 +807,25 @@ def run_learning(
 
             world.run()
 
+            world.learning_role.max_eval = max_eval
+            world.learning_role.rl_eval = all_eval
+            world.learning_role.avg_rewards = avg_eval
+
             total_rewards = world.output_role.get_sum_reward()
             avg_reward = np.mean(total_rewards)
-            # check reward improvement in validation run
+            # check reward improvement in evaluation run
             # and store best run in eval folder
-            world.learning_role.compare_and_save_policies({"avg_reward": avg_reward})
+            terminate = world.learning_role.compare_and_save_policies(
+                {"avg_reward": avg_reward}
+            )
+
+            max_eval = world.learning_role.max_eval
+            all_eval = world.learning_role.rl_eval
+            avg_eval = world.learning_role.avg_rewards
+
+            # if we have not improved in the last x evaluations, we stop
+            if terminate:
+                break
 
             eval_episode += 1
         world.reset()
@@ -814,6 +843,7 @@ def run_learning(
     world.export_csv_path = temp_csv_path
 
     # load scenario for evaluation
+    # TODO which policies of the actors are used here? change to last
     load_scenario_folder(
         world,
         inputs_path,
