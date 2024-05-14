@@ -734,8 +734,8 @@ def run_learning(
     inter_episodic_data = {
         "buffer": ReplayBuffer(
             buffer_size=int(world.learning_config.get("replay_buffer_size", 5e5)),
-            obs_dim=world.learning_role.obs_dim,
-            act_dim=world.learning_role.act_dim,
+            obs_dim=world.learning_role.rl_algorithm.obs_dim,
+            act_dim=world.learning_role.rl_algorithm.act_dim,
             n_rl_units=len(world.learning_role.rl_strats),
             device=world.learning_role.device,
             float_type=world.learning_role.float_type,
@@ -747,7 +747,7 @@ def run_learning(
         "episodes_done": 0,
         "eval_episodes_done": 0,
     }
-  
+
     # -----------------------------------------
 
     validation_interval = min(
