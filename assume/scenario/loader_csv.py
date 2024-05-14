@@ -282,8 +282,8 @@ async def load_scenario_folder_async(
     inputs_path: str,
     scenario: str,
     study_case: str,
-    perform_learning: bool = True,
     perform_evaluation: bool = False,
+    terminate_learning: bool = False,
     episode: int = 0,
     eval_episode: int = 0,
 ) -> None:
@@ -297,7 +297,6 @@ async def load_scenario_folder_async(
         inputs_path (str): The path to the folder containing input files necessary for the scenario.
         scenario (str): The name of the scenario to be loaded.
         study_case (str): The specific study case within the scenario to be loaded.
-        perform_learning (bool, optional): A flag indicating whether learning should be performed. Defaults to True.
         perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
         episode (int, optional): The episode number for learning. Defaults to 0.
         eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
@@ -360,10 +359,12 @@ async def load_scenario_folder_async(
     learning_config: LearningConfig = config.get("learning_config", {})
     bidding_strategy_params = config.get("bidding_strategy_params", {})
 
-    learning_config["learning_mode"] = (
-        config.get("learning_mode", False) and perform_learning
-    )
+    learning_config["learning_mode"] = config.get("learning_mode", False)
     learning_config["evaluation_mode"] = perform_evaluation
+
+    if terminate_learning:
+        learning_config["learning_mode"] = False
+        learning_config["evaluation_mode"] = False
 
     if not learning_config.get("trained_policies_save_path"):
         learning_config[
@@ -533,8 +534,8 @@ def load_scenario_folder(
     inputs_path: str,
     scenario: str,
     study_case: str,
-    perform_learning: bool = True,
     perform_evaluation: bool = False,
+    terminate_learning: bool = False,
     episode: int = 1,
     eval_episode: int = 1,
 ):
@@ -548,7 +549,6 @@ def load_scenario_folder(
         inputs_path (str): The path to the folder containing input files necessary for the scenario.
         scenario (str): The name of the scenario to be loaded.
         study_case (str): The specific study case within the scenario to be loaded.
-        perform_learning (bool, optional): A flag indicating whether learning should be performed. Defaults to True.
         perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
         episode (int, optional): The episode number for learning. Defaults to 0.
         eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
@@ -562,7 +562,6 @@ def load_scenario_folder(
             inputs_path="/path/to/inputs",
             scenario="scenario_name",
             study_case="study_case_name",
-            perform_learning=True,
             perform_evaluation=False,
             episode=1,
             eval_episode=1,
@@ -571,7 +570,6 @@ def load_scenario_folder(
 
     Notes:
         - The function sets up the world environment based on the provided inputs and configuration files.
-        - If `perform_learning` is set to True and learning_mode is set, the function initializes the learning mode with the specified episode number.
         - If `perform_evaluation` is set to True, the function performs evaluation using the specified evaluation episode number.
         - The function utilizes the specified inputs to configure the simulation environment, including market parameters, unit operators, and forecasting data.
         - After calling this function, the world environment is prepared for further simulation and analysis.
@@ -583,8 +581,8 @@ def load_scenario_folder(
             inputs_path=inputs_path,
             scenario=scenario,
             study_case=study_case,
-            perform_learning=perform_learning,
             perform_evaluation=perform_evaluation,
+            terminate_learning=terminate_learning,
             episode=episode,
             eval_episode=eval_episode,
         )
@@ -713,30 +711,9 @@ def run_learning(
     temp_csv_path = world.export_csv_path
     world.export_csv_path = ""
     world.output_role.del_similar_runs()
+
+    # check if we already stored policies for this simualtion
     save_path = world.learning_config["trained_policies_save_path"]
-
-    # -----------------------------------------
-    # Information That needs to be stored across episodes, aka one simulation run
-    buffer = ReplayBuffer(
-        buffer_size=int(world.learning_config.get("replay_buffer_size", 5e5)),
-        obs_dim=world.learning_role.obs_dim,
-        act_dim=world.learning_role.act_dim,
-        n_rl_units=len(world.learning_role.rl_strats),
-        device=world.learning_role.device,
-        float_type=world.learning_role.float_type,
-    )
-    actors_and_critics = None
-    max_eval = defaultdict(lambda: -1e9)
-    all_eval = defaultdict(list)
-    avg_eval = []
-    # -----------------------------------------
-
-    validation_interval = min(
-        world.learning_role.training_episodes,
-        world.learning_config.get("validation_episodes_interval", 5),
-    )
-
-    eval_episode = 1
 
     if Path(save_path).is_dir():
         # we are in learning mode and about to train new policies, which might overwrite existing ones
@@ -746,6 +723,35 @@ def run_learning(
         if not accept.lower().startswith("y"):
             # stop here - do not start learning or save anything
             raise AssumeException("don't overwrite existing strategies")
+
+    # -----------------------------------------
+    # Information That needs to be stored across episodes, aka one simulation run
+
+    inter_episodic_data = {
+        "buffer": ReplayBuffer(
+            buffer_size=int(world.learning_config.get("replay_buffer_size", 5e5)),
+            obs_dim=world.learning_role.obs_dim,
+            act_dim=world.learning_role.act_dim,
+            n_rl_units=len(world.learning_role.rl_strats),
+            device=world.learning_role.device,
+            float_type=world.learning_role.float_type,
+        ),
+        "actors_and_critics": None,
+        "max_eval": defaultdict(lambda: -1e9),
+        "all_eval": defaultdict(list),
+        "avg_rewards": [],
+        "episodes_done": 0,
+        "eval_episodes_done": 0,
+    }
+
+    # -----------------------------------------
+
+    validation_interval = min(
+        world.learning_role.training_episodes,
+        world.learning_config.get("validation_episodes_interval", 5),
+    )
+
+    eval_episode = 1
 
     for episode in tqdm(
         range(1, world.learning_role.training_episodes + 1),
@@ -758,30 +764,19 @@ def run_learning(
                 inputs_path,
                 scenario,
                 study_case,
-                perform_learning=True,
                 episode=episode,
             )
 
         # -----------------------------------------
         # Give the newly initliazed learning role the needed information across episodes
-        last_policies_path = save_path + "/last_policies"
-        world.learning_role.initialize_policy(actors_and_critics=actors_and_critics)
-        # worl.learning_startegies intitalize policy
-        world.learning_role.buffer = buffer
-        world.learning_role.episodes_done = episode
-        # -----------------------------------------
+        world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
         if episode > world.learning_role.episodes_collecting_initial_experience:
             world.learning_role.turn_off_initial_exploration()
 
         world.run()
 
-        # they are change implicitly anyhow do to our function call
-        actors_and_critics = world.learning_role.rl_algorithm.extract_policy()
-
-        # save current params in training path
-
-        world.learning_role.rl_algorithm.save_params(directory=last_policies_path)
+        inter_episodic_data = world.learning_role.dump_inter_episodic_data()
 
         # evaluation run:
         if (
@@ -796,16 +791,13 @@ def run_learning(
                 inputs_path,
                 scenario,
                 study_case,
-                perform_learning=False,
                 perform_evaluation=True,
                 eval_episode=eval_episode,
             )
 
-            world.run()
+            world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
-            world.learning_role.max_eval = max_eval
-            world.learning_role.rl_eval = all_eval
-            world.learning_role.avg_rewards = avg_eval
+            world.run()
 
             total_rewards = world.output_role.get_sum_reward()
             avg_reward = np.mean(total_rewards)
@@ -815,9 +807,7 @@ def run_learning(
                 {"avg_reward": avg_reward}
             )
 
-            max_eval = world.learning_role.max_eval
-            all_eval = world.learning_role.rl_eval
-            avg_eval = world.learning_role.avg_rewards
+            inter_episodic_data = world.learning_role.dump_inter_episodic_data()
 
             # if we have not improved in the last x evaluations, we stop
             if terminate:
@@ -839,14 +829,18 @@ def run_learning(
     world.export_csv_path = temp_csv_path
 
     # load scenario for evaluation
-    # TODO which policies of the actors are used here? change to last
+
     load_scenario_folder(
         world,
         inputs_path,
         scenario,
         study_case,
-        perform_learning=False,
+        perform_evaluation=True,
+        eval_episode=eval_episode,
+        terminate_learning=True,
     )
+
+    world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
 
 if __name__ == "__main__":

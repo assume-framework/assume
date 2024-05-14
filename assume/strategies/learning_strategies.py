@@ -53,6 +53,7 @@ class RLStrategy(LearningStrategy):
 
         # tells us whether we are training the agents or just executing per-learnind stategies
         self.learning_mode = kwargs.get("learning_mode", False)
+        self.perform_evaluation = kwargs.get("perform_evaluation", False)
 
         # sets the devide of the actor network
         device = kwargs.get("device", "cpu")
@@ -70,8 +71,7 @@ class RLStrategy(LearningStrategy):
         # define used order types
         self.order_types = kwargs.get("order_types", ["SB"])
 
-        if self.learning_mode:
-            self.learning_role = None
+        if self.learning_mode or self.perform_evaluation:
             self.collect_initial_experience_mode = kwargs.get(
                 "episodes_collecting_initial_experience", True
             )
