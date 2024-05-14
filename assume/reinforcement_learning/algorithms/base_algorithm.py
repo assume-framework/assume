@@ -57,13 +57,8 @@ class RLAlgorithm:
         self.target_noise_clip = target_noise_clip
         self.target_policy_noise = target_policy_noise
 
-        self.obs_dim = self.learning_role.obs_dim
-        self.act_dim = self.learning_role.act_dim
-
         self.device = self.learning_role.device
         self.float_type = self.learning_role.float_type
-
-        self.unique_obs_len = 8
 
     def update_policy(self):
         logger.error(

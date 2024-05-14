@@ -44,8 +44,6 @@ def power_plant() -> PowerPlant:
 @pytest.mark.require_learning
 def test_learning_advanced_orders(mock_market_config, power_plant):
     learning_config: LearningConfig = {
-        "observation_dimension": 97,
-        "action_dimension": 2,
         "algorithm": "matd3",
         "learning_mode": True,
         "training_episodes": 3,

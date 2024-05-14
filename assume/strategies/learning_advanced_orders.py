@@ -51,7 +51,7 @@ class RLAdvancedOrderStrategy(LearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(obs_dim=51, act_dim=2, unique_obs_dim=3, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
 
@@ -332,6 +332,11 @@ class RLAdvancedOrderStrategy(LearningStrategy):
     ):
         """
         Create observation.
+
+        It is important to keep in mind, that the DRL method and the centralized critic relies on
+        unique observation of individual units. The algorithm is designed in such a way, that
+        the unique observations are always placed at the end of the observation space. Please follow this
+        convention when adding new observations.
 
         Args:
             unit (SupportsMinMax): Unit to create observation for

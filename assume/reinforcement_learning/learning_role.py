@@ -43,8 +43,6 @@ class Learning(Role):
 
         # how many learning roles do exist and how are they named
         self.buffer: ReplayBuffer = None
-        self.obs_dim = learning_config["observation_dimension"]
-        self.act_dim = learning_config["action_dimension"]
         self.early_stopping_steps = learning_config.get("early_stopping_steps", 10)
         self.early_stopping_threshold = learning_config.get(
             "early_stopping_threshold", 0.05
