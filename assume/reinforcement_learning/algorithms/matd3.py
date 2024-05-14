@@ -424,6 +424,8 @@ class TD3(RLAlgorithm):
 
                 all_actions = actions.view(self.batch_size, -1)
 
+                # this takes the unique observations from all other agents assuming that
+                # the unique observations are at the end of the observation vector
                 temp = th.cat(
                     (
                         states[:, :i, self.obs_dim - self.unique_obs_dim :].reshape(
@@ -436,11 +438,14 @@ class TD3(RLAlgorithm):
                     axis=1,
                 )
 
+                # the final all_states vector now contains the current agent's observation
+                # and the unique observations from all other agents
                 all_states = th.cat(
                     (states[:, i, :].reshape(self.batch_size, -1), temp), axis=1
                 ).view(self.batch_size, -1)
                 # all_states = states[:, i, :].reshape(self.batch_size, -1)
 
+                # this is the same as above but for the next states
                 temp = th.cat(
                     (
                         next_states[
@@ -453,6 +458,8 @@ class TD3(RLAlgorithm):
                     axis=1,
                 )
 
+                # the final all_next_states vector now contains the current agent's observation
+                # and the unique observations from all other agents
                 all_next_states = th.cat(
                     (next_states[:, i, :].reshape(self.batch_size, -1), temp), axis=1
                 ).view(self.batch_size, -1)

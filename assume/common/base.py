@@ -737,9 +737,15 @@ class LearningStrategy(BaseStrategy):
     """
     A strategy which provides learning functionality, has a method to calculate the reward.
 
+    It is important to keep in mind, that the DRL method and the centralized critic relies on
+    unique observations of individual units. The algorithm is designed in such a way, that
+    the unique observations are always placed at the end of the observation space. Please follow this
+    convention when designing your create_observation method and the observation space.
+
     Attributes:
         obs_dim (int): The observation dimension.
         act_dim (int): The action dimension.
+        unique_obs_dim (int): The unique observation dimension.
 
     Args:
         *args (list): The arguments.
