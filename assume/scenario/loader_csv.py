@@ -748,7 +748,6 @@ def run_learning(
     max_eval = defaultdict(lambda: -1e9)
     all_eval = defaultdict(list)
     avg_eval = []
-    # -----------------------------------------
 
     validation_interval = min(
         world.learning_role.training_episodes,
@@ -853,6 +852,7 @@ def run_learning(
         # container shutdown implicitly with new initialisation
     logger.info("################")
     logger.info("Training finished, Start evaluation run")
+
     world.export_csv_path = temp_csv_path
 
     # load scenario for evaluation
