@@ -301,7 +301,6 @@ def load_config_and_create_forecaster(
     if not study_case:
         study_case = list(config.keys())[0]
     config = config[study_case]
-    config = replace_paths(config, path)
 
     sim_id = config.get("simulation_id", f"{scenario}_{study_case}")
 
@@ -366,6 +365,7 @@ def load_config_and_create_forecaster(
     return {
         "config": config,
         "sim_id": sim_id,
+        "path": path,
         "start": start,
         "end": end,
         "index": index,
@@ -431,6 +431,8 @@ async def async_setup_world(
             "trained_policies_save_path"
         ] = f"./learned_strategies/{study_case}"
 
+    config = replace_paths(config, scenario_data["path"])
+
     if learning_config.get("learning_mode", False) and not learning_config.get(
         "perform_evaluation", False
     ):
@@ -440,6 +442,8 @@ async def async_setup_world(
         "perform_evaluation", False
     ):
         sim_id = f"{sim_id}_eval_{eval_episode}"
+
+    world.reset()
 
     await world.setup(
         start=start,
@@ -594,6 +598,7 @@ def load_scenario_folder(
         - After calling this function, the world environment is prepared for further simulation and analysis.
 
     """
+    logger.info(f"Starting Scenario {scenario}/{study_case} from {inputs_path}")
 
     scenario_data = load_config_and_create_forecaster(inputs_path, scenario, study_case)
 
