@@ -6,6 +6,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import TypedDict, Union
 
+import numpy as np
 import pandas as pd
 
 from assume.common.forecasts import Forecaster
@@ -164,26 +165,29 @@ class BaseUnit:
         )
 
     def calculate_generation_cost(
-        self,
-        start: datetime,
-        end: datetime,
-        product_type: str,
+        self, start: datetime, end: datetime, product_type: str
     ) -> None:
         """
-        Calculates the generation cost for a specific product type within the given time range.
+        Calculates the generation cost for a specific product type within the given time range,
+        but only if the end is the last index in the time series.
 
         Args:
             start (datetime.datetime): The start time for the calculation.
             end (datetime.datetime): The end time for the calculation.
             product_type (str): The type of product for which the generation cost is to be calculated.
-
         """
+
         if start not in self.index:
             start = self.index[0]
+
         product_type_mc = product_type + "_marginal_costs"
-        for t in self.outputs[product_type_mc][start:end].index:
-            mc = self.calculate_marginal_cost(t, self.outputs[product_type].loc[t])
-            self.outputs[product_type_mc][t] = abs(mc * self.outputs[product_type][t])
+        product_data = self.outputs[product_type].loc[start:end]
+
+        marginal_costs = product_data.index.map(
+            lambda t: self.calculate_marginal_cost(t, product_data.loc[t])
+        )
+        new_values = np.abs(marginal_costs * product_data.values)
+        self.outputs[product_type_mc].loc[start:end] = new_values
 
     def execute_current_dispatch(
         self,
