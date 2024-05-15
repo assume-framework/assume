@@ -51,7 +51,7 @@ def load_file(
         index (pd.DatetimeIndex, optional): The index of the dataframe. Defaults to None.
 
     Returns:
-        pandas.DataFrame: The dataframe containing the loaded data.
+        pandas.DataFrame: The dataframe containing the loaded scenario_data.
 
     Raises:
         FileNotFoundError: If the specified file is not found, returns None.
@@ -148,7 +148,7 @@ def replace_paths(config: dict, inputs_path: str):
         for key, value in config.items():
             if isinstance(value, (dict, list)):
                 config[key] = replace_paths(value, inputs_path)
-            elif isinstance(key, str) and key.endswith("_path"):
+            elif isinstance(key, str) and key.endswith("_path") and value is not None:
                 if not value.startswith(inputs_path):
                     config[key] = inputs_path + "/" + value
     elif isinstance(config, list):
@@ -313,39 +313,59 @@ def load_config_and_create_forecaster(
         end=end + timedelta(days=1),
         freq=config["time_step"],
     )
+    # get extra parameters for bidding strategies
 
-    powerplant_units = load_file(path=path, config=config, file_name="powerplant_units")
-    storage_units = load_file(path=path, config=config, file_name="storage_units")
-    demand_units = load_file(path=path, config=config, file_name="demand_units")
+    # load the data from the csv files
+    # tries to load all files, returns a warning if file does not exist
+    # also attempts to resample the inputs if their resolution is higher than user specified time step
+    logger.info("Loading input data")
+    powerplant_units = load_file(
+        path=path,
+        config=config,
+        file_name="powerplant_units",
+    )
+
+    storage_units = load_file(
+        path=path,
+        config=config,
+        file_name="storage_units",
+    )
+
+    demand_units = load_file(
+        path=path,
+        config=config,
+        file_name="demand_units",
+    )
 
     if powerplant_units is None or demand_units is None:
         raise ValueError("No power plant or no demand units were provided!")
 
-    forecasts_df = load_file(
-        path=path, config=config, file_name="forecasts_df", index=index
-    )
-    demand_df = load_file(path=path, config=config, file_name="demand_df", index=index)
-    if demand_df is None:
-        raise ValueError("No demand time series was provided!")
-    cross_border_flows_df = load_file(
-        path=path, config=config, file_name="cross_border_flows", index=index
-    )
-    availability = load_file(
-        path=path, config=config, file_name="availability_df", index=index
-    )
-    electricity_prices_df = load_file(
-        path=path, config=config, file_name="electricity_prices", index=index
-    )
-    price_forecast_df = load_file(
-        path=path, config=config, file_name="price_forecasts", index=index
-    )
-    fuel_prices_df = load_file(
-        path=path, config=config, file_name="fuel_prices_df", index=index
-    )
-    temperature_df = load_file(
-        path=path, config=config, file_name="temperature", index=index
-    )
+    save_frequency_hours = config.get("save_frequency_hours", 48)
+    sim_id = f"{scenario}_{study_case}"
 
+    learning_config: LearningConfig = config.get("learning_config", {})
+    bidding_strategy_params = config.get("bidding_strategy_params", {})
+
+    learning_config["learning_mode"] = (
+        config.get("learning_mode", False) and perform_learning
+    )
+    learning_config["evaluation_mode"] = perform_evaluation
+
+    if not learning_config.get("trained_policies_save_path"):
+        learning_config[
+            "trained_policies_save_path"
+        ] = f"./learned_strategies/{study_case}"
+
+    config = replace_paths(config, path)
+
+    if learning_config.get("learning_mode", False):
+        sim_id = f"{sim_id}_{episode}"
+
+    if learning_config.get("evaluation_mode", False):
+        sim_id = f"{sim_id}_eval_{eval_episode}"
+
+    # add forecast provider
+    logger.info("Adding forecast")
     forecaster = CsvForecaster(
         index=index,
         powerplants_units=powerplant_units,
@@ -353,93 +373,62 @@ def load_config_and_create_forecaster(
         market_configs=config["markets_config"],
     )
 
+    forecasts_df = load_file(
+        path=path,
+        config=config,
+        file_name="forecasts_df",
+        index=index,
+    )
     forecaster.set_forecast(forecasts_df)
+
+    demand_df = load_file(
+        path=path,
+        config=config,
+        file_name="demand_df",
+        index=index,
+    )
+    if demand_df is None:
+        raise ValueError("No demand time series was provided!")
     forecaster.set_forecast(demand_df)
+
+    cross_border_flows_df = load_file(
+        path=path,
+        config=config,
+        file_name="cross_border_flows",
+        index=index,
+    )
     forecaster.set_forecast(cross_border_flows_df)
+
+    availability = load_file(
+        path=path,
+        config=config,
+        file_name="availability_df",
+        index=index,
+    )
     forecaster.set_forecast(availability, prefix="availability_")
+    electricity_prices_df = load_file(
+        path=path, config=config, file_name="electricity_prices", index=index
+    )
     forecaster.set_forecast(electricity_prices_df)
+
+    price_forecast_df = load_file(
+        path=path, config=config, file_name="price_forecasts", index=index
+    )
     forecaster.set_forecast(price_forecast_df, "price_")
-    forecaster.set_forecast(fuel_prices_df, prefix="fuel_price_")
-    forecaster.set_forecast(temperature_df)
+    forecaster.set_forecast(
+        load_file(
+            path=path,
+            config=config,
+            file_name="fuel_prices_df",
+            index=index,
+        ),
+        prefix="fuel_price_",
+    )
+    forecaster.set_forecast(
+        load_file(path=path, config=config, file_name="temperature", index=index)
+    )
     forecaster.calc_forecast_if_needed()
-
-    return {
-        "config": config,
-        "sim_id": sim_id,
-        "start": start,
-        "end": end,
-        "index": index,
-        "powerplant_units": powerplant_units,
-        "storage_units": storage_units,
-        "demand_units": demand_units,
-        "forecaster": forecaster,
-    }
-
-
-async def async_setup_world(
-    world: World,
-    scenario_data: dict[str, object],
-    study_case: str,
-    perform_evaluation: bool = False,
-    terminate_learning: bool = False,
-    episode: int = 0,
-    eval_episode: int = 0,
-) -> None:
-    """
-    Load a scenario from a given path.
-
-    This function loads a scenario within a specified study case from a given path, setting up the world environment for simulation and learning.
-
-    Args:
-        world (World): An instance of the World class representing the simulation environment.
-        scenario_data (dict): A dictionary containing the configuration and loaded files for the scenario and study case.
-        study_case (str): The specific study case within the scenario to be loaded.
-        perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
-        terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode itteration or because we triggered an early stopping.
-        episode (int, optional): The episode number for learning. Defaults to 0.
-        eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
-
-    Raises:
-        ValueError: If the specified scenario or study case is not found in the provided inputs.
-
-    """
-
-    sim_id = scenario_data["sim_id"]
-    config = scenario_data["config"]
-    start = scenario_data["start"]
-    end = scenario_data["end"]
-    index = scenario_data["index"]
-    powerplant_units = scenario_data["powerplant_units"]
-    storage_units = scenario_data["storage_units"]
-    demand_units = scenario_data["demand_units"]
-    forecaster = scenario_data["forecaster"]
-
-    save_frequency_hours = config.get("save_frequency_hours", 48)
-
-    learning_config: LearningConfig = config.get("learning_config", {})
-    bidding_strategy_params = config.get("bidding_strategy_params", {})
-
-    learning_config["learning_mode"] = config.get("learning_mode", False)
-    learning_config["evaluation_mode"] = perform_evaluation
-
-    if terminate_learning:
-        learning_config["learning_mode"] = False
-        learning_config["evaluation_mode"] = False
-
-    if not learning_config.get("trained_policies_save_path"):
-        learning_config[
-            "trained_policies_save_path"
-        ] = f"./learned_strategies/{study_case}"
-
-    if learning_config.get("learning_mode", False) and not learning_config.get(
-        "evaluation_mode", False
-    ):
-        sim_id = f"{sim_id}_{episode}"
-
-    elif learning_config.get("learning_mode", False) and learning_config.get(
-        "evaluation_mode", False
-    ):
-        sim_id = f"{sim_id}_eval_{eval_episode}"
+    forecaster.save_forecasts(path)
 
     await world.setup(
         start=start,
@@ -488,14 +477,14 @@ async def async_setup_world(
             [all_operators, storage_units.unit_operator.unique()]
         )
 
-    # add central RL unit oporator that handels all RL units
+    # add central RL unit operator that handles all RL units
     if world.learning_mode == True and "Operator-RL" not in all_operators:
         all_operators = np.concatenate([all_operators, ["Operator-RL"]])
 
     for company_name in set(all_operators):
         world.add_unit_operator(id=str(company_name))
 
-    # add the units to corresponsing unit operators
+    # add the units to corresponding unit operators
     add_units(
         units_df=powerplant_units,
         unit_type="power_plant",
@@ -523,28 +512,6 @@ async def async_setup_world(
         and len(world.learning_role.rl_strats) == 0
     ):
         raise ValueError("No RL units/strategies were provided!")
-
-
-def setup_world(
-    world: World,
-    scenario_data: dict[str, object],
-    study_case: str,
-    perform_evaluation: bool = False,
-    terminate_learning: bool = False,
-    episode: int = 0,
-    eval_episode: int = 0,
-) -> None:
-    world.loop.run_until_complete(
-        async_setup_world(
-            world=world,
-            scenario_data=scenario_data,
-            study_case=study_case,
-            perform_evaluation=perform_evaluation,
-            terminate_learning=terminate_learning,
-            episode=episode,
-            eval_episode=eval_episode,
-        )
-    )
 
 
 def load_scenario_folder(
@@ -590,21 +557,21 @@ def load_scenario_folder(
     Notes:
         - The function sets up the world environment based on the provided inputs and configuration files.
         - If `perform_evaluation` is set to True, the function performs evaluation using the specified evaluation episode number.
-        - The function utilizes the specified inputs to configure the simulation environment, including market parameters, unit operators, and forecasting data.
+        - The function utilizes the specified inputs to configure the simulation environment, including market parameters, unit operators, and forecasting scenario_data.
         - After calling this function, the world environment is prepared for further simulation and analysis.
 
     """
-
-    scenario_data = load_config_and_create_forecaster(inputs_path, scenario, study_case)
-
-    setup_world(
-        world=world,
-        scenario_data=scenario_data,
-        study_case=study_case,
-        perform_evaluation=perform_evaluation,
-        terminate_learning=terminate_learning,
-        episode=episode,
-        eval_episode=eval_episode,
+    world.loop.run_until_complete(
+        load_scenario_folder_async(
+            world=world,
+            inputs_path=inputs_path,
+            scenario=scenario,
+            study_case=study_case,
+            perform_learning=perform_learning,
+            perform_evaluation=perform_evaluation,
+            episode=episode,
+            eval_episode=eval_episode,
+        )
     )
 
 
@@ -713,6 +680,7 @@ def run_learning(
         inputs_path (str): The path to the folder containing input files necessary for the simulation.
         scenario (str): The name of the scenario for the simulation.
         study_case (str): The specific study case for the simulation.
+        verbose (bool, optional): A flag indicating whether to display verbose output. Defaults to False.
 
     Note:
         - The function uses a ReplayBuffer to store experiences for training the DRL agents.
@@ -721,6 +689,7 @@ def run_learning(
         - Upon completion of training, the function performs an evaluation run using the best policy learned during training.
         - The best policies are chosen based on the average reward obtained during the evaluation runs, and they are saved for future use.
     """
+
     from assume.reinforcement_learning.buffer import ReplayBuffer
 
     if not verbose:
@@ -738,6 +707,9 @@ def run_learning(
     # check if we already stored policies for this simualtion
     save_path = world.learning_config["trained_policies_save_path"]
 
+    # load all scenario_data and create forecaster to be used across episodes
+    scenario_data = load_config_and_create_forecaster(inputs_path, scenario, study_case)
+
     if Path(save_path).is_dir():
         # we are in learning mode and about to train new policies, which might overwrite existing ones
         accept = input(
@@ -748,28 +720,19 @@ def run_learning(
             raise AssumeException("don't overwrite existing strategies")
 
     # -----------------------------------------
-    # Load scenario data to reuse across episodes
-    scenario_data = load_config_and_create_forecaster(inputs_path, scenario, study_case)
-
-    # -----------------------------------------
-    # Information that needs to be stored across episodes, aka one simulation run
-    inter_episodic_data = {
-        "buffer": ReplayBuffer(
-            buffer_size=int(world.learning_config.get("replay_buffer_size", 5e5)),
-            obs_dim=world.learning_role.rl_algorithm.obs_dim,
-            act_dim=world.learning_role.rl_algorithm.act_dim,
-            n_rl_units=len(world.learning_role.rl_strats),
-            device=world.learning_role.device,
-            float_type=world.learning_role.float_type,
-        ),
-        "actors_and_critics": None,
-        "max_eval": defaultdict(lambda: -1e9),
-        "all_eval": defaultdict(list),
-        "avg_all_eval": [],
-        "episodes_done": 0,
-        "eval_episodes_done": 0,
-    }
-
+    # Information That needs to be stored across episodes, aka one simulation run
+    buffer = ReplayBuffer(
+        buffer_size=int(world.learning_config.get("replay_buffer_size", 5e5)),
+        obs_dim=world.learning_role.rl_algorithm.obs_dim,
+        act_dim=world.learning_role.rl_algorithm.act_dim,
+        n_rl_units=len(world.learning_role.rl_strats),
+        device=world.learning_role.device,
+        float_type=world.learning_role.float_type,
+    )
+    actors_and_critics = None
+    max_eval = defaultdict(lambda: -1e9)
+    all_eval = defaultdict(list)
+    avg_eval = []
     # -----------------------------------------
 
     validation_interval = min(
@@ -785,10 +748,12 @@ def run_learning(
     ):
         # TODO normally, loading twice should not create issues, somehow a scheduling issue is raised currently
         if episode != 1:
-            setup_world(
-                world=world,
-                scenario_data=scenario_data,
-                study_case=study_case,
+            load_scenario_folder(
+                world,
+                inputs_path,
+                scenario,
+                study_case,
+                perform_learning=True,
                 episode=episode,
             )
 
@@ -801,8 +766,12 @@ def run_learning(
 
         world.run()
 
-        inter_episodic_data = world.learning_role.get_inter_episodic_data()
-        inter_episodic_data["episodes_done"] = episode
+        # they are change implicitly anyhow do to our function call
+        actors_and_critics = world.learning_role.rl_algorithm.extract_policy()
+
+        # save current params in training path
+
+        world.learning_role.rl_algorithm.save_params(directory=last_policies_path)
 
         # evaluation run:
         if (
@@ -812,10 +781,12 @@ def run_learning(
             world.reset()
 
             # load evaluation run
-            setup_world(
-                world=world,
-                scenario_data=scenario_data,
-                study_case=study_case,
+            load_scenario_folder(
+                world,
+                inputs_path,
+                scenario,
+                study_case,
+                perform_learning=False,
                 perform_evaluation=True,
                 eval_episode=eval_episode,
             )
@@ -859,20 +830,21 @@ def run_learning(
         # container shutdown implicitly with new initialisation
     logger.info("################")
     logger.info("Training finished, Start evaluation run")
+
     world.export_csv_path = temp_csv_path
 
     # load scenario for evaluation
-
-    setup_world(
-        world=world,
-        scenario_data=scenario_data,
-        study_case=study_case,
-        terminate_learning=True,
-        eval_episode=eval_episode,
+    # TODO which policies of the actors are used here? change to last
+    load_scenario_folder(
+        world,
+        inputs_path,
+        scenario,
+        study_case,
+        perform_learning=False,
     )
 
     world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
 
 if __name__ == "__main__":
-    data = read_grid(Path("examples/inputs/example_01d"))
+    scenario_data = read_grid(Path("examples/inputs/example_01d"))
