@@ -277,10 +277,108 @@ def add_units(
         )
 
 
-async def load_scenario_folder_async(
-    world: World,
+def load_config_and_create_forecaster(
     inputs_path: str,
     scenario: str,
+    study_case: str,
+) -> dict[str, object]:
+    """
+    Load the configuration and files for a given scenario and study case. This function
+    allows us to load the files and config only once when running multiple iterations of the same scenario.
+
+    Args:
+        inputs_path (str): The path to the folder containing input files necessary for the scenario.
+        scenario (str): The name of the scenario to be loaded.
+        study_case (str): The specific study case within the scenario to be loaded.
+
+    Returns:
+        dict[str, object]:: A dictionary containing the configuration and loaded files for the scenario and study case.
+    """
+
+    path = f"{inputs_path}/{scenario}"
+    with open(f"{path}/config.yaml", "r") as f:
+        config = yaml.safe_load(f)
+    if not study_case:
+        study_case = list(config.keys())[0]
+    config = config[study_case]
+    config = replace_paths(config, path)
+
+    sim_id = config.get("simulation_id", f"{scenario}_{study_case}")
+
+    start = pd.Timestamp(config["start_date"])
+    end = pd.Timestamp(config["end_date"])
+
+    index = pd.date_range(
+        start=start,
+        end=end + timedelta(days=1),
+        freq=config["time_step"],
+    )
+
+    powerplant_units = load_file(path=path, config=config, file_name="powerplant_units")
+    storage_units = load_file(path=path, config=config, file_name="storage_units")
+    demand_units = load_file(path=path, config=config, file_name="demand_units")
+
+    if powerplant_units is None or demand_units is None:
+        raise ValueError("No power plant or no demand units were provided!")
+
+    forecasts_df = load_file(
+        path=path, config=config, file_name="forecasts_df", index=index
+    )
+    demand_df = load_file(path=path, config=config, file_name="demand_df", index=index)
+    if demand_df is None:
+        raise ValueError("No demand time series was provided!")
+    cross_border_flows_df = load_file(
+        path=path, config=config, file_name="cross_border_flows", index=index
+    )
+    availability = load_file(
+        path=path, config=config, file_name="availability_df", index=index
+    )
+    electricity_prices_df = load_file(
+        path=path, config=config, file_name="electricity_prices", index=index
+    )
+    price_forecast_df = load_file(
+        path=path, config=config, file_name="price_forecasts", index=index
+    )
+    fuel_prices_df = load_file(
+        path=path, config=config, file_name="fuel_prices_df", index=index
+    )
+    temperature_df = load_file(
+        path=path, config=config, file_name="temperature", index=index
+    )
+
+    forecaster = CsvForecaster(
+        index=index,
+        powerplants_units=powerplant_units,
+        demand_units=demand_units,
+        market_configs=config["markets_config"],
+    )
+
+    forecaster.set_forecast(forecasts_df)
+    forecaster.set_forecast(demand_df)
+    forecaster.set_forecast(cross_border_flows_df)
+    forecaster.set_forecast(availability, prefix="availability_")
+    forecaster.set_forecast(electricity_prices_df)
+    forecaster.set_forecast(price_forecast_df, "price_")
+    forecaster.set_forecast(fuel_prices_df, prefix="fuel_price_")
+    forecaster.set_forecast(temperature_df)
+    forecaster.calc_forecast_if_needed()
+
+    return {
+        "config": config,
+        "sim_id": sim_id,
+        "start": start,
+        "end": end,
+        "index": index,
+        "powerplant_units": powerplant_units,
+        "storage_units": storage_units,
+        "demand_units": demand_units,
+        "forecaster": forecaster,
+    }
+
+
+async def async_setup_world(
+    world: World,
+    scenario_data: dict[str, object],
     study_case: str,
     perform_evaluation: bool = False,
     terminate_learning: bool = False,
@@ -294,10 +392,10 @@ async def load_scenario_folder_async(
 
     Args:
         world (World): An instance of the World class representing the simulation environment.
-        inputs_path (str): The path to the folder containing input files necessary for the scenario.
-        scenario (str): The name of the scenario to be loaded.
+        scenario_data (dict): A dictionary containing the configuration and loaded files for the scenario and study case.
         study_case (str): The specific study case within the scenario to be loaded.
         perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
+        terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode itteration or because we triggered an early stopping.
         episode (int, optional): The episode number for learning. Defaults to 0.
         eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
 
@@ -306,55 +404,17 @@ async def load_scenario_folder_async(
 
     """
 
-    # load the config file
-    path = f"{inputs_path}/{scenario}"
-    with open(f"{path}/config.yaml", "r") as f:
-        config = yaml.safe_load(f)
-    if not study_case:
-        study_case = list(config.keys())[0]
-    config = config[study_case]
-    logger.info(f"Starting Scenario {scenario}/{study_case} from {inputs_path}")
-
-    world.reset()
-
-    start = pd.Timestamp(config["start_date"])
-    end = pd.Timestamp(config["end_date"])
-
-    index = pd.date_range(
-        start=start,
-        # end time needs to be a little ahead for forecasts
-        end=end + timedelta(days=1),
-        freq=config["time_step"],
-    )
-    # get extra parameters for bidding strategies
-
-    # load the data from the csv files
-    # tries to load all files, returns a warning if file does not exist
-    # also attempts to resample the inputs if their resolution is higher than user specified time step
-    logger.info("Loading input data")
-    powerplant_units = load_file(
-        path=path,
-        config=config,
-        file_name="powerplant_units",
-    )
-
-    storage_units = load_file(
-        path=path,
-        config=config,
-        file_name="storage_units",
-    )
-
-    demand_units = load_file(
-        path=path,
-        config=config,
-        file_name="demand_units",
-    )
-
-    if powerplant_units is None or demand_units is None:
-        raise ValueError("No power plant or no demand units were provided!")
+    sim_id = scenario_data["sim_id"]
+    config = scenario_data["config"]
+    start = scenario_data["start"]
+    end = scenario_data["end"]
+    index = scenario_data["index"]
+    powerplant_units = scenario_data["powerplant_units"]
+    storage_units = scenario_data["storage_units"]
+    demand_units = scenario_data["demand_units"]
+    forecaster = scenario_data["forecaster"]
 
     save_frequency_hours = config.get("save_frequency_hours", 48)
-    sim_id = f"{scenario}_{study_case}"
 
     learning_config: LearningConfig = config.get("learning_config", {})
     bidding_strategy_params = config.get("bidding_strategy_params", {})
@@ -371,8 +431,6 @@ async def load_scenario_folder_async(
             "trained_policies_save_path"
         ] = f"./learned_strategies/{study_case}"
 
-    config = replace_paths(config, path)
-
     if learning_config.get("learning_mode", False) and not learning_config.get(
         "evaluation_mode", False
     ):
@@ -382,72 +440,6 @@ async def load_scenario_folder_async(
         "evaluation_mode", False
     ):
         sim_id = f"{sim_id}_eval_{eval_episode}"
-
-    # add forecast provider
-    logger.info("Adding forecast")
-    forecaster = CsvForecaster(
-        index=index,
-        powerplants_units=powerplant_units,
-        demand_units=demand_units,
-        market_configs=config["markets_config"],
-    )
-
-    forecasts_df = load_file(
-        path=path,
-        config=config,
-        file_name="forecasts_df",
-        index=index,
-    )
-    forecaster.set_forecast(forecasts_df)
-
-    demand_df = load_file(
-        path=path,
-        config=config,
-        file_name="demand_df",
-        index=index,
-    )
-    if demand_df is None:
-        raise ValueError("No demand time series was provided!")
-    forecaster.set_forecast(demand_df)
-
-    cross_border_flows_df = load_file(
-        path=path,
-        config=config,
-        file_name="cross_border_flows",
-        index=index,
-    )
-    forecaster.set_forecast(cross_border_flows_df)
-
-    availability = load_file(
-        path=path,
-        config=config,
-        file_name="availability_df",
-        index=index,
-    )
-    forecaster.set_forecast(availability, prefix="availability_")
-    electricity_prices_df = load_file(
-        path=path, config=config, file_name="electricity_prices", index=index
-    )
-    forecaster.set_forecast(electricity_prices_df)
-
-    price_forecast_df = load_file(
-        path=path, config=config, file_name="price_forecasts", index=index
-    )
-    forecaster.set_forecast(price_forecast_df, "price_")
-    forecaster.set_forecast(
-        load_file(
-            path=path,
-            config=config,
-            file_name="fuel_prices_df",
-            index=index,
-        ),
-        prefix="fuel_price_",
-    )
-    forecaster.set_forecast(
-        load_file(path=path, config=config, file_name="temperature", index=index)
-    )
-    forecaster.calc_forecast_if_needed()
-    forecaster.save_forecasts(path)
 
     await world.setup(
         start=start,
@@ -533,6 +525,28 @@ async def load_scenario_folder_async(
         raise ValueError("No RL units/strategies were provided!")
 
 
+def setup_world(
+    world: World,
+    scenario_data: dict[str, object],
+    study_case: str,
+    perform_evaluation: bool = False,
+    terminate_learning: bool = False,
+    episode: int = 0,
+    eval_episode: int = 0,
+) -> None:
+    world.loop.run_until_complete(
+        async_setup_world(
+            world=world,
+            scenario_data=scenario_data,
+            study_case=study_case,
+            perform_evaluation=perform_evaluation,
+            terminate_learning=terminate_learning,
+            episode=episode,
+            eval_episode=eval_episode,
+        )
+    )
+
+
 def load_scenario_folder(
     world: World,
     inputs_path: str,
@@ -580,17 +594,17 @@ def load_scenario_folder(
         - After calling this function, the world environment is prepared for further simulation and analysis.
 
     """
-    world.loop.run_until_complete(
-        load_scenario_folder_async(
-            world=world,
-            inputs_path=inputs_path,
-            scenario=scenario,
-            study_case=study_case,
-            perform_evaluation=perform_evaluation,
-            terminate_learning=terminate_learning,
-            episode=episode,
-            eval_episode=eval_episode,
-        )
+
+    scenario_data = load_config_and_create_forecaster(inputs_path, scenario, study_case)
+
+    setup_world(
+        world=world,
+        scenario_data=scenario_data,
+        study_case=study_case,
+        perform_evaluation=perform_evaluation,
+        terminate_learning=terminate_learning,
+        episode=episode,
+        eval_episode=eval_episode,
     )
 
 
@@ -734,8 +748,11 @@ def run_learning(
             raise AssumeException("don't overwrite existing strategies")
 
     # -----------------------------------------
-    # Information That needs to be stored across episodes, aka one simulation run
+    # Load scenario data to reuse across episodes
+    scenario_data = load_config_and_create_forecaster(inputs_path, scenario, study_case)
 
+    # -----------------------------------------
+    # Information that needs to be stored across episodes, aka one simulation run
     inter_episodic_data = {
         "buffer": ReplayBuffer(
             buffer_size=int(world.learning_config.get("replay_buffer_size", 5e5)),
@@ -768,11 +785,10 @@ def run_learning(
     ):
         # TODO normally, loading twice should not create issues, somehow a scheduling issue is raised currently
         if episode != 1:
-            load_scenario_folder(
-                world,
-                inputs_path,
-                scenario,
-                study_case,
+            setup_world(
+                world=world,
+                scenario_data=scenario_data,
+                study_case=study_case,
                 episode=episode,
             )
 
@@ -796,11 +812,10 @@ def run_learning(
             world.reset()
 
             # load evaluation run
-            load_scenario_folder(
-                world,
-                inputs_path,
-                scenario,
-                study_case,
+            setup_world(
+                world=world,
+                scenario_data=scenario_data,
+                study_case=study_case,
                 perform_evaluation=True,
                 eval_episode=eval_episode,
             )
@@ -825,6 +840,7 @@ def run_learning(
                 break
 
             eval_episode += 1
+
         world.reset()
 
         # in load_scenario_folder_async, we initiate new container and kill old if present
@@ -847,14 +863,12 @@ def run_learning(
 
     # load scenario for evaluation
 
-    load_scenario_folder(
-        world,
-        inputs_path,
-        scenario,
-        study_case,
-        perform_evaluation=True,
-        eval_episode=eval_episode,
+    setup_world(
+        world=world,
+        scenario_data=scenario_data,
+        study_case=study_case,
         terminate_learning=True,
+        eval_episode=eval_episode,
     )
 
     world.learning_role.load_inter_episodic_data(inter_episodic_data)
