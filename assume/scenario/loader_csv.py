@@ -747,7 +747,7 @@ def run_learning(
         "actors_and_critics": None,
         "max_eval": defaultdict(lambda: -1e9),
         "all_eval": defaultdict(list),
-        "avg_rewards": [],
+        "avg_all_eval": [],
         "episodes_done": 0,
         "eval_episodes_done": 0,
     }

@@ -118,7 +118,7 @@ class Learning(Role):
         self.eval_episodes_done = inter_episodic_data["eval_episodes_done"]
         self.max_eval = inter_episodic_data["max_eval"]
         self.rl_eval = inter_episodic_data["all_eval"]
-        self.avg_rewards = inter_episodic_data["avg_rewards"]
+        self.avg_rewards = inter_episodic_data["avg_all_eval"]
         self.buffer = inter_episodic_data["buffer"]
 
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
@@ -136,7 +136,7 @@ class Learning(Role):
             "eval_episodes_done": self.eval_episodes_done,
             "max_eval": self.max_eval,
             "all_eval": self.rl_eval,
-            "avg_rewards": self.avg_rewards,
+            "avg_all_eval": self.avg_rewards,
             "buffer": self.buffer,
             "actors_and_critics": self.rl_algorithm.extract_policy(),
         }
