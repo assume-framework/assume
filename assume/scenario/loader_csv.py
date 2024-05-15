@@ -488,14 +488,14 @@ async def async_setup_world(
             [all_operators, storage_units.unit_operator.unique()]
         )
 
-    # add central RL unit oporator that handels all RL units
+    # add central RL unit operator that handels all RL units
     if world.learning_mode == True and "Operator-RL" not in all_operators:
         all_operators = np.concatenate([all_operators, ["Operator-RL"]])
 
     for company_name in set(all_operators):
         world.add_unit_operator(id=str(company_name))
 
-    # add the units to corresponsing unit operators
+    # add the units to corresponding unit operators
     add_units(
         units_df=powerplant_units,
         unit_type="power_plant",
@@ -868,7 +868,6 @@ def run_learning(
         scenario_data=scenario_data,
         study_case=study_case,
         terminate_learning=True,
-        eval_episode=eval_episode,
     )
 
     world.learning_role.load_inter_episodic_data(inter_episodic_data)
