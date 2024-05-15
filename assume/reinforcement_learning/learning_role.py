@@ -123,7 +123,7 @@ class Learning(Role):
 
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
-    def dump_inter_episodic_data(self):
+    def get_inter_episodic_data(self):
         """
         Dump the inter-episodic data to a dict for storing across simulation runs.
 
@@ -151,7 +151,7 @@ class Learning(Role):
         """
         # subscribe to messages for handling the training process
 
-        if self.perform_evaluation is False:
+        if not self.perform_evaluation:
             self.context.subscribe_message(
                 self,
                 self.handle_message,

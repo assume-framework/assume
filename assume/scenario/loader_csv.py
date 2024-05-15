@@ -373,10 +373,14 @@ async def load_scenario_folder_async(
 
     config = replace_paths(config, path)
 
-    if learning_config.get("learning_mode", False):
+    if learning_config.get("learning_mode", False) and not learning_config.get(
+        "evaluation_mode", False
+    ):
         sim_id = f"{sim_id}_{episode}"
 
-    if learning_config.get("evaluation_mode", False):
+    elif learning_config.get("learning_mode", False) and learning_config.get(
+        "evaluation_mode", False
+    ):
         sim_id = f"{sim_id}_eval_{eval_episode}"
 
     # add forecast provider
@@ -780,7 +784,8 @@ def run_learning(
 
         world.run()
 
-        inter_episodic_data = world.learning_role.dump_inter_episodic_data()
+        inter_episodic_data = world.learning_role.get_inter_episodic_data()
+        inter_episodic_data["episodes_done"] = episode
 
         # evaluation run:
         if (
@@ -811,7 +816,8 @@ def run_learning(
                 {"avg_reward": avg_reward}
             )
 
-            inter_episodic_data = world.learning_role.dump_inter_episodic_data()
+            inter_episodic_data = world.learning_role.get_inter_episodic_data()
+            inter_episodic_data["eval_episodes_done"] = eval_episode
 
             # if we have not improved in the last x evaluations, we stop
             if terminate:
