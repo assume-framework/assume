@@ -360,11 +360,11 @@ async def load_scenario_folder_async(
     bidding_strategy_params = config.get("bidding_strategy_params", {})
 
     learning_config["learning_mode"] = config.get("learning_mode", False)
-    learning_config["evaluation_mode"] = perform_evaluation
+    learning_config["perform_evaluation"] = perform_evaluation
 
     if terminate_learning:
         learning_config["learning_mode"] = False
-        learning_config["evaluation_mode"] = False
+        learning_config["perform_evaluation"] = False
 
     if not learning_config.get("trained_policies_save_path"):
         learning_config[
@@ -374,12 +374,12 @@ async def load_scenario_folder_async(
     config = replace_paths(config, path)
 
     if learning_config.get("learning_mode", False) and not learning_config.get(
-        "evaluation_mode", False
+        "perform_evaluation", False
     ):
         sim_id = f"{sim_id}_{episode}"
 
     elif learning_config.get("learning_mode", False) and learning_config.get(
-        "evaluation_mode", False
+        "perform_evaluation", False
     ):
         sim_id = f"{sim_id}_eval_{eval_episode}"
 

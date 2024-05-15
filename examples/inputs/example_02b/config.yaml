@@ -4,7 +4,7 @@
 
 base:
   start_date: 2019-03-01 00:00
-  end_date: 2019-04-01 00:00
+  end_date: 2019-03-02 00:00
   time_step: 1h
   save_frequency_hours: Null
   learning_mode: True
@@ -25,7 +25,7 @@ base:
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
-    validation_episodes_interval: 5
+    validation_episodes_interval: 2
     early_stopping_steps: 10
     early_stopping_threshold: 0.05
 

@@ -57,7 +57,7 @@ class Learning(Role):
         self.training_episodes = learning_config["training_episodes"]
         self.learning_mode = learning_config["learning_mode"]
         self.continue_learning = learning_config["continue_learning"]
-        self.perform_evaluation = learning_config["evaluation_mode"]
+        self.perform_evaluation = learning_config["perform_evaluation"]
         self.trained_policies_save_path = learning_config["trained_policies_save_path"]
         self.trained_policies_load_path = learning_config.get(
             "trained_policies_load_path", self.trained_policies_save_path
@@ -239,8 +239,6 @@ class Learning(Role):
                 logger.warning(
                     f"Folder with pretrained policies {directory} does not exist"
                 )
-
-        # if self.perform_evaluation is True and self.learning_mode:
 
     async def update_policy(self) -> None:
         """
