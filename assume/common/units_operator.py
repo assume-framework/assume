@@ -318,8 +318,7 @@ class UnitsOperator(Role):
             end = now
             current_dispatch.name = "power"
             data = pd.DataFrame(current_dispatch)
-            unit.calculate_generation_cost(start, now, "energy")
-            valid_outputs = ["soc", "cashflow", "marginal_costs", "total_costs"]
+            valid_outputs = ["soc", "cashflow", "total_costs"]
 
             for key in unit.outputs.keys():
                 for output in valid_outputs:
@@ -328,6 +327,20 @@ class UnitsOperator(Role):
 
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
+
+            if now == unit.index[-1] - pd.Timedelta(days=1):
+                data = pd.DataFrame()
+                unit.calculate_generation_cost(start, now, "energy")
+                outputs_to_collect_at_end = ["marginal_costs"]
+
+                for key in unit.outputs.keys():
+                    for output in outputs_to_collect_at_end:
+                        if output in key:
+                            data[key] = unit.outputs[key]
+
+                data["unit"] = unit_id
+                unit_dispatch_dfs.append(data)
+
         return market_dispatch, unit_dispatch_dfs
 
     def write_actual_dispatch(self, product_type: str) -> None:
