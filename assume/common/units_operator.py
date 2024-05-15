@@ -4,6 +4,7 @@
 
 import logging
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
@@ -313,7 +314,8 @@ class UnitsOperator(Role):
             groupby=["market_id", "unit_id"],
         )
         unit_dispatch_dfs = []
-        for unit_id, unit in self.units.items():
+
+        def process_unit(unit_id, unit):
             current_dispatch = unit.execute_current_dispatch(start, now)
             end = now
             current_dispatch.name = "power"
@@ -327,7 +329,14 @@ class UnitsOperator(Role):
                         data[key] = unit.outputs[key][start:end]
 
             data["unit"] = unit_id
-            unit_dispatch_dfs.append(data)
+            return data
+
+        with ThreadPoolExecutor() as executor:
+            results = executor.map(
+                lambda unit_id_unit: process_unit(*unit_id_unit), self.units.items()
+            )
+            unit_dispatch_dfs.extend(results)
+
         return market_dispatch, unit_dispatch_dfs
 
     def write_actual_dispatch(self, product_type: str) -> None:
