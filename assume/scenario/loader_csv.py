@@ -554,6 +554,7 @@ def load_scenario_folder(
         scenario (str): The name of the scenario to be loaded.
         study_case (str): The specific study case within the scenario to be loaded.
         perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
+        terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode itteration or because we triggered an early stopping.
         episode (int, optional): The episode number for learning. Defaults to 0.
         eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
 
