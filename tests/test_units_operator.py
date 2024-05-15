@@ -121,8 +121,6 @@ async def test_write_learning_params(units_operator: UnitsOperator):
             "EOM": RLAdvancedOrderStrategy(
                 unit_id="testplant",
                 learning_mode=True,
-                observation_dimension=2 + 2 * 23 + 3,
-                action_dimension=2,
             )
         },
         "technology": "energy",

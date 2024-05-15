@@ -557,5 +557,5 @@ if __name__ == "__main__":
             base_path,
         )
     )
-    print(f"did load {scenario} - now simulating")
+    logger.info(f"did load {scenario} - now simulating")
     world.run()

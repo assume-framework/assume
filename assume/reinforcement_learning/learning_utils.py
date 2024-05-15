@@ -35,36 +35,36 @@ class CriticTD3(nn.Module):
         obs_dim: int,
         act_dim: int,
         float_type,
-        unique_obs_len: int = 16,
+        unique_obs_dim: int = 0,
     ):
         super(CriticTD3, self).__init__()
 
-        self.obs_dim = obs_dim  # + unique_obs_len * (n_agents - 1)
+        self.obs_dim = obs_dim + unique_obs_dim * (n_agents - 1)
         self.act_dim = act_dim * n_agents
 
         # Q1 architecture
-        # if n_agents <= 50:
-        self.FC1_1 = nn.Linear(self.obs_dim + self.act_dim, 512, dtype=float_type)
-        self.FC1_2 = nn.Linear(512, 256, dtype=float_type)
-        self.FC1_3 = nn.Linear(256, 128, dtype=float_type)
-        self.FC1_4 = nn.Linear(128, 1, dtype=float_type)
-        # else:
-        #     self.FC1_1 = nn.Linear(self.obs_dim + self.act_dim, 1024, dtype = float_type)
-        #     self.FC1_2 = nn.Linear(1024, 512, dtype = float_type)
-        #     self.FC1_3 = nn.Linear(512, 128, dtype = float_type)
-        #     self.FC1_4 = nn.Linear(128, 1, dtype = float_type)
+        if n_agents <= 50:
+            self.FC1_1 = nn.Linear(self.obs_dim + self.act_dim, 512, dtype=float_type)
+            self.FC1_2 = nn.Linear(512, 256, dtype=float_type)
+            self.FC1_3 = nn.Linear(256, 128, dtype=float_type)
+            self.FC1_4 = nn.Linear(128, 1, dtype=float_type)
+        else:
+            self.FC1_1 = nn.Linear(self.obs_dim + self.act_dim, 1024, dtype=float_type)
+            self.FC1_2 = nn.Linear(1024, 512, dtype=float_type)
+            self.FC1_3 = nn.Linear(512, 128, dtype=float_type)
+            self.FC1_4 = nn.Linear(128, 1, dtype=float_type)
 
         # Q2 architecture
-        # if n_agents <= 50:
-        self.FC2_1 = nn.Linear(self.obs_dim + self.act_dim, 512, dtype=float_type)
-        self.FC2_2 = nn.Linear(512, 256, dtype=float_type)
-        self.FC2_3 = nn.Linear(256, 128, dtype=float_type)
-        self.FC2_4 = nn.Linear(128, 1, dtype=float_type)
-        # else:
-        #     self.FC2_1 = nn.Linear(self.obs_dim + self.act_dim, 1024, dtype = float_type)
-        #     self.FC2_2 = nn.Linear(1024, 512, dtype = float_type)
-        #     self.FC2_3 = nn.Linear(512, 128, dtype = float_type)
-        #     self.FC2_4 = nn.Linear(128, 1, dtype = float_type)
+        if n_agents <= 50:
+            self.FC2_1 = nn.Linear(self.obs_dim + self.act_dim, 512, dtype=float_type)
+            self.FC2_2 = nn.Linear(512, 256, dtype=float_type)
+            self.FC2_3 = nn.Linear(256, 128, dtype=float_type)
+            self.FC2_4 = nn.Linear(128, 1, dtype=float_type)
+        else:
+            self.FC2_1 = nn.Linear(self.obs_dim + self.act_dim, 1024, dtype=float_type)
+            self.FC2_2 = nn.Linear(1024, 512, dtype=float_type)
+            self.FC2_3 = nn.Linear(512, 128, dtype=float_type)
+            self.FC2_4 = nn.Linear(128, 1, dtype=float_type)
 
     def forward(self, obs, actions):
         """
@@ -123,7 +123,8 @@ class Actor(nn.Module):
         # x = th.tanh(self.FC3(x))
 
         return x
-    
+
+
 class LSTM_Actor(nn.Module):
     """
     The LSTM recurrent neurnal network for the actor.
@@ -135,9 +136,9 @@ class LSTM_Actor(nn.Module):
     def __init__(self, obs_dim: int, act_dim: int, float_type):
         super(LSTM_Actor, self).__init__()
         self.float_type = float_type
-        self.no_of_timeseries = 2 #TODO: variable no. of input timeseries
-        self.forecast_horizon = 24 #TODO: variable forecast horizon
-        #forecast_dim = (obs_dim - 2)/ no_of_timeseries 
+        self.no_of_timeseries = 2  # TODO: variable no. of input timeseries
+        self.forecast_horizon = 24  # TODO: variable forecast horizon
+        # forecast_dim = (obs_dim - 2)/ no_of_timeseries
 
         self.LSTM1 = nn.LSTMCell(self.no_of_timeseries, 8, dtype=float_type)
         self.LSTM2 = nn.LSTMCell(8, 16, dtype=float_type)
@@ -148,21 +149,27 @@ class LSTM_Actor(nn.Module):
 
     def forward(self, obs):
         if obs.dim() not in (1, 2):
-            raise ValueError(f"LSTMCell: Expected input to be 1D or 2D, got {obs.dim()}D instead")
-        
+            raise ValueError(
+                f"LSTMCell: Expected input to be 1D or 2D, got {obs.dim()}D instead"
+            )
+
         is_batched = obs.dim() == 2
         if not is_batched:
             obs = obs.unsqueeze(0)
 
-        x1, x2 = obs.split([obs.shape[1] - 2, 2], dim=1) #TODO: variable no. of mc and capacity values, currently 2
-        x1 = x1.reshape(-1, self.no_of_timeseries, int(x1.shape[1] / self.no_of_timeseries)) #Shape: [no_of_timeseries, forecast_horizon] TODO: error handling for division
-        
+        x1, x2 = obs.split(
+            [obs.shape[1] - 2, 2], dim=1
+        )  # TODO: variable no. of mc and capacity values, currently 2
+        x1 = x1.reshape(
+            -1, self.no_of_timeseries, int(x1.shape[1] / self.no_of_timeseries)
+        )  # Shape: [no_of_timeseries, forecast_horizon] TODO: error handling for division
+
         h_t = th.zeros(x1.size(0), 8, dtype=self.float_type, device=obs.device)
         c_t = th.zeros(x1.size(0), 8, dtype=self.float_type, device=obs.device)
 
         h_t2 = th.zeros(x1.size(0), 16, dtype=self.float_type, device=obs.device)
         c_t2 = th.zeros(x1.size(0), 16, dtype=self.float_type, device=obs.device)
-        
+
         outputs = []
 
         for time_step in x1.split(1, dim=2):
@@ -182,6 +189,7 @@ class LSTM_Actor(nn.Module):
             x = x.squeeze(0)
 
         return x
+
 
 # Ornstein-Uhlenbeck Noise
 # from https://github.com/songrotek/DDPG/blob/master/ou_noise.py

@@ -142,11 +142,11 @@ class NodalMarketRole(MarketRole):
         # Update the network parameters
         nodal_network = self.network.copy()
 
-        # Update p_max_pu for generators with _up and _down suffixes
+        # Update p_max_pu for generators
         nodal_network.generators_t.p_max_pu.update(p_max_pu)
         nodal_network.generators_t.p_min_pu.update(p_min_pu)
 
-        # Add _up and _down suffix to costs and update the network
+        # Update marginal costs for generators
         nodal_network.generators_t.marginal_cost.update(costs)
 
         status, termination_condition = nodal_network.optimize(

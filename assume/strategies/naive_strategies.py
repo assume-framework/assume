@@ -43,9 +43,6 @@ class NaiveSingleBidStrategy(BaseStrategy):
             start, end_all
         )  # minimum and maximum power output of the unit between the start time of the first product and the end time of the last product
 
-        if "node" in market_config.additional_fields:
-            node = unit.node
-
         bids = []
         for product in product_tuples:
             # for each product, calculate the marginal cost of the unit at the start time of the product
@@ -67,6 +64,7 @@ class NaiveSingleBidStrategy(BaseStrategy):
                     "only_hours": product[2],
                     "price": marginal_cost,
                     "volume": volume,
+                    "node": unit.node,
                 }
             )
 
@@ -75,7 +73,6 @@ class NaiveSingleBidStrategy(BaseStrategy):
                 bids[-1]["min_power"] = (
                     min_power[start] if volume > 0 else unit.max_power
                 )
-                bids[-1]["node"] = node
 
             previous_power = volume + current_power
             if previous_power > 0:
@@ -133,8 +130,8 @@ class NaiveProfileStrategy(BaseStrategy):
             "only_hours": product_tuples[0][2],
             "price": marginal_cost,
             "volume": profile,
-            "accepted_volume": {product[0]: 0 for product in product_tuples},
             "bid_type": "BB",
+            "node": unit.node,
         }
 
         bids = [order]
@@ -198,6 +195,7 @@ class NaivePosReserveStrategy(BaseStrategy):
                     "only_hours": product[2],
                     "price": price,
                     "volume": volume,
+                    "node": unit.node,
                 }
             )
             previous_power = volume + current_power
@@ -262,6 +260,7 @@ class NaiveNegReserveStrategy(BaseStrategy):
                     "only_hours": product[2],
                     "price": price,
                     "volume": volume,
+                    "node": unit.node,
                 }
             )
             previous_power = volume + current_power
@@ -306,7 +305,6 @@ class NaiveRedispatchStrategy(BaseStrategy):
         end_all = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
         min_power, max_power = unit.min_power, unit.max_power
-        node = unit.node
 
         bids = []
         for product in product_tuples:
@@ -325,7 +323,7 @@ class NaiveRedispatchStrategy(BaseStrategy):
                     "volume": current_power,
                     "max_power": max_power,
                     "min_power": min_power,
-                    "node": node,
+                    "node": unit.node,
                 }
             )
 

@@ -27,21 +27,40 @@ def add_generators(
         index=network.snapshots,
         columns=generators.index,
     )
-    gen_c = generators.copy()
-    if "p_min_pu" not in gen_c.columns:
-        gen_c["p_min_pu"] = p_set
-    if "p_max_pu" not in gen_c.columns:
-        gen_c["p_max_pu"] = p_set + 1
-    if "marginal_cost" not in gen_c.columns:
-        gen_c["marginal_cost"] = p_set
-    # add generators
-    network.madd(
-        "Generator",
-        names=generators.index,
-        bus=generators["node"],  # bus to which the generator is connected to
-        p_nom=generators["max_power"],  # Nominal capacity of the powerplant/generator
-        **gen_c,
-    )
+
+    if generators.isinstance(dict):
+        gen_c = generators.copy()
+
+        if "p_min_pu" not in gen_c.columns:
+            gen_c["p_min_pu"] = p_set
+        if "p_max_pu" not in gen_c.columns:
+            gen_c["p_max_pu"] = p_set + 1
+        if "marginal_cost" not in gen_c.columns:
+            gen_c["marginal_cost"] = p_set
+
+        network.madd(
+            "Generator",
+            names=generators.index,
+            bus=generators["node"],  # bus to which the generator is connected to
+            p_nom=generators[
+                "max_power"
+            ],  # Nominal capacity of the powerplant/generator
+            **gen_c,
+        )
+    else:
+        # add generators
+        network.madd(
+            "Generator",
+            names=generators.index,
+            bus=generators["node"],  # bus to which the generator is connected to
+            p_nom=generators[
+                "max_power"
+            ],  # Nominal capacity of the powerplant/generator
+            p_min_pu=p_set,
+            p_max_pu=p_set + 1,
+            marginal_cost=p_set,
+            **generators,
+        )
 
 
 def add_redispatch_generators(
@@ -286,7 +305,7 @@ def calculate_network_meta(network, product: MarketProduct, i: int):
         )
 
         supply_volume = dispatch_for_bus[dispatch_for_bus > 0].sum()
-        demand_volume = dispatch_for_bus[dispatch_for_bus < 0].sum()
+        demand_volume = -dispatch_for_bus[dispatch_for_bus < 0].sum()
         if not network.buses_t.marginal_price.empty:
             price = network.buses_t.marginal_price[str(bus)].iat[i]
         else:

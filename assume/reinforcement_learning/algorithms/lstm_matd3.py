@@ -13,7 +13,11 @@ logger = logging.getLogger(__name__)
 
 from assume.common.base import LearningStrategy
 from assume.reinforcement_learning.algorithms.matd3 import TD3
-from assume.reinforcement_learning.learning_utils import LSTM_Actor, CriticTD3, polyak_update
+from assume.reinforcement_learning.learning_utils import (
+    CriticTD3,
+    LSTM_Actor,
+    polyak_update,
+)
 
 
 class LSTM_TD3(TD3):
@@ -64,16 +68,20 @@ class LSTM_TD3(TD3):
 
         The created actor networks are associated with each unit strategy and stored as attributes.
         """
+
+        obs_dim_list = []
+        act_dim_list = []
+
         for _, unit_strategy in self.learning_role.rl_strats.items():
             unit_strategy.actor = LSTM_Actor(
-                obs_dim=self.obs_dim,
-                act_dim=self.act_dim,
+                obs_dim=unit_strategy.obs_dim,
+                act_dim=unit_strategy.act_dim,
                 float_type=self.float_type,
             ).to(self.device)
 
             unit_strategy.actor_target = LSTM_Actor(
-                obs_dim=self.obs_dim,
-                act_dim=self.act_dim,
+                obs_dim=unit_strategy.obs_dim,
+                act_dim=unit_strategy.act_dim,
                 float_type=self.float_type,
             ).to(self.device)
             unit_strategy.actor_target.load_state_dict(unit_strategy.actor.state_dict())
@@ -81,4 +89,19 @@ class LSTM_TD3(TD3):
 
             unit_strategy.actor.optimizer = Adam(
                 unit_strategy.actor.parameters(), lr=self.learning_rate
-            ) #TODO: Try LBFGS Optimizer
+            )  # TODO: Try LBFGS Optimizer
+
+            obs_dim_list.append(unit_strategy.obs_dim)
+            act_dim_list.append(unit_strategy.act_dim)
+
+        if len(set(obs_dim_list)) > 1:
+            raise ValueError(
+                "All observation dimensions must be the same for all RL agents"
+            )
+        else:
+            self.obs_dim = obs_dim_list[0]
+
+        if len(set(act_dim_list)) > 1:
+            raise ValueError("All action dimensions must be the same for all RL agents")
+        else:
+            self.act_dim = act_dim_list[0]

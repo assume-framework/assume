@@ -13,8 +13,8 @@ from mango import Role
 
 from assume.common.base import LearningConfig, LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
-from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.algorithms.lstm_matd3 import LSTM_TD3
+from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
 
 logger = logging.getLogger(__name__)
@@ -44,8 +44,10 @@ class Learning(Role):
 
         # how many learning roles do exist and how are they named
         self.buffer: ReplayBuffer = None
-        self.obs_dim = learning_config["observation_dimension"]
-        self.act_dim = learning_config["action_dimension"]
+        self.early_stopping_steps = learning_config.get("early_stopping_steps", 10)
+        self.early_stopping_threshold = learning_config.get(
+            "early_stopping_threshold", 0.05
+        )
         self.episodes_done = 0
         self.rl_strats: dict[int, LearningStrategy] = {}
         self.rl_algorithm = learning_config["algorithm"]
@@ -101,6 +103,8 @@ class Learning(Role):
         # store evaluation values
         self.max_eval = defaultdict(lambda: -1e9)
         self.rl_eval = defaultdict(list)
+        # list of avg_changes
+        self.avg_rewards = []
 
     def setup(self) -> None:
         """
@@ -243,7 +247,6 @@ class Learning(Role):
             logger.error("tried to save policies but did not get any metrics")
             return
         # if the current values are a new max in one of the metrics - we store them in the default folder
-        first_has_new_max = False
 
         # add current reward to list of all rewards
         for metric, value in metrics.items():
@@ -252,16 +255,34 @@ class Learning(Role):
             # check if the current value is the best value
             if self.rl_eval[metric][-1] > self.max_eval[metric]:
                 self.max_eval[metric] = self.rl_eval[metric][-1]
+
+                # use first metric as default
                 if metric == list(metrics.keys())[0]:
-                    first_has_new_max = True
-                # store the best for our current metric in its folder
-                self.rl_algorithm.save_params(
-                    directory=f"{self.trained_policies_save_path}/{metric}"
+                    # store the best for our current metric in its folder
+                    self.rl_algorithm.save_params(
+                        directory=f"{self.trained_policies_save_path}/{metric}_eval_policies"
+                    )
+
+                    logger.info(
+                        f"New best policy saved, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
+                    )
+
+            # if we do not see any improvment in the last x evaluation runs we stop the training
+            if len(self.rl_eval[metric]) >= self.early_stopping_steps:
+                self.avg_rewards.append(
+                    sum(self.rl_eval[metric][-self.early_stopping_steps :])
+                    / self.early_stopping_steps
                 )
 
-        # use last metric as default
-        if first_has_new_max:
-            self.rl_algorithm.save_params(directory=self.trained_policies_save_path)
-            logger.info(
-                f"Policies saved, episode: {self.eval_episodes_done}, {metric=}, value={value:.2f}"
-            )
+                if len(self.avg_rewards) >= self.early_stopping_steps:
+                    avg_change = (
+                        max(self.avg_rewards[-self.early_stopping_steps :])
+                        - min(self.avg_rewards[-self.early_stopping_steps :])
+                    ) / min(self.avg_rewards[-self.early_stopping_steps :])
+
+                    if avg_change < self.early_stopping_threshold:
+                        logger.info(
+                            f"Stopping training as no improvement above {self.early_stopping_threshold} in last {self.early_stopping_steps} evaluations for {metric}"
+                        )
+                        return True
+            return False

@@ -62,6 +62,7 @@ class OTCStrategy(BaseStrategy):
                     "only_hours": product[2],
                     "price": price,
                     "volume": volume,
+                    "node": unit.node,
                 }
             )
 
@@ -161,6 +162,7 @@ class SupportStrategy(NaiveSingleBidStrategy):
                         "eligible_lambda": is_co2emissionless,
                         # lambda u: u.technology in ["nuclear"],
                         "evaluation_frequency": self.evaluation_frequency,
+                        "node": unit.node,
                     }
                 )
 
@@ -220,6 +222,7 @@ class MarkupStrategy(BaseStrategy):
                     "only_hours": product[2],
                     "price": price * self.rel_markup + self.abs_markup,
                     "volume": volume,
+                    "node": unit.node,
                 }
             )
 

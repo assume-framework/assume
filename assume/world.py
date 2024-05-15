@@ -25,6 +25,7 @@ from tqdm import tqdm
 from assume.common import (
     Forecaster,
     MarketConfig,
+    OutputDef,
     UnitsOperator,
     WriteOutput,
     mango_codec_factory,
@@ -151,6 +152,7 @@ class World:
                 e,
             )
         self.clearing_mechanisms: dict[str, MarketRole] = clearing_mechanisms
+        self.additional_kpis: dict[str, OutputDef] = {}
         self.addresses = []
         nest_asyncio.apply()
         self.loop = asyncio.get_event_loop()
@@ -284,12 +286,13 @@ class World:
             simulation_id=simulation_id,
             start=self.start,
             end=self.end,
-            run_time=None, 
+            run_time=None,
             db_engine=self.db,
             export_csv_path=self.export_csv_path,
             save_frequency_hours=save_frequency_hours,
             learning_mode=self.learning_mode,
             evaluation_mode=self.evaluation_mode,
+            additional_kpis=self.additional_kpis,
         )
 
         # mango multiprocessing is currently only supported on linux
@@ -410,7 +413,7 @@ class World:
 
                     # if we have learning strategy we need to assign the powerplant to one  unit_operator handling all leanring units
                     if unit_operator_id != "Operator-RL":
-                        self.logger.warning(
+                        self.logger.debug(
                             f"Your chosen unit-operator {unit_operator_id} for the learning unit {id} was overwritten with 'Operator-RL', since all learning units need to be handeled by one unit operator."
                         )
 

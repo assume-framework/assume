@@ -45,7 +45,7 @@ class PowerPlant(SupportsMinMax):
         heat_extraction (bool, optional): A boolean indicating whether the power plant can extract heat for external purposes. Defaults to False.
         max_heat_extraction (float, optional): The maximum amount of heat that the power plant can extract for external use, in some suitable unit. Defaults to 0.
         location (Tuple[float, float], optional): The geographical coordinates (latitude and longitude) of the power plant's location. Defaults to (0.0, 0.0).
-        node (str, optional): The identifier of the electrical bus or network node to which the power plant is connected. Defaults to "bus0".
+        node (str, optional): The identifier of the electrical bus or network node to which the power plant is connected. Defaults to "node0".
         **kwargs (dict, optional): Additional keyword arguments to be passed to the base class. Defaults to {}.
     """
 
@@ -75,7 +75,7 @@ class PowerPlant(SupportsMinMax):
         heat_extraction: bool = False,
         max_heat_extraction: float = 0,
         location: Tuple[float, float] = (0.0, 0.0),
-        node: str = "bus0",
+        node: str = "node0",
         **kwargs,
     ):
         super().__init__(

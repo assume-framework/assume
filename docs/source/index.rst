@@ -79,8 +79,8 @@ Documentation
 * :doc:`learning`
 * :doc:`learning_algorithm`
 * :doc:`buffers`
-* :doc:`assume`
 * :doc:`support_policies`
+* :doc:`assume`
 
 .. toctree::
    :hidden:
@@ -94,8 +94,8 @@ Documentation
    learning
    learning_algorithm
    buffers
-   assume
    support_policies
+   assume
 
 
 Indices and tables

@@ -139,6 +139,7 @@ class flexableEOM(BaseStrategy):
                     "only_hours": None,
                     "price": bid_price_inflex,
                     "volume": bid_quantity_inflex,
+                    "node": unit.node,
                 }
             )
             bids.append(
@@ -148,6 +149,7 @@ class flexableEOM(BaseStrategy):
                     "only_hours": None,
                     "price": bid_price_flex,
                     "volume": bid_quantity_flex,
+                    "node": unit.node,
                 },
             )
             # calculate previous power with planned dispatch (bid_quantity)
@@ -279,6 +281,7 @@ class flexablePosCRM(BaseStrategy):
                     "only_hours": None,
                     "price": price,
                     "volume": bid_quantity,
+                    "node": unit.node,
                 }
             )
             previous_power = bid_quantity + current_power
@@ -388,6 +391,7 @@ class flexableNegCRM(BaseStrategy):
                     "only_hours": None,
                     "price": price,
                     "volume": bid_quantity,
+                    "node": unit.node,
                 }
             )
             previous_power = current_power + bid_quantity

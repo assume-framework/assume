@@ -28,8 +28,6 @@ The following table shows the options that can be adjusted and gives a short exp
  ======================================== ==========================================================================================================
   learning config item                    description
  ======================================== ==========================================================================================================
-  observation_dimension                   The dimension of the observations given to the actor in the bidding strategy.
-  action_dimension                        The dimension of the actors made by the actor, which equals the output neurons of the actor neural net.
   continue_learning                       Whether to use pre-learned strategies and then continue learning.
   trained_policies_save_path              Where to store the newly trained rl strategies - only needed when learning_mode is set
   trained_policies_load_path              If pre-learned strategies should be used, where are they stored? - only needed when continue_learning
@@ -47,6 +45,8 @@ The following table shows the options that can be adjusted and gives a short exp
   noise_sigma                             The standard deviation of the distribution used to draw the noise, which is added to the actions and forces exploration.  noise_scale
   noise_dt                                Determines how quickly the noise weakens over time.
   noise_scale                             The scale of the noise, which is multiplied by the noise drawn from the distribution.
+  early_stopping_steps                    The number of steps considered for early stopping. If the moving average reward does not improve over this number of steps, the learning is stopped.
+  early_stopping_threshold                The value by which the average reward needs to improve to avoid early stopping.
  ======================================== ==========================================================================================================
 
 
@@ -85,9 +85,9 @@ TD3 is summarized in the following picture from the others of the original paper
 
 
 The steps in the algorithm are translated to implementations in ASSUME in the following way.
-The initialization of the actors and critics is done by the :func:`assume.reinforcement_learning.MATD3.initialize_policy` function, which is called
+The initialization of the actors and critics is done by the :func:`assume.reinforcement_learning.algorithms.matd3.TD3.initialize_policy` function, which is called
 in the learning role. The replay buffer needs to be stable across different episodes, which corresponds to runs of the entire simulation, hence it needs to be detached from the
 entities of the simualtion that are killed after each episode, like the elarning role. Therefore, it is initialized independently and given to the learning role
 at the beginning of each episode. For more information regarding the buffer see :doc:`buffers`.
 
-The core of the algorithm is embodied by the :func:`assume.reinforcement_learning.MATD3.update_policy` in the learning algorithms. Here the critic and the actor are updated according to the algorithm.
+The core of the algorithm is embodied by the :func:`assume.reinforcement_learning.algorithms.matd3.TD3.update_policy` in the learning algorithms. Here the critic and the actor are updated according to the algorithm.

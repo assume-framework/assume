@@ -3,9 +3,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
-import time
 
 import numpy as np
 import pandas as pd
@@ -14,9 +14,14 @@ import torch as th
 from assume.common.base import LearningStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_products_index
-from assume.reinforcement_learning.learning_utils import Actor, LSTM_Actor, NormalActionNoise
+from assume.reinforcement_learning.learning_utils import (
+    Actor,
+    LSTM_Actor,
+    NormalActionNoise,
+)
 
 logger = logging.getLogger(__name__)
+
 
 class RLStrategy(LearningStrategy):
     """
@@ -24,6 +29,10 @@ class RLStrategy(LearningStrategy):
 
     The agent submittes two price bids
     - one for the infelxible (P_min) and one for the flexible part (P_max-P_min) of ist capacity.
+
+    This strategy utilizes a total of 50 observations, which are used to calculate the actions.
+    The actions are then transformed into bids. Actions are formulated as 2 values.
+    The unique observation space is 2 comprising of marginal cost and current capacity.
 
     Attributes:
         foresight (int): Number of time steps to look ahead. Defaults to 24.
@@ -44,7 +53,7 @@ class RLStrategy(LearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(obs_dim=50, act_dim=2, unique_obs_dim=2, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
 
@@ -165,6 +174,7 @@ class RLStrategy(LearningStrategy):
                 "only_hours": None,
                 "price": bid_price_inflex,
                 "volume": bid_quantity_inflex,
+                "node": unit.node,
             },
             {
                 "start_time": start,
@@ -172,6 +182,7 @@ class RLStrategy(LearningStrategy):
                 "only_hours": None,
                 "price": bid_price_flex,
                 "volume": bid_quantity_flex,
+                "node": unit.node,
             },
         ]
         realtime_end = time.time()
@@ -254,6 +265,11 @@ class RLStrategy(LearningStrategy):
     ):
         """
         Creates an observation.
+
+        It is important to keep in mind, that the DRL method and the centralized critic relies on
+        unique observation of individual units. The algorithm is designed in such a way, that
+        the unique observations are always placed at the end of the observation space. Please follow this
+        convention when adding new observations.
 
         Args:
             unit (SupportsMinMax): Unit to create observation for.
@@ -458,13 +474,13 @@ class RLStrategy(LearningStrategy):
         Args:
             load_path (str): Path to load from.
         """
-        directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
+        directory = f"{load_path}/last_policies/actors/actor_{self.unit_id}.pt"
 
         params = th.load(directory, map_location=self.device)
 
         if self.actor_type == "LSTM-matd3":
             self.actor = LSTM_Actor(self.obs_dim, self.act_dim, self.float_type)
-        else: 
+        else:
             self.actor = Actor(self.obs_dim, self.act_dim, self.float_type)
         self.actor.load_state_dict(params["actor"])
 

@@ -6,7 +6,7 @@ Market Configurations
 =====================
 
 The market configuration allows an extensive configuration of multiple bidding options.
-A full list of configurations and explanation is given here.
+A full list of configurations and explanation of the :meth:`assume.common.market_objects.MarketConfig` is given here.
 
 
  ============================= =====================================================
@@ -51,7 +51,7 @@ Most important, the `market_products` are a list of MarketProduct objects.
 MarketProduct
 -------------
 
-Each MarketProduct contains the three informations:
+Each :meth:`assume.common.market_objects.MarketProduct` contains the three informations:
 
 - duration (a relative timedelta or recurrency rule)
 - count (how many consecutive products are available for trading)

@@ -50,7 +50,7 @@ class BaseUnit:
         technology: str,
         bidding_strategies: dict[str, BaseStrategy],
         index: pd.DatetimeIndex,
-        node: str = "",
+        node: str = "node0",
         forecaster: Forecaster = None,
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs,
@@ -737,22 +737,35 @@ class LearningStrategy(BaseStrategy):
     """
     A strategy which provides learning functionality, has a method to calculate the reward.
 
+    It is important to keep in mind, that the DRL method and the centralized critic relies on
+    unique observations of individual units. The algorithm is designed in such a way, that
+    the unique observations are always placed at the end of the observation space. Please follow this
+    convention when designing your create_observation method and the observation space.
+
     Attributes:
         obs_dim (int): The observation dimension.
         act_dim (int): The action dimension.
+        unique_obs_dim (int): The unique observation dimension.
 
     Args:
         *args (list): The arguments.
         **kwargs (dict): The keyword arguments.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self, obs_dim: int, act_dim: int, unique_obs_dim: int = 0, *args, **kwargs
+    ):
         """
         Initializes the learning strategy.
         """
         super().__init__(*args, **kwargs)
-        self.obs_dim = kwargs.get("observation_dimension", 50)
-        self.act_dim = kwargs.get("action_dimension", 2)
+
+        self.obs_dim = obs_dim
+        self.act_dim = act_dim
+
+        # this defines the number of unique observations, which are not the same for all units
+        # this is used by the centralised critic and will return an error if not matched
+        self.unique_obs_dim = unique_obs_dim
 
 
 class LearningConfig(TypedDict):
@@ -760,8 +773,6 @@ class LearningConfig(TypedDict):
     A class for the learning configuration.
     """
 
-    observation_dimension: int
-    action_dimension: int
     continue_learning: bool
     max_bid_price: float
     learning_mode: bool
@@ -778,3 +789,5 @@ class LearningConfig(TypedDict):
     noise_scale: int
     noise_dt: int
     trained_policies_save_path: str
+    early_stopping_steps: int
+    early_stopping_threshold: float
