@@ -834,6 +834,12 @@ def run_learning(
         if episode >= world.learning_role.episodes_collecting_initial_experience:
             world.learning_role.turn_off_initial_exploration()
 
+        # if at end of simulation save last policies
+        if episode == (world.learning_role.training_episodes + 1):
+            world.learning_role.rl_algorithm.save_params(
+                directory=f"{world.learning_role.trained_policies_save_path}/last_policies"
+            )
+
         # container shutdown implicitly with new initialisation
     logger.info("################")
     logger.info("Training finished, Start evaluation run")
