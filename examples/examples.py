@@ -6,6 +6,8 @@
 import logging
 import os
 import shutil
+import random
+import time
 
 from assume import World
 from assume.scenario.loader_csv import load_scenario_folder, run_learning
@@ -103,7 +105,8 @@ if __name__ == "__main__":
     - timescale: with database and grafana (note: you need docker installed)
     """
     data_format = "timescale"  # "local_db" or "timescale"
-    examples = ["harder_case2_lstm", "harder_case2"]
+    examples = ["harder_case2_lstm", "harder_case2", "harder_case1_lstm", "harder_case1"]
+    duration = {}
     inputs_path = "examples/inputs"
     no_runs = 1 # later: no_runs = 10 for assessing robustness of model training
 
@@ -119,7 +122,7 @@ if __name__ == "__main__":
 
         # simulate the same example [no_runs] times
         for run in range(1, no_runs + 1):
-            set.seed(run)
+            random.seed(run)
 
             if data_format == "local_db":
                 db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
@@ -130,6 +133,9 @@ if __name__ == "__main__":
             study_case_run=f"{study_case}_run_{run}"
             rename_study_case(config_path, study_case, study_case_run)
 
+            # measure time of simulation
+            start = time.time()
+            
             # create world
             world = World(database_uri=db_uri, export_csv_path=csv_path)
 
@@ -152,7 +158,18 @@ if __name__ == "__main__":
 
             world.run()
 
+            # store duration of run
+            end = time.time()
+            duration[study_case_run] = [start, end, end - start]
+
+            # quick fix: write to file 
+            with open("examples/durations.txt", "w") as f:
+                f.write(str(duration))
+
             # Restore original config file, not only change back study_case name
             shutil.copyfile(tmp_config_path, config_path) 
 
-    os.remove(tmp_config_path)     
+    os.remove(tmp_config_path)
+
+    print("Done!")
+    print(duration)
