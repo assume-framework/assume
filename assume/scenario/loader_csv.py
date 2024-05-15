@@ -6,7 +6,7 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Optional
 
 import dateutil.rrule as rr
 import numpy as np
@@ -51,7 +51,7 @@ def load_file(
         index (pd.DatetimeIndex, optional): The index of the dataframe. Defaults to None.
 
     Returns:
-        pandas.DataFrame: The dataframe containing the loaded data.
+        pandas.DataFrame: The dataframe containing the loaded scenario_data.
 
     Raises:
         FileNotFoundError: If the specified file is not found, returns None.
@@ -278,8 +278,10 @@ def add_units(
 
 
 def load_config_and_create_forecaster(
-    inputs_path: str, scenario: str, study_case: str
-) -> Dict[str, Any]:
+    inputs_path: str,
+    scenario: str,
+    study_case: str,
+) -> dict[str, object]:
     """
     Load the configuration and files for a given scenario and study case. This function
     allows us to load the files and config only once when running multiple iterations of the same scenario.
@@ -290,7 +292,7 @@ def load_config_and_create_forecaster(
         study_case (str): The specific study case within the scenario to be loaded.
 
     Returns:
-        Dict[str, Any]: A dictionary containing the configuration and loaded files for the scenario and study case.
+        dict[str, object]:: A dictionary containing the configuration and loaded files for the scenario and study case.
     """
 
     path = f"{inputs_path}/{scenario}"
@@ -376,7 +378,7 @@ def load_config_and_create_forecaster(
 
 async def async_setup_world(
     world: World,
-    data: Dict[str, Any],
+    scenario_data: dict[str, object],
     study_case: str,
     perform_learning: bool = True,
     perform_evaluation: bool = False,
@@ -390,8 +392,7 @@ async def async_setup_world(
 
     Args:
         world (World): An instance of the World class representing the simulation environment.
-        inputs_path (str): The path to the folder containing input files necessary for the scenario.
-        scenario (str): The name of the scenario to be loaded.
+        scenario_data (dict): A dictionary containing the configuration and loaded files for the scenario and study case.
         study_case (str): The specific study case within the scenario to be loaded.
         perform_learning (bool, optional): A flag indicating whether learning should be performed. Defaults to True.
         perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
@@ -403,15 +404,15 @@ async def async_setup_world(
 
     """
 
-    sim_id = data["sim_id"]
-    config = data["config"]
-    start = data["start"]
-    end = data["end"]
-    index = data["index"]
-    powerplant_units = data["powerplant_units"]
-    storage_units = data["storage_units"]
-    demand_units = data["demand_units"]
-    forecaster = data["forecaster"]
+    sim_id = scenario_data["sim_id"]
+    config = scenario_data["config"]
+    start = scenario_data["start"]
+    end = scenario_data["end"]
+    index = scenario_data["index"]
+    powerplant_units = scenario_data["powerplant_units"]
+    storage_units = scenario_data["storage_units"]
+    demand_units = scenario_data["demand_units"]
+    forecaster = scenario_data["forecaster"]
 
     save_frequency_hours = config.get("save_frequency_hours", 48)
 
@@ -520,7 +521,7 @@ async def async_setup_world(
 
 def setup_world(
     world: World,
-    data: Dict[str, Any],
+    scenario_data: dict[str, object],
     study_case: str,
     perform_learning: bool = True,
     perform_evaluation: bool = False,
@@ -530,7 +531,7 @@ def setup_world(
     world.loop.run_until_complete(
         async_setup_world(
             world=world,
-            data=data,
+            scenario_data=scenario_data,
             study_case=study_case,
             perform_learning=perform_learning,
             perform_evaluation=perform_evaluation,
@@ -585,15 +586,15 @@ def load_scenario_folder(
         - The function sets up the world environment based on the provided inputs and configuration files.
         - If `perform_learning` is set to True and learning_mode is set, the function initializes the learning mode with the specified episode number.
         - If `perform_evaluation` is set to True, the function performs evaluation using the specified evaluation episode number.
-        - The function utilizes the specified inputs to configure the simulation environment, including market parameters, unit operators, and forecasting data.
+        - The function utilizes the specified inputs to configure the simulation environment, including market parameters, unit operators, and forecasting scenario_data.
         - After calling this function, the world environment is prepared for further simulation and analysis.
 
     """
-    data = load_config_and_create_forecaster(inputs_path, scenario, study_case)
+    scenario_data = load_config_and_create_forecaster(inputs_path, scenario, study_case)
 
     setup_world(
         world=world,
-        data=data,
+        scenario_data=scenario_data,
         study_case=study_case,
         perform_learning=perform_learning,
         perform_evaluation=perform_evaluation,
@@ -707,6 +708,7 @@ def run_learning(
         inputs_path (str): The path to the folder containing input files necessary for the simulation.
         scenario (str): The name of the scenario for the simulation.
         study_case (str): The specific study case for the simulation.
+        verbose (bool, optional): A flag indicating whether to display verbose output. Defaults to False.
 
     Note:
         - The function uses a ReplayBuffer to store experiences for training the DRL agents.
@@ -715,6 +717,7 @@ def run_learning(
         - Upon completion of training, the function performs an evaluation run using the best policy learned during training.
         - The best policies are chosen based on the average reward obtained during the evaluation runs, and they are saved for future use.
     """
+
     from assume.reinforcement_learning.buffer import ReplayBuffer
 
     if not verbose:
@@ -730,8 +733,8 @@ def run_learning(
     world.output_role.del_similar_runs()
     save_path = world.learning_config["trained_policies_save_path"]
 
-    # load all data and create forecaster to be used across episodes
-    data = load_config_and_create_forecaster(inputs_path, scenario, study_case)
+    # load all scenario_data and create forecaster to be used across episodes
+    scenario_data = load_config_and_create_forecaster(inputs_path, scenario, study_case)
 
     # -----------------------------------------
     # Information That needs to be stored across episodes, aka one simulation run
@@ -773,7 +776,7 @@ def run_learning(
         if episode != 1:
             setup_world(
                 world=world,
-                data=data,
+                scenario_data=scenario_data,
                 study_case=study_case,
                 perform_learning=True,
                 episode=episode,
@@ -809,7 +812,7 @@ def run_learning(
             # load evaluation run
             setup_world(
                 world=world,
-                data=data,
+                scenario_data=scenario_data,
                 study_case=study_case,
                 perform_learning=False,
                 perform_evaluation=True,
@@ -860,11 +863,11 @@ def run_learning(
 
     setup_world(
         world=world,
-        data=data,
+        scenario_data=scenario_data,
         study_case=study_case,
         perform_learning=False,
     )
 
 
 if __name__ == "__main__":
-    data = read_grid(Path("examples/inputs/example_01d"))
+    scenario_data = read_grid(Path("examples/inputs/example_01d"))
