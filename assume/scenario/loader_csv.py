@@ -429,7 +429,7 @@ async def async_setup_world(
     if not learning_config.get("trained_policies_save_path"):
         learning_config[
             "trained_policies_save_path"
-        ] = f"./learned_strategies/{study_case}"
+        ] = f"learned_strategies/{study_case}"
 
     config = replace_paths(config, scenario_data["path"])
 
@@ -856,7 +856,7 @@ def run_learning(
             world.learning_role.turn_off_initial_exploration()
 
         # if at end of simulation save last policies
-        if episode == (world.learning_role.training_episodes + 1):
+        if episode == (world.learning_role.training_episodes):
             world.learning_role.rl_algorithm.save_params(
                 directory=f"{world.learning_role.trained_policies_save_path}/last_policies"
             )
