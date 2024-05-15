@@ -31,6 +31,7 @@ class WriteOutput(Role):
         simulation_id (str): The ID of the simulation as a unique classifier.
         start (datetime.datetime): The start datetime of the simulation run.
         end (datetime.datetime): The end datetime of the simulation run.
+        run_time (float): The complete run time of the simulation run.
         db_engine: The database engine. Defaults to None.
         export_csv_path (str, optional): The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
         save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to None.
@@ -43,6 +44,7 @@ class WriteOutput(Role):
         simulation_id: str,
         start: datetime,
         end: datetime,
+        run_time: float,
         db_engine=None,
         export_csv_path: str = "",
         save_frequency_hours: int = None,
@@ -78,6 +80,9 @@ class WriteOutput(Role):
             # check if episode=0 and delete all similar runs
             if self.episode == 0:
                 self.del_similar_runs()
+
+        # initialize run time measure
+        self.run_time = run_time
 
         # contruct all timeframe under which hourly values are written to excel and db
         self.start = start
@@ -480,6 +485,8 @@ class WriteOutput(Role):
                     f"SELECT 'sum_reward' as variable, simulation as ident, sum(reward) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
                     f"SELECT 'sum_regret' as variable, simulation as ident, sum(regret) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
                     f"SELECT 'sum_profit' as variable, simulation as ident, sum(profit) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+                    #TODO: add SQL statement to calculate avg_train_time from rl_params
+                    #f"SELECT 'avg_actor_train_time' as variable, simulation as ident, avg(actor_train_time) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation"
                 ]
             )
 
@@ -501,6 +508,8 @@ class WriteOutput(Role):
             return
 
         df = pd.concat(dfs)
+         # store run time, TODO: avg_train_time, total_train_time, no_eval_episodes
+        df = pd.concat([df, pd.DataFrame([["run_time", self.simulation_id, self.run_time]], columns=["variable", "ident", "value"])])
         df.reset_index()
         df["simulation"] = self.simulation_id
 

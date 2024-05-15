@@ -5,6 +5,7 @@
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
+import time
 
 import numpy as np
 import pandas as pd
@@ -112,6 +113,7 @@ class RLStrategy(LearningStrategy):
             Orderbook: Bids containing start time, end time, price, volume and bid type.
 
         """
+        realtime_start = time.time()
 
         bid_quantity_inflex, bid_price_inflex = 0, 0
         bid_quantity_flex, bid_price_flex = 0, 0
@@ -172,11 +174,13 @@ class RLStrategy(LearningStrategy):
                 "volume": bid_quantity_flex,
             },
         ]
+        realtime_end = time.time()
 
         # store results in unit outputs which are written to database by unit operator
         unit.outputs["rl_observations"][start] = next_observation
         unit.outputs["rl_actions"][start] = actions
         unit.outputs["rl_exploration_noise"][start] = noise
+        unit.outputs["rl_bidding_time"][start] = realtime_end - realtime_start
 
         bids = self.remove_empty_bids(bids)
 
