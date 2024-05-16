@@ -330,7 +330,7 @@ class UnitsOperator(Role):
 
             if now == unit.index[-1] - pd.Timedelta(days=1):
                 data = pd.DataFrame()
-                unit.calculate_generation_cost(start, now, "energy")
+                # unit.calculate_generation_cost(start, now, "energy")
                 outputs_to_collect_at_end = ["marginal_costs"]
 
                 for key in unit.outputs.keys():
