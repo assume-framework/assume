@@ -72,7 +72,7 @@ if __name__ == "__main__":
     - local_db: without database and grafana
     - timescale: with database and grafana (note: you need docker installed)
     """
-    data_format = "timescale"  # "local_db" or "timescale"
+    data_format = "local_db"  # "local_db" or "timescale"
     example = "small"
 
     if data_format == "local_db":
