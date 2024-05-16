@@ -16,6 +16,7 @@ from assume.strategies.naive_strategies import (
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
     NaiveProfileStrategy,
+    NaiveRedispatchSteelplantStrategy,
     NaiveRedispatchStrategy,
     NaiveSingleBidStrategy,
 )
@@ -36,6 +37,7 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "flexable_pos_crm_storage": flexablePosCRMStorage,
     "naive_redispatch": NaiveRedispatchStrategy,
     "naive_da_steelplant": NaiveDASteelplantStrategy,
+    "naive_steel_redispatch": NaiveRedispatchSteelplantStrategy,
 }
 
 try:
