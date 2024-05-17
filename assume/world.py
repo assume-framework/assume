@@ -70,7 +70,7 @@ class World:
         start (datetime.datetime): The start datetime for the simulation.
         end (datetime.datetime): The end datetime for the simulation.
         learning_config (LearningConfig): The configuration for the learning process.
-        evaluation_mode (bool): A boolean indicating whether the evaluation mode is enabled.
+        perform_evaluation (bool): A boolean indicating whether the evaluation mode is enabled.
         forecaster (Forecaster, optional): The forecaster used for custom unit types.
         learning_mode (bool): A boolean indicating whether the learning mode is enabled.
         output_agent_addr (tuple[str, str]): The address of the output agent.
@@ -195,7 +195,7 @@ class World:
         self.end = end
         self.learning_config = learning_config
         # initiate learning if the learning mode is on and hence we want to learn new strategies
-        self.evaluation_mode = self.learning_config.get("evaluation_mode", False)
+        self.perform_evaluation = self.learning_config.get("perform_evaluation", False)
 
         # forecaster is used only when loading custom unit types
         self.forecaster = forecaster
@@ -249,7 +249,7 @@ class World:
 
         self.bidding_params.update(self.learning_config)
 
-        if self.learning_mode:
+        if self.learning_mode or self.perform_evaluation:
             # if so, we initate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
 
@@ -289,7 +289,7 @@ class World:
             export_csv_path=self.export_csv_path,
             save_frequency_hours=save_frequency_hours,
             learning_mode=self.learning_mode,
-            evaluation_mode=self.evaluation_mode,
+            perform_evaluation=self.perform_evaluation,
             additional_kpis=self.additional_kpis,
         )
 
@@ -452,7 +452,7 @@ class World:
         market_operator_agent.markets = []
 
         # after creation of an agent - we set additional context params
-        if not self.learning_mode and not self.evaluation_mode:
+        if not self.learning_mode and not self.perform_evaluation:
             market_operator_agent._role_context.data.update(
                 {
                     "output_agent_addr": self.output_agent_addr[0],
