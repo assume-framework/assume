@@ -318,7 +318,9 @@ class UnitsOperator(Role):
             end = now
             current_dispatch.name = "power"
             data = pd.DataFrame(current_dispatch)
-            unit.calculate_generation_cost(start, now, "energy")
+
+            # TODO: this needs to be fixed. For now it is consuming too much time and is deactivated
+            # unit.calculate_generation_cost(start, now, "energy")
             valid_outputs = ["soc", "cashflow", "marginal_costs", "total_costs"]
 
             for key in unit.outputs.keys():
