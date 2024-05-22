@@ -408,31 +408,31 @@ class SteelPlant(SupportsMinMax):
         Returns:
             float: the marginal cost of the unit for the given power.
         """
-        # for t in self.model.time_steps:
-        #     # Calculate total variable costs for the current time step
-        #     total_variable_costs = (
-        #         +value(self.components["electrolyser"].b.electrolyser_operating_cost[t])
-        #         + value(self.components["dri_plant"].b.dri_operating_cost[t])
-        #         + value(self.components["eaf"].b.eaf_operating_cost[t])
-        #     )
+        for t in self.model.time_steps:
+            # Calculate total variable costs for the current time step
+            total_variable_costs = (
+                +value(self.components["electrolyser"].b.electrolyser_operating_cost[t])
+                + value(self.components["dri_plant"].b.dri_operating_cost[t])
+                + value(self.components["eaf"].b.eaf_operating_cost[t])
+            )
 
-        #     # Calculate total energy consumption for the current time step
-        #     total_energy_consumption = (
-        #         value(self.components["electrolyser"].b.power_in[t])
-        #         + value(self.components["eaf"].b.power_eaf[t])
-        #         + +value(self.components["dri_plant"].b.power_dri[t])
-        #     )
+            # Calculate total energy consumption for the current time step
+            total_energy_consumption = (
+                value(self.components["electrolyser"].b.power_in[t])
+                + value(self.components["eaf"].b.power_eaf[t])
+                + +value(self.components["dri_plant"].b.power_dri[t])
+            )
 
-        #     # Calculate marginal cost per unit of energy
-        #     if total_energy_consumption > 0:
-        #         marginal_cost_per_unit_energy = (
-        #             total_variable_costs / total_energy_consumption
-        #         )
-        #     else:
-        #         marginal_cost_per_unit_energy = 0  # Avoid division by zero
+            # Calculate marginal cost per unit of energy
+            if total_energy_consumption > 0:
+                marginal_cost_per_unit_energy = (
+                    total_variable_costs / total_energy_consumption
+                )
+            else:
+                marginal_cost_per_unit_energy = 0  # Avoid division by zero
 
-        #     return marginal_cost_per_unit_energy
-        return self.electricity_price.at[start]
+            return marginal_cost_per_unit_energy
+        # return self.electricity_price.at[start]
 
     def as_dict(self) -> dict:
         """
