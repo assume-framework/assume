@@ -807,11 +807,6 @@ def run_learning(
         # Give the newly initliazed learning role the needed information across episodes
         world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
-        # if enough initial experience was collected according to specifications in learning config
-        # turn off initial exploration and go into full learning mode
-        if episode > world.learning_role.episodes_collecting_initial_experience:
-            world.learning_role.turn_off_initial_exploration()
-
         world.run()
 
         inter_episodic_data = world.learning_role.get_inter_episodic_data()
