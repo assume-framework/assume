@@ -59,8 +59,9 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         self.max_bid_price = kwargs.get("max_bid_price", 100)
         self.max_demand = kwargs.get("max_demand", 10e3)
 
-        # tells us whether we are training the agents or just executing pre-learnd stategies
+        # tells us whether we are training the agents or just executing per-learnind stategies
         self.learning_mode = kwargs.get("learning_mode", False)
+        self.perform_evaluation = kwargs.get("perform_evaluation", False)
 
         # sets the devide of the actor network
         device = kwargs.get("device", "cpu")
