@@ -431,9 +431,9 @@ async def async_setup_world(
 
     if not learning_config.get("trained_policies_save_path"):
         if learning_config["learning_mode"]:
-            path = f"learned_strategies/{study_case}/"
+            path = f"learned_strategies/{study_case}"
         else:
-            path = f"learned_strategies/{study_case}/last_policies/"
+            path = f"learned_strategies/{study_case}/last_policies"
 
         learning_config["trained_policies_save_path"] = path
 
@@ -807,6 +807,8 @@ def run_learning(
         # Give the newly initliazed learning role the needed information across episodes
         world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
+        # if enough initial experience was collected according to specifications in learning config
+        # turn off initial exploration and go into full learning mode
         if episode > world.learning_role.episodes_collecting_initial_experience:
             world.learning_role.turn_off_initial_exploration()
 
@@ -843,7 +845,6 @@ def run_learning(
                 {"avg_reward": avg_reward}
             )
 
-            inter_episodic_data = world.learning_role.get_inter_episodic_data()
             inter_episodic_data["eval_episodes_done"] = eval_episode
 
             # if we have not improved in the last x evaluations, we stop
@@ -853,13 +854,6 @@ def run_learning(
             eval_episode += 1
 
         world.reset()
-
-        # in load_scenario_folder_async, we initiate new container and kill old if present
-        # as long as we do not skip setup container should be handled correctly
-        # if enough initial experience was collected according to specifications in learning config
-        # turn off initial exploration and go into full learning mode
-        if episode >= world.learning_role.episodes_collecting_initial_experience:
-            world.learning_role.turn_off_initial_exploration()
 
         # if at end of simulation save last policies
         if episode == (world.learning_role.training_episodes):

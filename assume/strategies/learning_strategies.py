@@ -205,7 +205,7 @@ class RLStrategy(LearningStrategy):
         """
 
         # distinction whether we are in learning mode or not to handle exploration realised with noise
-        if self.learning_mode:
+        if self.learning_mode and not self.perform_evaluation:
             # if we are in learning mode the first x episodes we want to explore the entire action space
             # to get a good initial experience, in the area around the costs of the agent
             if self.collect_initial_experience_mode:
