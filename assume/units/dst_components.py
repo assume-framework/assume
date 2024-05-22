@@ -88,7 +88,9 @@ class Electrolyser:
     def define_variables(self, time_steps):
         self.b.power_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
         self.b.hydrogen_out = pyo.Var(time_steps, within=pyo.NonNegativeReals)
-        self.b.electricity_cost = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+        self.b.electrolyser_operating_cost = pyo.Var(
+            time_steps, within=pyo.NonNegativeReals
+        )
 
     def define_constraints(self, time_steps):
         # Power bounds constraints
@@ -204,7 +206,8 @@ class Electrolyser:
 
             """
             return (
-                b.electricity_cost[t] == b.power_in[t] * self.model.electricity_price[t]
+                b.electrolyser_operating_cost[t]
+                == b.power_in[t] * self.model.electricity_price[t]
             )
 
 

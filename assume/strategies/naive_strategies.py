@@ -152,9 +152,6 @@ class NaiveDASteelplantStrategy(BaseStrategy):
         start = product_tuples[0][0]  # start time of the first product
         end_all = product_tuples[-1][1]  # end time of the last product
 
-        hydrogen_price = unit.forecaster["hydrogen_price"]
-        electricity_price = unit.forecaster["price_EOM"]
-
         if unit.power_requirement is None:
             if unit.objective == "min_variable_cost":
                 unit.determine_optimal_operation_without_flex()
@@ -194,9 +191,6 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
         bids = []
         start = product_tuples[0][0]  # start time of the first product
         end_all = product_tuples[-1][1]  # end time of the last product
-
-        hydrogen_price = unit.forecaster["hydrogen_price"]
-        electricity_price = unit.forecaster["price_EOM"]
 
         if unit.power_requirement is None:
             if unit.flexibility_measure == "max_load_shift":
