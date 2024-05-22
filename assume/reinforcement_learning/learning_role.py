@@ -121,6 +121,11 @@ class Learning(Role):
         self.avg_rewards = inter_episodic_data["avg_all_eval"]
         self.buffer = inter_episodic_data["buffer"]
 
+        # if enough initial experience was collected according to specifications in learning config
+        # turn off initial exploration and go into full learning mode
+        if self.episodes_done > self.episodes_collecting_initial_experience:
+            self.turn_off_initial_exploration()
+
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
     def get_inter_episodic_data(self):

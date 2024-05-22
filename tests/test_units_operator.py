@@ -132,7 +132,10 @@ async def test_write_learning_params(units_operator: UnitsOperator):
     unit = PowerPlant("testplant", index=index, **params_dict)
     await units_operator.add_unit(unit)
 
-    units_operator.learning_config = {"learning_mode": True}
+    units_operator.learning_config = {
+        "learning_mode": True,
+        "perform_evaluation": False,
+    }
     units_operator.learning_data = {"test": 1}
 
     units_operator.context.data.update(

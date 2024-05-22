@@ -59,8 +59,9 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         self.max_bid_price = kwargs.get("max_bid_price", 100)
         self.max_demand = kwargs.get("max_demand", 10e3)
 
-        # tells us whether we are training the agents or just executing pre-learnd stategies
+        # tells us whether we are training the agents or just executing per-learnind stategies
         self.learning_mode = kwargs.get("learning_mode", False)
+        self.perform_evaluation = kwargs.get("perform_evaluation", False)
 
         # sets the devide of the actor network
         device = kwargs.get("device", "cpu")
@@ -285,7 +286,7 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         """
 
         # distinction wethere we are in learning mode or not to handle exploration realised with noise
-        if self.learning_mode:
+        if self.learning_mode and not self.perform_evaluation:
             # if we are in learning mode the first x episodes we want to explore the entire action space
             # to get a good initial experience, in the area around the costs of the agent
             if self.collect_initial_experience_mode:
