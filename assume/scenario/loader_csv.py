@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import copy
 import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -403,6 +404,8 @@ async def async_setup_world(
         ValueError: If the specified scenario or study case is not found in the provided inputs.
 
     """
+    # make a deep copy of the scenario data to avoid changing the original data
+    scenario_data = copy.deepcopy(scenario_data)
 
     sim_id = scenario_data["sim_id"]
     config = scenario_data["config"]
@@ -427,9 +430,12 @@ async def async_setup_world(
         learning_config["perform_evaluation"] = False
 
     if not learning_config.get("trained_policies_save_path"):
-        learning_config[
-            "trained_policies_save_path"
-        ] = f"learned_strategies/{study_case}"
+        if learning_config["learning_mode"]:
+            path = f"learned_strategies/{study_case}/"
+        else:
+            path = f"learned_strategies/{study_case}/last_policies/"
+
+        learning_config["trained_policies_save_path"] = path
 
     config = replace_paths(config, scenario_data["path"])
 

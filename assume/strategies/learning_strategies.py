@@ -91,7 +91,9 @@ class RLStrategy(LearningStrategy):
         elif Path(kwargs["trained_policies_save_path"]).is_dir():
             self.load_actor_params(load_path=kwargs["trained_policies_save_path"])
         else:
-            logger.error("did not have learning mode and folder did not exist")
+            raise FileNotFoundError(
+                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
+            )
 
     def calculate_bids(
         self,
@@ -462,7 +464,7 @@ class RLStrategy(LearningStrategy):
         Args:
             load_path (str): Path to load from.
         """
-        directory = f"{load_path}/last_policies/actors/actor_{self.unit_id}.pt"
+        directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
 
         params = th.load(directory, map_location=self.device)
 
