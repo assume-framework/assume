@@ -78,8 +78,7 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
 
-        if self.learning_mode:
-            self.learning_role = None
+        if self.learning_mode or self.perform_evaluation:
             self.collect_initial_experience_mode = kwargs.get(
                 "episodes_collecting_initial_experience", True
             )
@@ -94,6 +93,10 @@ class RLAdvancedOrderStrategy(LearningStrategy):
 
         elif Path(kwargs["trained_policies_save_path"]).is_dir():
             self.load_actor_params(load_path=kwargs["trained_policies_save_path"])
+        else:
+            raise FileNotFoundError(
+                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
+            )
 
     def calculate_bids(
         self,
