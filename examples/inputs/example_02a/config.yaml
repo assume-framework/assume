@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 tiny:
-  start_date: 2019-03-01 00:00
-  end_date: 2019-03-03 00:00
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-05 00:00
   time_step: 1h
   save_frequency_hours: Null
   learning_mode: True

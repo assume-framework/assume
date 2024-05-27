@@ -63,6 +63,7 @@ class RLStrategy(LearningStrategy):
 
         # tells us whether we are training the agents or just executing per-learnind stategies
         self.learning_mode = kwargs.get("learning_mode", False)
+        self.perform_evaluation = kwargs.get("perform_evaluation", False)
 
         # based on learning config
         self.actor_type = kwargs.get("algorithm", "matd3")
@@ -83,8 +84,7 @@ class RLStrategy(LearningStrategy):
         # define used order types
         self.order_types = kwargs.get("order_types", ["SB"])
 
-        if self.learning_mode:
-            self.learning_role = None
+        if self.learning_mode or self.perform_evaluation:
             self.collect_initial_experience_mode = kwargs.get(
                 "episodes_collecting_initial_experience", True
             )
@@ -100,7 +100,9 @@ class RLStrategy(LearningStrategy):
         elif Path(kwargs["trained_policies_save_path"]).is_dir():
             self.load_actor_params(load_path=kwargs["trained_policies_save_path"])
         else:
-            logger.error("did not have learning mode and folder did not exist")
+            raise FileNotFoundError(
+                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
+            )
 
     def calculate_bids(
         self,
@@ -215,7 +217,7 @@ class RLStrategy(LearningStrategy):
         """
 
         # distinction whether we are in learning mode or not to handle exploration realised with noise
-        if self.learning_mode:
+        if self.learning_mode and not self.perform_evaluation:
             # if we are in learning mode the first x episodes we want to explore the entire action space
             # to get a good initial experience, in the area around the costs of the agent
             if self.collect_initial_experience_mode:
@@ -474,7 +476,7 @@ class RLStrategy(LearningStrategy):
         Args:
             load_path (str): Path to load from.
         """
-        directory = f"{load_path}/last_policies/actors/actor_{self.unit_id}.pt"
+        directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
 
         params = th.load(directory, map_location=self.device)
 

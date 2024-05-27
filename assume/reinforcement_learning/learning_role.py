@@ -58,6 +58,7 @@ class Learning(Role):
         self.training_episodes = learning_config["training_episodes"]
         self.learning_mode = learning_config["learning_mode"]
         self.continue_learning = learning_config["continue_learning"]
+        self.perform_evaluation = learning_config["perform_evaluation"]
         self.trained_policies_save_path = learning_config["trained_policies_save_path"]
         self.trained_policies_load_path = learning_config.get(
             "trained_policies_load_path", self.trained_policies_save_path
@@ -106,6 +107,46 @@ class Learning(Role):
         # list of avg_changes
         self.avg_rewards = []
 
+    def load_inter_episodic_data(self, inter_episodic_data):
+        """
+        Load the inter-episodic data from the dict stored across simulation runs.
+
+        Args:
+            inter_episodic_data (dict): The inter-episodic data to be loaded.
+
+        """
+        self.episodes_done = inter_episodic_data["episodes_done"]
+        self.eval_episodes_done = inter_episodic_data["eval_episodes_done"]
+        self.max_eval = inter_episodic_data["max_eval"]
+        self.rl_eval = inter_episodic_data["all_eval"]
+        self.avg_rewards = inter_episodic_data["avg_all_eval"]
+        self.buffer = inter_episodic_data["buffer"]
+
+        # if enough initial experience was collected according to specifications in learning config
+        # turn off initial exploration and go into full learning mode
+        if self.episodes_done > self.episodes_collecting_initial_experience:
+            self.turn_off_initial_exploration()
+
+        self.initialize_policy(inter_episodic_data["actors_and_critics"])
+
+    def get_inter_episodic_data(self):
+        """
+        Dump the inter-episodic data to a dict for storing across simulation runs.
+
+        Returns:
+            dict: The inter-episodic data to be stored.
+        """
+
+        return {
+            "episodes_done": self.episodes_done,
+            "eval_episodes_done": self.eval_episodes_done,
+            "max_eval": self.max_eval,
+            "all_eval": self.rl_eval,
+            "avg_all_eval": self.avg_rewards,
+            "buffer": self.buffer,
+            "actors_and_critics": self.rl_algorithm.extract_policy(),
+        }
+
     def setup(self) -> None:
         """
         Set up the learning role for reinforcement learning training.
@@ -115,21 +156,23 @@ class Learning(Role):
             for handling the training process and schedules recurrent tasks for policy updates based on the specified training frequency.
         """
         # subscribe to messages for handling the training process
-        self.context.subscribe_message(
-            self,
-            self.handle_message,
-            lambda content, meta: content.get("context") == "rl_training",
-        )
 
-        recurrency_task = rr.rrule(
-            freq=rr.HOURLY,
-            interval=self.train_freq,
-            dtstart=self.simulation_start,
-            until=self.simulation_end,
-            cache=True,
-        )
+        if not self.perform_evaluation:
+            self.context.subscribe_message(
+                self,
+                self.handle_message,
+                lambda content, meta: content.get("context") == "rl_training",
+            )
 
-        self.context.schedule_recurrent_task(self.update_policy, recurrency_task)
+            recurrency_task = rr.rrule(
+                freq=rr.HOURLY,
+                interval=self.train_freq,
+                dtstart=self.simulation_start,
+                until=self.simulation_end,
+                cache=True,
+            )
+
+            self.context.schedule_recurrent_task(self.update_policy, recurrency_task)
 
     def handle_message(self, content: dict, meta: dict) -> None:
         """
@@ -284,5 +327,10 @@ class Learning(Role):
                         logger.info(
                             f"Stopping training as no improvement above {self.early_stopping_threshold} in last {self.early_stopping_steps} evaluations for {metric}"
                         )
+
+                        self.rl_algorithm.save_params(
+                            directory=f"{self.trained_policies_save_path}/last_policies"
+                        )
+
                         return True
             return False
