@@ -6,10 +6,11 @@ base:
   start_date: 2019-03-01 00:00
   end_date: 2019-04-01 00:00
   time_step: 1h
-  save_frequency_hours: null
-  learning_mode: true
+  save_frequency_hours: Null
+  learning_mode: True
+
   learning_config:
-    continue_learning: false
+    continue_learning: False
     trained_policies_save_path: learned_strategies/example_02b_base
     max_bid_price: 100
     algorithm: matd3
@@ -20,21 +21,22 @@ base:
     gradient_steps: -1
     batch_size: 256
     gamma: 0.99
-    device: cuda
+    device: cpu
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 5
     early_stopping_steps: 10
     early_stopping_threshold: 0.05
+
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
       products:
-      - duration: 1h
-        count: 1
-        first_delivery: 1h
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh
@@ -43,17 +45,17 @@ base:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
+
 harder:
   start_date: 2019-03-01 00:00
   end_date: 2019-04-01 00:00
   time_step: 1h
-  save_frequency_hours: null
-  learning_mode: true
+  save_frequency_hours: Null
+  learning_mode: True
+
   learning_config:
-    observation_dimension: 50
-    action_dimension: 2
-    continue_learning: false
-    trained_policies_save_path: null
+    continue_learning: False
+    trained_policies_save_path:
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.0001
@@ -68,14 +70,17 @@ harder:
     noise_scale: 1
     noise_dt: 0.9998
     validation_episodes_interval: 5
+    early_stopping_steps: 10
+    early_stopping_threshold: 0.05
+
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
       products:
-      - duration: 1h
-        count: 1
-        first_delivery: 1h
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh
@@ -84,17 +89,17 @@ harder:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
-harder_lstm_run_1:
+
+harder_lstm:
   start_date: 2019-03-01 00:00
   end_date: 2019-04-01 00:00
   time_step: 1h
-  save_frequency_hours: null
-  learning_mode: true
+  save_frequency_hours: Null
+  learning_mode: True
+
   learning_config:
-    observation_dimension: 50
-    action_dimension: 2
-    continue_learning: false
-    trained_policies_save_path: null
+    continue_learning: False
+    trained_policies_save_path:
     max_bid_price: 100
     algorithm: LSTM-matd3
     learning_rate: 0.001
@@ -109,14 +114,17 @@ harder_lstm_run_1:
     noise_scale: 1
     noise_dt: 0.9998
     validation_episodes_interval: 5
+    early_stopping_steps: 10
+    early_stopping_threshold: 0.05
+
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
       products:
-      - duration: 1h
-        count: 1
-        first_delivery: 1h
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh
