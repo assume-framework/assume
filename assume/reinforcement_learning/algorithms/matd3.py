@@ -56,9 +56,6 @@ class TD3(RLAlgorithm):
         )
         self.n_updates = 0
 
-        self.total_updating_time = {}
-        self.avg_updating_time = {}
-
     def save_params(self, directory):
         """
         This method saves the parameters of both the actor and critic networks associated with the learning role. It organizes the
@@ -522,11 +519,12 @@ class TD3(RLAlgorithm):
                     )
 
                 realtime_end = time.time()
-                # TODO: how to write from here to output role?
-                # self.learning_role.rl_strats[u_id].outputs["rl_updating_time"][self.learning_role.simulation_start] = realtime_end - realtime_start
-                self.total_updating_time[u_id] += realtime_end - realtime_start
-                self.avg_updating_time[u_id] = (
-                    self.total_updating_time[u_id] / self.n_updates
-                )
+                # Calculate 0:total_updating_time and 1:avg_updating_time of unit
+                if self.learning_role.updating_time.get(u_id) is not None:
+                    self.learning_role.updating_time[u_id][0] += realtime_end - realtime_start
+                    self.learning_role.updating_time[u_id][1] = (realtime_end - realtime_start) / self.n_updates
+                else:
+                    self.learning_role.updating_time[u_id][0] = realtime_end - realtime_start
+                    self.learning_role.updating_time[u_id][1] = (realtime_end - realtime_start) / self.n_updates
 
                 i += 1

@@ -140,20 +140,12 @@ if __name__ == "__main__":
                     study_case=study_case_run,
                 )
 
+            # save starting timestamp for run time calculation (- for calculating duration: end_ts - start_ts)
+            world.output_role.total_run_time = -start
+
             world.run()
-
-            # store duration of run
-            end = time.time()
-            duration[study_case_run] = [start, end, end - start]
-
-            # quick fix: write to file
-            with open("examples/durations.txt", "w") as f:
-                f.write(str(duration))
 
             # Restore original config file, not only change back study_case name
             shutil.copyfile(tmp_config_path, config_path)
 
     os.remove(tmp_config_path)
-
-    print("Done!")
-    print(duration)
