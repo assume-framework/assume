@@ -130,6 +130,8 @@ class Learning(Role):
         if self.episodes_done > self.episodes_collecting_initial_experience:
             self.turn_off_initial_exploration()
 
+        self.set_noise_scale(inter_episodic_data["noise_scale"])
+
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
     def get_inter_episodic_data(self):
@@ -148,6 +150,7 @@ class Learning(Role):
             "avg_all_eval": self.avg_rewards,
             "buffer": self.buffer,
             "actors_and_critics": self.rl_algorithm.extract_policy(),
+            "noise_scale":  self.get_noise_scale(),
         }
 
     def setup(self) -> None:
@@ -205,6 +208,29 @@ class Learning(Role):
         """
         for _, unit in self.rl_strats.items():
             unit.collect_initial_experience_mode = False
+
+    def set_noise_scale(self, stored_scale) -> None:
+        """
+        Set the noise scale for all learning strategies (units) in rl_strats.
+
+        """
+        for _, unit in self.rl_strats.items():
+            unit.action_noise.scale = stored_scale
+
+    def get_noise_scale(self) -> None:
+        """
+        Get the noise scale from the first learning strategy (unit) in rl_strats.
+
+        Notes:
+            The noise scale is the same for all learning strategies (units) in rl_strats, so we only need to get it from one unit. 
+            It is only depended on the number of updates done so far, which is determined by the number of episodes done and the update frequency.
+
+        """
+        stored_scale = list(self.rl_strats.values())[0].action_noise.scale
+
+        return stored_scale
+
+
 
     def create_learning_algorithm(self, algorithm: RLAlgorithm):
         """

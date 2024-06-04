@@ -779,6 +779,7 @@ def run_learning(
         "avg_all_eval": [],
         "episodes_done": 0,
         "eval_episodes_done": 0,
+        "noise_scale": world.learning_config.get("noise_scale", 1.0),
     }
 
     # -----------------------------------------
@@ -809,6 +810,8 @@ def run_learning(
 
         world.run()
 
+        # -----------------------------------------
+        # Store updated information across episodes
         inter_episodic_data = world.learning_role.get_inter_episodic_data()
         inter_episodic_data["episodes_done"] = episode
 

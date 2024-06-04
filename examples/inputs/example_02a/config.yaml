@@ -186,10 +186,8 @@ harder:
   learning_mode: True
 
   learning_config:
-    observation_dimension: 50
-    action_dimension: 2
     continue_learning: False
-    trained_policies_save_path: null
+    trained_policies_save_path: Null
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.0001
@@ -199,11 +197,13 @@ harder:
     gradient_steps: -1
     batch_size: 256
     gamma: 0.999
-    device: cuda
+    device: cpu
     noise_sigma: 0.2
     noise_scale: 1
-    noise_dt: 0.9998
-    validation_episodes_interval: 5
+    noise_dt: 0.99995
+    validation_episodes_interval: 3
+    early_stopping_steps: 8
+    early_stopping_threshold: 0.05
 
   markets_config:
     EOM:
@@ -230,10 +230,8 @@ harder_lstm:
   learning_mode: True
 
   learning_config:
-    observation_dimension: 50
-    action_dimension: 2
     continue_learning: False
-    trained_policies_save_path: null
+    trained_policies_save_path: Null
     max_bid_price: 100
     algorithm: LSTM-matd3
     learning_rate: 0.001
@@ -243,11 +241,13 @@ harder_lstm:
     gradient_steps: -1
     batch_size: 256
     gamma: 0.95
-    device: cuda
+    device: cpu
     noise_sigma: 0.2
     noise_scale: 1
-    noise_dt: 0.9998
-    validation_episodes_interval: 5
+    noise_dt: 0.99995
+    validation_episodes_interval: 3
+    early_stopping_steps: 8
+    early_stopping_threshold: 0.05
 
   markets_config:
     EOM:
