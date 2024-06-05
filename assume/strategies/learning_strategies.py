@@ -418,22 +418,22 @@ class RLStrategy(LearningStrategy):
             order_profit = order["accepted_price"] * order["accepted_volume"] * duration
             order_cost = marginal_cost * order["accepted_volume"] * duration
 
-            # calculate opportunity cost
-            # as the loss of income we have because we are not running at full power
-            order_opportunity_cost = (
+            # collect profit and opportunity cost for all orders
+            profit += order_profit
+            costs += order_cost
+
+        # calculate opportunity cost
+        # as the loss of income we have because we are not running at full power
+        opportunity_cost = (
                 (order["accepted_price"] - marginal_cost)
                 * (
                     unit.max_power - unit.outputs[product_type].loc[start:end_excl]
                 ).sum()
                 * duration
             )
-            # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
-            order_opportunity_cost = max(order_opportunity_cost, 0)
-
-            # collect profit and opportunity cost for all orders
-            profit += order_profit
-            costs += order_cost
-            opportunity_cost += order_opportunity_cost
+        
+        # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
+        opportunity_cost = max(opportunity_cost, 0)
 
         # consideration of start-up costs, which are evenly divided between the
         # upward and downward regulation events
