@@ -864,8 +864,9 @@ def run_learning(
     logger.info("Training finished, Start evaluation run")
     world.export_csv_path = temp_csv_path
 
+    world.reset()
+    
     # load scenario for evaluation
-
     setup_world(
         world=world,
         scenario_data=scenario_data,

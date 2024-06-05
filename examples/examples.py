@@ -85,14 +85,14 @@ if __name__ == "__main__":
     """
     data_format = "timescale"  # "local_db" or "timescale"
     examples = [
-        # "harder_case2_lstm",
-        # "harder_case2",
-        # "harder_case1_lstm",
-        "harder_case1",
+        "harder_case1", 
+        "harder_case1_lstm",
+        "harder_case2",
+        "harder_case2_lstm"
     ]
     duration = {}
     inputs_path = "examples/inputs"
-    no_runs = 1  # later: no_runs = 10 for assessing robustness of model training
+    no_runs = 10  # later: no_runs = 10 for assessing robustness of model training
 
     for example in examples:
         # temporarily store original config file to restore it after runs
@@ -143,6 +143,7 @@ if __name__ == "__main__":
             # save starting timestamp for run time calculation (- for calculating duration: end_ts - start_ts)
             world.output_role.total_run_time = -start
 
+            # final run with best policies
             world.run()
 
             # Restore original config file, not only change back study_case name
