@@ -85,9 +85,9 @@ if __name__ == "__main__":
     """
     data_format = "timescale"  # "local_db" or "timescale"
     examples = [
-        "harder_case2_lstm",
-        "harder_case2",
-        "harder_case1_lstm",
+        # "harder_case2_lstm",
+        # "harder_case2",
+        # "harder_case1_lstm",
         "harder_case1",
     ]
     duration = {}

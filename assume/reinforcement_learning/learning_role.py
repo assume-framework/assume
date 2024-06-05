@@ -298,7 +298,7 @@ class Learning(Role):
         if self.episodes_done > self.episodes_collecting_initial_experience:
             self.rl_algorithm.update_policy()
 
-    def compare_and_save_policies(self, metrics: dict) -> None:
+    def compare_and_save_policies(self, metrics: dict) -> bool:
         """
         Compare evaluation metrics and save policies based on the best achieved performance according to the metrics calculated.
 
@@ -310,6 +310,9 @@ class Learning(Role):
         metrics contain a metric key like "reward" and the current value.
         This function stores the policies with the highest metric.
         So if minimize is required one should add for example "minus_regret" which is then maximized.
+
+        Returns:
+            bool: True if early stopping criteria is triggered.
 
         Notes:
             This method is typically used during the evaluation phase to save policies that achieve superior performance.
