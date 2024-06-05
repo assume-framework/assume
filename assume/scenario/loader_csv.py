@@ -845,18 +845,14 @@ def run_learning(
 
             inter_episodic_data["eval_episodes_done"] = eval_episode 
 
+            # if we have not improved in the last x evaluations, we stop loop
+            if terminate:
+                break
+
             eval_episode += 1
 
         world.reset()
-
-        # if we have not improved in the last x evaluations, we stop
-        if isinstance(terminate):
-            # TODO: check other
-             option to continue loop but stop before next episode in tdqm
-            if terminate:
-                tqdm.close()
                
-
         # if at end of simulation save last policies
         if episode == (world.learning_role.training_episodes):
             world.learning_role.rl_algorithm.save_params(
