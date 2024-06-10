@@ -25,7 +25,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 3,
+  "id": 4,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -51,7 +51,7 @@
         "content": "# Welcome to ASSUMES Learning Dashboard\n",
         "mode": "markdown"
       },
-      "pluginVersion": "10.4.0",
+      "pluginVersion": "10.4.2",
       "targets": [
         {
           "datasource": {
@@ -110,7 +110,7 @@
         "content": "#### Introduction\n\nHere we visualize the results of the reinforcement learning process for the specified units that use a learning strategy. \nReinforcement Learning is a machine learning paradigm where an agent learns to make a sequence of decisions in an environment to maximize a reward signal. \nThe agent explores the environment, takes actions, and receives feedback in the form of rewards. \nThe goal is to learn a strategy (policy) that guides the agent to make actions that lead to the highest cumulative reward over time. \nTo better understand the agent's learning process, we use visualizations that illustrate key aspects of its journey.",
         "mode": "markdown"
       },
-      "pluginVersion": "10.4.0",
+      "pluginVersion": "10.4.2",
       "targets": [
         {
           "datasource": {
@@ -170,7 +170,7 @@
         "content": "#### How to use the dashboard\n\nThis interactive tool is designed to help you gain insights into the learning journey of our reinforcement learning (RL) agent. \nTo understand the dashboard take note of the following three points:\n\n##### 1. Division of the Dashboard:\nThe dashboard is divided into two parts. \nThe upper part summarizes the results for all learning units over all simulated episodes. \nThe lower part focuses the results on specific units and episodes, which you can select according to the second point.\n\n\n##### 2. Selection of Metrics and Simulation Subsets:\nThe dashboard is devided in system wide plots and specific plots for certain episodes, timeframes and learning units.\nOn the top of the dashboard, you'll find a list of available choices for the episode of the simualtion and a list of RL units. \nChoose the ones you're interested in by selecting their names in the list. The selected metrics will be displayed on the choice-specific visualization area.\n\n\n##### 3. Interaction with Plots:\nThe plots are interactive. You can zoom in and out, click on data points to view specific details etc.\nIn the upper left corner of each plot you find additional information about the depicted data.\n\nIf you need some guidance for interpreting the results, you can orient yourself on the follwing steps:\n\n1. Understand Learning Trends: \nObserve how reward, regret, and other metrics change over time. \nLook for trends such as increasing rewards, or decreasing regret. Take note of the evaluation runs, which are done every x episodes. There the exploration isturned off and a \"normal run\" with the currently learned policies is made. \nWhile the reward in all learning episodes can fluctuate you should see a clear rising trend in the evaluation reward. the \n2. Examine Policy and Action Patterns: \nVisualize the agent's learned policy and action distribution. Do you see some pattern in the agents actions. Do these patterns make sense with regard to your domain knowledge?\n5. Compare Different Strategies: \nFor an easy comparison we introduced the ASSUME Comparison dashboard. There you can easily compare two runs with and without learning. Analyse different behaviour of the agents there. \n6. Experiment and Learn: \nUse this tool to experiment with different settings and learn about RL agent behavior. \nIt's a great way to develop a deeper understanding of RL concepts.",
         "mode": "markdown"
       },
-      "pluginVersion": "10.4.0",
+      "pluginVersion": "10.4.2",
       "targets": [
         {
           "datasource": {
@@ -956,8 +956,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1172,8 +1171,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1403,8 +1401,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1640,8 +1637,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1853,8 +1849,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2107,8 +2102,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2266,8 +2260,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2426,8 +2419,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2542,8 +2534,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2658,8 +2649,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2736,21 +2726,21 @@
       {
         "current": {
           "selected": false,
-          "text": "example_02a_base",
-          "value": "example_02a_base"
+          "text": "example_02a_harder_run_4",
+          "value": "example_02a_harder_run_4"
         },
         "datasource": {
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT DISTINCT\nSUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\nFROM rl_params m\nwhere learning_mode is True",
+        "definition": "SELECT DISTINCT\nSUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\nFROM rl_params m\nwhere perform_evaluation is False and learning_mode is True",
         "description": "Can choose which simulation we want to show ",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "simulation",
         "options": [],
-        "query": "SELECT DISTINCT\nSUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\nFROM rl_params m\nwhere learning_mode is True",
+        "query": "SELECT DISTINCT\nSUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\nFROM rl_params m\nwhere perform_evaluation is False and learning_mode is True",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -2784,13 +2774,9 @@
       },
       {
         "current": {
-          "selected": true,
-          "text": [
-            "1551402000000"
-          ],
-          "value": [
-            "1551402000000"
-          ]
+          "selected": false,
+          "text": "1551402000000",
+          "value": "1551402000000"
         },
         "datasource": {
           "type": "postgres",
@@ -2827,8 +2813,8 @@
     ]
   },
   "timezone": "",
-  "title": "Assume: Training progress",
+  "title": "ASSUME: Training progress",
   "uid": "JKQzx0q4k",
-  "version": 3,
+  "version": 2,
   "weekStart": ""
 }
