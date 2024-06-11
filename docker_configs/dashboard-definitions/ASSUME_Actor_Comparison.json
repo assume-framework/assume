@@ -89,7 +89,7 @@
       "type": "text"
     },
     {
-      "collapsed": true,
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -127,8 +127,8 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 18,
-        "w": 8,
+        "h": 17,
+        "w": 7,
         "x": 0,
         "y": 3
       },
@@ -143,6 +143,7 @@
         "reduceOptions": {
           "calcs": [],
           "fields": "",
+          "limit": 40,
           "values": true
         },
         "showUnfilled": true,
@@ -227,7 +228,7 @@
       "gridPos": {
         "h": 11,
         "w": 8,
-        "x": 8,
+        "x": 7,
         "y": 3
       },
       "id": 20,
@@ -367,17 +368,251 @@
       "type": "histogram"
     },
     {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "How many episodes were needed for training?",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic-by-name"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "episodes_done"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 182
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "eval_episodes_done"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 167
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "simulation_id"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 263
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 17,
+        "w": 9,
+        "x": 15,
+        "y": 3
+      },
+      "id": 21,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "mean"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "10.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "CREATE EXTENSION IF NOT EXISTS tablefunc;\r\n\r\nSELECT \r\n  *\r\nFROM crosstab(\r\n  'SELECT ident, variable, value\r\n  FROM kpis\r\n  WHERE variable = ''episodes_done'' OR variable = ''eval_episodes_done''\r\n  ORDER BY ident, LENGTH(ident), variable',\r\n  'VALUES(''episodes_done''), (''eval_episodes_done'')'\r\n) as ct (simulation_id text, episodes_done text, eval_episodes_done text);\r\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Number of Episodes",
+      "type": "table"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 21
+        "y": 20
       },
       "id": 16,
       "panels": [],
       "title": "Market Result Comparison",
       "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "How much profit make all learning units combined per evaluation episode? (Trained models in eval_episode 1 are mostly based on exploration runs and performing badly.)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "min": -3000000,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
+      "id": 22,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "vertical",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "episode",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  simulation,\r\n  episode, \r\n  sum(profit)\r\nFROM rl_params\r\nWHERE simulation ~ '^${simulation}_eval_[1-9]+'  AND perform_evaluation is true \r\nGROUP BY simulation, episode\r\nORDER BY episode",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Total Evaluation Profit",
+      "type": "barchart"
     }
   ],
   "refresh": "",
@@ -388,21 +623,21 @@
       {
         "current": {
           "selected": false,
-          "text": "example_02b_harder_run_1",
-          "value": "example_02b_harder_run_1"
+          "text": "example_02b_harder_run_9",
+          "value": "example_02b_harder_run_9"
         },
         "datasource": {
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT DISTINCT\nSUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\nFROM rl_params m\nwhere learning_mode is True",
+        "definition": "SELECT DISTINCT\nSUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\nFROM rl_params m\nwhere learning_mode is True and perform_evaluation is False",
         "description": "Can choose which simulation we want to show ",
         "hide": 0,
         "includeAll": false,
         "multi": false,
         "name": "simulation",
         "options": [],
-        "query": "SELECT DISTINCT\nSUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\nFROM rl_params m\nwhere learning_mode is True",
+        "query": "SELECT DISTINCT\nSUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\nFROM rl_params m\nwhere learning_mode is True and perform_evaluation is False",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -475,16 +710,11 @@
         },
         "description": "The four different scenario and actor combinations.",
         "hide": 0,
-        "includeAll": true,
-        "label": "Case Study",
+        "includeAll": false,
+        "label": "NOT USED",
         "multi": true,
         "name": "case_study",
         "options": [
-          {
-            "selected": false,
-            "text": "All",
-            "value": "$__all"
-          },
           {
             "selected": true,
             "text": "example_02a_harder",
@@ -556,8 +786,8 @@
     ]
   },
   "time": {
-    "from": "2019-02-13T12:00:00.000Z",
-    "to": "2019-04-16T12:00:00.000Z"
+    "from": "2019-03-01T00:00:00.000Z",
+    "to": "2019-03-31T23:59:59.000Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -573,6 +803,6 @@
   "timezone": "",
   "title": "ASSUME: Actor Comparison",
   "uid": "bdnvfato1dlogd",
-  "version": 13,
+  "version": 24,
   "weekStart": ""
 }
