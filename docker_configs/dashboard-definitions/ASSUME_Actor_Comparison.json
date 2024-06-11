@@ -432,6 +432,30 @@
                 "value": 263
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "run"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 104
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "scenario"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 179
+              }
+            ]
           }
         ]
       },
@@ -465,7 +489,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "CREATE EXTENSION IF NOT EXISTS tablefunc;\r\n\r\nSELECT \r\n  *\r\nFROM crosstab(\r\n  'SELECT ident, variable, value\r\n  FROM kpis\r\n  WHERE variable = ''episodes_done'' OR variable = ''eval_episodes_done''\r\n  ORDER BY ident, LENGTH(ident), variable',\r\n  'VALUES(''episodes_done''), (''eval_episodes_done'')'\r\n) as ct (simulation_id text, episodes_done text, eval_episodes_done text);\r\n",
+          "rawSql": "\r\n  CREATE EXTENSION IF NOT EXISTS tablefunc; \r\n  SELECT \r\n    SUBSTRING(ident, 1, 18) as scenario, \r\n    SUBSTRING(ident, 20) as run, \r\n    episodes_done, \r\n    eval_episodes_done \r\n    FROM crosstab( \r\n      'SELECT ident, variable, value \r\n      FROM kpis \r\n      WHERE variable = ''episodes_done'' OR variable = ''eval_episodes_done'' \r\n      ORDER BY ident, LENGTH(ident), variable', \r\n      'VALUES(''episodes_done''), (''eval_episodes_done'')' \r\n      ) as ct (ident text, episodes_done text, eval_episodes_done text)\r\n    ORDER BY scenario, LENGTH(ident), run; ",
           "refId": "A",
           "sql": {
             "columns": [
@@ -622,9 +646,9 @@
     "list": [
       {
         "current": {
-          "selected": false,
-          "text": "example_02b_harder_run_9",
-          "value": "example_02b_harder_run_9"
+          "selected": true,
+          "text": "example_02b_harder_lstm_run_1",
+          "value": "example_02b_harder_lstm_run_1"
         },
         "datasource": {
           "type": "postgres",
@@ -803,6 +827,6 @@
   "timezone": "",
   "title": "ASSUME: Actor Comparison",
   "uid": "bdnvfato1dlogd",
-  "version": 24,
+  "version": 28,
   "weekStart": ""
 }
