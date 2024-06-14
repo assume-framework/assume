@@ -53,7 +53,11 @@ class RLStrategy(LearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=50, act_dim=2, unique_obs_dim=2, *args, **kwargs)
+        obs_dim = kwargs.get("observation_dimension", 50)
+        act_dim = kwargs.get("action_dimension", 2)
+        unique_obs_dim = kwargs.get("unique_obs_dim", 2)
+
+        super().__init__(obs_dim=obs_dim, act_dim=act_dim, unique_obs_dim=unique_obs_dim, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
 

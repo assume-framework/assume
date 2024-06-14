@@ -265,3 +265,95 @@ harder_lstm:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
+
+harder_LF:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-04-01 00:00
+  time_step: 1h
+  save_frequency_hours: Null
+  learning_mode: True
+
+  learning_config:
+    observation_dimension: 14
+    foresight: 6
+    continue_learning: False
+    trained_policies_save_path: Null
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.0001
+    training_episodes: 100
+    episodes_collecting_initial_experience: 5
+    train_freq: 10
+    gradient_steps: -1
+    batch_size: 256
+    gamma: 0.999
+    device: cpu
+    noise_sigma: 0.2
+    noise_scale: 1
+    noise_dt: 0.99995
+    validation_episodes_interval: 3
+    early_stopping_steps: 8
+    early_stopping_threshold: 0.05
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+harder_lstm_LF:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-04-01 00:00
+  time_step: 1h
+  save_frequency_hours: Null
+  learning_mode: True
+
+  learning_config:
+    observation_dimension: 14
+    foresight: 6
+    continue_learning: False
+    trained_policies_save_path: Null
+    max_bid_price: 100
+    algorithm: LSTM-matd3
+    learning_rate: 0.001
+    training_episodes: 100
+    episodes_collecting_initial_experience: 5
+    train_freq: 10
+    gradient_steps: -1
+    batch_size: 256
+    gamma: 0.95
+    device: cpu
+    noise_sigma: 0.2
+    noise_scale: 1
+    noise_dt: 0.99995
+    validation_episodes_interval: 3
+    early_stopping_steps: 8
+    early_stopping_threshold: 0.05
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear

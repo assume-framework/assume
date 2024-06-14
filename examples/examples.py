@@ -71,6 +71,8 @@ available_examples = {
     # Cases resembling Harder et al. 2023
     "harder_case1": {"scenario": "example_02a", "study_case": "harder"},
     "harder_case1_lstm": {"scenario": "example_02a", "study_case": "harder_lstm"},
+    "harder_case1_LF": {"scenario": "example_02a", "study_case": "harder_LF"},
+    "harder_case1_lstm_LF": {"scenario": "example_02a", "study_case": "harder_lstm_LF"},
     "harder_case2": {"scenario": "example_02b", "study_case": "harder"},
     "harder_case2_lstm": {"scenario": "example_02b", "study_case": "harder_lstm"},
 }
@@ -85,10 +87,8 @@ if __name__ == "__main__":
     """
     data_format = "timescale"  # "local_db" or "timescale"
     examples = [
-        "harder_case1", 
-        "harder_case1_lstm",
-        "harder_case2",
-        "harder_case2_lstm"
+        "harder_case1_LF", 
+        "harder_case1_lstm_LF"
     ]
     duration = {}
     inputs_path = "examples/inputs"

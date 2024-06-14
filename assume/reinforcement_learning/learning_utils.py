@@ -137,8 +137,7 @@ class LSTM_Actor(nn.Module):
         super(LSTM_Actor, self).__init__()
         self.float_type = float_type
         self.no_of_timeseries = 2  # TODO: variable no. of input timeseries
-        self.forecast_horizon = 24  # TODO: variable forecast horizon
-        # forecast_dim = (obs_dim - 2)/ no_of_timeseries
+        self.forecast_horizon = (obs_dim - 2) / self.no_of_timeseries #TODO: variable number of additional input features, currently 2 (marginal costs, capacity)
 
         self.LSTM1 = nn.LSTMCell(self.no_of_timeseries, 8, dtype=float_type)
         self.LSTM2 = nn.LSTMCell(8, 16, dtype=float_type)
