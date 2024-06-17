@@ -43,8 +43,10 @@ class Learning(Role):
 
         # how many learning roles do exist and how are they named
         self.buffer: ReplayBuffer = None
-        self.obs_dim = learning_config["observation_dimension"]
-        self.act_dim = learning_config["action_dimension"]
+        self.early_stopping_steps = learning_config.get("early_stopping_steps", 10)
+        self.early_stopping_threshold = learning_config.get(
+            "early_stopping_threshold", 0.05
+        )
         self.episodes_done = 0
         self.rl_strats: dict[int, LearningStrategy] = {}
         self.rl_algorithm = learning_config["algorithm"]
@@ -55,6 +57,7 @@ class Learning(Role):
         self.training_episodes = learning_config["training_episodes"]
         self.learning_mode = learning_config["learning_mode"]
         self.continue_learning = learning_config["continue_learning"]
+        self.perform_evaluation = learning_config["perform_evaluation"]
         self.trained_policies_save_path = learning_config["trained_policies_save_path"]
         self.trained_policies_load_path = learning_config.get(
             "trained_policies_load_path", self.trained_policies_save_path
@@ -100,6 +103,48 @@ class Learning(Role):
         # store evaluation values
         self.max_eval = defaultdict(lambda: -1e9)
         self.rl_eval = defaultdict(list)
+        # list of avg_changes
+        self.avg_rewards = []
+
+    def load_inter_episodic_data(self, inter_episodic_data):
+        """
+        Load the inter-episodic data from the dict stored across simulation runs.
+
+        Args:
+            inter_episodic_data (dict): The inter-episodic data to be loaded.
+
+        """
+        self.episodes_done = inter_episodic_data["episodes_done"]
+        self.eval_episodes_done = inter_episodic_data["eval_episodes_done"]
+        self.max_eval = inter_episodic_data["max_eval"]
+        self.rl_eval = inter_episodic_data["all_eval"]
+        self.avg_rewards = inter_episodic_data["avg_all_eval"]
+        self.buffer = inter_episodic_data["buffer"]
+
+        # if enough initial experience was collected according to specifications in learning config
+        # turn off initial exploration and go into full learning mode
+        if self.episodes_done > self.episodes_collecting_initial_experience:
+            self.turn_off_initial_exploration()
+
+        self.initialize_policy(inter_episodic_data["actors_and_critics"])
+
+    def get_inter_episodic_data(self):
+        """
+        Dump the inter-episodic data to a dict for storing across simulation runs.
+
+        Returns:
+            dict: The inter-episodic data to be stored.
+        """
+
+        return {
+            "episodes_done": self.episodes_done,
+            "eval_episodes_done": self.eval_episodes_done,
+            "max_eval": self.max_eval,
+            "all_eval": self.rl_eval,
+            "avg_all_eval": self.avg_rewards,
+            "buffer": self.buffer,
+            "actors_and_critics": self.rl_algorithm.extract_policy(),
+        }
 
     def setup(self) -> None:
         """
@@ -110,21 +155,23 @@ class Learning(Role):
             for handling the training process and schedules recurrent tasks for policy updates based on the specified training frequency.
         """
         # subscribe to messages for handling the training process
-        self.context.subscribe_message(
-            self,
-            self.handle_message,
-            lambda content, meta: content.get("context") == "rl_training",
-        )
 
-        recurrency_task = rr.rrule(
-            freq=rr.HOURLY,
-            interval=self.train_freq,
-            dtstart=self.simulation_start,
-            until=self.simulation_end,
-            cache=True,
-        )
+        if not self.perform_evaluation:
+            self.context.subscribe_message(
+                self,
+                self.handle_message,
+                lambda content, meta: content.get("context") == "rl_training",
+            )
 
-        self.context.schedule_recurrent_task(self.update_policy, recurrency_task)
+            recurrency_task = rr.rrule(
+                freq=rr.HOURLY,
+                interval=self.train_freq,
+                dtstart=self.simulation_start,
+                until=self.simulation_end,
+                cache=True,
+            )
+
+            self.context.schedule_recurrent_task(self.update_policy, recurrency_task)
 
     def handle_message(self, content: dict, meta: dict) -> None:
         """
@@ -233,23 +280,45 @@ class Learning(Role):
             logger.error("tried to save policies but did not get any metrics")
             return
         # if the current values are a new max in one of the metrics - we store them in the default folder
-        first_has_new_max = False
 
         # add current reward to list of all rewards
         for metric, value in metrics.items():
             self.rl_eval[metric].append(value)
             if self.rl_eval[metric][-1] > self.max_eval[metric]:
                 self.max_eval[metric] = self.rl_eval[metric][-1]
+
+                # use first metric as default
                 if metric == list(metrics.keys())[0]:
-                    first_has_new_max = True
-                # store the best for our current metric in its folder
-                self.rl_algorithm.save_params(
-                    directory=f"{self.trained_policies_save_path}/{metric}"
+                    # store the best for our current metric in its folder
+                    self.rl_algorithm.save_params(
+                        directory=f"{self.trained_policies_save_path}/{metric}_eval_policies"
+                    )
+
+                    logger.info(
+                        f"New best policy saved, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
+                    )
+
+            # if we do not see any improvment in the last x evaluation runs we stop the training
+            if len(self.rl_eval[metric]) >= self.early_stopping_steps:
+                self.avg_rewards.append(
+                    sum(self.rl_eval[metric][-self.early_stopping_steps :])
+                    / self.early_stopping_steps
                 )
 
-        # use last metric as default
-        if first_has_new_max:
-            self.rl_algorithm.save_params(directory=self.trained_policies_save_path)
-            logger.info(
-                f"Policies saved, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
-            )
+                if len(self.avg_rewards) >= self.early_stopping_steps:
+                    avg_change = (
+                        max(self.avg_rewards[-self.early_stopping_steps :])
+                        - min(self.avg_rewards[-self.early_stopping_steps :])
+                    ) / min(self.avg_rewards[-self.early_stopping_steps :])
+
+                    if avg_change < self.early_stopping_threshold:
+                        logger.info(
+                            f"Stopping training as no improvement above {self.early_stopping_threshold} in last {self.early_stopping_steps} evaluations for {metric}"
+                        )
+
+                        self.rl_algorithm.save_params(
+                            directory=f"{self.trained_policies_save_path}/last_policies"
+                        )
+
+                        return True
+            return False

@@ -149,7 +149,7 @@ An example configuration of how this can be used is shown here:
     world.run()
 
 This creates operators each per NUTS areas and creates a single EOM market, just as the `DMAS simulation <https://github.com/NOWUM/dmas/>`_ from FH Aachen.
-For more information consult the methods documentation :py:meth:`assume.scenario.loader_oeds.load_oeds`.
+For more information consult the methods documentation :py:meth:`assume.scenario.loader_oeds.load_oeds_async`.
 
 .. _pypsa_loader_doc:
 
@@ -167,7 +167,7 @@ An example can be seen from the pypsa scigrid case:
 
 .. code-block:: python
 
-    from assume.scenario.loader_pypsa import load_pypsa
+    from assume.scenario.loader_pypsa import load_pypsa_async
     from assume import World
     import pypsa
 
@@ -211,4 +211,4 @@ An example can be seen from the pypsa scigrid case:
 
 You can also create and use your own existing scenarios in pypsa format to convert these into a market simulation too.
 
-For more information consult the methods documentation :py:meth:`assume.scenario.loader_pypsa.load_pypsa`.
+For more information consult the methods documentation :py:meth:`assume.scenario.loader_pypsa.load_pypsa_async`.

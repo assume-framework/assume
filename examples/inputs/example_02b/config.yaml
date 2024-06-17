@@ -10,8 +10,6 @@ base:
   learning_mode: True
 
   learning_config:
-    observation_dimension: 50
-    action_dimension: 2
     continue_learning: False
     trained_policies_save_path: learned_strategies/example_02b_base
     max_bid_price: 100
@@ -28,6 +26,8 @@ base:
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 5
+    early_stopping_steps: 10
+    early_stopping_threshold: 0.05
 
   markets_config:
     EOM:

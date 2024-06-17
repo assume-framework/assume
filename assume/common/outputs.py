@@ -44,7 +44,7 @@ class WriteOutput(Role):
         export_csv_path (str, optional): The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
         save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to None.
         learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
-        evaluation_mode (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
+        perform_evaluation (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
         additional_kpis (dict[str, OutputDef], optional): makes it possible to define additional kpis evaluated
     """
 
@@ -57,7 +57,7 @@ class WriteOutput(Role):
         export_csv_path: str = "",
         save_frequency_hours: int = None,
         learning_mode: bool = False,
-        evaluation_mode: bool = False,
+        perform_evaluation: bool = False,
         additional_kpis: dict[str, OutputDef] = {},
     ):
         super().__init__()
@@ -77,11 +77,11 @@ class WriteOutput(Role):
         self.db = db_engine
 
         self.learning_mode = learning_mode
-        self.evaluation_mode = evaluation_mode
+        self.perform_evaluation = perform_evaluation
 
         # get episode number if in learning or evaluation mode
         self.episode = None
-        if self.learning_mode or self.evaluation_mode:
+        if self.learning_mode or self.perform_evaluation:
             episode = self.simulation_id.split("_")[-1]
             if episode.isdigit():
                 self.episode = int(episode)
@@ -242,7 +242,7 @@ class WriteOutput(Role):
 
         df["simulation"] = self.simulation_id
         df["learning_mode"] = self.learning_mode
-        df["evaluation_mode"] = self.evaluation_mode
+        df["perform_evaluation"] = self.perform_evaluation
         df["episode"] = self.episode
 
         self.write_dfs["rl_params"].append(df)
