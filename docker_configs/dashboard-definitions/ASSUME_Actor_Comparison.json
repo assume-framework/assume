@@ -110,11 +110,32 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "continuous-GrYlRd"
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
-            "mode": "absolute",
+            "mode": "percentage",
             "steps": [
               {
                 "color": "green",
@@ -127,28 +148,32 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 17,
-        "w": 7,
+        "h": 7,
+        "w": 15,
         "x": 0,
         "y": 3
       },
       "id": 19,
       "options": {
-        "displayMode": "basic",
-        "maxVizHeight": 300,
-        "minVizHeight": 16,
-        "minVizWidth": 8,
-        "namePlacement": "auto",
-        "orientation": "horizontal",
-        "reduceOptions": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
           "calcs": [],
-          "fields": "",
-          "limit": 40,
-          "values": true
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
         },
-        "showUnfilled": true,
-        "sizing": "auto",
-        "valueMode": "color"
+        "orientation": "vertical",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
       },
       "pluginVersion": "10.4.2",
       "targets": [
@@ -159,6 +184,7 @@
           },
           "editorMode": "code",
           "format": "table",
+          "hide": true,
           "rawQuery": true,
           "rawSql": "SELECT \r\n  SUBSTRING(ident, 1, 18) as scenario,\r\n  SUBSTRING(ident, 20) as run,\r\n  value \r\nFROM \r\n  kpis \r\nWHERE \r\n  variable = 'total_run_time'\r\nORDER BY \r\n  scenario, LENGTH(ident), run",
           "refId": "A",
@@ -179,10 +205,39 @@
             ],
             "limit": 50
           }
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  scenario, \r\n  min(value),\r\n  avg(value),  \r\n  max(value)\r\nFROM (\r\n  SELECT \r\n    SUBSTRING(ident, 1, regexp_instr(ident, 'run')-2) as scenario,\r\n    SUBSTRING(ident, regexp_instr(ident, 'run')) as run,\r\n    value \r\n  FROM \r\n    kpis \r\n  WHERE \r\n    variable = 'total_run_time'\r\n  ORDER BY \r\n    scenario, LENGTH(ident), run\r\n  ) as subselect\r\nGROUP BY \r\n  scenario",
+          "refId": "B",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
         }
       ],
       "title": "Total Run Time",
-      "type": "bargauge"
+      "type": "barchart"
     },
     {
       "datasource": {
@@ -226,9 +281,9 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 11,
-        "w": 8,
-        "x": 7,
+        "h": 14,
+        "w": 9,
+        "x": 15,
         "y": 3
       },
       "id": 20,
@@ -242,7 +297,9 @@
           ],
           "displayMode": "table",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": true,
+          "sortBy": "Name",
+          "sortDesc": false
         }
       },
       "pluginVersion": "10.4.2",
@@ -256,8 +313,8 @@
           "format": "table",
           "hide": false,
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  variable, \r\n  ident,\r\n  value as \"Case 1\"\r\nFROM \r\n  kpis\r\nWHERE \r\n  variable = 'run_time' AND \r\n  SUBSTRING(ident, 1, 22) = 'example_02a_harder_run' AND  \r\n  (CASE \r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN 1=1\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN ident !~ 'eval'\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'exploration' IN ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$'\r\n    WHEN 'evaluation' IN ($sim_type_filter) THEN ident ~ 'eval'\r\n    WHEN 'learning' IN ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' AND ident !~ 'eval'\r\n  END)",
-          "refId": "C",
+          "rawSql": "SELECT\r\n  variable, \r\n  ident,\r\n  value as \"Case 1\"\r\nFROM \r\n  kpis\r\nWHERE \r\n  variable = 'run_time' AND \r\n  SUBSTRING(ident, 1, regexp_instr(ident, 'run')-2) = 'example_02a_harder' AND  \r\n  (CASE \r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN 1=1\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN ident !~ 'eval'\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'exploration' IN ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$'\r\n    WHEN 'evaluation' IN ($sim_type_filter) THEN ident ~ 'eval'\r\n    WHEN 'learning' IN ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' AND ident !~ 'eval'\r\n  END)",
+          "refId": "Case1",
           "sql": {
             "columns": [
               {
@@ -285,8 +342,8 @@
           "format": "table",
           "hide": false,
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  variable, \r\n  ident,\r\n  value as \"Case 1 with LSTM\"\r\nFROM \r\n  kpis\r\nWHERE \r\n  variable = 'run_time' AND\r\n  SUBSTRING(ident, 1, 23) = 'example_02a_harder_lstm' AND \r\n  (CASE \r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN 1=1\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN ident !~ 'eval'\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'exploration' IN ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$'\r\n    WHEN 'evaluation' IN ($sim_type_filter) THEN ident ~ 'eval'\r\n    WHEN 'learning' IN ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' AND ident !~ 'eval'\r\n  END)",
-          "refId": "D",
+          "rawSql": "SELECT\r\n  variable, \r\n  ident,\r\n  value as \"Case 1 (LF)\"\r\nFROM \r\n  kpis\r\nWHERE \r\n  variable = 'run_time' AND \r\n  SUBSTRING(ident, 1, regexp_instr(ident, 'run')-2) = 'example_02a_harder_LF' AND  \r\n  (CASE \r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN 1=1\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN ident !~ 'eval'\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'exploration' IN ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$'\r\n    WHEN 'evaluation' IN ($sim_type_filter) THEN ident ~ 'eval'\r\n    WHEN 'learning' IN ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' AND ident !~ 'eval'\r\n  END)",
+          "refId": "Case1_LF",
           "sql": {
             "columns": [
               {
@@ -314,8 +371,8 @@
           "format": "table",
           "hide": false,
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  variable, \r\n  ident,\r\n  value as \"Case 2\"\r\nFROM \r\n  kpis\r\nWHERE \r\n  variable = 'run_time' AND \r\n  SUBSTRING(ident, 1, 22) = 'example_02b_harder_run' AND \r\n  (CASE \r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN 1=1\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN ident !~ 'eval'\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'exploration' IN ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$'\r\n    WHEN 'evaluation' IN ($sim_type_filter) THEN ident ~ 'eval'\r\n    WHEN 'learning' IN ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' AND ident !~ 'eval'\r\n  END)",
-          "refId": "E",
+          "rawSql": "SELECT\r\n  variable, \r\n  ident,\r\n  value as \"Case 1 with LSTM\"\r\nFROM \r\n  kpis\r\nWHERE \r\n  variable = 'run_time' AND\r\n  SUBSTRING(ident, 1, regexp_instr(ident, 'run')-2) = 'example_02a_harder_lstm' AND \r\n  (CASE \r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN 1=1\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN ident !~ 'eval'\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'exploration' IN ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$'\r\n    WHEN 'evaluation' IN ($sim_type_filter) THEN ident ~ 'eval'\r\n    WHEN 'learning' IN ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' AND ident !~ 'eval'\r\n  END)",
+          "refId": "Case1_LSTM",
           "sql": {
             "columns": [
               {
@@ -343,8 +400,66 @@
           "format": "table",
           "hide": false,
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  variable, \r\n  ident,\r\n  value as \"Case 2 with LSTM\"\r\nFROM \r\n  kpis\r\nWHERE \r\n  variable = 'run_time' AND \r\n  SUBSTRING(ident, 1, 23) = 'example_02b_harder_lstm' AND \r\n  (CASE \r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN 1=1\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN ident !~ 'eval'\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'exploration' IN ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$'\r\n    WHEN 'evaluation' IN ($sim_type_filter) THEN ident ~ 'eval'\r\n    WHEN 'learning' IN ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' AND ident !~ 'eval'\r\n  END)",
-          "refId": "F",
+          "rawSql": "SELECT\r\n  variable, \r\n  ident,\r\n  value as \"Case 1 with LSTM (LF)\"\r\nFROM \r\n  kpis\r\nWHERE \r\n  variable = 'run_time' AND\r\n  SUBSTRING(ident, 1, regexp_instr(ident, 'run')-2) = 'example_02a_harder_lstm_LF' AND \r\n  (CASE \r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN 1=1\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN ident !~ 'eval'\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'exploration' IN ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$'\r\n    WHEN 'evaluation' IN ($sim_type_filter) THEN ident ~ 'eval'\r\n    WHEN 'learning' IN ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' AND ident !~ 'eval'\r\n  END)",
+          "refId": "Case 1_LSTM_LF",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  variable, \r\n  ident,\r\n  value as \"Case 2\"\r\nFROM \r\n  kpis\r\nWHERE \r\n  variable = 'run_time' AND \r\n  SUBSTRING(ident, 1, regexp_instr(ident, 'run')-2) = 'example_02b_harder' AND \r\n  (CASE \r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN 1=1\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN ident !~ 'eval'\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'exploration' IN ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$'\r\n    WHEN 'evaluation' IN ($sim_type_filter) THEN ident ~ 'eval'\r\n    WHEN 'learning' IN ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' AND ident !~ 'eval'\r\n  END)",
+          "refId": "Case2",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  variable, \r\n  ident,\r\n  value as \"Case 2 with LSTM\"\r\nFROM \r\n  kpis\r\nWHERE \r\n  variable = 'run_time' AND \r\n  SUBSTRING(ident, 1, regexp_instr(ident, 'run')-2) = 'example_02b_harder_lstm' AND \r\n  (CASE \r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN 1=1\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN ident !~ 'eval'\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' OR ident ~ 'eval'\r\n    WHEN 'exploration' IN ($sim_type_filter) THEN ident ~ '[1-9]_[1-5]$'\r\n    WHEN 'evaluation' IN ($sim_type_filter) THEN ident ~ 'eval'\r\n    WHEN 'learning' IN ($sim_type_filter)  THEN ident !~ '[1-9]_[1-5]$' AND ident !~ 'eval'\r\n  END)",
+          "refId": "Case2_LSTM",
           "sql": {
             "columns": [
               {
@@ -376,14 +491,28 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic-by-name"
+            "mode": "palette-classic"
           },
           "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
             },
-            "inspect": false
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
@@ -392,92 +521,44 @@
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
               }
             ]
-          }
+          },
+          "unit": "short"
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "episodes_done"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 182
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "eval_episodes_done"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 167
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "simulation_id"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 263
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "run"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 104
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "scenario"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 179
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
-        "h": 17,
-        "w": 9,
-        "x": 15,
-        "y": 3
+        "h": 10,
+        "w": 15,
+        "x": 0,
+        "y": 10
       },
       "id": 21,
       "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "countRows": false,
-          "fields": "",
-          "reducer": [
-            "mean"
-          ],
-          "show": false
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
         },
-        "showHeader": true,
-        "sortBy": []
+        "orientation": "auto",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
       },
       "pluginVersion": "10.4.2",
       "targets": [
@@ -488,9 +569,39 @@
           },
           "editorMode": "code",
           "format": "table",
+          "hide": false,
           "rawQuery": true,
-          "rawSql": "\r\n  CREATE EXTENSION IF NOT EXISTS tablefunc; \r\n  SELECT \r\n    SUBSTRING(ident, 1, 18) as scenario, \r\n    SUBSTRING(ident, 20) as run, \r\n    episodes_done, \r\n    eval_episodes_done \r\n    FROM crosstab( \r\n      'SELECT ident, variable, value \r\n      FROM kpis \r\n      WHERE variable = ''episodes_done'' OR variable = ''eval_episodes_done'' \r\n      ORDER BY ident, LENGTH(ident), variable', \r\n      'VALUES(''episodes_done''), (''eval_episodes_done'')' \r\n      ) as ct (ident text, episodes_done text, eval_episodes_done text)\r\n    ORDER BY scenario, LENGTH(ident), run; ",
+          "rawSql": "CREATE EXTENSION IF NOT EXISTS tablefunc; \r\n\r\nSELECT \r\n  scenario, \r\n  min(episodes_done) as \"min. episodes\", \r\n  avg(episodes_done) as \"avg. episodes\", \r\n  max(episodes_done) as \"max. episodes\", \r\n  min(eval_episodes_done) as \"min. eval episodes\",\r\n  avg(eval_episodes_done) as \"avg. eval episodes\",\r\n  max(eval_episodes_done) as \"max. eval episodes\"\r\nFROM (\r\n  SELECT \r\n    SUBSTRING(ident, 1, regexp_instr(ident, 'run')-2) as scenario, \r\n    SUBSTRING(ident, regexp_instr(ident, 'run')) as run, \r\n    episodes_done::NUMERIC, \r\n    eval_episodes_done::NUMERIC\r\n  FROM crosstab( \r\n    'SELECT ident, variable, value \r\n    FROM kpis \r\n    WHERE variable = ''episodes_done'' OR variable = ''eval_episodes_done'' \r\n    ORDER BY ident, LENGTH(ident), variable',\r\n    'VALUES(''episodes_done''), (''eval_episodes_done'')' \r\n    ) as ct (ident text, episodes_done text, eval_episodes_done text)\r\n  ORDER BY scenario, LENGTH(ident), run) as subselect\r\nGROUP BY scenario",
           "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": true,
+          "rawQuery": true,
+          "rawSql": "CREATE EXTENSION IF NOT EXISTS tablefunc; \r\n\r\nSELECT\r\n  scenario\r\nFROM (\r\n  SELECT \r\n    SUBSTRING(ident, 1, regexp_instr(ident, 'run')-2) as scenario, \r\n    SUBSTRING(ident, regexp_instr(ident, 'run')) as run, \r\n    episodes_done, \r\n    eval_episodes_done \r\n  FROM crosstab( \r\n    'SELECT ident, variable, value \r\n    FROM kpis \r\n    WHERE variable = ''episodes_done'' OR variable = ''eval_episodes_done'' \r\n    ORDER BY ident, LENGTH(ident), variable', \r\n    'VALUES(''episodes_done''), (''eval_episodes_done'')' \r\n    ) as ct (ident text, episodes_done text, eval_episodes_done text)\r\n  ORDER BY scenario, LENGTH(ident), run) as subselect\r\nGROUP BY \r\n  scenario ",
+          "refId": "B",
           "sql": {
             "columns": [
               {
@@ -511,7 +622,7 @@
         }
       ],
       "title": "Number of Episodes",
-      "type": "table"
+      "type": "barchart"
     },
     {
       "collapsed": false,
@@ -646,9 +757,9 @@
     "list": [
       {
         "current": {
-          "selected": true,
-          "text": "example_02b_harder_lstm_run_1",
-          "value": "example_02b_harder_lstm_run_1"
+          "selected": false,
+          "text": "example_02a_harder_LF_run_1",
+          "value": "example_02a_harder_LF_run_1"
         },
         "datasource": {
           "type": "postgres",
@@ -827,6 +938,6 @@
   "timezone": "",
   "title": "ASSUME: Actor Comparison",
   "uid": "bdnvfato1dlogd",
-  "version": 28,
+  "version": 36,
   "weekStart": ""
 }
