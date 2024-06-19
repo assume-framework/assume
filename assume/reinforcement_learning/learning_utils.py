@@ -35,36 +35,36 @@ class CriticTD3(nn.Module):
         obs_dim: int,
         act_dim: int,
         float_type,
-        unique_obs_len: int = 16,
+        unique_obs_dim: int = 0,
     ):
         super(CriticTD3, self).__init__()
 
-        self.obs_dim = obs_dim  # + unique_obs_len * (n_agents - 1)
+        self.obs_dim = obs_dim + unique_obs_dim * (n_agents - 1)
         self.act_dim = act_dim * n_agents
 
         # Q1 architecture
-        # if n_agents <= 50:
-        self.FC1_1 = nn.Linear(self.obs_dim + self.act_dim, 512, dtype=float_type)
-        self.FC1_2 = nn.Linear(512, 256, dtype=float_type)
-        self.FC1_3 = nn.Linear(256, 128, dtype=float_type)
-        self.FC1_4 = nn.Linear(128, 1, dtype=float_type)
-        # else:
-        #     self.FC1_1 = nn.Linear(self.obs_dim + self.act_dim, 1024, dtype = float_type)
-        #     self.FC1_2 = nn.Linear(1024, 512, dtype = float_type)
-        #     self.FC1_3 = nn.Linear(512, 128, dtype = float_type)
-        #     self.FC1_4 = nn.Linear(128, 1, dtype = float_type)
+        if n_agents <= 50:
+            self.FC1_1 = nn.Linear(self.obs_dim + self.act_dim, 512, dtype=float_type)
+            self.FC1_2 = nn.Linear(512, 256, dtype=float_type)
+            self.FC1_3 = nn.Linear(256, 128, dtype=float_type)
+            self.FC1_4 = nn.Linear(128, 1, dtype=float_type)
+        else:
+            self.FC1_1 = nn.Linear(self.obs_dim + self.act_dim, 1024, dtype=float_type)
+            self.FC1_2 = nn.Linear(1024, 512, dtype=float_type)
+            self.FC1_3 = nn.Linear(512, 128, dtype=float_type)
+            self.FC1_4 = nn.Linear(128, 1, dtype=float_type)
 
         # Q2 architecture
-        # if n_agents <= 50:
-        self.FC2_1 = nn.Linear(self.obs_dim + self.act_dim, 512, dtype=float_type)
-        self.FC2_2 = nn.Linear(512, 256, dtype=float_type)
-        self.FC2_3 = nn.Linear(256, 128, dtype=float_type)
-        self.FC2_4 = nn.Linear(128, 1, dtype=float_type)
-        # else:
-        #     self.FC2_1 = nn.Linear(self.obs_dim + self.act_dim, 1024, dtype = float_type)
-        #     self.FC2_2 = nn.Linear(1024, 512, dtype = float_type)
-        #     self.FC2_3 = nn.Linear(512, 128, dtype = float_type)
-        #     self.FC2_4 = nn.Linear(128, 1, dtype = float_type)
+        if n_agents <= 50:
+            self.FC2_1 = nn.Linear(self.obs_dim + self.act_dim, 512, dtype=float_type)
+            self.FC2_2 = nn.Linear(512, 256, dtype=float_type)
+            self.FC2_3 = nn.Linear(256, 128, dtype=float_type)
+            self.FC2_4 = nn.Linear(128, 1, dtype=float_type)
+        else:
+            self.FC2_1 = nn.Linear(self.obs_dim + self.act_dim, 1024, dtype=float_type)
+            self.FC2_2 = nn.Linear(1024, 512, dtype=float_type)
+            self.FC2_3 = nn.Linear(512, 128, dtype=float_type)
+            self.FC2_4 = nn.Linear(128, 1, dtype=float_type)
 
     def forward(self, obs, actions):
         """

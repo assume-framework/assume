@@ -25,6 +25,10 @@ class RLStrategy(LearningStrategy):
     The agent submittes two price bids
     - one for the infelxible (P_min) and one for the flexible part (P_max-P_min) of ist capacity.
 
+    This strategy utilizes a total of 50 observations, which are used to calculate the actions.
+    The actions are then transformed into bids. Actions are formulated as 2 values.
+    The unique observation space is 2 comprising of marginal cost and current capacity.
+
     Attributes:
         foresight (int): Number of time steps to look ahead. Defaults to 24.
         max_bid_price (float): Maximum bid price. Defaults to 100.
@@ -43,7 +47,7 @@ class RLStrategy(LearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(obs_dim=50, act_dim=2, unique_obs_dim=2, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
 
@@ -53,6 +57,7 @@ class RLStrategy(LearningStrategy):
 
         # tells us whether we are training the agents or just executing per-learnind stategies
         self.learning_mode = kwargs.get("learning_mode", False)
+        self.perform_evaluation = kwargs.get("perform_evaluation", False)
 
         # sets the devide of the actor network
         device = kwargs.get("device", "cpu")
@@ -70,8 +75,7 @@ class RLStrategy(LearningStrategy):
         # define used order types
         self.order_types = kwargs.get("order_types", ["SB"])
 
-        if self.learning_mode:
-            self.learning_role = None
+        if self.learning_mode or self.perform_evaluation:
             self.collect_initial_experience_mode = kwargs.get(
                 "episodes_collecting_initial_experience", True
             )
@@ -87,7 +91,9 @@ class RLStrategy(LearningStrategy):
         elif Path(kwargs["trained_policies_save_path"]).is_dir():
             self.load_actor_params(load_path=kwargs["trained_policies_save_path"])
         else:
-            logger.error("did not have learning mode and folder did not exist")
+            raise FileNotFoundError(
+                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
+            )
 
     def calculate_bids(
         self,
@@ -199,7 +205,7 @@ class RLStrategy(LearningStrategy):
         """
 
         # distinction whether we are in learning mode or not to handle exploration realised with noise
-        if self.learning_mode:
+        if self.learning_mode and not self.perform_evaluation:
             # if we are in learning mode the first x episodes we want to explore the entire action space
             # to get a good initial experience, in the area around the costs of the agent
             if self.collect_initial_experience_mode:
@@ -249,6 +255,11 @@ class RLStrategy(LearningStrategy):
     ):
         """
         Creates an observation.
+
+        It is important to keep in mind, that the DRL method and the centralized critic relies on
+        unique observation of individual units. The algorithm is designed in such a way, that
+        the unique observations are always placed at the end of the observation space. Please follow this
+        convention when adding new observations.
 
         Args:
             unit (SupportsMinMax): Unit to create observation for.

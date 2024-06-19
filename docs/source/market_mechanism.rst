@@ -29,11 +29,15 @@ In the future, the MarketMechanism will be a class which contains the additional
 
 The available market mechanisms are the following:
 
-1. PayAsClearRole in [simple](http://localhost:8000/assume.markets.clearing_algorithms.html#module-assume.markets.clearing_algorithms.simple)
-2. PayAsBidRole in [simple](http://localhost:8000/assume.markets.clearing_algorithms.html#module-assume.markets.clearing_algorithms.simple)
-3. PayAsClearAonRole in [all_or_nothing](http://localhost:8000/assume.markets.clearing_algorithms.html#module-assume.markets.clearing_algorithms.all_or_nothing)
-4. PayAsBidAonRole in [all_or_nothing](http://localhost:8000/assume.markets.clearing_algorithms.html#module-assume.markets.clearing_algorithms.all_or_nothing)
-5. ComplexClearingRole in [complex_clearing](http://localhost:8000/assume.markets.clearing_algorithms.html#module-assume.markets.clearing_algorithms.complex_clearing)
+1. :py:meth:`assume.markets.clearing_algorithms.simple.PayAsClearRole`
+2. :py:meth:`assume.markets.clearing_algorithms.simple.PayAsBidRole`
+3. :py:meth:`assume.markets.clearing_algorithms.all_or_nothing.PayAsClearAonRole`
+4. :py:meth:`assume.markets.clearing_algorithms.all_or_nothing.PayAsBidAonRole`
+5. :py:meth:`assume.markets.clearing_algorithms.complex_clearing.ComplexClearingRole`
+6. :py:meth:`assume.markets.clearing_algorithms.complex_clearing_dmas.ComplexDmasClearingRole`
+7. :py:meth:`assume.markets.clearing_algorithms.redispatch.RedispatchMarketRole`
+8. :py:meth:`assume.markets.clearing_algorithms.nodal_pricing.NodalMarketRole`
+9. :py:meth:`assume.markets.clearing_algorithms.contracts.PayAsBidContractRole`
 
 The :code:`PayAsClearRole` performs an electricity market clearing using a pay-as-clear mechanism.
 This means that the clearing price is the highest price that is still accepted.

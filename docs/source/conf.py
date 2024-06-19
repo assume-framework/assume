@@ -26,6 +26,7 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
+    "sphinx.ext.imgconverter",
     "sphinxcontrib.mermaid",
     "sphinx.ext.todo",
     "sphinx.ext.mathjax",
@@ -93,3 +94,24 @@ nbsphinx_prolog = """
 """
 
 nbsphinx_allow_errors = True
+
+# --- Latex configuration ---
+
+latex_engine = "lualatex"
+latex_elements = {
+    "fontpkg": r"""
+\setmainfont{DejaVu Serif}
+\setsansfont{DejaVu Sans}
+\setmonofont{DejaVu Sans Mono}
+""",
+    "preamble": r"""
+\usepackage[titles]{tocloft}
+\usepackage{commonunicode}
+\cftsetpnumwidth {1.25cm}\cftsetrmarg{1.5cm}
+\setlength{\cftchapnumwidth}{0.75cm}
+\setlength{\cftsecindent}{\cftchapnumwidth}
+\setlength{\cftsecnumwidth}{1.25cm}
+""",
+    "fncychap": r"\usepackage[Bjornstrup]{fncychap}",
+    "printindex": r"\footnotesize\raggedright\printindex",
+}
