@@ -79,19 +79,21 @@ class SteelPlant(SupportsMinMax):
         self.cost_tolerance = cost_tolerance
         self.components = {}
 
-        # opt objective
-
+        # Main Model part
         self.model = pyo.ConcreteModel()
         self.define_sets()
         self.define_parameters()
+
+        # Model opt
+        self.model_opt = self.model.clone()
+        self.model_opt.model
         self.initialize_components(components)
         self.initialize_process_sequence()
         self.define_variables()
         self.define_constraints()
-
-        self.model_opt = self.model.create_instance()
         self.define_objective_opt()
 
+        # Model flex
         # self.model_flex = self.model.create_instance()
         # if self.flexibility_measure == "max_load_shift":
         #     flexibility_cost_tolerance(self)
@@ -241,7 +243,7 @@ class SteelPlant(SupportsMinMax):
         @self.model.Constraint(self.model.time_steps)
         def cost_per_time_step(m, t):
             return (
-                self.model.variable_cost[t]
+                m.variable_cost[t]
                 == self.components["electrolyser"].b.electrolyser_operating_cost[t]
                 + self.components["dri_plant"].b.dri_operating_cost[t]
                 + self.components["eaf"].b.eaf_operating_cost[t]
