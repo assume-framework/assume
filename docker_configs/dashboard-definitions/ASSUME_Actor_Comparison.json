@@ -51,7 +51,7 @@
         "content": "# Welcome to ASSUMES Actor Comparison Dashboard\n",
         "mode": "markdown"
       },
-      "pluginVersion": "10.4.2",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
           "datasource": {
@@ -214,6 +214,221 @@
         "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 0.5,
+            "pointSize": 2,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Max. Price"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#b4c3d31f",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Avg. Price"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#ffffff",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Min. Price"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "transparent",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "Max. Price"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "Min. Price"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Lower"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "transparent",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Upper"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "Upper"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "Lower"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      },
+      "id": 25,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "10.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  product_start AS \"time\",\r\n  avg(price) AS \"Avg. Price\",\r\n  min(price) AS \"Min. Price\", \r\n  avg(price) - stddev_samp(price) AS \"Lower\", \r\n  avg(price) + stddev_samp(price) AS \"Upper\",\r\n  max(price) AS \"Max. Price\"\r\nFROM market_meta\r\nWHERE (SUBSTRING(simulation, 1, regexp_instr(simulation, 'run')-2) IN ($case_study))\r\nGROUP BY product_start\r\nORDER BY product_start",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Market Clearing Price for Case: $case_study",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
       "description": "Averaged over all simulation runs.",
       "fieldConfig": {
         "defaults": {
@@ -319,7 +534,7 @@
         "h": 9,
         "w": 6,
         "x": 0,
-        "y": 11
+        "y": 18
       },
       "id": 24,
       "options": {
@@ -335,7 +550,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "10.4.2",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
           "datasource": {
@@ -454,7 +669,7 @@
         "h": 9,
         "w": 10,
         "x": 6,
-        "y": 11
+        "y": 18
       },
       "id": 23,
       "options": {
@@ -519,7 +734,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 20
+        "y": 27
       },
       "id": 18,
       "panels": [],
@@ -599,8 +814,7 @@
             "mode": "percentage",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -658,7 +872,7 @@
         "h": 7,
         "w": 15,
         "x": 0,
-        "y": 21
+        "y": 28
       },
       "id": 19,
       "options": {
@@ -811,8 +1025,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -915,7 +1128,7 @@
         "h": 14,
         "w": 9,
         "x": 15,
-        "y": 21
+        "y": 28
       },
       "id": 20,
       "options": {
@@ -1184,8 +1397,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1292,7 +1504,7 @@
         "h": 10,
         "w": 15,
         "x": 0,
-        "y": 28
+        "y": 35
       },
       "id": 21,
       "options": {
@@ -1381,13 +1593,14 @@
       "type": "barchart"
     }
   ],
+  "refresh": "",
   "schemaVersion": 39,
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": "example_02a_harder_lstm_LF_run_1",
           "value": "example_02a_harder_lstm_LF_run_1"
         },
@@ -1459,39 +1672,43 @@
       },
       {
         "current": {
-          "selected": false,
+          "selected": true,
           "text": [
-            "example_02a_harder",
-            "example_02a_harder_lstm",
-            "example_02b_harder",
             "example_02b_harder_lstm"
           ],
           "value": [
-            "example_02a_harder",
-            "example_02a_harder_lstm",
-            "example_02b_harder",
             "example_02b_harder_lstm"
           ]
         },
         "description": "The four different scenario and actor combinations.",
         "hide": 0,
         "includeAll": false,
-        "label": "NOT USED",
+        "label": "Case Study",
         "multi": true,
         "name": "case_study",
         "options": [
           {
-            "selected": true,
+            "selected": false,
             "text": "example_02a_harder",
             "value": "example_02a_harder"
           },
           {
-            "selected": true,
+            "selected": false,
+            "text": "example_02a_harder_LF",
+            "value": "example_02a_harder_LF"
+          },
+          {
+            "selected": false,
             "text": "example_02a_harder_lstm",
             "value": "example_02a_harder_lstm"
           },
           {
-            "selected": true,
+            "selected": false,
+            "text": "example_02a_harder_lstm_LF",
+            "value": "example_02a_harder_lstm_LF"
+          },
+          {
+            "selected": false,
             "text": "example_02b_harder",
             "value": "example_02b_harder"
           },
@@ -1501,7 +1718,7 @@
             "value": "example_02b_harder_lstm"
           }
         ],
-        "query": "example_02a_harder, example_02a_harder_lstm, example_02b_harder, example_02b_harder_lstm",
+        "query": "example_02a_harder, example_02a_harder_LF, example_02a_harder_lstm, example_02a_harder_lstm_LF, example_02b_harder, example_02b_harder_lstm",
         "queryValue": "",
         "skipUrlSync": false,
         "type": "custom"
@@ -1547,8 +1764,8 @@
     ]
   },
   "time": {
-    "from": "2019-02-13T12:00:00.500Z",
-    "to": "2019-04-16T11:59:58.500Z"
+    "from": "2019-03-01T00:00:00.000Z",
+    "to": "2019-03-31T23:59:59.000Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -1564,6 +1781,6 @@
   "timezone": "",
   "title": "ASSUME: Actor Comparison",
   "uid": "bdnvfato1dlogd",
-  "version": 48,
+  "version": 7,
   "weekStart": ""
 }
