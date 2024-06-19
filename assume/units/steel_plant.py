@@ -77,147 +77,159 @@ class SteelPlant(SupportsMinMax):
         self.objective = objective
         self.flexibility_measure = flexibility_measure
         self.cost_tolerance = cost_tolerance
-        self.components = {}
+        self.dsm_components = {}
 
         # Main Model part
         self.model = pyo.ConcreteModel()
-        self.define_sets()
-        self.define_parameters()
+        self.define_sets(self.model)
+        self.define_parameters(self.model)
+        self.initialize_components(components, self.model)
+        self.initialize_process_sequence(self.model)
 
-        # Model opt
-        self.model_opt = self.model.clone()
-        self.model_opt.model
-        self.initialize_components(components)
-        self.initialize_process_sequence()
-        self.define_variables()
-        self.define_constraints()
-        self.define_objective_opt()
+        self.define_variables(self.model)
+        self.define_constraints(self.model)
+        self.define_objective_opt(self.model)
 
-        # Model flex
-        # self.model_flex = self.model.create_instance()
-        # if self.flexibility_measure == "max_load_shift":
-        #     flexibility_cost_tolerance(self)
-        # self.define_objective_flex()
+        if self.flexibility_measure == "max_load_shift":
+            flexibility_cost_tolerance(self, self.model)
+        self.define_objective_flex(self.model)
+
+        self.solver = SolverFactory("gurobi")
 
         self.power_requirement = None
 
-    def initialize_components(self, components: Dict[str, Dict]):
+    def switch_to_opt(self):
+        self.model.obj_rule_opt.activate()
+        self.model.obj_rule_flex.deactivate()
+
+        self.model.total_cost_upper_limit.deactivate()
+        self.model.total_power_input_constraint.activate()
+        self.model.total_power_input_constraint_with_flex.deactivate()
+
+    def switch_to_flex(self):
+        self.model.obj_rule_flex.activate()
+        self.model.obj_rule_opt.deactivate()
+
+        self.model.total_cost_upper_limit.activate()
+        self.model.total_power_input_constraint.deactivate()
+        self.model.total_power_input_constraint_with_flex.activate()
+
+        # fix values of model.total_power_input
+        for t in self.model.time_steps:
+            self.model.total_power_input[t].fix(self.total_opt_power_input[t])
+        self.model.total_cost = self.total_cost
+
+    def initialize_components(self, components: Dict[str, Dict], model):
         for technology, component_data in components.items():
             component_id = f"{self.id}_{technology}"
             if technology in dst_components:
                 component_class = dst_components[technology]
                 component_instance = component_class(
-                    model=self.model, id=component_id, **component_data
+                    model=model, id=component_id, **component_data
                 )
 
                 # Call the add_to_model method for each component
-                component_instance.add_to_model(self.model, self.model.time_steps)
-                self.components[technology] = component_instance
+                component_instance.add_to_model(model, model.time_steps)
+                self.dsm_components[technology] = component_instance
 
-    def initialize_process_sequence(self):
+    def initialize_process_sequence(self, model):
         # Assuming the presence of 'h2storage' indicates the desire for dynamic flow management
-        has_h2storage = "h2storage" in self.components
+        has_h2storage = "h2storage" in self.dsm_components
 
         # Constraint for direct hydrogen flow from Electrolyser to dri plant
-        @self.model.Constraint(self.model.time_steps)
+        @model.Constraint(model.time_steps)
         def direct_hydrogen_flow_constraint(m, t):
             # This constraint allows part of the hydrogen produced by the dri plant to go directly to the EAF
             # The actual amount should ensure that it does not exceed the capacity or demand of the EAF
             if has_h2storage:
                 return (
-                    self.components["electrolyser"].b.hydrogen_out[t]
-                    + self.components["h2storage"].b.discharge[t]
-                    == self.components["dri_plant"].b.hydrogen_in[t]
-                    + self.components["h2storage"].b.charge[t]
+                    self.dsm_components["electrolyser"].b.hydrogen_out[t]
+                    + self.dsm_components["h2storage"].b.discharge[t]
+                    == self.dsm_components["dri_plant"].b.hydrogen_in[t]
+                    + self.dsm_components["h2storage"].b.charge[t]
                 )
             else:
                 return (
-                    self.components["electrolyser"].b.hydrogen_out[t]
-                    >= self.components["dri_plant"].b.hydrogen_in[t]
+                    self.dsm_components["electrolyser"].b.hydrogen_out[t]
+                    >= self.dsm_components["dri_plant"].b.hydrogen_in[t]
                 )
 
         # Assuming the presence of dristorage' indicates the desire for dynamic flow management
-        has_dristorage = "dri_storage" in self.components
+        has_dristorage = "dri_storage" in self.dsm_components
 
         # Constraint for direct hydrogen flow from Electrolyser to dri plant
-        @self.model.Constraint(self.model.time_steps)
+        @model.Constraint(model.time_steps)
         def direct_dri_flow_constraint(m, t):
             # This constraint allows part of the dri produced by the dri plant to go directly to the dri storage
             # The actual amount should ensure that it does not exceed the capacity or demand of the EAF
             if has_dristorage:
                 return (
-                    self.components["dri_plant"].b.dri_output[t]
-                    + self.components["dri_storage"].b.discharge_dri[t]
-                    == self.components["eaf"].b.dri_input[t]
-                    + self.components["dri_storage"].b.charge_dri[t]
+                    self.dsm_components["dri_plant"].b.dri_output[t]
+                    + self.dsm_components["dri_storage"].b.discharge_dri[t]
+                    == self.dsm_components["eaf"].b.dri_input[t]
+                    + self.dsm_components["dri_storage"].b.charge_dri[t]
                 )
             else:
                 return (
-                    self.components["dri_plant"].b.dri_output[t]
-                    == self.components["eaf"].b.dri_input[t]
+                    self.dsm_components["dri_plant"].b.dri_output[t]
+                    == self.dsm_components["eaf"].b.dri_input[t]
                 )
 
         # Constraint for material flow from dri plant to Electric Arc Furnace
-        @self.model.Constraint(self.model.time_steps)
+        @model.Constraint(model.time_steps)
         def shaft_to_arc_furnace_material_flow_constraint(m, t):
             return (
-                self.components["dri_plant"].b.dri_output[t]
-                == self.components["eaf"].b.dri_input[t]
+                self.dsm_components["dri_plant"].b.dri_output[t]
+                == self.dsm_components["eaf"].b.dri_input[t]
             )
 
-    def define_sets(self) -> None:
-        self.model.time_steps = pyo.Set(
-            initialize=[idx for idx, _ in enumerate(self.index)]
-        )
+    def define_sets(self, model) -> None:
+        model.time_steps = pyo.Set(initialize=[idx for idx, _ in enumerate(self.index)])
 
-    def define_parameters(self):
-        self.model.electricity_price = pyo.Param(
-            self.model.time_steps,
+    def define_parameters(self, model):
+        model.electricity_price = pyo.Param(
+            model.time_steps,
             initialize={t: value for t, value in enumerate(self.electricity_price)},
         )
-        self.model.natural_gas_price = pyo.Param(
-            self.model.time_steps,
+        model.natural_gas_price = pyo.Param(
+            model.time_steps,
             initialize={t: value for t, value in enumerate(self.natural_gas_price)},
         )
-        self.model.steel_demand = pyo.Param(initialize=self.steel_demand)
-        self.model.steel_price = pyo.Param(
+        model.steel_demand = pyo.Param(initialize=self.steel_demand)
+        model.steel_price = pyo.Param(
             initialize=self.steel_price.mean(), within=pyo.NonNegativeReals
         )
-        self.model.lime_co2_factor = pyo.Param(
+        model.lime_co2_factor = pyo.Param(
             initialize=self.lime_co2_factor.mean(), within=pyo.NonNegativeReals
         )
-        self.model.co2_price = pyo.Param(
+        model.co2_price = pyo.Param(
             initialize=self.co2_price.mean(), within=pyo.NonNegativeReals
         )
-        self.model.lime_price = pyo.Param(
+        model.lime_price = pyo.Param(
             initialize=self.lime_price.mean(), within=pyo.NonNegativeReals
         )
-        self.model.iron_ore_price = pyo.Param(
+        model.iron_ore_price = pyo.Param(
             initialize=self.iron_ore_price.mean(), within=pyo.NonNegativeReals
         )
 
-    def define_variables(self):
-        self.model.total_power_input = pyo.Var(
-            self.model.time_steps, within=pyo.NonNegativeReals
-        )
-        self.model.variable_cost = pyo.Var(
-            self.model.time_steps, within=pyo.NonNegativeReals
-        )
+    def define_variables(self, model):
+        model.total_power_input = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
+        model.variable_cost = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
 
-    def define_constraints(self):
-        @self.model.Constraint(self.model.time_steps)
+    def define_constraints(self, model):
+        @model.Constraint(model.time_steps)
         def steel_output_association_constraint(m, t):
             return (
                 sum(
-                    self.components["eaf"].b.steel_output[t]
-                    for t in self.model.time_steps
+                    self.dsm_components["eaf"].b.steel_output[t]
+                    for t in model.time_steps
                 )
-                == self.model.steel_demand
+                == model.steel_demand
             )
 
         # @self.model.Constraint(self.model.time_steps)
         # def steel_output_association_constraint(m, t):
-        #     return self.components["eaf"].b.steel_output[t] == self.model.steel_demand
+        #     return self.dsm_components["eaf"].b.steel_output[t] == self.model.steel_demand
 
         # @self.model.Constraint(self.model.time_steps)
         # def total_power_input_constraint(m, t):
@@ -226,37 +238,37 @@ class SteelPlant(SupportsMinMax):
         #     else:
         #         return (
         #             m.total_power_input[t]
-        #             == self.components["electrolyser"].b.power_in[t]
-        #             + self.components["eaf"].b.power_eaf[t]
-        #             + self.components["dri_plant"].b.power_dri[t]
+        #             == self.dsm_components["electrolyser"].b.power_in[t]
+        #             + self.dsm_components["eaf"].b.power_eaf[t]
+        #             + self.dsm_components["dri_plant"].b.power_dri[t]
         #         )
 
-        @self.model.Constraint(self.model.time_steps)
+        @model.Constraint(model.time_steps)
         def total_power_input_constraint(m, t):
             return (
                 m.total_power_input[t]
-                == self.components["electrolyser"].b.power_in[t]
-                + self.components["eaf"].b.power_eaf[t]
-                + self.components["dri_plant"].b.power_dri[t]
+                == self.dsm_components["electrolyser"].b.power_in[t]
+                + self.dsm_components["eaf"].b.power_eaf[t]
+                + self.dsm_components["dri_plant"].b.power_dri[t]
             )
 
-        @self.model.Constraint(self.model.time_steps)
+        @model.Constraint(model.time_steps)
         def cost_per_time_step(m, t):
             return (
-                m.variable_cost[t]
-                == self.components["electrolyser"].b.electrolyser_operating_cost[t]
-                + self.components["dri_plant"].b.dri_operating_cost[t]
-                + self.components["eaf"].b.eaf_operating_cost[t]
+                model.variable_cost[t]
+                == self.dsm_components["electrolyser"].b.electrolyser_operating_cost[t]
+                + self.dsm_components["dri_plant"].b.dri_operating_cost[t]
+                + self.dsm_components["eaf"].b.eaf_operating_cost[t]
             )
 
-    def define_objective_opt(self):
+    def define_objective_opt(self, model):
         if self.objective == "min_variable_cost" or "recalculate":
 
-            @self.model_opt.Objective(sense=pyo.minimize)
+            @model.Objective(sense=pyo.minimize)
             def obj_rule_opt(m):
                 # Sum up the variable cost over all time steps
                 total_variable_cost = sum(
-                    self.model.variable_cost[t] for t in self.model.time_steps
+                    model.variable_cost[t] for t in model.time_steps
                 )
 
                 return total_variable_cost
@@ -264,14 +276,12 @@ class SteelPlant(SupportsMinMax):
         else:
             raise ValueError(f"Unknown objective: {self.objective}")
 
-    def define_objective_flex(self):
+    def define_objective_flex(self, model):
         if self.flexibility_measure == "max_load_shift":
 
-            @self.model.Objective(sense=pyo.maximize)
+            @model.Objective(sense=pyo.maximize)
             def obj_rule_flex(m):
-                maximise_load_shift = sum(
-                    m.load_shift[t] for t in self.model.time_steps
-                )
+                maximise_load_shift = sum(m.load_shift[t] for t in model.time_steps)
                 return maximise_load_shift
 
         else:
@@ -282,9 +292,11 @@ class SteelPlant(SupportsMinMax):
         Determines the optimal operation of the steel plant without considering flexibility.
         """
         # Create a solver
-        solver = SolverFactory("gurobi")
+        self.switch_to_opt()
 
-        results = solver.solve(self.model_opt, tee=False)  # , tee=True
+        instance = self.model.create_instance()
+
+        results = self.solver.solve(instance, tee=False)  # , tee=True
 
         # Check solver status and termination condition
         if (results.solver.status == SolverStatus.ok) and (
@@ -293,7 +305,7 @@ class SteelPlant(SupportsMinMax):
             logger.debug("The model was solved optimally.")
 
             # Display the Objective Function Value
-            objective_value = self.model_opt.obj_rule_opt()
+            objective_value = instance.obj_rule_opt()
             logger.debug(f"The value of the objective function is {objective_value}.")
 
         elif results.solver.termination_condition == TerminationCondition.infeasible:
@@ -305,19 +317,25 @@ class SteelPlant(SupportsMinMax):
                 "Termination Condition: ", results.solver.termination_condition
             )
 
-        temp = self.model_opt.total_power_input.get_values()
-        self.power_requirement = pd.Series(index=self.index, data=0.0)
-        for i, date in enumerate(self.index):
-            self.power_requirement.loc[date] = temp[i]
+        temp = instance.total_power_input.get_values()
+        self.power_requirement = pd.Series(data=temp, index=self.index)
+
+        self.total_cost = sum(
+            instance.variable_cost[t].value for t in instance.time_steps
+        )
+        self.total_opt_power_input = [
+            instance.total_power_input[t].value for t in instance.time_steps
+        ]
 
     def determine_optimal_operation_with_flex(self):
         """
         Determines the optimal operation of the steel plant without considering flexibility.
         """
         # Create a solver
-        solver = SolverFactory("gurobi")
+        self.switch_to_flex()
 
-        results = solver.solve(self.model_flex, tee=False)  # , tee=True
+        instance = self.model.create_instance()
+        results = self.solver.solve(instance, tee=False)  # , tee=True
 
         # Check solver status and termination condition
         if (results.solver.status == SolverStatus.ok) and (
@@ -326,7 +344,7 @@ class SteelPlant(SupportsMinMax):
             logger.debug("The model was solved optimally.")
 
             # Display the Objective Function Value
-            objective_value = self.model.obj_rule_flex()
+            objective_value = instance.obj_rule_flex()
             logger.debug(f"The value of the objective function is {objective_value}.")
             print(f"The objective value is: {objective_value}")
 
@@ -339,10 +357,8 @@ class SteelPlant(SupportsMinMax):
                 "Termination Condition: ", results.solver.termination_condition
             )
 
-        temp = self.model.total_power_input.get_values()
-        self.power_requirement = pd.Series(index=self.index, data=0.0)
-        for i, date in enumerate(self.index):
-            self.power_requirement.loc[date] = temp[i]
+        temp = instance.total_power_input.get_values()
+        self.power_requirement = pd.Series(data=temp, index=self.index)
 
     def set_dispatch_plan(
         self,
@@ -413,16 +429,18 @@ class SteelPlant(SupportsMinMax):
         for t in self.model.time_steps:
             # Calculate total variable costs for the current time step
             total_variable_costs = (
-                +value(self.components["electrolyser"].b.electrolyser_operating_cost[t])
-                + value(self.components["dri_plant"].b.dri_operating_cost[t])
-                + value(self.components["eaf"].b.eaf_operating_cost[t])
+                +value(
+                    self.dsm_components["electrolyser"].b.electrolyser_operating_cost[t]
+                )
+                + value(self.dsm_components["dri_plant"].b.dri_operating_cost[t])
+                + value(self.dsm_components["eaf"].b.eaf_operating_cost[t])
             )
 
             # Calculate total energy consumption for the current time step
             total_energy_consumption = (
-                value(self.components["electrolyser"].b.power_in[t])
-                + value(self.components["eaf"].b.power_eaf[t])
-                + +value(self.components["dri_plant"].b.power_dri[t])
+                value(self.dsm_components["electrolyser"].b.power_in[t])
+                + value(self.dsm_components["eaf"].b.power_eaf[t])
+                + +value(self.dsm_components["dri_plant"].b.power_dri[t])
             )
 
             # Calculate marginal cost per unit of energy
@@ -444,7 +462,7 @@ class SteelPlant(SupportsMinMax):
             dict: The attributes of the unit as a dictionary.
         """
         # Assuming unit_dict is a dictionary that you want to save to the database
-        components_list = [component for component in self.components.keys()]
+        components_list = [component for component in self.dsm_components.keys()]
 
         # Convert the list to a delimited string
         components_string = ",".join(components_list)

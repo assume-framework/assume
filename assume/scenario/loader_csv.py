@@ -451,6 +451,7 @@ def load_config_and_create_forecaster(
         "powerplant_units": powerplant_units,
         "storage_units": storage_units,
         "demand_units": demand_units,
+        "dsm_units": dsm_units,
         "forecaster": forecaster,
     }
 
@@ -493,6 +494,7 @@ async def async_setup_world(
     powerplant_units = scenario_data["powerplant_units"]
     storage_units = scenario_data["storage_units"]
     demand_units = scenario_data["demand_units"]
+    dsm_units = scenario_data["dsm_units"]
     forecaster = scenario_data["forecaster"]
 
     save_frequency_hours = config.get("save_frequency_hours", 48)
