@@ -96,9 +96,9 @@
         "x": 0,
         "y": 2
       },
-      "id": 18,
+      "id": 16,
       "panels": [],
-      "title": "Computation Time Comparison",
+      "title": "Market Result Comparison",
       "type": "row"
     },
     {
@@ -106,7 +106,7 @@
         "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
-      "description": "Comparison of Total Run Times for each Simulation Run",
+      "description": "How much profit make all learning units combined per evaluation episode? (Trained models in eval_episode 1 are mostly based on exploration runs and performing badly.)",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -134,6 +134,467 @@
             }
           },
           "mappings": [],
+          "min": -3000000,
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 3
+      },
+      "id": 22,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "vertical",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "episode",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  SUBSTRING(simulation, 1, regexp_instr(simulation, 'eval')-2) as \"simulation run\",\r\n  episode, \r\n  sum(profit) as \"Sum (Learning Agents Profit)\"\r\nFROM rl_params\r\nWHERE simulation ~ '${simulation}_' AND perform_evaluation is true \r\nGROUP BY simulation, episode\r\nORDER BY 1, episode",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Total Evaluation Profit",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "Averaged over all simulation runs.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "text",
+            "mode": "fixed"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "color-text"
+            },
+            "filterable": false,
+            "inspect": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "example_02a_harder": {
+                  "color": "dark-blue",
+                  "index": 0,
+                  "text": "Case 1"
+                },
+                "example_02a_harder_LF": {
+                  "color": "semi-dark-blue",
+                  "index": 1,
+                  "text": "Case 1 (LF)"
+                },
+                "example_02a_harder_lstm": {
+                  "color": "blue",
+                  "index": 2,
+                  "text": "Case 1 with LSTM"
+                },
+                "example_02a_harder_lstm_LF": {
+                  "color": "light-blue",
+                  "index": 3,
+                  "text": "Case 1 with LSTM (LF)"
+                },
+                "example_02b_harder": {
+                  "color": "semi-dark-purple",
+                  "index": 4,
+                  "text": "Case 2"
+                },
+                "example_02b_harder_lstm": {
+                  "color": "light-purple",
+                  "index": 5,
+                  "text": "Case 2 with LSTM"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Case Study"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 163
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Overall Average"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 127
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Std. Dev"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 82
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 6,
+        "x": 0,
+        "y": 11
+      },
+      "id": 24,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": [],
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "10.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  simulation as \"Case Study\", \r\n  avg(\"Avg. Price\") as \"Overall Average\", \r\n  stddev(\"Avg. Price\") as \"Std. Dev.\"\r\nFROM (\r\n  SELECT\r\n    SUBSTRING(simulation, 1, regexp_instr(simulation, 'run')-2) as \"simulation\", \r\n    substr(simulation, regexp_instr(simulation, 'run')) as \"run\",\r\n    avg(price) AS \"Avg. Price\"\r\n  FROM market_meta\r\n  WHERE (\"market_id\" LIKE 'EOM')\r\n  GROUP BY simulation\r\n  ORDER BY 1, LENGTH(simulation), 2\r\n) as subselect\r\nGROUP BY simulation",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Overall Avg. Market Clearing Price",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic-by-name"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "hidden",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [
+            {
+              "options": {
+                "example_02a_harder": {
+                  "color": "dark-blue",
+                  "index": 0,
+                  "text": "Case 1"
+                },
+                "example_02a_harder_LF": {
+                  "color": "semi-dark-blue",
+                  "index": 1,
+                  "text": "Case 1 (LF)"
+                },
+                "example_02a_harder_lstm": {
+                  "color": "blue",
+                  "index": 2,
+                  "text": "Case 1 with LSTM"
+                },
+                "example_02a_harder_lstm_LF": {
+                  "color": "light-blue",
+                  "index": 3,
+                  "text": "Case 1 with LSTM (LF)"
+                },
+                "example_02b_harder": {
+                  "color": "semi-dark-purple",
+                  "index": 4,
+                  "text": "Case 2"
+                },
+                "example_02b_harder_lstm": {
+                  "color": "light-purple",
+                  "index": 5,
+                  "text": "Case 2 with LSTM"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 10,
+        "x": 6,
+        "y": 11
+      },
+      "id": 23,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "colorByField": "simulation",
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  SUBSTRING(simulation, 1, regexp_instr(simulation, 'run')-2) as \"simulation\", \r\n  substr(simulation, regexp_instr(simulation, 'run')) as \"run\",\r\n  avg(price) AS \"Avg. Price\"\r\nFROM market_meta\r\nWHERE (\"market_id\" LIKE 'EOM')\r\nGROUP BY simulation\r\nORDER BY 1, LENGTH(simulation), 2;",
+          "refId": "Market Clearing Price",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Avg. Market Clearing Price",
+      "type": "barchart"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 18,
+      "panels": [],
+      "title": "Computation Time Comparison",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "Comparison of Total Run Times for each Simulation Run",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic-by-name"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [
+            {
+              "options": {
+                "example_02a_harder": {
+                  "color": "dark-blue",
+                  "index": 0,
+                  "text": "Case 1"
+                },
+                "example_02a_harder_LF": {
+                  "color": "semi-dark-blue",
+                  "index": 1,
+                  "text": "Case 1 (LF)"
+                },
+                "example_02a_harder_lstm": {
+                  "color": "blue",
+                  "index": 2,
+                  "text": "Case 1 with LSTM"
+                },
+                "example_02a_harder_lstm_LF": {
+                  "color": "light-blue",
+                  "index": 3,
+                  "text": "Case 1 with LSTM (LF)"
+                },
+                "example_02b_harder": {
+                  "color": "semi-dark-purple",
+                  "index": 4,
+                  "text": "Case 2"
+                },
+                "example_02b_harder_lstm": {
+                  "color": "light-purple",
+                  "index": 5,
+                  "text": "Case 2 with LSTM"
+                }
+              },
+              "type": "value"
+            }
+          ],
           "thresholds": {
             "mode": "percentage",
             "steps": [
@@ -145,13 +606,59 @@
           },
           "unit": "s"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "min"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "avg"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "max"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 7,
         "w": 15,
         "x": 0,
-        "y": 3
+        "y": 21
       },
       "id": 19,
       "options": {
@@ -165,13 +672,14 @@
           "placement": "right",
           "showLegend": true
         },
-        "orientation": "vertical",
+        "orientation": "auto",
         "showValue": "always",
         "stacking": "none",
         "tooltip": {
           "mode": "single",
           "sort": "none"
         },
+        "xField": "scenario",
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
@@ -262,29 +770,152 @@
             "lineWidth": 1
           },
           "fieldMinMax": false,
-          "mappings": [],
+          "mappings": [
+            {
+              "options": {
+                "example_02a_harder": {
+                  "color": "dark-blue",
+                  "index": 0,
+                  "text": "Case 1"
+                },
+                "example_02a_harder_LF": {
+                  "color": "semi-dark-blue",
+                  "index": 1,
+                  "text": "Case 1 (LF)"
+                },
+                "example_02a_harder_lstm": {
+                  "color": "blue",
+                  "index": 2,
+                  "text": "Case 1 with LSTM"
+                },
+                "example_02a_harder_lstm_LF": {
+                  "color": "light-blue",
+                  "index": 3,
+                  "text": "Case 1 with LSTM (LF)"
+                },
+                "example_02b_harder": {
+                  "color": "semi-dark-purple",
+                  "index": 4,
+                  "text": "Case 2"
+                },
+                "example_02b_harder_lstm": {
+                  "color": "light-purple",
+                  "index": 5,
+                  "text": "Case 2 with LSTM"
+                }
+              },
+              "type": "value"
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           },
           "unit": "s"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Case 1"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Case 1 (LF)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Case 1 with LSTM"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Case 1 with LSTM (LF)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Case 2"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Case 2 with LSTM"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 14,
         "w": 9,
         "x": 15,
-        "y": 3
+        "y": 21
       },
       "id": 20,
       "options": {
@@ -297,9 +928,7 @@
           ],
           "displayMode": "table",
           "placement": "bottom",
-          "showLegend": true,
-          "sortBy": "Name",
-          "sortDesc": false
+          "showLegend": true
         }
       },
       "pluginVersion": "10.4.2",
@@ -514,7 +1143,43 @@
               "mode": "off"
             }
           },
-          "mappings": [],
+          "mappings": [
+            {
+              "options": {
+                "example_02a_harder": {
+                  "color": "dark-blue",
+                  "index": 0,
+                  "text": "Case 1"
+                },
+                "example_02a_harder_LF": {
+                  "color": "semi-dark-blue",
+                  "index": 1,
+                  "text": "Case 1 (LF)"
+                },
+                "example_02a_harder_lstm": {
+                  "color": "blue",
+                  "index": 2,
+                  "text": "Case 1 with LSTM"
+                },
+                "example_02a_harder_lstm_LF": {
+                  "color": "light-blue",
+                  "index": 3,
+                  "text": "Case 1 with LSTM (LF)"
+                },
+                "example_02b_harder": {
+                  "color": "semi-dark-purple",
+                  "index": 4,
+                  "text": "Case 2"
+                },
+                "example_02b_harder_lstm": {
+                  "color": "light-purple",
+                  "index": 5,
+                  "text": "Case 2 with LSTM"
+                }
+              },
+              "type": "value"
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -530,13 +1195,104 @@
           },
           "unit": "short"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "min. episodes"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "min. eval episodes"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "avg. episodes"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "avg. eval episodes"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "max. episodes"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "max. eval episodes"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 10,
         "w": 15,
         "x": 0,
-        "y": 10
+        "y": 28
       },
       "id": 21,
       "options": {
@@ -623,143 +1379,17 @@
       ],
       "title": "Number of Episodes",
       "type": "barchart"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 20
-      },
-      "id": 16,
-      "panels": [],
-      "title": "Market Result Comparison",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "P7B13B9DF907EC40C"
-      },
-      "description": "How much profit make all learning units combined per evaluation episode? (Trained models in eval_episode 1 are mostly based on exploration runs and performing badly.)",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "min": -3000000,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 21
-      },
-      "id": 22,
-      "options": {
-        "barRadius": 0,
-        "barWidth": 0.97,
-        "fullHighlight": false,
-        "groupWidth": 0.7,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "orientation": "vertical",
-        "showValue": "always",
-        "stacking": "none",
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        },
-        "xField": "episode",
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT\r\n  simulation,\r\n  episode, \r\n  sum(profit)\r\nFROM rl_params\r\nWHERE simulation ~ '^${simulation}_eval_[1-9]+'  AND perform_evaluation is true \r\nGROUP BY simulation, episode\r\nORDER BY episode",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Total Evaluation Profit",
-      "type": "barchart"
     }
   ],
-  "refresh": "",
   "schemaVersion": 39,
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
-          "selected": false,
-          "text": "example_02a_harder_LF_run_1",
-          "value": "example_02a_harder_LF_run_1"
+          "selected": true,
+          "text": "example_02a_harder_lstm_LF_run_1",
+          "value": "example_02a_harder_lstm_LF_run_1"
         },
         "datasource": {
           "type": "postgres",
@@ -829,7 +1459,7 @@
       },
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": [
             "example_02a_harder",
             "example_02a_harder_lstm",
@@ -880,14 +1510,10 @@
         "current": {
           "selected": true,
           "text": [
-            "exploration",
-            "learning",
-            "evaluation"
+            "learning"
           ],
           "value": [
-            "exploration",
-            "learning",
-            "evaluation"
+            "learning"
           ]
         },
         "description": "Charts can be filtered by type of simulation (exploration, learning or evaluation episodes).",
@@ -898,7 +1524,7 @@
         "name": "sim_type_filter",
         "options": [
           {
-            "selected": true,
+            "selected": false,
             "text": "exploration",
             "value": "exploration"
           },
@@ -908,7 +1534,7 @@
             "value": "learning"
           },
           {
-            "selected": true,
+            "selected": false,
             "text": "evaluation",
             "value": "evaluation"
           }
@@ -921,8 +1547,8 @@
     ]
   },
   "time": {
-    "from": "2019-03-01T00:00:00.000Z",
-    "to": "2019-03-31T23:59:59.000Z"
+    "from": "2019-02-13T12:00:00.500Z",
+    "to": "2019-04-16T11:59:58.500Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -938,6 +1564,6 @@
   "timezone": "",
   "title": "ASSUME: Actor Comparison",
   "uid": "bdnvfato1dlogd",
-  "version": 36,
+  "version": 48,
   "weekStart": ""
 }
