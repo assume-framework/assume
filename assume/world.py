@@ -133,23 +133,11 @@ class World:
 
         self.bidding_strategies = bidding_strategies
 
-        try:
-            from assume.strategies.learning_advanced_orders import (
-                RLAdvancedOrderStrategy,
-            )
-            from assume.strategies.learning_strategies import RLStrategy
-
-            self.bidding_strategies["learning"] = RLStrategy
-            self.bidding_strategies["pp_learning"] = RLStrategy
-            self.bidding_strategies["learning_advanced_orders"] = (
-                RLAdvancedOrderStrategy
-            )
-
-        except ImportError as e:
+        if "pp_learning" not in bidding_strategies:
             self.logger.info(
-                "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",
-                e,
+                "Learning Strategies not available. Check that you have all required packages installed (torch)."
             )
+
         self.clearing_mechanisms: dict[str, MarketRole] = clearing_mechanisms
         self.additional_kpis: dict[str, OutputDef] = {}
         self.addresses = []

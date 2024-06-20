@@ -549,10 +549,18 @@ class UnitsOperator(Role):
                 }
                 noise_tuple = unit.outputs["rl_exploration_noise"].loc[start]
                 action_tuple = unit.outputs["rl_actions"].loc[start]
-                action_dim = len(action_tuple)
+                action_dim = len(action_tuple) if isinstance(action_tuple, tuple) else 1
                 for i in range(action_dim):
-                    output_dict[f"exploration_noise_{i}"] = noise_tuple[i]
-                    output_dict[f"actions_{i}"] = action_tuple[i]
+                    output_dict[f"exploration_noise_{i}"] = (
+                        noise_tuple[i]
+                        if isinstance(noise_tuple, tuple)
+                        else noise_tuple
+                    )
+                    output_dict[f"actions_{i}"] = (
+                        action_tuple[i]
+                        if isinstance(action_tuple, tuple)
+                        else action_tuple
+                    )
 
                 output_agent_list.append(output_dict)
 

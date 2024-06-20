@@ -45,3 +45,18 @@ try:
 
 except ImportError:
     pass
+
+
+try:
+    from assume.strategies.learning_advanced_orders import (
+        RLAdvancedOrderStrategy,
+    )
+    from assume.strategies.learning_strategies import RLStrategy
+    from assume.strategies.learning_strategies_da import RLStrategyDA
+
+    bidding_strategies["pp_learning"] = RLStrategy
+    bidding_strategies["learning_advanced_orders"] = RLAdvancedOrderStrategy
+    bidding_strategies["da_learning"] = RLStrategyDA
+
+except ImportError:
+    pass
