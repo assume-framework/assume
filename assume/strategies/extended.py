@@ -47,7 +47,9 @@ class OTCStrategy(BaseStrategy):
             min_power, max_power = unit.calculate_min_max_power(
                 start, end
             )  # max_power describes the maximum power output of the unit
-            current_power = unit.outputs["energy"].at[
+            current_power = unit.outputs[
+                "energy"
+            ].at[
                 start
             ]  # current power output describes the power output at the start of the product
             volume = max_power[start]
@@ -209,7 +211,9 @@ class MarkupStrategy(BaseStrategy):
             min_power, max_power = unit.calculate_min_max_power(
                 start, end
             )  # max_power describes the maximum power output of the unit
-            current_power = unit.outputs["energy"].at[
+            current_power = unit.outputs[
+                "energy"
+            ].at[
                 start
             ]  # current power output describes the power output at the start of the product
             volume = max_power[start]

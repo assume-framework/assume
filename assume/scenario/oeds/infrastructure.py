@@ -925,7 +925,7 @@ if __name__ == "__main__":
         with open("../agents.json", "w") as f:
             json.dump(agents, f, indent=2)
     else:
-        with open("../agents.json", "r") as f:
+        with open("../agents.json") as f:
             agents = json.load(f)
 
     dem = interface.get_demand_in_area(area="DE91C")

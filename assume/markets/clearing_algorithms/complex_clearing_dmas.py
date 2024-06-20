@@ -5,7 +5,6 @@
 import logging
 import time
 from collections import defaultdict
-from datetime import timedelta
 
 import numpy as np
 import pandas as pd
@@ -186,7 +185,7 @@ class ComplexDmasClearingRole(MarketRole):
         # Step 6 set constraint: If parent block of an agent is used -> enable usage of child block
         model.enable_child_block = ConstraintList()
         model.mother_bid = ConstraintList()
-        orders_local = defaultdict(lambda: [])
+        orders_local = defaultdict(list)
         for block, hour, agent in orders["linked_ask"].keys():
             orders_local[(block, agent)].append(hour)
 

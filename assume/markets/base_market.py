@@ -4,7 +4,6 @@
 
 import logging
 import math
-from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
 
@@ -333,7 +332,7 @@ class MarketRole(MarketMechanism, Role):
             next_opening_ts = datetime2timestamp(next_opening)
             self.context.schedule_timestamp_task(self.opening(), next_opening_ts)
             logger.debug(
-                f"market opening: %s - %s - %s",
+                "market opening: %s - %s - %s",
                 self.marketconfig.market_id,
                 market_open,
                 market_closing,

@@ -9,11 +9,11 @@ import torch as th
 from torch.nn import functional as F
 from torch.optim import Adam
 
-logger = logging.getLogger(__name__)
-
 from assume.common.base import LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.learning_utils import Actor, CriticTD3, polyak_update
+
+logger = logging.getLogger(__name__)
 
 
 class TD3(RLAlgorithm):
@@ -383,7 +383,7 @@ class TD3(RLAlgorithm):
             This function implements the TD3 algorithm's key step for policy improvement and exploration.
         """
 
-        logger.debug(f"Updating Policy")
+        logger.debug("Updating Policy")
         n_rl_agents = len(self.learning_role.rl_strats.keys())
         for _ in range(self.gradient_steps):
             self.n_updates += 1

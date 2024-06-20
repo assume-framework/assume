@@ -47,7 +47,7 @@ def config_case_completer(prefix, parsed_args, **kwargs):
         Path(parsed_args.input_path) / Path(parsed_args.scenario) / "config.yaml"
     )
     if config_file.is_file():
-        with open(str(config_file), "r") as f:
+        with open(str(config_file)) as f:
             config = yaml.safe_load(f)
         return list(config.keys())
     return [""]

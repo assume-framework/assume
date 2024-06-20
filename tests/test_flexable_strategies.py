@@ -11,8 +11,6 @@ import pytest
 from assume.common.forecasts import NaiveForecast
 from assume.strategies import (
     flexableEOM,
-    flexableEOMBlock,
-    flexableEOMLinked,
     flexableNegCRM,
     flexablePosCRM,
 )

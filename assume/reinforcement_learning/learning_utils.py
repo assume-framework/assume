@@ -37,7 +37,7 @@ class CriticTD3(nn.Module):
         float_type,
         unique_obs_dim: int = 0,
     ):
-        super(CriticTD3, self).__init__()
+        super().__init__()
 
         self.obs_dim = obs_dim + unique_obs_dim * (n_agents - 1)
         self.act_dim = act_dim * n_agents
@@ -110,7 +110,7 @@ class Actor(nn.Module):
     """
 
     def __init__(self, obs_dim: int, act_dim: int, float_type):
-        super(Actor, self).__init__()
+        super().__init__()
 
         self.FC1 = nn.Linear(obs_dim, 256, dtype=float_type)
         self.FC2 = nn.Linear(256, 128, dtype=float_type)

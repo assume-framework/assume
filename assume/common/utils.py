@@ -228,7 +228,6 @@ def visualize_orderbook(order_book: Orderbook):
 
         for j, o in groupby(bids_grouped, itemgetter("link")):
             s = pd.Series(0.0, index=start_times)
-            ys = np.zeros(24)
             o = list(o)
             for order in o:
                 s[order["start_time"]] += order["volume"]
@@ -299,7 +298,7 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=No
                 end = date + timedelta(hours=duration_hours)
                 deltas.append((start, bid["volume"]) + add)
                 deltas.append((end, -bid["volume"]) + add)
-    aggregation = defaultdict(lambda: [])
+    aggregation = defaultdict(list)
     # current_power is separated by group
     current_power = defaultdict(lambda: 0)
     for d_tuple in sorted(deltas, key=lambda i: i[0]):
