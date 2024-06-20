@@ -142,9 +142,9 @@ class World:
 
             self.bidding_strategies["learning"] = RLStrategy
             self.bidding_strategies["pp_learning"] = RLStrategy
-            self.bidding_strategies[
-                "learning_advanced_orders"
-            ] = RLAdvancedOrderStrategy
+            self.bidding_strategies["learning_advanced_orders"] = (
+                RLAdvancedOrderStrategy
+            )
 
         except ImportError as e:
             self.logger.info(
@@ -305,7 +305,7 @@ class World:
                     suspendable_tasks=False,
                 )
                 agent.add_role(self.output_role)
-                clock_agent = DistributedClockAgent(container)
+                DistributedClockAgent(container)
 
             await self.container.as_agent_process(agent_creator=creator)
         else:
@@ -417,7 +417,7 @@ class World:
 
                         unit_operator_id = "Operator-RL"
 
-            except KeyError as e:
+            except KeyError:
                 self.logger.error(
                     f"Bidding strategy {strategy} not registered, could not add {id}"
                 )

@@ -297,7 +297,7 @@ def load_config_and_create_forecaster(
     """
 
     path = f"{inputs_path}/{scenario}"
-    with open(f"{path}/config.yaml", "r") as f:
+    with open(f"{path}/config.yaml") as f:
         config = yaml.safe_load(f)
     if not study_case:
         study_case = list(config.keys())[0]
@@ -499,7 +499,7 @@ async def async_setup_world(
         )
 
     # add central RL unit operator that handels all RL units
-    if world.learning_mode == True and "Operator-RL" not in all_operators:
+    if world.learning_mode and "Operator-RL" not in all_operators:
         all_operators = np.concatenate([all_operators, ["Operator-RL"]])
 
     for company_name in set(all_operators):

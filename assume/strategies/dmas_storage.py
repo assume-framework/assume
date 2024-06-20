@@ -34,9 +34,8 @@ def shift(prc, type_: str = "first"):
       np.array: shifted price curve
 
     """
-    new_prices, num_prices = [], len(
-        prc
-    )  # new_prices is the list of prices after the shift
+    new_prices, num_prices = ([], len(prc))
+    # new_prices is the list of prices after the shift
 
     for p, index in zip(prc, range(num_prices)):
         if type_ == "first":
@@ -63,17 +62,17 @@ def shaping(prc, type_: str = "peak"):
 
     """
     if type_ == "peak":
-        prc[
-            8:20
-        ] *= 1.1  # between 8 and 20 hours, the price is multiplied by 1.1 (general production is high)
+        prc[8:20] *= (
+            1.1  # between 8 and 20 hours, the price is multiplied by 1.1 (general production is high)
+        )
     elif type_ == "pv":
-        prc[
-            10:14
-        ] *= 0.9  # between 10 and 14 hours, the price is multiplied by 0.9 (Pv production is high)
+        prc[10:14] *= (
+            0.9  # between 10 and 14 hours, the price is multiplied by 0.9 (Pv production is high)
+        )
     elif type_ == "demand":
-        prc[
-            6:9
-        ] *= 1.1  # between 6 and 9 hours, the price is multiplied by 1.1 (demand is high)
+        prc[6:9] *= (
+            1.1  # between 6 and 9 hours, the price is multiplied by 1.1 (demand is high)
+        )
         prc[17:20] *= 1.1  # between 17 and 20 hours, the price is multiplied by 1.1
     return prc
 
@@ -196,7 +195,8 @@ class DmasStorageStrategy(BaseStrategy):
             self.model.obj = Objective(
                 expr=quicksum(profit[t] for t in time_range), sense=maximize
             )
-            r = self.opt.solve(self.model)
+            self.opt.solve(self.model)
+
             power = np.asarray(
                 [
                     -self.model.p_minus[t].value * unit.efficiency_discharge

@@ -41,11 +41,11 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         python -m pip install -e .[test]
         python -m pip install pyomo
-    - name: Lint with black and isort
+    - name: Lint with ruff
       run: |
         # stop the build if there are Python syntax errors or undefined names
-        black --check assume examples tests
-        isort --check assume examples tests
+        ruff check assume examples tests
+        ruff format assume examples tests
     - name: Test with pytest & integration tests
       run: |
         pytest -m "not require_learning"
