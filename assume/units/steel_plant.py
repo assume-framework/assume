@@ -8,7 +8,12 @@ from typing import Dict
 import pandas as pd
 import pyomo.environ as pyo
 from pyomo.environ import value
-from pyomo.opt import SolverFactory, SolverStatus, TerminationCondition
+from pyomo.opt import (
+    SolverFactory,
+    SolverStatus,
+    TerminationCondition,
+    check_available_solvers,
+)
 
 from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook
@@ -21,6 +26,8 @@ from assume.units.dst_components import (
     Electrolyser,
     GenericStorage,
 )
+
+SOLVERS = ["glpk", "gurobi", "cbc", "cplex"]
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +101,10 @@ class SteelPlant(SupportsMinMax):
             flexibility_cost_tolerance(self, self.model)
         self.define_objective_flex(self.model)
 
-        self.solver = SolverFactory("gurobi")
+        solvers = check_available_solvers(*SOLVERS)
+        if len(solvers) < 1:
+            raise Exception(f"None of {SOLVERS} are available")
+        self.solver = SolverFactory(solvers[0])
 
         self.power_requirement = None
 
@@ -318,7 +328,8 @@ class SteelPlant(SupportsMinMax):
             )
 
         temp = instance.total_power_input.get_values()
-        self.power_requirement = pd.Series(data=temp, index=self.index)
+        self.power_requirement = pd.Series(data=temp)
+        self.power_requirement.index = self.index
 
         self.total_cost = sum(
             instance.variable_cost[t].value for t in instance.time_steps
