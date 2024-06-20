@@ -5,7 +5,6 @@
 import logging
 from datetime import datetime, timedelta
 from functools import lru_cache
-from typing import Tuple, Union
 
 import pandas as pd
 
@@ -59,12 +58,12 @@ class PowerPlant(SupportsMinMax):
         max_power: float,
         min_power: float = 0.0,
         efficiency: float = 1.0,
-        additional_cost: Union[float, pd.Series] = 0.0,
+        additional_cost: float | pd.Series = 0.0,
         partial_load_eff: bool = False,
         fuel_type: str = "others",
         emission_factor: float = 0.0,
-        ramp_up: Union[float, None] = None,
-        ramp_down: Union[float, None] = None,
+        ramp_up: float | None = None,
+        ramp_down: float | None = None,
         hot_start_cost: float = 0,
         warm_start_cost: float = 0,
         cold_start_cost: float = 0,
@@ -74,7 +73,7 @@ class PowerPlant(SupportsMinMax):
         downtime_warm_start: int = 48,  # hours
         heat_extraction: bool = False,
         max_heat_extraction: float = 0,
-        location: Tuple[float, float] = (0.0, 0.0),
+        location: tuple[float, float] = (0.0, 0.0),
         node: str = "node0",
         **kwargs,
     ):
