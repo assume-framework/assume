@@ -815,7 +815,7 @@ def run_learning(
         # evaluation run:
         if (
             episode % validation_interval == 0
-            and episode > world.learning_role.episodes_collecting_initial_experience
+            and episode > world.learning_role.episodes_collecting_initial_experience + validation_interval
         ):
             world.reset()
 
