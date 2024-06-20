@@ -4,10 +4,10 @@
 
 import asyncio
 import logging
+from collections.abc import Callable
 from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
-from typing import Callable
 
 import pandas as pd
 from dateutil import rrule as rr

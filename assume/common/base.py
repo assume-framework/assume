@@ -4,7 +4,7 @@
 
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import TypedDict, Union
+from typing import TypedDict
 
 import numpy as np
 import pandas as pd
@@ -227,7 +227,7 @@ class BaseUnit:
         else:
             return self.outputs[product_type].at[dt - self.index.freq]
 
-    def as_dict(self) -> dict[str, Union[str, int]]:
+    def as_dict(self) -> dict[str, str | int]:
         """
         Returns a dictionary representation of the unit.
 
