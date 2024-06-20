@@ -7,7 +7,6 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 import dateutil.rrule as rr
 import numpy as np
@@ -35,7 +34,7 @@ def load_file(
     path: str,
     config: dict,
     file_name: str,
-    index: Optional[pd.DatetimeIndex] = None,
+    index: pd.DatetimeIndex | None = None,
 ) -> pd.DataFrame:
     """
     Loads a csv file from the given path and returns a dataframe.
@@ -147,7 +146,7 @@ def replace_paths(config: dict, inputs_path: str):
 
     if isinstance(config, dict):
         for key, value in config.items():
-            if isinstance(value, (dict, list)):
+            if isinstance(value, dict | list):
                 config[key] = replace_paths(value, inputs_path)
             elif isinstance(key, str) and key.endswith("_path") and value is not None:
                 if not value.startswith(inputs_path):

@@ -2,10 +2,11 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from numbers import Number
-from typing import Callable, NamedTuple, Optional, TypedDict
+from typing import NamedTuple, TypedDict
 
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
@@ -50,7 +51,7 @@ class Order(TypedDict):
     accepted_price: Number | dict[datetime, Number]
     agent_id: str
     node: str
-    only_hours: Optional[OnlyHours]
+    only_hours: OnlyHours | None
 
 
 Orderbook = list[Order]
