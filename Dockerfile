@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-FROM python:3.11-bookworm
+FROM python:3.11-slim
 
 RUN useradd -m -s /bin/bash admin
 
@@ -12,7 +12,7 @@ COPY README.md pyproject.toml .
 #RUN python -m pip install --upgrade pip
 # thats needed to use create the requirements.txt only
 RUN pip install pip-tools
-RUN mkdir assume
+RUN mkdir assume assume_cli
 RUN touch assume/__init__.py
 RUN pip-compile --resolver=backtracking -o requirements.txt ./pyproject.toml
 RUN pip install --no-cache-dir -r requirements.txt
