@@ -86,7 +86,7 @@ async def load_oeds_async(
         log.info(f"loading config {area} for {year}")
         config_path = Path.home() / ".assume" / f"{area}_{year}"
         if not config_path.is_dir():
-            log.info(f"query database time series")
+            log.info("query database time series")
             demand = infra_interface.get_demand_series_in_area(area, year)
             demand = demand.resample("h").mean()
             # demand in MW

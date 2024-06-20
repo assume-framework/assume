@@ -3,12 +3,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from config import (
-    agent_adress,
-    agent_adresses,
     db_uri,
     index,
     manager_addr,
-    market_operator_addr,
     market_operator_aid,
     marketdesign,
     worker,

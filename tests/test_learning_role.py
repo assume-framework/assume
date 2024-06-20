@@ -4,7 +4,6 @@
 
 from datetime import datetime
 
-import numpy as np
 import pytest
 
 try:
@@ -37,25 +36,25 @@ def test_learning_init():
         "early_stopping_threshold": 0.05,
     }
     # test init
-    l = Learning(learning_config, start, end)
-    assert len(l.rl_strats) == 0
+    learn = Learning(learning_config, start, end)
+    assert len(learn.rl_strats) == 0
 
     # we need to add learning strategies first
-    l.rl_strats["test_id"] = LearningStrategy(**learning_config)
+    learn.rl_strats["test_id"] = LearningStrategy(**learning_config)
 
     # test creating actors
-    l.initialize_policy()
+    learn.initialize_policy()
     # now we have an actor for every strategy
-    for strategy in l.rl_strats.values():
+    for strategy in learn.rl_strats.values():
         assert isinstance(strategy.actor, Actor)
         assert isinstance(strategy.actor_target, Actor)
 
     # now we have a critic for every strategy
-    for str_id in l.rl_strats.keys():
-        assert isinstance(l.critics[str_id], CriticTD3)
-        assert isinstance(l.target_critics[str_id], CriticTD3)
+    for str_id in learn.rl_strats.keys():
+        assert isinstance(learn.critics[str_id], CriticTD3)
+        assert isinstance(learn.target_critics[str_id], CriticTD3)
 
-    ac = l.rl_algorithm.extract_policy()
+    ac = learn.rl_algorithm.extract_policy()
 
-    assert ac["target_critics"] == l.target_critics
-    assert ac["critics"] == l.critics
+    assert ac["target_critics"] == learn.target_critics
+    assert ac["critics"] == learn.critics

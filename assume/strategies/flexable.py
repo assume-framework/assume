@@ -309,8 +309,6 @@ class flexableNegCRM(BaseStrategy):
         # check if kwargs contains crm_foresight argument
         self.foresight = pd.Timedelta(kwargs.get("crm_foresight", "4h"))
 
-        start = None
-
     def calculate_bids(
         self,
         unit: SupportsMinMax,

@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import math
 from datetime import datetime
 
 import pandas as pd
@@ -10,11 +9,8 @@ import pytest
 
 from assume.common.forecasts import NaiveForecast
 from assume.strategies import (
-    flexableEOM,
     flexableEOMBlock,
     flexableEOMLinked,
-    flexableNegCRM,
-    flexablePosCRM,
 )
 from assume.units import PowerPlant
 

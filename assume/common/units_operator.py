@@ -175,7 +175,7 @@ class UnitsOperator(Role):
                 "sender_id": self.context.aid,
                 "reply_with": market.market_id,
             },
-        ),
+        )
         logger.debug(f"{self.id} sent market registration to {market.market_id}")
 
     def handle_opening(self, opening: OpeningMessage, meta: MetaDict) -> None:
