@@ -547,7 +547,7 @@ async def async_setup_world(
         # add the units to corresponsing unit operators
         tcp_host = world.addr[0]
         manager_addr = world.addr
-        agent_port = 9100
+        agent_port = world.addr[1]
         for company_name in set(all_operators):
             agent_port += 1
             agent_world = World(

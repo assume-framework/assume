@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from config import (
+from .config import (
     db_uri,
     index,
     manager_addr,
