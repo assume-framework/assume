@@ -4,7 +4,7 @@
 
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import TypedDict, Union
+from typing import TypedDict
 
 import numpy as np
 import pandas as pd
@@ -227,7 +227,7 @@ class BaseUnit:
         else:
             return self.outputs[product_type].at[dt - self.index.freq]
 
-    def as_dict(self) -> dict[str, Union[str, int]]:
+    def as_dict(self) -> dict[str, str | int]:
         """
         Returns a dictionary representation of the unit.
 
@@ -284,19 +284,6 @@ class BaseUnit:
         """
         return 0
 
-    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
-        """
-        Calculates the marginal cost for the given power.
-
-        Args:
-            start (pandas.Timestamp): The start time of the dispatch.
-            power (float): The power output of the unit.
-
-        Returns:
-            float: The marginal cost for the given power.
-        """
-        pass
-
 
 class SupportsMinMax(BaseUnit):
     """
@@ -327,7 +314,6 @@ class SupportsMinMax(BaseUnit):
         Returns:
             tuple[pandas.Series, pandas.Series]: The min and max power for the given time period.
         """
-        pass
 
     def calculate_ramp(
         self,
@@ -529,7 +515,6 @@ class SupportsMinMaxCharge(BaseUnit):
         Returns:
             tuple[pandas.Series, pandas.Series]: The min and max charging power for the given time period.
         """
-        pass
 
     def calculate_min_max_discharge(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
@@ -545,7 +530,6 @@ class SupportsMinMaxCharge(BaseUnit):
         Returns:
             tuple[pandas.Series, pandas.Series]: The min and max discharging power for the given time period.
         """
-        pass
 
     def get_soc_before(self, dt: datetime) -> float:
         """
@@ -599,7 +583,7 @@ class SupportsMinMaxCharge(BaseUnit):
             return power_discharge
 
         # if storage was charging before and ramping for charging is defined
-        if previous_power < 0 and self.ramp_down_charge != None:
+        if previous_power < 0 and self.ramp_down_charge is not None:
             power_discharge = max(
                 previous_power - self.ramp_down_charge - current_power, 0
             )
@@ -612,7 +596,7 @@ class SupportsMinMaxCharge(BaseUnit):
                 max(0, previous_power + self.ramp_up_discharge - current_power),
             )
             # restrict only if ramping defined
-            if self.ramp_down_discharge != None:
+            if self.ramp_down_discharge is not None:
                 power_discharge = max(
                     power_discharge,
                     previous_power - self.ramp_down_discharge - current_power,
@@ -710,7 +694,6 @@ class BaseStrategy:
             marketconfig (MarketConfig): The market configuration.
             orderbook (Orderbook): The orderbook.
         """
-        pass
 
     def remove_empty_bids(self, bids: list) -> list:
         """

@@ -9,7 +9,6 @@ import time
 from datetime import datetime
 from pathlib import Path
 from sys import platform
-from typing import Optional, Union
 
 import nest_asyncio
 import pandas as pd
@@ -87,11 +86,11 @@ class World:
 
     def __init__(
         self,
-        addr: Union[tuple[str, int], str] = "world",
+        addr: tuple[str, int] | str = "world",
         database_uri: str = "",
         export_csv_path: str = "",
         log_level: str = "INFO",
-        distributed_role: Optional[bool] = None,
+        distributed_role: bool | None = None,
     ) -> None:
         logging.getLogger("assume").setLevel(log_level)
         self.logger = logging.getLogger(__name__)
@@ -143,9 +142,9 @@ class World:
 
             self.bidding_strategies["learning"] = RLStrategy
             self.bidding_strategies["pp_learning"] = RLStrategy
-            self.bidding_strategies[
-                "learning_advanced_orders"
-            ] = RLAdvancedOrderStrategy
+            self.bidding_strategies["learning_advanced_orders"] = (
+                RLAdvancedOrderStrategy
+            )
 
         except ImportError as e:
             self.logger.info(
@@ -168,7 +167,7 @@ class World:
         save_frequency_hours: int = 24,
         bidding_params: dict = {},
         learning_config: LearningConfig = {},
-        forecaster: Optional[Forecaster] = None,
+        forecaster: Forecaster | None = None,
         manager_address=None,
         **kwargs: dict,
     ) -> None:
@@ -306,7 +305,7 @@ class World:
                     suspendable_tasks=False,
                 )
                 agent.add_role(self.output_role)
-                clock_agent = DistributedClockAgent(container)
+                DistributedClockAgent(container)
 
             await self.container.as_agent_process(agent_creator=creator)
         else:
@@ -418,7 +417,7 @@ class World:
 
                         unit_operator_id = "Operator-RL"
 
-            except KeyError as e:
+            except KeyError:
                 self.logger.error(
                     f"Bidding strategy {strategy} not registered, could not add {id}"
                 )

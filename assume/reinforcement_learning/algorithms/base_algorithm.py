@@ -84,4 +84,3 @@ class RLAlgorithm:
         """
         Load learning params - abstract method to be implemented by the Learning Algorithm
         """
-        pass

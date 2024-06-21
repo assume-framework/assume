@@ -7,7 +7,6 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 import dateutil.rrule as rr
 import numpy as np
@@ -35,7 +34,7 @@ def load_file(
     path: str,
     config: dict,
     file_name: str,
-    index: Optional[pd.DatetimeIndex] = None,
+    index: pd.DatetimeIndex | None = None,
 ) -> pd.DataFrame:
     """
     Loads a csv file from the given path and returns a dataframe.
@@ -219,7 +218,7 @@ def replace_paths(config: dict, inputs_path: str):
 
     if isinstance(config, dict):
         for key, value in config.items():
-            if isinstance(value, (dict, list)):
+            if isinstance(value, dict | list):
                 config[key] = replace_paths(value, inputs_path)
             elif isinstance(key, str) and key.endswith("_path") and value is not None:
                 if not value.startswith(inputs_path):
@@ -369,7 +368,7 @@ def load_config_and_create_forecaster(
     """
 
     path = f"{inputs_path}/{scenario}"
-    with open(f"{path}/config.yaml", "r") as f:
+    with open(f"{path}/config.yaml") as f:
         config = yaml.safe_load(f)
     if not study_case:
         study_case = list(config.keys())[0]
@@ -584,7 +583,7 @@ async def async_setup_world(
         )
 
     # add central RL unit operator that handels all RL units
-    if world.learning_mode == True and "Operator-RL" not in all_operators:
+    if world.learning_mode and "Operator-RL" not in all_operators:
         all_operators = np.concatenate([all_operators, ["Operator-RL"]])
 
     for company_name in set(all_operators):
@@ -907,7 +906,9 @@ def run_learning(
         # evaluation run:
         if (
             episode % validation_interval == 0
-            and episode > world.learning_role.episodes_collecting_initial_experience
+            and episode
+            > world.learning_role.episodes_collecting_initial_experience
+            + validation_interval
         ):
             world.reset()
 
