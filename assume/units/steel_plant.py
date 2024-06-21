@@ -106,28 +106,29 @@ class SteelPlant(SupportsMinMax):
             raise Exception(f"None of {SOLVERS} are available")
         self.solver = SolverFactory(solvers[0])
 
-        self.power_requirement = None
+        self.opt_power_requirement = None
+        self.flex_power_requirement = None
 
-    def switch_to_opt(self):
-        self.model.obj_rule_opt.activate()
-        self.model.obj_rule_flex.deactivate()
+    def switch_to_opt(self, instance):
+        # deactivate the flexibility constraints and objective
+        instance.obj_rule_flex.deactivate()
 
-        self.model.total_cost_upper_limit.deactivate()
-        self.model.total_power_input_constraint.activate()
-        self.model.total_power_input_constraint_with_flex.deactivate()
+        instance.total_cost_upper_limit.deactivate()
+        instance.total_power_input_constraint_with_flex.deactivate()
 
-    def switch_to_flex(self):
-        self.model.obj_rule_flex.activate()
-        self.model.obj_rule_opt.deactivate()
+        return instance
 
-        self.model.total_cost_upper_limit.activate()
-        self.model.total_power_input_constraint.deactivate()
-        self.model.total_power_input_constraint_with_flex.activate()
+    def switch_to_flex(self, instance):
+        # deactivate the optimal constraints and objective
+        instance.obj_rule_opt.deactivate()
+        instance.total_power_input_constraint.deactivate()
 
         # fix values of model.total_power_input
-        for t in self.model.time_steps:
-            self.model.total_power_input[t].fix(self.total_opt_power_input[t])
-        self.model.total_cost = self.total_cost
+        for t in instance.time_steps:
+            instance.total_power_input[t].fix(self.opt_power_requirement[t])
+        instance.total_cost = self.total_cost
+
+        return instance
 
     def initialize_components(self, components: Dict[str, Dict], model):
         for technology, component_data in components.items():
@@ -301,11 +302,11 @@ class SteelPlant(SupportsMinMax):
         """
         Determines the optimal operation of the steel plant without considering flexibility.
         """
-        # Create a solver
-        self.switch_to_opt()
-
+        # create an instance of the model
         instance = self.model.create_instance()
-
+        # switch the instance to the optimal mode by deactivating the flexibility constraints and objective
+        instance = self.switch_to_opt(instance)
+        # solve the instance
         results = self.solver.solve(instance, tee=False)  # , tee=True
 
         # Check solver status and termination condition
@@ -328,24 +329,21 @@ class SteelPlant(SupportsMinMax):
             )
 
         temp = instance.total_power_input.get_values()
-        self.power_requirement = pd.Series(data=temp)
-        self.power_requirement.index = self.index
+        self.opt_power_requirement = pd.Series(data=temp, index=self.index)
 
         self.total_cost = sum(
             instance.variable_cost[t].value for t in instance.time_steps
         )
-        self.total_opt_power_input = [
-            instance.total_power_input[t].value for t in instance.time_steps
-        ]
 
     def determine_optimal_operation_with_flex(self):
         """
         Determines the optimal operation of the steel plant without considering flexibility.
         """
-        # Create a solver
-        self.switch_to_flex()
-
+        # create an instance of the model
         instance = self.model.create_instance()
+        # switch the instance to the flexibility mode by deactivating the optimal constraints and objective
+        instance = self.switch_to_flex(instance)
+        # solve the instance
         results = self.solver.solve(instance, tee=False)  # , tee=True
 
         # Check solver status and termination condition
@@ -369,7 +367,7 @@ class SteelPlant(SupportsMinMax):
             )
 
         temp = instance.total_power_input.get_values()
-        self.power_requirement = pd.Series(data=temp, index=self.index)
+        self.flex_power_requirement = pd.Series(data=temp, index=self.index)
 
     def set_dispatch_plan(
         self,

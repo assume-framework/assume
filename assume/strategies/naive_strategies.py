@@ -150,9 +150,8 @@ class NaiveDASteelplantStrategy(BaseStrategy):
     ) -> Orderbook:
         bids = []
         start = product_tuples[0][0]  # start time of the first product
-        end_all = product_tuples[-1][1]  # end time of the last product
 
-        if unit.power_requirement is None:
+        if unit.opt_power_requirement is None:
             if unit.objective == "min_variable_cost":
                 unit.determine_optimal_operation_without_flex()
 
@@ -165,7 +164,7 @@ class NaiveDASteelplantStrategy(BaseStrategy):
             and the volume of the product. Dispatch the order to the market.
             """
             start = product[0]
-            volume = unit.power_requirement.loc[start]
+            volume = unit.opt_power_requirement.loc[start]
             price = 3000
             bids.append(
                 {
@@ -190,9 +189,8 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
     ) -> Orderbook:
         bids = []
         start = product_tuples[0][0]  # start time of the first product
-        end_all = product_tuples[-1][1]  # end time of the last product
 
-        if unit.power_requirement is None:
+        if unit.flex_power_requirement is None:
             if unit.flexibility_measure == "max_load_shift":
                 unit.determine_optimal_operation_with_flex()
 
@@ -205,7 +203,7 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
             and the volume of the product. Dispatch the order to the market.
             """
             start = product[0]
-            volume = unit.power_requirement.loc[start]
+            volume = unit.flex_power_requirement.loc[start]
             price = 3000
             bids.append(
                 {
