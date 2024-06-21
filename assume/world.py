@@ -316,7 +316,10 @@ class World:
         if self.unit_operators.get(id):
             raise ValueError(f"Unit operator {id} already exists")
 
-        units_operator = UnitsOperator(available_markets=list(self.markets.values()))
+        units_operator = UnitsOperator(
+            available_markets=list(self.markets.values()),
+            learning_mode=self.learning_mode,
+        )
         # creating a new role agent and apply the role of a unitsoperator
         unit_operator_agent = RoleAgent(
             self.container, suggested_aid=f"{id}", suspendable_tasks=False

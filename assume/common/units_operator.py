@@ -32,6 +32,15 @@ from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
 
+try:
+    import torch as th
+
+    from assume.strategies.learning_advanced_orders import (
+        RLAdvancedOrderStrategy,
+    )
+except ImportError:
+    pass
+
 
 class UnitsOperator(Role):
     """
@@ -58,6 +67,7 @@ class UnitsOperator(Role):
         self,
         available_markets: list[MarketConfig],
         opt_portfolio: tuple[bool, BaseStrategy] | None = None,
+        learning_mode: bool = False,
     ):
         super().__init__()
 
@@ -75,6 +85,8 @@ class UnitsOperator(Role):
         # valid_orders per product_type
         self.valid_orders = defaultdict(list)
         self.units: dict[str, BaseUnit] = {}
+
+        self.learning_mode = learning_mode
 
     def setup(self):
         super().setup()
@@ -500,17 +512,6 @@ class UnitsOperator(Role):
             products_index (pandas.DatetimeIndex): The index of all products.
             marketconfig (MarketConfig): The market configuration.
         """
-        try:
-            from assume.strategies.learning_advanced_orders import (
-                RLAdvancedOrderStrategy,
-            )
-        except ImportError as e:
-            self.logger.info(
-                "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",
-                e,
-            )
-            return
-
         output_agent_list = []
         start = products_index[0]
         for unit_id, unit in self.units.items():
@@ -601,15 +602,6 @@ class UnitsOperator(Role):
         all_observations = []
         all_rewards = []
         start = products_index[0]
-        try:
-            import torch as th
-
-            from assume.strategies.learning_advanced_orders import (
-                RLAdvancedOrderStrategy,
-            )
-        except ImportError:
-            logger.error("tried writing learning_params, but torch is not installed")
-            return
 
         all_observations = th.zeros((learning_unit_count, obs_dim), device=device)
         all_actions = th.zeros((learning_unit_count, act_dim), device=device)
@@ -685,7 +677,7 @@ class UnitsOperator(Role):
 
             # we are using the first learning_strategy to check learning_mode
             # as this should be the same value for all strategies
-            if learning_strategies[0].learning_mode:
+            if self.learning_mode:
                 # in learning mode we are sending data to learning
                 self.write_to_learning(
                     products_index=products_index,
