@@ -328,11 +328,13 @@ class ComplexClearingRole(MarketRole):
         Raises:
             AssertionError: If the bid type is not valid or the volumes are not within the maximum bid volume.
         """
-
-        super().validate_orderbook(orderbook, agent_tuple)
-        max_volume = self.marketconfig.maximum_bid_volume
         for order in orderbook:
             order["bid_type"] = "SB" if order["bid_type"] is None else order["bid_type"]
+
+        super().validate_orderbook(orderbook, agent_tuple)
+
+        max_volume = self.marketconfig.maximum_bid_volume
+        for order in orderbook:
             assert order["bid_type"] in [
                 "SB",
                 "BB",
