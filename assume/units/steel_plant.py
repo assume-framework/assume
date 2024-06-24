@@ -329,7 +329,8 @@ class SteelPlant(SupportsMinMax):
             )
 
         temp = instance.total_power_input.get_values()
-        self.opt_power_requirement = pd.Series(data=temp, index=self.index)
+        self.opt_power_requirement = pd.Series(data=temp)
+        self.opt_power_requirement.index = self.index
 
         self.total_cost = sum(
             instance.variable_cost[t].value for t in instance.time_steps
@@ -367,7 +368,8 @@ class SteelPlant(SupportsMinMax):
             )
 
         temp = instance.total_power_input.get_values()
-        self.flex_power_requirement = pd.Series(data=temp, index=self.index)
+        self.flex_power_requirement = pd.Series(data=temp)
+        self.flex_power_requirement.index = self.index
 
     def set_dispatch_plan(
         self,
