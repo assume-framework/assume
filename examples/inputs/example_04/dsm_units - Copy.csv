@@ -1,7 +1,0 @@
-name,technology,node,bidding_EOM,bidding_redispatch,unit_operator,objective,flexibility_measure,cost_tolerance,demand,fuel_type,rated_power,min_power,ramp_up,ramp_down,min_operating_time,min_down_time,efficiency,specific_dri_demand,specific_electricity_consumption,specific_natural_gas_consumption,specific_hydrogen_consumption,specific_iron_ore_consumption,specific_lime_demand,start_price,max_capacity,min_capacity,initial_soc,storage_loss_rate,charge_loss_rate,discharge_loss_rate
-A360,electrolyser,360,naive_da_steelplant,,dsm_operator_1,min_variable_cost,,20,223693.1507,hydrogen,922,0,922,922,0,0,0.8,,,,,,,5,,,,,,
-A360,dri_plant,360,,,,,,,,hydrogen,120,36,120,120,0,0,,,0.3,0.9,1.83,1.43,,,,,,,,
-A360,eaf,360,,,,,,,,hydrogen,162,0,162,162,0,0,,1.09,0.44,,,,0.046,,,,,,,
-E183,electrolyser,183,naive_da_steelplant,naive_steel_redispatch,dsm_operator_5,min_variable_cost,max_load_shift,20,41424.65753,hydrogen,157,0,157,157,0,0,0.8,,,,,,,5,,,,,,
-E183,dri_plant,183,,,,,,,,hydrogen,23,8.8,23,23,0,0,,,0.3,0.9,1.83,1.43,,,,,,,,
-E183,eaf,183,,,,,,,,hydrogen,31,0,31,31,0,0,,1.09,0.44,,,,0.046,,,,,,,
