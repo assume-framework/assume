@@ -243,8 +243,8 @@ class RLAdvancedOrderStrategy(LearningStrategy):
             previous_power = bid_quantity_inflex + bid_quantity_flex + current_power
             op_time = max(op_time, 0) + 1 if previous_power > 0 else min(op_time, 0) - 1
             # store results in unit outputs which are written to database by unit operator
-            unit.outputs["rl_observations"][start] = next_observation
-            unit.outputs["rl_actions"][start] = actions
+            unit.outputs["rl_observations"].append(next_observation)
+            unit.outputs["rl_actions"].append(actions)
             unit.outputs["rl_exploration_noise"][start] = noise
 
         if "BB" in self.order_types:
@@ -564,6 +564,8 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         unit.outputs["reward"].loc[products_index] = reward
         unit.outputs["regret"].loc[products_index] = opportunity_cost
         unit.outputs["total_costs"].loc[products_index] = costs
+
+        unit.outputs["rl_rewards"].append(reward)
 
     def load_actor_params(self, load_path):
         """

@@ -146,10 +146,10 @@ class RLStrategyDA(LearningStrategy):
                 }
             )
 
-            # store results in unit outputs which are written to database by unit operator
-            unit.outputs["rl_observations"][start] = next_observation
-            unit.outputs["rl_actions"][start] = actions
-            unit.outputs["rl_exploration_noise"][start] = noise
+        # store results in unit outputs which are written to database by unit operator
+        unit.outputs["rl_observations"].append(next_observation)
+        unit.outputs["rl_actions"].append(actions)
+        unit.outputs["rl_exploration_noise"][start] = noise
 
         bids = self.remove_empty_bids(bids)
 
@@ -410,6 +410,8 @@ class RLStrategyDA(LearningStrategy):
         unit.outputs["reward"].loc[products_index] = reward
         unit.outputs["regret"].loc[products_index] = opportunity_cost
         unit.outputs["total_costs"].loc[products_index] = costs
+
+        unit.outputs["rl_rewards"].append(reward)
 
     def load_actor_params(self, load_path):
         """

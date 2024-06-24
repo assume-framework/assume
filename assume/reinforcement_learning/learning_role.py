@@ -236,7 +236,7 @@ class Learning(Role):
                     f"Folder with pretrained policies {directory} does not exist"
                 )
 
-    async def update_policy(self) -> None:
+    def update_policy(self) -> None:
         """
         Update the policy of the reinforcement learning agent.
 

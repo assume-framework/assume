@@ -585,21 +585,21 @@ class UnitsOperator(Role):
                         }
                     )
 
-                noise_tuple = unit.outputs["rl_exploration_noise"].loc[start]
-                action_tuple = unit.outputs["rl_actions"].loc[start]
-                action_dim = len(action_tuple) if isinstance(action_tuple, tuple) else 1
+                # noise_tuple = unit.outputs["rl_exploration_noise"].loc[start]
+                # action_tuple = unit.outputs["rl_actions"].loc[start]
+                # action_dim = len(action_tuple) if isinstance(action_tuple, tuple) else 1
 
-                for i in range(action_dim):
-                    output_dict[f"exploration_noise_{i}"] = (
-                        noise_tuple[i]
-                        if isinstance(noise_tuple, tuple)
-                        else noise_tuple
-                    )
-                    output_dict[f"actions_{i}"] = (
-                        action_tuple[i]
-                        if isinstance(action_tuple, tuple)
-                        else action_tuple
-                    )
+                # for i in range(action_dim):
+                #     output_dict[f"exploration_noise_{i}"] = (
+                #         noise_tuple[i]
+                #         if isinstance(noise_tuple, tuple)
+                #         else noise_tuple
+                #     )
+                #     output_dict[f"actions_{i}"] = (
+                #         action_tuple[i]
+                #         if isinstance(action_tuple, tuple)
+                #         else action_tuple
+                #     )
 
                 output_agent_list.append(output_dict)
 
@@ -617,7 +617,7 @@ class UnitsOperator(Role):
                 },
             )
 
-    def write_to_learning_role(
+    async def write_to_learning_role(
         self,
     ) -> None:
         """
@@ -634,28 +634,33 @@ class UnitsOperator(Role):
         device = self.learning_strategies["device"]
         learning_unit_count = len(self.rl_units)
 
+        values_len = len(self.rl_units[0].outputs["rl_observations"])
+        # return if no data is available
+        if values_len == 0:
+            return
+
         all_observations = th.zeros(
-            (learning_unit_count, self.train_freq, obs_dim), device=device
+            (learning_unit_count, values_len, obs_dim), device=device
         )
         if act_dim == 1:
-            all_actions = th.zeros(
-                (learning_unit_count, self.train_freq), device=device
-            )
+            all_actions = th.zeros((learning_unit_count, values_len), device=device)
         else:
             all_actions = th.zeros(
-                (learning_unit_count, self.train_freq, act_dim), device=device
+                (learning_unit_count, values_len, act_dim), device=device
             )
         all_rewards = []
 
         for i, unit in enumerate(self.rl_units):
             # Convert pandas Series to torch Tensor
-            obs_data = unit.outputs["rl_observations"]
-            obs_tensor = th.stack(obs_data[obs_data != 0].tolist(), dim=0)
-            actions_tensor = th.stack(unit.outputs["rl_actions"].tolist(), dim=0)
+            obs_tensor = th.stack(unit.outputs["rl_observations"], dim=0)
+            actions_tensor = th.stack(unit.outputs["rl_actions"], dim=0)
 
             all_observations[i] = obs_tensor
             all_actions[i] = actions_tensor
-            all_rewards.append(unit.outputs["reward"])
+            all_rewards.append(unit.outputs["rl_rewards"])
+
+            # reset the outputs
+            unit.reset_saved_rl_data()
 
         # convert all_actions list of tensor to numpy 2D array
         all_observations = (
@@ -677,7 +682,7 @@ class UnitsOperator(Role):
         learning_role_addr = self.context.data.get("learning_agent_addr")
 
         if learning_role_id and learning_role_addr:
-            self.context.schedule_instant_acl_message(
+            await self.context.schedule_instant_acl_message(
                 receiver_id=learning_role_id,
                 receiver_addr=learning_role_addr,
                 content={
@@ -686,14 +691,3 @@ class UnitsOperator(Role):
                     "data": rl_agent_data,
                 },
             )
-
-    def write_learning_params(
-        self, orderbook: Orderbook, marketconfig: MarketConfig
-    ) -> None:
-        """
-        Sends the current rl_strategy update to the output agent.
-
-        Args:
-            orderbook (Orderbook): The orderbook of the market.
-            marketconfig (MarketConfig): The market configuration.
-        """

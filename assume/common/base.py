@@ -65,10 +65,13 @@ class BaseUnit:
         self.index = index
         self.outputs = defaultdict(lambda: pd.Series(0.0, index=self.index))
         # series does not like to convert from tensor to float otherwise
-        self.outputs["rl_observations"] = {}
-        self.outputs["rl_actions"] = {}
-        self.outputs["reward"] = {}
-        self.outputs["rl_exploration_noise"] = {}
+        self.outputs["rl_observations"] = []
+        self.outputs["rl_actions"] = []
+        self.outputs["rl_rewards"] = []
+        self.outputs["reward"] = pd.Series(0.0, index=self.index, dtype=object)
+        self.outputs["rl_exploration_noise"] = pd.Series(
+            0.0, index=self.index, dtype=object
+        )
         if forecaster:
             self.forecaster = forecaster
         else:
@@ -280,6 +283,14 @@ class BaseUnit:
             Start-up costs.
         """
         return 0
+
+    def reset_saved_rl_data(self):
+        """
+        Resets the saved RL data.
+        """
+        self.outputs["rl_observations"] = []
+        self.outputs["rl_actions"] = []
+        self.outputs["rl_rewards"] = []
 
 
 class SupportsMinMax(BaseUnit):

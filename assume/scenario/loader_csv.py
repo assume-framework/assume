@@ -204,7 +204,10 @@ def make_market_config(
             until=end,
             cache=True,
         ),
-        opening_duration=pd.Timedelta(market_params["opening_duration"]),
+        opening_duration=pd.Timedelta(market_params["opening_duration"])
+        - pd.Timedelta(
+            minutes=1
+        ),  # subtract 1 minute to avoid overlapping markets with the same start time
         market_mechanism=market_params["market_mechanism"],
         maximum_bid_volume=market_params.get("maximum_bid_volume", 1e6),
         maximum_bid_price=market_params.get("maximum_bid_price", 3000),
