@@ -4,12 +4,10 @@
 
 import unittest
 from datetime import datetime
-from unittest.mock import MagicMock
 
 import pandas as pd
 
 from assume.common.forecasts import NaiveForecast
-from assume.units.dst_components import Electrolyser
 from assume.units.steel_plant import SteelPlant
 
 
