@@ -28,7 +28,7 @@ from assume.common.utils import (
     get_products_index,
     timestamp2datetime,
 )
-from assume.strategies import BaseStrategy, LearningStrategy, RLAdvancedOrderStrategy
+from assume.strategies import BaseStrategy, LearningStrategy
 from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
@@ -548,6 +548,14 @@ class UnitsOperator(Role):
             products_index (pandas.DatetimeIndex): The index of all products.
             marketconfig (MarketConfig): The market configuration.
         """
+        try:
+            from assume.strategies import (
+                RLAdvancedOrderStrategy,
+            )
+
+        except ImportError:
+            pass
+
         products_index = get_products_index(orderbook)
 
         # should write learning results if at least one bidding_strategy is a learning strategy
