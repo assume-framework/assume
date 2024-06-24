@@ -65,13 +65,10 @@ class BaseUnit:
         self.index = index
         self.outputs = defaultdict(lambda: pd.Series(0.0, index=self.index))
         # series does not like to convert from tensor to float otherwise
-        self.outputs["rl_actions"] = pd.Series(0.0, index=self.index, dtype=object)
-        self.outputs["rl_observations"] = pd.Series(0.0, index=self.index, dtype=object)
-        self.outputs["reward"] = pd.Series(0.0, index=self.index, dtype=object)
-        self.outputs["learning_mode"] = pd.Series(False, index=self.index, dtype=bool)
-        self.outputs["rl_exploration_noise"] = pd.Series(
-            0.0, index=self.index, dtype=object
-        )
+        self.outputs["rl_observations"] = {}
+        self.outputs["rl_actions"] = {}
+        self.outputs["reward"] = {}
+        self.outputs["rl_exploration_noise"] = {}
         if forecaster:
             self.forecaster = forecaster
         else:

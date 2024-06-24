@@ -47,7 +47,7 @@ class RLStrategyDA(LearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=60, act_dim=24, unique_obs_dim=2, *args, **kwargs)
+        super().__init__(obs_dim=14, act_dim=1, unique_obs_dim=2, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
 
@@ -116,52 +116,40 @@ class RLStrategyDA(LearningStrategy):
 
         """
 
-        start = product_tuples[0][0]
-        end = product_tuples[-1][1]
-
-        _, max_power = unit.calculate_min_max_power(start, end)
-
-        # =============================================================================
-        # 1. Get the Observations, which are the basis of the action decision
-        # =============================================================================
-        next_observation = self.create_observation(
-            unit=unit,
-            market_id=market_config.market_id,
-            start=start,
-            end=end,
+        _, max_power = unit.calculate_min_max_power(
+            start=product_tuples[0][0], end=product_tuples[-1][1]
         )
 
-        # =============================================================================
-        # 2. Get the Actions, based on the observations
-        # =============================================================================
-        actions, noise = self.get_actions(next_observation)
-
-        # =============================================================================
-        # 3. Transform Actions into bids
-        # =============================================================================
-        # actions are in the range [0,1], we need to transform them into actual bids
-        # we can use our domain knowledge to guide the bid formulation
-        bid_prices = actions * self.max_bid_price
-
         bids = []
-        for i, product in enumerate(product_tuples):
+        for product in product_tuples:
             start = product[0]
             end = product[1]
+
+            next_observation = self.create_observation(
+                unit=unit,
+                market_id=market_config.market_id,
+                start=start,
+                end=end,
+            )
+
+            actions, noise = self.get_actions(next_observation)
+
+            bid_prices = actions * self.max_bid_price
 
             bids.append(
                 {
                     "start_time": start,
                     "end_time": end,
                     "only_hours": None,
-                    "price": bid_prices[i],
+                    "price": bid_prices,
                     "volume": max_power[start],
                 }
             )
 
-        # store results in unit outputs which are written to database by unit operator
-        unit.outputs["rl_observations"][start] = next_observation
-        unit.outputs["rl_actions"][start] = actions
-        unit.outputs["rl_exploration_noise"][start] = noise
+            # store results in unit outputs which are written to database by unit operator
+            unit.outputs["rl_observations"][start] = next_observation
+            unit.outputs["rl_actions"][start] = actions
+            unit.outputs["rl_exploration_noise"][start] = noise
 
         bids = self.remove_empty_bids(bids)
 

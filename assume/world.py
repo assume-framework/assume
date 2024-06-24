@@ -317,8 +317,11 @@ class World:
             raise ValueError(f"Unit operator {id} already exists")
 
         units_operator = UnitsOperator(
+            simulation_start=self.start,
+            simulation_end=self.end,
             available_markets=list(self.markets.values()),
             learning_mode=self.learning_mode,
+            train_freq=self.learning_config.get("train_freq", 1),
         )
         # creating a new role agent and apply the role of a unitsoperator
         unit_operator_agent = RoleAgent(
@@ -412,6 +415,7 @@ class World:
                     f"Bidding strategy {strategy} not registered, could not add {id}"
                 )
                 return
+
         unit_params["bidding_strategies"] = bidding_strategies
 
         # create unit within the unit operator its associated with

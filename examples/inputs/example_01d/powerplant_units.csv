@@ -22,7 +22,7 @@ Unit 20,nuclear,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,uranium,
 Unit 21,nuclear,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,25,north,Operator 1
 Unit 22,nuclear,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,26,north,Operator 1
 Unit 23,nuclear,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,27,north,Operator 1
-Unit 24,nuclear,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,28,north,Operator 1
+Unit 24,nuclear,da_learning,naive_redispatch,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,28,north,Operator 1
 Unit 25,nuclear,da_learning,naive_redispatch,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,29,north,Operator 1
 Unit 26,nuclear,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,30,south,Operator 2
 Unit 27,nuclear,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,31,south,Operator 2
