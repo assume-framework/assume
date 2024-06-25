@@ -37,9 +37,7 @@ async def units_operator() -> UnitsOperator:
     clock = ExternalClock(0)
     container = await create_container(addr=("0.0.0.0", 9098), clock=clock)
     units_agent = RoleAgent(container, "test_operator")
-    units_role = UnitsOperator(
-        available_markets=[marketconfig], simulation_start=start, simulation_end=end
-    )
+    units_role = UnitsOperator(available_markets=[marketconfig])
     units_agent.add_role(units_role)
 
     index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")

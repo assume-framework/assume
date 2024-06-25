@@ -79,7 +79,7 @@ class Learning(Role):
 
         self.train_freq = learning_config.get("train_freq", 1)
         self.gradient_steps = (
-            self.train_freq
+            int(self.train_freq[:-1])
             if learning_config.get("gradient_steps", -1) == -1
             else learning_config["gradient_steps"]
         )

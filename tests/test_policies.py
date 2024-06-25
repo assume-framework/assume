@@ -62,9 +62,7 @@ async def test_request_messages():
         addr="world", connection_type="external_connection", clock=clock
     )
     units_agent = RoleAgent(container, "test_operator")
-    units_role = UnitsOperator(
-        available_markets=[marketconfig], simulation_start=start, simulation_end=end
-    )
+    units_role = UnitsOperator(available_markets=[marketconfig])
     units_agent.add_role(units_role)
 
     index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")

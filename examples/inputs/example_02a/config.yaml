@@ -17,7 +17,7 @@ tiny:
     learning_rate: 0.001
     training_episodes: 10
     episodes_collecting_initial_experience: 3
-    train_freq: 24
+    train_freq: 24h
     gradient_steps: -1
     batch_size: 64
     gamma: 0.99
@@ -60,7 +60,7 @@ base:
     learning_rate: 0.001
     training_episodes: 50
     episodes_collecting_initial_experience: 5
-    train_freq: 24
+    train_freq: 24h
     gradient_steps: -1
     batch_size: 256
     gamma: 0.99

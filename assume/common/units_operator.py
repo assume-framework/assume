@@ -10,7 +10,6 @@ from operator import itemgetter
 
 import numpy as np
 import pandas as pd
-from dateutil import rrule as rr
 from mango import Role
 from mango.messages.message import Performatives
 
@@ -63,15 +62,10 @@ class UnitsOperator(Role):
     def __init__(
         self,
         available_markets: list[MarketConfig],
-        simulation_start: datetime,
-        simulation_end: datetime,
         opt_portfolio: tuple[bool, BaseStrategy] | None = None,
-        train_freq: int = 24,
     ):
         super().__init__()
 
-        self.simulation_start = simulation_start
-        self.simulation_end = simulation_end
         self.available_markets = available_markets
         self.registered_markets: dict[str, MarketConfig] = {}
         self.last_sent_dispatch = defaultdict(lambda: 0)
@@ -87,7 +81,6 @@ class UnitsOperator(Role):
         self.valid_orders = defaultdict(list)
         self.units: dict[str, BaseUnit] = {}
 
-        self.train_freq = train_freq
         self.rl_units = []
         self.learning_strategies = {
             "obs_dim": 0,
@@ -128,18 +121,6 @@ class UnitsOperator(Role):
                     self.register_market(market),
                     1,  # register after time was updated for the first time
                 )
-
-        recurrency_task = rr.rrule(
-            freq=rr.HOURLY,
-            interval=self.train_freq,
-            dtstart=self.simulation_start,
-            until=self.simulation_end,
-            cache=True,
-        )
-
-        self.context.schedule_recurrent_task(
-            self.write_to_learning_role, recurrency_task
-        )
 
     async def add_unit(
         self,

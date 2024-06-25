@@ -777,7 +777,7 @@ class LearningConfig(TypedDict):
     learning_rate: float
     training_episodes: int
     episodes_collecting_initial_experience: int
-    train_freq: int
+    train_freq: str
     gradient_steps: int
     batch_size: int
     gamma: float

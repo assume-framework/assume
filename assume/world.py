@@ -30,7 +30,7 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.common.base import LearningConfig
-from assume.common.utils import datetime2timestamp, timestamp2datetime
+from assume.common.utils import create_rrule, datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import LearningStrategy, bidding_strategies
 from assume.units import BaseUnit, Demand, PowerPlant, Storage
@@ -312,12 +312,7 @@ class World:
         if self.unit_operators.get(id):
             raise ValueError(f"Unit operator {id} already exists")
 
-        units_operator = UnitsOperator(
-            simulation_start=self.start,
-            simulation_end=self.end,
-            available_markets=list(self.markets.values()),
-            train_freq=self.learning_config.get("train_freq", 24),
-        )
+        units_operator = UnitsOperator(available_markets=list(self.markets.values()))
         # creating a new role agent and apply the role of a unitsoperator
         unit_operator_agent = RoleAgent(
             self.container, suggested_aid=f"{id}", suspendable_tasks=False
@@ -328,7 +323,7 @@ class World:
         self.unit_operators[id] = units_operator
 
         # after creation of an agent - we set additional context params
-        if self.learning_mode:
+        if self.learning_mode and id == "Operator-RL":
             unit_operator_agent._role_context.data.update(
                 {
                     "learning_output_agent_addr": self.output_agent_addr[0],
@@ -337,6 +332,16 @@ class World:
                     "learning_agent_id": self.learning_agent_addr[1],
                 }
             )
+            recurrency_task = create_rrule(
+                start=self.start,
+                end=self.end,
+                freq=self.learning_config.get("train_freq", "24h"),
+            )
+
+            units_operator.context.schedule_recurrent_task(
+                units_operator.write_to_learning_role, recurrency_task
+            )
+
         else:
             unit_operator_agent._role_context.data.update(
                 {
