@@ -66,14 +66,12 @@ class UnitsOperator(Role):
         simulation_start: datetime,
         simulation_end: datetime,
         opt_portfolio: tuple[bool, BaseStrategy] | None = None,
-        learning_mode: bool = False,
         train_freq: int = 24,
     ):
         super().__init__()
 
         self.simulation_start = simulation_start
         self.simulation_end = simulation_end
-        self.data_collection_start = simulation_start
         self.available_markets = available_markets
         self.registered_markets: dict[str, MarketConfig] = {}
         self.last_sent_dispatch = defaultdict(lambda: 0)
@@ -89,7 +87,6 @@ class UnitsOperator(Role):
         self.valid_orders = defaultdict(list)
         self.units: dict[str, BaseUnit] = {}
 
-        self.learning_mode = learning_mode
         self.train_freq = train_freq
         self.rl_units = []
         self.learning_strategies = {
@@ -631,8 +628,6 @@ class UnitsOperator(Role):
         """
         Writes learning results to the learning agent.
 
-        Args:
-            products_index (pandas.DatetimeIndex): The index of all products.
         """
         if len(self.rl_units) == 0:
             return

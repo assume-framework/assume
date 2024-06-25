@@ -320,7 +320,6 @@ class World:
             simulation_start=self.start,
             simulation_end=self.end,
             available_markets=list(self.markets.values()),
-            learning_mode=self.learning_mode,
             train_freq=self.learning_config.get("train_freq", 1),
         )
         # creating a new role agent and apply the role of a unitsoperator
