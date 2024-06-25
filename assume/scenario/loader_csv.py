@@ -277,12 +277,11 @@ def add_units(
         )
 
 
-def add_units_distributed(
+def read_units(
     units_df: pd.DataFrame,
     unit_type: str,
-    worlds: dict[str, World],
     forecaster: Forecaster,
-) -> None:
+) -> dict[str, list[dict]]:
     """
     Add units to the world from a given dataframe.
     The callback is used to adjust unit_params depending on the unit_type, before adding the unit to the world.
@@ -290,13 +289,13 @@ def add_units_distributed(
     Args:
         units_df (pandas.DataFrame): The dataframe containing the units.
         unit_type (str): The type of the unit.
-        world (World): The world to which the units will be added.
         forecaster (Forecaster): The forecaster used for adding the units.
     """
     if units_df is None:
-        return
+        return {}
 
     logger.info(f"Adding {unit_type} units")
+    units_dict = defaultdict(list)
 
     units_df = units_df.fillna(0)
     for unit_name, unit_params in units_df.iterrows():
@@ -308,13 +307,16 @@ def add_units_distributed(
         unit_params["bidding_strategies"] = bidding_strategies
         operator_id = unit_params["unit_operator"]
         del unit_params["unit_operator"]
-        worlds[operator_id].add_unit(
-            id=unit_name,
-            unit_type=unit_type,
-            unit_operator_id=operator_id,
-            unit_params=unit_params,
-            forecaster=forecaster,
+        units_dict[operator_id].append(
+            dict(
+                id=unit_name,
+                unit_type=unit_type,
+                unit_operator_id=operator_id,
+                unit_params=unit_params,
+                forecaster=forecaster,
+            )
         )
+    return units_dict
 
 
 def load_config_and_create_forecaster(
@@ -525,100 +527,48 @@ async def async_setup_world(
 
     # add the unit operators using unique unit operator names in the powerplants csv
     logger.info("Adding unit operators")
-    all_operators = np.concatenate(
-        [
-            powerplant_units.unit_operator.unique(),
-            demand_units.unit_operator.unique(),
-        ]
+
+    units = defaultdict(list)
+    pwp_plants = read_units(
+        units_df=powerplant_units,
+        unit_type="power_plant",
+        forecaster=forecaster,
     )
 
-    if storage_units is not None:
-        all_operators = np.concatenate(
-            [all_operators, storage_units.unit_operator.unique()]
-        )
+    str_plants = read_units(
+        units_df=storage_units,
+        unit_type="storage",
+        forecaster=forecaster,
+    )
+
+    dem_plants = read_units(
+        units_df=demand_units,
+        unit_type="demand",
+        forecaster=forecaster,
+    )
+    for op, op_units in pwp_plants.items():
+        units[op].extend(op_units)
+    for op, op_units in str_plants.items():
+        units[op].extend(op_units)
+    for op, op_units in dem_plants.items():
+        units[op].extend(op_units)
 
     # add central RL unit operator that handels all RL units
-    if world.learning_mode and "Operator-RL" not in all_operators:
-        all_operators = np.concatenate([all_operators, ["Operator-RL"]])
+    if world.learning_mode and "Operator-RL":
+        # this adds the Operator-RL to the keys of the defaultdict
+        units["Operator-RL"]
 
     if world.distributed_role is True:
-        worlds = {}
-
-        # add the units to corresponsing unit operators
-        tcp_host = world.addr[0]
-        manager_addr = world.addr
-        agent_port = world.addr[1]
-        for company_name in set(all_operators):
-            agent_port += 1
-            agent_world = World(
-                addr=(tcp_host, agent_port),
-                distributed_role=False,
-                log_level=logging.getLogger("assume").level,
-            )
-            agent_world.markets = world.markets
-            agent_world.bidding_strategies = world.bidding_strategies
-            agent_world.bidding_params = world.bidding_params
-            agent_world.clearing_mechanisms = world.clearing_mechanisms
-            worlds[str(company_name)] = agent_world
-            world.addresses.append(agent_world.addr)
-            # add the units to corresponding unit operators
-
-            await agent_world.setup(
-                start=start,
-                end=end,
-                save_frequency_hours=48,
-                simulation_id=sim_id,
-                index=index,
-                manager_address=manager_addr,
-            )
-            agent_world.add_unit_operator(id=str(company_name))
-        # add the units to corresponsing unit operators
-        add_units_distributed(
-            units_df=powerplant_units,
-            unit_type="power_plant",
-            worlds=worlds,
-            forecaster=forecaster,
-        )
-
-        add_units_distributed(
-            units_df=storage_units,
-            unit_type="storage",
-            worlds=worlds,
-            forecaster=forecaster,
-        )
-
-        add_units_distributed(
-            units_df=demand_units,
-            unit_type="demand",
-            worlds=worlds,
-            forecaster=forecaster,
-        )
+        for op, op_units in units.items():
+            await world.add_units_with_operator(op, op_units)
     else:
-        for company_name in set(all_operators):
-            world.add_unit_operator(id=str(company_name))
+        for company_name in set(units.keys()):
+            await world.add_unit_operator(id=str(company_name))
 
         # add the units to corresponding unit operators
-        add_units(
-            units_df=powerplant_units,
-            unit_type="power_plant",
-            world=world,
-            forecaster=forecaster,
-        )
-
-        add_units(
-            units_df=storage_units,
-            unit_type="storage",
-            world=world,
-            forecaster=forecaster,
-        )
-
-        add_units(
-            units_df=demand_units,
-            unit_type="demand",
-            world=world,
-            forecaster=forecaster,
-        )
-
+        for op, op_units in units.items():
+            for unit in op_units:
+                await world.async_add_unit(**unit)
     if (
         world.learning_mode
         and world.learning_role is not None

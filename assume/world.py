@@ -300,7 +300,7 @@ class World:
         # mango multiprocessing is currently only supported on linux
         # with single
         if platform == "linux" and self.distributed_role is not None:
-            self.addresses.append(self.addr)
+            self.addresses.append((self.addr, "clock_agent"))
 
             def creator(container):
                 agent = RoleAgent(
@@ -320,7 +320,7 @@ class World:
             )
             output_agent.add_role(self.output_role)
 
-    def add_unit_operator(self, id: str) -> None:
+    async def add_unit_operator(self, id: str) -> None:
         """
         Add a unit operator to the simulation, creating a new role agent and applying the role of a unit operator to it.
         The unit operator is then added to the list of existing operators. If in learning mode, additional context parameters
@@ -334,6 +334,7 @@ class World:
             raise ValueError(f"Unit operator {id} already exists")
 
         units_operator = UnitsOperator(available_markets=list(self.markets.values()))
+
         # creating a new role agent and apply the role of a unitsoperator
         unit_operator_agent = RoleAgent(
             self.container, suggested_aid=f"{id}", suspendable_tasks=False
@@ -363,6 +364,86 @@ class World:
                 }
             )
 
+    async def add_units_with_operator(self, id: str, units: list):
+        clock_agent_name = f"clock_agent_{id}"
+        self.addresses.append((self.addr, clock_agent_name))
+
+        async def creator(container):
+            # creating a new role agent and apply the role of a unitsoperator
+            units_operator = UnitsOperator(
+                available_markets=list(self.markets.values())
+            )
+            unit_operator_agent = RoleAgent(
+                container, suggested_aid=f"{id}", suspendable_tasks=False
+            )
+            unit_operator_agent.add_role(units_operator)
+            unit_operator_agent._role_context.data.update(
+                {
+                    "output_agent_addr": self.output_agent_addr[0],
+                    "output_agent_id": self.output_agent_addr[1],
+                    "learning_output_agent_addr": self.output_agent_addr[0],
+                    "learning_output_agent_id": self.output_agent_addr[1],
+                }
+            )
+            DistributedClockAgent(container, clock_agent_name)
+            for unit in units:
+                await units_operator.add_unit(self.create_unit(**unit))
+
+        await self.container.as_agent_process(agent_creator=creator)
+
+    def create_unit(
+        self,
+        id: str,
+        unit_type: str,
+        unit_operator_id: str,
+        unit_params: dict,
+        forecaster: Forecaster,
+    ) -> BaseUnit:
+        bidding_strategies = {}
+        # provided unit type does not exist yet
+        unit_class: type[BaseUnit] = self.unit_types.get(unit_type)
+        if unit_class is None:
+            raise ValueError(f"invalid unit type {unit_type}")
+
+        for market_id, strategy in unit_params["bidding_strategies"].items():
+            if not strategy:
+                continue
+            bidding_params = unit_params.get("bidding_params", self.bidding_params)
+            try:
+                bidding_strategies[market_id] = self.bidding_strategies[strategy](
+                    unit_id=id,
+                    **bidding_params,
+                )
+                # TODO find better way to count learning agents
+                if self.learning_mode and issubclass(
+                    self.bidding_strategies[strategy], LearningStrategy
+                ):
+                    self.learning_role.rl_strats[id] = bidding_strategies[market_id]
+
+                    # if we have learning strategy we need to assign the powerplant to one unit_operator handling all leanring units
+                    if unit_operator_id != "Operator-RL":
+                        self.logger.debug(
+                            f"Your chosen unit-operator {unit_operator_id} for the learning unit {id} was overwritten with 'Operator-RL', since all learning units need to be handeled by one unit operator."
+                        )
+
+                        unit_operator_id = "Operator-RL"
+
+            except KeyError:
+                self.logger.error(
+                    f"Bidding strategy {strategy} not registered, could not add {id}"
+                )
+                return
+        unit_params["bidding_strategies"] = bidding_strategies
+
+        # create unit within the unit operator its associated with
+        return unit_class(
+            id=id,
+            unit_operator=unit_operator_id,
+            index=self.index,
+            forecaster=forecaster,
+            **unit_params,
+        )
+
     async def async_add_unit(
         self,
         id: str,
@@ -388,54 +469,14 @@ class World:
         if unit_operator_id not in self.unit_operators.keys():
             raise ValueError(f"invalid unit operator {unit_operator_id}")
 
-        # provided unit type does not exist yet
-        unit_class: type[BaseUnit] = self.unit_types.get(unit_type)
-        if unit_class is None:
-            raise ValueError(f"invalid unit type {unit_type}")
-
         # check if unit operator already has a unit with the same id
         if self.unit_operators[unit_operator_id].units.get(id):
             raise ValueError(f"Unit {id} already exists")
 
-        bidding_strategies = {}
-        for market_id, strategy in unit_params["bidding_strategies"].items():
-            if not strategy:
-                continue
-            bidding_params = unit_params.get("bidding_params", self.bidding_params)
-            try:
-                bidding_strategies[market_id] = self.bidding_strategies[strategy](
-                    unit_id=id,
-                    **bidding_params,
-                )
-                # TODO find better way to count learning agents
-                if self.learning_mode and issubclass(
-                    self.bidding_strategies[strategy], LearningStrategy
-                ):
-                    self.learning_role.rl_strats[id] = bidding_strategies[market_id]
-
-                    # if we have learning strategy we need to assign the powerplant to one  unit_operator handling all leanring units
-                    if unit_operator_id != "Operator-RL":
-                        self.logger.debug(
-                            f"Your chosen unit-operator {unit_operator_id} for the learning unit {id} was overwritten with 'Operator-RL', since all learning units need to be handeled by one unit operator."
-                        )
-
-                        unit_operator_id = "Operator-RL"
-
-            except KeyError:
-                self.logger.error(
-                    f"Bidding strategy {strategy} not registered, could not add {id}"
-                )
-                return
-        unit_params["bidding_strategies"] = bidding_strategies
-
-        # create unit within the unit operator its associated with
-        unit = unit_class(
-            id=id,
-            unit_operator=unit_operator_id,
-            index=self.index,
-            forecaster=forecaster,
-            **unit_params,
+        unit = self.create_unit(
+            id, unit_type, unit_operator_id, unit_params, forecaster
         )
+
         await self.unit_operators[unit_operator_id].add_unit(unit)
 
     def add_market_operator(self, id: str) -> None:
@@ -496,6 +537,10 @@ class World:
         self.markets[f"{market_config.market_id}"] = market_config
 
     async def _step(self):
+        if self.distributed_role:
+            # TODO find better way than sleeping
+            # we need to wait, until the last step is executed correctly
+            await asyncio.sleep(0.04)
         if self.distributed_role is not False:
             next_activity = await self.clock_manager.distribute_time()
         else:
@@ -526,10 +571,11 @@ class World:
         self.clock.set_time(start_ts - 1)
         if self.distributed_role is not False:
             await self.clock_manager.broadcast(self.clock.time)
+        prev_delta = 0
         while self.clock.time < end_ts:
             await asyncio.sleep(0)
             delta = await self._step()
-            if delta:
+            if delta or prev_delta:
                 pbar.update(delta)
                 pbar.set_description(
                     f"{self.output_role.simulation_id} {timestamp2datetime(self.clock.time)}",
@@ -537,6 +583,7 @@ class World:
                 )
             else:
                 self.clock.set_time(end_ts)
+            prev_delta = delta
         pbar.close()
         await self.container.shutdown()
 

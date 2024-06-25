@@ -2,6 +2,9 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from assume import MarketConfig, World
+from assume.common.forecasts import NaiveForecast
+
 from .config import (
     db_uri,
     index,
@@ -10,9 +13,6 @@ from .config import (
     marketdesign,
     worker,
 )
-
-from assume import MarketConfig, World
-from assume.common.forecasts import NaiveForecast
 
 
 async def create_worker(
