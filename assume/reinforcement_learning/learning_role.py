@@ -4,7 +4,6 @@
 
 import logging
 from collections import defaultdict
-from datetime import datetime
 from pathlib import Path
 
 import torch as th
@@ -25,8 +24,6 @@ class Learning(Role):
     the provided learning configuration.
 
     Args:
-        simulation_start (datetime.datetime): The start of the simulation.
-        simulation_end (datetime.datetime): The end of the simulation.
         learning_config (LearningConfig): The configuration for the learning process.
 
     """
@@ -34,12 +31,7 @@ class Learning(Role):
     def __init__(
         self,
         learning_config: LearningConfig,
-        start: datetime,
-        end: datetime,
     ):
-        self.simulation_start = start
-        self.simulation_end = end
-
         # how many learning roles do exist and how are they named
         self.buffer: ReplayBuffer = None
         self.early_stopping_steps = learning_config.get("early_stopping_steps", 10)

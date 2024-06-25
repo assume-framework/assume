@@ -240,11 +240,7 @@ class World:
             # if so, we initate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
 
-            self.learning_role = Learning(
-                learning_config=self.learning_config,
-                start=self.start,
-                end=self.end,
-            )
+            self.learning_role = Learning(self.learning_config)
             # separate process does not support buffer and learning
             self.learning_agent_addr = (self.addr, "learning_agent")
             rl_agent = RoleAgent(
@@ -320,7 +316,7 @@ class World:
             simulation_start=self.start,
             simulation_end=self.end,
             available_markets=list(self.markets.values()),
-            train_freq=self.learning_config.get("train_freq", 1),
+            train_freq=self.learning_config.get("train_freq", 24),
         )
         # creating a new role agent and apply the role of a unitsoperator
         unit_operator_agent = RoleAgent(
