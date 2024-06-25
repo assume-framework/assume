@@ -135,7 +135,7 @@ class UnitsOperator(Role):
         recurrency_task = rr.rrule(
             freq=rr.HOURLY,
             interval=self.train_freq,
-            dtstart=self.simulation_start + pd.Timedelta(hours=self.train_freq),
+            dtstart=self.simulation_start,
             until=self.simulation_end,
             cache=True,
         )
@@ -260,7 +260,7 @@ class UnitsOperator(Role):
         marketconfig = self.registered_markets[content["market_id"]]
         self.valid_orders[marketconfig.product_type].extend(orderbook)
         self.set_unit_dispatch(orderbook, marketconfig)
-        self.write_learning_to_output(orderbook)
+        self.write_learning_to_output(orderbook, marketconfig.market_id)
         self.write_actual_dispatch(marketconfig.product_type)
 
     def handle_registration_feedback(
@@ -540,7 +540,7 @@ class UnitsOperator(Role):
 
         return orderbook
 
-    def write_learning_to_output(self, orderbook: Orderbook) -> None:
+    def write_learning_to_output(self, orderbook: Orderbook, market_id: str) -> None:
         """
         Sends the current rl_strategy update to the output agent.
 
@@ -566,7 +566,7 @@ class UnitsOperator(Role):
         start = products_index[0]
 
         for unit in self.rl_units:
-            strategy = unit.bidding_strategies.get(orderbook[0]["market_id"])
+            strategy = unit.bidding_strategies.get(market_id)
 
             # rl only for energy market for now!
             if isinstance(strategy, LearningStrategy):
@@ -642,29 +642,29 @@ class UnitsOperator(Role):
         device = self.learning_strategies["device"]
         learning_unit_count = len(self.rl_units)
 
-        values_len = len(self.rl_units[0].outputs["rl_observations"])
+        values_len = len(self.rl_units[0].outputs["rl_rewards"])
         # return if no data is available
         if values_len == 0:
             return
 
         all_observations = th.zeros(
-            (learning_unit_count, values_len, obs_dim), device=device
+            (values_len, learning_unit_count, obs_dim), device=device
         )
         if act_dim == 1:
-            all_actions = th.zeros((learning_unit_count, values_len), device=device)
+            all_actions = th.zeros((values_len, learning_unit_count), device=device)
         else:
             all_actions = th.zeros(
-                (learning_unit_count, values_len, act_dim), device=device
+                (values_len, learning_unit_count, act_dim), device=device
             )
         all_rewards = []
 
         for i, unit in enumerate(self.rl_units):
             # Convert pandas Series to torch Tensor
-            obs_tensor = th.stack(unit.outputs["rl_observations"], dim=0)
-            actions_tensor = th.stack(unit.outputs["rl_actions"], dim=0)
+            obs_tensor = th.stack(unit.outputs["rl_observations"][:values_len], dim=0)
+            actions_tensor = th.stack(unit.outputs["rl_actions"][:values_len], dim=0)
 
-            all_observations[i] = obs_tensor
-            all_actions[i] = actions_tensor
+            all_observations[:, i, :] = obs_tensor
+            all_actions[:, i, :] = actions_tensor
             all_rewards.append(unit.outputs["rl_rewards"])
 
             # reset the outputs

@@ -204,10 +204,7 @@ def make_market_config(
             until=end,
             cache=True,
         ),
-        opening_duration=pd.Timedelta(market_params["opening_duration"])
-        - pd.Timedelta(
-            minutes=1
-        ),  # subtract 1 minute to avoid overlapping markets with the same start time
+        opening_duration=pd.Timedelta(market_params["opening_duration"]),
         market_mechanism=market_params["market_mechanism"],
         maximum_bid_volume=market_params.get("maximum_bid_volume", 1e6),
         maximum_bid_price=market_params.get("maximum_bid_price", 3000),
@@ -754,7 +751,7 @@ def run_learning(
     if Path(save_path).is_dir():
         # we are in learning mode and about to train new policies, which might overwrite existing ones
         accept = input(
-            f"{save_path=} exists - should we overwrite current learnings? (y/N)"
+            f"{save_path=} exists - should we overwrite current learnings? (y/N) "
         )
         if not accept.lower().startswith("y"):
             # stop here - do not start learning or save anything
@@ -818,7 +815,7 @@ def run_learning(
         if (
             episode % validation_interval == 0
             and episode
-            > world.learning_role.episodes_collecting_initial_experience
+            >= world.learning_role.episodes_collecting_initial_experience
             + validation_interval
         ):
             world.reset()

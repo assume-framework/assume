@@ -37,7 +37,9 @@ async def units_operator() -> UnitsOperator:
     clock = ExternalClock(0)
     container = await create_container(addr=("0.0.0.0", 9098), clock=clock)
     units_agent = RoleAgent(container, "test_operator")
-    units_role = UnitsOperator(available_markets=[marketconfig])
+    units_role = UnitsOperator(
+        available_markets=[marketconfig], simulation_start=start, simulation_end=end
+    )
     units_agent.add_role(units_role)
 
     index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
@@ -151,9 +153,9 @@ async def test_write_learning_params(units_operator: UnitsOperator):
 
     open_tasks = len(units_operator.context._scheduler._scheduled_tasks)
 
-    units_operator.write_learning_params(orderbook, marketconfig)
+    units_operator.write_learning_to_output(orderbook, market_id=marketconfig.market_id)
 
-    assert len(units_operator.context._scheduler._scheduled_tasks) == open_tasks + 2
+    assert len(units_operator.context._scheduler._scheduled_tasks) == open_tasks + 1
 
     units_operator.units["testplant"].bidding_strategies[
         "EOM"
@@ -171,9 +173,9 @@ async def test_write_learning_params(units_operator: UnitsOperator):
 
     open_tasks = len(units_operator.context._scheduler._scheduled_tasks)
 
-    units_operator.write_learning_params(orderbook, marketconfig)
+    units_operator.write_learning_to_output(orderbook, market_id=marketconfig.market_id)
 
-    assert len(units_operator.context._scheduler._scheduled_tasks) == open_tasks + 2
+    assert len(units_operator.context._scheduler._scheduled_tasks) == open_tasks + 1
 
 
 async def test_get_actual_dispatch(units_operator: UnitsOperator):

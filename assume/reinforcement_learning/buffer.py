@@ -135,7 +135,7 @@ class ReplayBuffer:
             reward (numpy.ndarray): The reward to add.
         """
         # copying all to avoid modification
-        len_obs = len(obs)
+        len_obs = obs.shape[0]
         self.observations[self.pos : self.pos + len_obs] = obs.copy()
         self.actions[self.pos : self.pos + len_obs] = actions.copy()
         self.rewards[self.pos : self.pos + len_obs] = reward.copy()

@@ -288,8 +288,10 @@ class BaseUnit:
         """
         Resets the saved RL data.
         """
-        self.outputs["rl_observations"] = []
-        self.outputs["rl_actions"] = []
+        values_len = len(self.outputs["rl_rewards"])
+
+        self.outputs["rl_observations"] = self.outputs["rl_observations"][values_len:]
+        self.outputs["rl_actions"] = self.outputs["rl_actions"][values_len:]
         self.outputs["rl_rewards"] = []
 
 
