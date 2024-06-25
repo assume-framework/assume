@@ -242,10 +242,6 @@ class RLAdvancedOrderStrategy(LearningStrategy):
             # calculate previous power with planned dispatch (bid_quantity)
             previous_power = bid_quantity_inflex + bid_quantity_flex + current_power
             op_time = max(op_time, 0) + 1 if previous_power > 0 else min(op_time, 0) - 1
-            # store results in unit outputs which are written to database by unit operator
-            unit.outputs["rl_observations"].append(next_observation)
-            unit.outputs["rl_actions"].append(actions)
-            unit.outputs["rl_exploration_noise"][start] = noise
 
         if "BB" in self.order_types:
             bids.append(
@@ -261,6 +257,14 @@ class RLAdvancedOrderStrategy(LearningStrategy):
                     "node": unit.node,
                 }
             )
+
+        # store results in unit outputs as lists to be written to the buffer for learning
+        unit.outputs["rl_observations"].append(next_observation)
+        unit.outputs["rl_actions"].append(actions)
+
+        # store results in unit outputs as series to be written to the database by the unit operator
+        unit.outputs["actions"][start] = actions
+        unit.outputs["exploration_noise"][start] = noise
 
         bids = self.remove_empty_bids(bids)
 

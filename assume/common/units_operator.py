@@ -571,21 +571,17 @@ class UnitsOperator(Role):
                         }
                     )
 
-                # noise_tuple = unit.outputs["rl_exploration_noise"].loc[start]
-                # action_tuple = unit.outputs["rl_actions"].loc[start]
-                # action_dim = len(action_tuple) if isinstance(action_tuple, tuple) else 1
+                action_tuple = unit.outputs["actions"].loc[start]
+                noise_tuple = unit.outputs["exploration_noise"].loc[start]
+                action_dim = action_tuple.numel()
 
-                # for i in range(action_dim):
-                #     output_dict[f"exploration_noise_{i}"] = (
-                #         noise_tuple[i]
-                #         if isinstance(noise_tuple, tuple)
-                #         else noise_tuple
-                #     )
-                #     output_dict[f"actions_{i}"] = (
-                #         action_tuple[i]
-                #         if isinstance(action_tuple, tuple)
-                #         else action_tuple
-                #     )
+                for i in range(action_dim):
+                    output_dict[f"exploration_noise_{i}"] = (
+                        noise_tuple[i] if action_dim > 1 else noise_tuple
+                    )
+                    output_dict[f"actions_{i}"] = (
+                        action_tuple[i] if action_dim > 1 else action_tuple
+                    )
 
                 output_agent_list.append(output_dict)
 
@@ -626,18 +622,17 @@ class UnitsOperator(Role):
         all_observations = th.zeros(
             (values_len, learning_unit_count, obs_dim), device=device
         )
-        if act_dim == 1:
-            all_actions = th.zeros((values_len, learning_unit_count), device=device)
-        else:
-            all_actions = th.zeros(
-                (values_len, learning_unit_count, act_dim), device=device
-            )
+        all_actions = th.zeros(
+            (values_len, learning_unit_count, act_dim), device=device
+        )
         all_rewards = []
 
         for i, unit in enumerate(self.rl_units):
             # Convert pandas Series to torch Tensor
             obs_tensor = th.stack(unit.outputs["rl_observations"][:values_len], dim=0)
-            actions_tensor = th.stack(unit.outputs["rl_actions"][:values_len], dim=0)
+            actions_tensor = th.stack(
+                unit.outputs["rl_actions"][:values_len], dim=0
+            ).reshape(-1, act_dim)
 
             all_observations[:, i, :] = obs_tensor
             all_actions[:, i, :] = actions_tensor

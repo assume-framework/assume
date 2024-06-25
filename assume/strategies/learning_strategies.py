@@ -177,10 +177,13 @@ class RLStrategy(LearningStrategy):
             },
         ]
 
-        # store results in unit outputs which are written to database by unit operator
+        # store results in unit outputs as lists to be written to the buffer for learning
         unit.outputs["rl_observations"].append(next_observation)
         unit.outputs["rl_actions"].append(actions)
-        unit.outputs["rl_exploration_noise"][start] = noise
+
+        # store results in unit outputs as series to be written to the database by the unit operator
+        unit.outputs["actions"][start] = actions
+        unit.outputs["exploration_noise"][start] = noise
 
         bids = self.remove_empty_bids(bids)
 

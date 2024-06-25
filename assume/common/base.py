@@ -65,13 +65,19 @@ class BaseUnit:
         self.index = index
         self.outputs = defaultdict(lambda: pd.Series(0.0, index=self.index))
         # series does not like to convert from tensor to float otherwise
+
+        # RL data stored as lists to simplify storing to the buffer
         self.outputs["rl_observations"] = []
         self.outputs["rl_actions"] = []
         self.outputs["rl_rewards"] = []
-        self.outputs["reward"] = pd.Series(0.0, index=self.index, dtype=object)
-        self.outputs["rl_exploration_noise"] = pd.Series(
+
+        # some data is stored as series to allow to store it in the outputs
+        self.outputs["actions"] = pd.Series(0.0, index=self.index, dtype=object)
+        self.outputs["exploration_noise"] = pd.Series(
             0.0, index=self.index, dtype=object
         )
+        self.outputs["reward"] = pd.Series(0.0, index=self.index, dtype=object)
+
         if forecaster:
             self.forecaster = forecaster
         else:

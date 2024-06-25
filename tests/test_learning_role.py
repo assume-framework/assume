@@ -25,6 +25,7 @@ def test_learning_init():
     learning_config: LearningConfig = {
         "obs_dim": 3,
         "act_dim": 2,
+        "train_freq": "1h",
         "unique_obs_dim": 0,
         "algorithm": "matd3",
         "learning_mode": False,
