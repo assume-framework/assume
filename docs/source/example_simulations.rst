@@ -17,9 +17,9 @@ Here you can find an overview of the different exampels provided. Below you find
   small_with_opt_clearing       example_01a                     Small simulation with optimization clearing instead of pay_as_clear.
   small_with_BB                 example_01d                     Small Simulation with Block Bids and complex clearing.
   small_with_vre                example_01b                     Small simulation with variable renewable energy.
-  small_learning_1              example_02a                     A small study with roughly 10 powerplants, where one powerplant is equiped with a learning bidding strategy and can learn to exert market power. [1]
-  small_learning_2              example_02b                     A small study with roughly 10 powerplants, where multiple powerplants are equiped with a learning bidding strategy and learn that they do not have market power anymore. [1]
-  small_learning_3              example_02c                     A small study with roughly 10 powerplants, where even more powerplants are equiped with a learning bidding strategy and learn that they do not have market power anymore. [1]
+  small_learning_1              example_02a                     A small study with roughly 7 power plants, where 1 power plant is equiped with a learning bidding strategy and can learn to exert market power. [1]
+  small_learning_2              example_02b                     A small study with roughly 11 power plants, where 5 power plants are equiped with a learning bidding strategy and learn that they do not have market power anymore. [1]
+  small_learning_3              example_02c                     A small study with roughly 16 power plants, where 10 power plants are equiped with a learning bidding strategy and learn that they do not have market power anymore. [1]
  ============================= ============================= =====================================================
 
 The following table categorizes the different provided examples in a more detailed manner. We included the main features of ASSUME in the table.

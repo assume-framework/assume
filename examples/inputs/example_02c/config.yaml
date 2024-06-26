@@ -11,14 +11,14 @@ base:
 
   learning_config:
     continue_learning: False
-    trained_policies_save_path: learned_strategies/example_02b_base
+    trained_policies_save_path: null
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.001
     training_episodes: 100
-    episodes_collecting_initial_experience: 5
-    train_freq: 24
-    gradient_steps: -1
+    episodes_collecting_initial_experience: 3
+    train_freq: 24h
+    gradient_steps: 1
     batch_size: 256
     gamma: 0.99
     device: cpu
