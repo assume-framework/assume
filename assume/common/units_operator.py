@@ -661,7 +661,7 @@ class UnitsOperator(Role):
         learning_role_addr = self.context.data.get("learning_agent_addr")
 
         if learning_role_id and learning_role_addr:
-            await self.context.schedule_instant_acl_message(
+            self.context.schedule_instant_acl_message(
                 receiver_id=learning_role_id,
                 receiver_addr=learning_role_addr,
                 content={
