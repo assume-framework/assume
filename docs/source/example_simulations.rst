@@ -19,7 +19,7 @@ Here you can find an overview of the different exampels provided. Below you find
   small_with_vre                example_01b                     Small simulation with variable renewable energy.
   small_learning_1              example_02a                     A small study with roughly 10 powerplants, where one powerplant is equiped with a learning bidding strategy and can learn to exert market power. [1]
   small_learning_2              example_02b                     A small study with roughly 10 powerplants, where multiple powerplants are equiped with a learning bidding strategy and learn that they do not have market power anymore. [1]
-  small_learning_2              example_02c                     A small study with roughly 10 powerplants, where even more powerplants are equiped with a learning bidding strategy and learn that they do not have market power anymore. [1]
+  small_learning_3              example_02c                     A small study with roughly 10 powerplants, where even more powerplants are equiped with a learning bidding strategy and learn that they do not have market power anymore. [1]
  ============================= ============================= =====================================================
 
 The following table categorizes the different provided examples in a more detailed manner. We included the main features of ASSUME in the table.
@@ -30,7 +30,7 @@ example name                   Country         Generation Tech Generation Volume
 ============================== =============== =============== =================== ====================== ============= ============= ================= ============== =============
 small_learning_1               Germany         conventional    12,500 MW           fixed inflexible       1,000,000 MW  EoM           Learning, Naive   No             Resembles Case 1 from [1]
 small_learning_2               Germany         conventional    12,500 MW           fixed inflexible       1,000,000 MW  EoM           Learning, Naive   No             Resembles Case 2 from [1]
-small_learning_2               Germany         conventional    12,500 MW           fixed inflexible       1,000,000 MW  EoM           Learning, Naive   No             Resembles Case 3 from [1]
+small_learning_3               Germany         conventional    12,500 MW           fixed inflexible       1,000,000 MW  EoM           Learning, Naive   No             Resembles Case 3 from [1]
 ============================== =============== =============== =================== ====================== ============= ============= ================= ============== =============
 
 
