@@ -46,7 +46,17 @@ class RLStrategy(LearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=50, act_dim=2, unique_obs_dim=2, *args, **kwargs)
+        obs_dim = kwargs.pop("obs_dim", 50)
+        act_dim = kwargs.pop("act_dim", 2)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
+
+        super().__init__(
+            obs_dim=obs_dim,
+            act_dim=act_dim,
+            unique_obs_dim=unique_obs_dim,
+            *args,
+            **kwargs,
+        )
 
         self.unit_id = kwargs["unit_id"]
 
@@ -211,24 +221,27 @@ class RLStrategy(LearningStrategy):
             # if we are in learning mode the first x episodes we want to explore the entire action space
             # to get a good initial experience, in the area around the costs of the agent
             if self.collect_initial_experience_mode:
-                # define current action as soley noise
-                noise = (
+                # =============================================================================
+                # 2.1 Get Actions and handle exploration
+                # =============================================================================
+                # extract the marginal cost from the observation
+                # needs to be adjusted if observation space is changed, because only makes sense
+                # if the last dimension of the observation space are the marginal cost
+                base_bid = next_observation[-1]
+                # define the action as a normal distribution around the base bid
+                # with a standard deviation of 0.05 which translates to a range of 10% around the base bid 95% of the time
+                curr_action = (
                     th.normal(
-                        mean=0.0, std=0.2, size=(1, self.act_dim), dtype=self.float_type
+                        mean=base_bid,
+                        std=0.05,
+                        size=(1, self.act_dim),
+                        dtype=self.float_type,
                     )
                     .to(self.device)
                     .squeeze()
                 )
 
-                # =============================================================================
-                # 2.1 Get Actions and handle exploration
-                # =============================================================================
-                base_bid = next_observation[-1]
-
-                # add noise to the last dimension of the observation
-                # needs to be adjusted if observation space is changed, because only makes sense
-                # if the last dimension of the observation space are the marginal cost
-                curr_action = noise + base_bid.clone().detach()
+                noise = tuple(0 for _ in range(self.act_dim))
 
             else:
                 # if we are not in the initial exploration phase we chose the action with the actor neural net
@@ -240,7 +253,6 @@ class RLStrategy(LearningStrategy):
                 curr_action += noise
         else:
             # if we are not in learning mode we just use the actor neural net to get the action without adding noise
-
             curr_action = self.actor(next_observation).detach()
             noise = tuple(0 for _ in range(self.act_dim))
 
@@ -478,3 +490,82 @@ class RLStrategy(LearningStrategy):
             self.actor_target.load_state_dict(params["actor_target"])
             self.actor_target.eval()
             self.actor.optimizer.load_state_dict(params["actor_optimizer"])
+
+
+class RLSingleBidStrategy(RLStrategy):
+    def __init__(self, *args, **kwargs):
+        # Set act_dim to 1 before calling the parent class's constructor
+        kwargs["act_dim"] = 1
+
+        super().__init__(*args, **kwargs)
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Calculates bids for a unit, based on the actions from the actors.
+
+        Args:
+            unit (SupportsMinMax): Unit to calculate bids for.
+            market_config (MarketConfig): Market configuration.
+            product_tuples (list[Product]): Product tuples.
+            **kwargs: Keyword arguments.
+
+        Returns:
+            Orderbook: Bids containing start time, end time, price, volume and bid type.
+
+        """
+
+        start = product_tuples[0][0]
+        end = product_tuples[0][1]
+        # get technical bounds for the unit output from the unit
+        _, max_power = unit.calculate_min_max_power(start, end)
+        max_power = max_power[start]
+
+        # =============================================================================
+        # 1. Get the Observations, which are the basis of the action decision
+        # =============================================================================
+        next_observation = self.create_observation(
+            unit=unit,
+            market_id=market_config.market_id,
+            start=start,
+            end=end,
+        )
+
+        # =============================================================================
+        # 2. Get the Actions, based on the observations
+        # =============================================================================
+        actions, noise = self.get_actions(next_observation)
+
+        # =============================================================================
+        # 3. Transform Actions into bids
+        # =============================================================================
+        bid_price = actions * self.max_bid_price
+
+        # actually formulate bids in orderbook format
+        bids = [
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "price": bid_price,
+                "volume": max_power,
+                "node": unit.node,
+            },
+        ]
+
+        # store results in unit outputs as lists to be written to the buffer for learning
+        unit.outputs["rl_observations"].append(next_observation)
+        unit.outputs["rl_actions"].append(actions)
+
+        # store results in unit outputs as series to be written to the database by the unit operator
+        unit.outputs["actions"][start] = actions
+        unit.outputs["exploration_noise"][start] = noise
+
+        bids = self.remove_empty_bids(bids)
+
+        return bids
