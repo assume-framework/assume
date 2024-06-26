@@ -11,7 +11,7 @@ base:
 
   learning_config:
     continue_learning: False
-    trained_policies_save_path: learned_strategies/example_02b_base
+    trained_policies_save_path: Null
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.001
