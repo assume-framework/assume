@@ -115,6 +115,78 @@ def load_file(
         return None
 
 
+def load_dsm_units(
+    path: str,
+    config: dict,
+    file_name: str,
+) -> pd.DataFrame:
+    """
+    Loads and processes a CSV file containing DSM unit data, where each unit may consist of multiple components
+    (technologies) under the same plant name. The function groups data by plant name, processes each group to
+    handle different technologies, and organizes the data into a structured DataFrame.
+
+    Parameters:
+        path (str): The directory path where the CSV file is located.
+        config (dict): Configuration dictionary, potentially used for specifying additional options or behaviors
+                       (not used in the current implementation but provides flexibility for future enhancements).
+        file_name (str): The name of the CSV file to be loaded.
+
+    Returns:
+        pd.DataFrame: A DataFrame where each row represents a plant with its components organized into nested
+                      dictionaries under the 'components' column. Each plant's common attributes like unit operator
+                      and objective are directly in the row.
+
+    Notes:
+        - The CSV file is expected to have columns such as 'name', 'technology', and other operational parameters.
+        - The function assumes that the first non-null value in common and bidding columns is representative if multiple
+          entries exist for the same plant.
+        - It is crucial that the input CSV file follows the expected structure for the function to process it correctly.
+    """
+
+    dsm_units = load_file(
+        path=path,
+        config=config,
+        file_name=file_name,
+    )
+
+    if dsm_units is None:
+        return None
+
+    # Define columns that are common across different technologies within the same plant
+    common_columns = ["unit_operator", "objective", "demand", "cost_tolerance"]
+    bidding_columns = [col for col in dsm_units.columns if col.startswith("bidding_")]
+
+    # Initialize the dictionary to hold the final structured data
+    dsm_units_dict = {}
+
+    # Process each group of components by plant name
+    for name, group in dsm_units.groupby(dsm_units.index):
+        dsm_unit = {}
+
+        # Aggregate or select appropriate data for common and bidding columns
+        # We take the first non-null entry
+        for col in common_columns + bidding_columns:
+            non_null_values = group[col].dropna()
+            if not non_null_values.empty:
+                dsm_unit[col] = non_null_values.iloc[0]
+
+        # Process each technology within the plant
+        components = {}
+        for tech, tech_data in group.groupby("technology"):
+            # Clean the technology-specific data: drop all-NaN columns and 'technology' column
+            cleaned_data = tech_data.dropna(axis=1, how="all").drop(
+                columns=["technology"]
+            )
+            components[tech] = cleaned_data.to_dict(orient="records")[0]
+
+        dsm_unit["components"] = components
+        dsm_units_dict[name] = dsm_unit
+
+    # Convert the structured dictionary into a DataFrame
+    dsm_units = pd.DataFrame.from_dict(dsm_units_dict, orient="index")
+    return dsm_units
+
+
 def convert_to_rrule_freq(string: str) -> tuple[int, int]:
     """
     Convert a string to a rrule frequency and interval.
@@ -317,6 +389,12 @@ def load_config_and_create_forecaster(
     storage_units = load_file(path=path, config=config, file_name="storage_units")
     demand_units = load_file(path=path, config=config, file_name="demand_units")
 
+    dsm_units = load_dsm_units(
+        path=path,
+        config=config,
+        file_name="dsm_units",
+    )
+
     if powerplant_units is None or demand_units is None:
         raise ValueError("No power plant or no demand units were provided!")
 
@@ -372,6 +450,7 @@ def load_config_and_create_forecaster(
         "powerplant_units": powerplant_units,
         "storage_units": storage_units,
         "demand_units": demand_units,
+        "dsm_units": dsm_units,
         "forecaster": forecaster,
     }
 
@@ -414,6 +493,7 @@ async def async_setup_world(
     powerplant_units = scenario_data["powerplant_units"]
     storage_units = scenario_data["storage_units"]
     demand_units = scenario_data["demand_units"]
+    dsm_units = scenario_data["dsm_units"]
     forecaster = scenario_data["forecaster"]
 
     save_frequency_hours = config.get("save_frequency_hours", 48)
@@ -497,6 +577,11 @@ async def async_setup_world(
             [all_operators, storage_units.unit_operator.unique()]
         )
 
+    if dsm_units is not None:
+        all_operators = np.concatenate(
+            [all_operators, dsm_units.unit_operator.unique()]
+        )
+
     # add central RL unit operator that handels all RL units
     if world.learning_mode and "Operator-RL" not in all_operators:
         all_operators = np.concatenate([all_operators, ["Operator-RL"]])
@@ -522,6 +607,13 @@ async def async_setup_world(
     add_units(
         units_df=demand_units,
         unit_type="demand",
+        world=world,
+        forecaster=forecaster,
+    )
+
+    add_units(
+        units_df=dsm_units,
+        unit_type="steel_plant",
         world=world,
         forecaster=forecaster,
     )

@@ -51,6 +51,13 @@ availabe_examples = {
         "scenario": "example_01d",
         "study_case": "zonal_case",
     },
+    "small_with_steel_plant": {
+        "scenario": "example_04",
+        "study_case": "base_case_steel_plant_2019",
+    },
+    "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
+    "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
+    "small_learning_3": {"scenario": "example_02c", "study_case": "dam"},
     "large_2019_eom": {"scenario": "example_02", "study_case": "base_case_2019"},
     "large_2019_eom_crm": {
         "scenario": "example_02",
@@ -60,9 +67,6 @@ availabe_examples = {
         "scenario": "example_02",
         "study_case": "dam_case_2019",
     },
-    "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
-    "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
-    "small_learning_3": {"scenario": "example_02c", "study_case": "dam"},
 }
 
 # %%
@@ -73,7 +77,7 @@ if __name__ == "__main__":
     - timescale: with database and grafana (note: you need docker installed)
     """
     data_format = "local_db"  # "local_db" or "timescale"
-    example = "small"
+    example = "small_with_steel_plant"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
