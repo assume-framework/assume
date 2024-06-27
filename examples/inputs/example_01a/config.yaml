@@ -50,7 +50,7 @@ tiny:
 
 dam:
   start_date: 2019-01-01 00:00
-  end_date: 2019-04-01 00:00
+  end_date: 2019-01-31 00:00
   time_step: 1h
   save_frequency_hours: 24
 
@@ -63,7 +63,7 @@ dam:
           count: 24
           first_delivery: 1h
       opening_frequency: 24h
-      opening_duration: 24h
+      opening_duration: 1h
       volume_unit: MWh
       maximum_bid_volume: 100000
       maximum_bid_price: 3000
