@@ -30,7 +30,7 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.common.base import LearningConfig
-from assume.common.utils import datetime2timestamp, timestamp2datetime
+from assume.common.utils import create_rrule, datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import LearningStrategy, bidding_strategies
 from assume.units import BaseUnit, Demand, PowerPlant, Storage
@@ -133,23 +133,11 @@ class World:
 
         self.bidding_strategies = bidding_strategies
 
-        try:
-            from assume.strategies.learning_advanced_orders import (
-                RLAdvancedOrderStrategy,
-            )
-            from assume.strategies.learning_strategies import RLStrategy
-
-            self.bidding_strategies["learning"] = RLStrategy
-            self.bidding_strategies["pp_learning"] = RLStrategy
-            self.bidding_strategies["learning_advanced_orders"] = (
-                RLAdvancedOrderStrategy
-            )
-
-        except ImportError as e:
+        if "pp_learning" not in bidding_strategies:
             self.logger.info(
-                "Import of Learning Strategies failed. Check that you have all required packages installed (torch): %s",
-                e,
+                "Learning Strategies not available. Check that you have all required packages installed (torch)."
             )
+
         self.clearing_mechanisms: dict[str, MarketRole] = clearing_mechanisms
         self.additional_kpis: dict[str, OutputDef] = {}
         self.addresses = []
@@ -252,11 +240,7 @@ class World:
             # if so, we initate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
 
-            self.learning_role = Learning(
-                learning_config=self.learning_config,
-                start=self.start,
-                end=self.end,
-            )
+            self.learning_role = Learning(self.learning_config)
             # separate process does not support buffer and learning
             self.learning_agent_addr = (self.addr, "learning_agent")
             rl_agent = RoleAgent(
@@ -339,7 +323,7 @@ class World:
         self.unit_operators[id] = units_operator
 
         # after creation of an agent - we set additional context params
-        if self.learning_mode:
+        if self.learning_mode and id == "Operator-RL":
             unit_operator_agent._role_context.data.update(
                 {
                     "learning_output_agent_addr": self.output_agent_addr[0],
@@ -348,6 +332,16 @@ class World:
                     "learning_agent_id": self.learning_agent_addr[1],
                 }
             )
+            recurrency_task = create_rrule(
+                start=self.start,
+                end=self.end,
+                freq=self.learning_config.get("train_freq", "24h"),
+            )
+
+            units_operator.context.schedule_recurrent_task(
+                units_operator.write_to_learning_role, recurrency_task
+            )
+
         else:
             unit_operator_agent._role_context.data.update(
                 {
@@ -421,6 +415,7 @@ class World:
                     f"Bidding strategy {strategy} not registered, could not add {id}"
                 )
                 return
+
         unit_params["bidding_strategies"] = bidding_strategies
 
         # create unit within the unit operator its associated with

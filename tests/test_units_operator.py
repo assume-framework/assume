@@ -132,10 +132,7 @@ async def test_write_learning_params(units_operator: UnitsOperator):
     unit = PowerPlant("testplant", index=index, **params_dict)
     await units_operator.add_unit(unit)
 
-    units_operator.learning_config = {
-        "learning_mode": True,
-        "perform_evaluation": False,
-    }
+    units_operator.learning_mode = True
     units_operator.learning_data = {"test": 1}
 
     units_operator.context.data.update(
@@ -154,9 +151,9 @@ async def test_write_learning_params(units_operator: UnitsOperator):
 
     open_tasks = len(units_operator.context._scheduler._scheduled_tasks)
 
-    units_operator.write_learning_params(orderbook, marketconfig)
+    units_operator.write_learning_to_output(orderbook, market_id=marketconfig.market_id)
 
-    assert len(units_operator.context._scheduler._scheduled_tasks) == open_tasks + 2
+    assert len(units_operator.context._scheduler._scheduled_tasks) == open_tasks + 1
 
     units_operator.units["testplant"].bidding_strategies[
         "EOM"
@@ -174,9 +171,9 @@ async def test_write_learning_params(units_operator: UnitsOperator):
 
     open_tasks = len(units_operator.context._scheduler._scheduled_tasks)
 
-    units_operator.write_learning_params(orderbook, marketconfig)
+    units_operator.write_learning_to_output(orderbook, market_id=marketconfig.market_id)
 
-    assert len(units_operator.context._scheduler._scheduled_tasks) == open_tasks + 2
+    assert len(units_operator.context._scheduler._scheduled_tasks) == open_tasks + 1
 
 
 async def test_get_actual_dispatch(units_operator: UnitsOperator):
