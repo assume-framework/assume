@@ -18,16 +18,10 @@ from assume.common.base import LearningConfig
 from assume.common.exceptions import AssumeException
 from assume.common.forecasts import CsvForecaster, Forecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
+from assume.common.utils import convert_to_rrule_freq
 from assume.world import World
 
 logger = logging.getLogger(__name__)
-
-freq_map = {
-    "h": rr.HOURLY,
-    "m": rr.MINUTELY,
-    "d": rr.DAILY,
-    "w": rr.WEEKLY,
-}
 
 
 def load_file(
@@ -113,21 +107,6 @@ def load_file(
     except FileNotFoundError:
         logger.info(f"{file_name} not found. Returning None")
         return None
-
-
-def convert_to_rrule_freq(string: str) -> tuple[int, int]:
-    """
-    Convert a string to a rrule frequency and interval.
-
-    Args:
-        string (str): The string to be converted. Should be in the format of "1h" or "1d" or "1w".
-
-    Returns:
-        tuple[int, int]: The rrule frequency and interval.
-    """
-    freq = freq_map[string[-1]]
-    interval = int(string[:-1])
-    return freq, interval
 
 
 def replace_paths(config: dict, inputs_path: str):
@@ -751,7 +730,7 @@ def run_learning(
     if Path(save_path).is_dir():
         # we are in learning mode and about to train new policies, which might overwrite existing ones
         accept = input(
-            f"{save_path=} exists - should we overwrite current learnings? (y/N)"
+            f"{save_path=} exists - should we overwrite current learnings? (y/N) "
         )
         if not accept.lower().startswith("y"):
             # stop here - do not start learning or save anything
@@ -815,7 +794,7 @@ def run_learning(
         if (
             episode % validation_interval == 0
             and episode
-            > world.learning_role.episodes_collecting_initial_experience
+            >= world.learning_role.episodes_collecting_initial_experience
             + validation_interval
         ):
             world.reset()
