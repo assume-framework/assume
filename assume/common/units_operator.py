@@ -335,11 +335,12 @@ class UnitsOperator(Role):
         start = timestamp2datetime(last + 1)
 
         market_dispatch = aggregate_step_amount(
-            self.valid_orders[product_type],
-            start,
-            now,
+            orderbook=self.valid_orders[product_type],
+            begin=timestamp2datetime(last),
+            end=now,
             groupby=["market_id", "unit_id"],
         )
+
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
             current_dispatch = unit.execute_current_dispatch(start, now)
@@ -358,6 +359,7 @@ class UnitsOperator(Role):
 
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
+
         return market_dispatch, unit_dispatch_dfs
 
     def write_actual_dispatch(self, product_type: str) -> None:
