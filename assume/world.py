@@ -323,11 +323,50 @@ class World:
         self.unit_operators[id] = units_operator
 
         # after creation of an agent - we set additional context params
-        if self.learning_mode and id == "Operator-RL":
+        if not self.learning_mode:
             unit_operator_agent._role_context.data.update(
                 {
-                    "learning_output_agent_addr": self.output_agent_addr[0],
-                    "learning_output_agent_id": self.output_agent_addr[1],
+                    "output_agent_addr": self.output_agent_addr[0],
+                    "output_agent_id": self.output_agent_addr[1],
+                }
+            )
+
+    def add_rl_unit_operator(self, id: str = "Operator-RL") -> None:
+        """
+        Add a unit operator to the simulation, creating a new role agent and applying the role of a unit operator to it.
+        The unit operator is then added to the list of existing operators. If in learning mode, additional context parameters
+        related to learning and output agents are set for the unit operator's role context.
+
+        Args:
+            id (str): The identifier for the unit operator.
+        """
+
+        from assume.reinforcement_learning.learning_unit_operator import RLUnitsOperator
+
+        if self.unit_operators.get(id):
+            raise ValueError(f"Unit operator {id} already exists")
+
+        units_operator = RLUnitsOperator(available_markets=list(self.markets.values()))
+        # creating a new role agent and apply the role of a unitsoperator
+        unit_operator_agent = RoleAgent(
+            self.container, suggested_aid=f"{id}", suspendable_tasks=False
+        )
+        unit_operator_agent.add_role(units_operator)
+
+        # add the current unitsoperator to the list of operators currently existing
+        self.unit_operators[id] = units_operator
+
+        unit_operator_agent._role_context.data.update(
+            {
+                "learning_output_agent_addr": self.output_agent_addr[0],
+                "learning_output_agent_id": self.output_agent_addr[1],
+            }
+        )
+
+        # after creation of an agent - we set additional context params
+        if self.learning_mode:
+            unit_operator_agent._role_context.data.update(
+                {
                     "learning_agent_addr": self.learning_agent_addr[0],
                     "learning_agent_id": self.learning_agent_addr[1],
                 }
@@ -347,8 +386,6 @@ class World:
                 {
                     "output_agent_addr": self.output_agent_addr[0],
                     "output_agent_id": self.output_agent_addr[1],
-                    "learning_output_agent_addr": self.output_agent_addr[0],
-                    "learning_output_agent_id": self.output_agent_addr[1],
                 }
             )
 
@@ -372,51 +409,21 @@ class World:
             unit_params (dict): Parameters for configuring the unit.
             forecaster (Forecaster): The forecaster used by the unit.
         """
+        if self.learning_mode:
+            unit_operator_id = self._correct_unit_operator_id(
+                unit_params["bidding_strategies"], unit_operator_id
+            )
 
-        # check if unit operator exists
-        if unit_operator_id not in self.unit_operators.keys():
-            raise ValueError(f"invalid unit operator {unit_operator_id}")
+        self._validate_unit_addition(id, unit_type, unit_operator_id)
 
         # provided unit type does not exist yet
         unit_class: type[BaseUnit] = self.unit_types.get(unit_type)
-        if unit_class is None:
-            raise ValueError(f"invalid unit type {unit_type}")
 
-        # check if unit operator already has a unit with the same id
-        if self.unit_operators[unit_operator_id].units.get(id):
-            raise ValueError(f"Unit {id} already exists")
-
-        bidding_strategies = {}
-        for market_id, strategy in unit_params["bidding_strategies"].items():
-            if not strategy:
-                continue
-            bidding_params = unit_params.get("bidding_params", self.bidding_params)
-            try:
-                bidding_strategies[market_id] = self.bidding_strategies[strategy](
-                    unit_id=id,
-                    **bidding_params,
-                )
-                # TODO find better way to count learning agents
-                if self.learning_mode and issubclass(
-                    self.bidding_strategies[strategy], LearningStrategy
-                ):
-                    self.learning_role.rl_strats[id] = bidding_strategies[market_id]
-
-                    # if we have learning strategy we need to assign the powerplant to one  unit_operator handling all leanring units
-                    if unit_operator_id != "Operator-RL":
-                        self.logger.debug(
-                            f"Your chosen unit-operator {unit_operator_id} for the learning unit {id} was overwritten with 'Operator-RL', since all learning units need to be handeled by one unit operator."
-                        )
-
-                        unit_operator_id = "Operator-RL"
-
-            except KeyError:
-                self.logger.error(
-                    f"Bidding strategy {strategy} not registered, could not add {id}"
-                )
-                return
-
+        bidding_strategies = self._prepare_bidding_strategies(unit_params, id)
         unit_params["bidding_strategies"] = bidding_strategies
+
+        if self.learning_mode:
+            self._add_bidding_strategies_to_learning_role(id, bidding_strategies)
 
         # create unit within the unit operator its associated with
         unit = unit_class(
@@ -426,7 +433,78 @@ class World:
             forecaster=forecaster,
             **unit_params,
         )
+
         await self.unit_operators[unit_operator_id].add_unit(unit)
+
+    def _add_bidding_strategies_to_learning_role(self, unit_id, bidding_strategies):
+        """
+        Add bidding strategies to the learning role for the specified unit.
+
+        Args:
+            unit_id (str): The identifier for the unit.
+            bidding_strategies (dict[str, BaseStrategy]): The bidding strategies for the unit.
+        """
+
+        for strategy in bidding_strategies.values():
+            if isinstance(strategy, LearningStrategy):
+                self.learning_role.rl_strats[unit_id] = strategy
+
+    def _prepare_bidding_strategies(self, unit_params, unit_id):
+        bidding_strategies = {}
+        for market_id, strategy in unit_params["bidding_strategies"].items():
+            if not strategy:
+                continue
+
+            if strategy not in self.bidding_strategies:
+                raise ValueError(
+                    f"""Bidding strategy {strategy} not registered. Please check the name of
+                    the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""
+                )
+
+            bidding_params = unit_params.get("bidding_params", self.bidding_params)
+
+            bidding_strategies[market_id] = self.bidding_strategies[strategy](
+                unit_id=unit_id,
+                **bidding_params,
+            )
+
+        return bidding_strategies
+
+    def _correct_unit_operator_id(self, bidding_strategies, unit_operator_id):
+        """
+        Check if any of the bidding strategies are learning strategies.
+        And change the unit operator to RL if learning strategies are found.
+
+        """
+        for strategy in bidding_strategies.values():
+            if issubclass(self.bidding_strategies[strategy], LearningStrategy):
+                if unit_operator_id != "Operator-RL":
+                    unit_operator_id = "Operator-RL"
+                    self.logger.debug(
+                        f"Your chosen unit operator {unit_operator_id} for the learning unit {id} was overwritten with 'Operator-RL', since all learning units need to be handeled by one unit operator."
+                    )
+
+        return unit_operator_id
+
+    def _validate_unit_addition(self, id, unit_type, unit_operator_id):
+        """
+        Validate the addition of a unit to the simulation, checking if the unit operator and unit type exist,
+        and ensuring that the unit does not already exist.
+
+        Args:
+            id (str): The identifier for the unit.
+            unit_type (str): The type of the unit.
+            unit_operator_id (str): The identifier of the unit operator.
+        """
+
+        if unit_operator_id not in self.unit_operators:
+            raise ValueError(f"Invalid unit operator: {unit_operator_id}")
+
+        if unit_type not in self.unit_types:
+            raise ValueError(f"Invalid unit type: {unit_type}")
+
+        if self.unit_operators[unit_operator_id].units.get(id):
+            raise ValueError(f"Unit {id} already exists")
 
     def add_market_operator(self, id: str) -> None:
         """
