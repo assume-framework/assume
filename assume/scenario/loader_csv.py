@@ -19,7 +19,8 @@ from assume.common.exceptions import AssumeException
 from assume.common.forecasts import CsvForecaster, Forecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import convert_to_rrule_freq
-from assume.world import World
+from assume.strategies import BaseStrategy
+from assume.world import World, adjust_unit_operator_for_learning
 
 logger = logging.getLogger(__name__)
 
@@ -260,6 +261,7 @@ def read_units(
     units_df: pd.DataFrame,
     unit_type: str,
     forecaster: Forecaster,
+    world_bidding_strategies: dict[str, BaseStrategy],
 ) -> dict[str, list[dict]]:
     """
     Add units to the world from a given dataframe.
@@ -269,6 +271,7 @@ def read_units(
         units_df (pandas.DataFrame): The dataframe containing the units.
         unit_type (str): The type of the unit.
         forecaster (Forecaster): The forecaster used for adding the units.
+        world_bidding_strategies (dict[str, BaseStrategy]): The world strategies available
     """
     if units_df is None:
         return {}
@@ -284,7 +287,11 @@ def read_units(
             if key.startswith("bidding_")
         }
         unit_params["bidding_strategies"] = bidding_strategies
-        operator_id = unit_params["unit_operator"]
+        operator_id = adjust_unit_operator_for_learning(
+            bidding_strategies,
+            world_bidding_strategies,
+            unit_params["unit_operator"],
+        )
         del unit_params["unit_operator"]
         units_dict[operator_id].append(
             dict(
@@ -512,18 +519,21 @@ async def async_setup_world(
         units_df=powerplant_units,
         unit_type="power_plant",
         forecaster=forecaster,
+        world_bidding_strategies=world.bidding_strategies,
     )
 
     str_plants = read_units(
         units_df=storage_units,
         unit_type="storage",
         forecaster=forecaster,
+        world_bidding_strategies=world.bidding_strategies,
     )
 
     dem_plants = read_units(
         units_df=demand_units,
         unit_type="demand",
         forecaster=forecaster,
+        world_bidding_strategies=world.bidding_strategies,
     )
     for op, op_units in pwp_plants.items():
         units[op].extend(op_units)
@@ -531,11 +541,6 @@ async def async_setup_world(
         units[op].extend(op_units)
     for op, op_units in dem_plants.items():
         units[op].extend(op_units)
-
-    # add central RL unit operator that handels all RL units
-    if world.learning_mode and "Operator-RL":
-        # this adds the Operator-RL to the keys of the defaultdict
-        units["Operator-RL"]
 
     if world.distributed_role is True:
         for op, op_units in units.items():

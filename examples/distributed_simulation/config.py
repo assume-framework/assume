@@ -85,9 +85,9 @@ async def worker(
 
     # wait until done if we are a worker agent
     if world.distributed_role:
-        world.logger.info("sleeping 2s")
+        log.info("sleeping 2s")
         await asyncio.sleep(2)
-        world.logger.info("starting simulation")
+        log.info("starting simulation")
         await world.async_run(
             start_ts=datetime2timestamp(world.start),
             end_ts=datetime2timestamp(world.end),

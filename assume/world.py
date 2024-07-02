@@ -32,7 +32,7 @@ from assume.common import (
 from assume.common.base import LearningConfig
 from assume.common.utils import create_rrule, datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
-from assume.strategies import LearningStrategy, bidding_strategies
+from assume.strategies import BaseStrategy, LearningStrategy, bidding_strategies
 from assume.units import BaseUnit, Demand, PowerPlant, Storage
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
@@ -40,6 +40,41 @@ stdout_handler = logging.StreamHandler(stream=sys.stdout)
 handlers = [file_handler, stdout_handler]
 logging.basicConfig(level=logging.INFO, handlers=handlers)
 logging.getLogger("mango").setLevel(logging.WARNING)
+
+logger = logging.getLogger(__name__)
+
+
+def adjust_unit_operator_for_learning(
+    bidding_strategies: dict[str, str],
+    world_bidding_strategies: dict[str, BaseStrategy],
+    unit_operator_id: str,
+):
+    """
+    Check if any of the bidding strategies are learning strategies.
+    And change the unit operator to RL if learning strategies are found.
+
+    Args:
+        bidding_strategies (dict[str, str]): The bidding strategies for the unit.
+        world_bidding_strategies (dict[str, BaseStrategy]): The bidding strategies of the World
+        unit_operator_id (str): The identifier of the unit operator.
+
+    Returns:
+        str: The corrected unit operator identifier.
+
+    """
+    if unit_operator_id == "Operator-RL":
+        return unit_operator_id
+    for strategy in bidding_strategies.values():
+        if issubclass(world_bidding_strategies[strategy], LearningStrategy):
+            unit_operator_id = "Operator-RL"
+            logger.debug(
+                "Your chosen unit operator %s for the learning unit %s was overwritten with 'Operator-RL', "
+                "since all learning units need to be handeled by one unit operator.",
+                unit_operator_id,
+                id,
+            )
+
+    return unit_operator_id
 
 
 class World:
@@ -51,7 +86,6 @@ class World:
     Finally, it sets up the event loop for asynchronous operations.
 
     Attributes:
-        logger (logging.Logger): The logger for the world instance.
         addr (Union[tuple[str, int], str]): The address of the world, represented as a tuple of string and int or a string.
         container (mango.Container, optional): The container for the world instance.
         distributed_role (bool, optional): A boolean indicating whether distributed roles are enabled.
@@ -93,7 +127,6 @@ class World:
         distributed_role: bool | None = None,
     ) -> None:
         logging.getLogger("assume").setLevel(log_level)
-        self.logger = logging.getLogger(__name__)
         self.addr = addr
         self.container = None
         self.distributed_role = distributed_role
@@ -110,14 +143,12 @@ class World:
                 try:
                     with self.db.connect():
                         connected = True
-                        self.logger.info("connected to db")
+                        logger.info("connected to db")
                 except OperationalError as e:
-                    self.logger.error(
-                        f"could not connect to {database_uri}, trying again"
-                    )
+                    logger.error("could not connect to %s, trying again", database_uri)
                     # log error if not connection refused
                     if not e.code == "e3q8":
-                        self.logger.error(f"{e}")
+                        logger.error("%s", e)
                     time.sleep(2)
         else:
             self.db = None
@@ -134,7 +165,7 @@ class World:
         self.bidding_strategies = bidding_strategies
 
         if "pp_learning" not in bidding_strategies:
-            self.logger.info(
+            logger.info(
                 "Learning Strategies not available. Check that you have all required packages installed (torch)."
             )
 
@@ -268,7 +299,11 @@ class World:
             save_frequency_hours (int): The frequency (in hours) at which to save simulation data.
         """
 
-        self.logger.debug(f"creating output agent {self.db=} {self.export_csv_path=}")
+        logger.debug(
+            "creating output agent db=%s export_csv_path=%s",
+            self.db,
+            self.export_csv_path,
+        )
         self.output_role = WriteOutput(
             simulation_id=simulation_id,
             start=self.start,
@@ -304,7 +339,7 @@ class World:
             )
             output_agent.add_role(self.output_role)
 
-    async def add_unit_operator(self, id: str) -> None:
+    def add_unit_operator(self, id: str) -> None:
         """
         Add a unit operator to the simulation, creating a new role agent and applying the role of a unit operator to it.
         The unit operator is then added to the list of existing operators. Unit operator receives the output agent address
@@ -433,11 +468,11 @@ class World:
         unit_params: dict,
         forecaster: Forecaster,
     ) -> BaseUnit:
-        bidding_strategies = {}
         # provided unit type does not exist yet
         unit_class: type[BaseUnit] = self.unit_types.get(unit_type)
 
-                    # if we have learning strategy we need to assign the powerplant to one unit_operator handling all leanring units
+        bidding_strategies = self._prepare_bidding_strategies(unit_params, id)
+        # if we have learning strategy we need to assign the powerplant to one unit_operator handling all learning units
         unit_params["bidding_strategies"] = bidding_strategies
 
         if self.learning_mode:
@@ -531,29 +566,6 @@ class World:
 
         return bidding_strategies
 
-    def _correct_unit_operator_id(self, bidding_strategies, unit_operator_id):
-        """
-        Check if any of the bidding strategies are learning strategies.
-        And change the unit operator to RL if learning strategies are found.
-
-        Args:
-            bidding_strategies (dict[str, str]): The bidding strategies for the unit.
-            unit_operator_id (str): The identifier of the unit operator.
-
-        Returns:
-            str: The corrected unit operator identifier.
-
-        """
-        for strategy in bidding_strategies.values():
-            if issubclass(self.bidding_strategies[strategy], LearningStrategy):
-                if unit_operator_id != "Operator-RL":
-                    unit_operator_id = "Operator-RL"
-                    self.logger.debug(
-                        f"Your chosen unit operator {unit_operator_id} for the learning unit {id} was overwritten with 'Operator-RL', since all learning units need to be handeled by one unit operator."
-                    )
-
-        return unit_operator_id
-
     def _validate_unit_addition(self, id, unit_type, unit_operator_id):
         """
         Validate the addition of a unit to the simulation, checking if the unit operator and unit type exist,
@@ -641,7 +653,7 @@ class World:
         else:
             next_activity = self.clock.get_next_activity()
         if not next_activity:
-            self.logger.info("simulation finished - no schedules left")
+            logger.info("simulation finished - no schedules left")
             return None
         delta = next_activity - self.clock.time
         self.clock.set_time(next_activity)
