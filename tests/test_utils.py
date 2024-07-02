@@ -23,6 +23,8 @@ from assume.common.utils import (
     separate_orders,
     timestamp2datetime,
     visualize_orderbook,
+    numpy_dt_indexer,
+    idx_from_date,
 )
 from assume.scenario.loader_csv import make_market_config
 
@@ -446,6 +448,31 @@ def test_datetime2timestamp():
     unix_start = datetime(1970, 1, 1)
     assert 0 == datetime2timestamp(unix_start)
 
+def test_numpy_idx():
+    pd.date_range()
+    data = [
+        {
+            "start": datetime.now(),
+            "end": datetime.now(),
+            "value": 7,
+        }
+    ]
+
+def test_2():
+    orderbook = create_orderbook()
+    
+    df = pd.DataFrame(orderbook)
+    from collections import defaultdict
+    import numpy as np
+    l = len(orderbook)
+    results = defaultdict(lambda: np.zeros(l))
+    for element in orderbook:
+        for k,v in element.items():
+            result
+    results
+
+    for element in orderbook:
+
 
 if __name__ == "__main__":
     test_convert_rrule()
@@ -455,3 +482,5 @@ if __name__ == "__main__":
     test_initializer()
     test_sep_block_orders()
     test_aggregate_step_amount()
+
+

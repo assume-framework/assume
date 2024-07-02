@@ -449,6 +449,16 @@ def datetime2timestamp(datetime: datetime):
     return calendar.timegm(datetime.utctimetuple())
 
 
+def idx_from_date(date: datetime, start: datetime, freq: int):
+    return (date - start) // freq
+
+
+def numpy_dt_indexer(data, fr, to):
+    from_idx = idx_from_date(fr)
+    to_idx = idx_from_date(to)
+    return data[from_idx:to_idx]
+
+
 def create_rrule(start, end, freq):
     freq, interval = convert_to_rrule_freq(freq)
 

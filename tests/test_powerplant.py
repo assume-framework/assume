@@ -217,7 +217,7 @@ def test_powerplant_ramping(power_plant_1):
 
     start = datetime(2022, 1, 1, 0)
     end = datetime(2022, 1, 1, 1)
-    end_excl = end - power_plant_1.index.freq
+    end_excl = end - power_plant_1.freq
     min_power, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
     )
@@ -246,7 +246,7 @@ def test_powerplant_ramping(power_plant_1):
     # next hour
     start = datetime(2022, 1, 1, 1)
     end = datetime(2022, 1, 1, 2)
-    end_excl = end - power_plant_1.index.freq
+    end_excl = end - power_plant_1.freq
 
     min_power, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
@@ -270,7 +270,7 @@ def test_powerplant_ramping(power_plant_1):
     # next hour
     start = datetime(2022, 1, 1, 2)
     end = datetime(2022, 1, 1, 3)
-    end_excl = end - power_plant_1.index.freq
+    end_excl = end - power_plant_1.freq
 
     min_power, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
@@ -286,7 +286,7 @@ def test_powerplant_ramping(power_plant_1):
     assert max_ramp == 700
 
     # ramp_up if min_down_time is not reached
-    power_plant_1.outputs["energy"].loc[start - power_plant_1.index.freq] = 0
+    power_plant_1.outputs["energy"].loc[start - power_plant_1.freq] = 0
 
     op_time = power_plant_1.get_operation_time(start)
     assert op_time == -1
@@ -298,8 +298,8 @@ def test_powerplant_ramping(power_plant_1):
     assert max_ramp == 0
 
     # ramp_down if min_operating_time is not reached
-    power_plant_1.outputs["energy"].loc[start - power_plant_1.index.freq * 2] = 0
-    power_plant_1.outputs["energy"].loc[start - power_plant_1.index.freq] = 100
+    power_plant_1.outputs["energy"].loc[start - power_plant_1.freq * 2] = 0
+    power_plant_1.outputs["energy"].loc[start - power_plant_1.freq] = 100
 
     op_time = power_plant_1.get_operation_time(start)
     assert op_time == 1
