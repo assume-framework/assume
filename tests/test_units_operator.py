@@ -23,7 +23,8 @@ from assume.units.powerplant import PowerPlant
 try:
     from assume.reinforcement_learning.learning_unit_operator import RLUnitsOperator
 except ImportError:
-    pass
+    # to suffice the type hint as best as possible
+    from assume.common.units_operator import UnitsOperator as RLUnitsOperator
 
 start = datetime(2020, 1, 1)
 end = datetime(2020, 12, 2)
