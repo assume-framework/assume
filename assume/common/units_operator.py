@@ -8,7 +8,6 @@ from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
 
-import numpy as np
 import pandas as pd
 from mango import Role
 from mango.messages.message import Performatives
@@ -24,18 +23,12 @@ from assume.common.market_objects import (
 )
 from assume.common.utils import (
     aggregate_step_amount,
-    get_products_index,
     timestamp2datetime,
 )
-from assume.strategies import BaseStrategy, LearningStrategy
+from assume.strategies import BaseStrategy
 from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
-
-try:
-    import torch as th
-except ImportError:
-    pass
 
 
 class UnitsOperator(Role):
@@ -80,13 +73,6 @@ class UnitsOperator(Role):
         # valid_orders per product_type
         self.valid_orders = defaultdict(list)
         self.units: dict[str, BaseUnit] = {}
-
-        self.rl_units = []
-        self.learning_strategies = {
-            "obs_dim": 0,
-            "act_dim": 0,
-            "device": "cpu",
-        }
 
     def setup(self):
         super().setup()
@@ -133,22 +119,6 @@ class UnitsOperator(Role):
             unit (BaseUnit): The unit to be added.
         """
         self.units[unit.id] = unit
-
-        # check if unit has learning strategy for any of the available markets
-        for market in self.available_markets:
-            strategy = unit.bidding_strategies.get(market.market_id)
-
-            if isinstance(strategy, LearningStrategy):
-                self.learning_strategies.update(
-                    {
-                        "obs_dim": strategy.obs_dim,
-                        "act_dim": strategy.act_dim,
-                        "device": strategy.device,
-                    }
-                )
-
-                self.rl_units.append(unit)
-                break
 
         db_aid = self.context.data.get("output_agent_id")
         db_addr = self.context.data.get("output_agent_addr")
@@ -238,7 +208,6 @@ class UnitsOperator(Role):
         marketconfig = self.registered_markets[content["market_id"]]
         self.valid_orders[marketconfig.product_type].extend(orderbook)
         self.set_unit_dispatch(orderbook, marketconfig)
-        self.write_learning_to_output(orderbook, marketconfig.market_id)
         self.write_actual_dispatch(marketconfig.product_type)
 
     def handle_registration_feedback(
@@ -519,156 +488,3 @@ class UnitsOperator(Role):
                 orderbook.append(order)
 
         return orderbook
-
-    def write_learning_to_output(self, orderbook: Orderbook, market_id: str) -> None:
-        """
-        Sends the current rl_strategy update to the output agent.
-
-        Args:
-            products_index (pandas.DatetimeIndex): The index of all products.
-            marketconfig (MarketConfig): The market configuration.
-        """
-        try:
-            from assume.strategies import (
-                RLAdvancedOrderStrategy,
-            )
-
-        except ImportError:
-            pass
-
-        products_index = get_products_index(orderbook)
-
-        # should write learning results if at least one bidding_strategy is a learning strategy
-        if not (len(self.rl_units) and orderbook):
-            return
-
-        output_agent_list = []
-        start = products_index[0]
-
-        for unit in self.rl_units:
-            strategy = unit.bidding_strategies.get(market_id)
-
-            # rl only for energy market for now!
-            if isinstance(strategy, LearningStrategy):
-                output_dict = {
-                    "datetime": start,
-                    "unit": unit.id,
-                }
-
-                if isinstance(strategy, RLAdvancedOrderStrategy):
-                    output_dict.update(
-                        {
-                            "profit": unit.outputs["profit"].loc[products_index].sum(),
-                            "reward": unit.outputs["reward"].loc[products_index].sum()
-                            / 24,
-                            "regret": unit.outputs["regret"].loc[products_index].sum(),
-                        }
-                    )
-                else:
-                    output_dict.update(
-                        {
-                            "profit": unit.outputs["profit"].loc[start],
-                            "reward": unit.outputs["reward"].loc[start],
-                            "regret": unit.outputs["regret"].loc[start],
-                        }
-                    )
-
-                action_tuple = unit.outputs["actions"].loc[start]
-                noise_tuple = unit.outputs["exploration_noise"].loc[start]
-                action_dim = action_tuple.numel()
-
-                for i in range(action_dim):
-                    output_dict[f"exploration_noise_{i}"] = (
-                        noise_tuple[i] if action_dim > 1 else noise_tuple
-                    )
-                    output_dict[f"actions_{i}"] = (
-                        action_tuple[i] if action_dim > 1 else action_tuple
-                    )
-
-                output_agent_list.append(output_dict)
-
-        db_aid = self.context.data.get("learning_output_agent_id")
-        db_addr = self.context.data.get("learning_output_agent_addr")
-
-        if db_aid and db_addr and output_agent_list:
-            self.context.schedule_instant_acl_message(
-                receiver_id=db_aid,
-                receiver_addr=db_addr,
-                content={
-                    "context": "write_results",
-                    "type": "rl_learning_params",
-                    "data": output_agent_list,
-                },
-            )
-
-    async def write_to_learning_role(
-        self,
-    ) -> None:
-        """
-        Writes learning results to the learning agent.
-
-        """
-        if len(self.rl_units) == 0:
-            return
-
-        obs_dim = self.learning_strategies["obs_dim"]
-        act_dim = self.learning_strategies["act_dim"]
-        device = self.learning_strategies["device"]
-        learning_unit_count = len(self.rl_units)
-
-        values_len = len(self.rl_units[0].outputs["rl_rewards"])
-        # return if no data is available
-        if values_len == 0:
-            return
-
-        all_observations = th.zeros(
-            (values_len, learning_unit_count, obs_dim), device=device
-        )
-        all_actions = th.zeros(
-            (values_len, learning_unit_count, act_dim), device=device
-        )
-        all_rewards = []
-
-        for i, unit in enumerate(self.rl_units):
-            # Convert pandas Series to torch Tensor
-            obs_tensor = th.stack(unit.outputs["rl_observations"][:values_len], dim=0)
-            actions_tensor = th.stack(
-                unit.outputs["rl_actions"][:values_len], dim=0
-            ).reshape(-1, act_dim)
-
-            all_observations[:, i, :] = obs_tensor
-            all_actions[:, i, :] = actions_tensor
-            all_rewards.append(unit.outputs["rl_rewards"])
-
-            # reset the outputs
-            unit.reset_saved_rl_data()
-
-        # convert all_actions list of tensor to numpy 2D array
-        all_observations = (
-            all_observations.squeeze()
-            .cpu()
-            .numpy()
-            .reshape(-1, learning_unit_count, obs_dim)
-        )
-        all_actions = (
-            all_actions.squeeze()
-            .cpu()
-            .numpy()
-            .reshape(-1, learning_unit_count, act_dim)
-        )
-        all_rewards = np.array(all_rewards).reshape(-1, learning_unit_count)
-        rl_agent_data = (all_observations, all_actions, all_rewards)
-
-        learning_role_id = self.context.data.get("learning_agent_id")
-        learning_role_addr = self.context.data.get("learning_agent_addr")
-
-        if learning_role_id and learning_role_addr:
-            self.context.schedule_instant_acl_message(
-                receiver_id=learning_role_id,
-                receiver_addr=learning_role_addr,
-                content={
-                    "context": "rl_training",
-                    "type": "save_buffer_and_update",
-                    "data": rl_agent_data,
-                },
-            )

@@ -481,7 +481,10 @@ async def async_setup_world(
         all_operators = np.concatenate([all_operators, ["Operator-RL"]])
 
     for company_name in set(all_operators):
-        world.add_unit_operator(id=str(company_name))
+        if company_name == "Operator-RL" and world.learning_mode:
+            world.add_rl_unit_operator(id="Operator-RL")
+        else:
+            world.add_unit_operator(id=str(company_name))
 
     # add the units to corresponding unit operators
     add_units(
