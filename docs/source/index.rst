@@ -108,6 +108,7 @@ Indices and tables
 
 **Help & References**
 
+* :doc:`release_notes`
 * :doc:`developers`
 
 .. toctree::
@@ -115,4 +116,5 @@ Indices and tables
    :maxdepth: 1
    :caption: Help & References
 
+   release_notes
    developers
