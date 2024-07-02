@@ -31,6 +31,7 @@ def test_replay_buffer_init():
 
 @pytest.mark.require_learning
 def test_replay_buffer_add():
+    n_steps = 1
     obs_dim = 2
     act_dim = 3
     n_rl_units = 4
@@ -44,9 +45,9 @@ def test_replay_buffer_add():
         device=th.device("cpu"),
         float_type=th.float,
     )
-    obs = np.ones((n_rl_units, obs_dim))
-    actions = np.ones((n_rl_units, act_dim))
-    reward = np.ones(n_rl_units)
+    obs = np.ones((n_steps, n_rl_units, obs_dim))
+    actions = np.ones((n_steps, n_rl_units, act_dim))
+    reward = np.ones((n_steps, n_rl_units))
     buffer.add(obs, actions, reward)
     # can't sample with only one entry
     with pytest.raises(Exception):

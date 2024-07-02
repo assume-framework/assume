@@ -388,9 +388,8 @@ class TD3(RLAlgorithm):
         for _ in range(self.gradient_steps):
             self.n_updates += 1
             i = 0
-            strategy: LearningStrategy
 
-            for u_id, strategy in self.learning_role.rl_strats.items():
+            for u_id in self.learning_role.rl_strats.keys():
                 critic_target = self.learning_role.target_critics[u_id]
                 critic = self.learning_role.critics[u_id]
                 actor = self.learning_role.rl_strats[u_id].actor

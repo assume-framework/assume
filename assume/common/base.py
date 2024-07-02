@@ -65,13 +65,19 @@ class BaseUnit:
         self.index = index
         self.outputs = defaultdict(lambda: pd.Series(0.0, index=self.index))
         # series does not like to convert from tensor to float otherwise
-        self.outputs["rl_actions"] = pd.Series(0.0, index=self.index, dtype=object)
-        self.outputs["rl_observations"] = pd.Series(0.0, index=self.index, dtype=object)
-        self.outputs["reward"] = pd.Series(0.0, index=self.index, dtype=object)
-        self.outputs["learning_mode"] = pd.Series(False, index=self.index, dtype=bool)
-        self.outputs["rl_exploration_noise"] = pd.Series(
+
+        # RL data stored as lists to simplify storing to the buffer
+        self.outputs["rl_observations"] = []
+        self.outputs["rl_actions"] = []
+        self.outputs["rl_rewards"] = []
+
+        # some data is stored as series to allow to store it in the outputs
+        self.outputs["actions"] = pd.Series(0.0, index=self.index, dtype=object)
+        self.outputs["exploration_noise"] = pd.Series(
             0.0, index=self.index, dtype=object
         )
+        self.outputs["reward"] = pd.Series(0.0, index=self.index, dtype=object)
+
         if forecaster:
             self.forecaster = forecaster
         else:
@@ -283,6 +289,16 @@ class BaseUnit:
             Start-up costs.
         """
         return 0
+
+    def reset_saved_rl_data(self):
+        """
+        Resets the saved RL data.
+        """
+        values_len = len(self.outputs["rl_rewards"])
+
+        self.outputs["rl_observations"] = self.outputs["rl_observations"][values_len:]
+        self.outputs["rl_actions"] = self.outputs["rl_actions"][values_len:]
+        self.outputs["rl_rewards"] = []
 
 
 class SupportsMinMax(BaseUnit):
@@ -767,7 +783,7 @@ class LearningConfig(TypedDict):
     learning_rate: float
     training_episodes: int
     episodes_collecting_initial_experience: int
-    train_freq: int
+    train_freq: str
     gradient_steps: int
     batch_size: int
     gamma: float
