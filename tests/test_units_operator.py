@@ -16,10 +16,14 @@ from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
 from assume.common.utils import datetime2timestamp
-from assume.reinforcement_learning.learning_unit_operator import RLUnitsOperator
 from assume.strategies.naive_strategies import NaiveSingleBidStrategy
 from assume.units.demand import Demand
 from assume.units.powerplant import PowerPlant
+
+try:
+    from assume.reinforcement_learning.learning_unit_operator import RLUnitsOperator
+except ImportError:
+    pass
 
 start = datetime(2020, 1, 1)
 end = datetime(2020, 12, 2)
