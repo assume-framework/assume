@@ -302,8 +302,8 @@ class World:
     def add_unit_operator(self, id: str) -> None:
         """
         Add a unit operator to the simulation, creating a new role agent and applying the role of a unit operator to it.
-        The unit operator is then added to the list of existing operators. If in learning mode, additional context parameters
-        related to learning and output agents are set for the unit operator's role context.
+        The unit operator is then added to the list of existing operators. Unit operator receives the output agent address
+        if not in learning mode.
 
         Args:
             id (str): The identifier for the unit operator.
@@ -333,9 +333,12 @@ class World:
 
     def add_rl_unit_operator(self, id: str = "Operator-RL") -> None:
         """
-        Add a unit operator to the simulation, creating a new role agent and applying the role of a unit operator to it.
-        The unit operator is then added to the list of existing operators. If in learning mode, additional context parameters
-        related to learning and output agents are set for the unit operator's role context.
+        Add a RL unit operator to the simulation, creating a new role agent and applying the role of a unit operator to it.
+        The unit operator is then added to the list of existing operators.
+
+        The RL unit operator differs from the standard unit operator in that it is used to handle learning units. It has additional
+        functions such as writing to the learning role and scheduling recurrent tasks for writing to the learning role. It also
+        writes learning outputs to the output role.
 
         Args:
             id (str): The identifier for the unit operator.
@@ -450,6 +453,16 @@ class World:
                 self.learning_role.rl_strats[unit_id] = strategy
 
     def _prepare_bidding_strategies(self, unit_params, unit_id):
+        """
+        Prepare bidding strategies for the unit based on the specified parameters.
+
+        Args:
+            unit_params (dict): Parameters for configuring the unit.
+            unit_id (str): The identifier for the unit.
+
+        Returns:
+            dict[str, BaseStrategy]: The bidding strategies for the unit.
+        """
         bidding_strategies = {}
         for market_id, strategy in unit_params["bidding_strategies"].items():
             if not strategy:
@@ -474,6 +487,13 @@ class World:
         """
         Check if any of the bidding strategies are learning strategies.
         And change the unit operator to RL if learning strategies are found.
+
+        Args:
+            bidding_strategies (dict[str, str]): The bidding strategies for the unit.
+            unit_operator_id (str): The identifier of the unit operator.
+
+        Returns:
+            str: The corrected unit operator identifier.
 
         """
         for strategy in bidding_strategies.values():
