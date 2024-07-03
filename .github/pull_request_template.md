@@ -30,7 +30,7 @@ Please check all applicable items:
 - [ ] Code tested with both local and Docker databases
 - [ ] Code follows project style guidelines and best practices
 - [ ] Changes are backwards compatible, or deprecation notices added
-- [ ] New dependencies added to `environment.yaml`, `environment_docs.yaml`, and `setup.py`
+- [ ] New dependencies added to `pyproject.toml`
 - [ ] A note for the release notes `doc/release_notes.rst` of the upcoming release is included
 - [ ] Consent to release this PR's code under the GNU Affero General Public License v3.0
 

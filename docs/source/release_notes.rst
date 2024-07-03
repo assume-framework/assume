@@ -23,7 +23,7 @@ Upcoming Release 0.3.8
 **Improvements:**
 
 - Significant speed up of the framework and especially of the learning process
-- Split scenario loader function to improve speed and reduce unrequired operations
+- Separated scenario loader function to improve speed and reduce unrequired operations
 - Refactored unit operator by adding a seperate unit operator for learning units
 - Enhanced learning output and path handling
 - Updated dashboard for better storage view
