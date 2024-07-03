@@ -4,11 +4,9 @@
 
 import logging
 from collections import defaultdict
-from datetime import datetime
 from pathlib import Path
 
 import torch as th
-from dateutil import rrule as rr
 from mango import Role
 
 from assume.common.base import LearningConfig, LearningStrategy
@@ -27,8 +25,6 @@ class Learning(Role):
     the provided learning configuration.
 
     Args:
-        simulation_start (datetime.datetime): The start of the simulation.
-        simulation_end (datetime.datetime): The end of the simulation.
         learning_config (LearningConfig): The configuration for the learning process.
 
     """
@@ -36,12 +32,7 @@ class Learning(Role):
     def __init__(
         self,
         learning_config: LearningConfig,
-        start: datetime,
-        end: datetime,
     ):
-        self.simulation_start = start
-        self.simulation_end = end
-
         # how many learning roles do exist and how are they named
         self.buffer: ReplayBuffer = None
         self.early_stopping_steps = learning_config.get("early_stopping_steps", 10)
@@ -89,7 +80,7 @@ class Learning(Role):
 
         self.train_freq = learning_config.get("train_freq", 1)
         self.gradient_steps = (
-            self.train_freq
+            int(self.train_freq[:-1])
             if learning_config.get("gradient_steps", -1) == -1
             else learning_config["gradient_steps"]
         )
@@ -166,21 +157,11 @@ class Learning(Role):
         if not self.perform_evaluation:
             self.context.subscribe_message(
                 self,
-                self.handle_message,
+                self.save_buffer_and_update,
                 lambda content, meta: content.get("context") == "rl_training",
             )
 
-            recurrency_task = rr.rrule(
-                freq=rr.HOURLY,
-                interval=self.train_freq,
-                dtstart=self.simulation_start,
-                until=self.simulation_end,
-                cache=True,
-            )
-
-            self.context.schedule_recurrent_task(self.update_policy, recurrency_task)
-
-    def handle_message(self, content: dict, meta: dict) -> None:
+    def save_buffer_and_update(self, content: dict, meta: dict) -> None:
         """
         Handles the incoming messages and performs corresponding actions.
 
@@ -189,13 +170,15 @@ class Learning(Role):
             meta (dict): The metadata associated with the message. (not needed yet)
         """
 
-        if content.get("type") == "replay_buffer":
+        if content.get("type") == "save_buffer_and_update":
             data = content["data"]
             self.buffer.add(
                 obs=data[0],
                 actions=data[1],
                 reward=data[2],
             )
+
+        self.update_policy()
 
     def turn_off_initial_exploration(self) -> None:
         """
@@ -284,7 +267,7 @@ class Learning(Role):
                     f"Folder with pretrained policies {directory} does not exist"
                 )
 
-    async def update_policy(self) -> None:
+    def update_policy(self) -> None:
         """
         Update the policy of the reinforcement learning agent.
 

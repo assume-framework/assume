@@ -8,7 +8,6 @@ from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
 
-import numpy as np
 import pandas as pd
 from mango import Role
 from mango.messages.message import Performatives
@@ -24,10 +23,9 @@ from assume.common.market_objects import (
 )
 from assume.common.utils import (
     aggregate_step_amount,
-    get_products_index,
     timestamp2datetime,
 )
-from assume.strategies import BaseStrategy, LearningStrategy
+from assume.strategies import BaseStrategy
 from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
@@ -175,7 +173,7 @@ class UnitsOperator(Role):
                 "sender_id": self.context.aid,
                 "reply_with": market.market_id,
             },
-        ),
+        )
         logger.debug(f"{self.id} sent market registration to {market.market_id}")
 
     def handle_opening(self, opening: OpeningMessage, meta: MetaDict) -> None:
@@ -210,7 +208,6 @@ class UnitsOperator(Role):
         marketconfig = self.registered_markets[content["market_id"]]
         self.valid_orders[marketconfig.product_type].extend(orderbook)
         self.set_unit_dispatch(orderbook, marketconfig)
-        self.write_learning_params(orderbook, marketconfig)
         self.write_actual_dispatch(marketconfig.product_type)
 
     def handle_registration_feedback(
@@ -307,11 +304,12 @@ class UnitsOperator(Role):
         start = timestamp2datetime(last + 1)
 
         market_dispatch = aggregate_step_amount(
-            self.valid_orders[product_type],
-            start,
-            now,
+            orderbook=self.valid_orders[product_type],
+            begin=timestamp2datetime(last),
+            end=now,
             groupby=["market_id", "unit_id"],
         )
+
         unit_dispatch_dfs = []
         for unit_id, unit in self.units.items():
             current_dispatch = unit.execute_current_dispatch(start, now)
@@ -330,6 +328,7 @@ class UnitsOperator(Role):
 
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
+
         return market_dispatch, unit_dispatch_dfs
 
     def write_actual_dispatch(self, product_type: str) -> None:

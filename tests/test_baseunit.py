@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pandas as pd
 import pytest
@@ -38,7 +38,7 @@ class BasicStrategy(BaseStrategy):
 def base_unit() -> BaseUnit:
     # Create a PowerPlant instance with some example parameters
     index = pd.date_range("2022-01-01", periods=4, freq="h")
-    ff = NaiveForecast(
+    NaiveForecast(
         index, availability=1, fuel_price=[10, 11, 12, 13], co2_price=[10, 20, 30, 30]
     )
     return BaseUnit(

@@ -191,10 +191,13 @@ class RLStrategy(LearningStrategy):
             },
         ]
 
-        # store results in unit outputs which are written to database by unit operator
-        unit.outputs["rl_observations"][start] = next_observation
-        unit.outputs["rl_actions"][start] = actions
-        unit.outputs["rl_exploration_noise"][start] = noise
+        # store results in unit outputs as lists to be written to the buffer for learning
+        unit.outputs["rl_observations"].append(next_observation)
+        unit.outputs["rl_actions"].append(actions)
+
+        # store results in unit outputs as series to be written to the database by the unit operator
+        unit.outputs["actions"][start] = actions
+        unit.outputs["exploration_noise"][start] = noise
 
         bids = self.remove_empty_bids(bids)
 
@@ -429,13 +432,11 @@ class RLStrategy(LearningStrategy):
         # calculate opportunity cost
         # as the loss of income we have because we are not running at full power
         opportunity_cost = (
-                (order["accepted_price"] - marginal_cost)
-                * (
-                    unit.max_power - unit.outputs[product_type].loc[start:end_excl]
-                ).sum()
-                * duration
-            )
-        
+            (order["accepted_price"] - marginal_cost)
+            * (unit.max_power - unit.outputs[product_type].loc[start:end_excl]).sum()
+            * duration
+        )
+
         # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
         opportunity_cost = max(opportunity_cost, 0)
 
@@ -469,6 +470,8 @@ class RLStrategy(LearningStrategy):
         unit.outputs["reward"].loc[start:end_excl] = reward
         unit.outputs["regret"].loc[start:end_excl] = regret_scale * opportunity_cost
         unit.outputs["total_costs"].loc[start:end_excl] = costs
+
+        unit.outputs["rl_rewards"].append(reward)
 
     def load_actor_params(self, load_path):
         """

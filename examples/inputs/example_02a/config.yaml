@@ -6,7 +6,7 @@ tiny:
   start_date: 2019-01-01 00:00
   end_date: 2019-01-05 00:00
   time_step: 1h
-  save_frequency_hours: Null
+  save_frequency_hours: null
   learning_mode: True
 
   learning_config:
@@ -17,7 +17,7 @@ tiny:
     learning_rate: 0.001
     training_episodes: 10
     episodes_collecting_initial_experience: 3
-    train_freq: 24
+    train_freq: 24h
     gradient_steps: -1
     batch_size: 64
     gamma: 0.99
@@ -48,7 +48,7 @@ tiny:
   start_date: 2019-03-01 00:00
   end_date: 2019-03-03 00:00
   time_step: 1h
-  save_frequency_hours: Null
+  save_frequency_hours: null
   learning_mode: True
 
   learning_config:

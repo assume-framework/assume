@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import asyncio
 import logging
 import shutil
 from collections import defaultdict
@@ -625,7 +624,7 @@ class WriteOutput(Role):
 
         if self.db is not None and not df.empty:
             with self.db.begin() as db:
-                df.to_sql("kpis", self.db, if_exists="append", index=None)
+                df.to_sql("kpis", db, if_exists="append", index=None)
 
     def get_sum_reward(self):
         """

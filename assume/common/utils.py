@@ -20,6 +20,13 @@ from assume.common.market_objects import MarketProduct, Orderbook
 
 logger = logging.getLogger(__name__)
 
+freq_map = {
+    "h": rr.HOURLY,
+    "m": rr.MINUTELY,
+    "d": rr.DAILY,
+    "w": rr.WEEKLY,
+}
+
 
 def initializer(func):
     """
@@ -229,7 +236,6 @@ def visualize_orderbook(order_book: Orderbook):
 
         for j, o in groupby(bids_grouped, itemgetter("link")):
             s = pd.Series(0.0, index=start_times)
-            ys = np.zeros(24)
             o = list(o)
             for order in o:
                 s[order["start_time"]] += order["volume"]
@@ -300,7 +306,7 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=No
                 end = date + timedelta(hours=duration_hours)
                 deltas.append((start, bid["volume"]) + add)
                 deltas.append((end, -bid["volume"]) + add)
-    aggregation = defaultdict(lambda: [])
+    aggregation = defaultdict(list)
     # current_power is separated by group
     current_power = defaultdict(lambda: 0)
     for d_tuple in sorted(deltas, key=lambda i: i[0]):
@@ -437,6 +443,35 @@ def timestamp2datetime(timestamp: float):
 
 def datetime2timestamp(datetime: datetime):
     return calendar.timegm(datetime.utctimetuple())
+
+
+def create_rrule(start, end, freq):
+    freq, interval = convert_to_rrule_freq(freq)
+
+    recurrency_rule = rr.rrule(
+        freq=freq,
+        interval=interval,
+        dtstart=start,
+        until=end,
+        cache=True,
+    )
+
+    return recurrency_rule
+
+
+def convert_to_rrule_freq(string: str) -> tuple[int, int]:
+    """
+    Convert a string to a rrule frequency and interval.
+
+    Args:
+        string (str): The string to be converted. Should be in the format of "1h" or "1d" or "1w".
+
+    Returns:
+        tuple[int, int]: The rrule frequency and interval.
+    """
+    freq = freq_map[string[-1]]
+    interval = int(string[:-1])
+    return freq, interval
 
 def rename_study_case(
         path: str, 

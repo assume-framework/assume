@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2,
+  "id": 1,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -50,7 +50,7 @@
         "content": "# Welcome to our ASSUME demo\n\nThis is the Grafana Dashboard which makes interacting with the simulation data very easy.",
         "mode": "markdown"
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.0.0",
       "title": "Overview Dashboard",
       "type": "text"
     },
@@ -88,7 +88,7 @@
         "content": "# Market-specific Data\n\nData specific for the market depending on the choice made at te top of the panel\n\n",
         "mode": "markdown"
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.0.0",
       "targets": [
         {
           "datasource": {
@@ -137,6 +137,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -150,6 +151,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "stepAfter",
             "lineStyle": {
               "fill": "solid"
@@ -268,6 +270,7 @@
           ""
         ],
         "tooltip": {
+          "maxHeight": 600,
           "mode": "multi",
           "sort": "none"
         }
@@ -356,6 +359,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -369,6 +373,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -407,7 +412,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 128
+        "y": 20
       },
       "id": 19,
       "options": {
@@ -420,6 +425,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "multi",
           "sort": "desc"
         }
@@ -533,6 +539,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -546,6 +553,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -584,7 +592,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 128
+        "y": 20
       },
       "id": 20,
       "options": {
@@ -597,6 +605,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "multi",
           "sort": "desc"
         }
@@ -704,7 +713,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 137
+        "y": 29
       },
       "id": 74,
       "panels": [],
@@ -722,6 +731,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -736,6 +746,9 @@
             "lineWidth": 1,
             "scaleDistribution": {
               "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
             }
           },
           "mappings": [],
@@ -793,12 +806,13 @@
         "h": 12,
         "w": 10,
         "x": 0,
-        "y": 138
+        "y": 30
       },
       "id": 72,
       "options": {
         "barRadius": 0,
         "barWidth": 0.97,
+        "fullHighlight": false,
         "groupWidth": 0.7,
         "legend": {
           "calcs": [],
@@ -810,6 +824,7 @@
         "showValue": "never",
         "stacking": "none",
         "tooltip": {
+          "maxHeight": 600,
           "mode": "multi",
           "sort": "none"
         },
@@ -865,7 +880,9 @@
         "defaults": {
           "custom": {
             "align": "auto",
-            "displayMode": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
             "inspect": false
           },
           "mappings": [],
@@ -927,11 +944,13 @@
         "h": 12,
         "w": 9,
         "x": 10,
-        "y": 138
+        "y": 30
       },
       "id": 76,
       "options": {
+        "cellHeight": "sm",
         "footer": {
+          "countRows": false,
           "fields": "",
           "reducer": [
             "sum"
@@ -946,7 +965,7 @@
           }
         ]
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.0.0",
       "targets": [
         {
           "datasource": {
@@ -1012,7 +1031,7 @@
         "h": 12,
         "w": 5,
         "x": 19,
-        "y": 138
+        "y": 30
       },
       "id": 7,
       "options": {
@@ -1034,6 +1053,7 @@
           "values": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
@@ -1101,7 +1121,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 150
+        "y": 42
       },
       "id": 41,
       "panels": [],
@@ -1118,7 +1138,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 151
+        "y": 43
       },
       "id": 22,
       "options": {
@@ -1130,7 +1150,7 @@
         "content": "# Unit Specific Data\n\nFor the chosen market and the chosen unit here the dispatch is displayed.",
         "mode": "markdown"
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.0.0",
       "targets": [
         {
           "datasource": {
@@ -1178,6 +1198,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -1191,6 +1212,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineStyle": {
               "fill": "solid"
@@ -1232,7 +1254,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 154
+        "y": 46
       },
       "id": 24,
       "options": {
@@ -1247,6 +1269,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "multi",
           "sort": "desc"
         }
@@ -1349,7 +1372,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 154
+        "y": 46
       },
       "id": 26,
       "options": {
@@ -1369,7 +1392,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "4.3.0",
+      "pluginVersion": "5.0.0",
       "targets": [
         {
           "datasource": {
@@ -1419,6 +1442,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -1432,6 +1456,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -1483,7 +1508,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 163
+        "y": 55
       },
       "id": 70,
       "options": {
@@ -1498,6 +1523,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "multi",
           "sort": "desc"
         }
@@ -1646,6 +1672,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -1659,6 +1686,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -1725,7 +1753,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 163
+        "y": 55
       },
       "id": 78,
       "options": {
@@ -1740,6 +1768,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
@@ -1896,7 +1925,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 171
+        "y": 63
       },
       "id": 93,
       "options": {
@@ -1911,9 +1940,11 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.0.0",
       "targets": [
         {
           "datasource": {
@@ -1963,6 +1994,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -1976,6 +2008,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -2045,7 +2078,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 180
+        "y": 72
       },
       "id": 99,
       "options": {
@@ -2056,6 +2089,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
@@ -2104,7 +2138,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 185
+        "y": 77
       },
       "id": 39,
       "panels": [],
@@ -2122,6 +2156,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -2135,6 +2170,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
@@ -2173,7 +2209,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 186
+        "y": 78
       },
       "id": 36,
       "options": {
@@ -2188,6 +2224,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "multi",
           "sort": "desc"
         }
@@ -2289,7 +2326,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 186
+        "y": 78
       },
       "id": 37,
       "options": {
@@ -2309,7 +2346,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "4.3.0",
+      "pluginVersion": "5.0.0",
       "targets": [
         {
           "datasource": {
@@ -2359,6 +2396,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -2372,6 +2410,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -2393,7 +2432,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2422,7 +2462,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 195
+        "y": 87
       },
       "id": 89,
       "options": {
@@ -2437,6 +2477,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "multi",
           "sort": "desc"
         }
@@ -2554,7 +2595,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2610,7 +2652,7 @@
         "h": 5,
         "w": 4,
         "x": 12,
-        "y": 195
+        "y": 87
       },
       "id": 95,
       "options": {
@@ -2625,9 +2667,11 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.0.0",
       "targets": [
         {
           "datasource": {
@@ -2678,6 +2722,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -2691,6 +2736,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -2712,7 +2758,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2756,7 +2803,7 @@
         "h": 5,
         "w": 8,
         "x": 16,
-        "y": 195
+        "y": 87
       },
       "id": 90,
       "options": {
@@ -2771,6 +2818,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "multi",
           "sort": "none"
         }
@@ -2845,7 +2893,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2861,7 +2910,7 @@
         "h": 4,
         "w": 4,
         "x": 12,
-        "y": 200
+        "y": 92
       },
       "id": 96,
       "options": {
@@ -2876,9 +2925,11 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.0.0",
       "targets": [
         {
           "datasource": {
@@ -2932,7 +2983,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2948,7 +3000,7 @@
         "h": 4,
         "w": 8,
         "x": 16,
-        "y": 200
+        "y": 92
       },
       "id": 94,
       "options": {
@@ -2963,9 +3015,11 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.0.0",
       "targets": [
         {
           "datasource": {
@@ -3015,6 +3069,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -3028,6 +3083,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -3049,7 +3105,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3081,7 +3138,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 204
+        "y": 96
       },
       "id": 86,
       "options": {
@@ -3097,6 +3154,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "multi",
           "sort": "none"
         }
@@ -3144,7 +3202,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 213
+        "y": 105
       },
       "id": 44,
       "panels": [],
@@ -3162,6 +3220,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -3175,6 +3234,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "smooth",
             "lineWidth": 2,
             "pointSize": 5,
@@ -3196,7 +3256,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3212,7 +3273,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 214
+        "y": 106
       },
       "id": 65,
       "options": {
@@ -3227,6 +3288,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "multi",
           "sort": "desc"
         }
@@ -3312,7 +3374,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3327,7 +3390,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 214
+        "y": 106
       },
       "id": 47,
       "options": {
@@ -3347,7 +3410,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "4.3.0",
+      "pluginVersion": "5.0.0",
       "targets": [
         {
           "datasource": {
@@ -3387,7 +3450,7 @@
     },
     {
       "datasource": {
-        "type": "postgres",
+        "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
       "fieldConfig": {
@@ -3396,6 +3459,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -3409,6 +3473,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -3430,7 +3495,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3446,7 +3512,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 223
+        "y": 115
       },
       "id": 80,
       "options": {
@@ -3461,6 +3527,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
@@ -3471,11 +3538,12 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  SOC AS \"State of Charge\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, SOC\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  SOC*100 AS \"State of Charge\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, SOC\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -3487,6 +3555,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -3522,7 +3607,7 @@
     },
     {
       "datasource": {
-        "type": "postgres",
+        "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
       "description": "Bid prices of accepted bids per unit in the chosen market",
@@ -3532,6 +3617,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -3545,6 +3631,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -3566,7 +3653,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3595,7 +3683,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 232
+        "y": 124
       },
       "id": 91,
       "options": {
@@ -3610,6 +3698,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "multi",
           "sort": "desc"
         }
@@ -3621,6 +3710,7 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [
             {
@@ -3639,7 +3729,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  accepted_price AS \"Accepted price:\",\r\n  price AS \"Bid price:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Storage_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id, price, accepted_price\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  CASE WHEN avg(accepted_volume) < 0 THEN avg(accepted_price::float) END AS \"Accepted price Discharge\",\r\n  CASE WHEN avg(accepted_volume) >= 0 THEN avg(accepted_price::float) END AS \"Accepted price Charge\",\r\n  CASE WHEN avg(volume) < 0 THEN avg(price) END AS \"Bid price Discharge\",\r\n  CASE WHEN avg(volume) >= 0 THEN avg(price) END AS \"Bid price Charge\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Storage_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id\r\nORDER BY 1\r\n",
           "refId": "A",
           "select": [
             [
@@ -3677,6 +3767,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_orders",
           "timeColumn": "start_time",
           "timeColumnType": "timestamp",
@@ -3714,7 +3821,7 @@
     },
     {
       "datasource": {
-        "type": "postgres",
+        "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
       "description": "",
@@ -3724,6 +3831,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -3737,6 +3845,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -3758,7 +3867,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3802,7 +3912,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 232
+        "y": 124
       },
       "id": 92,
       "options": {
@@ -3817,6 +3927,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "multi",
           "sort": "none"
         }
@@ -3827,11 +3938,12 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_volume) AS \"Accepted volume:\",\r\n  avg(volume) AS \"Bid volume:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Storage_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id\r\nORDER BY 1\r\n",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_volume) AS \"Accepted volume:\",\r\n  CASE WHEN avg(volume) < 0 THEN avg(volume) END AS \"Bid volume charge:\",\r\n  CASE WHEN avg(volume) >= 0 THEN avg(volume) END AS \"Bid volume discharge:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Storage_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id\r\nORDER BY 1\r\n",
           "refId": "A",
           "select": [
             [
@@ -3843,6 +3955,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -3925,7 +4054,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3972,7 +4102,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 241
+        "y": 133
       },
       "id": 97,
       "options": {
@@ -3987,9 +4117,11 @@
           "fields": "",
           "values": false
         },
-        "textMode": "auto"
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.0.0",
       "targets": [
         {
           "datasource": {
@@ -4039,6 +4171,7 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
@@ -4052,6 +4185,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -4073,7 +4207,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -4113,30 +4248,6 @@
                 }
               }
             ]
-          },
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "Cashflow Goldisthal"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
           }
         ]
       },
@@ -4144,7 +4255,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 250
+        "y": 142
       },
       "id": 98,
       "options": {
@@ -4155,6 +4266,7 @@
           "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "multi",
           "sort": "none"
         }
@@ -4199,8 +4311,7 @@
     }
   ],
   "refresh": false,
-  "schemaVersion": 37,
-  "style": "dark",
+  "schemaVersion": 39,
   "tags": [],
   "templating": {
     "list": [
@@ -4334,6 +4445,7 @@
     "from": "2019-01-01T00:00:00.000Z",
     "to": "2019-01-15T23:59:59.000Z"
   },
+  "timeRangeUpdatedDuringEditOrView": false,
   "timepicker": {
     "refresh_intervals": [
       "5s",
@@ -4347,6 +4459,6 @@
   "timezone": "utc",
   "title": "ASSUME: Main overview",
   "uid": "mQ3Lvkr4k",
-  "version": 6,
+  "version": 5,
   "weekStart": ""
 }

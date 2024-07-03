@@ -7,7 +7,6 @@ from datetime import datetime
 
 import pandas as pd
 from sqlalchemy import create_engine
-from sqlalchemy.orm import scoped_session, sessionmaker
 
 from assume.common.outputs import WriteOutput
 

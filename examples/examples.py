@@ -67,7 +67,11 @@ available_examples = {
     "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
     "small_learning_1_lstm": {"scenario": "example_02a", "study_case": "base_lstm"},
     "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
-    "small_learning_3": {"scenario": "example_02c", "study_case": "dam"},
+    "small_learning_3": {"scenario": "example_02c", "study_case": "base"},
+    "learning_with_complex_bids": {
+        "scenario": "example_02e",
+        "study_case": "base",
+    },
     # Cases resembling Harder et al. 2023
     "harder_case1": {"scenario": "example_02a", "study_case": "harder"},
     "harder_case1_lstm": {"scenario": "example_02a", "study_case": "harder_lstm"},

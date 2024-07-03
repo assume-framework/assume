@@ -7,13 +7,13 @@
 import tomllib
 
 with open("../../pyproject.toml", "rb") as f:
-    pyproject_toml = tomllib.load(f)["tool"]["poetry"]
+    pyproject_toml = tomllib.load(f)["project"]
 
 # -- Project information
 
 project = "ASSUME"
 copyright = "2022-2024 ASSUME Developers"
-author = ",".join(pyproject_toml["authors"])
+author = ",".join([a["name"] for a in pyproject_toml["authors"]])
 
 version = pyproject_toml["version"]
 release = version

@@ -4,10 +4,10 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from collections.abc import Callable
+from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
-from typing import Callable
 
 import pandas as pd
 from dateutil import rrule as rr
@@ -16,7 +16,6 @@ from dateutil.relativedelta import relativedelta as rd
 from assume.common.market_objects import (
     ClearingMessage,
     MarketConfig,
-    MarketProduct,
     MetaDict,
     Order,
     Orderbook,

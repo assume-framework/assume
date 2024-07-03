@@ -41,7 +41,7 @@ class Demand(SupportsMinMax):
         node: str = "node0",
         price: float | pd.Series = 3000.0,
         location: tuple[float, float] = (0.0, 0.0),
-        **kwargs
+        **kwargs,
     ):
         super().__init__(
             id=id,

@@ -155,6 +155,19 @@ To run pre-commit checks directly, use:
 pre-commit run --all-files
 ```
 
+### Release
+
+To release a new version, increase the version in `pyproject.toml` and create a git tag of the release commit and release notes in GitHub.
+To push to PyPi run:
+
+```
+rm -r dist
+python -m build .
+twine upload --repository pypi dist/*
+```
+
+See also: https://twine.readthedocs.io/en/stable/index.html#using-twine
+
 ## Creating Documentation
 
 First, create an environment that includes the documentation dependencies:

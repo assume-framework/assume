@@ -12,7 +12,6 @@ from pyomo.environ import (
     ConcreteModel,
     Constraint,
     ConstraintList,
-    NonNegativeReals,
     Objective,
     Reals,
     Var,

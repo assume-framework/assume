@@ -514,7 +514,7 @@ async def load_amiris_async(
         "MeritOrderForecaster",
     ]
     agents_sorted = sorted(
-        amiris_scenario["Agents"], key=lambda agent: keyorder.index((agent["Type"]))
+        amiris_scenario["Agents"], key=lambda agent: keyorder.index(agent["Type"])
     )
     for agent in agents_sorted:
         add_agent_to_world(

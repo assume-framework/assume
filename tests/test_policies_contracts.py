@@ -2,26 +2,16 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import asyncio
 from datetime import datetime
 
 import pandas as pd
 from dateutil import rrule as rr
-from dateutil.relativedelta import relativedelta as rd
-from mango import Agent, RoleAgent, create_container
-from mango.util.clock import ExternalClock
 
-from assume.common.forecasts import NaiveForecast
-from assume.common.market_objects import MarketConfig, MarketProduct
-from assume.common.units_operator import UnitsOperator
-from assume.markets.base_market import MarketRole
 from assume.markets.clearing_algorithms.contracts import (
     available_contracts,
     market_premium,
 )
 from assume.strategies.extended import is_co2emissionless
-from assume.strategies.naive_strategies import NaiveSingleBidStrategy
-from assume.units.demand import Demand
 
 
 def test_contract_functions():
