@@ -234,7 +234,7 @@ class SteelPlant(SupportsMinMax):
                     self.dsm_components["eaf"].b.steel_output[t]
                     for t in model.time_steps
                 )
-                == model.steel_demand
+                <= model.steel_demand
             )
 
         # @self.model.Constraint(self.model.time_steps)
