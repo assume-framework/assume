@@ -8,6 +8,7 @@ from collections.abc import Callable
 from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
+from random import shuffle
 
 import pandas as pd
 from dateutil import rrule as rr
@@ -152,6 +153,10 @@ class PayAsBidContractRole(MarketRole):
             product_orders = list(product_orders)
             demand_orders = list(filter(lambda x: x["volume"] < 0, product_orders))
             supply_orders = list(filter(lambda x: x["volume"] > 0, product_orders))
+
+            #shufle all orders to avoid always having the same order of bids with the same price
+            shuffle(supply_orders)
+            shuffle(demand_orders)
 
             # generation
             supply_orders.sort(key=lambda i: i["price"])

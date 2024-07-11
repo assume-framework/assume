@@ -6,6 +6,7 @@ import logging
 from datetime import timedelta
 from itertools import groupby
 from operator import itemgetter
+from random import shuffle
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.markets.base_market import MarketRole
@@ -77,6 +78,10 @@ class PayAsClearRole(MarketRole):
             supply_orders = [x for x in product_orders if x["volume"] > 0]
             demand_orders = [x for x in product_orders if x["volume"] < 0]
             # volume 0 is ignored/invalid
+
+            #shufle all orders to avoid always having the same order of bids with the same price
+            shuffle(supply_orders)
+            shuffle(demand_orders)
 
             # generation
             supply_orders.sort(key=itemgetter("price"))
