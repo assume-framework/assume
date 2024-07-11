@@ -26,7 +26,7 @@ from assume.units.dst_components import (
     GenericStorage,
 )
 
-SOLVERS = ["glpk", "gurobi", "cbc", "cplex"]
+SOLVERS = ["gurobi", "glpk", "cbc", "cplex"]
 
 logger = logging.getLogger(__name__)
 
@@ -234,7 +234,7 @@ class SteelPlant(SupportsMinMax):
                     self.dsm_components["eaf"].b.steel_output[t]
                     for t in model.time_steps
                 )
-                <= model.steel_demand
+                == model.steel_demand
             )
 
         # @self.model.Constraint(self.model.time_steps)
