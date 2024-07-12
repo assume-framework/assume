@@ -10,7 +10,7 @@ dependencies:
 - pip
 - ipykernel
 - pandas
-- numpy
+- numpy>=1.26.4
 - tqdm
 - SQLAlchemy
 - matplotlib

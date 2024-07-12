@@ -18,16 +18,10 @@ from assume.common.base import LearningConfig
 from assume.common.exceptions import AssumeException
 from assume.common.forecasts import CsvForecaster, Forecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
+from assume.common.utils import convert_to_rrule_freq
 from assume.world import World
 
 logger = logging.getLogger(__name__)
-
-freq_map = {
-    "h": rr.HOURLY,
-    "m": rr.MINUTELY,
-    "d": rr.DAILY,
-    "w": rr.WEEKLY,
-}
 
 
 def load_file(
@@ -185,21 +179,6 @@ def load_dsm_units(
     # Convert the structured dictionary into a DataFrame
     dsm_units = pd.DataFrame.from_dict(dsm_units_dict, orient="index")
     return dsm_units
-
-
-def convert_to_rrule_freq(string: str) -> tuple[int, int]:
-    """
-    Convert a string to a rrule frequency and interval.
-
-    Args:
-        string (str): The string to be converted. Should be in the format of "1h" or "1d" or "1w".
-
-    Returns:
-        tuple[int, int]: The rrule frequency and interval.
-    """
-    freq = freq_map[string[-1]]
-    interval = int(string[:-1])
-    return freq, interval
 
 
 def replace_paths(config: dict, inputs_path: str):
@@ -587,7 +566,10 @@ async def async_setup_world(
         all_operators = np.concatenate([all_operators, ["Operator-RL"]])
 
     for company_name in set(all_operators):
-        world.add_unit_operator(id=str(company_name))
+        if company_name == "Operator-RL" and world.learning_mode:
+            world.add_rl_unit_operator(id="Operator-RL")
+        else:
+            world.add_unit_operator(id=str(company_name))
 
     # add the units to corresponding unit operators
     add_units(
@@ -843,7 +825,7 @@ def run_learning(
     if Path(save_path).is_dir():
         # we are in learning mode and about to train new policies, which might overwrite existing ones
         accept = input(
-            f"{save_path=} exists - should we overwrite current learnings? (y/N)"
+            f"{save_path=} exists - should we overwrite current learnings? (y/N) "
         )
         if not accept.lower().startswith("y"):
             # stop here - do not start learning or save anything
@@ -907,7 +889,7 @@ def run_learning(
         if (
             episode % validation_interval == 0
             and episode
-            > world.learning_role.episodes_collecting_initial_experience
+            >= world.learning_role.episodes_collecting_initial_experience
             + validation_interval
         ):
             world.reset()

@@ -17,8 +17,9 @@ Here you can find an overview of the different exampels provided. Below you find
   small_with_opt_clearing       example_01a                     Small simulation with optimization clearing instead of pay_as_clear.
   small_with_BB                 example_01d                     Small Simulation with Block Bids and complex clearing.
   small_with_vre                example_01b                     Small simulation with variable renewable energy.
-  small_learning_1              example_02a                     A small study with roughly 10 powerplants, where one powerplant is equiped with a learning bidding strategy and can learn to exert market power.
-  small_learning_2              example_02b                     A small study with roughly 10 powerplants, where multiple powerplants are equiped with a learning bidding strategy and learn that they do not have market power anymore.
+  small_learning_1              example_02a                     A small study with roughly 7 power plants, where 1 power plant is equiped with a learning bidding strategy and can learn to exert market power. [1]
+  small_learning_2              example_02b                     A small study with roughly 11 power plants, where 5 power plants are equiped with a learning bidding strategy and learn that they do not have market power anymore. [1]
+  small_learning_3              example_02c                     A small study with roughly 16 power plants, where 10 power plants are equiped with a learning bidding strategy and learn that they do not have market power anymore. [1]
  ============================= ============================= =====================================================
 
 The following table categorizes the different provided examples in a more detailed manner. We included the main features of ASSUME in the table.
@@ -27,11 +28,12 @@ The following table categorizes the different provided examples in a more detail
 ============================== =============== =============== =================== ====================== ============= ============= ================= ============== =============
 example name                   Country         Generation Tech Generation Volume   Demand Tech            Demand Volume Markets       Bidding Strategy  Grid           Further Infos
 ============================== =============== =============== =================== ====================== ============= ============= ================= ============== =============
-small_learning_1               Germany         conventional    12,500 MW           fixed inflexible       1,000,000 MW  EoM           Learning, Naive   No             Resembles Case 1 from Harder et.al. 2023
-small_learning_2               Germany         conventional    12,500 MW           fixed inflexible       1,000,000 MW  EoM           Learning, Naive   No             Resembles Case 2 from Harder et.al. 2023
+small_learning_1               Germany         conventional    12,500 MW           fixed inflexible       1,000,000 MW  EoM           Learning, Naive   No             Resembles Case 1 from [1]
+small_learning_2               Germany         conventional    12,500 MW           fixed inflexible       1,000,000 MW  EoM           Learning, Naive   No             Resembles Case 2 from [1]
+small_learning_3               Germany         conventional    12,500 MW           fixed inflexible       1,000,000 MW  EoM           Learning, Naive   No             Resembles Case 3 from [1]
 ============================== =============== =============== =================== ====================== ============= ============= ================= ============== =============
 
 
 References
 -----------
-Harder, Nick & Qussous, Ramiz & Weidlich, Anke. (2023). Fit for purpose: Modeling wholesale electricity markets realistically with multi-agent deep reinforcement learning. Energy and AI. 14. 100295. 10.1016/j.egyai.2023.100295.
+[1] Harder, Nick & Qussous, Ramiz & Weidlich, Anke. (2023). Fit for purpose: Modeling wholesale electricity markets realistically with multi-agent deep reinforcement learning. Energy and AI. 14. 100295. 10.1016/j.egyai.2023.100295.
