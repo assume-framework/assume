@@ -119,7 +119,6 @@ class CsvForecaster(Forecaster):
         self.powerplants_units = powerplants_units
         self.demand_units = demand_units
         self.market_configs = market_configs
-
         self.forecasts = pd.DataFrame(index=index)
 
     def __getitem__(self, column: str) -> pd.Series:
