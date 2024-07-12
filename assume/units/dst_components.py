@@ -9,7 +9,7 @@ class Electrolyser:
     """
     Represents an electrolyser unit used for hydrogen production through electrolysis.
 
-    Attributes:
+    Args:
         model (pyomo.ConcreteModel): The Pyomo model where the electrolyser unit will be added.
         id (str): Identifier for the electrolyser unit.
         rated_power (float): The rated power capacity of the electrolyser (in kW).
@@ -20,6 +20,17 @@ class Electrolyser:
         min_down_time (float): The minimum downtime required between operating cycles (in hours).
         efficiency (float): The efficiency of the electrolysis process.
         fuel_type (str): The type of fuel used by the electrolyser unit.
+
+    Constraints:
+        power_upper_bound: Ensures the power input to the electrolyser does not exceed the rated power capacity.
+        power_lower_bound: Ensures the power input to the electrolyser does not fall below the minimum required power.
+        ramp_up_constraint: Limits the rate at which the power input to the electrolyser can increase.
+        ramp_down_constraint: Limits the rate at which the power input to the electrolyser can decrease.
+        min_operating_time_electrolyser_constraint: Ensures the electrolyser operates continuously for a minimum duration.
+        min_downtime_electrolyser_constraint: Ensures the electrolyser has a minimum downtime between operating cycles.
+        efficiency_constraint: Relates the power input to the hydrogen output based on the efficiency of the electrolysis process.
+        operating_cost_with_el_price: Calculates the operating cost of the electrolyser based on the electricity price.
+
     """
 
     def __init__(
@@ -36,22 +47,6 @@ class Electrolyser:
         fuel_type,
         **kwargs,
     ):
-        """
-        Initializes the Electrolyser object with the provided parameters.
-
-        Args:
-            model (pyomo.ConcreteModel): The Pyomo model where the electrolyser unit will be added.
-            id (str): Identifier for the electrolyser unit.
-            rated_power (float): The rated power capacity of the electrolyser (in kW).
-            min_power (float): The minimum power required for operation (in kW).
-            ramp_up (float): The maximum rate at which the electrolyser can increase its power output (in kW/hr).
-            ramp_down (float): The maximum rate at which the electrolyser can decrease its power output (in kW/hr).
-            min_operating_time (float): The minimum duration the electrolyser must operate continuously (in hours).
-            min_down_time (float): The minimum downtime required between operating cycles (in hours).
-            efficiency (float): The efficiency of the electrolysis process.
-            fuel_type (str): The type of fuel used by the electrolyser unit.
-            **kwargs: Additional keyword arguments.
-        """
         self.model = model
         self.id = id
         self.fuel_type = fuel_type
@@ -212,6 +207,38 @@ class Electrolyser:
 
 
 class DriPlant:
+    """
+    Represents a Direct Reduced Iron (DRI) plant in a steel production process.
+
+    Args:
+        model (pyomo.ConcreteModel): The Pyomo model where the DRI plant will be added.
+        id (str): Identifier for the DRI plant.
+        specific_hydrogen_consumption (float): The specific hydrogen consumption of the DRI plant (in kg per ton of DRI).
+        specific_natural_gas_consumption (float): The specific natural gas consumption of the DRI plant (in m3 per ton of DRI).
+        specific_electricity_consumption (float): The specific electricity consumption of the DRI plant (in kWh per ton of DRI).
+        specific_iron_ore_consumption (float): The specific iron ore consumption of the DRI plant (in kg per ton of DRI).
+        rated_power (float): The rated power capacity of the DRI plant (in MW).
+        min_power (float): The minimum power required for operation (in MW).
+        fuel_type (str): The type of fuel used by the DRI plant.
+        ramp_up (float): The maximum rate at which the DRI plant can increase its power output (in MW/hr).
+        ramp_down (float): The maximum rate at which the DRI plant can decrease its power output (in MW/hr).
+        min_operating_time (float): The minimum duration the DRI plant must operate continuously (in hours).
+        min_down_time (float): The minimum downtime required between operating cycles (in hours).
+
+    Constraints:
+        dri_power_lower_bound: Ensures that the power input to the DRI plant does not fall below the minimum power requirement.
+        dri_power_upper_bound: Ensures that the power input to the DRI plant does not exceed the rated power capacity.
+        dri_output_constraint: Relates the DRI output to the fuel inputs based on the specific consumption rates.
+        dri_output_electricity_constraint: Relates the electricity input to the DRI output based on the specific electricity consumption.
+        iron_ore_constraint: Relates the iron ore input to the DRI output based on the specific iron ore consumption.
+        ramp_up_dri_constraint: Limits the rate at which the power input to the DRI plant can increase.
+        ramp_down_dri_constraint: Limits the rate at which the power input to the DRI plant can decrease.
+        min_operating_time_dri_constraint: Ensures that the DRI plant operates continuously for a minimum duration.
+        min_down_time_dri_constraint: Ensures that the DRI plant has a minimum downtime between operating cycles.
+        dri_operating_cost_constraint: Calculates the operating cost of the DRI plant based on inputs and prices.
+
+    """
+
     def __init__(
         self,
         model,
@@ -398,24 +425,31 @@ class ElectricArcFurnace:
     """
     Represents an Electric Arc Furnace (EAF) in a steel production process.
 
-    Parameters:
-    - model: A Pyomo ConcreteModel object representing the optimization model.
-    - id: A unique identifier for the ElectricArcFurnace instance.
-    - rated_power: The rated power capacity of the electric arc furnace (in MW).
-    - min_power: The minimum power requirement of the electric arc furnace (in MW).
-    - specific_electricity_consumption: The specific electricity consumption of the electric arc furnace (in kWh per ton of steel produced).
-    - specific_dri_demand: The specific demand for Direct Reduced Iron (DRI) in the electric arc furnace (in tons per ton of steel produced).
-    - specific_lime_demand: The specific demand for lime in the electric arc furnace (in tons per ton of steel produced).
-    - ramp_up: The ramp-up rate of the electric arc furnace (in MW per hour).
-    - ramp_down: The ramp-down rate of the electric arc furnace (in MW per hour).
-    - min_operating_time: The minimum operating time requirement for the electric arc furnace (in hours).
-    - min_down_time: The minimum downtime requirement for the electric arc furnace (in hours).
+    Args:
+        model: A Pyomo ConcreteModel object representing the optimization model.
+        id: A unique identifier for the ElectricArcFurnace instance.
+        rated_power: The rated power capacity of the electric arc furnace (in MW).
+        min_power: The minimum power requirement of the electric arc furnace (in MW).
+        specific_electricity_consumption: The specific electricity consumption of the electric arc furnace (in kWh per ton of steel produced).
+        specific_dri_demand: The specific demand for Direct Reduced Iron (DRI) in the electric arc furnace (in tons per ton of steel produced).
+        specific_lime_demand: The specific demand for lime in the electric arc furnace (in tons per ton of steel produced).
+        ramp_up: The ramp-up rate of the electric arc furnace (in MW per hour).
+        ramp_down: The ramp-down rate of the electric arc furnace (in MW per hour).
+        min_operating_time: The minimum operating time requirement for the electric arc furnace (in hours).
+        min_down_time: The minimum downtime requirement for the electric arc furnace (in hours).
 
-    Methods:
-    - add_to_model(unit_block, time_steps): Adds the ElectricArcFurnace instance to the optimization model.
-    - define_parameters(): Defines the parameters for the ElectricArcFurnace instance.
-    - define_variables(time_steps): Defines the decision variables for the ElectricArcFurnace instance.
-    - define_constraints(time_steps): Defines the constraints for the ElectricArcFurnace instance.
+    Constraints:
+        electricity_input_upper_bound: Limits the electricity input to the rated power capacity.
+        electricity_input_lower_bound: Ensures the electricity input does not fall below the minimum power requirement.
+        steel_output_dri_relation: Defines the steel output based on the DRI input and efficiency.
+        steel_output_power_relation: Defines the steel output based on the electricity input and efficiency.
+        eaf_lime_demand: Defines the lime demand based on the steel output and specific lime demand.
+        eaf_co2_emission: Defines the CO2 emissions based on the lime demand and CO2 factor.
+        ramp_up_eaf_constraint: Limits the rate at which the electricity input can increase.
+        ramp_down_eaf_constraint: Limits the rate at which the electricity input can decrease.
+        min_operating_time_eaf_constraint: Ensures the EAF operates continuously for a minimum duration.
+        min_down_time_eaf_constraint: Ensures the EAF has a minimum downtime between operating cycles.
+        eaf_operating_cost_cosntraint: Calculates the operating cost of the EAF based on inputs and prices.
     """
 
     def __init__(
@@ -583,7 +617,7 @@ class GenericStorage:
     """
     Represents a generic energy storage unit.
 
-    Attributes:
+    Args:
         model: A Pyomo ConcreteModel object representing the optimization model.
         id (str): A unique identifier for the storage unit.
         max_capacity (float): The maximum storage capacity of the unit.
@@ -592,16 +626,16 @@ class GenericStorage:
         storage_loss_rate (float): The rate of energy loss due to storage inefficiency.
         charge_loss_rate (float): The rate of energy loss during charging.
         discharge_loss_rate (float): The rate of energy loss during discharging.
+        **kwargs: Additional keyword arguments.
 
-    Methods:
-        add_to_model(unit_block, time_steps):
-            Adds the storage unit to the optimization model.
-        define_parameters():
-            Defines the parameters of the storage unit in the optimization model.
-        define_variables(time_steps):
-            Defines the variables of the storage unit in the optimization model.
-        define_constraints(time_steps):
-            Defines the constraints of the storage unit in the optimization model.
+    Constraints:
+        storage_min_capacity_constraint: Ensures the SOC of the storage unit stays above the minimum capacity.
+        storage_max_capacity_constraint: Ensures the SOC of the storage unit stays below the maximum capacity.
+        energy_in_max_capacity_constraint: Limits the charging of the storage unit to its maximum capacity.
+        energy_out_max_capacity_constraint: Limits the discharging of the storage unit to its maximum capacity.
+        energy_in_uniformity_constraint: Ensures uniformity in charging the storage unit.
+        energy_out_uniformity_constraint: Ensures uniformity in discharging the storage unit.
+        storage_capacity_change_constraint: Defines the change in SOC of the storage unit over time.
     """
 
     def __init__(
@@ -616,20 +650,6 @@ class GenericStorage:
         discharge_loss_rate,
         **kwargs,
     ):
-        """
-        Initializes a GenericStorage object with the specified parameters.
-
-        Args:
-            model: A Pyomo ConcreteModel object representing the optimization model.
-            id (str): A unique identifier for the storage unit.
-            max_capacity (float): The maximum storage capacity of the unit.
-            min_capacity (float): The minimum storage capacity of the unit.
-            initial_soc (float): The initial state of charge (SOC) of the storage unit.
-            storage_loss_rate (float): The rate of energy loss due to storage inefficiency.
-            charge_loss_rate (float): The rate of energy loss during charging.
-            discharge_loss_rate (float): The rate of energy loss during discharging.
-            **kwargs: Additional keyword arguments.
-        """
         self.model = model
         self.id = id
         self.max_capacity = max_capacity
@@ -697,24 +717,24 @@ class DRIStorage:
     """
     Represents a Direct Reduced Iron (DRI) storage unit.
 
-    Parameters:
-    - model: A Pyomo ConcreteModel object representing the optimization model.
-    - id: A unique identifier for the DRI storage unit.
-    - max_capacity: The maximum capacity of the DRI storage unit.
-    - min_capacity: The minimum capacity of the DRI storage unit.
-    - initial_soc: The initial state of charge (SOC) of the DRI storage unit.
-    - storage_loss_rate: The rate of DRI loss due to storage over time.
-    - charge_loss_rate: The rate of DRI loss during charging.
-    - discharge_loss_rate: The rate of DRI loss during discharging.
+    Args:
+        model: A Pyomo ConcreteModel object representing the optimization model.
+        id: A unique identifier for the DRI storage unit.
+        max_capacity: The maximum capacity of the DRI storage unit.
+        min_capacity: The minimum capacity of the DRI storage unit.
+        initial_soc: The initial state of charge (SOC) of the DRI storage unit.
+        storage_loss_rate: The rate of DRI loss due to storage over time.
+        charge_loss_rate: The rate of DRI loss during charging.
+        discharge_loss_rate: The rate of DRI loss during discharging.
 
     Constraints:
-    - storage_min_capacity_dri_constraint: Ensures the SOC of the DRI storage unit stays above the minimum capacity.
-    - storage_max_capacity_dri_constraint: Ensures the SOC of the DRI storage unit stays below the maximum capacity.
-    - energy_in_max_capacity_dri_constraint: Limits the charging of the DRI storage unit to its maximum capacity.
-    - energy_out_max_capacity_dri_constraint: Limits the discharging of the DRI storage unit to its maximum capacity.
-    - energy_in_uniformity_dri_constraint: Ensures uniformity in charging the DRI storage unit.
-    - energy_out_uniformity_dri_constraint: Ensures uniformity in discharging the DRI storage unit.
-    - storage_capacity_change_dri_constraint: Defines the change in SOC of the DRI storage unit over time.
+        storage_min_capacity_dri_constraint: Ensures the SOC of the DRI storage unit stays above the minimum capacity.
+        storage_max_capacity_dri_constraint: Ensures the SOC of the DRI storage unit stays below the maximum capacity.
+        energy_in_max_capacity_dri_constraint: Limits the charging of the DRI storage unit to its maximum capacity.
+        energy_out_max_capacity_dri_constraint: Limits the discharging of the DRI storage unit to its maximum capacity.
+        energy_in_uniformity_dri_constraint: Ensures uniformity in charging the DRI storage unit.
+        energy_out_uniformity_dri_constraint: Ensures uniformity in discharging the DRI storage unit.
+        storage_capacity_change_dri_constraint: Defines the change in SOC of the DRI storage unit over time.
     """
 
     def __init__(

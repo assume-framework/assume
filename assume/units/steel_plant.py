@@ -41,6 +41,24 @@ dst_components = {
 
 
 class SteelPlant(SupportsMinMax):
+    """
+    The SteelPlant class represents a steel plant unit in the energy system.
+
+    Args:
+        id (str): The unique identifier of the unit.
+        unit_operator (str): The operator of the unit.
+        bidding_strategies (dict): The bidding strategies of the unit.
+        technology (str): The technology of the unit.
+        node (str): The node of the unit.
+        index (pd.DatetimeIndex): The index for the data of the unit.
+        location (tuple[float, float]): The location of the unit.
+        components (dict[str, dict]): The components of the unit such as Electrolyser, DRI Plant, DRI Storage, and Electric Arc Furnace.
+        objective (str): The objective of the unit, e.g. minimize variable cost ("min_variable_cost").
+        flexibility_measure (str): The flexibility measure of the unit, e.g. maximum load shift ("max_load_shift").
+        demand (float): The demand of the unit - the amount of steel to be produced.
+        cost_tolerance (float): The cost tolerance of the unit - the maximum cost that can be tolerated when shifting the load.
+    """
+
     def __init__(
         self,
         id: str,
@@ -77,9 +95,6 @@ class SteelPlant(SupportsMinMax):
         self.lime_price = self.forecaster.get_price("lime")
         self.co2_price = self.forecaster.get_price("co2")
 
-        self.recalculated_power = self.forecaster[f"{self.id}_recalculated_power"]
-
-        self.location = location
         self.objective = objective
         self.flexibility_measure = flexibility_measure
         self.cost_tolerance = cost_tolerance
