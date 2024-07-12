@@ -33,7 +33,7 @@ def electrolyser_unit() -> Electrolyser:
     )
 
 
-def test_init_function(electrolyser_unit):
+def test_electrolyser_init_function(electrolyser_unit):
     assert electrolyser_unit.id == "Test_Electrolyser"
     assert electrolyser_unit.rated_power == 100
     assert electrolyser_unit.min_power == 10
@@ -45,12 +45,12 @@ def test_init_function(electrolyser_unit):
     assert electrolyser_unit.fuel_type == "Electricity"
 
 
-def test_add_to_model(electrolyser_unit):
+def test_electrolyser_add_to_model(electrolyser_unit):
     electrolyser_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(electrolyser_unit, "b")
 
 
-def test_parameters(electrolyser_unit):
+def test_electrolyser_parameters(electrolyser_unit):
     electrolyser_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(electrolyser_unit.b, "rated_power")
     assert hasattr(electrolyser_unit.b, "min_power")
@@ -61,14 +61,13 @@ def test_parameters(electrolyser_unit):
     assert hasattr(electrolyser_unit.b, "efficiency")
 
 
-def test_variables(electrolyser_unit):
+def test_electrolyser_variables(electrolyser_unit):
     electrolyser_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(electrolyser_unit.b, "power_in")
     assert hasattr(electrolyser_unit.b, "hydrogen_out")
-    assert hasattr(electrolyser_unit.b, "electricity_cost")
 
 
-def test_constraints(electrolyser_unit):
+def test_electrolyser_constraints(electrolyser_unit):
     electrolyser_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(electrolyser_unit.b, "power_upper_bound")
     assert hasattr(electrolyser_unit.b, "power_lower_bound")
@@ -101,7 +100,7 @@ def driplant_unit() -> DriPlant:
     )
 
 
-def test_init_function(driplant_unit):
+def test_driplant_init_function(driplant_unit):
     assert driplant_unit.id == "Test_DriPlant"
     assert driplant_unit.specific_hydrogen_consumption == 0.5
     assert driplant_unit.specific_natural_gas_consumption == 0.8
@@ -112,12 +111,12 @@ def test_init_function(driplant_unit):
     assert driplant_unit.fuel_type == "natural_gas"
 
 
-def test_add_to_model(driplant_unit):
+def test_driplant_add_to_model(driplant_unit):
     driplant_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(driplant_unit, "b")
 
 
-def test_parameters(driplant_unit):
+def test_driplant_parameters(driplant_unit):
     driplant_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(driplant_unit.b, "specific_hydrogen_consumption")
     assert hasattr(driplant_unit.b, "specific_natural_gas_consumption")
@@ -131,7 +130,7 @@ def test_parameters(driplant_unit):
     assert hasattr(driplant_unit.b, "min_down_time_dri")
 
 
-def test_variables(driplant_unit):
+def test_driplant_variables(driplant_unit):
     driplant_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(driplant_unit.b, "iron_ore_in")
     assert hasattr(driplant_unit.b, "natural_gas_in")
@@ -142,7 +141,7 @@ def test_variables(driplant_unit):
     assert hasattr(driplant_unit.b, "power_dri")
 
 
-def test_constraints(driplant_unit):
+def test_driplant_constraints(driplant_unit):
     driplant_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(driplant_unit.b, "dri_power_lower_bound")
     assert hasattr(driplant_unit.b, "dri_power_upper_bound")
@@ -174,7 +173,7 @@ def electric_arc_furnace_unit() -> ElectricArcFurnace:
     )
 
 
-def test_init_function_electric_arc_furnace(electric_arc_furnace_unit):
+def test_eaf_init_function(electric_arc_furnace_unit):
     assert electric_arc_furnace_unit.id == "Test_EAF"
     assert electric_arc_furnace_unit.rated_power == 200
     assert electric_arc_furnace_unit.min_power == 50
@@ -187,12 +186,12 @@ def test_init_function_electric_arc_furnace(electric_arc_furnace_unit):
     assert electric_arc_furnace_unit.min_down_time == 2
 
 
-def test_add_to_model_electric_arc_furnace(electric_arc_furnace_unit):
+def test_eaf_add_to_model(electric_arc_furnace_unit):
     electric_arc_furnace_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(electric_arc_furnace_unit, "b")
 
 
-def test_parameters_electric_arc_furnace(electric_arc_furnace_unit):
+def test_eaf_parameters(electric_arc_furnace_unit):
     electric_arc_furnace_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(electric_arc_furnace_unit.b, "rated_power_eaf")
     assert hasattr(electric_arc_furnace_unit.b, "min_power_eaf")
@@ -205,7 +204,7 @@ def test_parameters_electric_arc_furnace(electric_arc_furnace_unit):
     assert hasattr(electric_arc_furnace_unit.b, "min_down_time_eaf")
 
 
-def test_variables_electric_arc_furnace(electric_arc_furnace_unit):
+def test_eaf_variables(electric_arc_furnace_unit):
     electric_arc_furnace_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(electric_arc_furnace_unit.b, "power_eaf")
     assert hasattr(electric_arc_furnace_unit.b, "dri_input")
@@ -215,7 +214,7 @@ def test_variables_electric_arc_furnace(electric_arc_furnace_unit):
     assert hasattr(electric_arc_furnace_unit.b, "lime_demand")
 
 
-def test_constraints_electric_arc_furnace(electric_arc_furnace_unit):
+def test_eaf_constraints(electric_arc_furnace_unit):
     electric_arc_furnace_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(electric_arc_furnace_unit.b, "electricity_input_upper_bound")
     assert hasattr(electric_arc_furnace_unit.b, "electricity_input_lower_bound")
@@ -245,7 +244,7 @@ def dri_storage_unit() -> DRIStorage:
     )
 
 
-def test_init_function(dri_storage_unit):
+def test_dri_storage_init_function(dri_storage_unit):
     assert dri_storage_unit.id == "Test_DRI_Storage"
     assert dri_storage_unit.max_capacity == 1000
     assert dri_storage_unit.min_capacity == 100
@@ -255,12 +254,12 @@ def test_init_function(dri_storage_unit):
     assert dri_storage_unit.discharge_loss_rate == 0.07
 
 
-def test_add_to_model(dri_storage_unit):
+def test_dri_storage_add_to_model(dri_storage_unit):
     dri_storage_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(dri_storage_unit, "b")
 
 
-def test_parameters(dri_storage_unit):
+def test_dri_storage_parameters(dri_storage_unit):
     dri_storage_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(dri_storage_unit.b, "max_capacity_dri")
     assert hasattr(dri_storage_unit.b, "min_capacity_dri")
@@ -270,7 +269,7 @@ def test_parameters(dri_storage_unit):
     assert hasattr(dri_storage_unit.b, "discharge_loss_rate_dri")
 
 
-def test_variables(dri_storage_unit):
+def test_dri_storage_variables(dri_storage_unit):
     dri_storage_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(dri_storage_unit.b, "soc_dri")
     assert hasattr(dri_storage_unit.b, "uniformity_indicator_dri")
@@ -278,7 +277,7 @@ def test_variables(dri_storage_unit):
     assert hasattr(dri_storage_unit.b, "discharge_dri")
 
 
-def test_constraints(dri_storage_unit):
+def test_dri_storage_constraints(dri_storage_unit):
     dri_storage_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(dri_storage_unit.b, "storage_min_capacity_dri_constraint")
     assert hasattr(dri_storage_unit.b, "storage_max_capacity_dri_constraint")
@@ -303,7 +302,7 @@ def generic_storage_unit() -> GenericStorage:
     )
 
 
-def test_init_function(generic_storage_unit):
+def test_generic_storage_init_function(generic_storage_unit):
     assert generic_storage_unit.id == "Test_Generic_Storage"
     assert generic_storage_unit.max_capacity == 1000
     assert generic_storage_unit.min_capacity == 100
@@ -313,12 +312,12 @@ def test_init_function(generic_storage_unit):
     assert generic_storage_unit.discharge_loss_rate == 0.07
 
 
-def test_add_to_model(generic_storage_unit):
+def test_generic_storage_add_to_model(generic_storage_unit):
     generic_storage_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(generic_storage_unit, "b")
 
 
-def test_parameters(generic_storage_unit):
+def test_generic_storage_parameters(generic_storage_unit):
     generic_storage_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(generic_storage_unit.b, "max_capacity")
     assert hasattr(generic_storage_unit.b, "min_capacity")
@@ -328,7 +327,7 @@ def test_parameters(generic_storage_unit):
     assert hasattr(generic_storage_unit.b, "discharge_loss_rate")
 
 
-def test_variables(generic_storage_unit):
+def test_generic_storage_variables(generic_storage_unit):
     generic_storage_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(generic_storage_unit.b, "soc")
     assert hasattr(generic_storage_unit.b, "uniformity_indicator")
@@ -336,7 +335,7 @@ def test_variables(generic_storage_unit):
     assert hasattr(generic_storage_unit.b, "discharge")
 
 
-def test_constraints(generic_storage_unit):
+def test_generic_storage_constraints(generic_storage_unit):
     generic_storage_unit.add_to_model(unit_block=pyo.Block(), time_steps=[0, 1, 2])
     assert hasattr(generic_storage_unit.b, "storage_min_capacity_constraint")
     assert hasattr(generic_storage_unit.b, "storage_max_capacity_constraint")

@@ -28,9 +28,8 @@ class Forecaster:
 
     """
 
-    def __init__(self, index: pd.Series, base_path: str = ""):
+    def __init__(self, index: pd.Series):
         self.index = index
-        self.base_path = base_path
 
     def __getitem__(self, column: str) -> pd.Series:
         """
@@ -112,7 +111,6 @@ class CsvForecaster(Forecaster):
         powerplants_units: dict[str, pd.Series] = {},
         demand_units: dict[str, pd.Series] = {},
         market_configs: dict[str, pd.Series] = {},
-        operation_states: dict[str, pd.DataFrame] = {},
         *args,
         **kwargs,
     ):
@@ -121,7 +119,6 @@ class CsvForecaster(Forecaster):
         self.powerplants_units = powerplants_units
         self.demand_units = demand_units
         self.market_configs = market_configs
-        self.operation_states = operation_states
 
         self.forecasts = pd.DataFrame(index=index)
 
@@ -145,18 +142,6 @@ class CsvForecaster(Forecaster):
             return pd.Series(0.0, self.index)
 
         return self.forecasts[column]
-
-    def get_operational_state(self, unit: str) -> pd.DataFrame:
-        """
-        Returns the operational state for a given unit.
-
-        Args:
-            unit (str): The unit for which the operational state is requested.
-
-        Returns:
-            pd.DataFrame: The operational state data for the specified unit.
-        """
-        return self.operation_states.get(unit, pd.DataFrame(index=self.index))
 
     def set_forecast(self, data: pd.DataFrame | pd.Series | None, prefix=""):
         """
@@ -193,24 +178,6 @@ class CsvForecaster(Forecaster):
                 )
         else:
             self.forecasts[prefix + data.name] = data
-
-    def set_operation_states(self, unit: str, data: pd.DataFrame):
-        """
-        Sets the operational state data for a given unit.
-
-        Args:
-            unit (str): The unit for which the operational state data is provided.
-            data (pd.DataFrame): The operational state data.
-        """
-        # Check if the unit already exists in the operation_states dictionary
-        if unit in self.operation_states:
-            # Append the new data to the existing DataFrame for the unit
-            self.operation_states[unit] = pd.concat(
-                [self.operation_states[unit], data], axis=1
-            )
-        else:
-            # Set the operational state data for the unit
-            self.operation_states[unit] = data
 
     def calc_forecast_if_needed(self):
         """
