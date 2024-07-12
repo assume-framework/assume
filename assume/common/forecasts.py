@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-import os
 
 import numpy as np
 import pandas as pd
@@ -423,34 +422,6 @@ class CsvForecaster(Forecaster):
             self.logger.error(
                 f"No forecasts for {self.market_id} provided, so none saved."
             )
-
-    def save_operation_states(self, unit, path: str, flexibility=False):
-        """
-        Saves the operation states data to a single CSV file located at the specified path.
-
-        Args:
-            path (str): The path to save the operation states data to.
-        """
-
-        os.makedirs(path, exist_ok=True)
-
-        # Concatenate all operation states dataframes along the columns axis
-        df = self.operation_states[unit]
-        df.index = self.index
-        # Check if the CSV file already exists
-        csv_file = (
-            f"{path}/{unit}_operation_states{'_with_flex' if flexibility else ''}.csv"
-        )
-        if os.path.exists(csv_file):
-            # Load existing CSV file
-            existing_df = pd.read_csv(csv_file, index_col=0)
-            # Update existing DataFrame with new data
-            existing_df.update(concatenated_data)
-            # Update the DataFrame
-            concatenated_data = existing_df
-
-        # Save the concatenated data to a CSV file
-        concatenated_data.to_csv(csv_file)
 
 
 class RandomForecaster(CsvForecaster):
