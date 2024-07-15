@@ -27,7 +27,7 @@ Upcoming Release 0.3.8
 - Refactored unit operator by adding a seperate unit operator for learning units
 - Enhanced learning output and path handling
 - Updated dashboard for better storage view
-- Improved clearing with shuffling of bids, to avoid bias in clearing of units early in order book 
+- Improved clearing with shuffling of bids, to avoid bias in clearing of units early in order book
 
 **Bug Fixes:**
 

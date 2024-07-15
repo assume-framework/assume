@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+import random
 from datetime import timedelta
 from itertools import groupby
 from operator import itemgetter
-from random import shuffle
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.markets.base_market import MarketRole
@@ -79,14 +79,14 @@ class PayAsClearRole(MarketRole):
             demand_orders = [x for x in product_orders if x["volume"] < 0]
             # volume 0 is ignored/invalid
 
-            #shufle all orders to avoid always having the same order of bids with the same price
-            shuffle(supply_orders)
-            shuffle(demand_orders)
+            # Sort supply orders by price with randomness for tie-breaking
+            supply_orders.sort(key=lambda x: (x["price"], random.random()))
 
-            # generation
-            supply_orders.sort(key=itemgetter("price"))
-            # demand
-            demand_orders.sort(key=itemgetter("price"), reverse=True)
+            # Sort demand orders by price in descending order with randomness for tie-breaking
+            demand_orders.sort(
+                key=lambda x: (x["price"], random.random()), reverse=True
+            )
+
             dem_vol, gen_vol = 0, 0
             # the following algorithm is inspired by one bar for generation and one for demand
             # add generation for currents demand price, until it matches demand
