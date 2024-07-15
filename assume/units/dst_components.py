@@ -12,10 +12,10 @@ class Electrolyser:
     Args:
         model (pyomo.ConcreteModel): The Pyomo model where the electrolyser unit will be added.
         id (str): Identifier for the electrolyser unit.
-        rated_power (float): The rated power capacity of the electrolyser (in kW).
+        rated_power (float): The rated power capacity of the electrolyser (in MW).
         min_power (float): The minimum power required for operation (in kW).
-        ramp_up (float): The maximum rate at which the electrolyser can increase its power output (in kW/hr).
-        ramp_down (float): The maximum rate at which the electrolyser can decrease its power output (in kW/hr).
+        ramp_up (float): The maximum rate at which the electrolyser can increase its power output (in MW/hr).
+        ramp_down (float): The maximum rate at which the electrolyser can decrease its power output (in MW/hr).
         min_operating_time (float): The minimum duration the electrolyser must operate continuously (in hours).
         min_down_time (float): The minimum downtime required between operating cycles (in hours).
         efficiency (float): The efficiency of the electrolysis process.
@@ -213,10 +213,10 @@ class DriPlant:
     Args:
         model (pyomo.ConcreteModel): The Pyomo model where the DRI plant will be added.
         id (str): Identifier for the DRI plant.
-        specific_hydrogen_consumption (float): The specific hydrogen consumption of the DRI plant (in kg per ton of DRI).
-        specific_natural_gas_consumption (float): The specific natural gas consumption of the DRI plant (in m3 per ton of DRI).
-        specific_electricity_consumption (float): The specific electricity consumption of the DRI plant (in kWh per ton of DRI).
-        specific_iron_ore_consumption (float): The specific iron ore consumption of the DRI plant (in kg per ton of DRI).
+        specific_hydrogen_consumption (float): The specific hydrogen consumption of the DRI plant (in MWh per ton of DRI).
+        specific_natural_gas_consumption (float): The specific natural gas consumption of the DRI plant (in MWh per ton of DRI).
+        specific_electricity_consumption (float): The specific electricity consumption of the DRI plant (in MWh per ton of DRI).
+        specific_iron_ore_consumption (float): The specific iron ore consumption of the DRI plant (in ton per ton of DRI).
         rated_power (float): The rated power capacity of the DRI plant (in MW).
         min_power (float): The minimum power required for operation (in MW).
         fuel_type (str): The type of fuel used by the DRI plant.
@@ -272,6 +272,13 @@ class DriPlant:
         self.min_down_time = min_down_time
 
     def add_to_model(self, unit_block, time_steps):
+        """
+        Adds the DRI plant to the Pyomo model.
+
+        Args:
+            unit_block (pyomo.Block): The Pyomo block where the DRI plant will be added.
+            time_steps (list): List of time steps for which the model will be defined.
+        """
         self.b = unit_block
         self.define_parameters()
         self.define_variables(time_steps)
@@ -430,7 +437,7 @@ class ElectricArcFurnace:
         id: A unique identifier for the ElectricArcFurnace instance.
         rated_power: The rated power capacity of the electric arc furnace (in MW).
         min_power: The minimum power requirement of the electric arc furnace (in MW).
-        specific_electricity_consumption: The specific electricity consumption of the electric arc furnace (in kWh per ton of steel produced).
+        specific_electricity_consumption: The specific electricity consumption of the electric arc furnace (in MWh per ton of steel produced).
         specific_dri_demand: The specific demand for Direct Reduced Iron (DRI) in the electric arc furnace (in tons per ton of steel produced).
         specific_lime_demand: The specific demand for lime in the electric arc furnace (in tons per ton of steel produced).
         ramp_up: The ramp-up rate of the electric arc furnace (in MW per hour).
@@ -483,6 +490,13 @@ class ElectricArcFurnace:
         self.min_down_time = min_down_time
 
     def add_to_model(self, unit_block, time_steps):
+        """
+        Adds the Electric Arc Furnace (EAF) to the Pyomo model.
+
+        Args:
+            unit_block (pyomo.Block): The Pyomo block where the EAF will be added.
+            time_steps (list): List of time steps for which the model will be defined.
+        """
         self.b = unit_block
         self.define_parameters()
         self.define_variables(time_steps)
@@ -520,14 +534,14 @@ class ElectricArcFurnace:
         def electricity_input_lower_bound(b, t):
             return b.power_eaf[t] >= b.min_power_eaf
 
+        # This constraint defines the steel output based on inputs and efficiency
         @self.b.Constraint(time_steps)
         def steel_output_dri_relation(b, t):
-            # This constraint defines the steel output based on inputs and efficiency
             return b.steel_output[t] == b.dri_input[t] / b.specific_dri_demand
 
+        # This constraint defines the steel output based on inputs and efficiency
         @self.b.Constraint(time_steps)
         def steel_output_power_relation(b, t):
-            # This constraint defines the steel output based on inputs and efficiency
             return (
                 b.power_eaf[t]
                 == b.steel_output[t] * b.specific_electricity_consumption_eaf
@@ -601,7 +615,7 @@ class ElectricArcFurnace:
                     >= min_downtime_units * b.steel_output[t]
                 )
 
-        # operational cost
+        # Operational cost
         @self.b.Constraint(time_steps)
         def eaf_operating_cost_cosntraint(b, t):
             # This constraint defines the steel output based on inputs and efficiency
@@ -660,6 +674,13 @@ class GenericStorage:
         self.discharge_loss_rate = discharge_loss_rate
 
     def add_to_model(self, unit_block, time_steps):
+        """
+        Adds the generic storage unit to the Pyomo model.
+
+        Args:
+            unit_block (pyomo.Block): The Pyomo block where the storage unit will be added.
+            time_steps (list): List of time steps for which the model will be defined.
+        """
         self.b = unit_block
         self.define_parameters()
         self.define_variables(time_steps)
@@ -680,29 +701,57 @@ class GenericStorage:
         self.b.discharge = pyo.Var(time_steps, within=pyo.NonNegativeReals)
 
     def define_constraints(self, time_steps):
+        """
+        Ensures the SOC of the storage unit stays above the minimum capacity.
+        """
+
         @self.b.Constraint(time_steps)
         def storage_min_capacity_constraint(b, t):
             return b.soc[t] >= b.min_capacity
+
+        """
+        Ensures the SOC of the storage unit stays below the maximum capacity.
+        """
 
         @self.b.Constraint(time_steps)
         def storage_max_capacity_constraint(b, t):
             return b.soc[t] <= b.max_capacity
 
+        """
+        Limits the charging of the storage unit to its maximum capacity.
+        """
+
         @self.b.Constraint(time_steps)
         def energy_in_max_capacity_constraint(b, t):
             return b.charge[t] <= b.max_capacity
+
+        """
+        Limits the discharging of the storage unit to its maximum capacity.
+        """
 
         @self.b.Constraint(time_steps)
         def energy_out_max_capacity_constraint(b, t):
             return b.discharge[t] <= b.max_capacity
 
+        """
+        Ensures uniformity in charging the storage unit.
+        """
+
         @self.b.Constraint(time_steps)
         def energy_in_uniformity_constraint(b, t):
             return b.charge[t] <= b.max_capacity * b.uniformity_indicator[t]
 
+        """
+        Ensures uniformity in discharging the storage unit.
+        """
+
         @self.b.Constraint(time_steps)
         def energy_out_uniformity_constraint(b, t):
             return b.discharge[t] <= b.max_capacity * (1 - b.uniformity_indicator[t])
+
+        """
+        Defines the change in SOC of the storage unit over time.
+        """
 
         @self.b.Constraint(time_steps)
         def storage_capacity_change_constraint(b, t):
@@ -759,6 +808,13 @@ class DRIStorage:
         self.discharge_loss_rate = discharge_loss_rate
 
     def add_to_model(self, unit_block, time_steps):
+        """
+        Adds the DRI storage unit to the Pyomo model.
+
+        Args:
+            unit_block (pyomo.Block): The Pyomo block where the DRI storage unit will be added.
+            time_steps (list): List of time steps for which the model will be defined.
+        """
         self.b = unit_block
         self.define_parameters()
         self.define_variables(time_steps)
@@ -781,31 +837,59 @@ class DRIStorage:
         self.b.discharge_dri = pyo.Var(time_steps, within=pyo.NonNegativeReals)
 
     def define_constraints(self, time_steps):
+        """
+        Ensures the SOC of the DRI storage unit stays above the minimum capacity.
+        """
+
         @self.b.Constraint(time_steps)
         def storage_min_capacity_dri_constraint(b, t):
             return b.soc_dri[t] >= b.min_capacity_dri
+
+        """
+        Ensures the SOC of the DRI storage unit stays below the maximum capacity.
+        """
 
         @self.b.Constraint(time_steps)
         def storage_max_capacity_dri_constraint(b, t):
             return b.soc_dri[t] <= b.max_capacity_dri
 
+        """
+        Limits the charging of the DRI storage unit to its maximum capacity.
+        """
+
         @self.b.Constraint(time_steps)
         def energy_in_max_capacity_dri_constraint(b, t):
             return b.charge_dri[t] <= b.max_capacity_dri
+
+        """
+        Limits the discharging of the DRI storage unit to its maximum capacity.
+        """
 
         @self.b.Constraint(time_steps)
         def energy_out_max_capacity_dri_constraint(b, t):
             return b.discharge_dri[t] <= b.max_capacity_dri
 
+        """
+        Ensures uniformity in charging the DRI storage unit.
+        """
+
         @self.b.Constraint(time_steps)
         def energy_in_uniformity_dri_constraint(b, t):
             return b.charge_dri[t] <= b.max_capacity_dri * b.uniformity_indicator_dri[t]
+
+        """
+        Ensures uniformity in discharging the DRI storage unit.
+        """
 
         @self.b.Constraint(time_steps)
         def energy_out_uniformity_dri_constraint(b, t):
             return b.discharge_dri[t] <= b.max_capacity_dri * (
                 1 - b.uniformity_indicator_dri[t]
             )
+
+        """
+        Defines the change in SOC of the DRI storage unit over time.
+        """
 
         @self.b.Constraint(time_steps)
         def storage_capacity_change_dri_constraint(b, t):
