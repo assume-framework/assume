@@ -5,12 +5,8 @@
 # %%
 import logging
 import os
-import random
-import shutil
-import time
 
 from assume import World
-from assume.common.utils import rename_study_case
 from assume.scenario.loader_csv import load_scenario_folder, run_learning
 
 log = logging.getLogger(__name__)
