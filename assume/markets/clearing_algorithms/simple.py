@@ -206,6 +206,14 @@ class PayAsBidRole(MarketRole):
             demand_orders = [x for x in product_orders if x["volume"] < 0]
             # volume 0 is ignored/invalid
 
+            # Sort supply orders by price with randomness for tie-breaking
+            supply_orders.sort(key=lambda x: (x["price"], random.random()))
+
+            # Sort demand orders by price in descending order with randomness for tie-breaking
+            demand_orders.sort(
+                key=lambda x: (x["price"], random.random()), reverse=True
+            )
+
             # generation
             supply_orders.sort(key=itemgetter("price"))
             # demand
