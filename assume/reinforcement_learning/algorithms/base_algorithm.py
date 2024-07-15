@@ -6,7 +6,7 @@ import logging
 
 import torch as th
 
-from assume.reinforcement_learning.learning_utils import PolicyRegistry
+from assume.reinforcement_learning.algorithms import policy_aliases
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,11 @@ class RLAlgorithm:
         self.target_noise_clip = target_noise_clip
         self.target_policy_noise = target_policy_noise
 
-        self.policy_class = PolicyRegistry().get_policy_from_name(network_architecture)
+        if network_architecture in self.policy_aliases:
+            self.policy_class = policy_aliases[network_architecture]
+        else:
+            raise ValueError(f"Policy {self.network_architecture} unknown")
+
 
         self.device = self.learning_role.device
         self.float_type = self.learning_role.float_type

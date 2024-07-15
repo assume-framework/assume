@@ -90,67 +90,52 @@ if __name__ == "__main__":
     - timescale: with database and grafana (note: you need docker installed)
     """
     data_format = "timescale"  # "local_db" or "timescale"
-    examples = [
-        "harder_case1_LF", 
-        "harder_case1_lstm_LF"
-    ]
-    duration = {}
-    inputs_path = "examples/inputs"
-    no_runs = 10  # later: no_runs = 10 for assessing robustness of model training
+    example = "harder_case1_LF"
 
-    for example in examples:
-        # temporarily store original config file to restore it after runs
-        scenario = available_examples[example]["scenario"]
-        study_case = available_examples[example]["study_case"]
+    if data_format == "local_db":
+        db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
+    elif data_format == "timescale":
+        db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
-        config_path = f"{inputs_path}/{scenario}/config.yaml"
-        tmp_config_path = f"{inputs_path}/{scenario}/tmp_config.yaml"
+    # create world
+    world = World(database_uri=db_uri, export_csv_path=csv_path)
 
-        shutil.copyfile(config_path, tmp_config_path)
+    # load scenario
+    load_scenario_folder(
+        world,
+        inputs_path="examples/inputs",
+        scenario=available_examples[example]["scenario"],
+        study_case=available_examples[example]["study_case"],
+    )
 
-        # simulate the same example [no_runs] times
-        for run in range(1, no_runs + 1):
-            random.seed(run)
+    # to add custom bidding strategies, you need to import them
+    # and add them to the world as follows:
+    # from custom_bidding_strategy import CustomBiddingStrategy
+    # world.bidding_strategies["custom_bidding_strategy"] = CustomBiddingStrategy
 
-            if data_format == "local_db":
-                db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
-            elif data_format == "timescale":
-                db_uri = "postgresql://assume:assume@localhost:5432/assume"
+    # to add a custom unit type, you need to import it
+    # and add it to the world as follows:
+    # from custom_unit import CustomUnit
+    # world.unit_types["custom_unit"] = CustomUnit
 
-            # edit config["study_case"] to include run number
-            study_case_run = f"{study_case}_run_{run}"
-            rename_study_case(config_path, study_case, study_case_run)
+    # next you need to load and add the custom units to the scenario
+    # from assume import load_custom_units
+    # load_custom_units(
+    #     world,
+    #     inputs_path="examples/inputs",
+    #     scenario=availabe_examples[example]["scenario"],
+    #     file_name="custom_units",
+    #     unit_type="custom_unit",
+    # )
 
-            # measure time of simulation
-            start = time.time()
+    if world.learning_config.get("learning_mode", False):
+        # run learning if learning mode is enabled
+        run_learning(
+            world,
+            inputs_path="examples/inputs",
+            scenario=available_examples[example]["scenario"],
+            study_case=available_examples[example]["study_case"],
+        )
 
-            # create world
-            world = World(database_uri=db_uri, export_csv_path=csv_path)
+    world.run()
 
-            # load scenario
-            load_scenario_folder(
-                world,
-                inputs_path=inputs_path,
-                scenario=scenario,
-                study_case=study_case_run,
-            )
-
-            if world.learning_config.get("learning_mode", False):
-                # run learning if learning mode is enabled
-                run_learning(
-                    world,
-                    inputs_path=inputs_path,
-                    scenario=scenario,
-                    study_case=study_case_run,
-                )
-
-            # save starting timestamp for run time calculation (- for calculating duration: end_ts - start_ts)
-            world.output_role.total_run_time = -start
-
-            # final run with best policies
-            world.run()
-
-            # Restore original config file, not only change back study_case name
-            shutil.copyfile(tmp_config_path, config_path)
-
-    os.remove(tmp_config_path)

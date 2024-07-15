@@ -13,7 +13,8 @@ import torch as th
 from assume.common.base import LearningStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_products_index
-from assume.reinforcement_learning.learning_utils import NormalActionNoise, PolicyRegistry
+from assume.reinforcement_learning.learning_utils import NormalActionNoise
+from assume.reinforcement_learning.algorithms import policy_aliases
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,13 @@ class RLStrategy(LearningStrategy):
         # based on learning config
         self.algorithm = kwargs.get("algorithm", "matd3")
         self.network_architecture = kwargs.get("network_architecture", "mlp")
-        self.policy_class = PolicyRegistry().get_policy_from_name(self.network_architecture)
+        
+        if self.network_architecture in self.policy_aliases:
+            self.policy_class = policy_aliases[self.network_architecture]
+        else:
+            raise ValueError(f"Policy {self.network_architecture} unknown")
+
+        self.policy_class = policy_aliases[self.network_architecture]
 
         # sets the devide of the actor network
         device = kwargs.get("device", "cpu")
