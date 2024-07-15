@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+import random
 from datetime import timedelta
 from itertools import groupby
 from operator import itemgetter
@@ -78,10 +79,14 @@ class PayAsClearRole(MarketRole):
             demand_orders = [x for x in product_orders if x["volume"] < 0]
             # volume 0 is ignored/invalid
 
-            # generation
-            supply_orders.sort(key=itemgetter("price"))
-            # demand
-            demand_orders.sort(key=itemgetter("price"), reverse=True)
+            # Sort supply orders by price with randomness for tie-breaking
+            supply_orders.sort(key=lambda x: (x["price"], random.random()))
+
+            # Sort demand orders by price in descending order with randomness for tie-breaking
+            demand_orders.sort(
+                key=lambda x: (x["price"], random.random()), reverse=True
+            )
+
             dem_vol, gen_vol = 0, 0
             # the following algorithm is inspired by one bar for generation and one for demand
             # add generation for currents demand price, until it matches demand
@@ -200,6 +205,14 @@ class PayAsBidRole(MarketRole):
             supply_orders = [x for x in product_orders if x["volume"] > 0]
             demand_orders = [x for x in product_orders if x["volume"] < 0]
             # volume 0 is ignored/invalid
+
+            # Sort supply orders by price with randomness for tie-breaking
+            supply_orders.sort(key=lambda x: (x["price"], random.random()))
+
+            # Sort demand orders by price in descending order with randomness for tie-breaking
+            demand_orders.sort(
+                key=lambda x: (x["price"], random.random()), reverse=True
+            )
 
             # generation
             supply_orders.sort(key=itemgetter("price"))
