@@ -6,6 +6,8 @@ import logging
 
 import torch as th
 
+from assume.reinforcement_learning.learning_utils import PolicyRegistry
+
 logger = logging.getLogger(__name__)
 
 
@@ -24,6 +26,7 @@ class RLAlgorithm:
         policy_delay (int): Policy and target networks will only be updated once every policy_delay steps per training steps. The Q values will be updated policy_delay more often (update every training step)
         target_policy_noise (float): Standard deviation of Gaussian noise added to target policy (smoothing noise)
         target_noise_clip (float): Limit for absolute value of target policy smoothing noise
+        network_architecture (str): type of Actor network
     """
 
     def __init__(
@@ -39,6 +42,7 @@ class RLAlgorithm:
         policy_delay=2,
         target_policy_noise=0.2,
         target_noise_clip=0.5,
+        network_architecture='mlp'
     ):
         super().__init__()
 
@@ -56,6 +60,8 @@ class RLAlgorithm:
         self.policy_delay = policy_delay
         self.target_noise_clip = target_noise_clip
         self.target_policy_noise = target_policy_noise
+
+        self.policy_class = PolicyRegistry().get_policy_from_name(network_architecture)
 
         self.device = self.learning_role.device
         self.float_type = self.learning_role.float_type

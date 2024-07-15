@@ -91,13 +91,13 @@ class CriticTD3(nn.Module):
         return x
 
 
-class Actor(nn.Module):
+class MLPActor(nn.Module):
     """
     The neurnal network for the actor.
     """
 
     def __init__(self, obs_dim: int, act_dim: int, float_type):
-        super(Actor, self).__init__()
+        super(MLPActor, self).__init__()
 
         self.FC1 = nn.Linear(obs_dim, 256, dtype=float_type)
         self.FC2 = nn.Linear(256, 128, dtype=float_type)
@@ -112,7 +112,7 @@ class Actor(nn.Module):
         return x
 
 
-class LSTM_Actor(nn.Module):
+class LSTMActor(nn.Module):
     """
     The LSTM recurrent neurnal network for the actor.
 
@@ -121,7 +121,7 @@ class LSTM_Actor(nn.Module):
     """
 
     def __init__(self, obs_dim: int, act_dim: int, float_type):
-        super(LSTM_Actor, self).__init__()
+        super(LSTMActor, self).__init__()
         self.float_type = float_type
         self.no_of_timeseries = 2  # TODO: variable no. of input timeseries
         self.forecast_horizon = int((obs_dim - 2) / self.no_of_timeseries) #TODO: variable number of additional input features, currently 2 (marginal costs, capacity)

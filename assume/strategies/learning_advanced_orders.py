@@ -12,7 +12,8 @@ import torch as th
 from assume.common.base import LearningStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_products_index
-from assume.reinforcement_learning.learning_utils import Actor, NormalActionNoise
+from assume.reinforcement_learning.learning_utils import NormalActionNoise
+from assume.reinforcement_learning.network_architecture import MLPActor
 
 
 class RLAdvancedOrderStrategy(LearningStrategy):
@@ -582,11 +583,11 @@ class RLAdvancedOrderStrategy(LearningStrategy):
 
         params = th.load(directory, map_location=self.device)
 
-        self.actor = Actor(self.obs_dim, self.act_dim, self.float_type)
+        self.actor = MLPActor(self.obs_dim, self.act_dim, self.float_type)
         self.actor.load_state_dict(params["actor"])
 
         if self.learning_mode:
-            self.actor_target = Actor(self.obs_dim, self.act_dim, self.float_type)
+            self.actor_target = MLPActor(self.obs_dim, self.act_dim, self.float_type)
             self.actor_target.load_state_dict(params["actor_target"])
             self.actor_target.eval()
             self.actor.optimizer.load_state_dict(params["actor_optimizer"])

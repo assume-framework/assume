@@ -62,7 +62,7 @@ tiny:
     learning_rate: 0.001
     training_episodes: 2
     episodes_collecting_initial_experience: 1
-    train_freq: 24
+    train_freq: 24h
     gradient_steps: -1
     batch_size: 256
     gamma: 0.99
@@ -107,7 +107,7 @@ base:
     learning_rate: 0.001
     training_episodes: 10
     episodes_collecting_initial_experience: 2
-    train_freq: 24
+    train_freq: 24h
     gradient_steps: -1
     batch_size: 256
     gamma: 0.99
@@ -151,7 +151,7 @@ base_lstm:
     learning_rate: 0.001
     training_episodes: 10
     episodes_collecting_initial_experience: 2
-    train_freq: 24
+    train_freq: 24h
     gradient_steps: -1
     batch_size: 256
     gamma: 0.99
@@ -193,7 +193,7 @@ harder:
     learning_rate: 0.0001
     training_episodes: 100
     episodes_collecting_initial_experience: 5
-    train_freq: 10
+    train_freq: 10h
     gradient_steps: -1
     batch_size: 256
     gamma: 0.999
@@ -237,7 +237,7 @@ harder_lstm:
     learning_rate: 0.001
     training_episodes: 100
     episodes_collecting_initial_experience: 5
-    train_freq: 10
+    train_freq: 10h
     gradient_steps: -1
     batch_size: 256
     gamma: 0.95
@@ -280,10 +280,11 @@ harder_LF:
     trained_policies_save_path: Null
     max_bid_price: 100
     algorithm: matd3
+    network_architecture: mlp
     learning_rate: 0.0001
     training_episodes: 100
     episodes_collecting_initial_experience: 5
-    train_freq: 10
+    train_freq: 10h
     gradient_steps: -1
     batch_size: 256
     gamma: 0.999
@@ -325,11 +326,12 @@ harder_lstm_LF:
     continue_learning: False
     trained_policies_save_path: Null
     max_bid_price: 100
-    algorithm: LSTM-matd3
+    algorithm: matd3
+    network_architecture: lstm
     learning_rate: 0.001
     training_episodes: 100
     episodes_collecting_initial_experience: 5
-    train_freq: 10
+    train_freq: 10h
     gradient_steps: -1
     batch_size: 256
     gamma: 0.95

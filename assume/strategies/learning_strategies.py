@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -14,11 +13,7 @@ import torch as th
 from assume.common.base import LearningStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_products_index
-from assume.reinforcement_learning.learning_utils import (
-    Actor,
-    LSTM_Actor,
-    NormalActionNoise,
-)
+from assume.reinforcement_learning.learning_utils import NormalActionNoise, PolicyRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +36,8 @@ class RLStrategy(LearningStrategy):
         device (str): Device to run on. Defaults to "cpu".
         float_type (str): Float type to use. Defaults to "float32".
         learning_mode (bool): Whether to use learning mode. Defaults to False.
-        actor_type (str): Actor network architecture. Defaults to "matd3".
-        actor (torch.nn.Module): Actor network. Defaults to None.
+        algorithm (str): RL algorithm. Defaults to "matd3".
+        policy_class (torch.nn.Module): Actor network. Defaults to "mlp".
         order_types (list[str]): Order types to use. Defaults to ["SB"].
         action_noise (NormalActionNoise): Action noise. Defaults to None.
         collect_initial_experience_mode (bool): Whether to collect initial experience. Defaults to True.
@@ -70,7 +65,9 @@ class RLStrategy(LearningStrategy):
         self.perform_evaluation = kwargs.get("perform_evaluation", False)
 
         # based on learning config
-        self.actor_type = kwargs.get("algorithm", "matd3")
+        self.algorithm = kwargs.get("algorithm", "matd3")
+        self.network_architecture = kwargs.get("network_architecture", "mlp")
+        self.policy_class = PolicyRegistry().get_policy_from_name(self.network_architecture)
 
         # sets the devide of the actor network
         device = kwargs.get("device", "cpu")
@@ -484,14 +481,11 @@ class RLStrategy(LearningStrategy):
 
         params = th.load(directory, map_location=self.device)
 
-        if self.actor_type == "LSTM-matd3":
-            self.actor = LSTM_Actor(self.obs_dim, self.act_dim, self.float_type)
-        else:
-            self.actor = Actor(self.obs_dim, self.act_dim, self.float_type)
+        self.actor = self.policy_class(self.obs_dim, self.act_dim, self.float_type)
         self.actor.load_state_dict(params["actor"])
 
         if self.learning_mode:
-            self.actor_target = Actor(self.obs_dim, self.act_dim, self.float_type)
+            self.actor_target = self.policy_class(self.obs_dim, self.act_dim, self.float_type)
             self.actor_target.load_state_dict(params["actor_target"])
             self.actor_target.eval()
             self.actor.optimizer.load_state_dict(params["actor_optimizer"])

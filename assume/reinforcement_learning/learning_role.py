@@ -11,7 +11,6 @@ from mango import Role
 
 from assume.common.base import LearningConfig, LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
-from assume.reinforcement_learning.algorithms.lstm_matd3 import LSTM_TD3
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
 
@@ -42,6 +41,7 @@ class Learning(Role):
         self.episodes_done = 0
         self.rl_strats: dict[int, LearningStrategy] = {}
         self.rl_algorithm = learning_config["algorithm"]
+        self.network_architecture = learning_config["network_architecture"]
         self.critics = {}
         self.target_critics = {}
 
@@ -78,7 +78,7 @@ class Learning(Role):
             learning_config.get("episodes_collecting_initial_experience", 5), 1
         )
 
-        self.train_freq = learning_config.get("train_freq", 1)
+        self.train_freq = learning_config.get("train_freq", "1h")
         self.gradient_steps = (
             int(self.train_freq[:-1])
             if learning_config.get("gradient_steps", -1) == -1
@@ -233,15 +233,7 @@ class Learning(Role):
                 gradient_steps=self.gradient_steps,
                 batch_size=self.batch_size,
                 gamma=self.gamma,
-            )
-        elif algorithm == "LSTM-matd3":
-            self.rl_algorithm = LSTM_TD3(
-                learning_role=self,
-                learning_rate=self.learning_rate,
-                episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,
-                gradient_steps=self.gradient_steps,
-                batch_size=self.batch_size,
-                gamma=self.gamma,
+                network_architecture=self.network_architecture
             )
         else:
             logger.error(f"Learning algorithm {algorithm} not implemented!")

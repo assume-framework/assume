@@ -4,7 +4,6 @@
 
 import logging
 import os
-import time
 
 import torch as th
 from torch.nn import functional as F
@@ -12,7 +11,8 @@ from torch.optim import Adam
 
 from assume.common.base import LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
-from assume.reinforcement_learning.learning_utils import Actor, CriticTD3, polyak_update
+from assume.reinforcement_learning.learning_utils import polyak_update
+from assume.reinforcement_learning.network_architecture import CriticTD3
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class TD3(RLAlgorithm):
         policy_delay=2,
         target_policy_noise=0.2,
         target_noise_clip=0.5,
-        network_architecture= mlp,
+        network_architecture='mlp'
     ):
         super().__init__(
             learning_role,
@@ -54,6 +54,7 @@ class TD3(RLAlgorithm):
             policy_delay,
             target_policy_noise,
             target_noise_clip,
+            network_architecture
         )
         self.n_updates = 0
 
@@ -245,15 +246,13 @@ class TD3(RLAlgorithm):
         act_dim_list = []
 
         for _, unit_strategy in self.learning_role.rl_strats.items():
-
-            self.learning_role.learnin
-            unit_strategy.actor = Actor(
+            unit_strategy.actor = self.policy_class(
                 obs_dim=unit_strategy.obs_dim,
                 act_dim=unit_strategy.act_dim,
                 float_type=self.float_type,
             ).to(self.device)
 
-            unit_strategy.actor_target = Actor(
+            unit_strategy.actor_target = self.policy_class(
                 obs_dim=unit_strategy.obs_dim,
                 act_dim=unit_strategy.act_dim,
                 float_type=self.float_type,
@@ -517,14 +516,4 @@ class TD3(RLAlgorithm):
                     polyak_update(
                         actor.parameters(), actor_target.parameters(), self.tau
                     )
-
-                realtime_end = time.time()
-                # Calculate 0:total_updating_time and 1:avg_updating_time of unit
-                if self.learning_role.updating_time.get(u_id) is not None:
-                    self.learning_role.updating_time[u_id][0] += realtime_end - realtime_start
-                    self.learning_role.updating_time[u_id][1] = (realtime_end - realtime_start) / self.n_updates
-                else:
-                    self.learning_role.updating_time[u_id][0] = realtime_end - realtime_start
-                    self.learning_role.updating_time[u_id][1] = (realtime_end - realtime_start) / self.n_updates
-
                 i += 1
