@@ -4,6 +4,7 @@
 
 import asyncio
 import logging
+import random
 from collections.abc import Callable
 from datetime import datetime
 from itertools import groupby
@@ -152,6 +153,14 @@ class PayAsBidContractRole(MarketRole):
             product_orders = list(product_orders)
             demand_orders = list(filter(lambda x: x["volume"] < 0, product_orders))
             supply_orders = list(filter(lambda x: x["volume"] > 0, product_orders))
+
+            # Sort supply orders by price with randomness for tie-breaking
+            supply_orders.sort(key=lambda x: (x["price"], random.random()))
+
+            # Sort demand orders by price in descending order with randomness for tie-breaking
+            demand_orders.sort(
+                key=lambda x: (x["price"], random.random()), reverse=True
+            )
 
             # generation
             supply_orders.sort(key=lambda i: i["price"])
