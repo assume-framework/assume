@@ -207,17 +207,9 @@ class PayAsBidRole(MarketRole):
             # volume 0 is ignored/invalid
 
             # Sort supply orders by price with randomness for tie-breaking
-            supply_orders.sort(key=lambda x: (x["price"], random.random()))
-
+            supply_orders.sort(key=lambda i: (i["price"], random.random()))
             # Sort demand orders by price in descending order with randomness for tie-breaking
-            demand_orders.sort(
-                key=lambda x: (x["price"], random.random()), reverse=True
-            )
-
-            # generation
-            supply_orders.sort(key=itemgetter("price"))
-            # demand
-            demand_orders.sort(key=itemgetter("price"), reverse=True)
+            demand_orders.sort(key=lambda i: (i["price"], random.random()), reverse=True)
 
             dem_vol, gen_vol = 0, 0
             # the following algorithm is inspired by one bar for generation and one for demand
