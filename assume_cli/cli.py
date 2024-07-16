@@ -53,9 +53,7 @@ def config_case_completer(prefix, parsed_args, **kwargs):
     return [""]
 
 
-def cli(args=None):
-    if not args:
-        args = sys.argv[1:]
+def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Command Line Interface for ASSUME simulations",
     )
@@ -110,6 +108,13 @@ def cli(args=None):
         help="run simulation with multiple processes",
         action="store_true",
     )
+    return parser
+
+
+def cli(args=None):
+    if not args:
+        args = sys.argv[1:]
+    parser = create_parser()
 
     argcomplete.autocomplete(parser)
     args = parser.parse_args(args)

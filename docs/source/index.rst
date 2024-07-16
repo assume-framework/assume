@@ -80,6 +80,7 @@ Documentation
 * :doc:`learning_algorithm`
 * :doc:`buffers`
 * :doc:`support_policies`
+* :doc:`command_line_interface`
 * :doc:`assume`
 
 .. toctree::
@@ -95,6 +96,7 @@ Documentation
    learning_algorithm
    buffers
    support_policies
+   command_line_interface
    assume
 
 
