@@ -176,12 +176,11 @@ def create_electrolyser(
             b.electrolyser_operating_cost[t]
             == b.power_in[t] * model.electricity_price[t]
         )
+    return model_part
 
 
 def create_driplant(
-    self,
     model,
-    id,
     specific_hydrogen_consumption,
     specific_natural_gas_consumption,
     specific_electricity_consumption,
@@ -366,6 +365,7 @@ def create_driplant(
             + b.power_dri[t] * model.electricity_price[t]
             + b.iron_ore_in[t] * model.iron_ore_price
         )
+    return model_part
 
 
 def create_electric_furnance(
@@ -650,11 +650,11 @@ def create_storage(
             + ((1 - b.charge_loss_rate) * b.charge[t])
             - ((1 + b.discharge_loss_rate) * b.discharge[t])
         )
+    return model_part
 
 
 def create_dristorage(
     model,
-    id,
     max_capacity,
     min_capacity,
     initial_soc,
@@ -762,3 +762,4 @@ def create_dristorage(
             + ((1 - b.charge_loss_rate_dri) * b.charge_dri[t])
             - ((1 + b.discharge_loss_rate_dri) * b.discharge_dri[t])
         )
+    return model_part

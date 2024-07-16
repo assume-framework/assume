@@ -101,8 +101,8 @@ class SteelPlant(SupportsMinMax, DSMUnit):
 
         # Main Model part
         self.model = pyo.ConcreteModel()
-        self.define_sets(self.model)
-        self.define_parameters(self.model)
+        self.define_sets()
+        self.define_parameters()
         self.initialize_components(components)
         self.initialize_process_sequence()
 
@@ -173,7 +173,7 @@ class SteelPlant(SupportsMinMax, DSMUnit):
         for technology, component_data in components.items():
             if technology in dst_components:
                 factory_method = dst_components[technology]
-                self.model.dsm_blocks[technology] = factory_method(self.model, **component_data)
+                self.model.dsm_blocks[technology].transfer_attributes_from(factory_method(self.model, time_steps=self.model.time_steps, **component_data))
 
     def initialize_process_sequence(self):
         """
