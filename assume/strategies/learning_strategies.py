@@ -12,9 +12,8 @@ import torch as th
 
 from assume.common.base import LearningStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.common.utils import get_products_index
-from assume.reinforcement_learning.learning_utils import NormalActionNoise
 from assume.reinforcement_learning.algorithms import policy_aliases
+from assume.reinforcement_learning.learning_utils import NormalActionNoise
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +53,13 @@ class RLStrategy(LearningStrategy):
         act_dim = kwargs.get("action_dimension", 2)
         unique_obs_dim = kwargs.get("unique_obs_dim", 2)
 
-        super().__init__(obs_dim=obs_dim, act_dim=act_dim, unique_obs_dim=unique_obs_dim, *args, **kwargs)
+        super().__init__(
+            obs_dim=obs_dim,
+            act_dim=act_dim,
+            unique_obs_dim=unique_obs_dim,
+            *args,
+            **kwargs,
+        )
 
         self.unit_id = kwargs["unit_id"]
 
@@ -69,7 +74,7 @@ class RLStrategy(LearningStrategy):
         # based on learning config
         self.algorithm = kwargs.get("algorithm", "matd3")
         network_architecture = kwargs.get("network_architecture", "mlp")
-        
+
         if network_architecture in policy_aliases:
             self.policy_class = policy_aliases[network_architecture]
         else:
@@ -491,7 +496,9 @@ class RLStrategy(LearningStrategy):
         self.actor.load_state_dict(params["actor"])
 
         if self.learning_mode:
-            self.actor_target = self.policy_class(self.obs_dim, self.act_dim, self.float_type)
+            self.actor_target = self.policy_class(
+                self.obs_dim, self.act_dim, self.float_type
+            )
             self.actor_target.load_state_dict(params["actor_target"])
             self.actor_target.eval()
             self.actor.optimizer.load_state_dict(params["actor_optimizer"])

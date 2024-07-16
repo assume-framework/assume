@@ -42,7 +42,7 @@ class RLAlgorithm:
         policy_delay=2,
         target_policy_noise=0.2,
         target_noise_clip=0.5,
-        network_architecture='mlp'
+        network_architecture="mlp",
     ):
         super().__init__()
 

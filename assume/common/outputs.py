@@ -564,10 +564,10 @@ class WriteOutput(Role):
 
         # Iterate through all units
         for u_id, values in self.updating_time.items():
-            rows.append(['total_updating_time', u_id, values[0]])
-            rows.append(['avg_updating_time', u_id, values[1]])
+            rows.append(["total_updating_time", u_id, values[0]])
+            rows.append(["avg_updating_time", u_id, values[1]])
 
-        df_updating = pd.DataFrame(rows, columns=['variable', 'ident', 'value'])
+        df_updating = pd.DataFrame(rows, columns=["variable", "ident", "value"])
 
         # Time passed in update_policy()-function
         if not df_updating.empty:
@@ -579,36 +579,50 @@ class WriteOutput(Role):
             )
 
         # Time passed during whole simulation episode (all units)
-        df = pd.concat([
-                    df,
-                    pd.DataFrame(
-                        [["run_time", self.simulation_id, self.run_time]], 
-                        columns=["variable", "ident", "value"]
-                    ),
-
-                ]
+        df = pd.concat(
+            [
+                df,
+                pd.DataFrame(
+                    [["run_time", self.simulation_id, self.run_time]],
+                    columns=["variable", "ident", "value"],
+                ),
+            ]
         )
 
         # Only write final episode numbers after terminating simulation
         if self.simulation_id.split("_")[-2] == "run":
-            df = pd.concat([
-                        df, 
-                        pd.DataFrame(
-                            [["episodes_done", self.simulation_id, self.episodes["episodes_done"]],
-                            ["eval_episodes_done", self.simulation_id, self.episodes["eval_episodes_done"]]], 
-                            columns=["variable", "ident", "value"]
-                        )
-            ])
+            df = pd.concat(
+                [
+                    df,
+                    pd.DataFrame(
+                        [
+                            [
+                                "episodes_done",
+                                self.simulation_id,
+                                self.episodes["episodes_done"],
+                            ],
+                            [
+                                "eval_episodes_done",
+                                self.simulation_id,
+                                self.episodes["eval_episodes_done"],
+                            ],
+                        ],
+                        columns=["variable", "ident", "value"],
+                    ),
+                ]
+            )
 
         if self.total_run_time is not None:
-            df = pd.concat([
-                        df, 
-                        pd.DataFrame(
-                            [["total_run_time", self.simulation_id, self.total_run_time]],
-                            columns=["variable", "ident", "value"]
-                        )
-            ])
-            
+            df = pd.concat(
+                [
+                    df,
+                    pd.DataFrame(
+                        [["total_run_time", self.simulation_id, self.total_run_time]],
+                        columns=["variable", "ident", "value"],
+                    ),
+                ]
+            )
+
         df.reset_index()
         df["simulation"] = self.simulation_id
 

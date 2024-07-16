@@ -68,7 +68,7 @@ available_examples = {
     "learning_with_complex_bids": {
         "scenario": "example_02e",
         "study_case": "base",
-    }
+    },
 }
 
 
@@ -128,4 +128,3 @@ if __name__ == "__main__":
         )
 
     world.run()
-

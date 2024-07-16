@@ -3,21 +3,19 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from datetime import datetime
-from typing import TypedDict, ClassVar, Type, Dict
+from typing import TypedDict
 
 import numpy as np
 import torch as th
-from torch import nn
 
-from assume.reinforcement_learning.network_architecture import MLPActor, LSTMActor
 
 class ObsActRew(TypedDict):
     observation: list[th.Tensor]
     action: list[th.Tensor]
     reward: list[th.Tensor]
 
-observation_dict = dict[list[datetime], ObsActRew]
 
+observation_dict = dict[list[datetime], ObsActRew]
 
 
 # Ornstein-Uhlenbeck Noise

@@ -99,7 +99,7 @@ class Learning(Role):
         self.avg_rewards = []
 
         # unit-wise run time data
-        self.updating_time = defaultdict(lambda: [0,0])
+        self.updating_time = defaultdict(lambda: [0, 0])
 
     def load_inter_episodic_data(self, inter_episodic_data):
         """
@@ -141,7 +141,7 @@ class Learning(Role):
             "avg_all_eval": self.avg_rewards,
             "buffer": self.buffer,
             "actors_and_critics": self.rl_algorithm.extract_policy(),
-            "noise_scale":  self.get_noise_scale(),
+            "noise_scale": self.get_noise_scale(),
         }
 
     def setup(self) -> None:
@@ -205,15 +205,13 @@ class Learning(Role):
         Get the noise scale from the first learning strategy (unit) in rl_strats.
 
         Notes:
-            The noise scale is the same for all learning strategies (units) in rl_strats, so we only need to get it from one unit. 
+            The noise scale is the same for all learning strategies (units) in rl_strats, so we only need to get it from one unit.
             It is only depended on the number of updates done so far, which is determined by the number of episodes done and the update frequency.
 
         """
         stored_scale = list(self.rl_strats.values())[0].action_noise.scale
 
         return stored_scale
-
-
 
     def create_learning_algorithm(self, algorithm: RLAlgorithm):
         """
@@ -233,7 +231,7 @@ class Learning(Role):
                 gradient_steps=self.gradient_steps,
                 batch_size=self.batch_size,
                 gamma=self.gamma,
-                network_architecture=self.network_architecture
+                network_architecture=self.network_architecture,
             )
         else:
             logger.error(f"Learning algorithm {algorithm} not implemented!")

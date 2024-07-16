@@ -10,11 +10,11 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 from itertools import groupby
 from operator import itemgetter
-import yaml
 
 import dateutil.rrule as rr
 import numpy as np
 import pandas as pd
+import yaml
 
 from assume.common.market_objects import MarketProduct, Orderbook
 
@@ -473,15 +473,12 @@ def convert_to_rrule_freq(string: str) -> tuple[int, int]:
     interval = int(string[:-1])
     return freq, interval
 
-def rename_study_case(
-        path: str, 
-        old_key: str, 
-        new_key: str
-):
+
+def rename_study_case(path: str, old_key: str, new_key: str):
     """
     Rename key in config file and save changes.
-     
-    This function makes changes to the config file. 
+
+    This function makes changes to the config file.
     Background is so that study cases can be simulated multiple times under different names with the same configuration.
 
     Args:
@@ -490,11 +487,11 @@ def rename_study_case(
         new_key (str): The name of the key with adjustments. E.g. added run number: "base_run_1".
     """
     # Read the YAML file
-    with open(path, "r") as file:
+    with open(path) as file:
         data = yaml.safe_load(file)
 
     # store modifications to the config file
-    data[new_key]= data.pop(old_key)
+    data[new_key] = data.pop(old_key)
 
     # Write the modified data back to the file
     with open(path, "w") as file:

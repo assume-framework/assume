@@ -630,10 +630,15 @@ class World:
         self.realtime_end = time.time()
         self.output_role.run_time = self.realtime_end - self.realtime_start
         self.output_role.updating_time = self.learning_role.updating_time
-        
+
         if self.output_role.simulation_id.split("_")[-2] == "run":
-            self.output_role.episodes = {"episodes_done": self.learning_role.episodes_done, "eval_episodes_done":self.learning_role.eval_episodes_done}
-            self.output_role.total_run_time = self.output_role.total_run_time + time.time()
+            self.output_role.episodes = {
+                "episodes_done": self.learning_role.episodes_done,
+                "eval_episodes_done": self.learning_role.eval_episodes_done,
+            }
+            self.output_role.total_run_time = (
+                self.output_role.total_run_time + time.time()
+            )
         await self.container.shutdown()
 
     def run(self):

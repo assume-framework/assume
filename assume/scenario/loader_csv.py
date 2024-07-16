@@ -826,7 +826,7 @@ def run_learning(
                 {"avg_reward": avg_reward}
             )
 
-            inter_episodic_data["eval_episodes_done"] = eval_episode 
+            inter_episodic_data["eval_episodes_done"] = eval_episode
 
             # if we have not improved in the last x evaluations, we stop loop
             if terminate:
@@ -835,7 +835,7 @@ def run_learning(
             eval_episode += 1
 
         world.reset()
-               
+
         # if at end of simulation save last policies
         if episode == (world.learning_role.training_episodes):
             world.learning_role.rl_algorithm.save_params(
@@ -848,7 +848,7 @@ def run_learning(
     world.export_csv_path = temp_csv_path
 
     world.reset()
-    
+
     # load scenario for evaluation
     setup_world(
         world=world,

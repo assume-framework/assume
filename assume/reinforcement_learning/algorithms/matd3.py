@@ -41,7 +41,7 @@ class TD3(RLAlgorithm):
         policy_delay=2,
         target_policy_noise=0.2,
         target_noise_clip=0.5,
-        network_architecture='mlp'
+        network_architecture="mlp",
     ):
         super().__init__(
             learning_role,
@@ -54,7 +54,7 @@ class TD3(RLAlgorithm):
             policy_delay,
             target_policy_noise,
             target_noise_clip,
-            network_architecture
+            network_architecture,
         )
         self.n_updates = 0
 

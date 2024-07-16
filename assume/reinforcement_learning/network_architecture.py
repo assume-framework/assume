@@ -2,10 +2,10 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import numpy as np
 import torch as th
 from torch import nn
 from torch.nn import functional as F
+
 
 class CriticTD3(nn.Module):
     """Initialize parameters and build model.
@@ -24,7 +24,7 @@ class CriticTD3(nn.Module):
         float_type,
         unique_obs_dim: int = 0,
     ):
-        super(CriticTD3, self).__init__()
+        super().__init__()
 
         self.obs_dim = obs_dim + unique_obs_dim * (n_agents - 1)
         self.act_dim = act_dim * n_agents
@@ -90,13 +90,15 @@ class CriticTD3(nn.Module):
 
         return x
 
+
 class Actor(nn.Module):
     """
     Parent class for actor networks.
     """
 
     def __init__(self):
-        super(Actor, self).__init__()
+        super().__init__()
+
 
 class MLPActor(Actor):
     """
@@ -104,7 +106,7 @@ class MLPActor(Actor):
     """
 
     def __init__(self, obs_dim: int, act_dim: int, float_type):
-        super(MLPActor, self).__init__()
+        super().__init__()
 
         self.FC1 = nn.Linear(obs_dim, 256, dtype=float_type)
         self.FC2 = nn.Linear(256, 128, dtype=float_type)
@@ -128,10 +130,12 @@ class LSTMActor(nn.Module):
     """
 
     def __init__(self, obs_dim: int, act_dim: int, float_type):
-        super(LSTMActor, self).__init__()
+        super().__init__()
         self.float_type = float_type
         self.no_of_timeseries = 2  # TODO: variable no. of input timeseries
-        self.forecast_horizon = int((obs_dim - 2) / self.no_of_timeseries) #TODO: variable number of additional input features, currently 2 (marginal costs, capacity)
+        self.forecast_horizon = int(
+            (obs_dim - 2) / self.no_of_timeseries
+        )  # TODO: variable number of additional input features, currently 2 (marginal costs, capacity)
 
         self.LSTM1 = nn.LSTMCell(self.no_of_timeseries, 8, dtype=float_type)
         self.LSTM2 = nn.LSTMCell(8, 16, dtype=float_type)
