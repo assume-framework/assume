@@ -17,7 +17,7 @@ from pyomo.opt import (
 from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
-from assume.strategies.dsm_load_shift import flexibility_cost_tolerance
+from assume.units.dsm_load_shift import flexibility_cost_tolerance
 from assume.units.dst_components import (
     DriPlant,
     DRIStorage,
