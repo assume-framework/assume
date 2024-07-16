@@ -151,9 +151,7 @@ class NaiveDASteelplantStrategy(BaseStrategy):
         bids = []
         start = product_tuples[0][0]  # start time of the first product
 
-        if unit.opt_power_requirement is None:
-            if unit.objective == "min_variable_cost":
-                unit.determine_optimal_operation_without_flex()
+        unit.calculate_optimal_operation_if_needed()
 
         # unit.run_modified_optimization()
 
@@ -190,9 +188,7 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
         bids = []
         start = product_tuples[0][0]  # start time of the first product
 
-        if unit.flex_power_requirement is None:
-            if unit.flexibility_measure == "max_load_shift":
-                unit.determine_optimal_operation_with_flex()
+        unit.calculate_optimal_operation_if_needed()
 
         # introduce marginal cost
 
