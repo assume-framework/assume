@@ -6,6 +6,7 @@ from multiprocessing import Process
 
 from assume import World
 
+# import common simulation config from distributed_simulation/config.py
 from .config import (
     agent_adress,
     agent_adresses,
@@ -15,6 +16,8 @@ from .config import (
     tcp_host,
     worker,
 )
+
+# import creator functions from world_agent and world_manager
 from .world_agent import create_worker as create_agent
 from .world_manager import create_worker as create_manager
 
@@ -38,6 +41,7 @@ def agent(i: int, n_proc: int, m_agent: int = 1):
 
 
 if __name__ == "__main__":
+    # we are creating processes so that we do not need to open multiple terminals
     man = Process(target=manager)
     n = 1
     for i in range(n - 1):
@@ -55,6 +59,8 @@ if __name__ == "__main__":
     for ag in ags:
         ag.start()
 
+    # first we are waiting for the manager to finish
     man.join()
+    # then we are joining all the finished Agent Containers
     for ag in ags:
         ag.join()

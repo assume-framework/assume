@@ -18,9 +18,9 @@ from assume.common.base import LearningConfig
 from assume.common.exceptions import AssumeException
 from assume.common.forecasts import CsvForecaster, Forecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
-from assume.common.utils import convert_to_rrule_freq
+from assume.common.utils import adjust_unit_operator_for_learning, convert_to_rrule_freq
 from assume.strategies import BaseStrategy
-from assume.world import World, adjust_unit_operator_for_learning
+from assume.world import World
 
 logger = logging.getLogger(__name__)
 
@@ -264,14 +264,14 @@ def read_units(
     world_bidding_strategies: dict[str, BaseStrategy],
 ) -> dict[str, list[dict]]:
     """
-    Add units to the world from a given dataframe.
-    The callback is used to adjust unit_params depending on the unit_type, before adding the unit to the world.
+    Read units from a dataframe and only add them to a dictionary.
+    The dictionary contains the operator ids as keys and the list of units belonging to the operator as values.
 
     Args:
         units_df (pandas.DataFrame): The dataframe containing the units.
         unit_type (str): The type of the unit.
         forecaster (Forecaster): The forecaster used for adding the units.
-        world_bidding_strategies (dict[str, BaseStrategy]): The world strategies available
+        world_bidding_strategies (dict[str, BaseStrategy]): The strategies available in the world
     """
     if units_df is None:
         return {}
@@ -511,8 +511,8 @@ async def async_setup_world(
             market_config=market_config,
         )
 
-    # add the unit operators using unique unit operator names in the powerplants csv
-    logger.info("Adding unit operators")
+    # create list of units from dataframes before adding actual operators
+    logger.info("Read units from file")
 
     units = defaultdict(list)
     pwp_plants = read_units(
@@ -542,10 +542,14 @@ async def async_setup_world(
     for op, op_units in dem_plants.items():
         units[op].extend(op_units)
 
+    # if distributed_role is true - there is a manager available
+    # and we cann add each units_operator as a separate process
     if world.distributed_role is True:
+        logger.info("Adding unit operators and units - with subprocesses")
         for op, op_units in units.items():
-            await world.add_units_with_operator(op, op_units)
+            await world.add_units_with_operator_subprocess(op, op_units)
     else:
+        logger.info("Adding unit operators and units")
         for company_name in set(units.keys()):
             if company_name == "Operator-RL" and world.learning_mode:
                 world.add_rl_unit_operator(id="Operator-RL")
@@ -556,6 +560,7 @@ async def async_setup_world(
         for op, op_units in units.items():
             for unit in op_units:
                 await world.async_add_unit(**unit)
+
     if (
         world.learning_mode
         and world.learning_role is not None

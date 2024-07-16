@@ -32,7 +32,7 @@ from assume.common import (
 from assume.common.base import LearningConfig
 from assume.common.utils import create_rrule, datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
-from assume.strategies import BaseStrategy, LearningStrategy, bidding_strategies
+from assume.strategies import LearningStrategy, bidding_strategies
 from assume.units import BaseUnit, Demand, PowerPlant, Storage
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
@@ -42,39 +42,6 @@ logging.basicConfig(level=logging.INFO, handlers=handlers)
 logging.getLogger("mango").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
-
-
-def adjust_unit_operator_for_learning(
-    bidding_strategies: dict[str, str],
-    world_bidding_strategies: dict[str, BaseStrategy],
-    unit_operator_id: str,
-):
-    """
-    Check if any of the bidding strategies are learning strategies.
-    And change the unit operator to RL if learning strategies are found.
-
-    Args:
-        bidding_strategies (dict[str, str]): The bidding strategies for the unit.
-        world_bidding_strategies (dict[str, BaseStrategy]): The bidding strategies of the World
-        unit_operator_id (str): The identifier of the unit operator.
-
-    Returns:
-        str: The corrected unit operator identifier.
-
-    """
-    if unit_operator_id == "Operator-RL":
-        return unit_operator_id
-    for strategy in bidding_strategies.values():
-        if issubclass(world_bidding_strategies[strategy], LearningStrategy):
-            unit_operator_id = "Operator-RL"
-            logger.debug(
-                "Your chosen unit operator %s for the learning unit %s was overwritten with 'Operator-RL', "
-                "since all learning units need to be handeled by one unit operator.",
-                unit_operator_id,
-                id,
-            )
-
-    return unit_operator_id
 
 
 class World:
@@ -116,6 +83,9 @@ class World:
         export_csv_path: The path for exporting CSV data.
         log_level: The logging level for the world instance.
         distributed_role: A boolean indicating whether distributed roles are enabled.
+            If True - this world is a manager world which schedules events itself.
+            If False - this world is a client world which receives schedules from a manager through the DistributedClock mechanism.
+            If None (default) - this world is not distributed and does not use subprocesses
     """
 
     def __init__(
@@ -249,12 +219,15 @@ class World:
         self.learning_mode = self.learning_config.get("learning_mode", False)
         self.output_agent_addr = (self.addr, "export_agent_1")
         if self.distributed_role is False:
+            # if distributed_role is False - we are a ChildContainer
+            # and only connect to the manager_address, which can set/sync our clock
             self.clock_agent = DistributedClockAgent(self.container)
             self.output_agent_addr = (manager_address, "export_agent_1")
 
             def stop(fut):
                 self.loop.run_until_complete(self.container.shutdown())
 
+            # when the clock_agent is stopped, we should gracefully shutdown our container
             self.clock_agent.stopped.add_done_callback(stop)
         else:
             await self.setup_learning()
@@ -354,7 +327,7 @@ class World:
 
         units_operator = UnitsOperator(available_markets=list(self.markets.values()))
 
-        # creating a new role agent and apply the role of a unitsoperator
+        # creating a new role agent and apply the role of a units operator
         unit_operator_agent = RoleAgent(
             self.container, suggested_aid=f"{id}", suspendable_tasks=False
         )
@@ -391,7 +364,7 @@ class World:
             raise ValueError(f"Unit operator {id} already exists")
 
         units_operator = RLUnitsOperator(available_markets=list(self.markets.values()))
-        # creating a new role agent and apply the role of a unitsoperator
+        # creating a new role agent and apply the role of a units operator
         unit_operator_agent = RoleAgent(
             self.container, suggested_aid=f"{id}", suspendable_tasks=False
         )
@@ -433,12 +406,21 @@ class World:
                 }
             )
 
-    async def add_units_with_operator(self, id: str, units: list):
+    async def add_units_with_operator_subprocess(self, id: str, units: list[dict]):
+        """
+        Adds a units operator with given ID in a separate process
+        and creates and adds the given list of unit dictionaries to it
+        through a creator function
+
+        Args:
+            id (str): the id of the units operator
+            units (list[dict]): list of unit dictionaries forwarded to create_unit
+        """
         clock_agent_name = f"clock_agent_{id}"
         self.addresses.append((self.addr, clock_agent_name))
 
         async def creator(container):
-            # creating a new role agent and apply the role of a unitsoperator
+            # creating a new role agent and apply the role of a units operator
             units_operator = UnitsOperator(
                 available_markets=list(self.markets.values())
             )
@@ -509,12 +491,7 @@ class World:
         """
 
         # check if unit operator exists
-        if unit_operator_id not in self.unit_operators.keys():
-            raise ValueError(f"invalid unit operator {unit_operator_id}")
-
-        # check if unit operator already has a unit with the same id
-        if self.unit_operators[unit_operator_id].units.get(id):
-            raise ValueError(f"Unit {id} already exists")
+        self._validate_unit_addition(id, unit_type, unit_operator_id)
 
         unit = self.create_unit(
             id, unit_type, unit_operator_id, unit_params, forecaster
