@@ -39,10 +39,6 @@ class WriteOutput(Role):
         simulation_id (str): The ID of the simulation as a unique classifier.
         start (datetime.datetime): The start datetime of the simulation run.
         end (datetime.datetime): The end datetime of the simulation run.
-        run_time (float): The run time of the simulation episode.
-        total_run_time (float): The run time of whole simulation.
-        updating_time: (dict[str, list]): Time passed with updating policy for each unit.
-        episodes (dict[str, int]): Number of episodes done when terminating simulation.
         db_engine: The database engine. Defaults to None.
         export_csv_path (str, optional): The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
         save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to None.
@@ -56,10 +52,6 @@ class WriteOutput(Role):
         simulation_id: str,
         start: datetime,
         end: datetime,
-        run_time: float = None,
-        total_run_time: float = None,
-        updating_time: dict[str, list] = {},
-        episodes: dict[str, int] = {},
         db_engine=None,
         export_csv_path: str = "",
         save_frequency_hours: int = None,
@@ -96,12 +88,6 @@ class WriteOutput(Role):
             # check if episode=0 and delete all similar runs
             if self.episode == 0:
                 self.del_similar_runs()
-
-        # initialize run time measure
-        self.run_time = run_time
-        self.total_run_time = total_run_time
-        self.updating_time = updating_time
-        self.episodes = episodes
 
         # contruct all timeframe under which hourly values are written to excel and db
         self.start = start
@@ -534,8 +520,6 @@ class WriteOutput(Role):
                     f"SELECT 'sum_reward' as variable, simulation as ident, sum(reward) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
                     f"SELECT 'sum_regret' as variable, simulation as ident, sum(regret) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
                     f"SELECT 'sum_profit' as variable, simulation as ident, sum(profit) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
-                    # TODO: add SQL statement to calculate avg_train_time from rl_params
-                    # f"SELECT 'avg_actor_train_time' as variable, simulation as ident, avg(actor_train_time) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation"
                 ]
             )
 
@@ -557,72 +541,6 @@ class WriteOutput(Role):
             return
 
         df = pd.concat(dfs)
-
-        # Store run times of simulation
-        # Initialize a list to hold rows
-        rows = []
-
-        # Iterate through all units
-        for u_id, values in self.updating_time.items():
-            rows.append(["total_updating_time", u_id, values[0]])
-            rows.append(["avg_updating_time", u_id, values[1]])
-
-        df_updating = pd.DataFrame(rows, columns=["variable", "ident", "value"])
-
-        # Time passed in update_policy()-function
-        if not df_updating.empty:
-            df = pd.concat(
-                [
-                    df,
-                    df_updating,
-                ]
-            )
-
-        # Time passed during whole simulation episode (all units)
-        df = pd.concat(
-            [
-                df,
-                pd.DataFrame(
-                    [["run_time", self.simulation_id, self.run_time]],
-                    columns=["variable", "ident", "value"],
-                ),
-            ]
-        )
-
-        # Only write final episode numbers after terminating simulation
-        if self.simulation_id.split("_")[-2] == "run":
-            df = pd.concat(
-                [
-                    df,
-                    pd.DataFrame(
-                        [
-                            [
-                                "episodes_done",
-                                self.simulation_id,
-                                self.episodes["episodes_done"],
-                            ],
-                            [
-                                "eval_episodes_done",
-                                self.simulation_id,
-                                self.episodes["eval_episodes_done"],
-                            ],
-                        ],
-                        columns=["variable", "ident", "value"],
-                    ),
-                ]
-            )
-
-        if self.total_run_time is not None:
-            df = pd.concat(
-                [
-                    df,
-                    pd.DataFrame(
-                        [["total_run_time", self.simulation_id, self.total_run_time]],
-                        columns=["variable", "ident", "value"],
-                    ),
-                ]
-            )
-
         df.reset_index()
         df["simulation"] = self.simulation_id
 
