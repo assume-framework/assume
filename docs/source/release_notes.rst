@@ -28,6 +28,7 @@ Upcoming Release 0.3.8
 - Enhanced learning output and path handling
 - Updated dashboard for better storage view
 - Improved clearing with shuffling of bids, to avoid bias in clearing of units early in order book
+- added the option of integrating different actor network architectures to the Reinforcorement learning algorithm, currently an mlp and lstm are implemented
 
 **Bug Fixes:**
 
