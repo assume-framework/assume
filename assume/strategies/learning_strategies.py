@@ -38,7 +38,8 @@ class RLStrategy(LearningStrategy):
         float_type (str): Float type to use. Defaults to "float32".
         learning_mode (bool): Whether to use learning mode. Defaults to False.
         algorithm (str): RL algorithm. Defaults to "matd3".
-        policy_class (torch.nn.Module): Actor network. Defaults to "mlp".
+        policy_class (type[torch.nn.Module]): Actor network class. Defaults to "MLPActor".
+        actor (torch.nn.Module): The actor network.
         order_types (list[str]): Order types to use. Defaults to ["SB"].
         action_noise (NormalActionNoise): Action noise. Defaults to None.
         collect_initial_experience_mode (bool): Whether to collect initial experience. Defaults to True.
@@ -67,14 +68,12 @@ class RLStrategy(LearningStrategy):
 
         # based on learning config
         self.algorithm = kwargs.get("algorithm", "matd3")
-        self.network_architecture = kwargs.get("network_architecture", "mlp")
+        network_architecture = kwargs.get("network_architecture", "mlp")
         
-        if self.network_architecture in self.policy_aliases:
-            self.policy_class = policy_aliases[self.network_architecture]
+        if network_architecture in policy_aliases:
+            self.policy_class = policy_aliases[network_architecture]
         else:
-            raise ValueError(f"Policy {self.network_architecture} unknown")
-
-        self.policy_class = policy_aliases[self.network_architecture]
+            raise ValueError(f"Policy {network_architecture} unknown")
 
         # sets the devide of the actor network
         device = kwargs.get("device", "cpu")

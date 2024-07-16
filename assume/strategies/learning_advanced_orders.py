@@ -13,7 +13,7 @@ from assume.common.base import LearningStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_products_index
 from assume.reinforcement_learning.learning_utils import NormalActionNoise
-from assume.reinforcement_learning.network_architecture import MLPActor
+from assume.reinforcement_learning.algorithms import policy_aliases
 
 
 class RLAdvancedOrderStrategy(LearningStrategy):
@@ -27,6 +27,8 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         device (str): The device to run on.
         float_type (str): The float type to use.
         learning_mode (bool): Whether to use learning mode.
+        algorithm (str): RL algorithm. Defaults to "matd3".
+        policy_class (type[torch.nn.Module]): Actor network class. Defaults to "MLPActor".
         actor (torch.nn.Module): The actor network.
         order_types (list[str]): The list of order types to use (SB, LB, BB).
         episodes_collecting_initial_experience (int): Number of episodes to collect initial experience.
@@ -63,6 +65,15 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         # tells us whether we are training the agents or just executing per-learnind stategies
         self.learning_mode = kwargs.get("learning_mode", False)
         self.perform_evaluation = kwargs.get("perform_evaluation", False)
+
+        # based on learning config
+        self.algorithm = kwargs.get("algorithm", "matd3")
+        network_architecture = kwargs.get("network_architecture", "mlp")
+        
+        if network_architecture in policy_aliases:
+            self.policy_class = policy_aliases[network_architecture]
+        else:
+            raise ValueError(f"Policy {network_architecture} unknown")
 
         # sets the devide of the actor network
         device = kwargs.get("device", "cpu")
@@ -583,11 +594,11 @@ class RLAdvancedOrderStrategy(LearningStrategy):
 
         params = th.load(directory, map_location=self.device)
 
-        self.actor = MLPActor(self.obs_dim, self.act_dim, self.float_type)
+        self.actor = self.policy_class(self.obs_dim, self.act_dim, self.float_type)
         self.actor.load_state_dict(params["actor"])
 
         if self.learning_mode:
-            self.actor_target = MLPActor(self.obs_dim, self.act_dim, self.float_type)
+            self.actor_target = self.policy_class(self.obs_dim, self.act_dim, self.float_type)
             self.actor_target.load_state_dict(params["actor_target"])
             self.actor_target.eval()
             self.actor.optimizer.load_state_dict(params["actor_optimizer"])

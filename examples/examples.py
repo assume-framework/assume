@@ -63,18 +63,12 @@ available_examples = {
     "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
     "small_learning_1_lstm": {"scenario": "example_02a", "study_case": "base_lstm"},
     "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
+    "small_learning_2_lstm": {"scenario": "example_02b", "study_case": "base_lstm"},
     "small_learning_3": {"scenario": "example_02c", "study_case": "base"},
     "learning_with_complex_bids": {
         "scenario": "example_02e",
         "study_case": "base",
-    },
-    # Cases resembling Harder et al. 2023
-    "harder_case1": {"scenario": "example_02a", "study_case": "harder"},
-    "harder_case1_lstm": {"scenario": "example_02a", "study_case": "harder_lstm"},
-    "harder_case1_LF": {"scenario": "example_02a", "study_case": "harder_LF"},
-    "harder_case1_lstm_LF": {"scenario": "example_02a", "study_case": "harder_lstm_LF"},
-    "harder_case2": {"scenario": "example_02b", "study_case": "harder"},
-    "harder_case2_lstm": {"scenario": "example_02b", "study_case": "harder_lstm"},
+    }
 }
 
 
@@ -85,8 +79,8 @@ if __name__ == "__main__":
     - local_db: without database and grafana
     - timescale: with database and grafana (note: you need docker installed)
     """
-    data_format = "timescale"  # "local_db" or "timescale"
-    example = "harder_case1_LF"
+    data_format = "local_db"  # "local_db" or "timescale"
+    example = "small"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"

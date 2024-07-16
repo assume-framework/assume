@@ -61,11 +61,10 @@ class RLAlgorithm:
         self.target_noise_clip = target_noise_clip
         self.target_policy_noise = target_policy_noise
 
-        if network_architecture in self.policy_aliases:
+        if network_architecture in policy_aliases:
             self.policy_class = policy_aliases[network_architecture]
         else:
-            raise ValueError(f"Policy {self.network_architecture} unknown")
-
+            raise ValueError(f"Policy {network_architecture} unknown")
 
         self.device = self.learning_role.device
         self.float_type = self.learning_role.float_type

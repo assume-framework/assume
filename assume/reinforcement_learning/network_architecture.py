@@ -90,10 +90,17 @@ class CriticTD3(nn.Module):
 
         return x
 
-
-class MLPActor(nn.Module):
+class Actor(nn.Module):
     """
-    The neurnal network for the actor.
+    Parent class for actor networks.
+    """
+
+    def __init__(self):
+        super(Actor, self).__init__()
+
+class MLPActor(Actor):
+    """
+    The neurnal network for the MLP actor.
     """
 
     def __init__(self, obs_dim: int, act_dim: int, float_type):
