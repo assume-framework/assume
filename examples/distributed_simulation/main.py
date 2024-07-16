@@ -45,7 +45,7 @@ if __name__ == "__main__":
     man = Process(target=manager)
     n = 1
     for i in range(n - 1):
-        agent_adresses.append((tcp_host, 9099 + i))
+        agent_adresses.append(((tcp_host, 9099 + i), "clock_agent"))
     ags = []
     for i in range(n):
         ag = Process(target=agent, args=(i, n))
