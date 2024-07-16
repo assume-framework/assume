@@ -26,12 +26,12 @@ tcp_port = int(os.getenv("TCP_PORT", "9097"))
 if use_mqtt:
     manager_addr = "manager"
     agent_adress = "agent"
-    agent_adresses = ["agent"]
+    agent_adresses = [("agent", "clock_agent")]
     market_operator_addr = "manager"
 else:
     manager_addr = (tcp_host, tcp_port)
     agent_adress = (tcp_host, 9098)
-    agent_adresses = [(tcp_host, 9098)]
+    agent_adresses = [((tcp_host, 9098), "clock_agent")]
     market_operator_addr = (tcp_host, tcp_port)
 
 market_operator_aid = "market_operator"
