@@ -98,9 +98,6 @@ class Learning(Role):
         # list of avg_changes
         self.avg_rewards = []
 
-        # unit-wise run time data
-        self.updating_time = defaultdict(lambda: [0, 0])
-
     def load_inter_episodic_data(self, inter_episodic_data):
         """
         Load the inter-episodic data from the dict stored across simulation runs.
