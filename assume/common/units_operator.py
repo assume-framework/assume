@@ -8,6 +8,7 @@ from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
 
+import numpy as np
 import pandas as pd
 from mango import Role
 from mango.messages.message import Performatives
@@ -23,9 +24,10 @@ from assume.common.market_objects import (
 )
 from assume.common.utils import (
     aggregate_step_amount,
+    get_products_index,
     timestamp2datetime,
 )
-from assume.strategies import BaseStrategy
+from assume.strategies import BaseStrategy, LearningStrategy
 from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
