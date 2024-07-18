@@ -377,7 +377,7 @@ class SteelPlant(SupportsMinMax, DSMUnit):
             raise ValueError(f"Unknown objective: {self.flexibility_measure}")
 
     def calculate_optimal_operation_if_needed(self):
-        if self.flex_power_requirement is None and self.flexibility_measure == "max_load_shift":
+        if self.opt_power_requirement is not None and self.flex_power_requirement is None and self.flexibility_measure == "max_load_shift":
             self.determine_optimal_operation_with_flex()
 
         if self.opt_power_requirement is None and self.objective == "min_variable_cost":
