@@ -169,7 +169,7 @@ class SteelPlant(SupportsMinMax, DSMUnit):
             components (dict[str, dict]): The components of the steel plant.
             model (pyomo.ConcreteModel): The Pyomo model.
         """
-        self.model.dsm_blocks = pyo.Block(components.keys())
+        self.model.dsm_blocks = pyo.Block(list(components.keys()))
         for technology, component_data in components.items():
             if technology in dst_components:
                 factory_method = dst_components[technology]
