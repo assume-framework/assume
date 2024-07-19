@@ -780,7 +780,7 @@ class LearningConfig(TypedDict):
     max_bid_price: float
     learning_mode: bool
     algorithm: str
-    network_architecture: str
+    neural_network_architecture: str
     learning_rate: float
     training_episodes: int
     episodes_collecting_initial_experience: int

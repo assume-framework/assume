@@ -12,7 +12,7 @@ from torch.optim import Adam
 from assume.common.base import LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.learning_utils import polyak_update
-from assume.reinforcement_learning.network_architecture import CriticTD3
+from assume.reinforcement_learning.neural_network_architecture import CriticTD3
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class TD3(RLAlgorithm):
         policy_delay=2,
         target_policy_noise=0.2,
         target_noise_clip=0.5,
-        network_architecture="mlp",
+        neural_network_architecture="mlp",
     ):
         super().__init__(
             learning_role,
@@ -54,7 +54,7 @@ class TD3(RLAlgorithm):
             policy_delay,
             target_policy_noise,
             target_noise_clip,
-            network_architecture,
+            neural_network_architecture,
         )
         self.n_updates = 0
 

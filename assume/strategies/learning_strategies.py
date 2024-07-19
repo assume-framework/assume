@@ -12,7 +12,7 @@ import torch as th
 
 from assume.common.base import LearningStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.reinforcement_learning.algorithms import policy_aliases
+from assume.reinforcement_learning.algorithms import neural_network_architecture_aliases
 from assume.reinforcement_learning.learning_utils import NormalActionNoise
 
 logger = logging.getLogger(__name__)
@@ -49,17 +49,7 @@ class RLStrategy(LearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        obs_dim = kwargs.get("observation_dimension", 50)
-        act_dim = kwargs.get("action_dimension", 2)
-        unique_obs_dim = kwargs.get("unique_obs_dim", 2)
-
-        super().__init__(
-            obs_dim=obs_dim,
-            act_dim=act_dim,
-            unique_obs_dim=unique_obs_dim,
-            *args,
-            **kwargs,
-        )
+        super().__init__(obs_dim=50, act_dim=2, unique_obs_dim=2, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
 
@@ -73,12 +63,14 @@ class RLStrategy(LearningStrategy):
 
         # based on learning config
         self.algorithm = kwargs.get("algorithm", "matd3")
-        network_architecture = kwargs.get("network_architecture", "mlp")
+        neural_network_architecture = kwargs.get("neural_network_architecture", "mlp")
 
-        if network_architecture in policy_aliases:
-            self.policy_class = policy_aliases[network_architecture]
+        if neural_network_architecture in neural_network_architecture_aliases:
+            self.policy_class = neural_network_architecture_aliases[
+                neural_network_architecture
+            ]
         else:
-            raise ValueError(f"Policy {network_architecture} unknown")
+            raise ValueError(f"Policy {neural_network_architecture} unknown")
 
         # sets the devide of the actor network
         device = kwargs.get("device", "cpu")

@@ -41,7 +41,9 @@ class Learning(Role):
         self.episodes_done = 0
         self.rl_strats: dict[int, LearningStrategy] = {}
         self.rl_algorithm = learning_config["algorithm"]
-        self.network_architecture = learning_config["network_architecture"]
+        self.neural_network_architecture = learning_config[
+            "neural_network_architecture"
+        ]
         self.critics = {}
         self.target_critics = {}
 
@@ -228,7 +230,7 @@ class Learning(Role):
                 gradient_steps=self.gradient_steps,
                 batch_size=self.batch_size,
                 gamma=self.gamma,
-                network_architecture=self.network_architecture,
+                neural_network_architecture=self.neural_network_architecture,
             )
         else:
             logger.error(f"Learning algorithm {algorithm} not implemented!")

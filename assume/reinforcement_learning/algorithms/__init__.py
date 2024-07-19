@@ -4,9 +4,12 @@
 
 from torch import nn
 
-from assume.reinforcement_learning.network_architecture import MLPActor, LSTMActor
+from assume.reinforcement_learning.neural_network_architecture import (
+    MLPActor,
+    LSTMActor,
+)
 
-policy_aliases: dict[str, type[nn.Module]] = {
+neural_network_architecture_aliases: dict[str, type[nn.Module]] = {
     "mlp": MLPActor,
     "lstm": LSTMActor,
 }

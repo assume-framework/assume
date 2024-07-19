@@ -34,7 +34,7 @@ The following table shows the options that can be adjusted and gives a short exp
   max_bid_price                           The maximum bid price which limits the action of the actor to this price.
   learning_mode                           Should we use learning mode at all? If not, the learning bidding strategy is overwritten with a default strategy.
   algorithm                               Specifies which algorithm to use. Currently, only MATD3 is implemented.
-  network_architecture                    The architecture of the neural networks used in the algorithm. The architecture is a list of names specifying the "policy" used e.g. multi layer perceptron (mlp).
+  neural_network_architecture                    The architecture of the neural networks used in the algorithm. The architecture is a list of names specifying the "policy" used e.g. multi layer perceptron (mlp).
   learning_rate                           The learning rate, also known as step size, which specifies how much the new policy should be considered in the update.
   training_episodes                       The number of training episodes, whereby one episode is the entire simulation horizon specified in the general config.
   episodes_collecting_initial_experience  The number of episodes collecting initial experience, whereby this means that random actions are chosen instead of using the actor network
@@ -95,7 +95,7 @@ The core of the algorithm is embodied by the :func:`assume.reinforcement_learnin
 
 The network architecture for the actor in the RL algorithm can be customized by specifying the network arhcitecture used.
 In stablebaselines3 they are also referred to as "policies". The architecture is defined as a list of names that represent the layers of the neural network.
-For example, to implement a multi-layer perceptron (MLP) architecture for the actor, you can set the "network_architecture" config item to ["mlp"].
+For example, to implement a multi-layer perceptron (MLP) architecture for the actor, you can set the "neural_network_architecture" config item to ["mlp"].
 This will create a neural network with multiple fully connected layers.
 
 Other available options for the "policy" include Long-Short-Term Memory (LSTMs). The architecture for the observation handling is implemented from [2].
