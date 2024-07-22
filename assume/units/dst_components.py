@@ -5,6 +5,108 @@
 import pyomo.environ as pyo
 
 
+def create_heatpump(
+    model,
+    rated_power,
+    min_power,
+    COP,
+    ramp_up,
+    ramp_down,
+    min_operating_time,
+    min_down_time,
+    type,
+    time_steps,
+    **kwargs,
+):
+    model_part = pyo.Block()
+    model_part.rated_power = pyo.Param(initialize=rated_power)
+    model_part.min_power = pyo.Param(initialize=min_power)
+    model_part.COP = pyo.Param(initialize=COP)
+    model_part.ramp_up = pyo.Param(initialize=ramp_up)
+    model_part.ramp_down = pyo.Param(initialize=ramp_down)
+    model_part.min_operating_time = pyo.Param(initialize=min_operating_time)
+    model_part.min_down_time = pyo.Param(initialize=min_down_time)
+    model_part.type = pyo.Param(initialize=type)
+
+    model_part.power_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+    model_part.heat_out = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+    model_part.operating_cost = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+    model_part.operational_status = pyo.Var(time_steps, within=pyo.Binary)
+
+    @model_part.Constraint(time_steps)
+    def power_bounds(b, t):
+        return pyo.inequality(b.min_power, b.power_in[t], b.rated_power)
+
+    @model_part.Constraint(time_steps)
+    def cop_constraint(b, t):
+        return b.heat_out[t] == b.power_in[t] * b.COP
+
+    @model_part.Constraint(time_steps)
+    def ramp_up_constraint(b, t):
+        if t == 0:
+            return pyo.Constraint.Skip
+        return b.power_in[t] - b.power_in[t - 1] <= b.ramp_up
+
+    @model_part.Constraint(time_steps)
+    def ramp_down_constraint(b, t):
+        if t == 0:
+            return pyo.Constraint.Skip
+        return b.power_in[t - 1] - b.power_in[t] <= b.ramp_down
+
+    @model_part.Constraint(time_steps)
+    def min_operating_time_constraint(b, t):
+        if t == 0:
+            return pyo.Constraint.Skip
+
+        delta_t = t - (t - 1)
+        min_operating_time_units = int(min_operating_time / delta_t)
+
+        if t < min_operating_time_units:
+            return (
+                sum(b.operational_status[i] for i in range(t + 1))
+                >= min_operating_time_units * b.operational_status[t]
+            )
+        else:
+            return (
+                sum(
+                    b.operational_status[i]
+                    for i in range(t - min_operating_time_units + 1, t + 1)
+                )
+                >= min_operating_time_units * b.operational_status[t]
+            )
+
+    @model_part.Constraint(time_steps)
+    def min_downtime_constraint(b, t):
+        if t == 0:
+            return pyo.Constraint.Skip
+
+        delta_t = t - (t - 1)
+        min_downtime_units = int(min_down_time / delta_t)
+
+        if t < min_downtime_units:
+            return sum(
+                b.operational_status[i] for i in range(t + 1)
+            ) <= 1 - min_downtime_units * (1 - b.operational_status[t])
+        else:
+            return sum(
+                b.operational_status[i]
+                for i in range(t - min_downtime_units + 1, t + 1)
+            ) <= 1 - min_downtime_units * (1 - b.operational_status[t])
+
+    @model_part.Constraint(time_steps)
+    def operating_cost_constraint(b, t):
+        if b.type == "electric":
+            return b.operating_cost[t] == b.power_in[t] * model.electricity_price[t]
+        elif b.type == "gas":
+            return b.operating_cost[t] == b.power_in[t] * model.gas_price[t]
+        elif b.type == "both":
+            return b.operating_cost[t] == b.power_in[t] * (
+                model.electricity_price[t] + model.gas_price[t]
+            )
+
+    return model_part
+
+
 def create_electrolyser(
     model,
     rated_power,
