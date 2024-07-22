@@ -17,7 +17,7 @@ from pyomo.opt import (
 from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
-from assume.units.dsm_load_shift import DSMUnit
+from assume.units.dsm_load_shift import DSMFlex
 from assume.units.dst_components import (
     create_driplant,
     create_dristorage,
@@ -40,7 +40,7 @@ dst_components = {
 }
 
 
-class SteelPlant(SupportsMinMax, DSMUnit):
+class SteelPlant(SupportsMinMax, DSMFlex):
     """
     The SteelPlant class represents a steel plant unit in the energy system.
 

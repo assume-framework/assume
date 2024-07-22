@@ -5,7 +5,7 @@
 import pyomo.environ as pyo
 
 
-class DSMUnit:
+class DSMFlex:
     def flexibility_cost_tolerance(self, model):
         """
         Modify the optimization model to include constraints for flexibility within cost tolerance.
