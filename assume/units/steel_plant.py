@@ -173,7 +173,11 @@ class SteelPlant(SupportsMinMax, DSMUnit):
         for technology, component_data in components.items():
             if technology in dst_components:
                 factory_method = dst_components[technology]
-                self.model.dsm_blocks[technology].transfer_attributes_from(factory_method(self.model, time_steps=self.model.time_steps, **component_data))
+                self.model.dsm_blocks[technology].transfer_attributes_from(
+                    factory_method(
+                        self.model, time_steps=self.model.time_steps, **component_data
+                    )
+                )
 
     def initialize_process_sequence(self):
         """
@@ -242,7 +246,9 @@ class SteelPlant(SupportsMinMax, DSMUnit):
         """
         Defines the sets for the Pyomo model.
         """
-        self.model.time_steps = pyo.Set(initialize=[idx for idx, _ in enumerate(self.index)])
+        self.model.time_steps = pyo.Set(
+            initialize=[idx for idx, _ in enumerate(self.index)]
+        )
 
     def define_parameters(self):
         """
@@ -277,8 +283,12 @@ class SteelPlant(SupportsMinMax, DSMUnit):
         """
         Defines the variables for the Pyomo model.
         """
-        self.model.total_power_input = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
-        self.model.variable_cost = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
+        self.model.total_power_input = pyo.Var(
+            self.model.time_steps, within=pyo.NonNegativeReals
+        )
+        self.model.variable_cost = pyo.Var(
+            self.model.time_steps, within=pyo.NonNegativeReals
+        )
 
     def define_constraints(self):
         @self.model.Constraint(self.model.time_steps)
@@ -370,14 +380,20 @@ class SteelPlant(SupportsMinMax, DSMUnit):
                 """
                 Maximizes the load shift over all time steps.
                 """
-                maximise_load_shift = sum(m.load_shift[t] for t in self.model.time_steps)
+                maximise_load_shift = sum(
+                    m.load_shift[t] for t in self.model.time_steps
+                )
                 return maximise_load_shift
 
         else:
             raise ValueError(f"Unknown objective: {self.flexibility_measure}")
 
     def calculate_optimal_operation_if_needed(self):
-        if self.opt_power_requirement is not None and self.flex_power_requirement is None and self.flexibility_measure == "max_load_shift":
+        if (
+            self.opt_power_requirement is not None
+            and self.flex_power_requirement is None
+            and self.flexibility_measure == "max_load_shift"
+        ):
             self.determine_optimal_operation_with_flex()
 
         if self.opt_power_requirement is None and self.objective == "min_variable_cost":

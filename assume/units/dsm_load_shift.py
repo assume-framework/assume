@@ -50,7 +50,9 @@ class DSMUnit:
         )
 
         # Variables
-        model.capacity_upper_bound = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
+        model.capacity_upper_bound = pyo.Var(
+            model.time_steps, within=pyo.NonNegativeReals
+        )
 
         # Constraints
         @model.Constraint(model.time_steps)

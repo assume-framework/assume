@@ -24,7 +24,6 @@ def dsm_components():
             "min_operating_time": 0,
             "min_down_time": 0,
             "efficiency": 1,
-            "fuel_type": "hydrogen",
         },
         "dri_plant": {
             "specific_hydrogen_consumption": 1,
@@ -70,6 +69,8 @@ def steel_plant(dsm_components) -> SteelPlant:
     return SteelPlant(
         id="test_steel_plant",
         unit_operator="test_operator",
+        objective="min_variable_cost",
+        flexibility_measure="max_load_shift",
         bidding_strategies=bidding_strategies,
         index=index,
         components=dsm_components,
@@ -79,13 +80,9 @@ def steel_plant(dsm_components) -> SteelPlant:
 
 
 def test_initialize_components(steel_plant):
-    assert "electrolyser" in steel_plant.dsm_components
-    assert "dri_plant" in steel_plant.dsm_components
-    assert "eaf" in steel_plant.dsm_components
-
-    assert steel_plant.model.direct_hydrogen_flow_constraint is not None
-    assert steel_plant.model.direct_dri_flow_constraint is not None
-    assert steel_plant.model.shaft_to_arc_furnace_material_flow_constraint is not None
+    assert "electrolyser" in steel_plant.model.dsm_blocks.keys()
+    assert "dri_plant" in steel_plant.model.dsm_blocks.keys()
+    assert "eaf" in steel_plant.model.dsm_blocks.keys()
 
 
 def test_determine_optimal_operation_without_flex(steel_plant):
@@ -102,6 +99,34 @@ def test_determine_optimal_operation_without_flex(steel_plant):
     )
 
     assert total_power_input == 3000
+
+    for t in instance.time_steps:
+        hydrogen_out = instance.dsm_blocks["electrolyser"].hydrogen_out[t].value
+        hydrogen_in = instance.dsm_blocks["dri_plant"].hydrogen_in[t].value
+        assert (
+            hydrogen_out >= hydrogen_in
+        ), f"Hydrogen out at time {t} is less than hydrogen in"
+
+    for t in instance.time_steps:
+        dri_output = instance.dsm_blocks["dri_plant"].dri_output[t].value
+        dri_input = instance.dsm_blocks["eaf"].dri_input[t].value
+        assert (
+            dri_output == dri_input
+        ), f"DRI output at time {t} does not match DRI input"
+
+    for t in instance.time_steps:
+        dri_output = instance.dsm_blocks["dri_plant"].dri_output[t].value
+        dri_input = instance.dsm_blocks["eaf"].dri_input[t].value
+        assert (
+            dri_output == dri_input
+        ), f"Material flow from DRI plant to EAF at time {t} is inconsistent"
+
+    total_steel_output = sum(
+        instance.dsm_blocks["eaf"].steel_output[t].value for t in instance.time_steps
+    )
+    assert (
+        total_steel_output == instance.steel_demand
+    ), f"Total steel output {total_steel_output} does not match steel demand {instance.steel_demand}"
 
 
 def test_determine_optimal_operation_with_flex(steel_plant):

@@ -14,7 +14,6 @@ def create_electrolyser(
     min_operating_time,
     min_down_time,
     efficiency,
-    fuel_type,
     time_steps,
     **kwargs,
 ):
@@ -31,7 +30,6 @@ def create_electrolyser(
         min_operating_time (float): The minimum duration the electrolyser must operate continuously (in hours).
         min_down_time (float): The minimum downtime required between operating cycles (in hours).
         efficiency (float): The efficiency of the electrolysis process.
-        fuel_type (str): The type of fuel used by the electrolyser unit.
 
     Constraints:
         power_upper_bound: Ensures the power input to the electrolyser does not exceed the rated power capacity.
@@ -176,6 +174,7 @@ def create_electrolyser(
             b.electrolyser_operating_cost[t]
             == b.power_in[t] * model.electricity_price[t]
         )
+
     return model_part
 
 
@@ -265,10 +264,7 @@ def create_driplant(
     @model_part.Constraint(time_steps)
     def dri_output_constraint(b, t):
         if fuel_type == "hydrogen":
-            return (
-                b.dri_output[t]
-                == b.hydrogen_in[t] / b.specific_hydrogen_consumption
-            )
+            return b.dri_output[t] == b.hydrogen_in[t] / b.specific_hydrogen_consumption
         elif fuel_type == "natural_gas":
             return (
                 b.dri_output[t]
@@ -282,8 +278,7 @@ def create_driplant(
     @model_part.Constraint(time_steps)
     def dri_output_electricity_constraint(b, t):
         return (
-            b.power_dri[t]
-            == b.dri_output[t] * b.specific_electricity_consumption_dri
+            b.power_dri[t] == b.dri_output[t] * b.specific_electricity_consumption_dri
         )
 
     @model_part.Constraint(time_steps)
@@ -365,6 +360,7 @@ def create_driplant(
             + b.power_dri[t] * model.electricity_price[t]
             + b.iron_ore_in[t] * model.iron_ore_price
         )
+
     return model_part
 
 
@@ -455,8 +451,7 @@ def create_electric_furnance(
     @model_part.Constraint(time_steps)
     def steel_output_power_relation(b, t):
         return (
-            b.power_eaf[t]
-            == b.steel_output[t] * b.specific_electricity_consumption_eaf
+            b.power_eaf[t] == b.steel_output[t] * b.specific_electricity_consumption_eaf
         )
 
     @model_part.Constraint(time_steps)
@@ -650,6 +645,7 @@ def create_storage(
             + ((1 - b.charge_loss_rate) * b.charge[t])
             - ((1 + b.discharge_loss_rate) * b.discharge[t])
         )
+
     return model_part
 
 
@@ -703,7 +699,7 @@ def create_dristorage(
     model_part.discharge_dri = pyo.Var(time_steps, within=pyo.NonNegativeReals)
 
     # define constraints
-    
+
     @model_part.Constraint(time_steps)
     def storage_min_capacity_dri_constraint(b, t):
         """
@@ -731,7 +727,6 @@ def create_dristorage(
         Limits the discharging of the DRI storage unit to its maximum capacity.
         """
         return b.discharge_dri[t] <= b.max_capacity_dri
-
 
     @model_part.Constraint(time_steps)
     def energy_in_uniformity_dri_constraint(b, t):
@@ -762,4 +757,5 @@ def create_dristorage(
             + ((1 - b.charge_loss_rate_dri) * b.charge_dri[t])
             - ((1 + b.discharge_loss_rate_dri) * b.discharge_dri[t])
         )
+
     return model_part
