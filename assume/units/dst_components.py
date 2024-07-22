@@ -9,19 +9,19 @@ def create_heatpump(
     model,
     rated_power,
     min_power,
-    COP,
+    cop,
     ramp_up,
     ramp_down,
     min_operating_time,
     min_down_time,
-    type,
+    type,  # 'mono' or 'bivalent'
     time_steps,
     **kwargs,
 ):
     model_part = pyo.Block()
     model_part.rated_power = pyo.Param(initialize=rated_power)
     model_part.min_power = pyo.Param(initialize=min_power)
-    model_part.COP = pyo.Param(initialize=COP)
+    model_part.cop = pyo.Param(initialize=cop)
     model_part.ramp_up = pyo.Param(initialize=ramp_up)
     model_part.ramp_down = pyo.Param(initialize=ramp_down)
     model_part.min_operating_time = pyo.Param(initialize=min_operating_time)
@@ -39,7 +39,7 @@ def create_heatpump(
 
     @model_part.Constraint(time_steps)
     def cop_constraint(b, t):
-        return b.heat_out[t] == b.power_in[t] * b.COP
+        return b.heat_out[t] == b.power_in[t] * b.cop
 
     @model_part.Constraint(time_steps)
     def ramp_up_constraint(b, t):
@@ -95,14 +95,7 @@ def create_heatpump(
 
     @model_part.Constraint(time_steps)
     def operating_cost_constraint(b, t):
-        if b.type == "electric":
-            return b.operating_cost[t] == b.power_in[t] * model.electricity_price[t]
-        elif b.type == "gas":
-            return b.operating_cost[t] == b.power_in[t] * model.gas_price[t]
-        elif b.type == "both":
-            return b.operating_cost[t] == b.power_in[t] * (
-                model.electricity_price[t] + model.gas_price[t]
-            )
+        return b.operating_cost[t] == b.power_in[t] * model.electricity_price[t]
 
     return model_part
 

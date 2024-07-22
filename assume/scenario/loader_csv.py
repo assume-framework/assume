@@ -600,6 +600,13 @@ async def async_setup_world(
         forecaster=forecaster,
     )
 
+    add_units(
+        units_df=dsm_units,
+        unit_type="building",
+        world=world,
+        forecaster=forecaster,
+    )
+
     if (
         world.learning_mode
         and world.learning_role is not None

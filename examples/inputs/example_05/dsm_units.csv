@@ -1,0 +1,2 @@
+name,technology,node,bidding_EOM,bidding_redispatch,unit_operator,objective,flexibility_measure,cost_tolerance,rated_power,min_power,ramp_up,ramp_down,min_operating_time,min_down_time,cop,start_price,max_capacity,min_capacity,initial_soc,storage_loss_rate,charge_loss_rate,discharge_loss_rate
+A360,heat_pump,north,naive_da_building,,dsm_operator_household,min_expense,max_load_shift,,5,0,0,0,0,0,0.8,5,,,,,,

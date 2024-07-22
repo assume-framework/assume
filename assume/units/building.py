@@ -17,7 +17,7 @@ from pyomo.opt import (
 from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
-from assume.units.dsm_load_shift import DSMUnit
+from assume.units.dsm_load_shift import DSMFlex
 from assume.units.dst_components import (
     create_electric_boiler,
     create_heatpump,
@@ -36,7 +36,7 @@ building_components = {
 }
 
 
-class Building(SupportsMinMax, DSMUnit):
+class Building(SupportsMinMax, DSMFlex):
     """
     The Building class represents a building unit in the energy system.
 
@@ -77,7 +77,7 @@ class Building(SupportsMinMax, DSMUnit):
         )
 
         self.electricity_price = self.forecaster["price_EOM"]
-        self.heat_demand = kwargs.get("heat_demand", 0)
+        self.heat_demand = self.forecaster["heat_demand"]
         self.objective = objective
 
         # Main Model part
@@ -186,7 +186,7 @@ class Building(SupportsMinMax, DSMUnit):
             )
 
         @self.model.Constraint(self.model.time_steps)
-        def cost_per_time_step(m, t):
+        def variable_cost_constraint(m, t):
             """
             Calculates the variable cost per time step.
             """
