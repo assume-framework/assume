@@ -612,13 +612,14 @@ async def async_setup_world(
         forecaster=forecaster,
     )
 
-    for unit_type, units_df in industrial_dsm_units.items():
-        add_units(
-            units_df=units_df,
-            unit_type=unit_type,
-            world=world,
-            forecaster=forecaster,
-        )
+    if industrial_dsm_units is not None:
+        for unit_type, units_df in industrial_dsm_units.items():
+            add_units(
+                units_df=units_df,
+                unit_type=unit_type,
+                world=world,
+                forecaster=forecaster,
+            )
 
     if (
         world.learning_mode
