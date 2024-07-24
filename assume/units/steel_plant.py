@@ -457,7 +457,6 @@ class SteelPlant(SupportsMinMax, DSMFlex):
             # Display the Objective Function Value
             objective_value = instance.obj_rule_flex()
             logger.debug(f"The value of the objective function is {objective_value}.")
-            print(f"The objective value is: {objective_value}")
 
         elif results.solver.termination_condition == TerminationCondition.infeasible:
             logger.debug("The model is infeasible.")

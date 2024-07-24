@@ -113,11 +113,12 @@ def load_dsm_units(
     path: str,
     config: dict,
     file_name: str,
-) -> pd.DataFrame:
+) -> dict:
     """
     Loads and processes a CSV file containing DSM unit data, where each unit may consist of multiple components
     (technologies) under the same plant name. The function groups data by plant name, processes each group to
-    handle different technologies, and organizes the data into a structured DataFrame.
+    handle different technologies, and organizes the data into a structured DataFrame. It then splits the DataFrame
+    based on unique unit_types.
 
     Parameters:
         path (str): The directory path where the CSV file is located.
@@ -126,12 +127,11 @@ def load_dsm_units(
         file_name (str): The name of the CSV file to be loaded.
 
     Returns:
-        pd.DataFrame: A DataFrame where each row represents a plant with its components organized into nested
-                      dictionaries under the 'components' column. Each plant's common attributes like unit operator
-                      and objective are directly in the row.
+        dict: A dictionary where each key is a unique unit_type and the value is a DataFrame containing
+              the corresponding DSM units of that type.
 
     Notes:
-        - The CSV file is expected to have columns such as 'name', 'technology', and other operational parameters.
+        - The CSV file is expected to have columns such as 'name', 'technology', 'unit_type', and other operational parameters.
         - The function assumes that the first non-null value in common and bidding columns is representative if multiple
           entries exist for the same plant.
         - It is crucial that the input CSV file follows the expected structure for the function to process it correctly.
@@ -147,7 +147,13 @@ def load_dsm_units(
         return None
 
     # Define columns that are common across different technologies within the same plant
-    common_columns = ["unit_operator", "objective", "demand", "cost_tolerance"]
+    common_columns = [
+        "unit_operator",
+        "objective",
+        "demand",
+        "cost_tolerance",
+        "unit_type",
+    ]
     bidding_columns = [col for col in dsm_units.columns if col.startswith("bidding_")]
 
     # Initialize the dictionary to hold the final structured data
@@ -178,7 +184,13 @@ def load_dsm_units(
 
     # Convert the structured dictionary into a DataFrame
     dsm_units = pd.DataFrame.from_dict(dsm_units_dict, orient="index")
-    return dsm_units
+
+    # Split the DataFrame based on unit_type
+    unit_type_dict = {}
+    for unit_type in dsm_units["unit_type"].unique():
+        unit_type_dict[unit_type] = dsm_units[dsm_units["unit_type"] == unit_type]
+
+    return unit_type_dict
 
 
 def replace_paths(config: dict, inputs_path: str):
@@ -557,9 +569,10 @@ async def async_setup_world(
         )
 
     if dsm_units is not None:
-        all_operators = np.concatenate(
-            [all_operators, dsm_units.unit_operator.unique()]
+        dsm_unit_operators = np.unique(
+            np.concatenate([df.unit_operator.unique() for df in dsm_units.values()])
         )
+        all_operators = np.concatenate([all_operators, dsm_unit_operators])
 
     # add central RL unit operator that handels all RL units
     if world.learning_mode and "Operator-RL" not in all_operators:
@@ -593,12 +606,13 @@ async def async_setup_world(
         forecaster=forecaster,
     )
 
-    add_units(
-        units_df=dsm_units,
-        unit_type="steel_plant",
-        world=world,
-        forecaster=forecaster,
-    )
+    for unit_type, units_df in dsm_units.items():
+        add_units(
+            units_df=units_df,
+            unit_type=unit_type,
+            world=world,
+            forecaster=forecaster,
+        )
 
     if (
         world.learning_mode
