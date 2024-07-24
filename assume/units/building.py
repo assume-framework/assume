@@ -19,9 +19,8 @@ from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
 from assume.units.dsm_load_shift import DSMFlex
 from assume.units.dst_components import (
-    create_electric_boiler,
+    create_boiler,
     create_heatpump,
-    create_thermal_storage,
 )
 
 SOLVERS = ["gurobi", "glpk", "cbc", "cplex"]
@@ -31,8 +30,8 @@ logger = logging.getLogger(__name__)
 # Mapping of component type identifiers to their respective classes
 building_components = {
     "heatpump": create_heatpump,
-    "electric_boiler": create_electric_boiler,
-    "thermal_storage": create_thermal_storage,
+    "boiler": create_boiler,
+    # "thermal_storage": create_thermal_storage,
 }
 
 
@@ -62,6 +61,8 @@ class Building(SupportsMinMax, DSMFlex):
         index: pd.DatetimeIndex = None,
         location: tuple[float, float] = (0.0, 0.0),
         components: dict[str, dict] = None,
+        flexibility_measure: str = "max_load_shift",
+        demand: float = 0,
         objective: str = None,
         **kwargs,
     ):
@@ -77,7 +78,10 @@ class Building(SupportsMinMax, DSMFlex):
         )
 
         self.electricity_price = self.forecaster["price_EOM"]
+        self.natural_gas_price = self.forecaster["fuel_price_natural_gas"]
         self.heat_demand = self.forecaster["heat_demand"]
+        self.demand = demand
+        self.flexibility_measure = flexibility_measure
         self.objective = objective
 
         # Main Model part
@@ -129,7 +133,7 @@ class Building(SupportsMinMax, DSMFlex):
             if has_thermal_storage:
                 return (
                     self.model.dsm_blocks["heatpump"].heat_out[t]
-                    + self.model.dsm_blocks["electric_boiler"].heat_out[t]
+                    + self.model.dsm_blocks["boiler"].heat_out[t]
                     + self.model.dsm_blocks["thermal_storage"].discharge[t]
                     == self.model.heat_demand[t]
                     + self.model.dsm_blocks["thermal_storage"].charge[t]
@@ -137,7 +141,7 @@ class Building(SupportsMinMax, DSMFlex):
             else:
                 return (
                     self.model.dsm_blocks["heatpump"].heat_out[t]
-                    + self.model.dsm_blocks["electric_boiler"].heat_out[t]
+                    + self.model.dsm_blocks["boiler"].heat_out[t]
                     == self.model.heat_demand[t]
                 )
 
@@ -157,9 +161,19 @@ class Building(SupportsMinMax, DSMFlex):
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.electricity_price)},
         )
+        self.model.natural_gas_price = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.natural_gas_price)},
+        )
         self.model.heat_demand = pyo.Param(
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.heat_demand)},
+        )
+        self.model.additional_household_electricity = pyo.Param(
+            self.model.time_steps,
+            initialize={
+                t: self.additional_household_electricity for t in self.model.time_steps
+            },
         )
 
     def define_variables(self):
@@ -182,7 +196,8 @@ class Building(SupportsMinMax, DSMFlex):
             return (
                 m.total_power_input[t]
                 == self.model.dsm_blocks["heatpump"].power_in[t]
-                + self.model.dsm_blocks["electric_boiler"].power_in[t]
+                + self.model.dsm_blocks["boiler"].power_in[t]
+                + self.model.additional_household_electricity[t]
             )
 
         @self.model.Constraint(self.model.time_steps)
@@ -193,7 +208,9 @@ class Building(SupportsMinMax, DSMFlex):
             return (
                 self.model.variable_cost[t]
                 == self.model.dsm_blocks["heatpump"].operating_cost[t]
-                + self.model.dsm_blocks["electric_boiler"].operating_cost[t]
+                + self.model.dsm_blocks["boiler"].operating_cost[t]
+                + self.model.additional_household_electricity[t]
+                * self.model.electricity_price[t]
             )
 
     def define_objective(self):
@@ -213,6 +230,10 @@ class Building(SupportsMinMax, DSMFlex):
                 return total_variable_cost
         else:
             raise ValueError(f"Unknown objective: {self.objective}")
+
+    def calculate_optimal_operation_if_needed(self):
+        if self.opt_power_requirement is None and self.objective == "minimize_expenses":
+            self.calculate_optimal_operation()
 
     def calculate_optimal_operation(self):
         """

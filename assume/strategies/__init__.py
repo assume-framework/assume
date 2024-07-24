@@ -37,6 +37,7 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "flexable_pos_crm_storage": flexablePosCRMStorage,
     "naive_redispatch": NaiveRedispatchStrategy,
     "naive_da_steelplant": NaiveDASteelplantStrategy,
+    "naive_da_building": NaiveDASteelplantStrategy,
     "naive_steel_redispatch": NaiveRedispatchSteelplantStrategy,
 }
 

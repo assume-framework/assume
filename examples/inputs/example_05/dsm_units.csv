@@ -1,2 +1,6 @@
-name,technology,node,bidding_EOM,bidding_redispatch,unit_operator,objective,flexibility_measure,cost_tolerance,rated_power,min_power,ramp_up,ramp_down,min_operating_time,min_down_time,cop,start_price,max_capacity,min_capacity,initial_soc,storage_loss_rate,charge_loss_rate,discharge_loss_rate
-A360,heat_pump,north,naive_da_building,,dsm_operator_household,min_expense,max_load_shift,,5,0,0,0,0,0,0.8,5,,,,,,
+name,technology,fuel_type,node,bidding_EOM,bidding_redispatch,unit_operator,objective,demand,flexibility_measure,cost_tolerance,rated_power,min_power,ramp_up,ramp_down,min_operating_time,min_down_time,cop,efficiency,specific_dri_demand,specific_electricity_consumption,specific_natural_gas_consumption,specific_hydrogen_consumption,specific_iron_ore_consumption,specific_lime_demand,start_price,max_capacity,min_capacity,initial_soc,storage_loss_rate,charge_loss_rate,discharge_loss_rate
+A360,heat_pump,,north,naive_da_building,,dsm_operator_household,min_expense,,max_load_shift,,5,0,0,0,0,0,2,,,,,,,,,,,,,,
+A360,boiler,natural_gas,north,,,,,,,,,,,,,,,0.8,,,,,,,,,,,,,
+B360,electrolyser,hydrogen,north,naive_da_steelplant,,dsm_operator_steel,min_variable_cost,223693.1507,max_load_shift,20,922,0,922,922,0,0,,0.8,,,,,,,5,,,,,,
+B360,dri_plant,hydrogen,north,,,,,,,,120,36,120,120,0,0,,,,0.3,0.9,1.83,1.43,,,,,,,,
+B360,eaf,hydrogen,north,,,,,,,,162,0,162,162,0,0,,,1.09,0.44,,,,0.046,,,,,,,
