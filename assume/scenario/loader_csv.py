@@ -137,13 +137,13 @@ def load_dsm_units(
         - It is crucial that the input CSV file follows the expected structure for the function to process it correctly.
     """
 
-    dsm_units = load_file(
+    industrial_dsm_units = load_file(
         path=path,
         config=config,
         file_name=file_name,
     )
 
-    if dsm_units is None:
+    if industrial_dsm_units is None:
         return None
 
     # Define columns that are common across different technologies within the same plant
@@ -154,13 +154,15 @@ def load_dsm_units(
         "cost_tolerance",
         "unit_type",
     ]
-    bidding_columns = [col for col in dsm_units.columns if col.startswith("bidding_")]
+    bidding_columns = [
+        col for col in industrial_dsm_units.columns if col.startswith("bidding_")
+    ]
 
     # Initialize the dictionary to hold the final structured data
     dsm_units_dict = {}
 
     # Process each group of components by plant name
-    for name, group in dsm_units.groupby(dsm_units.index):
+    for name, group in industrial_dsm_units.groupby(industrial_dsm_units.index):
         dsm_unit = {}
 
         # Aggregate or select appropriate data for common and bidding columns
@@ -183,12 +185,14 @@ def load_dsm_units(
         dsm_units_dict[name] = dsm_unit
 
     # Convert the structured dictionary into a DataFrame
-    dsm_units = pd.DataFrame.from_dict(dsm_units_dict, orient="index")
+    industrial_dsm_units = pd.DataFrame.from_dict(dsm_units_dict, orient="index")
 
     # Split the DataFrame based on unit_type
     unit_type_dict = {}
-    for unit_type in dsm_units["unit_type"].unique():
-        unit_type_dict[unit_type] = dsm_units[dsm_units["unit_type"] == unit_type]
+    for unit_type in industrial_dsm_units["unit_type"].unique():
+        unit_type_dict[unit_type] = industrial_dsm_units[
+            industrial_dsm_units["unit_type"] == unit_type
+        ]
 
     return unit_type_dict
 
@@ -380,10 +384,10 @@ def load_config_and_create_forecaster(
     storage_units = load_file(path=path, config=config, file_name="storage_units")
     demand_units = load_file(path=path, config=config, file_name="demand_units")
 
-    dsm_units = load_dsm_units(
+    industrial_dsm_units = load_dsm_units(
         path=path,
         config=config,
-        file_name="dsm_units",
+        file_name="industrial_dsm_units",
     )
 
     if powerplant_units is None or demand_units is None:
@@ -441,7 +445,7 @@ def load_config_and_create_forecaster(
         "powerplant_units": powerplant_units,
         "storage_units": storage_units,
         "demand_units": demand_units,
-        "dsm_units": dsm_units,
+        "industrial_dsm_units": industrial_dsm_units,
         "forecaster": forecaster,
     }
 
@@ -484,7 +488,7 @@ async def async_setup_world(
     powerplant_units = scenario_data["powerplant_units"]
     storage_units = scenario_data["storage_units"]
     demand_units = scenario_data["demand_units"]
-    dsm_units = scenario_data["dsm_units"]
+    industrial_dsm_units = scenario_data["industrial_dsm_units"]
     forecaster = scenario_data["forecaster"]
 
     save_frequency_hours = config.get("save_frequency_hours", 48)
@@ -568,9 +572,11 @@ async def async_setup_world(
             [all_operators, storage_units.unit_operator.unique()]
         )
 
-    if dsm_units is not None:
+    if industrial_dsm_units is not None:
         dsm_unit_operators = np.unique(
-            np.concatenate([df.unit_operator.unique() for df in dsm_units.values()])
+            np.concatenate(
+                [df.unit_operator.unique() for df in industrial_dsm_units.values()]
+            )
         )
         all_operators = np.concatenate([all_operators, dsm_unit_operators])
 
@@ -606,7 +612,7 @@ async def async_setup_world(
         forecaster=forecaster,
     )
 
-    for unit_type, units_df in dsm_units.items():
+    for unit_type, units_df in industrial_dsm_units.items():
         add_units(
             units_df=units_df,
             unit_type=unit_type,
