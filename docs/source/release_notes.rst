@@ -6,7 +6,7 @@
 Release Notes
 #######################
 
-Upcoming Release 0.3.8
+Upcoming Release 0.4.0
 =======================
 
 **New Features:**
@@ -20,7 +20,7 @@ Upcoming Release 0.3.8
   accurately reflects the outcomes of all market interactions. This improvement supports more sophisticated and realistic agent training scenarios.
   A tutorial on how to use this feature is coming soon.
 
-- **Multiprocessing** Using a command line option, it is now possible to use run each simulation agent in its own process to speed up larger simulations.
+- **Multiprocessing:** Using a command line option, it is now possible to use run each simulation agent in its own process to speed up larger simulations.
   You can read more about it in :doc:`distributed_simulation`
 
 **Improvements:**
@@ -31,6 +31,12 @@ Upcoming Release 0.3.8
 - Enhanced learning output and path handling
 - Updated dashboard for better storage view
 - Improved clearing with shuffling of bids, to avoid bias in clearing of units early in order book
+- Introduced a mechanism to clear the market according to defined market zones while maintaining information about
+  individual nodes, enabling the establishment of specific market zones within the energy market and subsequent
+  nodal-based markets such as redispatch.
+- Added `zones_identifier` to the configuration file and `zone_id` to the `buses.csv`, and refactored the complex market
+  clearing algorithm to incorporate zone information, ensuring that bids submitted with a specific node are
+  matched to the corresponding market zone.
 
 **Bug Fixes:**
 
