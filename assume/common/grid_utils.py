@@ -28,7 +28,7 @@ def add_generators(
         columns=generators.index,
     )
 
-    if generators.isinstance(dict):
+    if isinstance(generators, dict):
         gen_c = generators.copy()
 
         if "p_min_pu" not in gen_c.columns:
