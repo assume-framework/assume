@@ -319,14 +319,12 @@ class ComplexClearingRole(MarketRole):
             self.zones_id = self.marketconfig.param_dict.get("zones_identifier")
             self.node_to_zone = None
 
-            if self.zones_identifier:
+            if self.zones_id:
                 self.incidence_matrix = create_zonal_incidence_matrix(
-                    lines, buses, self.zones_identifier
+                    lines, buses, self.zones_id
                 )
                 self.nodes = buses[self.zones_id].unique()
-                self.node_to_zone = self.grid_data["buses"][
-                    self.zones_identifier
-                ].to_dict()
+                self.node_to_zone = self.grid_data["buses"][self.zones_id].to_dict()
 
             else:
                 self.incidence_matrix = create_nodal_incidence_matrix(lines, buses)
