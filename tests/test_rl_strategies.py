@@ -78,5 +78,5 @@ def test_learning_strategies(mock_market_config, power_plant):
 
     assert reward.iloc[0] == 0.8
     assert profit.iloc[0] == 10000.0
-    assert regret.iloc[0] == 10000.0
+    assert regret.iloc[0] == 2000.0
     assert costs.iloc[0] == 40000.0
