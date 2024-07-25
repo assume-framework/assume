@@ -11,11 +11,11 @@ import pandas as pd
 import pyomo.environ as pyo
 from pyomo.opt import SolverFactory, TerminationCondition, check_available_solvers
 
-from assume.common.grid_utils import (
+from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
+from assume.common.utils import (
     create_nodal_incidence_matrix,
     create_zonal_incidence_matrix,
 )
-from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)
