@@ -31,6 +31,7 @@ extensions = [
     "sphinx.ext.todo",
     "sphinx.ext.mathjax",
     "sphinx.ext.napoleon",
+    "sphinxarg.ext",
     "nbsphinx",
     "nbsphinx_link",
     # "sphinx.ext.imgconverter",  # for SVG conversion
