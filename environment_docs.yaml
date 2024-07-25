@@ -25,4 +25,3 @@ dependencies:
   - nbsphinx_link
   - sphinx-argparse
   - git+https://github.com/mgaitan/sphinxcontrib-mermaid
-

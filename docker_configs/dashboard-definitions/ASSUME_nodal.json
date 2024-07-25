@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 4,
+  "id": 1,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -50,7 +50,7 @@
         "content": "# Nodal Analysing Board\n\nThis board can be used to visualize the Grid statistics and usage.\nAs well as the prices at different locations of the grid.",
         "mode": "markdown"
       },
-      "pluginVersion": "10.4.0",
+      "pluginVersion": "11.0.0",
       "title": "Nodal Dashboard",
       "type": "text"
     },
@@ -88,7 +88,7 @@
         "content": "# Market-specific Data\n\nData specific for the market depending on the choice made at te top of the panel\n\n",
         "mode": "markdown"
       },
-      "pluginVersion": "10.4.0",
+      "pluginVersion": "11.0.0",
       "targets": [
         {
           "datasource": {
@@ -355,6 +355,7 @@
           ""
         ],
         "tooltip": {
+          "maxHeight": 600,
           "mode": "multi",
           "sort": "none"
         }
@@ -465,8 +466,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -482,7 +482,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 144
+        "y": 24
       },
       "id": 19,
       "options": {
@@ -644,8 +644,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -661,7 +660,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 144
+        "y": 24
       },
       "id": 20,
       "options": {
@@ -776,7 +775,6 @@
       "type": "timeseries"
     }
   ],
-  "refresh": "",
   "schemaVersion": 39,
   "tags": [],
   "templating": {
@@ -784,8 +782,8 @@
       {
         "current": {
           "selected": false,
-          "text": "world_pypsa_scigrid_deredispatch",
-          "value": "world_pypsa_scigrid_deredispatch"
+          "text": "example_01d_base",
+          "value": "example_01d_base"
         },
         "datasource": {
           "type": "postgres",
@@ -808,8 +806,8 @@
       {
         "current": {
           "selected": false,
-          "text": "EOM",
-          "value": "EOM"
+          "text": "DAM",
+          "value": "DAM"
         },
         "datasource": {
           "type": "postgres",
@@ -832,9 +830,10 @@
     ]
   },
   "time": {
-    "from": "2011-01-01T00:23:03.353Z",
-    "to": "2011-01-01T03:42:03.926Z"
+    "from": "2019-01-01T23:00:00.000Z",
+    "to": "2019-01-06T22:59:59.000Z"
   },
+  "timeRangeUpdatedDuringEditOrView": false,
   "timepicker": {
     "refresh_intervals": [
       "5s",
@@ -848,6 +847,6 @@
   "timezone": "",
   "title": "ASSUME - Nodal view",
   "uid": "nodalview",
-  "version": 5,
+  "version": 2,
   "weekStart": ""
 }
