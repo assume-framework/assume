@@ -18,16 +18,11 @@ from assume.common.base import LearningConfig
 from assume.common.exceptions import AssumeException
 from assume.common.forecasts import CsvForecaster, Forecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
+from assume.common.utils import adjust_unit_operator_for_learning, convert_to_rrule_freq
+from assume.strategies import BaseStrategy
 from assume.world import World
 
 logger = logging.getLogger(__name__)
-
-freq_map = {
-    "h": rr.HOURLY,
-    "m": rr.MINUTELY,
-    "d": rr.DAILY,
-    "w": rr.WEEKLY,
-}
 
 
 def load_file(
@@ -113,21 +108,6 @@ def load_file(
     except FileNotFoundError:
         logger.info(f"{file_name} not found. Returning None")
         return None
-
-
-def convert_to_rrule_freq(string: str) -> tuple[int, int]:
-    """
-    Convert a string to a rrule frequency and interval.
-
-    Args:
-        string (str): The string to be converted. Should be in the format of "1h" or "1d" or "1w".
-
-    Returns:
-        tuple[int, int]: The rrule frequency and interval.
-    """
-    freq = freq_map[string[-1]]
-    interval = int(string[:-1])
-    return freq, interval
 
 
 def replace_paths(config: dict, inputs_path: str):
@@ -275,6 +255,54 @@ def add_units(
             unit_params=unit_params,
             forecaster=forecaster,
         )
+
+
+def read_units(
+    units_df: pd.DataFrame,
+    unit_type: str,
+    forecaster: Forecaster,
+    world_bidding_strategies: dict[str, BaseStrategy],
+) -> dict[str, list[dict]]:
+    """
+    Read units from a dataframe and only add them to a dictionary.
+    The dictionary contains the operator ids as keys and the list of units belonging to the operator as values.
+
+    Args:
+        units_df (pandas.DataFrame): The dataframe containing the units.
+        unit_type (str): The type of the unit.
+        forecaster (Forecaster): The forecaster used for adding the units.
+        world_bidding_strategies (dict[str, BaseStrategy]): The strategies available in the world
+    """
+    if units_df is None:
+        return {}
+
+    logger.info(f"Adding {unit_type} units")
+    units_dict = defaultdict(list)
+
+    units_df = units_df.fillna(0)
+    for unit_name, unit_params in units_df.iterrows():
+        bidding_strategies = {
+            key.split("bidding_")[1]: unit_params[key]
+            for key in unit_params.keys()
+            if key.startswith("bidding_")
+        }
+        unit_params["bidding_strategies"] = bidding_strategies
+        operator_id = adjust_unit_operator_for_learning(
+            bidding_strategies,
+            world_bidding_strategies,
+            unit_params["unit_operator"],
+        )
+        del unit_params["unit_operator"]
+        units_dict[operator_id].append(
+            dict(
+                id=unit_name,
+                unit_type=unit_type,
+                unit_operator_id=operator_id,
+                unit_params=unit_params,
+                forecaster=forecaster,
+            )
+        )
+    return units_dict
 
 
 def load_config_and_create_forecaster(
@@ -483,48 +511,55 @@ async def async_setup_world(
             market_config=market_config,
         )
 
-    # add the unit operators using unique unit operator names in the powerplants csv
-    logger.info("Adding unit operators")
-    all_operators = np.concatenate(
-        [
-            powerplant_units.unit_operator.unique(),
-            demand_units.unit_operator.unique(),
-        ]
-    )
+    # create list of units from dataframes before adding actual operators
+    logger.info("Read units from file")
 
-    if storage_units is not None:
-        all_operators = np.concatenate(
-            [all_operators, storage_units.unit_operator.unique()]
-        )
-
-    # add central RL unit operator that handels all RL units
-    if world.learning_mode and "Operator-RL" not in all_operators:
-        all_operators = np.concatenate([all_operators, ["Operator-RL"]])
-
-    for company_name in set(all_operators):
-        world.add_unit_operator(id=str(company_name))
-
-    # add the units to corresponding unit operators
-    add_units(
+    units = defaultdict(list)
+    pwp_plants = read_units(
         units_df=powerplant_units,
         unit_type="power_plant",
-        world=world,
         forecaster=forecaster,
+        world_bidding_strategies=world.bidding_strategies,
     )
 
-    add_units(
+    str_plants = read_units(
         units_df=storage_units,
         unit_type="storage",
-        world=world,
         forecaster=forecaster,
+        world_bidding_strategies=world.bidding_strategies,
     )
 
-    add_units(
+    dem_plants = read_units(
         units_df=demand_units,
         unit_type="demand",
-        world=world,
         forecaster=forecaster,
+        world_bidding_strategies=world.bidding_strategies,
     )
+    for op, op_units in pwp_plants.items():
+        units[op].extend(op_units)
+    for op, op_units in str_plants.items():
+        units[op].extend(op_units)
+    for op, op_units in dem_plants.items():
+        units[op].extend(op_units)
+
+    # if distributed_role is true - there is a manager available
+    # and we cann add each units_operator as a separate process
+    if world.distributed_role is True:
+        logger.info("Adding unit operators and units - with subprocesses")
+        for op, op_units in units.items():
+            await world.add_units_with_operator_subprocess(op, op_units)
+    else:
+        logger.info("Adding unit operators and units")
+        for company_name in set(units.keys()):
+            if company_name == "Operator-RL" and world.learning_mode:
+                world.add_rl_unit_operator(id="Operator-RL")
+            else:
+                world.add_unit_operator(id=str(company_name))
+
+        # add the units to corresponding unit operators
+        for op, op_units in units.items():
+            for unit in op_units:
+                await world.async_add_unit(**unit)
 
     if (
         world.learning_mode
@@ -751,7 +786,7 @@ def run_learning(
     if Path(save_path).is_dir():
         # we are in learning mode and about to train new policies, which might overwrite existing ones
         accept = input(
-            f"{save_path=} exists - should we overwrite current learnings? (y/N)"
+            f"{save_path=} exists - should we overwrite current learnings? (y/N) "
         )
         if not accept.lower().startswith("y"):
             # stop here - do not start learning or save anything
@@ -815,7 +850,7 @@ def run_learning(
         if (
             episode % validation_interval == 0
             and episode
-            > world.learning_role.episodes_collecting_initial_experience
+            >= world.learning_role.episodes_collecting_initial_experience
             + validation_interval
         ):
             world.reset()

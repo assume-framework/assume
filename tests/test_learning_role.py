@@ -25,6 +25,7 @@ def test_learning_init():
     learning_config: LearningConfig = {
         "obs_dim": 3,
         "act_dim": 2,
+        "train_freq": "1h",
         "unique_obs_dim": 0,
         "algorithm": "matd3",
         "learning_mode": False,
@@ -36,7 +37,7 @@ def test_learning_init():
         "early_stopping_threshold": 0.05,
     }
     # test init
-    learn = Learning(learning_config, start, end)
+    learn = Learning(learning_config)
     assert len(learn.rl_strats) == 0
 
     # we need to add learning strategies first

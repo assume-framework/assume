@@ -80,6 +80,8 @@ Documentation
 * :doc:`learning_algorithm`
 * :doc:`buffers`
 * :doc:`support_policies`
+* :doc:`distributed_simulation`
+* :doc:`command_line_interface`
 * :doc:`assume`
 
 .. toctree::
@@ -95,6 +97,8 @@ Documentation
    learning_algorithm
    buffers
    support_policies
+   distributed_simulation
+   command_line_interface
    assume
 
 
@@ -108,6 +112,7 @@ Indices and tables
 
 **Help & References**
 
+* :doc:`release_notes`
 * :doc:`developers`
 
 .. toctree::
@@ -115,4 +120,5 @@ Indices and tables
    :maxdepth: 1
    :caption: Help & References
 
+   release_notes
    developers

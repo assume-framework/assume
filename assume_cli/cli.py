@@ -53,9 +53,7 @@ def config_case_completer(prefix, parsed_args, **kwargs):
     return [""]
 
 
-def cli(args=None):
-    if not args:
-        args = sys.argv[1:]
+def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Command Line Interface for ASSUME simulations",
     )
@@ -104,6 +102,20 @@ def cli(args=None):
         choices=set(logging._nameToLevel.keys()),
     )
 
+    parser.add_argument(
+        "-p",
+        "--parallel",
+        help="run simulation with multiple processes",
+        action="store_true",
+    )
+    return parser
+
+
+def cli(args=None):
+    if not args:
+        args = sys.argv[1:]
+    parser = create_parser()
+
     argcomplete.autocomplete(parser)
     args = parser.parse_args(args)
     name = args.scenario
@@ -124,10 +136,19 @@ def cli(args=None):
 
         os.makedirs("./examples/local_db", exist_ok=True)
 
+        if args.parallel:
+            distributed_role = True
+            addr = ("localhost", 9100)
+        else:
+            distributed_role = None
+            addr = "world"
+
         world = World(
             database_uri=db_uri,
             export_csv_path=args.csv_export_path,
             log_level=args.loglevel,
+            distributed_role=distributed_role,
+            addr=addr,
         )
         load_scenario_folder(
             world,
