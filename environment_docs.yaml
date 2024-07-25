@@ -23,4 +23,5 @@ dependencies:
   - sphinx-book-theme
   - nbsphinx
   - nbsphinx_link
-  - git+https://github.com/maurerle/sphinxcontrib-mermaid@maurerle
+  - sphinx-argparse
+  - git+https://github.com/mgaitan/sphinxcontrib-mermaid
