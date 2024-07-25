@@ -638,9 +638,10 @@ async def async_setup_world(
                 units_df=units_df,
                 unit_type=unit_type,
                 forecaster=forecaster,
+                world_bidding_strategies=world.bidding_strategies,
             )
-        for op, op_units in dsm_plants.items():
-            units[op].extend(dsm_units)
+        for op, op_units in dsm_units.items():
+            units[op].extend(op_units)
 
     for op, op_units in pwp_plants.items():
         units[op].extend(op_units)
