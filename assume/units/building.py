@@ -80,6 +80,9 @@ class Building(SupportsMinMax, DSMFlex):
         self.electricity_price = self.forecaster["price_EOM"]
         self.natural_gas_price = self.forecaster["fuel_price_natural_gas"]
         self.heat_demand = self.forecaster["heat_demand"]
+        self.additional_electricity_load = self.forecaster[
+            "360_residential_load_profile"
+        ]
         self.demand = demand
         self.flexibility_measure = flexibility_measure
         self.objective = objective
@@ -169,10 +172,10 @@ class Building(SupportsMinMax, DSMFlex):
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.heat_demand)},
         )
-        self.model.additional_household_electricity = pyo.Param(
+        self.model.additional_electricity_load = pyo.Param(
             self.model.time_steps,
             initialize={
-                t: self.additional_household_electricity for t in self.model.time_steps
+                t: value for t, value in enumerate(self.additional_electricity_load)
             },
         )
 
@@ -197,7 +200,7 @@ class Building(SupportsMinMax, DSMFlex):
                 m.total_power_input[t]
                 == self.model.dsm_blocks["heatpump"].power_in[t]
                 + self.model.dsm_blocks["boiler"].power_in[t]
-                + self.model.additional_household_electricity[t]
+                + self.model.additional_electricity_load[t]
             )
 
         @self.model.Constraint(self.model.time_steps)
@@ -209,7 +212,7 @@ class Building(SupportsMinMax, DSMFlex):
                 self.model.variable_cost[t]
                 == self.model.dsm_blocks["heatpump"].operating_cost[t]
                 + self.model.dsm_blocks["boiler"].operating_cost[t]
-                + self.model.additional_household_electricity[t]
+                + self.model.additional_electricity_load[t]
                 * self.model.electricity_price[t]
             )
 

@@ -14,7 +14,6 @@ def create_heatpump(
     ramp_down,
     min_operating_time,
     min_down_time,
-    type,  # 'mono' or 'bivalent'
     time_steps,
     **kwargs,
 ):
@@ -26,7 +25,6 @@ def create_heatpump(
     model_part.ramp_down = pyo.Param(initialize=ramp_down)
     model_part.min_operating_time = pyo.Param(initialize=min_operating_time)
     model_part.min_down_time = pyo.Param(initialize=min_down_time)
-    model_part.type = pyo.Param(initialize=type)
 
     model_part.power_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.heat_out = pyo.Var(time_steps, within=pyo.NonNegativeReals)
@@ -121,7 +119,6 @@ def create_boiler(
     model_part.ramp_down = pyo.Param(initialize=ramp_down)
     model_part.min_operating_time = pyo.Param(initialize=min_operating_time)
     model_part.min_down_time = pyo.Param(initialize=min_down_time)
-    model_part.fuel_type = pyo.Param(initialize=fuel_type)
 
     model_part.natural_gas_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.power_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
@@ -135,9 +132,9 @@ def create_boiler(
 
     @model_part.Constraint(time_steps)
     def efficiency_constraint(b, t):
-        if b.fuel_type == "electric":
+        if fuel_type == "electric":
             return b.heat_out[t] == b.power_in[t] * b.efficiency
-        elif b.fuel_type == "natural_gas":
+        elif fuel_type == "natural_gas":
             # Assuming an equal split for simplicity
             b.heat_out[t] == b.natural_gas_in[t] * b.efficiency
 
@@ -195,9 +192,9 @@ def create_boiler(
 
     @model_part.Constraint(time_steps)
     def operating_cost_constraint(b, t):
-        if b.fuel_type == "electric":
+        if fuel_type == "electric":
             return b.operating_cost[t] == b.power_in[t] * model.electricity_price[t]
-        elif b.fuel_type == "natural_gas":
+        elif fuel_type == "natural_gas":
             return b.operating_cost[t] == b.power_in[t] * model.natural_gas_price[t]
 
     return model_part
