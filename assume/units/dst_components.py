@@ -341,7 +341,7 @@ def create_ev(
         max_capacity: The maximum capacity of the EV battery.
         min_capacity: The minimum capacity of the EV battery.
         initial_soc: The initial state of charge (SOC) of the EV battery.
-        max_ev_charging_rate: The maximum charging rate of the EV onboard charger OR the chargign station.
+        max_ev_charging_rate: The maximum charging rate of the EV onboard charger OR the charging station.
         ramp_up: The ramp-up rate for charging.
         ramp_down: The ramp-down rate for charging.
         availability_start: The start time of EV availability for charging.
