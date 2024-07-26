@@ -28,7 +28,7 @@ def create_heatpump(
 
     model_part.power_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.heat_out = pyo.Var(time_steps, within=pyo.NonNegativeReals)
-    model_part.operating_cost = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+    model_part.operating_cost_hp = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.operational_status = pyo.Var(time_steps, within=pyo.Binary)
 
     @model_part.Constraint(time_steps)
@@ -93,7 +93,7 @@ def create_heatpump(
 
     @model_part.Constraint(time_steps)
     def operating_cost_constraint(b, t):
-        return b.operating_cost[t] == b.power_in[t] * model.electricity_price[t]
+        return b.operating_cost_hp[t] == b.power_in[t] * model.electricity_price[t]
 
     return model_part
 
@@ -123,7 +123,7 @@ def create_boiler(
     model_part.natural_gas_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.power_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.heat_out = pyo.Var(time_steps, within=pyo.NonNegativeReals)
-    model_part.operating_cost = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+    model_part.operating_cost_boiler = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.operational_status = pyo.Var(time_steps, within=pyo.Binary)
 
     @model_part.Constraint(time_steps)
@@ -193,9 +193,13 @@ def create_boiler(
     @model_part.Constraint(time_steps)
     def operating_cost_constraint(b, t):
         if fuel_type == "electric":
-            return b.operating_cost[t] == b.power_in[t] * model.electricity_price[t]
+            return (
+                b.operating_cost_boiler[t] == b.power_in[t] * model.electricity_price[t]
+            )
         elif fuel_type == "natural_gas":
-            return b.operating_cost[t] == b.power_in[t] * model.natural_gas_price[t]
+            return (
+                b.operating_cost_boiler[t] == b.power_in[t] * model.natural_gas_price[t]
+            )
 
     return model_part
 
@@ -313,6 +317,133 @@ def create_thermal_storage(
         )
 
     return model_part
+
+
+def create_ev(
+    model,
+    max_capacity,
+    min_capacity,
+    initial_soc,
+    max_ev_charging_rate,
+    ramp_up,
+    ramp_down,
+    availability_start,
+    availability_end,
+    charging_profile,
+    time_steps,
+    **kwargs,
+):
+    """
+    Represents an Electric Vehicle (EV) unit.
+
+    Args:
+        model: A Pyomo ConcreteModel object representing the optimization model.
+        max_capacity: The maximum capacity of the EV battery.
+        min_capacity: The minimum capacity of the EV battery.
+        initial_soc: The initial state of charge (SOC) of the EV battery.
+        max_ev_charging_rate: The maximum charging rate of the EV onboard charger OR the chargign station.
+        ramp_up: The ramp-up rate for charging.
+        ramp_down: The ramp-down rate for charging.
+        availability_start: The start time of EV availability for charging.
+        availability_end: The end time of EV availability for charging.
+        charging_profile: A predefined charging profile. YES is use has a predefined charging profile otherwise NO.
+        time_steps: The time steps in the optimization model.
+    """
+    model_part = pyo.Block()
+    # define parameters
+    model_part.max_ev_battery_capacity = pyo.Param(initialize=max_capacity)
+    model_part.min_ev_battery_capacity = pyo.Param(initialize=min_capacity)
+    model_part.initial_ev_battery_soc = pyo.Param(initialize=initial_soc)
+    model_part.max_ev_charging_rate = pyo.Param(initialize=max_ev_charging_rate)
+    model_part.ramp_up = pyo.Param(initialize=ramp_up)
+    model_part.ramp_down = pyo.Param(initialize=ramp_down)
+    model_part.availability_start = pyo.Param(initialize=availability_start)
+    model_part.availability_end = pyo.Param(initialize=availability_end)
+
+    # define variables
+    model_part.ev_battery_soc = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+    model_part.charge_ev = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+    model_part.ev_operating_cost = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+
+    # define constraints
+    if charging_profile == "Yes":
+
+        @model_part.Constraint(time_steps)
+        def charging_profile_constraint(b, t):
+            """
+            Ensures the EV follows the predefined charging profile.
+            """
+            return b.charge_ev[t] == model.ev_load_profile[t]
+    else:
+
+        @model_part.Constraint(time_steps)
+        def charging_rate_limit(b, t):
+            """
+            Limits the charging rate of the EV to its maximum charging rate.
+            """
+            return b.charge_ev[t] <= b.max_ev_charging_rate
+
+        @model_part.Constraint(time_steps)
+        def ramp_up_constraint(b, t):
+            """
+            Limits the ramp-up rate of the EV charging.
+            """
+            if t == 0:
+                return pyo.Constraint.Skip
+            return b.charge_ev[t] - b.charge_ev[t - 1] <= b.ramp_up
+
+        @model_part.Constraint(time_steps)
+        def ramp_down_constraint(b, t):
+            """
+            Limits the ramp-down rate of the EV charging.
+            """
+            if t == 0:
+                return pyo.Constraint.Skip
+            return b.charge_ev[t - 1] - b.charge_ev[t] <= b.ramp_down
+
+        @model_part.Constraint(time_steps)
+        def availability_constraint(b, t):
+            """
+            Ensures the EV is only charged within the availability window.
+            """
+            if availability_start <= t <= availability_end:
+                return pyo.Constraint.Skip
+            else:
+                return b.charge_ev[t] == 0
+
+        @model_part.Constraint(time_steps)
+        def soc_limit_upper(b, t):
+            """
+            Ensures the SOC of the EV stays below the maximum capacity.
+            """
+            return b.ev_battery_soc[t] <= b.max_ev_battery_capacity
+
+        @model_part.Constraint(time_steps)
+        def soc_limit_lower(b, t):
+            """
+            Ensures the SOC of the EV stays above the minimum capacity.
+            """
+            return b.ev_battery_soc[t] >= b.min_ev_battery_capacity
+
+        @model_part.Constraint(time_steps)
+        def soc_change_constraint(b, t):
+            """
+            Defines the change in SOC of the EV over time.
+            """
+            return b.ev_battery_soc[t] == (
+                (b.ev_battery_soc[t - 1] if t > 0 else b.initial_ev_battery_soc)
+                + b.charge_ev[t]
+            )
+
+        @model_part.Constraint(time_steps)
+        def operating_cost_ev_constraint(b, t):
+            """
+            Calculates the operating cost of the ev based on the electricity price.
+
+            """
+            return b.operating_cost_ev[t] == b.charge_ev[t] * model.electricity_price[t]
+
+        return model_part
 
 
 def create_electrolyser(

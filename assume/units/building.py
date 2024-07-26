@@ -20,6 +20,7 @@ from assume.common.utils import get_products_index
 from assume.units.dsm_load_shift import DSMFlex
 from assume.units.dst_components import (
     create_boiler,
+    create_ev,
     create_heatpump,
     create_thermal_storage,
 )
@@ -33,6 +34,7 @@ building_components = {
     "heatpump": create_heatpump,
     "boiler": create_boiler,
     "thermal_storage": create_thermal_storage,
+    "ev": create_ev,
 }
 
 
@@ -81,6 +83,7 @@ class Building(SupportsMinMax, DSMFlex):
         self.electricity_price = self.forecaster["price_EOM"]
         self.natural_gas_price = self.forecaster["fuel_price_natural_gas"]
         self.heat_demand = self.forecaster["heat_demand"]
+        self.ev_load_profile = self.forecaster["ev_load_profile"]
         self.additional_electricity_load = self.forecaster[
             "360_residential_load_profile"
         ]
@@ -173,6 +176,10 @@ class Building(SupportsMinMax, DSMFlex):
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.heat_demand)},
         )
+        self.model.ev_load_profile = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.ev_load_profile)},
+        )
         self.model.additional_electricity_load = pyo.Param(
             self.model.time_steps,
             initialize={
@@ -201,6 +208,7 @@ class Building(SupportsMinMax, DSMFlex):
                 m.total_power_input[t]
                 == self.model.dsm_blocks["heatpump"].power_in[t]
                 + self.model.dsm_blocks["boiler"].power_in[t]
+                + self.model.dsm_blocks["ev"].charge_ev[t]
                 + self.model.additional_electricity_load[t]
             )
 
@@ -211,9 +219,10 @@ class Building(SupportsMinMax, DSMFlex):
             """
             return (
                 self.model.variable_cost[t]
-                == self.model.dsm_blocks["heatpump"].operating_cost[t]
-                + self.model.dsm_blocks["boiler"].operating_cost[t]
-                + self.model.additional_electricity_load[t]
+                == self.model.dsm_blocks["heatpump"].operating_cost_hp[t]
+                + self.model.dsm_blocks["boiler"].operating_cost_boiler[t]
+                + self.model.dsm_blocks["ev"].operating_cost_ev[t]
+                + self.model.additional_electricity_load
                 * self.model.electricity_price[t]
             )
 
