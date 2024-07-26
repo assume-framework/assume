@@ -19,8 +19,8 @@ from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
 from assume.units.dsm_load_shift import DSMFlex
 from assume.units.dst_components import (
-    create_driplant,
-    create_dristorage,
+    create_dri_plant,
+    create_dri_storage,
     create_electric_furnance,
     create_electrolyser,
     create_storage,
@@ -34,8 +34,8 @@ logger = logging.getLogger(__name__)
 dst_components = {
     "electrolyser": create_electrolyser,
     "h2storage": create_storage,
-    "dri_plant": create_driplant,
-    "dri_storage": create_dristorage,
+    "dri_plant": create_dri_plant,
+    "dri_storage": create_dri_storage,
     "eaf": create_electric_furnance,
 }
 
@@ -457,7 +457,6 @@ class SteelPlant(SupportsMinMax, DSMFlex):
             # Display the Objective Function Value
             objective_value = instance.obj_rule_flex()
             logger.debug(f"The value of the objective function is {objective_value}.")
-            print(f"The objective value is: {objective_value}")
 
         elif results.solver.termination_condition == TerminationCondition.infeasible:
             logger.debug("The model is infeasible.")

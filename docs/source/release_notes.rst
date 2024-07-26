@@ -20,6 +20,9 @@ Upcoming Release 0.3.8
   accurately reflects the outcomes of all market interactions. This improvement supports more sophisticated and realistic agent training scenarios.
   A tutorial on how to use this feature is coming soon.
 
+- **Multiprocessing** Using a command line option, it is now possible to use run each simulation agent in its own process to speed up larger simulations.
+  You can read more about it in :doc:`distributed_simulation`
+
 **Improvements:**
 
 - Significant speed up of the framework and especially of the learning process

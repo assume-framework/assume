@@ -18,7 +18,8 @@ from assume.common.base import LearningConfig
 from assume.common.exceptions import AssumeException
 from assume.common.forecasts import CsvForecaster, Forecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
-from assume.common.utils import convert_to_rrule_freq
+from assume.common.utils import adjust_unit_operator_for_learning, convert_to_rrule_freq
+from assume.strategies import BaseStrategy
 from assume.world import World
 
 logger = logging.getLogger(__name__)
@@ -113,11 +114,12 @@ def load_dsm_units(
     path: str,
     config: dict,
     file_name: str,
-) -> pd.DataFrame:
+) -> dict:
     """
     Loads and processes a CSV file containing DSM unit data, where each unit may consist of multiple components
     (technologies) under the same plant name. The function groups data by plant name, processes each group to
-    handle different technologies, and organizes the data into a structured DataFrame.
+    handle different technologies, and organizes the data into a structured DataFrame. It then splits the DataFrame
+    based on unique unit_types.
 
     Parameters:
         path (str): The directory path where the CSV file is located.
@@ -126,35 +128,42 @@ def load_dsm_units(
         file_name (str): The name of the CSV file to be loaded.
 
     Returns:
-        pd.DataFrame: A DataFrame where each row represents a plant with its components organized into nested
-                      dictionaries under the 'components' column. Each plant's common attributes like unit operator
-                      and objective are directly in the row.
+        dict: A dictionary where each key is a unique unit_type and the value is a DataFrame containing
+              the corresponding DSM units of that type.
 
     Notes:
-        - The CSV file is expected to have columns such as 'name', 'technology', and other operational parameters.
+        - The CSV file is expected to have columns such as 'name', 'technology', 'unit_type', and other operational parameters.
         - The function assumes that the first non-null value in common and bidding columns is representative if multiple
           entries exist for the same plant.
         - It is crucial that the input CSV file follows the expected structure for the function to process it correctly.
     """
 
-    dsm_units = load_file(
+    industrial_dsm_units = load_file(
         path=path,
         config=config,
         file_name=file_name,
     )
 
-    if dsm_units is None:
+    if industrial_dsm_units is None:
         return None
 
     # Define columns that are common across different technologies within the same plant
-    common_columns = ["unit_operator", "objective", "demand", "cost_tolerance"]
-    bidding_columns = [col for col in dsm_units.columns if col.startswith("bidding_")]
+    common_columns = [
+        "unit_operator",
+        "objective",
+        "demand",
+        "cost_tolerance",
+        "unit_type",
+    ]
+    bidding_columns = [
+        col for col in industrial_dsm_units.columns if col.startswith("bidding_")
+    ]
 
     # Initialize the dictionary to hold the final structured data
     dsm_units_dict = {}
 
     # Process each group of components by plant name
-    for name, group in dsm_units.groupby(dsm_units.index):
+    for name, group in industrial_dsm_units.groupby(industrial_dsm_units.index):
         dsm_unit = {}
 
         # Aggregate or select appropriate data for common and bidding columns
@@ -177,8 +186,16 @@ def load_dsm_units(
         dsm_units_dict[name] = dsm_unit
 
     # Convert the structured dictionary into a DataFrame
-    dsm_units = pd.DataFrame.from_dict(dsm_units_dict, orient="index")
-    return dsm_units
+    industrial_dsm_units = pd.DataFrame.from_dict(dsm_units_dict, orient="index")
+
+    # Split the DataFrame based on unit_type
+    unit_type_dict = {}
+    for unit_type in industrial_dsm_units["unit_type"].unique():
+        unit_type_dict[unit_type] = industrial_dsm_units[
+            industrial_dsm_units["unit_type"] == unit_type
+        ]
+
+    return unit_type_dict
 
 
 def replace_paths(config: dict, inputs_path: str):
@@ -328,6 +345,54 @@ def add_units(
         )
 
 
+def read_units(
+    units_df: pd.DataFrame,
+    unit_type: str,
+    forecaster: Forecaster,
+    world_bidding_strategies: dict[str, BaseStrategy],
+) -> dict[str, list[dict]]:
+    """
+    Read units from a dataframe and only add them to a dictionary.
+    The dictionary contains the operator ids as keys and the list of units belonging to the operator as values.
+
+    Args:
+        units_df (pandas.DataFrame): The dataframe containing the units.
+        unit_type (str): The type of the unit.
+        forecaster (Forecaster): The forecaster used for adding the units.
+        world_bidding_strategies (dict[str, BaseStrategy]): The strategies available in the world
+    """
+    if units_df is None:
+        return {}
+
+    logger.info(f"Adding {unit_type} units")
+    units_dict = defaultdict(list)
+
+    units_df = units_df.fillna(0)
+    for unit_name, unit_params in units_df.iterrows():
+        bidding_strategies = {
+            key.split("bidding_")[1]: unit_params[key]
+            for key in unit_params.keys()
+            if key.startswith("bidding_")
+        }
+        unit_params["bidding_strategies"] = bidding_strategies
+        operator_id = adjust_unit_operator_for_learning(
+            bidding_strategies,
+            world_bidding_strategies,
+            unit_params["unit_operator"],
+        )
+        del unit_params["unit_operator"]
+        units_dict[operator_id].append(
+            dict(
+                id=unit_name,
+                unit_type=unit_type,
+                unit_operator_id=operator_id,
+                unit_params=unit_params,
+                forecaster=forecaster,
+            )
+        )
+    return units_dict
+
+
 def load_config_and_create_forecaster(
     inputs_path: str,
     scenario: str,
@@ -368,10 +433,10 @@ def load_config_and_create_forecaster(
     storage_units = load_file(path=path, config=config, file_name="storage_units")
     demand_units = load_file(path=path, config=config, file_name="demand_units")
 
-    dsm_units = load_dsm_units(
+    industrial_dsm_units = load_dsm_units(
         path=path,
         config=config,
-        file_name="dsm_units",
+        file_name="industrial_dsm_units",
     )
 
     if powerplant_units is None or demand_units is None:
@@ -429,7 +494,7 @@ def load_config_and_create_forecaster(
         "powerplant_units": powerplant_units,
         "storage_units": storage_units,
         "demand_units": demand_units,
-        "dsm_units": dsm_units,
+        "industrial_dsm_units": industrial_dsm_units,
         "forecaster": forecaster,
     }
 
@@ -472,7 +537,7 @@ async def async_setup_world(
     powerplant_units = scenario_data["powerplant_units"]
     storage_units = scenario_data["storage_units"]
     demand_units = scenario_data["demand_units"]
-    dsm_units = scenario_data["dsm_units"]
+    industrial_dsm_units = scenario_data["industrial_dsm_units"]
     forecaster = scenario_data["forecaster"]
 
     save_frequency_hours = config.get("save_frequency_hours", 48)
@@ -542,63 +607,67 @@ async def async_setup_world(
             market_config=market_config,
         )
 
-    # add the unit operators using unique unit operator names in the powerplants csv
-    logger.info("Adding unit operators")
-    all_operators = np.concatenate(
-        [
-            powerplant_units.unit_operator.unique(),
-            demand_units.unit_operator.unique(),
-        ]
-    )
+    # create list of units from dataframes before adding actual operators
+    logger.info("Read units from file")
 
-    if storage_units is not None:
-        all_operators = np.concatenate(
-            [all_operators, storage_units.unit_operator.unique()]
-        )
-
-    if dsm_units is not None:
-        all_operators = np.concatenate(
-            [all_operators, dsm_units.unit_operator.unique()]
-        )
-
-    # add central RL unit operator that handels all RL units
-    if world.learning_mode and "Operator-RL" not in all_operators:
-        all_operators = np.concatenate([all_operators, ["Operator-RL"]])
-
-    for company_name in set(all_operators):
-        if company_name == "Operator-RL" and world.learning_mode:
-            world.add_rl_unit_operator(id="Operator-RL")
-        else:
-            world.add_unit_operator(id=str(company_name))
-
-    # add the units to corresponding unit operators
-    add_units(
+    units = defaultdict(list)
+    pwp_plants = read_units(
         units_df=powerplant_units,
         unit_type="power_plant",
-        world=world,
         forecaster=forecaster,
+        world_bidding_strategies=world.bidding_strategies,
     )
 
-    add_units(
+    str_plants = read_units(
         units_df=storage_units,
         unit_type="storage",
-        world=world,
         forecaster=forecaster,
+        world_bidding_strategies=world.bidding_strategies,
     )
 
-    add_units(
+    dem_plants = read_units(
         units_df=demand_units,
         unit_type="demand",
-        world=world,
         forecaster=forecaster,
+        world_bidding_strategies=world.bidding_strategies,
     )
 
-    add_units(
-        units_df=dsm_units,
-        unit_type="steel_plant",
-        world=world,
-        forecaster=forecaster,
-    )
+    if industrial_dsm_units is not None:
+        for unit_type, units_df in industrial_dsm_units.items():
+            dsm_units = read_units(
+                units_df=units_df,
+                unit_type=unit_type,
+                forecaster=forecaster,
+                world_bidding_strategies=world.bidding_strategies,
+            )
+        for op, op_units in dsm_units.items():
+            units[op].extend(op_units)
+
+    for op, op_units in pwp_plants.items():
+        units[op].extend(op_units)
+    for op, op_units in str_plants.items():
+        units[op].extend(op_units)
+    for op, op_units in dem_plants.items():
+        units[op].extend(op_units)
+
+    # if distributed_role is true - there is a manager available
+    # and we cann add each units_operator as a separate process
+    if world.distributed_role is True:
+        logger.info("Adding unit operators and units - with subprocesses")
+        for op, op_units in units.items():
+            await world.add_units_with_operator_subprocess(op, op_units)
+    else:
+        logger.info("Adding unit operators and units")
+        for company_name in set(units.keys()):
+            if company_name == "Operator-RL" and world.learning_mode:
+                world.add_rl_unit_operator(id="Operator-RL")
+            else:
+                world.add_unit_operator(id=str(company_name))
+
+        # add the units to corresponding unit operators
+        for op, op_units in units.items():
+            for unit in op_units:
+                await world.async_add_unit(**unit)
 
     add_units(
         units_df=dsm_units,
