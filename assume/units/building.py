@@ -21,6 +21,7 @@ from assume.units.dsm_load_shift import DSMFlex
 from assume.units.dst_components import (
     create_boiler,
     create_heatpump,
+    create_thermal_storage,
 )
 
 SOLVERS = ["gurobi", "glpk", "cbc", "cplex"]
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 building_components = {
     "heatpump": create_heatpump,
     "boiler": create_boiler,
-    # "thermal_storage": create_thermal_storage,
+    "thermal_storage": create_thermal_storage,
 }
 
 
@@ -137,9 +138,9 @@ class Building(SupportsMinMax, DSMFlex):
                 return (
                     self.model.dsm_blocks["heatpump"].heat_out[t]
                     + self.model.dsm_blocks["boiler"].heat_out[t]
-                    + self.model.dsm_blocks["thermal_storage"].discharge[t]
+                    + self.model.dsm_blocks["thermal_storage"].discharge_thermal[t]
                     == self.model.heat_demand[t]
-                    + self.model.dsm_blocks["thermal_storage"].charge[t]
+                    + self.model.dsm_blocks["thermal_storage"].charge_thermal[t]
                 )
             else:
                 return (

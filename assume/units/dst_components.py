@@ -200,6 +200,121 @@ def create_boiler(
     return model_part
 
 
+def create_thermal_storage(
+    model,
+    max_capacity,
+    min_capacity,
+    initial_soc,
+    storage_loss_rate,
+    charge_loss_rate,
+    discharge_loss_rate,
+    time_steps,
+    **kwargs,
+):
+    """
+    Represents a Direct Reduced Iron (DRI) storage unit.
+
+    Args:
+        model: A Pyomo ConcreteModel object representing the optimization model.
+        id: A unique identifier for the thermal storage unit.
+        max_capacity: The maximum capacity of the thermal storage unit.
+        min_capacity: The minimum capacity of the thermal storage unit.
+        initial_soc: The initial state of charge (SOC) of the thermal storage unit.
+        storage_loss_rate: The rate of thermal loss due to storage over time.
+        charge_loss_rate: The rate of thermal loss during charging.
+        discharge_loss_rate: The rate of thermal loss during discharging.
+
+    Constraints:
+        storage_min_capacity_dri_constraint: Ensures the SOC of the thermal storage unit stays above the minimum capacity.
+        storage_max_capacity_dri_constraint: Ensures the SOC of the thermal storage unit stays below the maximum capacity.
+        energy_in_max_capacity_dri_constraint: Limits the charging of the thermal storage unit to its maximum capacity.
+        energy_out_max_capacity_dri_constraint: Limits the discharging of the thermal storage unit to its maximum capacity.
+        energy_in_uniformity_dri_constraint: Ensures uniformity in charging the thermal storage unit.
+        energy_out_uniformity_dri_constraint: Ensures uniformity in discharging the thermal storage unit.
+        storage_capacity_change_dri_constraint: Defines the change in SOC of the thermal storage unit over time.
+    """
+    model_part = pyo.Block()
+    model_part.max_thermal_capacity = pyo.Param(initialize=max_capacity)
+    model_part.min_thermal_capacity = pyo.Param(initialize=min_capacity)
+    model_part.initial_soc_thermal = pyo.Param(initialize=initial_soc)
+    model_part.storage_loss_rate_thermal = pyo.Param(initialize=storage_loss_rate)
+    model_part.charge_loss_rate_thermal = pyo.Param(initialize=charge_loss_rate)
+    model_part.discharge_loss_rate_thermal = pyo.Param(initialize=discharge_loss_rate)
+
+    # define variables
+    model_part.soc_thermal = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+    model_part.uniformity_indicator_thermal = pyo.Var(time_steps, within=pyo.Binary)
+
+    # Define the variables for power and hydrogen
+    model_part.charge_thermal = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+    model_part.discharge_thermal = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+
+    # define constraints
+
+    @model_part.Constraint(time_steps)
+    def storage_min_capacity_thermal_constraint(b, t):
+        """
+        Ensures the SOC of the thermal storage unit stays above the minimum capacity.
+        """
+        return b.soc_thermal[t] >= b.min_thermal_capacity
+
+    @model_part.Constraint(time_steps)
+    def storage_max_capacity_thermal_constraint(b, t):
+        """
+        Ensures the SOC of the thermal storage unit stays below the maximum capacity.
+        """
+        return b.soc_thermal[t] <= b.max_thermal_capacity
+
+    @model_part.Constraint(time_steps)
+    def energy_in_max_capacity_thermal_constraint(b, t):
+        """
+        Limits the charging of the thermal storage unit to its maximum capacity.
+        """
+        return b.charge_thermal[t] <= b.max_thermal_capacity
+
+    @model_part.Constraint(time_steps)
+    def energy_out_max_capacity_thermal_constraint(b, t):
+        """
+        Limits the discharging of the thermal storage unit to its maximum capacity.
+        """
+        return b.discharge_thermal[t] <= b.max_thermal_capacity
+
+    @model_part.Constraint(time_steps)
+    def energy_in_uniformity_thermal_constraint(b, t):
+        """
+        Ensures uniformity in charging the thermal storage unit.
+        """
+        return (
+            b.charge_thermal[t]
+            <= b.max_thermal_capacity * b.uniformity_indicator_thermal[t]
+        )
+
+    @model_part.Constraint(time_steps)
+    def energy_out_uniformity_thermal_constraint(b, t):
+        """
+        Ensures uniformity in discharging the thermal storage unit.
+        """
+        return b.discharge_thermal[t] <= b.max_thermal_capacity * (
+            1 - b.uniformity_indicator_thermal[t]
+        )
+
+    @model_part.Constraint(time_steps)
+    def storage_capacity_change_thermal_constraint(b, t):
+        """
+        Defines the change in SOC of the thermal storage unit over time.
+        """
+        return b.soc_thermal[t] == (
+            (
+                (b.soc_thermal[t - 1] if t > 0 else b.initial_soc_thermal)
+                * (1 - b.storage_loss_rate_thermal)
+            )
+            + ((1 - b.charge_loss_rate_thermal) * b.charge_thermal[t])
+            - ((1 + b.discharge_loss_rate_thermal) * b.discharge_thermal[t])
+        )
+
+    return model_part
+
+
 def create_electrolyser(
     model,
     rated_power,
