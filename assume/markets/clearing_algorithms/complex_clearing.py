@@ -12,6 +12,10 @@ import pyomo.environ as pyo
 from pyomo.opt import SolverFactory, TerminationCondition, check_available_solvers
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
+from assume.common.utils import (
+    create_nodal_incidence_matrix,
+    create_zonal_incidence_matrix,
+)
 from assume.markets.base_market import MarketRole
 
 log = logging.getLogger(__name__)
@@ -277,11 +281,27 @@ class ComplexClearingRole(MarketRole):
 
     The complex market is a pay-as-clear market with more complex bid structures, including minimum acceptance ratios, bid types, and profiled volumes.
 
+    The class supports two types of network representations:
+    1. **Zonal Representation**: The network is divided into zones, and the incidence matrix represents the connections between these zones.
+    2. **Nodal Representation**: Each bus in the network is treated as a node, and the incidence matrix represents the connections between these nodes.
+
     Attributes:
         marketconfig (MarketConfig): The market configuration.
+        incidence_matrix (pd.DataFrame): The incidence matrix representing the network connections.
+        nodes (list): List of nodes or zones in the network.
 
     Args:
         marketconfig (MarketConfig): The market configuration.
+
+    Zonal Representation:
+        If a `zones_identifier` is provided in the market configuration param_dict, the buses are grouped into zones based on this identifier.
+        The incidence matrix is then constructed to represent the power connections between these zones. The total transfer
+        capacity between zones is determined by the sum of the capacities of the lines connecting the zones.
+        - `zones_identifier` (str): The key in the bus data that identifies the zone to which each bus belongs.
+
+    Nodal Representation:
+        If no `zones_identifier` is provided, each bus is treated as a separate node.
+        The incidence matrix is constructed to represent the power connections between these nodes.
     """
 
     required_fields = ["bid_type"]
@@ -293,29 +313,22 @@ class ComplexClearingRole(MarketRole):
         self.nodes = ["node0"]
 
         if self.grid_data:
-            self.lines = self.grid_data["lines"]
-            # Combine 'bus0' and 'bus1' columns into a set of unique nodes
-            self.nodes = self.grid_data["buses"].index.values
+            lines = self.grid_data["lines"]
+            buses = self.grid_data["buses"]
 
-            # Initialize an empty matrix with zeros. Dimensions: number of nodes x number of nodes
-            incidence_matrix = np.zeros((len(self.nodes), len(self.nodes)))
+            self.zones_id = self.marketconfig.param_dict.get("zones_identifier")
+            self.node_to_zone = None
 
-            # Create a dictionary mapping each node to its index for faster lookup
-            node_index = {node: idx for idx, node in enumerate(self.nodes)}
+            if self.zones_id:
+                self.incidence_matrix = create_zonal_incidence_matrix(
+                    lines, buses, self.zones_id
+                )
+                self.nodes = buses[self.zones_id].unique()
+                self.node_to_zone = self.grid_data["buses"][self.zones_id].to_dict()
 
-            # Iterate over the lines to fill the incidence matrix
-            for _, line in self.lines.iterrows():
-                bus0, bus1, s_nom = line["bus0"], line["bus1"], line["s_nom"]
-
-                # Update the incidence matrix with s_nom values
-                # s_nom is positive for bus0 to bus1 and negative for bus1 to bus0
-                incidence_matrix[node_index[bus0], node_index[bus1]] = s_nom
-                incidence_matrix[node_index[bus1], node_index[bus0]] = -s_nom
-
-            # Convert the numpy array to a DataFrame for readability and to use nodes as both index and columns
-            self.incidence_matrix = pd.DataFrame(
-                incidence_matrix, index=self.nodes, columns=self.nodes
-            )
+            else:
+                self.incidence_matrix = create_nodal_incidence_matrix(lines, buses)
+                self.nodes = buses.index.values
 
     def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> None:
         """
@@ -323,7 +336,7 @@ class ComplexClearingRole(MarketRole):
 
         Args:
             orderbook (Orderbook): The orderbook to be validated.
-            agent_tuple (tuple[str, str]): The agent tuple of the market (agend_adrr, agent_id).
+            agent_tuple (tuple[str, str]): The agent tuple of the market (agent_adrr, agent_id).
 
         Raises:
             AssertionError: If the bid type is not valid or the volumes are not within the maximum bid volume.
@@ -334,6 +347,7 @@ class ComplexClearingRole(MarketRole):
         super().validate_orderbook(orderbook, agent_tuple)
 
         max_volume = self.marketconfig.maximum_bid_volume
+
         for order in orderbook:
             assert order["bid_type"] in [
                 "SB",
@@ -352,9 +366,15 @@ class ComplexClearingRole(MarketRole):
 
             # check if the node is in the network
             if "node" in order.keys():
-                assert (
-                    order["node"] in self.nodes
-                ), f"node {order['node']} not in {self.nodes}"
+                if self.zones_id:
+                    order["node"] = self.node_to_zone.get(order["node"], self.nodes[0])
+                    assert (
+                        order["node"] in self.nodes
+                    ), f"node {order['node']} not in {self.nodes}"
+                else:
+                    assert (
+                        order["node"] in self.nodes
+                    ), f"node {order['node']} not in {self.nodes}"
             # if not, set the node to the first node in the network
             else:
                 log.warning(
