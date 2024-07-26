@@ -147,6 +147,15 @@ def load_dsm_units(
     if industrial_dsm_units is None:
         return None
 
+    residential_dsm_units = load_file(
+        path=path,
+        config=config,
+        file_name=file_name,
+    )
+
+    if residential_dsm_units is None:
+        return None
+
     # Define columns that are common across different technologies within the same plant
     common_columns = [
         "unit_operator",
@@ -188,11 +197,42 @@ def load_dsm_units(
     # Convert the structured dictionary into a DataFrame
     industrial_dsm_units = pd.DataFrame.from_dict(dsm_units_dict, orient="index")
 
+    # Process each group of components by building name
+    for name, group in residential_dsm_units.groupby(residential_dsm_units.index):
+        dsm_unit = {}
+
+        # Aggregate or select appropriate data for common and bidding columns
+        # We take the first non-null entry
+        for col in common_columns + bidding_columns:
+            non_null_values = group[col].dropna()
+            if not non_null_values.empty:
+                dsm_unit[col] = non_null_values.iloc[0]
+
+        # Process each technology within the plant
+        components = {}
+        for tech, tech_data in group.groupby("technology"):
+            # Clean the technology-specific data: drop all-NaN columns and 'technology' column
+            cleaned_data = tech_data.dropna(axis=1, how="all").drop(
+                columns=["technology"]
+            )
+            components[tech] = cleaned_data.to_dict(orient="records")[0]
+
+        dsm_unit["components"] = components
+        dsm_units_dict[name] = dsm_unit
+
+    # Convert the structured dictionary into a DataFrame
+    residential_dsm_units = pd.DataFrame.from_dict(dsm_units_dict, orient="index")
+
     # Split the DataFrame based on unit_type
     unit_type_dict = {}
     for unit_type in industrial_dsm_units["unit_type"].unique():
         unit_type_dict[unit_type] = industrial_dsm_units[
             industrial_dsm_units["unit_type"] == unit_type
+        ]
+
+    for unit_type in residential_dsm_units["unit_type"].unique():
+        unit_type_dict[unit_type] = residential_dsm_units[
+            residential_dsm_units["unit_type"] == unit_type
         ]
 
     return unit_type_dict
@@ -439,6 +479,12 @@ def load_config_and_create_forecaster(
         file_name="industrial_dsm_units",
     )
 
+    residential_dsm_units = load_dsm_units(
+        path=path,
+        config=config,
+        file_name="residential_dsm_units",
+    )
+
     if powerplant_units is None or demand_units is None:
         raise ValueError("No power plant or no demand units were provided!")
 
@@ -495,6 +541,7 @@ def load_config_and_create_forecaster(
         "storage_units": storage_units,
         "demand_units": demand_units,
         "industrial_dsm_units": industrial_dsm_units,
+        "residential_dsm_units": residential_dsm_units,
         "forecaster": forecaster,
     }
 
@@ -538,6 +585,7 @@ async def async_setup_world(
     storage_units = scenario_data["storage_units"]
     demand_units = scenario_data["demand_units"]
     industrial_dsm_units = scenario_data["industrial_dsm_units"]
+    residential_dsm_units = scenario_data["residential_dsm_units"]
     forecaster = scenario_data["forecaster"]
 
     save_frequency_hours = config.get("save_frequency_hours", 48)
@@ -643,6 +691,17 @@ async def async_setup_world(
         for op, op_units in dsm_units.items():
             units[op].extend(op_units)
 
+    if residential_dsm_units is not None:
+        for unit_type, units_df in residential_dsm_units.items():
+            dsm_units = read_units(
+                units_df=units_df,
+                unit_type=unit_type,
+                forecaster=forecaster,
+                world_bidding_strategies=world.bidding_strategies,
+            )
+        for op, op_units in dsm_units.items():
+            units[op].extend(op_units)
+
     for op, op_units in pwp_plants.items():
         units[op].extend(op_units)
     for op, op_units in str_plants.items():
@@ -668,13 +727,6 @@ async def async_setup_world(
         for op, op_units in units.items():
             for unit in op_units:
                 await world.async_add_unit(**unit)
-
-    add_units(
-        units_df=dsm_units,
-        unit_type="building",
-        world=world,
-        forecaster=forecaster,
-    )
 
     if (
         world.learning_mode
