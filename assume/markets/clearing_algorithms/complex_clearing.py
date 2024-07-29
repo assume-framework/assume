@@ -282,16 +282,10 @@ class ComplexClearingRole(MarketRole):
     The complex market is a pay-as-clear market with more complex bid structures, including minimum acceptance ratios, bid types, and profiled volumes.
 
     The class supports two types of network representations:
+
     1. **Zonal Representation**: The network is divided into zones, and the incidence matrix represents the connections between these zones.
+
     2. **Nodal Representation**: Each bus in the network is treated as a node, and the incidence matrix represents the connections between these nodes.
-
-    Attributes:
-        marketconfig (MarketConfig): The market configuration.
-        incidence_matrix (pd.DataFrame): The incidence matrix representing the network connections.
-        nodes (list): List of nodes or zones in the network.
-
-    Args:
-        marketconfig (MarketConfig): The market configuration.
 
     Zonal Representation:
         If a `zones_identifier` is provided in the market configuration param_dict, the buses are grouped into zones based on this identifier.
@@ -302,6 +296,14 @@ class ComplexClearingRole(MarketRole):
     Nodal Representation:
         If no `zones_identifier` is provided, each bus is treated as a separate node.
         The incidence matrix is constructed to represent the power connections between these nodes.
+
+    Attributes:
+        marketconfig (MarketConfig): The market configuration.
+        incidence_matrix (pd.DataFrame): The incidence matrix representing the network connections.
+        nodes (list): List of nodes or zones in the network.
+
+    Args:
+        marketconfig (MarketConfig): The market configuration.
     """
 
     required_fields = ["bid_type"]
