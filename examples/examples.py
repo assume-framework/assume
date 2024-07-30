@@ -62,11 +62,12 @@ availabe_examples = {
     },
     "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
     "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
-    "small_learning_3": {"scenario": "example_02c", "study_case": "base"},
+    "small_learning_3": {"scenario": "example_02c", "study_case": "dam"},
     "learning_with_complex_bids": {
         "scenario": "example_02e",
         "study_case": "base",
     },
+    "redispatch_validation": {"scenario": "example_04a", "study_case": "base"},
 }
 
 # %%
@@ -77,7 +78,7 @@ if __name__ == "__main__":
     - timescale: with database and grafana (note: you need docker installed)
     """
     data_format = "local_db"  # "local_db" or "timescale"
-    example = "small"
+    example = "redispatch_validation"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
