@@ -45,23 +45,16 @@ def electrolyser_model(electrolyser_config):
         == total_hydrogen_production
     )
 
-    return model
+    # Solve the model once in the fixture
+    instance = model.create_instance()
+    solver = pyo.SolverFactory("glpk")
+    results = solver.solve(instance, tee=False)
+
+    return instance, results
 
 
 def test_electrolyser_ramping_and_power_bounds(electrolyser_model):
-    model = electrolyser_model
-
-    # Create an instance of the model
-    instance = model.create_instance()
-
-    # Solver setup
-    solver = pyo.SolverFactory("glpk")
-
-    # Solve the model
-    results = solver.solve(instance, tee=True)
-    # Print the solver status and termination condition
-    print(f"Solver Status: {results.solver.status}")
-    print(f"Termination Condition: {results.solver.termination_condition}")
+    instance, results = electrolyser_model
 
     # Check ramp-up constraints
     for t in range(1, len(instance.time_steps)):
@@ -85,6 +78,10 @@ def test_electrolyser_ramping_and_power_bounds(electrolyser_model):
             <= power_in
             <= instance.electrolyser.rated_power
         )
+
+    # Equality checks for specific values
+    assert pyo.value(instance.electrolyser.power_in[2]) == 50  # Expected power at t=2
+    assert pyo.value(instance.electrolyser.power_in[5]) == 0  # Expected power at t=5
 
 
 if __name__ == "__main__":
