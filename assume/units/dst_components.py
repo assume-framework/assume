@@ -178,7 +178,7 @@ def create_electrolyser(
     return model_part
 
 
-def create_dri_plant(
+def create_driplant(
     model,
     specific_hydrogen_consumption,
     specific_natural_gas_consumption,
@@ -649,7 +649,7 @@ def create_storage(
     return model_part
 
 
-def create_dri_storage(
+def create_dristorage(
     model,
     max_capacity,
     min_capacity,
