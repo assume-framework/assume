@@ -105,7 +105,13 @@ def create_electrolyser(
         delta_t = t - (t - 1)
         min_operating_time_units = int(min_operating_time / delta_t)
 
+        # Check for valid indexing
         if t < min_operating_time_units:
+            if t - min_operating_time_units + 1 < 0:
+                raise ValueError(
+                    f"Invalid min_operating_time: {min_operating_time} exceeds available time steps. "
+                    "Ensure min_operating_time is compatible with the available time steps."
+                )
             return (
                 sum(
                     b.power_in[i]
@@ -130,7 +136,13 @@ def create_electrolyser(
         delta_t = t - (t - 1)
         min_downtime_units = int(min_down_time / delta_t)
 
+        # Check for valid indexing
         if t < min_downtime_units:
+            if t - min_downtime_units < 0:
+                raise ValueError(
+                    f"Invalid min_down_time: {min_down_time} exceeds available time steps. "
+                    "Ensure min_down_time is compatible with the available time steps."
+                )
             return (
                 sum(b.power_in[t - i] for i in range(min_downtime_units))
                 >= min_downtime_units * b.power_in[t]
@@ -296,7 +308,13 @@ def create_driplant(
         # Convert minimum operating time to the time unit of your choice
         min_operating_time_units = int(min_operating_time / delta_t)
 
+        # Check for valid indexing
         if t < min_operating_time_units:
+            if t - min_operating_time_units + 1 < 0:
+                raise ValueError(
+                    f"Invalid min_operating_time: {min_operating_time} exceeds available time steps. "
+                    "Ensure min_operating_time is compatible with the available time steps."
+                )
             return (
                 sum(
                     b.power_dri[i]
@@ -316,14 +334,20 @@ def create_driplant(
     @model_part.Constraint(time_steps)
     def min_down_time_dri_constraint(b, t):
         if t == 0:
-            return pyo.Constraint.Skip  # No constraint for the first time step
+            return pyo.Constraint.Skip
 
         # Calculate the time step duration dynamically
         delta_t = t - (t - 1)
         # Convert minimum downtime to the time unit of your choice
         min_downtime_units = int(min_down_time / delta_t)
 
+        # Check for valid indexing
         if t < min_downtime_units:
+            if t - min_downtime_units < 0:
+                raise ValueError(
+                    f"Invalid min_down_time: {min_down_time} exceeds available time steps. "
+                    "Ensure min_down_time is compatible with the available time steps."
+                )
             return (
                 sum(b.power_dri[t - i] for i in range(min_downtime_units))
                 >= min_downtime_units * b.power_dri[t]
@@ -464,12 +488,19 @@ def create_electric_arc_furnance(
     def min_operating_time_eaf_constraint(b, t):
         if t == 0:
             return pyo.Constraint.Skip  # No constraint for the first time step
+
         # Calculate the time step duration dynamically
         delta_t = t - (t - 1)
         # Convert minimum operating time to the time unit of your choice
         min_operating_time_units = int(min_operating_time / delta_t)
 
+        # Check for valid indexing
         if t < min_operating_time_units:
+            if t - min_operating_time_units + 1 < 0:
+                raise ValueError(
+                    f"Invalid min_operating_time: {min_operating_time} exceeds available time steps. "
+                    "Ensure min_operating_time is compatible with the available time steps."
+                )
             return (
                 sum(
                     b.steel_output[i]
@@ -490,12 +521,19 @@ def create_electric_arc_furnance(
     def min_down_time_eaf_constraint(b, t):
         if t == 0:
             return pyo.Constraint.Skip  # No constraint for the first time step
+
         # Calculate the time step duration dynamically
         delta_t = t - (t - 1)
         # Convert minimum downtime to the time unit of your choice
         min_downtime_units = int(min_down_time / delta_t)
 
+        # Check for valid indexing
         if t < min_downtime_units:
+            if t - min_downtime_units < 0:
+                raise ValueError(
+                    f"Invalid min_down_time: {min_down_time} exceeds available time steps. "
+                    "Ensure min_down_time is compatible with the available time steps."
+                )
             return (
                 sum(b.steel_output[t - i] for i in range(min_downtime_units))
                 >= min_downtime_units * b.steel_output[t]
