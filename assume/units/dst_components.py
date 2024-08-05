@@ -106,11 +106,6 @@ def create_electrolyser(
         min_operating_time_units = int(min_operating_time / delta_t)
 
         if t < min_operating_time_units:
-            if (t - min_operating_time_units + 1) < 0:
-                raise ValueError(
-                    f"Error: The specified 'min_operating_time' of {min_operating_time} hours requires the electrolyser to operate continuously, "
-                    "but the current setup doesn't allow it. Please ensure the operating time is achievable within the given schedule."
-                )
             return (
                 sum(
                     b.power_in[i]
@@ -136,19 +131,15 @@ def create_electrolyser(
         min_downtime_units = int(min_down_time / delta_t)
 
         if t < min_downtime_units:
-            if (t - min_downtime_units + 1) < 0:
-                raise ValueError(
-                    f"Error: The specified 'min_down_time' of {min_down_time} hours requires the electrolyser to remain offline for a certain period, "
-                    "but the current setup doesn't allow it. Please ensure the downtime is achievable within the given schedule."
-                )
             return (
-                sum(b.power_in[i] for i in range(t - min_downtime_units + 1, t + 1))
-                <= 0
+                sum(b.power_in[t - i] for i in range(min_downtime_units))
+                >= min_downtime_units * b.power_in[t]
             )
+
         else:
             return (
-                sum(b.power_in[i] for i in range(t - min_downtime_units + 1, t + 1))
-                <= 0
+                sum(b.hydrogen_out[t - i] for i in range(min_downtime_units))
+                >= min_downtime_units * b.power_in[t]
             )
 
     # Efficiency constraint
@@ -244,7 +235,6 @@ def create_driplant(
     model_part.natural_gas_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.dri_operating_cost = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.hydrogen_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
-    model_part.operational_status = pyo.Var(time_steps, within=pyo.Binary)
     model_part.dri_output = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.power_dri = pyo.Var(time_steps, within=pyo.NonNegativeReals)
 
@@ -297,7 +287,7 @@ def create_driplant(
             return b.power_dri[t - 1] - b.power_dri[t] <= b.ramp_down_dri
 
     @model_part.Constraint(time_steps)
-    def min_operating_time_dri__constraint(b, t):
+    def min_operating_time_dri_constraint(b, t):
         if t == 0:
             return pyo.Constraint.Skip
 
@@ -307,11 +297,6 @@ def create_driplant(
         min_operating_time_units = int(min_operating_time / delta_t)
 
         if t < min_operating_time_units:
-            if (t - min_operating_time_units + 1) < 0:
-                raise ValueError(
-                    f"Error: The specified 'min_operating_time' of {min_operating_time} hours requires the DRI plant to operate continuously, "
-                    "but the current setup doesn't allow it. Please ensure the operating time is achievable within the given schedule."
-                )
             return (
                 sum(
                     b.power_dri[i]
@@ -339,19 +324,15 @@ def create_driplant(
         min_downtime_units = int(min_down_time / delta_t)
 
         if t < min_downtime_units:
-            if (t - min_downtime_units + 1) < 0:
-                raise ValueError(
-                    f"Error: The specified 'min_down_time' of {min_down_time} hours requires the DRI plant to remain offline for a certain period, "
-                    "but the current setup doesn't allow it. Please ensure the downtime is achievable within the given schedule."
-                )
             return (
-                sum(b.power_dri[i] for i in range(t - min_downtime_units + 1, t + 1))
-                <= 0
+                sum(b.power_dri[t - i] for i in range(min_downtime_units))
+                >= min_downtime_units * b.power_dri[t]
             )
+
         else:
             return (
-                sum(b.power_dri[i] for i in range(t - min_downtime_units + 1, t + 1))
-                <= 0
+                sum(b.dri_output[t - i] for i in range(min_downtime_units))
+                >= min_downtime_units * b.power_dri[t]
             )
 
     # Operational cost
@@ -489,25 +470,20 @@ def create_electric_arc_furnance(
         min_operating_time_units = int(min_operating_time / delta_t)
 
         if t < min_operating_time_units:
-            if (t - min_operating_time_units + 1) < 0:
-                raise ValueError(
-                    f"Error: The specified 'min_operating_time' of {min_operating_time} hours requires the Electric Arc Furnace to operate continuously, "
-                    "but the current setup doesn't allow it. Please ensure the operating time is achievable within the given schedule."
-                )
             return (
                 sum(
-                    b.power_dri[i]
+                    b.steel_output[i]
                     for i in range(t - min_operating_time_units + 1, t + 1)
                 )
-                >= min_operating_time_units * b.power_dri[t]
+                >= min_operating_time_units * b.steel_output[t]
             )
         else:
             return (
                 sum(
-                    b.power_dri[i]
+                    b.steel_output[i]
                     for i in range(t - min_operating_time_units + 1, t + 1)
                 )
-                >= min_operating_time_units * b.power_dri[t]
+                >= min_operating_time_units * b.steel_output[t]
             )
 
     @model_part.Constraint(time_steps)
@@ -520,19 +496,14 @@ def create_electric_arc_furnance(
         min_downtime_units = int(min_down_time / delta_t)
 
         if t < min_downtime_units:
-            if (t - min_downtime_units + 1) < 0:
-                raise ValueError(
-                    f"Error: The specified 'min_down_time' of {min_down_time} hours requires the Electric Arc Furnace to remain offline for a certain period, "
-                    "but the current setup doesn't allow it. Please ensure the downtime is achievable within the given schedule."
-                )
             return (
-                sum(b.power_dri[i] for i in range(t - min_downtime_units + 1, t + 1))
-                <= 0
+                sum(b.steel_output[t - i] for i in range(min_downtime_units))
+                >= min_downtime_units * b.steel_output[t]
             )
         else:
             return (
-                sum(b.power_dri[i] for i in range(t - min_downtime_units + 1, t + 1))
-                <= 0
+                sum(b.steel_output[t - i] for i in range(min_downtime_units))
+                >= min_downtime_units * b.steel_output[t]
             )
 
     # Operational cost
@@ -549,7 +520,7 @@ def create_electric_arc_furnance(
     return model_part
 
 
-def create_storage(
+def create_hydrogen_storage(
     model,
     max_capacity,
     min_capacity,

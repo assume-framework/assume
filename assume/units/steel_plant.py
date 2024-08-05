@@ -23,7 +23,7 @@ from assume.units.dst_components import (
     create_dristorage,
     create_electric_arc_furnance,
     create_electrolyser,
-    create_storage,
+    create_hydrogen_storage,
 )
 
 SOLVERS = ["gurobi", "glpk", "cbc", "cplex"]
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # Mapping of component type identifiers to their respective classes
 dst_components = {
     "electrolyser": create_electrolyser,
-    "h2storage": create_storage,
+    "h2storage": create_hydrogen_storage,
     "dri_plant": create_driplant,
     "dri_storage": create_dristorage,
     "eaf": create_electric_arc_furnance,
