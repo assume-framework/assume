@@ -16,20 +16,21 @@ csv_path = ""
 os.makedirs("./examples/local_db", exist_ok=True)
 
 availabe_examples = {
+    # small examples for easier understanding of different features and configurations
     "small": {"scenario": "example_01a", "study_case": "base"},
     "small_dam": {"scenario": "example_01a", "study_case": "dam"},
     "small_with_opt_clearing": {
         "scenario": "example_01a",
         "study_case": "dam_with_complex_clearing",
     },
-    "small_with_BB_and_LB": {
-        "scenario": "example_01c",
-        "study_case": "dam_with_complex_opt_clearing",
-    },
     "small_with_vre": {"scenario": "example_01b", "study_case": "base"},
     "small_with_vre_and_storage": {
         "scenario": "example_01c",
         "study_case": "eom_only",
+    },
+    "small_with_BB_and_LB": {
+        "scenario": "example_01c",
+        "study_case": "dam_with_complex_opt_clearing",
     },
     "small_with_vre_and_storage_and_complex_clearing": {
         "scenario": "example_01c",
@@ -51,22 +52,27 @@ availabe_examples = {
         "scenario": "example_01d",
         "study_case": "zonal_case",
     },
-    "large_2019_eom": {"scenario": "example_02", "study_case": "base_case_2019"},
-    "large_2019_eom_crm": {
-        "scenario": "example_02",
-        "study_case": "eom_crm_case_2019",
-    },
-    "large_2019_day_ahead": {
-        "scenario": "example_02",
-        "study_case": "dam_case_2019",
-    },
+    # example_01e is used in the tutorial notebook #3: Custom unit and bidding strategy example
+    # example_01f is used in the tutorial notebook #5: Market configuration comparison example
+    # example_01g is used in the tutorial notebook #6: Advanced order types example
+    #
+    # small examples with DRL enabled to show the learning process and configuration
     "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
     "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
     "small_learning_3": {"scenario": "example_02c", "study_case": "base"},
-    "learning_with_complex_bids": {
-        "scenario": "example_02e",
-        "study_case": "base",
+    "learning_with_complex_bids": {"scenario": "example_02d", "study_case": "base"},
+    #
+    # full year examples to show real-world scenarios
+    "large_2019_eom": {"scenario": "example_03", "study_case": "base_case_2019"},
+    "large_2019_eom_crm": {
+        "scenario": "example_03",
+        "study_case": "eom_crm_case_2019",
     },
+    "large_2019_day_ahead": {
+        "scenario": "example_03",
+        "study_case": "dam_case_2019",
+    },
+    "large_2019_rl": {"scenario": "example_03a", "study_case": "base_case_2019"},
 }
 
 # %%
