@@ -546,22 +546,20 @@ def normalize_availability(powerplants_df, availability_df):
 
     # Iterate through each column in the availability dataframe
     for column in normalized_df.columns:
-        # Get the max_power for the current unit from the powerplants dataframe
-        # using the index instead of a 'unit_name' column
-        try:
-            max_power = powerplants_df.loc[column, "max_power"]
-        except KeyError:
-            logger.warning(
-                f"Warning: Unit '{column}' not found in powerplants dataframe. Skipping normalization for this unit."
-            )
-            continue
+        # Check if any value in the column is greater than 1
+        if (normalized_df[column] > 1).any():
+            try:
+                # Get the max_power for the current unit from the powerplants dataframe
+                max_power = powerplants_df.loc[column, "max_power"]
 
-        # Normalize values greater than 1 by dividing by max_power
-        normalized_df[column] = normalized_df[column].apply(
-            lambda x: x / max_power if x > 1 else x
-        )
+                # Normalize the entire column
+                normalized_df[column] = normalized_df[column] / max_power
 
-        # Ensure all values are between 0 and 1
-        normalized_df[column] = normalized_df[column].clip(0, 1)
+                # Ensure all values are between 0 and 1
+                normalized_df[column] = normalized_df[column].clip(0, 1)
+            except KeyError:
+                logger.warning(
+                    f"Unit '{column}' not found in powerplants dataframe. Skipping normalization for this unit."
+                )
 
     return normalized_df
