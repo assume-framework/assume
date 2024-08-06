@@ -76,7 +76,10 @@ Overview of Example Simulations
      - Full-year German market simulation with Demand Side Management. [2]
    * - large_2019_rl
      - example_03a
-     - Modified 2019 simulation for reinforcement learning. [1][2]
+     - Full-year 2021 German market simulation with reinforcement learning with modified power plants list. [1]
+   * - large_2021_rl
+     - example_03b
+     - Full-year 2021 German market simulation with reinforcement learning with modified power plants list. [1]
 
 Detailed Features of Example Simulations
 ----------------------------------------
@@ -170,13 +173,23 @@ The following table provides a more in-depth look at key examples, highlighting 
    * - large_2019_rl
      - Germany
      - Conv., VRE
-     - Modified 2019 data
+     - Full 2019 data
      - Fixed inflexible
-     - Modified 2019 data
+     - Full 2019 data
      - EOM
      - RL, Various
      - No
-     - Based on [1][2]
+     - Based on [1]
+   * - large_2021_rl
+     - Germany
+     - Conv., VRE
+     - Full 2021 data
+     - Fixed inflexible
+     - Full 2021 data
+     - EOM
+     - RL, Various
+     - No
+     - Based on [1]
 
 Note: Conv. = Conventional, VRE = Variable Renewable Energy, EOM = Energy-Only Market, CRM = Control Reserve Market, DAM = Day-Ahead Market, RL = Reinforcement Learning, DSM = Demand Side Management
 
@@ -196,15 +209,16 @@ Key Features of Example Simulations
    - small_learning_1, small_learning_2, and small_learning_3 directly correspond to Cases 1, 2, and 3, respectively, in the publication by Harder et al. [1].
    - Demonstrate practical applications of reinforcement learning in energy markets.
 
-3. Large-scale examples (large_2019_*):
+3. Large-scale examples (large_2019_*, large_2021_rl):
 
-   - Represent real-world scenarios based on the German power market in 2019.
+   - Represent real-world scenarios based on the German power market in 2019 and 2021.
    - Include full demand and renewable generation profiles, major generation units, and storage facilities.
    - Demonstrate different market configurations (EOM, CRM, DAM) and their impacts.
    - The large_2019_with_DSM example incorporates steel plants as flexible demand side units, showcasing Demand Side Management capabilities.
-   - Based on comprehensive research presented in [2], offering insights into complex market dynamics.
+   - large_2019_rl and large_2021_rl examples apply reinforcement learning techniques to full-year market simulations, as presented in [1]. In this examples, the power plant units with a capacity of less then 300 MW were aggregated into larger units to increase the learning speed.
+   - Based on comprehensive research presented in [1] and [2], offering insights into complex market dynamics and the application of advanced learning techniques in different market years.
 
-These examples provide a diverse range of scenarios, allowing users to explore various aspects of energy market simulation, from basic concepts to complex, real-world applications.
+These examples provide a diverse range of scenarios, allowing users to explore various aspects of energy market simulation, from basic concepts to complex, real-world applications and advanced learning strategies.
 
 References
 ----------

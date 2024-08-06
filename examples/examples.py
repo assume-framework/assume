@@ -60,7 +60,6 @@ availabe_examples = {
     "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
     "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
     "small_learning_3": {"scenario": "example_02c", "study_case": "base"},
-    "large_2019_rl": {"scenario": "example_03a", "study_case": "base_case_2019"},
     # Further DRL example simulation showcasing learning features
     "learning_with_complex_bids": {"scenario": "example_02d", "study_case": "base"},
     #
@@ -78,6 +77,8 @@ availabe_examples = {
         "scenario": "example_03",
         "study_case": "base_case_2019_with_DSM",
     },
+    "large_2019_rl": {"scenario": "example_03a", "study_case": "base_case_2019"},
+    "large_2021_rl": {"scenario": "example_03b", "study_case": "base_case_2021"},
 }
 
 # %%
