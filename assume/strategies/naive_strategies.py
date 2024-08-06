@@ -137,6 +137,79 @@ class NaiveProfileStrategy(BaseStrategy):
         bids = [order]
 
         bids = self.remove_empty_bids(bids)
+        return bids
+
+
+class NaiveDASteelplantStrategy(BaseStrategy):
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        bids = []
+        start = product_tuples[0][0]  # start time of the first product
+
+        unit.calculate_optimal_operation_if_needed()
+
+        # unit.run_modified_optimization()
+
+        bids = []
+        for product in product_tuples:
+            """
+            for each product, calculate the marginal cost of the unit at the start time of the product
+            and the volume of the product. Dispatch the order to the market.
+            """
+            start = product[0]
+            volume = unit.opt_power_requirement.loc[start]
+            price = 3000
+            bids.append(
+                {
+                    "start_time": product[0],
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": price,
+                    "volume": -volume,
+                }
+            )
+
+        return bids
+
+
+class NaiveRedispatchSteelplantStrategy(BaseStrategy):
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        bids = []
+        start = product_tuples[0][0]  # start time of the first product
+
+        unit.calculate_optimal_operation_if_needed()
+
+        # introduce marginal cost
+
+        bids = []
+        for product in product_tuples:
+            """
+            for each product, calculate the marginal cost of the unit at the start time of the product
+            and the volume of the product. Dispatch the order to the market.
+            """
+            start = product[0]
+            volume = unit.flex_power_requirement.loc[start]
+            price = 3000
+            bids.append(
+                {
+                    "start_time": product[0],
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": price,
+                    "volume": -volume,
+                }
+            )
 
         return bids
 

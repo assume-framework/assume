@@ -1,0 +1,9 @@
+name,technology,bidding_EOM,,bidding_redispatch,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,additional_cost,hot_start_cost,warm_start_cost,cold_start_cost,min_operating_time,min_down_time,heat_extraction,max_heat_extraction,node,unit_operator
+Wind onshore,wind_onshore,naive_eom,,naive_redispatch,renewable,0,53190,0,1,,,0,0,0,0,0,0,0,0,north,renewables_operator
+Wind offshore,wind_offshore,naive_eom,,naive_redispatch,renewable,0,7560,0,1,,,0,0,0,0,0,0,0,0,north,renewables_operator
+Solar,solar,naive_eom,,naive_redispatch,renewable,0,48860,0,1,,,0,0,0,0,0,0,0,0,north,renewables_operator
+Hydro,hydro,naive_eom,,naive_redispatch,renewable,0,4940,0,1,,,0,0,0,0,0,0,0,0,north,renewables_operator
+Biomass,biomass,naive_eom,,naive_redispatch,renewable,0,8340,0,1,,,0,0,0,0,0,0,0,0,north,renewables_operator
+KKW ISAR 2,nuclear,naive_eom,,naive_redispatch,uranium,0,1485,590,0.33,890,890,10.3,140,140,140,72,10,no,0,north,UNIPER
+KKW BROKDORF,nuclear,naive_eom,,naive_redispatch,uranium,0,1480,590,0.33,890,890,10.3,140,140,140,72,10,no,0,north,UNIPER
+KKW PHILIPPSBURG 2,nuclear,naive_eom,,naive_redispatch,uranium,0,1468,590,0.33,880,880,10.3,140,140,140,72,10,no,0,north,ENBW ENERGIE BADEN-WURTTEMBERG
