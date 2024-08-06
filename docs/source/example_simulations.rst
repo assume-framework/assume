@@ -71,6 +71,9 @@ Overview of Example Simulations
    * - large_2019_day_ahead
      - example_03
      - Full-year German day-ahead market simulation. [2]
+   * - large_2019_with_DSM
+     - example_03
+     - Full-year German market simulation with Demand Side Management. [2]
    * - large_2019_rl
      - example_03a
      - Modified 2019 simulation for reinforcement learning. [1][2]
@@ -154,6 +157,16 @@ The following table provides a more in-depth look at key examples, highlighting 
      - Various
      - No
      - Based on [2]
+   * - large_2019_with_DSM
+     - Germany
+     - Conv., VRE
+     - Full 2019 data
+     - Fixed, Flexible (DSM)
+     - Full 2019 data
+     - EOM
+     - Various
+     - No
+     - Based on [2]
    * - large_2019_rl
      - Germany
      - Conv., VRE
@@ -165,7 +178,7 @@ The following table provides a more in-depth look at key examples, highlighting 
      - No
      - Based on [1][2]
 
-Note: Conv. = Conventional, VRE = Variable Renewable Energy, EOM = Energy-Only Market, CRM = Control Reserve Market, DAM = Day-Ahead Market, RL = Reinforcement Learning
+Note: Conv. = Conventional, VRE = Variable Renewable Energy, EOM = Energy-Only Market, CRM = Control Reserve Market, DAM = Day-Ahead Market, RL = Reinforcement Learning, DSM = Demand Side Management
 
 Key Features of Example Simulations
 -----------------------------------
@@ -188,6 +201,7 @@ Key Features of Example Simulations
    - Represent real-world scenarios based on the German power market in 2019.
    - Include full demand and renewable generation profiles, major generation units, and storage facilities.
    - Demonstrate different market configurations (EOM, CRM, DAM) and their impacts.
+   - The large_2019_with_DSM example incorporates steel plants as flexible demand side units, showcasing Demand Side Management capabilities.
    - Based on comprehensive research presented in [2], offering insights into complex market dynamics.
 
 These examples provide a diverse range of scenarios, allowing users to explore various aspects of energy market simulation, from basic concepts to complex, real-world applications.
