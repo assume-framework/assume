@@ -1,6 +1,6 @@
 name,technology,bidding_EOM,bidding_CRM_pos,bidding_CRM_neg,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,additional_cost,hot_start_cost,warm_start_cost,cold_start_cost,min_operating_time,min_down_time,heat_extraction,max_heat_extraction,unit_operator
-Wind onshore,wind_onshore,naive_eom,-,-,renewable,0,53190,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
-Wind offshore,wind_offshore,naive_eom,-,-,renewable,0,7560,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
+Wind Onshore,wind_onshore,naive_eom,-,-,renewable,0,53190,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
+Wind Offshore,wind_offshore,naive_eom,-,-,renewable,0,7560,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
 Solar,solar,naive_eom,-,-,renewable,0,48860,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
 Hydro,hydro,naive_eom,-,-,renewable,0,4940,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
 Biomass,biomass,naive_eom,-,-,renewable,0,8340,0,1,,,0,0,0,0,0,0,0,0,renewables_operator

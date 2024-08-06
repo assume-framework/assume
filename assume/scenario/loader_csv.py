@@ -58,6 +58,8 @@ def load_file(
     df = None
 
     if file_name in config:
+        if config[file_name] is None:
+            return None
         file_path = f"{path}/{config[file_name]}"
     else:
         file_path = f"{path}/{file_name}.csv"
