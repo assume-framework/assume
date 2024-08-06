@@ -33,7 +33,7 @@ base_case_2021:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2019-01-01 00:00
+      start_date: 2021-03-01 00:00
       products:
         - duration: 1h
           count: 1
