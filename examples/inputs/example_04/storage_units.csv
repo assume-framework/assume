@@ -1,0 +1,26 @@
+name,technology,bidding_EOM,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_volume,max_volume,additional_cost_charge,additional_cost_discharge,natural_inflow,unit_operator
+Tanzmühle - Rabenleite,PSPP,flexable_eom_storage,25,35,0.81,0.88,1,404,0.28,0.28,0,GDF SUEZ ENERGIE DEUTSCHLAND
+Schwarzenbachwerk,PSPP,flexable_eom_storage,20,46,0.73,0.82,1,198,0.28,0.28,1.2,ENBW ENERGIE BADEN-WURTTEMBERG
+Leitzach II,PSPP,flexable_eom_storage,38,49,0.86,0.9,1,550,0.28,0.28,0.7,STADTWERKE MUENCHEN GMBH
+Leitzach I,PSPP,flexable_eom_storage,40,51,0.86,0.9,1,550,0.28,0.28,1.8,STADTWERKE MUENCHEN GMBH
+Hohenwarte I,PSPP,flexable_eom_storage,34,63,0.8,0.87,1,504,0.28,0.28,1.9,VATTENFALL EUROPE AG
+Bleiloch,PSPP,flexable_eom_storage,32,80,0.8,0.87,1,640,0.28,0.28,1.3,VATTENFALL EUROPE AG
+Wendefurth,PSPP,flexable_eom_storage,72,80,0.82,0.88,1,523,0.28,0.28,0,VATTENFALL EUROPE AG
+Glems,PSPP,flexable_eom_storage,68,90,0.84,0.89,1,560,0.28,0.28,0,ENBW ENERGIE BADEN-WURTTEMBERG
+Reisach - Rabenleite,PSPP,flexable_eom_storage,84,100,0.85,0.9,1,630,0.28,0.28,0,GDF SUEZ ENERGIE DEUTSCHLAND
+Geesthacht,PSPP,flexable_eom_storage,96,105,0.81,0.87,1,600,0.28,0.28,0,VATTENFALL EUROPE AG
+Rönkhausen,PSPP,flexable_eom_storage,140,140,0.85,0.9,1,690,0.28,0.28,0,ENERVIE - SUEDWESTFALEN ENERGIE
+Waldeck I,PSPP,flexable_eom_storage,96,140,0.87,0.92,1,478,0.28,0.28,0,UNIPER
+Häusern,PSPP,flexable_eom_storage,104,144,0.82,0.88,1,514,0.28,0.28,0,ENBW ENERGIE BADEN-WURTTEMBERG
+Koepchenwerk Herdecke II,PSPP,flexable_eom_storage,153,153,0.85,0.9,1,590,0.28,0.28,0,RWE POWER AG
+Happurg,PSPP,flexable_eom_storage,126,160,0.83,0.89,1,900,0.28,0.28,0,UNIPER
+Langenprozelten,PSPP,flexable_eom_storage,154,168,0.85,0.9,1,950,0.28,0.28,0,UNIPER
+Waldshut,PSPP,flexable_eom_storage,80,176,0.79,0.86,1,581,0.28,0.28,0,ENBW ENERGIE BADEN-WURTTEMBERG
+Erzhausen,PSPP,flexable_eom_storage,230,220,0.84,0.9,1,940,0.28,0.28,0,STATKRAFT AS
+Witznau,PSPP,flexable_eom_storage,128,220,0.77,0.84,1,880,0.28,0.28,0,ENBW ENERGIE BADEN-WURTTEMBERG
+Hohenwarte II,PSPP,flexable_eom_storage,310,320,0.8,0.87,1,2087,0.28,0.28,0,VATTENFALL EUROPE AG
+Säckingen,PSPP,flexable_eom_storage,301,353,0.86,0.91,1,2064,0.28,0.28,1.8,ENBW ENERGIE BADEN-WURTTEMBERG
+Waldeck II,PSPP,flexable_eom_storage,476,440,0.87,0.92,1,3428,0.28,0.28,0,UNIPER
+Wehr,PSPP,flexable_eom_storage,1000,992,0.86,0.9,1,6076,0.28,0.28,0,RWE POWER AG
+Markersbach,PSPP,flexable_eom_storage,1140,1050,0.84,0.89,1,4018,0.28,0.28,0,VATTENFALL EUROPE AG
+Goldisthal,PSPP,flexable_eom_storage,1140,1060,0.88,0.92,1,8480,0.28,0.28,0,VATTENFALL EUROPE AG
