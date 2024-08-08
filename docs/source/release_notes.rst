@@ -8,9 +8,9 @@ Release Notes
 
 Upcoming Release
 =======================
-!! Warning !!
-The features listed below are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
-e.g. pip install git+https://github.com/assume-framework/assume
+.. warning::
+  The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
+  e.g. pip install git+https://github.com/assume-framework/assume
 
 
 v0.4.0 - latest release (8th August 2024)
@@ -71,7 +71,6 @@ v0.4.0 - latest release (8th August 2024)
 **Other Changes:**
 
 - Added closing word and final dashboard link to interoperability tutorial
-
 
 
 v0.3.7 (21st March 2024)
@@ -161,7 +160,7 @@ v0.3 (6th February 2024)
 
 **Improvements:**
 
-- Added "Open in Collab" to notebooks (#258)
+- Added "Open in Colab" to notebooks (#258)
 - Improved data_dict usage (#274)
 
 **Bug Fixes:**
