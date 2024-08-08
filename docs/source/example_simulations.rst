@@ -52,34 +52,34 @@ Overview of Example Simulations
      - Implements zonal market clearing.
    * - small_learning_1
      - example_02a
-     - 7 power plants, 1 with learning bidding strategy. Case 1 in [1]
+     - 7 power plants, 1 with learning bidding strategy. Case 1 in [1]_
    * - small_learning_2
      - example_02b
-     - 11 power plants, 5 with learning bidding strategy. Case 2 in [1]
+     - 11 power plants, 5 with learning bidding strategy. Case 2 in [1]_
    * - small_learning_3
      - example_02c
-     - 16 power plants, 10 with learning bidding strategy. Case 3 in [1]
+     - 16 power plants, 10 with learning bidding strategy. Case 3 in [1]_
    * - learning_with_complex_bids
      - example_02d
      - Learning strategies with complex bidding.
    * - large_2019_eom
      - example_03
-     - Full-year German power market simulation (EOM only). [2]
+     - Full-year German power market simulation (EOM only). [2]_
    * - large_2019_eom_crm
      - example_03
-     - Full-year German power market simulation (EOM + CRM). [2]
+     - Full-year German power market simulation (EOM + CRM). [2]_
    * - large_2019_day_ahead
      - example_03
-     - Full-year German day-ahead market simulation. [2]
+     - Full-year German day-ahead market simulation. [2]_
    * - large_2019_with_DSM
      - example_03
-     - Full-year German market simulation with Demand Side Management. [2]
+     - Full-year German market simulation with Demand Side Management. [2]_
    * - large_2019_rl
      - example_03a
-     - Full-year 2021 German market simulation with reinforcement learning with modified power plants list. [1]
+     - Full-year 2021 German market simulation with reinforcement learning with modified power plants list. [1]_
    * - large_2021_rl
      - example_03b
-     - Full-year 2021 German market simulation with reinforcement learning with modified power plants list. [1]
+     - Full-year 2021 German market simulation with reinforcement learning with modified power plants list. [1]_
 
 Detailed Features of Example Simulations
 ----------------------------------------
@@ -109,7 +109,7 @@ The following table provides a more in-depth look at key examples, highlighting 
      - EOM
      - Learning, Naive
      - No
-     - Case 1 from [1]
+     - Case 1 from [1]_
    * - small_learning_2
      - Germany
      - Conventional
@@ -119,7 +119,7 @@ The following table provides a more in-depth look at key examples, highlighting 
      - EOM
      - Learning, Naive
      - No
-     - Case 2 from [1]
+     - Case 2 from [1]_
    * - small_learning_3
      - Germany
      - Conventional
@@ -129,7 +129,7 @@ The following table provides a more in-depth look at key examples, highlighting 
      - EOM
      - Learning, Naive
      - No
-     - Case 3 from [1]
+     - Case 3 from [1]_
    * - large_2019_eom
      - Germany
      - Conv., VRE
@@ -139,7 +139,7 @@ The following table provides a more in-depth look at key examples, highlighting 
      - EOM
      - Various
      - No
-     - Based on [2]
+     - Based on [2]_
    * - large_2019_eom_crm
      - Germany
      - Conv., VRE
@@ -149,7 +149,7 @@ The following table provides a more in-depth look at key examples, highlighting 
      - EOM, CRM
      - Various
      - No
-     - Based on [2]
+     - Based on [2]_
    * - large_2019_day_ahead
      - Germany
      - Conv., VRE
@@ -159,7 +159,7 @@ The following table provides a more in-depth look at key examples, highlighting 
      - DAM
      - Various
      - No
-     - Based on [2]
+     - Based on [2]_
    * - large_2019_with_DSM
      - Germany
      - Conv., VRE
@@ -169,7 +169,7 @@ The following table provides a more in-depth look at key examples, highlighting 
      - EOM
      - Various
      - No
-     - Based on [2]
+     - Based on [2]_
    * - large_2019_rl
      - Germany
      - Conv., VRE
@@ -179,7 +179,7 @@ The following table provides a more in-depth look at key examples, highlighting 
      - EOM
      - RL, Various
      - No
-     - Based on [1]
+     - Based on [1]_
    * - large_2021_rl
      - Germany
      - Conv., VRE
@@ -189,7 +189,7 @@ The following table provides a more in-depth look at key examples, highlighting 
      - EOM
      - RL, Various
      - No
-     - Based on [1]
+     - Based on [1]_
 
 Note: Conv. = Conventional, VRE = Variable Renewable Energy, EOM = Energy-Only Market, CRM = Control Reserve Market, DAM = Day-Ahead Market, RL = Reinforcement Learning, DSM = Demand Side Management
 
@@ -206,7 +206,7 @@ Key Features of Example Simulations
 
    - Showcase the integration of learning algorithms in bidding strategies.
    - Illustrate how agents can adapt their behavior in different market conditions.
-   - small_learning_1, small_learning_2, and small_learning_3 directly correspond to Cases 1, 2, and 3, respectively, in the publication by Harder et al. [1].
+   - small_learning_1, small_learning_2, and small_learning_3 directly correspond to Cases 1, 2, and 3, respectively, in the publication by Harder et al. [1]_.
    - Demonstrate practical applications of reinforcement learning in energy markets.
 
 3. Large-scale examples (large_2019_*, large_2021_rl):
@@ -215,13 +215,13 @@ Key Features of Example Simulations
    - Include full demand and renewable generation profiles, major generation units, and storage facilities.
    - Demonstrate different market configurations (EOM, CRM, DAM) and their impacts.
    - The large_2019_with_DSM example incorporates steel plants as flexible demand side units, showcasing Demand Side Management capabilities.
-   - large_2019_rl and large_2021_rl examples apply reinforcement learning techniques to full-year market simulations, as presented in [1]. In this examples, the power plant units with a capacity of less then 300 MW were aggregated into larger units to increase the learning speed.
-   - Based on comprehensive research presented in [1] and [2], offering insights into complex market dynamics and the application of advanced learning techniques in different market years.
+   - large_2019_rl and large_2021_rl examples apply reinforcement learning techniques to full-year market simulations, as presented in [1]_. In this examples, the power plant units with a capacity of less then 300 MW were aggregated into larger units to increase the learning speed.
+   - Based on comprehensive research presented in [1]_ and [2]_, offering insights into complex market dynamics and the application of advanced learning techniques in different market years.
 
 These examples provide a diverse range of scenarios, allowing users to explore various aspects of energy market simulation, from basic concepts to complex, real-world applications and advanced learning strategies.
 
 References
 ----------
-[1] Harder, Nick & Qussous, Ramiz & Weidlich, Anke. (2023). Fit for purpose: Modeling wholesale electricity markets realistically with multi-agent deep reinforcement learning. Energy and AI. 14. 100295. 10.1016/j.egyai.2023.100295.
+.. [1] Harder, Nick & Qussous, Ramiz & Weidlich, Anke. (2023). Fit for purpose: Modeling wholesale electricity markets realistically with multi-agent deep reinforcement learning. Energy and AI. 14. 100295. 10.1016/j.egyai.2023.100295.
 
-[2] Qussous, R.; Harder, N.; Weidlich, A. Understanding Power Market Dynamics by Reflecting Market Interrelations and Flexibility-Oriented Bidding Strategies. *Energies* **2022**, *15*, 494. https://doi.org/10.3390/en15020494
+.. [2] Qussous, R.; Harder, N.; Weidlich, A. Understanding Power Market Dynamics by Reflecting Market Interrelations and Flexibility-Oriented Bidding Strategies. *Energies* **2022**, *15*, 494. https://doi.org/10.3390/en15020494
