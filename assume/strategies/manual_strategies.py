@@ -61,9 +61,12 @@ class SimpleManualTerminalStrategy(BaseStrategy):
             print(f"> requesting bid for time from {product[0]} to {product[1]}")
             print(f"> power must be between {min_power[start]} and {max_power[start]}")
             print(f"> {previous_power=}, {current_power=}, {marginal_cost=}")
-            prompt = input("> waiting for volume and price, space-separated with a dot as decimal point \n")
-            volume, price = prompt.split(" ")
-            volume, price = float(volume), float(price)
+            try:
+                prompt = input("> waiting for volume and price, space-separated with a dot as decimal point \n")
+                volume, price = prompt.split(" ")
+                volume, price = float(volume), float(price)
+            except ValueError:
+                volume, price = 0, 0
 
             bids.append(
                 {
