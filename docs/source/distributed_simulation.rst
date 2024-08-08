@@ -51,7 +51,7 @@ which starts the simulation in your terminal.
 
 Or use two separate terminals, start the first one using:
 
-    python -m distributed_simulation.world_agents
+    python -m distributed_simulation.world_agent
 
 The script tries to connect to the manager now.
 Next step is to start the manager.

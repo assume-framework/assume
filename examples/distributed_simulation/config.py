@@ -49,10 +49,10 @@ sim_id = "handmade_simulation"
 marketdesign = [
     MarketConfig(
         market_id="EOM",
-        opening_hours=rr.rrule(rr.HOURLY, interval=24, dtstart=start, until=end),
+        opening_hours=rr.rrule(rr.HOURLY, interval=1, dtstart=start, until=end),
         opening_duration=timedelta(hours=1),
         market_mechanism="pay_as_clear",
-        market_products=[MarketProduct(timedelta(hours=1), 24, timedelta(hours=1))],
+        market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
         additional_fields=["block_id", "link", "exclusive_id"],
     )
 ]
