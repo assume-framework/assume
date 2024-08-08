@@ -50,6 +50,12 @@ Overview of Example Simulations
    * - small_with_zonal_clearing
      - example_01d
      - Implements zonal market clearing.
+   * - market_study_eom
+     - example_01f
+     - Showcases comparison of single market to multi market. Case 1 in [3]_
+   * - market_study_eom_and_ltm
+     - example_01f
+     - Showcases simulation with EOM and LTM market. Case 2 in [3]_
    * - small_learning_1
      - example_02a
      - 7 power plants, 1 with learning bidding strategy. Case 1 in [1]_
@@ -222,6 +228,8 @@ These examples provide a diverse range of scenarios, allowing users to explore v
 
 References
 ----------
-.. [1] Harder, Nick & Qussous, Ramiz & Weidlich, Anke. (2023). Fit for purpose: Modeling wholesale electricity markets realistically with multi-agent deep reinforcement learning. Energy and AI. 14. 100295. 10.1016/j.egyai.2023.100295.
+.. [1] Harder, N.; Qussous, R.; Weidlich, A. Fit for purpose: Modeling wholesale electricity markets realistically with multi-agent deep reinforcement learning. *Energy and AI* **2023**. 14. 100295. https://doi.org/10.1016/j.egyai.2023.100295.
 
 .. [2] Qussous, R.; Harder, N.; Weidlich, A. Understanding Power Market Dynamics by Reflecting Market Interrelations and Flexibility-Oriented Bidding Strategies. *Energies* **2022**, *15*, 494. https://doi.org/10.3390/en15020494
+
+.. [3] Maurer, F.; Miskiw, K.; Ramirez, R.; Harder, N.; Sander, V.; Lehnhoff, S. Abstraction of Energy Markets and Policies - Application in an Agent-Based Modeling Toolbox. *Energy Informatics* **2023**, http://doi.org/10.1007/978-3-031-48652-4_10

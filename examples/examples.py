@@ -53,6 +53,14 @@ availabe_examples = {
         "study_case": "zonal_case",
     },
     # example_01e is used in the tutorial notebook #3: Custom unit and bidding strategy example
+    "market_study_eom": {
+        "scenario": "example_01f",
+        "study_case": "eom_case",
+    },
+    "market_study_eom_and_ltm": {
+        "scenario": "example_01f",
+        "study_case": "ltm_case",
+    },
     # example_01f is used in the tutorial notebook #5: Market configuration comparison example
     # example_01g is used in the tutorial notebook #6: Advanced order types example
     #
