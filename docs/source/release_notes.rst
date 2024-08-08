@@ -104,8 +104,8 @@ v0.3.7 (21st March 2024)
 - Increased version to 0.3.7 for latest release (#327)
 
 
-v0.3.6 (21st March 2024)
-=========================
+v0.3.6 (22nd February 2024)
+===========================
 
 **Improvements:**
 
@@ -186,7 +186,7 @@ v0.3 (6th February 2024)
 - Added automatic assignment of RL units to one RL unit operator (#276)
 
 
-v0.2.1 (6th November 2023)
+v0.2.1 (3rd November 2023)
 ===========================
 
 **Improvements:**
