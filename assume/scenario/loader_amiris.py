@@ -10,7 +10,7 @@ import dateutil.rrule as rr
 import pandas as pd
 import yaml
 from dateutil.relativedelta import relativedelta as rd
-from yamlinclude import YamlIncludeConstructor
+from yaml_include import Constructor
 
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
@@ -442,9 +442,7 @@ def add_agent_to_world(
 
 
 def read_amiris_yaml(base_path):
-    YamlIncludeConstructor.add_to_loader_class(
-        loader_class=yaml.FullLoader, base_dir=base_path
-    )
+    Constructor.add_to_loader_class(loader_class=yaml.FullLoader, base_dir=base_path)
 
     with open(base_path + "/scenario.yaml", "rb") as f:
         amiris_scenario = yaml.load(f, Loader=yaml.FullLoader)
