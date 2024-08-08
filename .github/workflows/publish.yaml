@@ -52,7 +52,9 @@ jobs:
     name: Upload release to PyPI
     needs: build-and-test
     runs-on: ubuntu-latest
-    environment: release
+    environment:
+      name: release
+      url: https://pypi.org/p/assume-framework
     permissions:
       id-token: write  # IMPORTANT: mandatory for trusted publishing
     steps:
