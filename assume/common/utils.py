@@ -505,3 +505,36 @@ def adjust_unit_operator_for_learning(
             )
 
     return unit_operator_id
+
+
+def create_zonal_incidence_matrix(lines, buses, zones_id):
+    nodes = buses[zones_id].unique()
+    node_to_zone = buses[zones_id].to_dict()
+
+    incidence_matrix = pd.DataFrame(0, index=nodes, columns=nodes)
+
+    for _, line in lines.iterrows():
+        zone0, zone1 = node_to_zone[line["bus0"]], node_to_zone[line["bus1"]]
+        if zone0 != zone1:
+            incidence_matrix.loc[zone0, zone1] += line["s_nom"]
+            incidence_matrix.loc[zone1, zone0] += line["s_nom"]
+
+    # Convert values below the diagonal to negative
+    mask = np.tril(np.ones(incidence_matrix.shape), -1).astype(bool)
+    incidence_matrix.values[mask] = -incidence_matrix.values[mask]
+
+    return incidence_matrix
+
+
+def create_nodal_incidence_matrix(lines, buses):
+    nodes = buses.index.values
+    node_index = {node: idx for idx, node in enumerate(nodes)}
+
+    incidence_matrix = np.zeros((len(nodes), len(nodes)))
+
+    for _, line in lines.iterrows():
+        i, j = node_index[line["bus0"]], node_index[line["bus1"]]
+        incidence_matrix[i, j] = line["s_nom"]
+        incidence_matrix[j, i] = -line["s_nom"]
+
+    return pd.DataFrame(incidence_matrix, index=nodes, columns=nodes)

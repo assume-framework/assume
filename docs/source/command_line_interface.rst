@@ -17,6 +17,6 @@ It takes an input folder relative from the place it was run from.
 The following command line parameters are available in the CLI:
 
 .. argparse::
-   :filename: ../assume_cli/cli.py
+   :filename: ../../assume_cli/cli.py
    :func: create_parser
    :prog: assume

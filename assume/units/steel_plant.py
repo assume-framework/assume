@@ -19,11 +19,11 @@ from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
 from assume.units.dsm_load_shift import DSMFlex
 from assume.units.dst_components import (
-    create_dri_plant,
-    create_dri_storage,
-    create_electric_furnance,
+    create_driplant,
+    create_dristorage,
+    create_electric_arc_furnance,
     create_electrolyser,
-    create_storage,
+    create_hydrogen_storage,
 )
 
 SOLVERS = ["gurobi", "glpk", "cbc", "cplex"]
@@ -33,10 +33,10 @@ logger = logging.getLogger(__name__)
 # Mapping of component type identifiers to their respective classes
 dst_components = {
     "electrolyser": create_electrolyser,
-    "h2storage": create_storage,
-    "dri_plant": create_dri_plant,
-    "dri_storage": create_dri_storage,
-    "eaf": create_electric_furnance,
+    "h2storage": create_hydrogen_storage,
+    "dri_plant": create_driplant,
+    "dri_storage": create_dristorage,
+    "eaf": create_electric_arc_furnance,
 }
 
 
