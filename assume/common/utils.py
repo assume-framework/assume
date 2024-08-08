@@ -538,3 +538,28 @@ def create_nodal_incidence_matrix(lines, buses):
         incidence_matrix[j, i] = -line["s_nom"]
 
     return pd.DataFrame(incidence_matrix, index=nodes, columns=nodes)
+
+
+def normalize_availability(powerplants_df, availability_df):
+    # Create a copy of the availability dataframe to avoid modifying the original
+    normalized_df = availability_df.copy()
+
+    # Iterate through each column in the availability dataframe
+    for column in normalized_df.columns:
+        # Check if any value in the column is greater than 1
+        if (normalized_df[column] > 1).any():
+            try:
+                # Get the max_power for the current unit from the powerplants dataframe
+                max_power = powerplants_df.loc[column, "max_power"]
+
+                # Normalize the entire column
+                normalized_df[column] = normalized_df[column] / max_power
+
+                # Ensure all values are between 0 and 1
+                normalized_df[column] = normalized_df[column].clip(0, 1)
+            except KeyError:
+                logger.warning(
+                    f"Unit '{column}' not found in powerplants dataframe. Skipping normalization for this unit."
+                )
+
+    return normalized_df

@@ -37,6 +37,10 @@ Upcoming Release 0.4.0
 - Added `zones_identifier` to the configuration file and `zone_id` to the `buses.csv`, and refactored the complex market
   clearing algorithm to incorporate zone information, ensuring that bids submitted with a specific node are
   matched to the corresponding market zone.
+- If any values in the availability_df.csv file are larger than 1, the framework will now warn the user
+  and run a method to normalize the values to [0, 1].
+- Examples have been restructed to easier orientation and understanding: example_01.. cover all feature demonstration examples,
+  example_02.. cover all learning examples, example_03.. cover all full year examples
 
 **Bug Fixes:**
 
@@ -49,6 +53,7 @@ Upcoming Release 0.4.0
 - Fixed complex clearing with pyomo>=6.7
 - Resolved various issues with learning and policy saving
 - Fixed missing market dispatch values in day-ahead markets
+- Added a check for availability_df.csv file to check for any values larger than 1
 
 **Other Changes:**
 

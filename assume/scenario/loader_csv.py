@@ -18,7 +18,11 @@ from assume.common.base import LearningConfig
 from assume.common.exceptions import AssumeException
 from assume.common.forecasts import CsvForecaster, Forecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
-from assume.common.utils import adjust_unit_operator_for_learning, convert_to_rrule_freq
+from assume.common.utils import (
+    adjust_unit_operator_for_learning,
+    convert_to_rrule_freq,
+    normalize_availability,
+)
 from assume.strategies import BaseStrategy
 from assume.world import World
 
@@ -54,6 +58,8 @@ def load_file(
     df = None
 
     if file_name in config:
+        if config[file_name] is None:
+            return None
         file_path = f"{path}/{config[file_name]}"
     else:
         file_path = f"{path}/{file_name}.csv"
@@ -412,7 +418,7 @@ def read_units(
         bidding_strategies = {
             key.split("bidding_")[1]: unit_params[key]
             for key in unit_params.keys()
-            if key.startswith("bidding_")
+            if key.startswith("bidding_") and unit_params[key]
         }
         unit_params["bidding_strategies"] = bidding_strategies
         operator_id = adjust_unit_operator_for_learning(
@@ -500,6 +506,17 @@ def load_config_and_create_forecaster(
     availability = load_file(
         path=path, config=config, file_name="availability_df", index=index
     )
+    # check if availability contains any values larger than 1 and raise a warning
+    if availability is not None and availability.max().max() > 1:
+        # warn the user that the availability contains values larger than 1
+        # and normalize the availability
+        logger.warning(
+            "Availability contains values larger than 1. This is not allowed. "
+            "The availability will be normalized automatically. "
+            "The quality of the automatic normalization is not guaranteed."
+        )
+        availability = normalize_availability(powerplant_units, availability)
+
     electricity_prices_df = load_file(
         path=path, config=config, file_name="electricity_prices", index=index
     )

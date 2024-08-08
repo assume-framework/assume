@@ -2,9 +2,9 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-base_case_2019:
-  start_date: 2019-01-01 00:00
-  end_date: 2019-01-31 00:00
+base_case_2021:
+  start_date: 2021-03-01 00:00
+  end_date: 2021-03-31 00:00
   time_step: 1h
   learning_mode: True
   save_frequency_hours: Null
@@ -33,7 +33,7 @@ base_case_2019:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2019-01-01 00:00
+      start_date: 2021-03-01 00:00
       products:
         - duration: 1h
           count: 1
