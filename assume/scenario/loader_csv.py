@@ -378,7 +378,7 @@ def read_units(
         bidding_strategies = {
             key.split("bidding_")[1]: unit_params[key]
             for key in unit_params.keys()
-            if key.startswith("bidding_") and unit_params[key] != 0
+            if key.startswith("bidding_") and unit_params[key]
         }
         unit_params["bidding_strategies"] = bidding_strategies
         operator_id = adjust_unit_operator_for_learning(
