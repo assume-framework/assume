@@ -6,8 +6,15 @@
 Release Notes
 #######################
 
-Upcoming Release 0.4.0
+Upcoming Release
 =======================
+.. warning::
+  The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
+  e.g. pip install git+https://github.com/assume-framework/assume
+
+
+v0.4.0 - latest release (8th August 2024)
+=========================================
 
 **New Features:**
 
@@ -22,6 +29,12 @@ Upcoming Release 0.4.0
 
 - **Multiprocessing:** Using a command line option, it is now possible to use run each simulation agent in its own process to speed up larger simulations.
   You can read more about it in :doc:`distributed_simulation`
+
+- **Steel Plant Demand Side Management Unit**: A new unit type has been added to the framework, enabling users to model the demand side management
+  of a steel plant. This feature allows for more detailed and accurate simulations of industrial energy consumption patterns and market interactions.
+  This unit can be configured with different components, such as the electric arc furnace, electrolyzer, and hot storage, to reflect the specific
+  characteristics of steel production processes. The process can be optimized to minimize costs or to maximize the available flexibility, depending
+  on the user's requirements. A tutorial and detailed documentation on how to use this feature are coming soon.
 
 **Improvements:**
 
@@ -60,9 +73,8 @@ Upcoming Release 0.4.0
 - Added closing word and final dashboard link to interoperability tutorial
 
 
-
-v0.3.7 (Latest)
-===============
+v0.3.7 (21st March 2024)
+=========================
 
 **New Features:**
 
@@ -91,8 +103,8 @@ v0.3.7 (Latest)
 - Increased version to 0.3.7 for latest release (#327)
 
 
-v0.3.6
-======
+v0.3.6 (22nd February 2024)
+===========================
 
 **Improvements:**
 
@@ -115,8 +127,8 @@ v0.3.6
 - Moved DMAS bidding strategies into try-except block since Pyomo is not a required dependency (#308)
 
 
-v0.3.5
-======
+v0.3.5 (14th February 2024)
+===========================
 
 **New Features:**
 
@@ -136,8 +148,8 @@ v0.3.5
 - Cleaned up hard-coded EOM references (#294)
 
 
-v0.3
-====
+v0.3 (6th February 2024)
+=========================
 
 **New Features:**
 
@@ -148,7 +160,7 @@ v0.3
 
 **Improvements:**
 
-- Added "Open in Collab" to notebooks (#258)
+- Added "Open in Colab" to notebooks (#258)
 - Improved data_dict usage (#274)
 
 **Bug Fixes:**
@@ -173,8 +185,8 @@ v0.3
 - Added automatic assignment of RL units to one RL unit operator (#276)
 
 
-v0.2.1
-======
+v0.2.1 (3rd November 2023)
+===========================
 
 **Improvements:**
 
@@ -195,8 +207,8 @@ v0.2.1
 - Fixed issues for running distributed scenario with MQTT (#222)
 
 
-v0.2.0
-======
+v0.2.0 (30th September 2023)
+=============================
 
 **New Features:**
 
@@ -215,8 +227,8 @@ v0.2.0
 - Updated Docker compose file to include Renderer for saving plots directly from Grafana dashboards
 
 
-v0.1.0 - Initial Release
-========================
+v0.1.0 - Initial Release (12th September 2023)
+==============================================
 
 This is the initial release of the ASSUME Framework, published to PyPi.
 
