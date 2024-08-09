@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import ast
 import logging
 
 import pandas as pd
@@ -95,6 +96,27 @@ class Building(SupportsMinMax, DSMFlex):
         self.model = pyo.ConcreteModel()
         self.define_sets()
         self.define_parameters()
+        # Create availability DataFrame for EVs
+        # Parse the availability periods
+        if "ev" in components:
+            if "availability_periods" in components["ev"]:
+                try:
+                    # Convert the string to a list of tuples
+                    components["ev"]["availability_periods"] = ast.literal_eval(
+                        components["ev"]["availability_periods"]
+                    )
+                    components["ev"]["availability_df"] = self.create_availability_df(
+                        components["ev"]["availability_periods"]
+                    )
+                except Exception as e:
+                    raise ValueError(
+                        f"Error processing availability periods for EV: {e}"
+                    )
+            else:
+                raise KeyError(
+                    "Missing 'availability_periods' in EV components configuration."
+                )
+
         self.initialize_components(components)
         self.initialize_process_sequence()
 
@@ -108,6 +130,23 @@ class Building(SupportsMinMax, DSMFlex):
         self.solver = SolverFactory(solvers[0])
 
         self.opt_power_requirement = None
+
+    def create_availability_df(self, availability_periods):
+        """
+        Create an availability DataFrame based on the provided availability periods.
+
+        Args:
+            availability_periods (list of tuples): List of (start, end) tuples for availability periods.
+
+        Returns:
+            pd.Series: A series with 1 for available time steps and 0 otherwise.
+        """
+        availability_series = pd.Series(0, index=self.index)
+
+        for start, end in availability_periods:
+            availability_series[start:end] = 1
+
+        return availability_series
 
     def initialize_components(self, components: dict[str, dict]):
         """
@@ -222,7 +261,7 @@ class Building(SupportsMinMax, DSMFlex):
                 == self.model.dsm_blocks["heatpump"].operating_cost_hp[t]
                 + self.model.dsm_blocks["boiler"].operating_cost_boiler[t]
                 + self.model.dsm_blocks["ev"].operating_cost_ev[t]
-                + self.model.additional_electricity_load
+                + self.model.additional_electricity_load[t]
                 * self.model.electricity_price[t]
             )
 

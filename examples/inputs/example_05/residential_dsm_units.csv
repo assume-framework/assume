@@ -1,5 +1,4 @@
-name,unit_type,technology,node,bidding_EOM,fuel_type,bidding_redispatch,unit_operator,objective,flexibility_measure,cost_tolerance,demand,rated_power,min_power,ramp_up,ramp_down,min_operating_time,min_down_time,efficiency,cop,charging_profile,max_charging_rate_of_charging_station,max_capacity,min_capacity,initial_soc,storage_loss_rate,charge_loss_rate,discharge_loss_rate
-A360_building,building,heatpump,north,naive_da_building,,,dsm_operator_1,minimize_expenses,,,,5,0,5,5,0,0,,2,,,,,,,,
-A360_building,building,boiler,north,,electric,,,,,,,5,0,5,5,0,0,0.8,,,,,,,,,
-A360_building,building,thermal_storage,north,,,,,,,,,,,,,,,,,,,2,0,0,0,0,0
-A360_building,building,ev,north,,,,,,,,,,,1,1,,,,,No,1,1,0,0,,,
+name,unit_type,technology,node,bidding_EOM,fuel_type,bidding_redispatch,unit_operator,objective,flexibility_measure,cost_tolerance,charging_profile,availability_periods,demand,rated_power,min_power,ramp_up,ramp_down,min_operating_time,min_down_time,efficiency,cop,max_capacity,min_capacity,initial_soc,storage_loss_rate,charge_loss_rate,discharge_loss_rate
+A360_building,building,heatpump,north,naive_da_building,,,dsm_operator_1,minimize_expenses,,,,,,5,0,5,5,0,0,,2,,,,,,
+A360_building,building,boiler,north,,natural_gas,,,,,,,,,5,0,5,5,0,0,0.8,,,,,,,
+A360_building,building,ev,north,,,,,,,,No,"[(""1/1/2019  3:00:00 AM"", ""1/1/2019  5:00:00 AM"")]",,,,3,3,,,,,3,0,0,,,
