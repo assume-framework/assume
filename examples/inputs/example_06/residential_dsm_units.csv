@@ -1,0 +1,44 @@
+name,unit_type,technology,node,bidding_EOM,fuel_type,bidding_redispatch,unit_operator,objective,flexibility_measure,cost_tolerance,charging_profile,availability_periods,demand,rated_power,max_power,min_power,ramp_up,ramp_down,min_operating_time,min_down_time,efficiency,cop,max_capacity,min_capacity,initial_soc,storage_loss_rate,charge_loss_rate,discharge_loss_rate,max_charging_rate,max_discharging_rate,sells_energy_to_market
+A360_building,building,pv_plant,north,naive_da_building,,,dsm_operator_1,minimize_expenses,,,,,,,4,0,,,,,,,,,,,,,,,
+A360_building,building,heatpump,north,,,,,,,,,,,5,,0,5,5,0,0,,2,,,,,,,,,
+A360_building,building,ev,north,,,,,,,,No,"[(""1/1/2019  3:00:00 AM"", ""1/1/2019  5:00:00 AM"")]",,,,,3,3,,,,,3,0,0,,,,,,
+A360_building,building,battery_storage,north,,,,,,,,No,,,,,,,,,,,,8,1,0,,0,0,1,1,Yes
+A361_building,building,pv_plant,north,naive_da_building,,,dsm_operator_2,minimize_expenses,,,,,,,4,0,,,,,,,,,,,,,,,
+A361_building,building,heatpump,north,,,,,,,,,,,5,,0,5,5,0,0,,2,,,,,,,,,
+A361_building,building,boiler,north,,natural_gas,,,,,,,,,5,,0,5,5,0,0,0.8,,,,,,,,,,
+A361_building,building,ev,north,,,,,,,,No,"[(""1/1/2019  3:00:00 AM"", ""1/1/2019  5:00:00 AM"")]",,,,,3,3,,,,,3,0,0,,,,,,
+A361_building,building,battery_storage,north,,,,,,,,No,,,,,,,,,,,,8,1,0,,0,0,1,1,Yes
+A362_building,building,pv_plant,north,naive_da_building,,,dsm_operator_3,minimize_expenses,,,,,,,4,0,,,,,,,,,,,,,,,
+A362_building,building,heatpump,north,,,,,,,,,,,5,,0,5,5,0,0,,2,,,,,,,,,
+A362_building,building,boiler,north,,natural_gas,,,,,,,,,5,,0,5,5,0,0,0.8,,,,,,,,,,
+A362_building,building,ev,north,,,,,,,,No,"[(""1/1/2019  3:00:00 AM"", ""1/1/2019  5:00:00 AM"")]",,,,,3,3,,,,,3,0,0,,,,,,
+A362_building,building,battery_storage,north,,,,,,,,No,,,,,,,,,,,,8,1,0,,0,0,1,1,Yes
+A363_building,building,pv_plant,north,naive_da_building,,,dsm_operator_4,minimize_expenses,,,,,,,4,0,,,,,,,,,,,,,,,
+A363_building,building,heatpump,north,,,,,,,,,,,5,,0,5,5,0,0,,2,,,,,,,,,
+A363_building,building,boiler,north,,natural_gas,,,,,,,,,5,,0,5,5,0,0,0.8,,,,,,,,,,
+A363_building,building,ev,north,,,,,,,,No,"[(""1/1/2019  3:00:00 AM"", ""1/1/2019  5:00:00 AM"")]",,,,,3,3,,,,,3,0,0,,,,,,
+A363_building,building,battery_storage,north,,,,,,,,No,,,,,,,,,,,,8,1,0,,0,0,1,1,Yes
+A364_building,building,pv_plant,north,naive_da_building,,,dsm_operator_5,minimize_expenses,,,,,,,4,0,,,,,,,,,,,,,,,
+A364_building,building,heatpump,north,,,,,,,,,,,5,,0,5,5,0,0,,2,,,,,,,,,
+A364_building,building,boiler,north,,natural_gas,,,,,,,,,5,,0,5,5,0,0,0.8,,,,,,,,,,
+A364_building,building,ev,north,,,,,,,,No,"[(""1/1/2019  3:00:00 AM"", ""1/1/2019  5:00:00 AM"")]",,,,,3,3,,,,,3,0,0,,,,,,
+A364_building,building,battery_storage,north,,,,,,,,No,,,,,,,,,,,,8,1,0,,0,0,1,1,Yes
+A365_building,building,pv_plant,north,naive_da_building,,,dsm_operator_6,minimize_expenses,,,,,,,4,0,,,,,,,,,,,,,,,
+A365_building,building,heatpump,north,,,,,,,,,,,5,,0,5,5,0,0,,2,,,,,,,,,
+A365_building,building,boiler,north,,natural_gas,,,,,,,,,5,,0,5,5,0,0,0.8,,,,,,,,,,
+A365_building,building,ev,north,,,,,,,,No,"[(""1/1/2019  3:00:00 AM"", ""1/1/2019  5:00:00 AM"")]",,,,,3,3,,,,,3,0,0,,,,,,
+A365_building,building,battery_storage,north,,,,,,,,No,,,,,,,,,,,,8,1,0,,0,0,1,1,Yes
+A366_building,building,pv_plant,north,naive_da_building,,,dsm_operator_7,minimize_expenses,,,,,,,4,0,,,,,,,,,,,,,,,
+A366_building,building,heatpump,north,,,,,,,,,,,5,,0,5,5,0,0,,2,,,,,,,,,
+A366_building,building,boiler,north,,natural_gas,,,,,,,,,5,,0,5,5,0,0,0.8,,,,,,,,,,
+A366_building,building,ev,north,,,,,,,,No,"[(""1/1/2019  3:00:00 AM"", ""1/1/2019  5:00:00 AM"")]",,,,,3,3,,,,,3,0,0,,,,,,
+A366_building,building,battery_storage,north,,,,,,,,No,,,,,,,,,,,,8,1,0,,0,0,1,1,Yes
+A367_building,building,pv_plant,north,naive_da_building,,,dsm_operator_8,minimize_expenses,,,,,,,4,0,,,,,,,,,,,,,,,
+A367_building,building,heatpump,north,,,,,,,,,,,5,,0,5,5,0,0,,2,,,,,,,,,
+A367_building,building,boiler,north,,natural_gas,,,,,,,,,5,,0,5,5,0,0,0.8,,,,,,,,,,
+A367_building,building,ev,north,,,,,,,,No,"[(""1/1/2019  3:00:00 AM"", ""1/1/2019  5:00:00 AM"")]",,,,,3,3,,,,,3,0,0,,,,,,
+A367_building,building,battery_storage,north,,,,,,,,No,,,,,,,,,,,,8,1,0,,0,0,1,1,Yes
+A368_building,building,pv_plant,north,naive_da_building,,,dsm_operator_9,maximize_revenue,,,,,,,4,0,,,,,,,,,,,,,,,
+A369_building,building,battery_storage,north,naive_da_building,,,dsm_operator_10,maximize_revenue,,,No,,,,,,,,,,,,8,1,0,,0,0,1,1,Yes
+
+

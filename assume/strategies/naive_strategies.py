@@ -200,13 +200,14 @@ class NaiveDABuildingStrategy(BaseStrategy):
             """
             start = product[0]
             volume = unit.opt_power_requirement.loc[start]
-            price = 3000
+            prev_power = unit.get_output_before(start)
+            marginal_costs = unit.calculate_marginal_cost(start, prev_power)
             bids.append(
                 {
                     "start_time": product[0],
                     "end_time": product[1],
                     "only_hours": product[2],
-                    "price": price,
+                    "price": marginal_costs,
                     "volume": -volume,
                 }
             )

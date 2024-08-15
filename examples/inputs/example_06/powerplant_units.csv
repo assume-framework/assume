@@ -1,0 +1,2 @@
+name,technology,bidding_EOM,,bidding_redispatch,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,additional_cost,hot_start_cost,warm_start_cost,cold_start_cost,min_operating_time,min_down_time,heat_extraction,max_heat_extraction,node,unit_operator
+Solar,solar,naive_eom,,naive_redispatch,renewable,0,13,0,1,,,0,0,0,0,0,0,0,0,north,dsm_operator_1
