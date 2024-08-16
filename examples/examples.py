@@ -67,7 +67,9 @@ availabe_examples = {
         "scenario": "example_02e",
         "study_case": "base",
     },
-    "redispatch_validation": {"scenario": "example_04a", "study_case": "base"},
+    "redispatch_validation_2019": {"scenario": "example_04a", "study_case": "base"},
+    "redispatch_validation_2023": {"scenario": "example_04b", "study_case": "base"},
+    
 }
 
 # %%
@@ -78,7 +80,7 @@ if __name__ == "__main__":
     - timescale: with database and grafana (note: you need docker installed)
     """
     data_format = "local_db"  # "local_db" or "timescale"
-    example = "redispatch_validation"
+    example = "redispatch_validation_2023"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
