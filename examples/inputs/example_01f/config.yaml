@@ -1,0 +1,61 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+eom_case:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-21 00:00
+  time_step: 1h
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_volume: 1000000
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+ltm_case:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-21 00:00
+  time_step: 1h
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2018-12-31 23:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_volume: 1000000
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+    # Long Term Market - 7d contracts
+    LTM_OTC:
+      operator: LTM_operator
+      product_type: energy
+      start_date: 2018-12-31 22:00
+      products:
+        - duration: 7d
+          count: 1
+          first_delivery: 2h
+      opening_frequency: 7d
+      opening_duration: 1h
+      volume_unit: MW
+      maximum_volume: 1000000
+      price_unit: EUR/MW
+      market_mechanism: pay_as_bid

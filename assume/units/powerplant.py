@@ -334,9 +334,13 @@ class PowerPlant(SupportsMinMax):
         # min_power should be at least the heat demand at that time
         min_power = min_power.clip(lower=heat_demand)
 
-        max_power = (
-            self.forecaster.get_availability(self.id)[start:end_excl] * self.max_power
-        )
+        available_power = self.forecaster.get_availability(self.id)[start:end_excl]
+        # check if available power is larger than max_power and raise an error if so
+        if (available_power > self.max_power).any():
+            raise ValueError(
+                f"Available power is larger than max_power for unit {self.id} at time {start}."
+            )
+        max_power = available_power * self.max_power
         # provide reserve for capacity_pos
         max_power = max_power - self.outputs["capacity_pos"][start:end_excl]
         # remove what has already been bid

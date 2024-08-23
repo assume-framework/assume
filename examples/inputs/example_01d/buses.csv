@@ -1,3 +1,6 @@
-name,v_nom,carrier,x,y
-north,380.0,AC,9.598,53.5585
-south,380.0,AC,13.607,51.0769
+name,v_nom,carrier,zone_id,x,y
+north_1,380.0,AC,DE_1,10.0,54.0
+north_2,380.0,AC,DE_1,9.5,53.5
+east,380.0,AC,DE_1,13.4,52.5
+south,380.0,AC,DE_2,11.6,48.1
+west,380.0,AC,DE_2,7.0,51.5

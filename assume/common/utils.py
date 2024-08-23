@@ -508,6 +508,64 @@ def adjust_unit_operator_for_learning(
     return unit_operator_id
 
 
+def create_zonal_incidence_matrix(lines, buses, zones_id):
+    nodes = buses[zones_id].unique()
+    node_to_zone = buses[zones_id].to_dict()
+
+    incidence_matrix = pd.DataFrame(0, index=nodes, columns=nodes)
+
+    for _, line in lines.iterrows():
+        zone0, zone1 = node_to_zone[line["bus0"]], node_to_zone[line["bus1"]]
+        if zone0 != zone1:
+            incidence_matrix.loc[zone0, zone1] += line["s_nom"]
+            incidence_matrix.loc[zone1, zone0] += line["s_nom"]
+
+    # Convert values below the diagonal to negative
+    mask = np.tril(np.ones(incidence_matrix.shape), -1).astype(bool)
+    incidence_matrix.values[mask] = -incidence_matrix.values[mask]
+
+    return incidence_matrix
+
+
+def create_nodal_incidence_matrix(lines, buses):
+    nodes = buses.index.values
+    node_index = {node: idx for idx, node in enumerate(nodes)}
+
+    incidence_matrix = np.zeros((len(nodes), len(nodes)))
+
+    for _, line in lines.iterrows():
+        i, j = node_index[line["bus0"]], node_index[line["bus1"]]
+        incidence_matrix[i, j] = line["s_nom"]
+        incidence_matrix[j, i] = -line["s_nom"]
+
+    return pd.DataFrame(incidence_matrix, index=nodes, columns=nodes)
+
+
+def normalize_availability(powerplants_df, availability_df):
+    # Create a copy of the availability dataframe to avoid modifying the original
+    normalized_df = availability_df.copy()
+
+    # Iterate through each column in the availability dataframe
+    for column in normalized_df.columns:
+        # Check if any value in the column is greater than 1
+        if (normalized_df[column] > 1).any():
+            try:
+                # Get the max_power for the current unit from the powerplants dataframe
+                max_power = powerplants_df.loc[column, "max_power"]
+
+                # Normalize the entire column
+                normalized_df[column] = normalized_df[column] / max_power
+
+                # Ensure all values are between 0 and 1
+                normalized_df[column] = normalized_df[column].clip(0, 1)
+            except KeyError:
+                logger.warning(
+                    f"Unit '{column}' not found in powerplants dataframe. Skipping normalization for this unit."
+                )
+
+    return normalized_df
+
+
 def rename_study_case(path: str, old_key: str, new_key: str):
     """
     Rename key in config file and save changes.

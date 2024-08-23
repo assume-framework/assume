@@ -1,5 +1,0 @@
-name,technology,bidding_EOM,fuel_type,emission_factor,max_power,min_power,efficiency,additional_cost,unit_operator
-Unit 1,nuclear,naive_eom,uranium,0.0,1000.0,200.0,0.3,10.3,Operator 1
-Unit 2,lignite,naive_eom,lignite,0.4,1000.0,200.0,0.5,1.65,Operator 1
-Unit 3,hard coal,learning_advanced_orders,hard coal,0.3,2000.0,200.0,0.4,5,Operator 1
-Unit 4,hard coal,naive_eom,hard coal,0.3,2000,200.0,0.4,20,Operator 1

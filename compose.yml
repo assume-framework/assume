@@ -75,7 +75,7 @@ services:
     build: .
     depends_on:
       - assume_db
-    command: -s example_02 -db "postgresql://assume:assume@assume_db:5432/assume"
+    command: -s example_03 -db "postgresql://assume:assume@assume_db:5432/assume"
 
   # to run the simulation distributed with MQTT
   mqtt-broker:
