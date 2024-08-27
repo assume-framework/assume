@@ -749,6 +749,7 @@ class LearningStrategy(BaseStrategy):
         obs_dim (int): The observation dimension.
         act_dim (int): The action dimension.
         unique_obs_dim (int): The unique observation dimension.
+        num_timeseries_obs_dim (int): The number of observation timeseries dimension.
 
     Args:
         *args (list): The arguments.
@@ -756,7 +757,13 @@ class LearningStrategy(BaseStrategy):
     """
 
     def __init__(
-        self, obs_dim: int, act_dim: int, unique_obs_dim: int = 0, *args, **kwargs
+        self,
+        obs_dim: int,
+        act_dim: int,
+        unique_obs_dim: int = 0,
+        num_timeseries_obs_dim: int = 2,
+        *args,
+        **kwargs,
     ):
         """
         Initializes the learning strategy.
@@ -769,6 +776,10 @@ class LearningStrategy(BaseStrategy):
         # this defines the number of unique observations, which are not the same for all units
         # this is used by the centralised critic and will return an error if not matched
         self.unique_obs_dim = unique_obs_dim
+
+        # defines the number of provided timeseries, this is necessary for correctly splitting
+        # them into suitable format for recurrent neural networks
+        self.num_timeseries_obs_dim = num_timeseries_obs_dim
 
 
 class LearningConfig(TypedDict):

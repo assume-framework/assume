@@ -62,9 +62,9 @@ class RLAlgorithm:
         self.target_policy_noise = target_policy_noise
 
         if neural_network_architecture in neural_network_architecture_aliases:
-            self.policy_class = neural_network_architecture_aliases[
-                neural_network_architecture
-            ]
+            self.neural_network_architecture_class = (
+                neural_network_architecture_aliases[neural_network_architecture]
+            )
         else:
             raise ValueError(
                 f"Policy {neural_network_architecture} unknown. Please use supported architecture such as mlp or lstm in the config file."

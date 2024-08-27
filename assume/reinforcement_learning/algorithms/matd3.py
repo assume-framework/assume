@@ -246,16 +246,20 @@ class TD3(RLAlgorithm):
         act_dim_list = []
 
         for _, unit_strategy in self.learning_role.rl_strats.items():
-            unit_strategy.actor = self.policy_class(
+            unit_strategy.actor = self.neural_network_architecture_class(
                 obs_dim=unit_strategy.obs_dim,
                 act_dim=unit_strategy.act_dim,
                 float_type=self.float_type,
+                unique_obs_dim=unit_strategy.unique_obs_dim,
+                num_timeseries_obs_dim=unit_strategy.num_timeseries_obs_dim,
             ).to(self.device)
 
-            unit_strategy.actor_target = self.policy_class(
+            unit_strategy.actor_target = self.neural_network_architecture_class(
                 obs_dim=unit_strategy.obs_dim,
                 act_dim=unit_strategy.act_dim,
                 float_type=self.float_type,
+                unique_obs_dim=unit_strategy.unique_obs_dim,
+                num_timeseries_obs_dim=unit_strategy.num_timeseries_obs_dim,
             ).to(self.device)
             unit_strategy.actor_target.load_state_dict(unit_strategy.actor.state_dict())
             unit_strategy.actor_target.train(mode=False)

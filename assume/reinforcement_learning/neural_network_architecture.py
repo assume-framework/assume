@@ -105,7 +105,7 @@ class MLPActor(Actor):
     The neurnal network for the MLP actor.
     """
 
-    def __init__(self, obs_dim: int, act_dim: int, float_type):
+    def __init__(self, obs_dim: int, act_dim: int, float_type, *args, **kwargs):
         super().__init__()
 
         self.FC1 = nn.Linear(obs_dim, 256, dtype=float_type)
@@ -121,27 +121,48 @@ class MLPActor(Actor):
         return x
 
 
-class LSTMActor(nn.Module):
+class LSTMActor(Actor):
     """
     The LSTM recurrent neurnal network for the actor.
 
-    Based on: "Multi-Period and Multi-Spatial Equilibrium Analysis in Imperfect Electricity Markets"
+    Based on "Multi-Period and Multi-Spatial Equilibrium Analysis in Imperfect Electricity Markets"
     by Ye at al. (2019)
+
+    Note: the original source code was not available, therefore this implementation was derived from the published paper.
+    Adjustments to resemble final layers from MLPActor:
+    - dense layer 2 was omitted
+    - single output layer with softsign activation function to output actions directly instead of two output layers for mean and stddev
     """
 
-    def __init__(self, obs_dim: int, act_dim: int, float_type):
+    def __init__(
+        self,
+        obs_dim: int,
+        act_dim: int,
+        float_type,
+        unique_obs_dim: int = 0,
+        num_timeseries_obs_dim: int = 2,
+        *args,
+        **kwargs,
+    ):
         super().__init__()
         self.float_type = float_type
-        self.no_of_timeseries = 2  # TODO: variable no. of input timeseries
-        self.forecast_horizon = int(
-            (obs_dim - 2) / self.no_of_timeseries
-        )  # TODO: variable number of additional input features, currently 2 (marginal costs, capacity)
+        self.unique_obs_dim = unique_obs_dim
+        self.num_timeseries_obs_dim = num_timeseries_obs_dim
 
-        self.LSTM1 = nn.LSTMCell(self.no_of_timeseries, 8, dtype=float_type)
+        try:
+            self.timeseries_len = int(
+                (obs_dim - unique_obs_dim) / num_timeseries_obs_dim
+            )
+        except Exception as e:
+            raise ValueError(
+                f"Using LSTM but not providing correctly shaped timeseries: Expected integer as unique timeseries length, got {(obs_dim - unique_obs_dim) / num_timeseries_obs_dim} instead."
+            ) from e
+
+        self.LSTM1 = nn.LSTMCell(num_timeseries_obs_dim, 8, dtype=float_type)
         self.LSTM2 = nn.LSTMCell(8, 16, dtype=float_type)
 
         # input size defined by forecast horizon and concatenated with capacity and marginal cost values
-        self.FC1 = nn.Linear(self.forecast_horizon * 16 + 2, 128, dtype=float_type)
+        self.FC1 = nn.Linear(self.timeseries_len * 16 + 2, 128, dtype=float_type)
         self.FC2 = nn.Linear(128, act_dim, dtype=float_type)
 
     def forward(self, obs):
@@ -155,11 +176,9 @@ class LSTMActor(nn.Module):
             obs = obs.unsqueeze(0)
 
         x1, x2 = obs.split(
-            [obs.shape[1] - 2, 2], dim=1
-        )  # TODO: variable no. of mc and capacity values, currently 2
-        x1 = x1.reshape(
-            -1, self.no_of_timeseries, int(x1.shape[1] / self.no_of_timeseries)
-        )  # Shape: [no_of_timeseries, forecast_horizon] TODO: error handling for division
+            [obs.shape[1] - self.unique_obs_dim, self.unique_obs_dim], dim=1
+        )
+        x1 = x1.reshape(-1, self.num_timeseries_obs_dim, self.timeseries_len)
 
         h_t = th.zeros(x1.size(0), 8, dtype=self.float_type, device=obs.device)
         c_t = th.zeros(x1.size(0), 8, dtype=self.float_type, device=obs.device)

@@ -37,7 +37,7 @@ class RLStrategy(LearningStrategy):
         float_type (str): Float type to use. Defaults to "float32".
         learning_mode (bool): Whether to use learning mode. Defaults to False.
         algorithm (str): RL algorithm. Defaults to "matd3".
-        policy_class (type[torch.nn.Module]): Actor network class. Defaults to "MLPActor".
+        neural_network_architecture_class (type[torch.nn.Module]): Actor network class. Defaults to "MLPActor".
         actor (torch.nn.Module): The actor network.
         order_types (list[str]): Order types to use. Defaults to ["SB"].
         action_noise (NormalActionNoise): Action noise. Defaults to None.
@@ -66,9 +66,9 @@ class RLStrategy(LearningStrategy):
         neural_network_architecture = kwargs.get("neural_network_architecture", "mlp")
 
         if neural_network_architecture in neural_network_architecture_aliases:
-            self.policy_class = neural_network_architecture_aliases[
-                neural_network_architecture
-            ]
+            self.neural_network_architecture_class = (
+                neural_network_architecture_aliases[neural_network_architecture]
+            )
         else:
             raise ValueError(f"Policy {neural_network_architecture} unknown")
 
@@ -484,13 +484,23 @@ class RLStrategy(LearningStrategy):
 
         params = th.load(directory, map_location=self.device)
 
-        self.actor = self.policy_class(self.obs_dim, self.act_dim, self.float_type)
+        self.actor = self.neural_network_architecture_class(
+            obs_dim=self.obs_dim,
+            act_dim=self.act_dim,
+            float_type=self.float_type,
+            unique_obs_dim=self.unique_obs_dim,
+            num_timeseries_obs_dim=self.num_timeseries_obs_dim,
+        ).to(self.device)
         self.actor.load_state_dict(params["actor"])
 
         if self.learning_mode:
-            self.actor_target = self.policy_class(
-                self.obs_dim, self.act_dim, self.float_type
-            )
+            self.actor_target = self.neural_network_architecture_class(
+                obs_dim=self.obs_dim,
+                act_dim=self.act_dim,
+                float_type=self.float_type,
+                unique_obs_dim=self.unique_obs_dim,
+                num_timeseries_obs_dim=self.num_timeseries_obs_dim,
+            ).to(self.device)
             self.actor_target.load_state_dict(params["actor_target"])
             self.actor_target.eval()
             self.actor.optimizer.load_state_dict(params["actor_optimizer"])
