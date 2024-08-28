@@ -197,7 +197,8 @@ The following table provides a more in-depth look at key examples, highlighting 
      - No
      - Based on [1]_
 
-Note: Conv. = Conventional, VRE = Variable Renewable Energy, EOM = Energy-Only Market, CRM = Control Reserve Market, DAM = Day-Ahead Market, RL = Reinforcement Learning, DSM = Demand Side Management
+.. note::
+  Conv. = Conventional, VRE = Variable Renewable Energy, EOM = Energy-Only Market, CRM = Control Reserve Market, DAM = Day-Ahead Market, RL = Reinforcement Learning, DSM = Demand Side Management
 
 Key Features of Example Simulations
 -----------------------------------
