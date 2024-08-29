@@ -62,7 +62,9 @@ class SimpleManualTerminalStrategy(BaseStrategy):
             print(f"> power must be between {min_power[start]} and {max_power[start]}")
             print(f"> {previous_power=}, {current_power=}, {marginal_cost=}")
             try:
-                prompt = input("> waiting for volume and price, space-separated with a dot as decimal point \n")
+                prompt = input(
+                    "> waiting for volume and price, space-separated with a dot as decimal point \n"
+                )
                 volume, price = prompt.split(" ")
                 volume, price = float(volume), float(price)
             except ValueError:
