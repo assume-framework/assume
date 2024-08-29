@@ -177,6 +177,41 @@ class NaiveDASteelplantStrategy(BaseStrategy):
         return bids
 
 
+class NaiveDABuildingStrategy(BaseStrategy):
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        bids = []
+        start = product_tuples[0][0]  # start time of the first product
+
+        unit.calculate_optimal_operation_if_needed()
+
+        bids = []
+        for product in product_tuples:
+            """
+            for each product, calculate the marginal cost of the unit at the start time of the product
+            and the volume of the product. Dispatch the order to the market.
+            """
+            start = product[0]
+            volume = unit.opt_power_requirement.loc[start]
+            marginal_price = unit.calculate_marginal_cost(start, volume)
+            bids.append(
+                {
+                    "start_time": product[0],
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": marginal_price,
+                    "volume": -volume,
+                }
+            )
+
+        return bids
+
+
 class NaiveRedispatchSteelplantStrategy(BaseStrategy):
     def calculate_bids(
         self,

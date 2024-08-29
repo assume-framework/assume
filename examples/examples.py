@@ -52,27 +52,15 @@ availabe_examples = {
         "scenario": "example_01d",
         "study_case": "zonal_case",
     },
-    # example_01e is used in the tutorial notebook #3: Custom unit and bidding strategy example
-    "market_study_eom": {
-        "scenario": "example_01f",
-        "study_case": "eom_case",
+    "small_with_steel_plant": {
+        "scenario": "example_04",
+        "study_case": "base_case_steel_plant_2019",
     },
-    "market_study_eom_and_ltm": {
-        "scenario": "example_01f",
-        "study_case": "ltm_case",
+    "small_with_building": {
+        "scenario": "example_05",
+        "study_case": "base_case_building_2019",
     },
-    # example_01f is used in the tutorial notebook #5: Market configuration comparison example
-    # example_01g is used in the tutorial notebook #6: Advanced order types example
-    #
-    # DRL references case for learning advancement testing
-    "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
-    "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
-    "small_learning_3": {"scenario": "example_02c", "study_case": "base"},
-    # Further DRL example simulation showcasing learning features
-    "learning_with_complex_bids": {"scenario": "example_02d", "study_case": "base"},
-    #
-    # full year examples to show real-world scenarios
-    "large_2019_eom": {"scenario": "example_03", "study_case": "base_case_2019"},
+    "large_2019_eom": {"scenario": "example_02", "study_case": "base_case_2019"},
     "large_2019_eom_crm": {
         "scenario": "example_03",
         "study_case": "eom_crm_case_2019",
@@ -97,7 +85,7 @@ if __name__ == "__main__":
     - timescale: with database and grafana (note: you need docker installed)
     """
     data_format = "local_db"  # "local_db" or "timescale"
-    example = "small"
+    example = "small_with_building"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
