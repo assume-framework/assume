@@ -7,7 +7,6 @@ import logging
 
 import pandas as pd
 import pyomo.environ as pyo
-from pyomo.environ import value
 from pyomo.opt import (
     SolverFactory,
     SolverStatus,
@@ -130,6 +129,7 @@ class Building(SupportsMinMax, DSMFlex):
         self.solver = SolverFactory(solvers[0])
 
         self.opt_power_requirement = None
+        self.variable_cost_series = None
 
     def create_availability_df(self, availability_periods):
         """
@@ -312,10 +312,15 @@ class Building(SupportsMinMax, DSMFlex):
             logger.debug(
                 "Termination Condition: ", results.solver.termination_condition
             )
-
-        temp = instance.total_power_input.get_values()
-        self.opt_power_requirement = pd.Series(data=temp)
+        # Total power input series
+        temp_1 = instance.total_power_input.get_values()
+        self.opt_power_requirement = pd.Series(data=temp_1)
         self.opt_power_requirement.index = self.index
+
+        # Variable cost series
+        temp_2 = instance.variable_cost.get_values()
+        self.variable_cost_series = pd.Series(data=temp_2)
+        self.variable_cost_series.index = self.index
 
     def set_dispatch_plan(
         self,
@@ -366,22 +371,16 @@ class Building(SupportsMinMax, DSMFlex):
         Returns:
             float: the marginal cost of the unit for the given power.
         """
-        for t in self.model.time_steps:
-            total_variable_costs = +value(
-                self.model.dsm_blocks["heatpump"].operating_cost[t]
-            ) + value(self.model.dsm_blocks["electric_boiler"].operating_cost[t])
-            total_energy_consumption = value(
-                self.model.dsm_blocks["heatpump"].power_in[t]
-            ) + value(self.model.dsm_blocks["electric_boiler"].power_in[t])
+        # Initialize marginal cost
+        marginal_cost = 0
 
-            if total_energy_consumption > 0:
-                marginal_cost_per_unit_energy = (
-                    total_variable_costs / total_energy_consumption
-                )
-            else:
-                marginal_cost_per_unit_energy = 0
-
-            return marginal_cost_per_unit_energy
+        if self.opt_power_requirement[start] > 0:
+            marginal_cost = (
+                self.variable_cost_series[start] / self.opt_power_requirement[start]
+            )
+        else:
+            marginal_cost = 0
+        return marginal_cost
 
     def as_dict(self) -> dict:
         """
