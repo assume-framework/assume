@@ -28,7 +28,7 @@ def create_heatpump(
 
     model_part.power_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.heat_out = pyo.Var(time_steps, within=pyo.NonNegativeReals)
-    model_part.operating_cost = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+    model_part.operating_cost_hp = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.operational_status = pyo.Var(time_steps, within=pyo.Binary)
 
     @model_part.Constraint(time_steps)
@@ -93,7 +93,7 @@ def create_heatpump(
 
     @model_part.Constraint(time_steps)
     def operating_cost_constraint(b, t):
-        return b.operating_cost[t] == b.power_in[t] * model.electricity_price[t]
+        return b.operating_cost_hp[t] == b.power_in[t] * model.electricity_price[t]
 
     return model_part
 
@@ -123,7 +123,7 @@ def create_boiler(
     model_part.natural_gas_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.power_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.heat_out = pyo.Var(time_steps, within=pyo.NonNegativeReals)
-    model_part.operating_cost = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+    model_part.operating_cost_boiler = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.operational_status = pyo.Var(time_steps, within=pyo.Binary)
 
     @model_part.Constraint(time_steps)
@@ -194,11 +194,11 @@ def create_boiler(
     def operating_cost_constraint(b, t):
         if fuel_type == "electric":
             return (
-                    b.operating_cost[t] == b.power_in[t] * model.electricity_price[t]
+                b.operating_cost_boiler[t] == b.power_in[t] * model.electricity_price[t]
             )
         elif fuel_type == "natural_gas":
             return (
-                    b.operating_cost[t] == b.power_in[t] * model.natural_gas_price[t]
+                b.operating_cost_boiler[t] == b.power_in[t] * model.natural_gas_price[t]
             )
 
     return model_part
@@ -357,7 +357,7 @@ def create_ev(
     # define variables
     model_part.ev_battery_soc = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.charge_ev = pyo.Var(time_steps, within=pyo.NonNegativeReals)
-    model_part.operating_cost = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+    model_part.operating_cost_ev = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     if charging_profile == "Yes":
         model_part.load_profile_ev = pyo.Param(
             time_steps, initialize=kwargs["load_profile"]
@@ -429,7 +429,7 @@ def create_ev(
         Calculates the operating cost of the ev based on the electricity price.
 
         """
-        return b.operating_cost[t] == model.charge_ev_from_grid[t] * model.electricity_price[t]
+        return b.operating_cost_ev[t] == b.charge_ev[t] * model.electricity_price[t]
 
     return model_part
 
@@ -1468,7 +1468,7 @@ def create_pv_plant(
 
     #define variables
     model_part.energy_out = pyo.Var(time_steps, within=pyo.NonNegativeReals)
-    model_part.operating_revenue = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+    model_part.operating_revenue_pv = pyo.Var(time_steps, within=pyo.NonNegativeReals)
 
     @model_part.Constraint(time_steps)
     def power_pv_constraint(b, t):
@@ -1489,7 +1489,7 @@ def create_pv_plant(
         """
         Calculates the revenue of the PV unit based on the electricity price.
         """
-        return b.operating_revenue[t] == model.energy_sell_pv[t] * model.electricity_price[t]
+        return b.operating_revenue_pv[t] == model.energy_sell_pv[t] * model.electricity_price[t]
 
     return model_part
 
@@ -1550,8 +1550,8 @@ def create_battery_storage(
 
     model_part.max_battery_charging_rate = pyo.Param(initialize=max_charging_rate)
     model_part.max_battery_discharging_rate = pyo.Param(initialize=max_discharging_rate)
-    model_part.operating_cost = pyo.Var(time_steps, within=pyo.NonNegativeReals)
-    model_part.operating_revenue = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+    model_part.operating_cost_battery = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+    model_part.operating_revenue_battery = pyo.Var(time_steps, within=pyo.NonNegativeReals)
 
     @model_part.Constraint(time_steps)
     def operating_cost_battery_constraint(b, t):
@@ -1559,7 +1559,7 @@ def create_battery_storage(
         Calculates the operating cost of the battery based on the electricity price.
 
         """
-        return b.operating_cost[t] == model.charge_battery_from_grid[t] * model.electricity_price[t]
+        return b.operating_cost_battery[t] == model.charge_battery_from_grid[t] * model.electricity_price[t]
 
     if sells_energy_to_market == "Yes":
         @model_part.Constraint(time_steps)
@@ -1567,21 +1567,21 @@ def create_battery_storage(
             """
             Calculates the revenue of the battery unit based on the electricity price.
             """
-            return b.operating_revenue[t] == model.discharge_battery_sell[t] * model.electricity_price[t]
+            return b.operating_revenue_battery[t] == model.discharge_battery_sell[t] * model.electricity_price[t]
     else:
         @model_part.Constraint(time_steps)
         def operating_revenue_battery_constraint(b, t):
             """
             Calculates the revenue of the battery unit based on the electricity price.
             """
-            return b.operating_revenue[t] == 0
+            return b.operating_revenue_battery[t] == 0
 
         @model_part.Constraint(time_steps)
         def operating_revenue_battery_constraint(b, t):
             """
             Ensures that no profit will be made.
             """
-            return b.operating_revenue[t] == 0
+            return b.operating_revenue_battery[t] == 0
 
         @model_part.Constraint(time_steps)
         def battery_no_energy_sell_constraint(b, t):

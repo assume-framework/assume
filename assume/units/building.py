@@ -416,8 +416,8 @@ class Building(SupportsMinMax, DSMFlex):
             """
             return (
                 self.model.variable_revenue[t]
-                == (self.model.dsm_blocks["pv_plant"].operating_revenue[t] if self.has_pv else 0)
-                + (self.model.dsm_blocks["battery_storage"].operating_revenue[t] if self.has_battery_storage else 0)
+                == (self.model.dsm_blocks["pv_plant"].operating_revenue_pv[t] if self.has_pv else 0)
+                + (self.model.dsm_blocks["battery_storage"].operating_revenue_battery[t] if self.has_battery_storage else 0)
             )
 
         @self.model.Constraint(self.model.time_steps)
@@ -427,10 +427,10 @@ class Building(SupportsMinMax, DSMFlex):
             """
             return (
                 self.model.variable_cost[t]
-                == (self.model.dsm_blocks["heatpump"].operating_cost[t] if self.has_heatpump else 0)
-                + (self.model.dsm_blocks["boiler"].operating_cost[t] if self.has_boiler else 0)
-                + (self.model.dsm_blocks["ev"].operating_cost[t] if self.has_ev else 0)
-                + (self.model.dsm_blocks["battery_storage"].operating_cost[t] if self.has_battery_storage else 0)
+                == (self.model.dsm_blocks["heatpump"].operating_cost_hp[t] if self.has_heatpump else 0)
+                + (self.model.dsm_blocks["boiler"].operating_cost_boiler[t] if self.has_boiler else 0)
+                + (self.model.dsm_blocks["ev"].operating_cost_ev[t] if self.has_ev else 0)
+                + (self.model.dsm_blocks["battery_storage"].operating_cost_battery[t] if self.has_battery_storage else 0)
                 + (self.model.additional_electricity_load[t] - m.electricity_load_self_covered[t])
                 * self.model.electricity_price[t]
             )
@@ -495,15 +495,27 @@ class Building(SupportsMinMax, DSMFlex):
                 "Termination Condition: ", results.solver.termination_condition
             )
 
-        power_input = instance.total_power_input.get_values()
-        power_output = instance.total_power_output.get_values()
-        temp = {key: power_input[key] - power_output[key] for key in power_input.keys()}
-        self.opt_power_requirement = pd.Series(data=temp)
+        # power_input = instance.total_power_input.get_values()
+        # power_output = instance.total_power_output.get_values()
+        # temp_1 = {key: power_input[key] - power_output[key] for key in power_input.keys()}
+        # self.opt_power_requirement = pd.Series(data=temp_1)
+        # self.opt_power_requirement.index = self.index
+        #
+        # # Variable cost series
+        # variable_costs = instance.variable_cost.get_values()
+        # variable_revenues = instance.variable_revenue.get_values()
+        # temp_2 = {key: variable_costs[key] - variable_revenues[key] for key in variable_costs.keys()}
+        # self.variable_cost_series = pd.Series(data=temp_2)
+        # self.variable_cost_series.index = self.index
+
+        # Total power input series
+        temp_1 = instance.total_power_input.get_values()
+        self.opt_power_requirement = pd.Series(data=temp_1)
         self.opt_power_requirement.index = self.index
 
         # Variable cost series
-        variable_costs = instance.variable_cost.get_values()
-        self.variable_cost_series = pd.Series(data=variable_costs)
+        temp_2 = instance.variable_cost.get_values()
+        self.variable_cost_series = pd.Series(data=temp_2)
         self.variable_cost_series.index = self.index
 
     def set_dispatch_plan(
@@ -564,8 +576,6 @@ class Building(SupportsMinMax, DSMFlex):
             marginal_cost = (
                 self.variable_cost_series[start] / self.opt_power_requirement[start]
             )
-        else:
-            marginal_cost = 0
         return marginal_cost
 
     def as_dict(self) -> dict:
