@@ -190,8 +190,6 @@ class NaiveDABuildingStrategy(BaseStrategy):
 
         unit.calculate_optimal_operation_if_needed()
 
-        # unit.run_modified_optimization()
-
         bids = []
         for product in product_tuples:
             """
@@ -200,14 +198,13 @@ class NaiveDABuildingStrategy(BaseStrategy):
             """
             start = product[0]
             volume = unit.opt_power_requirement.loc[start]
-            prev_power = unit.get_output_before(start)
-            marginal_costs = unit.calculate_marginal_cost(start, prev_power)
+            marginal_price = unit.calculate_marginal_cost(start, volume)
             bids.append(
                 {
                     "start_time": product[0],
                     "end_time": product[1],
                     "only_hours": product[2],
-                    "price": marginal_costs,
+                    "price": marginal_price,
                     "volume": -volume,
                 }
             )
