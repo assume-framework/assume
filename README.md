@@ -46,19 +46,19 @@ pip install assume-framework
 To install with reinforcement learning capabilities:
 
 ```bash
-pip install assume-framework[learning]
+pip install 'assume-framework[learning]'
 ```
 
 We also include market clearing algorithms for complex bids. These clearing algorithms require pyomo and a solver (we use GLPK). To install the package with these capabilities, use:
 
 ```bash
-pip install assume-framework[optimization]
+pip install 'assume-framework[optimization]'
 ```
 
 To install with testing capabilities:
 
 ```bash
-pip install assume-framework[test]
+pip install 'assume-framework[test]'
 ```
 
 ### Timescale Database and Grafana Dashboards
