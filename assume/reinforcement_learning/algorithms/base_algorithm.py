@@ -6,7 +6,7 @@ import logging
 
 import torch as th
 
-from assume.reinforcement_learning.algorithms import neural_network_architecture_aliases
+from assume.reinforcement_learning.algorithms import actor_architecture_aliases
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class RLAlgorithm:
         policy_delay (int): Policy and target networks will only be updated once every policy_delay steps per training steps. The Q values will be updated policy_delay more often (update every training step)
         target_policy_noise (float): Standard deviation of Gaussian noise added to target policy (smoothing noise)
         target_noise_clip (float): Limit for absolute value of target policy smoothing noise
-        neural_network_architecture (str): type of Actor network
+        actor_architecture (str): type of Actor neural network
     """
 
     def __init__(
@@ -42,7 +42,7 @@ class RLAlgorithm:
         policy_delay=2,
         target_policy_noise=0.2,
         target_noise_clip=0.5,
-        neural_network_architecture="mlp",
+        actor_architecture="mlp",
     ):
         super().__init__()
 
@@ -61,13 +61,13 @@ class RLAlgorithm:
         self.target_noise_clip = target_noise_clip
         self.target_policy_noise = target_policy_noise
 
-        if neural_network_architecture in neural_network_architecture_aliases:
-            self.neural_network_architecture_class = (
-                neural_network_architecture_aliases[neural_network_architecture]
-            )
+        if actor_architecture in actor_architecture_aliases:
+            self.actor_architecture_class = actor_architecture_aliases[
+                actor_architecture
+            ]
         else:
             raise ValueError(
-                f"Policy {neural_network_architecture} unknown. Please use supported architecture such as mlp or lstm in the config file."
+                f"Policy '{actor_architecture}' unknown. Please use supported architecture such as 'mlp' or 'lstm' in the config file."
             )
 
         self.device = self.learning_role.device

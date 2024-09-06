@@ -14,7 +14,7 @@ base:
     trained_policies_save_path: null
     max_bid_price: 100
     algorithm: matd3
-    neural_network_architecture: mlp
+    actor_architecture: mlp
     learning_rate: 0.001
     training_episodes: 100
     episodes_collecting_initial_experience: 3

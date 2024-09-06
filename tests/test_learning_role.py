@@ -31,7 +31,7 @@ def test_learning_init():
         "train_freq": "1h",
         "unique_obs_dim": 0,
         "algorithm": "matd3",
-        "neural_network_architecture": "mlp",
+        "actor_architecture": "mlp",
         "learning_mode": False,
         "perform_evaluation": False,
         "training_episodes": 3,

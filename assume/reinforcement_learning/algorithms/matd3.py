@@ -41,7 +41,7 @@ class TD3(RLAlgorithm):
         policy_delay=2,
         target_policy_noise=0.2,
         target_noise_clip=0.5,
-        neural_network_architecture="mlp",
+        actor_architecture="mlp",
     ):
         super().__init__(
             learning_role,
@@ -54,7 +54,7 @@ class TD3(RLAlgorithm):
             policy_delay,
             target_policy_noise,
             target_noise_clip,
-            neural_network_architecture,
+            actor_architecture,
         )
         self.n_updates = 0
 
@@ -246,7 +246,7 @@ class TD3(RLAlgorithm):
         act_dim_list = []
 
         for _, unit_strategy in self.learning_role.rl_strats.items():
-            unit_strategy.actor = self.neural_network_architecture_class(
+            unit_strategy.actor = self.actor_architecture_class(
                 obs_dim=unit_strategy.obs_dim,
                 act_dim=unit_strategy.act_dim,
                 float_type=self.float_type,
@@ -254,7 +254,7 @@ class TD3(RLAlgorithm):
                 num_timeseries_obs_dim=unit_strategy.num_timeseries_obs_dim,
             ).to(self.device)
 
-            unit_strategy.actor_target = self.neural_network_architecture_class(
+            unit_strategy.actor_target = self.actor_architecture_class(
                 obs_dim=unit_strategy.obs_dim,
                 act_dim=unit_strategy.act_dim,
                 float_type=self.float_type,

@@ -9,7 +9,7 @@ from assume.reinforcement_learning.neural_network_architecture import (
     LSTMActor,
 )
 
-neural_network_architecture_aliases: dict[str, type[nn.Module]] = {
+actor_architecture_aliases: dict[str, type[nn.Module]] = {
     "mlp": MLPActor,
     "lstm": LSTMActor,
 }

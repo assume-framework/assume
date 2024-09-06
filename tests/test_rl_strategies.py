@@ -88,7 +88,7 @@ def test_lstm_learning_strategies(mock_market_config, power_plant):
         "observation_dimension": 50,
         "action_dimension": 2,
         "algorithm": "matd3",
-        "neural_network_architecture": "lstm",
+        "actor_architecture": "lstm",
         "learning_mode": True,
         "training_episodes": 3,
         "unit_id": "test_pp",
