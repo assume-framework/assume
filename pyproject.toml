@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "assume-framework"
-version = "0.4.0"
+version = "0.4.0.post2"
 description = "ASSUME - Agent-Based Electricity Markets Simulation Toolbox"
 authors = [{ name = "ASSUME Developers", email = "contact@assume-project.de"}]
 license = {text = "AGPL-3.0-or-later"}
@@ -75,7 +75,7 @@ repository = "https://github.com/assume-framework/assume"
 assume = "assume_cli.cli:cli"
 
 [tool.setuptools]
-packages = ["assume", "assume_cli"]
+packages = {find = {}}
 
 [tool.ruff]
 
