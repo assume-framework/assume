@@ -36,6 +36,10 @@ v0.4.0 - latest release (8th August 2024)
   characteristics of steel production processes. The process can be optimized to minimize costs or to maximize the available flexibility, depending
   on the user's requirements. A tutorial and detailed documentation on how to use this feature are coming soon.
 
+- **LSTM Actor Architectures:** The framework now supports long short-term memory (LSTM) networks as actor architectures for reinforcement learning.
+  This feature enables users to apply more advanced neural network architectures to their learning agents, enhancing the learning process and
+  enabling more accurate and efficient decision-making especially with time series data.
+
 **Improvements:**
 
 - Significant speed up of the framework and especially of the learning process
