@@ -11,7 +11,8 @@ from torch.optim import Adam
 
 from assume.common.base import LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
-from assume.reinforcement_learning.learning_utils import Actor, CriticTD3, polyak_update
+from assume.reinforcement_learning.learning_utils import polyak_update
+from assume.reinforcement_learning.neural_network_architecture import CriticTD3
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ class TD3(RLAlgorithm):
         policy_delay=2,
         target_policy_noise=0.2,
         target_noise_clip=0.5,
+        actor_architecture="mlp",
     ):
         super().__init__(
             learning_role,
@@ -52,6 +54,7 @@ class TD3(RLAlgorithm):
             policy_delay,
             target_policy_noise,
             target_noise_clip,
+            actor_architecture,
         )
         self.n_updates = 0
 
@@ -243,16 +246,20 @@ class TD3(RLAlgorithm):
         act_dim_list = []
 
         for _, unit_strategy in self.learning_role.rl_strats.items():
-            unit_strategy.actor = Actor(
+            unit_strategy.actor = self.actor_architecture_class(
                 obs_dim=unit_strategy.obs_dim,
                 act_dim=unit_strategy.act_dim,
                 float_type=self.float_type,
+                unique_obs_dim=unit_strategy.unique_obs_dim,
+                num_timeseries_obs_dim=unit_strategy.num_timeseries_obs_dim,
             ).to(self.device)
 
-            unit_strategy.actor_target = Actor(
+            unit_strategy.actor_target = self.actor_architecture_class(
                 obs_dim=unit_strategy.obs_dim,
                 act_dim=unit_strategy.act_dim,
                 float_type=self.float_type,
+                unique_obs_dim=unit_strategy.unique_obs_dim,
+                num_timeseries_obs_dim=unit_strategy.num_timeseries_obs_dim,
             ).to(self.device)
             unit_strategy.actor_target.load_state_dict(unit_strategy.actor.state_dict())
             unit_strategy.actor_target.train(mode=False)
@@ -396,6 +403,7 @@ class TD3(RLAlgorithm):
                 actor_target = self.learning_role.rl_strats[u_id].actor_target
 
                 if i % 100 == 0:
+                    # only update target netwroks every 100 steps, to have delayed network update
                     transitions = self.learning_role.buffer.sample(self.batch_size)
                     states = transitions.observations
                     actions = transitions.actions
@@ -512,5 +520,4 @@ class TD3(RLAlgorithm):
                     polyak_update(
                         actor.parameters(), actor_target.parameters(), self.tau
                     )
-
                 i += 1
