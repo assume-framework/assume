@@ -87,6 +87,26 @@ It then makes sense to reschedule the market clearing all 4 hours, but it would 
       Delivery14 EOM         :2019-01-01 18:00, 1h
 
 
+Please note, Trade Convention
+----------------
+
+In our market trading system, we follow this convention for representing the volume and price of trades in any market:
+
+- **Volume Representation**:
+    - The sign of the volume indicates the direction of the trade:
+    - **Positive Volume**: Indicates that the volume is being sold to the market.
+    - **Negative Volume**: Indicates that the volume is being bought from the market.
+
+- **Price Representation**:
+  - The price of a trade canbe negative and positive.
+  - The price does not change based on the direction of the trade (Providing energy/power or procurring energy/power) but potentially the financial flow.
+  - **Positive Volume and Positive Price**: Indicates that electricity is sold to the market, and money is received for it.
+  - **Positive Volume and Negative Price**: Indicates that electricity is sold to the market, but money has to be paid for it.
+  - **Negative Volume and Positive Price**: Indicates that electricity is bought from the market, and money is paid for it.
+  - **Negative Volume and Negative Price**: Indicates that electricity is bought from the market, and money is received for it.
+
+
+This convention ensures clarity and consistency in how trades are represented and interpreted within the market. By using positive and negative volumes to indicate the direction of trades, we can easily distinguish between buying and selling activities while maintaining a straightforward and unambiguous pricing structure.
 Example Configuration - CRM Market
 ----------------------------------
 
@@ -140,3 +160,5 @@ Due to the configuration of the market opening frequency and duration, the timet
       Delivery CRM           :crm02, 2019-01-01 01:00, 4h
       Bidding CRM            :crm03, 2019-01-01 04:00, 30m
       Delivery CRM           :crm04, 2019-01-01 05:00, 4h
+
+$PLACEHOLDER$ This is the code snippet that describes the market configuration options and provides an example configuration for an EOM and CRM market.
