@@ -938,6 +938,7 @@ def run_learning(
         "avg_all_eval": [],
         "episodes_done": 0,
         "eval_episodes_done": 0,
+        "noise_scale": world.learning_config.get("noise_scale", 1.0),
     }
 
     # -----------------------------------------
@@ -968,6 +969,8 @@ def run_learning(
 
         world.run()
 
+        # -----------------------------------------
+        # Store updated information across episodes
         inter_episodic_data = world.learning_role.get_inter_episodic_data()
         inter_episodic_data["episodes_done"] = episode
 
@@ -1003,7 +1006,7 @@ def run_learning(
 
             inter_episodic_data["eval_episodes_done"] = eval_episode
 
-            # if we have not improved in the last x evaluations, we stop
+            # if we have not improved in the last x evaluations, we stop loop
             if terminate:
                 break
 
@@ -1022,8 +1025,9 @@ def run_learning(
     logger.info("Training finished, Start evaluation run")
     world.export_csv_path = temp_csv_path
 
-    # load scenario for evaluation
+    world.reset()
 
+    # load scenario for evaluation
     setup_world(
         world=world,
         scenario_data=scenario_data,

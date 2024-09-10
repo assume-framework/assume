@@ -12,7 +12,8 @@ import torch as th
 from assume.common.base import LearningStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_products_index
-from assume.reinforcement_learning.learning_utils import Actor, NormalActionNoise
+from assume.reinforcement_learning.algorithms import actor_architecture_aliases
+from assume.reinforcement_learning.learning_utils import NormalActionNoise
 
 
 class RLAdvancedOrderStrategy(LearningStrategy):
@@ -26,6 +27,8 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         device (str): The device to run on.
         float_type (str): The float type to use.
         learning_mode (bool): Whether to use learning mode.
+        algorithm (str): RL algorithm. Defaults to "matd3".
+        actor_architecture_class (type[torch.nn.Module]): Actor network class. Defaults to "MLPActor".
         actor (torch.nn.Module): The actor network.
         order_types (list[str]): The list of order types to use (SB, LB, BB).
         episodes_collecting_initial_experience (int): Number of episodes to collect initial experience.
@@ -62,6 +65,19 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         # tells us whether we are training the agents or just executing per-learnind stategies
         self.learning_mode = kwargs.get("learning_mode", False)
         self.perform_evaluation = kwargs.get("perform_evaluation", False)
+
+        # based on learning config
+        self.algorithm = kwargs.get("algorithm", "matd3")
+        actor_architecture = kwargs.get("actor_architecture", "mlp")
+
+        if actor_architecture in actor_architecture_aliases:
+            self.actor_architecture_class = actor_architecture_aliases[
+                actor_architecture
+            ]
+        else:
+            raise ValueError(
+                f"Policy '{actor_architecture}' unknown. Please use supported architecture such as 'mlp' or 'lstm' in the config file."
+            )
 
         # sets the devide of the actor network
         device = kwargs.get("device", "cpu")
@@ -576,17 +592,29 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         Load actor parameters.
 
         Args:
-            load_path (str): Thze path to load parameters from.
+            load_path (str): The path to load parameters from.
         """
         directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
 
         params = th.load(directory, map_location=self.device)
 
-        self.actor = Actor(self.obs_dim, self.act_dim, self.float_type)
+        self.actor = self.actor_architecture_class(
+            obs_dim=self.obs_dim,
+            act_dim=self.act_dim,
+            float_type=self.float_type,
+            unique_obs_dim=self.unique_obs_dim,
+            num_timeseries_obs_dim=self.num_timeseries_obs_dim,
+        ).to(self.device)
         self.actor.load_state_dict(params["actor"])
 
         if self.learning_mode:
-            self.actor_target = Actor(self.obs_dim, self.act_dim, self.float_type)
+            self.actor_target = self.actor_architecture_class(
+                obs_dim=self.obs_dim,
+                act_dim=self.act_dim,
+                float_type=self.float_type,
+                unique_obs_dim=self.unique_obs_dim,
+                num_timeseries_obs_dim=self.num_timeseries_obs_dim,
+            ).to(self.device)
             self.actor_target.load_state_dict(params["actor_target"])
             self.actor_target.eval()
             self.actor.optimizer.load_state_dict(params["actor_optimizer"])

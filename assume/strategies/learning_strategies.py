@@ -12,7 +12,8 @@ import torch as th
 
 from assume.common.base import LearningStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.reinforcement_learning.learning_utils import Actor, NormalActionNoise
+from assume.reinforcement_learning.algorithms import actor_architecture_aliases
+from assume.reinforcement_learning.learning_utils import NormalActionNoise
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,9 @@ class RLStrategy(LearningStrategy):
         device (str): Device to run on. Defaults to "cpu".
         float_type (str): Float type to use. Defaults to "float32".
         learning_mode (bool): Whether to use learning mode. Defaults to False.
-        actor (torch.nn.Module): Actor network. Defaults to None.
+        algorithm (str): RL algorithm. Defaults to "matd3".
+        actor_architecture_class (type[torch.nn.Module]): Actor network class. Defaults to "MLPActor".
+        actor (torch.nn.Module): The actor network.
         order_types (list[str]): Order types to use. Defaults to ["SB"].
         action_noise (NormalActionNoise): Action noise. Defaults to None.
         collect_initial_experience_mode (bool): Whether to collect initial experience. Defaults to True.
@@ -57,6 +60,19 @@ class RLStrategy(LearningStrategy):
         # tells us whether we are training the agents or just executing per-learnind stategies
         self.learning_mode = kwargs.get("learning_mode", False)
         self.perform_evaluation = kwargs.get("perform_evaluation", False)
+
+        # based on learning config
+        self.algorithm = kwargs.get("algorithm", "matd3")
+        actor_architecture = kwargs.get("actor_architecture", "mlp")
+
+        if actor_architecture in actor_architecture_aliases:
+            self.actor_architecture_class = actor_architecture_aliases[
+                actor_architecture
+            ]
+        else:
+            raise ValueError(
+                f"Policy '{actor_architecture}' unknown. Please use supported architecture such as 'mlp' or 'lstm' in the config file."
+            )
 
         # sets the devide of the actor network
         device = kwargs.get("device", "cpu")
@@ -454,7 +470,7 @@ class RLStrategy(LearningStrategy):
         # store results in unit outputs which are written to database by unit operator
         unit.outputs["profit"].loc[start:end_excl] += profit
         unit.outputs["reward"].loc[start:end_excl] = reward
-        unit.outputs["regret"].loc[start:end_excl] = opportunity_cost
+        unit.outputs["regret"].loc[start:end_excl] = regret_scale * opportunity_cost
         unit.outputs["total_costs"].loc[start:end_excl] = costs
 
         unit.outputs["rl_rewards"].append(reward)
@@ -470,11 +486,23 @@ class RLStrategy(LearningStrategy):
 
         params = th.load(directory, map_location=self.device)
 
-        self.actor = Actor(self.obs_dim, self.act_dim, self.float_type)
+        self.actor = self.actor_architecture_class(
+            obs_dim=self.obs_dim,
+            act_dim=self.act_dim,
+            float_type=self.float_type,
+            unique_obs_dim=self.unique_obs_dim,
+            num_timeseries_obs_dim=self.num_timeseries_obs_dim,
+        ).to(self.device)
         self.actor.load_state_dict(params["actor"])
 
         if self.learning_mode:
-            self.actor_target = Actor(self.obs_dim, self.act_dim, self.float_type)
+            self.actor_target = self.actor_architecture_class(
+                obs_dim=self.obs_dim,
+                act_dim=self.act_dim,
+                float_type=self.float_type,
+                unique_obs_dim=self.unique_obs_dim,
+                num_timeseries_obs_dim=self.num_timeseries_obs_dim,
+            ).to(self.device)
             self.actor_target.load_state_dict(params["actor_target"])
             self.actor_target.eval()
             self.actor.optimizer.load_state_dict(params["actor_optimizer"])
