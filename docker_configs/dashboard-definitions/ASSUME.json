@@ -50,7 +50,7 @@
         "content": "# Welcome to our ASSUME demo\n\nThis is the Grafana Dashboard which makes interacting with the simulation data very easy.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "11.0.1",
       "title": "Overview Dashboard",
       "type": "text"
     },
@@ -88,7 +88,7 @@
         "content": "# Market-specific Data\n\nData specific for the market depending on the choice made at te top of the panel\n\n",
         "mode": "markdown"
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "11.0.1",
       "targets": [
         {
           "datasource": {
@@ -965,7 +965,7 @@
           }
         ]
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "11.0.1",
       "targets": [
         {
           "datasource": {
@@ -1150,7 +1150,7 @@
         "content": "# Unit Specific Data\n\nFor the chosen market and the chosen unit here the dispatch is displayed.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "11.0.1",
       "targets": [
         {
           "datasource": {
@@ -1378,6 +1378,7 @@
       "options": {
         "afterRender": "",
         "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
+        "contentPartials": [],
         "defaultContent": "The query didn't return any results.",
         "editor": {
           "format": "auto",
@@ -1392,7 +1393,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "5.0.0",
+      "pluginVersion": "5.3.0",
       "targets": [
         {
           "datasource": {
@@ -1944,7 +1945,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "11.0.1",
       "targets": [
         {
           "datasource": {
@@ -2332,6 +2333,7 @@
       "options": {
         "afterRender": "",
         "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
+        "contentPartials": [],
         "defaultContent": "The query didn't return any results.",
         "editor": {
           "format": "auto",
@@ -2346,7 +2348,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "5.0.0",
+      "pluginVersion": "5.3.0",
       "targets": [
         {
           "datasource": {
@@ -2671,7 +2673,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "11.0.1",
       "targets": [
         {
           "datasource": {
@@ -2929,7 +2931,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "11.0.1",
       "targets": [
         {
           "datasource": {
@@ -3019,7 +3021,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "11.0.1",
       "targets": [
         {
           "datasource": {
@@ -3396,6 +3398,7 @@
       "options": {
         "afterRender": "",
         "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power Disharge: {{max_power_discharge}} MW <br>\nMinimum Power Discharge: {{min_power_discharge}} MW <br>\nEfficiency Discharge: {{efficiency_discharge}} <br>\n\nMaximum Power Charge: {{max_power_charge}} MW <br>\nMinimum Power Charge: {{min_power_charge}} MW <br>\nEfficiency Charge: {{efficiency_charge}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
+        "contentPartials": [],
         "defaultContent": "The query didn't return any results.",
         "editor": {
           "format": "auto",
@@ -3410,7 +3413,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "5.0.0",
+      "pluginVersion": "5.3.0",
       "targets": [
         {
           "datasource": {
@@ -3729,7 +3732,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  CASE WHEN avg(accepted_volume) < 0 THEN avg(accepted_price::float) END AS \"Accepted price Discharge\",\r\n  CASE WHEN avg(accepted_volume) >= 0 THEN avg(accepted_price::float) END AS \"Accepted price Charge\",\r\n  CASE WHEN avg(volume) < 0 THEN avg(price) END AS \"Bid price Discharge\",\r\n  CASE WHEN avg(volume) >= 0 THEN avg(price) END AS \"Bid price Charge\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Storage_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id\r\nORDER BY 1\r\n",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  CASE WHEN avg(accepted_volume) >= 0 THEN avg(accepted_price::float) END AS \"Accepted price Discharge\",\r\n  CASE WHEN avg(accepted_volume) < 0 THEN avg(accepted_price::float) END AS \"Accepted price Charge\",\r\n  CASE WHEN avg(volume) >= 0 THEN avg(price) END AS \"Bid price Discharge\",\r\n  CASE WHEN avg(volume) < 0 THEN avg(price) END AS \"Bid price Charge\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Storage_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id\r\nORDER BY 1\r\n",
           "refId": "A",
           "select": [
             [
@@ -4121,7 +4124,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "11.0.1",
       "targets": [
         {
           "datasource": {
@@ -4426,6 +4429,7 @@
         },
         "definition": "SELECT index\nFROM storage_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which storage units we want to display ",
+        "error": {},
         "hide": 0,
         "includeAll": false,
         "label": "",
