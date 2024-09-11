@@ -378,8 +378,6 @@ class Building(SupportsMinMax, DSMFlex):
             marginal_cost = (
                 self.variable_cost_series[start] / self.opt_power_requirement[start]
             )
-        else:
-            marginal_cost = 0
         return marginal_cost
 
     def as_dict(self) -> dict:

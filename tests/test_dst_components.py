@@ -2,16 +2,280 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import ast
+
 import pyomo.environ as pyo
 import pytest
 
+from assume.units.building import Building
 from assume.units.dst_components import (
+    create_boiler,
     create_driplant,
     create_dristorage,
     create_electric_arc_furnance,
     create_electrolyser,
+    create_ev,
+    create_heatpump,
     create_hydrogen_storage,
+    create_thermal_storage,
 )
+
+
+# Heat Pump Test Configuration
+@pytest.fixture
+def heatpump_config():
+    return {
+        "rated_power": 50,
+        "min_power": 10,
+        "cop": 3.5,
+        "ramp_up": 20,
+        "ramp_down": 20,
+        "min_operating_time": 1,
+        "min_down_time": 1,
+    }
+
+
+@pytest.fixture
+def heatpump_model(heatpump_config):
+    model = pyo.ConcreteModel()
+    time_steps = range(10)
+    model.time_steps = pyo.Set(initialize=time_steps)
+    model.electricity_price = pyo.Param(model.time_steps, initialize=1, mutable=True)
+    model_part = create_heatpump(model, time_steps=model.time_steps, **heatpump_config)
+    model.heatpump = model_part
+
+    # Objective for testing
+    model.total_cost = pyo.Objective(
+        expr=sum(model.heatpump.operating_cost_hp[t] for t in model.time_steps),
+        sense=pyo.minimize,
+    )
+    return model
+
+
+def test_heatpump_constraints(heatpump_model):
+    instance = heatpump_model.create_instance()
+    solver = pyo.SolverFactory("glpk")
+    results = solver.solve(instance, tee=False)
+
+    # Ensure ramp-up constraint holds
+    for t in range(1, len(instance.time_steps)):
+        ramp_up_diff = pyo.value(
+            instance.heatpump.power_in[t] - instance.heatpump.power_in[t - 1]
+        )
+        assert ramp_up_diff <= instance.heatpump.ramp_up
+
+    # Ensure ramp-down constraint holds
+    for t in range(1, len(instance.time_steps)):
+        ramp_down_diff = pyo.value(
+            instance.heatpump.power_in[t - 1] - instance.heatpump.power_in[t]
+        )
+        assert ramp_down_diff <= instance.heatpump.ramp_down
+
+    # Check power bounds
+    for t in instance.time_steps:
+        power_in = pyo.value(instance.heatpump.power_in[t])
+        assert instance.heatpump.min_power <= power_in <= instance.heatpump.rated_power
+
+    # Specific value checks at certain time steps
+    assert pyo.value(instance.heatpump.power_in[2]) == 10  # Expected power at t=2
+    assert pyo.value(instance.heatpump.power_in[5]) == 10  # Expected power at t=5
+
+
+# Boiler Test Configuration
+@pytest.fixture
+def boiler_config():
+    return {
+        "rated_power": 60,
+        "min_power": 15,
+        "efficiency": 0.9,
+        "ramp_up": 25,
+        "ramp_down": 25,
+        "min_operating_time": 1,
+        "min_down_time": 1,
+        "fuel_type": "electric",
+    }
+
+
+@pytest.fixture
+def boiler_model(boiler_config):
+    model = pyo.ConcreteModel()
+    time_steps = range(10)
+    model.time_steps = pyo.Set(initialize=time_steps)
+    model.electricity_price = pyo.Param(model.time_steps, initialize=1, mutable=True)
+    model_part = create_boiler(model, time_steps=model.time_steps, **boiler_config)
+    model.boiler = model_part
+
+    # Objective for testing
+    model.total_cost = pyo.Objective(
+        expr=sum(model.boiler.operating_cost_boiler[t] for t in model.time_steps),
+        sense=pyo.minimize,
+    )
+    return model
+
+
+def test_boiler_constraints(boiler_model):
+    instance = boiler_model.create_instance()
+    solver = pyo.SolverFactory("glpk")
+    results = solver.solve(instance, tee=False)
+
+    # Check power bounds
+    for t in instance.time_steps:
+        power_in = pyo.value(instance.boiler.power_in[t])
+        assert instance.boiler.min_power <= power_in <= instance.boiler.rated_power
+
+    # Specific value checks at certain time steps
+    assert pyo.value(instance.boiler.power_in[1]) == 15  # Expected power at t=1
+    assert pyo.value(instance.boiler.power_in[3]) == 15  # Expected power at t=3
+
+
+# Thermal Storage Test Configuration
+@pytest.fixture
+def thermal_storage_config():
+    return {
+        "max_capacity": 1000,
+        "min_capacity": 100,
+        "initial_soc": 500,
+        "charge_rate": 50,
+        "discharge_rate": 50,
+        "storage_loss_rate": 0.01,  # Adding storage loss rate
+        "charge_loss_rate": 0.05,  # Adding charge loss rate
+        "discharge_loss_rate": 0.05,  # Adding discharge loss rate
+        "time_steps": range(10),
+    }
+
+
+@pytest.fixture
+def thermal_storage_model(thermal_storage_config):
+    model = pyo.ConcreteModel()
+    time_steps = thermal_storage_config["time_steps"]
+    model.time_steps = pyo.Set(initialize=time_steps)
+    model.electricity_price = pyo.Param(model.time_steps, initialize=1, mutable=True)
+    model_part = create_thermal_storage(model, **thermal_storage_config)
+    model.thermal_storage = model_part
+
+    # Objective for testing
+    model.total_cost = pyo.Objective(
+        expr=sum(
+            model.thermal_storage.charge_thermal[t]
+            - model.thermal_storage.discharge_thermal[t]
+            for t in model.time_steps
+        ),
+        sense=pyo.minimize,
+    )
+    return model
+
+
+def test_thermal_storage_constraints(thermal_storage_model):
+    instance = thermal_storage_model.create_instance()
+    solver = pyo.SolverFactory("glpk")
+    results = solver.solve(instance, tee=False)
+
+    # Check SOC constraints
+    for t in instance.time_steps:
+        soc_thermal = pyo.value(instance.thermal_storage.soc_thermal[t])
+        assert 100 <= soc_thermal <= 1000
+
+    # Specific value checks at certain time steps
+    assert (
+        pyo.value(instance.thermal_storage.soc_thermal[3]) == 106.215728567005
+    )  # Expected SOC at t=3
+    assert (
+        pyo.value(instance.thermal_storage.soc_thermal[8]) == 101.010101010101
+    )  # Expected SOC at t=8
+
+
+# EV Test Configuration
+@pytest.fixture
+def ev_config():
+    return {
+        "max_capacity": 100,  # EV's maximum battery capacity in kWh
+        "min_capacity": 20,  # Minimum SOC (state of charge) in kWh
+        "charge_rate": 20,  # Maximum charge rate in kW
+        "discharge_rate": 20,  # Maximum discharge rate in kW
+        "initial_soc": 50,  # Initial SOC in kWh
+        "ramp_up": 10,  # Ramp-up rate in kW
+        "ramp_down": 10,  # Ramp-down rate in kW
+        "availability_periods": [
+            ("1/1/2019  3:00:00 AM", "1/1/2019  5:00:00 AM")
+        ],  # Availability periods
+        "time_steps": range(10),  # Time steps for the model
+        "charging_profile": [
+            0,
+            0,
+            20,
+            20,
+            0,
+            0,
+            30,
+            30,
+            0,
+            0,
+        ],  # Charging profile in kWh for each time step
+    }
+
+
+@pytest.fixture
+def ev_model(ev_config):
+    model = pyo.ConcreteModel()
+    time_steps = ev_config["time_steps"]
+    model.time_steps = pyo.Set(initialize=time_steps)
+    model.electricity_price = pyo.Param(model.time_steps, initialize=1, mutable=True)
+
+    # Reuse create_availability_df from Building class to process availability_periods
+    try:
+        ev_config["availability_periods"] = ast.literal_eval(
+            str(ev_config["availability_periods"])
+        )
+        building = Building(
+            id="test_building", unit_operator="operator", bidding_strategies={}
+        )  # Temporary Building instance
+        availability_df = building.create_availability_df(
+            ev_config["availability_periods"]
+        )
+        ev_config["availability_df"] = availability_df
+    except Exception as e:
+        raise ValueError(f"Error processing availability periods for EV: {e}")
+
+    # Create EV component in the Pyomo model
+    model_part = create_ev(model, **ev_config)
+    model.ev = model_part
+
+    # Objective for testing (minimizing total cost for charging)
+    model.total_cost = pyo.Objective(
+        expr=sum(
+            model.ev.charge_ev[t] * model.electricity_price[t] for t in model.time_steps
+        ),
+        sense=pyo.minimize,
+    )
+    return model
+
+
+def test_ev_constraints(ev_model):
+    instance = ev_model.create_instance()
+    solver = pyo.SolverFactory("glpk")
+    results = solver.solve(instance, tee=False)
+
+    # Check SOC and availability constraints
+    for t in instance.time_steps:
+        soc = pyo.value(instance.ev.ev_battery_soc[t])
+        min_capacity = ev_config["min_capacity"]  # Accessing ev_config directly
+        max_capacity = ev_config["max_capacity"]  # Accessing ev_config directly
+        assert min_capacity <= soc <= max_capacity, f"SOC out of bounds at time {t}"
+
+        # Ensure that charging/discharging happens only during availability periods
+        is_available = ev_config["availability_df"].loc[t] == 1
+        if is_available:
+            assert (
+                soc > ev_config["min_capacity"]
+            ), f"EV is unavailable at time {t}, but SOC changed."
+        else:
+            assert (
+                soc == ev_config["initial_soc"]
+            ), f"EV should not charge/discharge when unavailable at time {t}"
+
+    # Check specific value of SOC at certain time steps
+    assert pyo.value(instance.ev.ev_battery_soc[2]) == 70  # Expected SOC at t=2
+    assert pyo.value(instance.ev.ev_battery_soc[5]) == 30  # Expected SOC at t=5
 
 
 @pytest.fixture
