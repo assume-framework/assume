@@ -4,6 +4,7 @@
 
 import asyncio
 import logging
+import random
 from collections.abc import Callable
 from datetime import datetime
 from itertools import groupby
@@ -153,10 +154,12 @@ class PayAsBidContractRole(MarketRole):
             demand_orders = list(filter(lambda x: x["volume"] < 0, product_orders))
             supply_orders = list(filter(lambda x: x["volume"] > 0, product_orders))
 
-            # generation
-            supply_orders.sort(key=lambda i: i["price"])
-            # demand
-            demand_orders.sort(key=lambda i: i["price"], reverse=True)
+            # Sort supply orders by price with randomness for tie-breaking
+            supply_orders.sort(key=lambda i: (i["price"], random.random()))
+            # Sort demand orders by price in descending order with randomness for tie-breaking
+            demand_orders.sort(
+                key=lambda i: (i["price"], random.random()), reverse=True
+            )
             dem_vol, gen_vol = 0, 0
             # the following algorithm is inspired by one bar for generation and one for demand
             # add generation for currents demand price, until it matches demand

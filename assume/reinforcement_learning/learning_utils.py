@@ -7,8 +7,6 @@ from typing import TypedDict
 
 import numpy as np
 import torch as th
-from torch import nn
-from torch.nn import functional as F
 
 
 # TD3 and PPO

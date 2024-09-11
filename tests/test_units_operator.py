@@ -20,6 +20,12 @@ from assume.strategies.naive_strategies import NaiveSingleBidStrategy
 from assume.units.demand import Demand
 from assume.units.powerplant import PowerPlant
 
+try:
+    from assume.reinforcement_learning.learning_unit_operator import RLUnitsOperator
+except ImportError:
+    # to suffice the type hint as best as possible
+    from assume.common.units_operator import UnitsOperator as RLUnitsOperator
+
 start = datetime(2020, 1, 1)
 end = datetime(2020, 12, 2)
 
@@ -38,6 +44,46 @@ async def units_operator() -> UnitsOperator:
     container = await create_container(addr=("0.0.0.0", 9098), clock=clock)
     units_agent = RoleAgent(container, "test_operator")
     units_role = UnitsOperator(available_markets=[marketconfig])
+    units_agent.add_role(units_role)
+
+    index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
+
+    params_dict = {
+        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
+        "technology": "energy",
+        "unit_operator": "test_operator",
+        "max_power": 1000,
+        "min_power": 0,
+        "forecaster": NaiveForecast(index, demand=1000),
+    }
+    unit = Demand("testdemand", index=index, **params_dict)
+    await units_role.add_unit(unit)
+
+    start_ts = datetime2timestamp(start)
+    clock.set_time(start_ts)
+
+    yield units_role
+
+    end_ts = datetime2timestamp(end)
+    clock.set_time(end_ts)
+    await tasks_complete_or_sleeping(container)
+    await container.shutdown()
+
+
+@pytest.fixture
+async def rl_units_operator() -> RLUnitsOperator:
+    market_id = "EOM"
+    marketconfig = MarketConfig(
+        market_id=market_id,
+        opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
+        opening_duration=rd(hours=1),
+        market_mechanism="pay_as_clear",
+        market_products=[MarketProduct(rd(hours=1), 1, rd(hours=1))],
+    )
+    clock = ExternalClock(0)
+    container = await create_container(addr=("0.0.0.0", 9098), clock=clock)
+    units_agent = RoleAgent(container, "test_operator")
+    units_role = RLUnitsOperator(available_markets=[marketconfig])
     units_agent.add_role(units_role)
 
     index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
@@ -107,11 +153,11 @@ async def test_formulate_bids(units_operator: UnitsOperator):
 
 
 @pytest.mark.require_learning
-async def test_write_learning_params(units_operator: UnitsOperator):
+async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
     from assume.strategies.learning_advanced_orders import RLAdvancedOrderStrategy
     from assume.strategies.learning_strategies import RLStrategy
 
-    marketconfig = units_operator.available_markets[0]
+    marketconfig = rl_units_operator.available_markets[0]
     start = datetime(2020, 1, 1)
     end = datetime(2020, 1, 2)
     index = pd.date_range(start=start, end=end + pd.Timedelta(hours=24), freq="1h")
@@ -130,12 +176,12 @@ async def test_write_learning_params(units_operator: UnitsOperator):
         "forecaster": NaiveForecast(index, powerplant=1000),
     }
     unit = PowerPlant("testplant", index=index, **params_dict)
-    await units_operator.add_unit(unit)
+    await rl_units_operator.add_unit(unit)
 
-    units_operator.learning_mode = True
-    units_operator.learning_data = {"test": 1}
+    rl_units_operator.learning_mode = True
+    rl_units_operator.learning_data = {"test": 1}
 
-    units_operator.context.data.update(
+    rl_units_operator.context.data.update(
         {
             "learning_output_agent_addr": "world",
             "learning_output_agent_id": "export_agent_1",
@@ -147,15 +193,17 @@ async def test_write_learning_params(units_operator: UnitsOperator):
     from assume.common.utils import get_available_products
 
     products = get_available_products(marketconfig.market_products, start)
-    orderbook = await units_operator.formulate_bids(marketconfig, products)
+    orderbook = await rl_units_operator.formulate_bids(marketconfig, products)
 
-    open_tasks = len(units_operator.context._scheduler._scheduled_tasks)
+    open_tasks = len(rl_units_operator.context._scheduler._scheduled_tasks)
 
-    units_operator.write_learning_to_output(orderbook, market_id=marketconfig.market_id)
+    rl_units_operator.write_learning_to_output(
+        orderbook, market_id=marketconfig.market_id
+    )
 
-    assert len(units_operator.context._scheduler._scheduled_tasks) == open_tasks + 1
+    assert len(rl_units_operator.context._scheduler._scheduled_tasks) == open_tasks + 1
 
-    units_operator.units["testplant"].bidding_strategies[
+    rl_units_operator.units["testplant"].bidding_strategies[
         "EOM"
     ].bidding_strategies = RLStrategy(
         unit_id="testplant",
@@ -164,16 +212,18 @@ async def test_write_learning_params(units_operator: UnitsOperator):
         action_dimension=2,
     )
 
-    units_operator.learning_data = {"test": 2}
+    rl_units_operator.learning_data = {"test": 2}
 
     products = get_available_products(marketconfig.market_products, start)
-    orderbook = await units_operator.formulate_bids(marketconfig, products)
+    orderbook = await rl_units_operator.formulate_bids(marketconfig, products)
 
-    open_tasks = len(units_operator.context._scheduler._scheduled_tasks)
+    open_tasks = len(rl_units_operator.context._scheduler._scheduled_tasks)
 
-    units_operator.write_learning_to_output(orderbook, market_id=marketconfig.market_id)
+    rl_units_operator.write_learning_to_output(
+        orderbook, market_id=marketconfig.market_id
+    )
 
-    assert len(units_operator.context._scheduler._scheduled_tasks) == open_tasks + 1
+    assert len(rl_units_operator.context._scheduler._scheduled_tasks) == open_tasks + 1
 
 
 async def test_get_actual_dispatch(units_operator: UnitsOperator):

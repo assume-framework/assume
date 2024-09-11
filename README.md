@@ -17,7 +17,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 [![](https://img.shields.io/pypi/status/assume-framework.svg)](https://pypi.org/pypi/assume-framework/)
 [![](https://img.shields.io/readthedocs/assume)](https://assume.readthedocs.io/)
 
-[![Try examples in Collab](https://colab.research.google.com/assets/colab-badge.svg)](https://github.com/assume-framework/assume/tree/main/examples/notebooks)
+[![Try examples in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://github.com/assume-framework/assume/tree/main/examples/notebooks)
 
 **ASSUME** is an open-source toolbox for agent-based simulations of European electricity markets, with a primary focus on the German market setup. Developed as an open-source model, its primary objectives are to ensure usability and customizability for a wide range of users and use cases in the energy system modeling community.
 
@@ -46,19 +46,19 @@ pip install assume-framework
 To install with reinforcement learning capabilities:
 
 ```bash
-pip install assume-framework[learning]
+pip install 'assume-framework[learning]'
 ```
 
 We also include market clearing algorithms for complex bids. These clearing algorithms require pyomo and a solver (we use GLPK). To install the package with these capabilities, use:
 
 ```bash
-pip install assume-framework[optimization]
+pip install 'assume-framework[optimization]'
 ```
 
 To install with testing capabilities:
 
 ```bash
-pip install assume-framework[test]
+pip install 'assume-framework[test]'
 ```
 
 ### Timescale Database and Grafana Dashboards
@@ -185,7 +185,7 @@ sphinx-apidoc -o docs/source -Fa assume
 To create and serve the documentation locally, use:
 
 ```bash
-make -C docs html && python -m http.server --directory docs/build/html
+cd docs/source && python -m sphinx . ../build && cd ../.. && python -m http.server --directory docs/build
 ```
 
 ## Contributors and Funding
