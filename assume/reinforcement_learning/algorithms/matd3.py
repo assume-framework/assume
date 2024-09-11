@@ -27,7 +27,7 @@ class TD3(RLAlgorithm):
 
     Original paper: https://arxiv.org/pdf/1802.09477.pdf
     """
-
+    
     def __init__(
         self,
         learning_role,
@@ -197,6 +197,19 @@ class TD3(RLAlgorithm):
                 )
             except Exception:
                 logger.warning(f"No actor values loaded for agent {u_id}")
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     def initialize_policy(self, actors_and_critics: dict = None) -> None:
         """
@@ -514,3 +527,4 @@ class TD3(RLAlgorithm):
                     )
 
                 i += 1
+

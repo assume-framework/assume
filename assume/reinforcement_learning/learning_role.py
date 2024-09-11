@@ -28,6 +28,7 @@ class Learning(Role):
 
     """
 
+    # TD3 and PPO (Replay buffer, gradient steps, early stopping, self.eval_episodes_done potentiall irrelevant for PPO)
     def __init__(
         self,
         learning_config: LearningConfig,
@@ -39,8 +40,8 @@ class Learning(Role):
             "early_stopping_threshold", 0.05
         )
         self.episodes_done = 0
-        self.rl_strats: dict[int, LearningStrategy] = {}
-        self.rl_algorithm = learning_config["algorithm"]
+        self.rl_strats: dict[int, LearningStrategy] = {}  # A dictionary for learning strategies, indexed according to integers.
+        self.rl_algorithm = learning_config["algorithm"] # The name of the reinforcement learning algorithm.
         self.critics = {}
         self.target_critics = {}
 
@@ -97,6 +98,7 @@ class Learning(Role):
         # list of avg_changes
         self.avg_rewards = []
 
+    # TD3 and PPO
     def load_inter_episodic_data(self, inter_episodic_data):
         """
         Load the inter-episodic data from the dict stored across simulation runs.
@@ -119,6 +121,7 @@ class Learning(Role):
 
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
+    # TD3 and PPO
     def get_inter_episodic_data(self):
         """
         Dump the inter-episodic data to a dict for storing across simulation runs.
@@ -137,6 +140,7 @@ class Learning(Role):
             "actors_and_critics": self.rl_algorithm.extract_policy(),
         }
 
+    # TD3 and PPO
     def setup(self) -> None:
         """
         Set up the learning role for reinforcement learning training.
@@ -173,6 +177,7 @@ class Learning(Role):
 
         self.update_policy()
 
+    # TD3
     def turn_off_initial_exploration(self) -> None:
         """
         Disable initial exploration mode for all learning strategies.
@@ -185,6 +190,7 @@ class Learning(Role):
         for _, unit in self.rl_strats.items():
             unit.collect_initial_experience_mode = False
 
+    # TD3 and PPO
     def create_learning_algorithm(self, algorithm: RLAlgorithm):
         """
         Create and initialize the reinforcement learning algorithm.
@@ -207,6 +213,7 @@ class Learning(Role):
         else:
             logger.error(f"Learning algorithm {algorithm} not implemented!")
 
+    # TD3
     def initialize_policy(self, actors_and_critics: dict = None) -> None:
         """
         Initialize the policy of the reinforcement learning agent considering the respective algorithm.
@@ -228,6 +235,7 @@ class Learning(Role):
                     f"Folder with pretrained policies {directory} does not exist"
                 )
 
+    # TD3 and PPO
     def update_policy(self) -> None:
         """
         Update the policy of the reinforcement learning agent.
@@ -242,6 +250,7 @@ class Learning(Role):
         if self.episodes_done > self.episodes_collecting_initial_experience:
             self.rl_algorithm.update_policy()
 
+    # TD3 and PPO
     def compare_and_save_policies(self, metrics: dict) -> None:
         """
         Compare evaluation metrics and save policies based on the best achieved performance according to the metrics calculated.

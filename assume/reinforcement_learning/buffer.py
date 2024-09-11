@@ -172,3 +172,100 @@ class ReplayBuffer:
         )
 
         return ReplayBufferSamples(*tuple(map(self.to_torch, data)))
+
+
+class RolloutBuffer:
+    def __init__(self, buffer_size, obs_dim, act_dim, n_agents, gamma=0.99, gae_lambda=0.95, device="cpu"):
+        """
+        A class for storing rollout data for PPO in a multi-agent setting.
+        Stores the trajectories (observations, actions, rewards, log_probs) for all agents.
+
+        Args:
+            buffer_size (int): Max size of the buffer (in terms of time steps).
+            obs_dim (int): Dimension of the observation space.
+            act_dim (int): Dimension of the action space.
+            n_agents (int): Number of agents.
+            gamma (float): Discount factor for rewards.
+            gae_lambda (float): Lambda parameter for Generalized Advantage Estimation (GAE).
+            device (str): Device to store the data ('cpu' or 'cuda').
+        """
+        self.buffer_size = buffer_size
+        self.obs_dim = obs_dim
+        self.act_dim = act_dim
+        self.n_agents = n_agents
+        self.device = device
+        self.gamma = gamma
+        self.gae_lambda = gae_lambda
+
+        # Initialize buffers
+        self.observations = np.zeros((buffer_size, n_agents, obs_dim), dtype=np.float32)
+        self.actions = np.zeros((buffer_size, n_agents, act_dim), dtype=np.float32)
+        self.rewards = np.zeros((buffer_size, n_agents), dtype=np.float32)
+        self.log_probs = np.zeros((buffer_size, n_agents), dtype=np.float32)
+        self.values = np.zeros((buffer_size, n_agents), dtype=np.float32)
+        self.advantages = np.zeros((buffer_size, n_agents), dtype=np.float32)
+        self.returns = np.zeros((buffer_size, n_agents), dtype=np.float32)
+        self.masks = np.ones((buffer_size, n_agents), dtype=np.float32)  # Used to indicate episode boundaries
+
+        self.pos = 0
+
+    def add(self, obs, actions, rewards, log_probs, values, dones):
+        """
+        Add data for the current time step to the buffer.
+        
+        Args:
+            obs (np.array): The observations for all agents.
+            actions (np.array): The actions taken by all agents.
+            rewards (np.array): The rewards received by all agents.
+            log_probs (np.array): The log probabilities of the actions taken.
+            values (np.array): The value estimates for all agents.
+            dones (np.array): Whether the episode has finished for each agent.
+        """
+        self.observations[self.pos] = obs
+        self.actions[self.pos] = actions
+        self.rewards[self.pos] = rewards
+        self.log_probs[self.pos] = log_probs
+        self.values[self.pos] = values
+        self.masks[self.pos] = 1.0 - dones
+
+        self.pos += 1
+
+    def compute_returns_and_advantages(self, last_values, dones):
+        """
+        Compute the returns and advantages using Generalized Advantage Estimation (GAE).
+
+        Args:
+            last_values (np.array): Value estimates for the last observation.
+            dones (np.array): Whether the episode has finished for each agent.
+        """
+        last_advantage = 0
+        for step in reversed(range(self.pos)):
+            if step == self.pos - 1:
+                next_non_terminal = 1.0 - dones
+                next_values = last_values
+            else:
+                next_non_terminal = self.masks[step + 1]
+                next_values = self.values[step + 1]
+
+            delta = self.rewards[step] + self.gamma * next_values * next_non_terminal - self.values[step]
+            self.advantages[step] = last_advantage = delta + self.gamma * self.gae_lambda * next_non_terminal * last_advantage
+            self.returns[step] = self.advantages[step] + self.values[step]
+
+    def get(self):
+        """
+        Get all data stored in the buffer and convert it to PyTorch tensors.
+        Returns the observations, actions, log_probs, advantages, returns, and masks.
+        """
+        data = (
+            self.observations[:self.pos],
+            self.actions[:self.pos],
+            self.log_probs[:self.pos],
+            self.advantages[:self.pos],
+            self.returns[:self.pos],
+            self.masks[:self.pos],
+        )
+        return tuple(map(lambda x: th.tensor(x, device=self.device), data))
+
+    def reset(self):
+        """Reset the buffer after each update."""
+        self.pos = 0

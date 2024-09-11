@@ -11,15 +11,40 @@ from torch import nn
 from torch.nn import functional as F
 
 
+# TD3 and PPO
 class ObsActRew(TypedDict):
     observation: list[th.Tensor]
     action: list[th.Tensor]
     reward: list[th.Tensor]
 
 
+# TD3 and PPO
 observation_dict = dict[list[datetime], ObsActRew]
 
 
+# TD3 and PPO
+class Actor(nn.Module):
+    """
+    The neurnal network for the actor.
+    """
+
+    def __init__(self, obs_dim: int, act_dim: int, float_type):
+        super(Actor, self).__init__()
+
+        self.FC1 = nn.Linear(obs_dim, 256, dtype=float_type)
+        self.FC2 = nn.Linear(256, 128, dtype=float_type)
+        self.FC3 = nn.Linear(128, act_dim, dtype=float_type)
+
+    def forward(self, obs):
+        x = F.relu(self.FC1(obs))
+        x = F.relu(self.FC2(x))
+        x = F.softsign(self.FC3(x))
+        # x = th.tanh(self.FC3(x))
+
+        return x
+
+
+# TD3
 class CriticTD3(nn.Module):
     """Initialize parameters and build model.
 
@@ -37,7 +62,7 @@ class CriticTD3(nn.Module):
         float_type,
         unique_obs_dim: int = 0,
     ):
-        super().__init__()
+        super(CriticTD3, self).__init__()
 
         self.obs_dim = obs_dim + unique_obs_dim * (n_agents - 1)
         self.act_dim = act_dim * n_agents
@@ -83,7 +108,7 @@ class CriticTD3(nn.Module):
         x2 = self.FC2_4(x2)
 
         return x1, x2
-
+    
     def q1_forward(self, obs, actions):
         """
         Only predict the Q-value using the first network.
@@ -102,29 +127,45 @@ class CriticTD3(nn.Module):
         x = self.FC1_4(x)
 
         return x
+    
 
+class CriticPPO(nn.Module):
+    """Critic Network for Proximal Policy Optimization (PPO) in a Multi-Agent Setting.
 
-class Actor(nn.Module):
+    Args:
+        n_agents (int): Number of agents
+        obs_dim (int): Dimension of each state
+        unique_obs_dim (int): Unique observation dimension per agent
+        float_type: Data type for the model parameters
     """
-    The neurnal network for the actor.
-    """
+    # Actor dimension missing compared to MATD3 -> not needed for PPO
+    def __init__(
+        self, 
+        n_agents: int, 
+        obs_dim: int, 
+        float_type,
+        unique_obs_dim: int, 
+       ):
 
-    def __init__(self, obs_dim: int, act_dim: int, float_type):
-        super().__init__()
+        super(CriticPPO, self).__init__()
 
-        self.FC1 = nn.Linear(obs_dim, 256, dtype=float_type)
-        self.FC2 = nn.Linear(256, 128, dtype=float_type)
-        self.FC3 = nn.Linear(128, act_dim, dtype=float_type)
+        # Define the combined observation dimension
+        combined_obs_dim = obs_dim + unique_obs_dim * (n_agents - 1)
 
-    def forward(self, obs):
-        x = F.relu(self.FC1(obs))
-        x = F.relu(self.FC2(x))
-        x = F.softsign(self.FC3(x))
-        # x = th.tanh(self.FC3(x))
+        # Define the architecture of the Critic network
+        self.fc1 = nn.Linear(combined_obs_dim, 256, dtype=float_type)
+        self.fc2 = nn.Linear(256, 128, dtype=float_type)
+        self.fc3 = nn.Linear(128, 1, dtype=float_type)
 
-        return x
+    def forward(self, x):
+        """Forward pass through the network."""
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        value = self.fc3(x)
+        return value
 
 
+# TD3
 # Ornstein-Uhlenbeck Noise
 # from https://github.com/songrotek/DDPG/blob/master/ou_noise.py
 class OUNoise:
@@ -158,6 +199,7 @@ class OUNoise:
         return noise
 
 
+# TD3
 class NormalActionNoise:
     """
     A gaussian action noise
@@ -176,6 +218,7 @@ class NormalActionNoise:
         return noise
 
 
+# TD3
 def polyak_update(params, target_params, tau: float):
     """
     Perform a Polyak average update on ``target_params`` using ``params``:
