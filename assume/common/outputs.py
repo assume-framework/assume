@@ -318,19 +318,44 @@ class WriteOutput(Role):
             except Exception:
                 logger.info("tried writing grid data to non postGIS database")
                 import pypsa
-                
-                from assume.common.grid_utils import add_generators, read_pypsa_grid
+                import matplotlib.pyplot as plt
+                import cartopy.crs as ccrs
+                import cartopy.feature as cfeature
+                from assume.common.grid_utils import add_generators, read_pypsa_grid, add_loads, add_redispatch_dsm
                 n = pypsa.Network()
                 read_pypsa_grid(n, grid)
                 add_generators(
                     network=n,
                     generators=grid["generators"],
                 )
+                print(grid["generators"])
+                
                 n.plot()
-                import matplotlib.pyplot as plt
                 plt.savefig("current_grid.svg")
-                return
+                plt.clf()
 
+                add_loads(
+                    network=n,
+                    loads=grid["loads"],
+                )    
+                print(grid["loads"])    
+
+                n.plot()
+                plt.savefig("loads_grid.svg")
+                plt.clf()
+
+                add_redispatch_dsm(
+                    network=n,
+                    industrial_dsm_units=grid["industrial_dsm_units"],
+                )    
+                print(grid["industrial_dsm_units"])    
+
+                n.plot()
+                plt.savefig("industrial_dsm_units.svg")
+                plt.clf()
+
+                return
+            
         # Check if 'x' and 'y' columns are in the buses DataFrame
         if "x" in grid["buses"].columns and "y" in grid["buses"].columns:
             grid["buses"]["wkt_srid_4326"] = grid["buses"].agg(
