@@ -317,6 +317,18 @@ class WriteOutput(Role):
                 db.execute(text("CREATE EXTENSION IF NOT EXISTS postgis;"))
             except Exception:
                 logger.info("tried writing grid data to non postGIS database")
+                import pypsa
+                
+                from assume.common.grid_utils import add_generators, read_pypsa_grid
+                n = pypsa.Network()
+                read_pypsa_grid(n, grid)
+                add_generators(
+                    network=n,
+                    generators=grid["generators"],
+                )
+                n.plot()
+                import matplotlib.pyplot as plt
+                plt.savefig("current_grid.svg")
                 return
 
         # Check if 'x' and 'y' columns are in the buses DataFrame
