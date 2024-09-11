@@ -11,8 +11,10 @@ import pypsa
 from assume.common.grid_utils import (
     add_redispatch_generators,
     add_redispatch_loads,
+    add_redispatch_dsm,
     calculate_network_meta,
-    read_pypsa_grid,
+    read_pypsa_grid
+
 )
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.markets.base_market import MarketRole
@@ -64,6 +66,11 @@ class RedispatchMarketRole(MarketRole):
         add_redispatch_loads(
             network=self.network,
             loads=self.grid_data["loads"],
+        )
+
+        add_redispatch_dsm(
+            network=self.network,
+            industrial_dsm_units=self.grid_data["industrial_dsm_units"],
         )
 
         self.solver = marketconfig.param_dict.get("solver", "glpk")
@@ -137,7 +144,13 @@ class RedispatchMarketRole(MarketRole):
             max_power_pivot.where(max_power_pivot != 0, np.inf)
         )
         p_max_pu_down = p_max_pu_down.clip(lower=0)  # Ensure no negative values
-
+        """
+        # Calculate p_max_pu_shut for downward redispatch below min_power until shut down
+        p_max_pu_shut = (min_power_pivot).div(
+            max_power_pivot.where(max_power_pivot != 0, np.inf)
+        )
+        p_max_pu_shut = p_max_pu_shut.clip(lower=0)  # Ensure no negative values
+        """
         # Determine the costs directly from the price pivot
         costs = price_pivot
 
@@ -149,12 +162,16 @@ class RedispatchMarketRole(MarketRole):
         p_max_pu_down = p_max_pu_down.drop(
             columns=negative_only_units.index[negative_only_units]
         )
+        p_max_pu_shut = p_max_pu_shut.drop(
+        columns=negative_only_units.index[negative_only_units]
+        )
         costs = costs.drop(columns=negative_only_units.index[negative_only_units])
 
         # reset indexes for all dataframes
         p_set.reset_index(inplace=True, drop=True)
         p_max_pu_up.reset_index(inplace=True, drop=True)
         p_max_pu_down.reset_index(inplace=True, drop=True)
+        p_max_pu_shut.reset_index(inplace=True, drop=True)
         costs.reset_index(inplace=True, drop=True)
 
         # Update the network parameters
@@ -166,13 +183,22 @@ class RedispatchMarketRole(MarketRole):
         redispatch_network.generators_t.p_max_pu.update(
             p_max_pu_down.add_suffix("_down")
         )
-
+        """ 
+        redispatch_network.generators_t.p_max_pu.update(
+        p_max_pu_shut.add_suffix("_shut")
+        )
+        """
         # Add _up and _down suffix to costs and update the network
         redispatch_network.generators_t.marginal_cost.update(costs.add_suffix("_up"))
         redispatch_network.generators_t.marginal_cost.update(
             costs.add_suffix("_down") * (-1)
         )
-
+        """
+        # Provide marginal cost here which also include shutting down cost
+        redispatch_network.generators_t.marginal_cost.update(
+            costs.add_suffix("_shut") * (-1)
+        )
+        """
         # run linear powerflow
         redispatch_network.lpf()
 
