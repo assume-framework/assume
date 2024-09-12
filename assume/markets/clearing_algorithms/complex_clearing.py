@@ -311,6 +311,7 @@ class ComplexClearingRole(MarketRole):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
 
+        self.zones_id = None
         self.incidence_matrix = None
         self.nodes = ["node0"]
 
@@ -378,11 +379,13 @@ class ComplexClearingRole(MarketRole):
                         order["node"] in self.nodes
                     ), f"node {order['node']} not in {self.nodes}"
             # if not, set the node to the first node in the network
-            else:
+            elif self.incidence_matrix is not None:
                 log.warning(
                     "Order without a node, setting node to the first node. Please check the bidding strategy if correct node is set."
                 )
                 order["node"] = self.nodes[0]
+            else:
+                order["node"] = "node0"
 
     def clear(
         self, orderbook: Orderbook, market_products
