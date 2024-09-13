@@ -188,57 +188,63 @@ def add_loads(
             columns=loads.index,
         )
 
-def add_dsm(
-    network: pypsa.Network,
-    industrial_dsm_units: pd.DataFrame,
-) -> None:
-    """
-    Add dsm_units as a generators to the grid
-
-    Args:
-        network (pypsa.Network): the pypsa network to which the loads are
-        dsm_units (pandas.DataFrame): the loads dataframe
-    """
-
-    # add loads
-    network.madd(
-        "Generator",
-        names=industrial_dsm_units.index,
-        bus=industrial_dsm_units["node"],  # bus to which the generator is connected to
-        **industrial_dsm_units,
-    )
-
-    if "p_set" not in industrial_dsm_units.columns:
-        network.generators_t["p_set"] = pd.DataFrame(
-            np.zeros((len(network.snapshots), len(industrial_dsm_units.index))),
-            index=network.snapshots,
-            columns=industrial_dsm_units.index,
-        )
-
 def add_redispatch_dsm(
     network: pypsa.Network,
     industrial_dsm_units: pd.DataFrame,
 ) -> None:
-    """
-    This adds dsm_units to the redispatch PyPSA network with respective bus data
 
     """
+    Adds sold capacities of dsm_units as loads to the grid
+    
+    Also adds dsm units with flexible capacities as upward and downward generator
 
-    # add loads
+    Args:
+        network (pypsa.Network): the pypsa network to which the loads are
+        industrial_dsm_units (pandas.DataFrame): the loads dataframe
+    """
+
+    p_set = pd.DataFrame(
+        np.zeros((len(network.snapshots), len(industrial_dsm_units.index))),
+        index=network.snapshots,
+        columns=industrial_dsm_units.index,
+    )
+
+    # add dsm units as loads
+    network.madd(
+        "load",
+        names=industrial_dsm_units.index,
+        bus=industrial_dsm_units["node"],  # bus to which the generator is connected to
+        sign=1,
+        suffix="_dsm",
+        **industrial_dsm_units,
+    )
+
+    # add redispatch generator for upward redispatch (i.e. ramping down of dsm units)
     network.madd(
         "Generator",
         names=industrial_dsm_units.index,
         bus=industrial_dsm_units["node"],  # bus to which the generator is connected to
+        suffix="_pos",
+        p_nom=industrial_dsm_units["max_power"],  # Nominal capacity of the powerplant/generator
+        p_min_pu=p_set,
+        p_max_pu=p_set + 1,
+        marginal_cost=p_set,
         **industrial_dsm_units,
     )
 
-    if "p_set" not in industrial_dsm_units.columns:
-        network.generators_t["p_set"] = pd.DataFrame(
-            np.zeros((len(network.snapshots), len(industrial_dsm_units.index))),
-            index=network.snapshots,
-            columns=industrial_dsm_units.index,
-        )
-
+    # add redispatch generator for downward redispatch (i.e. ramping up of dsm units)
+    network.madd(
+        "Generator",
+        names=industrial_dsm_units.index,
+        bus=industrial_dsm_units["node"],  # bus to which the generator is connected to
+        suffix="_neg",
+        p_nom=industrial_dsm_units["max_power"],  # Nominal capacity of the powerplant/generator
+        p_min_pu=p_set,
+        p_max_pu=p_set + 1,
+        marginal_cost=p_set,
+        sign=-1,
+        **industrial_dsm_units,
+    )
 
 def add_redispatch_loads(
     network: pypsa.Network,
