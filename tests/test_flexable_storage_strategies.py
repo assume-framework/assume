@@ -112,7 +112,7 @@ def test_flexable_eom_storage(mock_market_config, storage):
     ]
     storage.forecaster = NaiveForecast(index, availability=1, price_forecast=forecast)
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
-    assert len(bids) == 20
+    assert len(bids) == 24
     assert math.isclose(
         bids[0]["price"],
         np.mean(forecast[0:13]) * storage.efficiency_charge,
@@ -138,23 +138,23 @@ def test_flexable_eom_storage(mock_market_config, storage):
     )
     assert bids[3]["volume"] == -100
     assert math.isclose(
-        bids[7]["price"],
-        np.mean(forecast[0:21]) / storage.efficiency_discharge,
+        bids[4]["price"],
+        np.mean(forecast[0:17]) / storage.efficiency_discharge,
         abs_tol=0.01,
     )
-    assert math.isclose(bids[7]["volume"], 100, abs_tol=0.01)
+    assert math.isclose(bids[4]["volume"], 60, abs_tol=0.01)
     assert math.isclose(
-        bids[11]["price"],
+        bids[14]["price"],
         np.mean(forecast[2:]) * storage.efficiency_charge,
         abs_tol=0.01,
     )
-    assert bids[11]["volume"] == -60
+    assert bids[14]["volume"] == -100
     assert math.isclose(
-        bids[1]["price"],
-        np.mean(forecast[:14]) * storage.efficiency_charge,
+        bids[20]["price"],
+        np.mean(forecast[6:]) * storage.efficiency_charge,
         abs_tol=0.01,
     )
-    assert bids[1]["volume"] == -100
+    assert bids[20]["volume"] == -60
 
 
 def test_flexable_pos_crm_storage(mock_market_config, storage):
@@ -195,7 +195,7 @@ def test_flexable_pos_crm_storage(mock_market_config, storage):
         (start + pd.Timedelta(hours=1), end + pd.Timedelta(hours=1), None)
     ]
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
-    assert bids == []
+    assert len(bids) == 1
 
 
 def test_flexable_neg_crm_storage(mock_market_config, storage):
@@ -228,7 +228,7 @@ def test_flexable_neg_crm_storage(mock_market_config, storage):
         (start + pd.Timedelta(hours=1), end + pd.Timedelta(hours=1), None)
     ]
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
-    assert bids == []
+    assert len(bids) == 1
 
 
 if __name__ == "__main__":

@@ -502,17 +502,31 @@ class SupportsMinMaxCharge(BaseUnit):
     """
     Base Class used for units with energy storage.
 
+    The volume is always the amount of energy which is put on (if positive) the market or (if negative) taken from the market.
+    A demand does always have a negative volume - as it buys/consumes energy .
+    A powerplant does always have a positive volume - as it produces energy.
+
+    All charging related params are negative, as charging is a demand.
+    This is special for SupportsMinMaxCharge as both charge and discharge is available.
     """
 
     initial_soc: float
     min_power_charge: float
+    # negative float - if this storage is charging, what is the minimum charging power (the negative non-zero power closest to zero) (resulting in negative current power)
     max_power_charge: float
+    # negative float - if this storage is charging, what is the maximum charging power (resulting in negative current power)
     min_power_discharge: float
+    # positive float - if this storage is discharging, what is the minimum output power
     max_power_discharge: float
+    # positive float - if this storage is discharging, what is the maximum output power
     ramp_up_discharge: float
+    # positive float - when discharging,
     ramp_down_discharge: float
+    # positive float
     ramp_up_charge: float
+    # negative
     ramp_down_charge: float
+    # ramp_down_charge is negative
     max_volume: float
     efficiency_charge: float
     efficiency_discharge: float
@@ -586,6 +600,10 @@ class SupportsMinMaxCharge(BaseUnit):
     ) -> float:
         """
         Adjusts the discharging power to the ramping constraints.
+        Given previous_power in the step before, we want to offer power_discharge (positive) to some market,
+        while we already sold current_power on some other market.
+
+        power_discharge is a power delta to our current output, this function checks if this amount is still feasible to sell.
 
         Args:
             previous_power (float): The previous power output of the unit.
@@ -595,26 +613,34 @@ class SupportsMinMaxCharge(BaseUnit):
         Returns:
             float: The discharging power adjusted to the ramping constraints.
         """
-        if power_discharge == 0:
-            return power_discharge
+        # vorher laden  -800 MW  möchte zu 200 MW - muss aber vorher gucken ob das vom Laden überhaupt klappt
+        # - 800 MW nach 0 mit charge ramp down und dann 200 MW mit discharge_ramp_up
 
-        # if storage was charging before and ramping for charging is defined
-        if previous_power < 0 and self.ramp_down_charge is not None:
-            power_discharge = max(
-                previous_power - self.ramp_down_charge - current_power, 0
-            )
+        # if storage was charging before we need to check if we can ramp back to zero
+        # assert power_discharge >= 0
+        if (
+            previous_power < 0
+            and self.calculate_ramp_charge(previous_power, 0, current_power) < 0
+        ):
+            # if we can not ramp back to 0, we can not discharge anything
+            return self.calculate_ramp_charge(previous_power, 0, current_power)
         else:
-            # Assuming the storage is not restricted by ramping charging down
+            # as we can ramp the charging to 0, we can assume that the previous_power = 0
             previous_power = max(previous_power, 0)
 
             power_discharge = min(
                 power_discharge,
+                # what I had + how much I could - what I already sold
                 max(0, previous_power + self.ramp_up_discharge - current_power),
+                self.max_power_discharge - current_power,
             )
             # restrict only if ramping defined
-            if self.ramp_down_discharge is not None:
+            if self.ramp_down_discharge and power_discharge != 0:
                 power_discharge = max(
                     power_discharge,
+                    # what I had - ramp down = minimum_required
+                    # as I already provide current_power,
+                    # need to at least offer minimum_required - current_power
                     previous_power - self.ramp_down_discharge - current_power,
                     0,
                 )
@@ -638,30 +664,33 @@ class SupportsMinMaxCharge(BaseUnit):
             float: The charging power adjusted to the ramping constraints.
         """
 
-        if power_charge == 0:
-            return power_charge
-
-        # assuming ramping down discharge restricts ramp up of charge
-        # if storage was discharging before and ramp_down_discharge is defined
-        if previous_power > 0 and self.ramp_down_discharge != 0:
-            power_charge = min(
-                previous_power - self.ramp_down_discharge - current_power, 0
-            )
+        # assert power_charge <= 0
+        if (
+            previous_power > 0
+            and self.calculate_ramp_discharge(previous_power, 0, current_power) > 0
+        ):
+            # if we can not ramp back to 0, we can not charge anything
+            return self.calculate_ramp_discharge(previous_power, 0, current_power)
         else:
+            # as we can ramp the charging to 0, we can assume that the previous_power = 0
             previous_power = min(previous_power, 0)
 
             power_charge = max(
                 power_charge,
-                min(previous_power + self.ramp_up_charge - current_power, 0),
+                # what I had + how much I could - what I already sold
+                min(0, previous_power + self.ramp_up_charge - current_power),
+                self.max_power_charge - current_power,
             )
             # restrict only if ramping defined
-            if self.ramp_down_charge != 0:
+            if self.ramp_down_charge and power_charge != 0:
                 power_charge = min(
                     power_charge,
+                    # what I had - ramp down = minimum_required
+                    # as I already provide current_power,
+                    # need to at least offer minimum_required - current_power
                     previous_power - self.ramp_down_charge - current_power,
                     0,
                 )
-
         return power_charge
 
 
