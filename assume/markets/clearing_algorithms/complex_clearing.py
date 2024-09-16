@@ -664,6 +664,16 @@ def extract_results(
         else:
             rejected_orders.append(order)
 
+    for order in rejected_orders:
+        # set the accepted volume and price for each rejected order to zero
+        if order["bid_type"] == "SB":
+            order["accepted_volume"] = 0
+            order["accepted_price"] = 0
+
+        elif order["bid_type"] in ["BB", "LB"]:
+            order["accepted_volume"] = {t: 0 for t in order["volume"].keys()}
+            order["accepted_price"] = {t: 0 for t in order["volume"].keys()}
+
     # write the meta information for each hour of the clearing period
     for node in market_clearing_prices.keys():
         for product in market_products:
