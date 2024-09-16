@@ -4,6 +4,7 @@
 
 import ast
 
+import pandas as pd
 import pyomo.environ as pyo
 import pytest
 
@@ -185,6 +186,7 @@ def test_thermal_storage_constraints(thermal_storage_model):
 
 
 # EV Test Configuration
+# EV Test Configuration
 @pytest.fixture
 def ev_config():
     return {
@@ -198,7 +200,9 @@ def ev_config():
         "availability_periods": [
             ("1/1/2019  3:00:00 AM", "1/1/2019  5:00:00 AM")
         ],  # Availability periods
-        "time_steps": range(10),  # Time steps for the model
+        "time_steps": pd.date_range(
+            "2019-01-01", periods=10, freq="h"
+        ),  # Time steps for the model
         "charging_profile": [
             0,
             0,
@@ -240,7 +244,7 @@ def ev_model(ev_config):
     model_part = create_ev(model, **ev_config)
     model.ev = model_part
 
-    # Objective for testing (minimizing total cost for charging)
+    # Objective for testing (simple minimization of total cost)
     model.total_cost = pyo.Objective(
         expr=sum(
             model.ev.charge_ev[t] * model.electricity_price[t] for t in model.time_steps
@@ -250,7 +254,7 @@ def ev_model(ev_config):
     return model
 
 
-def test_ev_constraints(ev_model):
+def test_ev_constraints(ev_model, ev_config):
     instance = ev_model.create_instance()
     solver = pyo.SolverFactory("glpk")
     results = solver.solve(instance, tee=False)
