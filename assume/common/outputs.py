@@ -64,6 +64,7 @@ class WriteOutput(Role):
         # store needed date
         self.simulation_id = simulation_id
         self.save_frequency_hours = save_frequency_hours or (end - start).days * 24
+        logger.info(f"saving results every {self.save_frequency_hours} hours")
 
         # make directory if not already present
         if export_csv_path:
@@ -505,6 +506,7 @@ class WriteOutput(Role):
         It is called when the simulation is finished. It collects average price, total cost, total volume and capacity factors
         and uses them to calculate the KPIs. The KPIs are then stored in the database and CSV files.
         """
+        logger.warning("did exec on_stop!")
         await super().on_stop()
 
         # insert left records into db

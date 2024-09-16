@@ -313,6 +313,7 @@ class ComplexClearingRole(MarketRole):
 
         self.incidence_matrix = None
         self.nodes = ["node0"]
+        self.zones_id = None
 
         if self.grid_data:
             lines = self.grid_data["lines"]
