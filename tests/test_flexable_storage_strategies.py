@@ -142,19 +142,19 @@ def test_flexable_eom_storage(mock_market_config, storage):
         np.mean(forecast[0:21]) / storage.efficiency_discharge,
         abs_tol=0.01,
     )
-    assert math.isclose(bids[7]["volume"], 14.444, abs_tol=0.01)
+    assert math.isclose(bids[7]["volume"], 100, abs_tol=0.01)
     assert math.isclose(
         bids[11]["price"],
-        np.mean(forecast[0:25]) / storage.efficiency_discharge,
+        np.mean(forecast[2:]) * storage.efficiency_charge,
         abs_tol=0.01,
     )
-    assert bids[11]["volume"] == 100
+    assert bids[11]["volume"] == -60
     assert math.isclose(
-        bids[14]["price"],
-        np.mean(forecast[4:]) * storage.efficiency_charge,
+        bids[1]["price"],
+        np.mean(forecast[:14]) * storage.efficiency_charge,
         abs_tol=0.01,
     )
-    assert bids[14]["volume"] == -100
+    assert bids[1]["volume"] == -100
 
 
 def test_flexable_pos_crm_storage(mock_market_config, storage):

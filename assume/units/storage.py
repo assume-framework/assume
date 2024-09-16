@@ -130,18 +130,18 @@ class Storage(SupportsMinMaxCharge):
         # if ramp_up_charge == 0, the ramp_up_charge is set to the max_power_charge
         # else the ramp_up_charge is set to the negative value of the ramp_up_charge
         self.ramp_up_charge = (
-            self.max_power_charge if ramp_up_charge is None else -abs(ramp_up_charge)
+            self.max_power_charge - self.max_power_discharge if ramp_up_charge is None else -abs(ramp_up_charge)
         )
         self.ramp_down_charge = (
-            self.min_power_charge
+            self.max_power_charge - self.max_power_discharge
             if ramp_down_charge is None
             else -abs(ramp_down_charge)
         )
         self.ramp_up_discharge = (
-            self.max_power_discharge if ramp_up_discharge is None else ramp_up_discharge
+            self.max_power_discharge - self.max_power_charge if ramp_up_discharge is None else ramp_up_discharge
         )
         self.ramp_down_discharge = (
-            self.min_power_discharge
+            self.max_power_discharge - self.max_power_charge
             if ramp_down_discharge is None
             else ramp_down_discharge
         )
