@@ -9,12 +9,11 @@ import pandas as pd
 import pypsa
 
 from assume.common.grid_utils import (
+    add_redispatch_dsm,
     add_redispatch_generators,
     add_redispatch_loads,
-    add_redispatch_dsm,
     calculate_network_meta,
-    read_pypsa_grid
-
+    read_pypsa_grid,
 )
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.markets.base_market import MarketRole
@@ -134,6 +133,7 @@ class RedispatchMarketRole(MarketRole):
         # Calculate p_set, p_max_pu_up, and p_max_pu_down directly using DataFrame operations
         p_set = volume_pivot
 
+        # TODO: remove division by max power since now we are using the p_max_pu as actual capacity values and p_nom=1
         # Calculate p_max_pu_up as difference between max_power and accepted volume
         p_max_pu_up = (max_power_pivot - volume_pivot).div(
             max_power_pivot.where(max_power_pivot != 0, np.inf)

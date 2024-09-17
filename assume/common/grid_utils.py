@@ -92,6 +92,8 @@ def add_redispatch_generators(
         sign=1,
     )
 
+    # TODO: Set all p_nom for all up and down generators to 1, so that we can set p_max_pu to actual capacity values
+
     # add upward redispatch generators
     network.madd(
         "Generator",
@@ -188,14 +190,14 @@ def add_loads(
             columns=loads.index,
         )
 
+
 def add_redispatch_dsm(
     network: pypsa.Network,
     industrial_dsm_units: pd.DataFrame,
 ) -> None:
-
     """
     Adds sold capacities of dsm_units as loads to the grid
-    
+
     Also adds dsm units with flexible capacities as upward and downward generator
 
     Args:
@@ -225,7 +227,9 @@ def add_redispatch_dsm(
         names=industrial_dsm_units.index,
         bus=industrial_dsm_units["node"],  # bus to which the generator is connected to
         suffix="_pos",
-        p_nom=industrial_dsm_units["max_power"],  # Nominal capacity of the powerplant/generator
+        p_nom=industrial_dsm_units[
+            "max_power"
+        ],  # Nominal capacity of the powerplant/generator
         p_min_pu=p_set,
         p_max_pu=p_set + 1,
         marginal_cost=p_set,
@@ -238,13 +242,16 @@ def add_redispatch_dsm(
         names=industrial_dsm_units.index,
         bus=industrial_dsm_units["node"],  # bus to which the generator is connected to
         suffix="_neg",
-        p_nom=industrial_dsm_units["max_power"],  # Nominal capacity of the powerplant/generator
+        p_nom=industrial_dsm_units[
+            "max_power"
+        ],  # Nominal capacity of the powerplant/generator
         p_min_pu=p_set,
         p_max_pu=p_set + 1,
         marginal_cost=p_set,
         sign=-1,
         **industrial_dsm_units,
     )
+
 
 def add_redispatch_loads(
     network: pypsa.Network,
