@@ -64,6 +64,7 @@ class WriteOutput(Role):
         # store needed date
         self.simulation_id = simulation_id
         self.save_frequency_hours = save_frequency_hours or (end - start).days * 24
+        logger.debug("saving results every %s hours", self.save_frequency_hours)
 
         # make directory if not already present
         if export_csv_path:

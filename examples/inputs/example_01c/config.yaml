@@ -23,7 +23,9 @@ eom_only:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: pay_as_clear
+      additional_fields:
+        - bid_type
+      market_mechanism: pay_as_clear_complex
 
 eom_and_crm:
   start_date: 2019-01-01 00:00
@@ -49,7 +51,9 @@ eom_and_crm:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: pay_as_clear
+      additional_fields:
+        - bid_type
+      market_mechanism: pay_as_clear_complex
 
     CRM_pos:
       operator: CRM_operator
