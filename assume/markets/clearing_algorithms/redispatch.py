@@ -131,28 +131,20 @@ class RedispatchMarketRole(MarketRole):
         )
 
         # Calculate p_set, p_max_pu_up, and p_max_pu_down directly using DataFrame operations
-        p_set = volume_pivot
+        p_set = volume_pivot.copy()
 
-        # TODO: remove division by max power since now we are using the p_max_pu as actual capacity values and p_nom=1
         # Calculate p_max_pu_up as difference between max_power and accepted volume
         p_max_pu_up = max_power_pivot - volume_pivot
+        # revert the sign for negative values
+        p_max_pu_up = p_max_pu_up.where(p_max_pu_up >= 0, -p_max_pu_up)
 
         # Calculate p_max_pu_down as difference between accepted volume and min_power
         p_max_pu_down = volume_pivot - min_power_pivot
-        p_max_pu_down = p_max_pu_down.clip(lower=0)  # Ensure no negative values
+        # revert the sign for negative values
+        p_max_pu_down = p_max_pu_down.where(p_max_pu_down >= 0, -p_max_pu_down)
 
         # Determine the costs directly from the price pivot
         costs = price_pivot
-
-        # Drop units with only negative volumes (if necessary)
-        negative_only_units = volume_pivot.lt(0).all()
-        p_max_pu_up = p_max_pu_up.drop(
-            columns=negative_only_units.index[negative_only_units]
-        )
-        p_max_pu_down = p_max_pu_down.drop(
-            columns=negative_only_units.index[negative_only_units]
-        )
-        costs = costs.drop(columns=negative_only_units.index[negative_only_units])
 
         # reset indexes for all dataframes
         p_set.reset_index(inplace=True, drop=True)

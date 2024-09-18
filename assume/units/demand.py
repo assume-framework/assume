@@ -103,6 +103,23 @@ class Demand(SupportsMinMax):
         bid_volume = (self.volume - self.outputs[product_type]).loc[start:end_excl]
         return bid_volume, bid_volume
 
+    def calculate_available_min_max_power(
+        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
+    ) -> tuple[pd.Series, pd.Series]:
+        """
+        Calculates the minimum and maximum power output of the unit and returns the bid volume as both the minimum and maximum power output of the unit.
+
+        Args:
+            start (pandas.Timestamp): The start time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch.
+
+        Returns:
+            tuple[pandas.Series, pandas.Series]: The bid colume as both the minimum and maximum power output of the unit.
+        """
+        end_excl = end - self.index.freq
+        bid_volume = self.volume.loc[start:end_excl]
+        return bid_volume, bid_volume
+
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         """
         Calculate the marginal cost of the unit returns the marginal cost of the unit based on the provided time and power.

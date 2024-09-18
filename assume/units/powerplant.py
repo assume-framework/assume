@@ -350,6 +350,40 @@ class PowerPlant(SupportsMinMax):
 
         return min_power, max_power
 
+    def calculate_available_min_max_power(
+        self, start: pd.Timestamp, end: pd.Timestamp
+    ) -> tuple[pd.Series, pd.Series]:
+        """
+        Calculates the minimum and maximum power output of the unit and returns it.
+
+        Args:
+            start (pandas.Timestamp): The start time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch.
+
+        Returns:
+            tuple[pandas.Series, pandas.Series]: The minimum and maximum power output of the unit.
+
+        Note:
+            The calculation does not include ramping constraints and can be used for arbitrary start times in the future.
+        """
+        end_excl = end - self.index.freq
+
+        availability = self.forecaster.get_availability(self.id)[start:end_excl]
+        # check if available power is larger than max_power and raise an error if so
+        if (availability > self.max_power).any():
+            raise ValueError(
+                f"Available power is larger than max_power for unit {self.id} at time {start}."
+            )
+        max_power = availability * self.max_power
+        max_power = max_power.clip(lower=0)
+
+        min_power = pd.Series(self.min_power, index=max_power.index)
+        # make sure that min_power is > 0 and < max_power for all timesteps
+        min_power = min_power.clip(lower=0)
+        min_power = min_power.clip(upper=max_power)
+
+        return min_power, max_power
+
     def calculate_marginal_cost(self, start: datetime, power: float):
         """
         Calculates the marginal cost of the unit based on the provided start time and power output and returns it.

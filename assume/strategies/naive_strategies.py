@@ -177,43 +177,6 @@ class NaiveDASteelplantStrategy(BaseStrategy):
         return bids
 
 
-class NaiveRedispatchSteelplantStrategy(BaseStrategy):
-    def calculate_bids(
-        self,
-        unit: SupportsMinMax,
-        market_config: MarketConfig,
-        product_tuples: list[Product],
-        **kwargs,
-    ) -> Orderbook:
-        bids = []
-        start = product_tuples[0][0]  # start time of the first product
-
-        unit.calculate_optimal_operation_if_needed()
-
-        # introduce marginal cost
-
-        bids = []
-        for product in product_tuples:
-            """
-            for each product, calculate the marginal cost of the unit at the start time of the product
-            and the volume of the product. Dispatch the order to the market.
-            """
-            start = product[0]
-            volume = unit.flex_power_requirement.loc[start]
-            price = 3000
-            bids.append(
-                {
-                    "start_time": product[0],
-                    "end_time": product[1],
-                    "only_hours": product[2],
-                    "price": price,
-                    "volume": -volume,
-                }
-            )
-
-        return bids
-
-
 class NaivePosReserveStrategy(BaseStrategy):
     """
     A naive strategy that bids the ramp up volume on the positive reserve market (price = 0).
@@ -375,9 +338,12 @@ class NaiveRedispatchStrategy(BaseStrategy):
         :rtype: Orderbook
         """
         start = product_tuples[0][0]
-        # end_all = product_tuples[-1][1]
+        end_all = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
-        min_power, max_power = unit.min_power, unit.max_power
+        min_power, max_power = unit.calculate_available_min_max_power(
+            start,
+            end_all,
+        )
 
         bids = []
         for product in product_tuples:
@@ -394,8 +360,48 @@ class NaiveRedispatchStrategy(BaseStrategy):
                     "only_hours": product[2],
                     "price": marginal_cost,
                     "volume": current_power,
-                    "max_power": max_power,
-                    "min_power": min_power,
+                    "max_power": max_power[start],
+                    "min_power": min_power[start],
+                    "node": unit.node,
+                }
+            )
+
+        return bids
+
+
+class NaiveRedispatchSteelplantStrategy(BaseStrategy):
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        bids = []
+        start = product_tuples[0][0]  # start time of the first product
+
+        unit.calculate_optimal_operation_if_needed()
+
+        # introduce marginal cost
+
+        bids = []
+        for product in product_tuples:
+            """
+            for each product, calculate the marginal cost of the unit at the start time of the product
+            and the volume of the product. Dispatch the order to the market.
+            """
+            start = product[0]
+            volume = unit.flex_power_requirement.loc[start]
+            price = 20
+            bids.append(
+                {
+                    "start_time": product[0],
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": price,
+                    "volume": -volume,
+                    "max_power": -1500,
+                    "min_power": -700,
                     "node": unit.node,
                 }
             )

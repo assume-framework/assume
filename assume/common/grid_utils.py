@@ -102,7 +102,7 @@ def add_redispatch_generators(
         bus=generators["node"],  # bus to which the generator is connected to
         p_nom=1,  # Set to 1 since we want to set p_max_pu to the actual capacity
         p_min_pu=p_set,
-        p_max_pu=p_set + 1,
+        p_max_pu=p_set,
         marginal_cost=p_set,
     )
 
@@ -114,7 +114,7 @@ def add_redispatch_generators(
         bus=generators["node"],  # bus to which the generator is connected to
         p_nom=1,  # Set to 1 since we want to set p_max_pu to the actual capacity
         p_min_pu=p_set,
-        p_max_pu=p_set + 1,
+        p_max_pu=p_set,
         marginal_cost=p_set,
         sign=-1,
     )
@@ -191,65 +191,6 @@ def add_loads(
         )
 
 
-def add_redispatch_dsm(
-    network: pypsa.Network,
-    industrial_dsm_units: pd.DataFrame,
-) -> None:
-    """
-    Adds dsm_units as loads to the grid.
-
-    Also adds dsm units with flexible capacities as upward and downward generators.
-
-    Args:
-        network (pypsa.Network): the pypsa network to which the loads are
-        industrial_dsm_units (pandas.DataFrame): the loads dataframe
-    """
-
-    dsm_units = pd.DataFrame()
-    for unit in industrial_dsm_units.values():
-        dsm_units = pd.concat([dsm_units, unit])
-
-    p_set = pd.DataFrame(
-        np.zeros((len(network.snapshots), len(dsm_units.index))),
-        index=network.snapshots,
-        columns=dsm_units.index,
-    )
-
-    # add dsm units as loads
-    network.madd(
-        "Load",
-        names=dsm_units.index,
-        bus=dsm_units["node"],  # bus to which the generator is connected to
-        p_set=p_set,
-    )
-
-    # add redispatch generator for downward redispatch (i.e. ramping up of dsm units)
-    network.madd(
-        "Generator",
-        names=dsm_units.index,
-        suffix="_down",
-        bus=dsm_units["node"],  # bus to which the generator is connected to
-        p_nom=1,  # Set to 1 since we want to set p_max_pu to the actual capacity
-        p_min_pu=p_set,
-        p_max_pu=p_set + 1,
-        marginal_cost=p_set,
-        sign=-1,  # set sign to -1 to mimic a load increase for positive flexibility
-    )
-
-    # add redispatch generator for upward redispatch (i.e. ramping down of dsm units)
-    network.madd(
-        "Generator",
-        names=dsm_units.index,
-        suffix="_up",
-        bus=dsm_units["node"],  # bus to which the generator is connected to
-        p_nom=1,  # Set to 1 since we want to set p_max_pu to the actual capacity
-        p_min_pu=p_set,
-        p_max_pu=p_set + 1,
-        marginal_cost=p_set,
-        sign=1,  # set sign to 1 to mimic a generation increase for negative flexibility
-    )
-
-
 def add_redispatch_loads(
     network: pypsa.Network,
     loads: pd.DataFrame,
@@ -304,10 +245,70 @@ def add_nodal_loads(
         bus=loads["node"],  # bus to which the generator is connected to
         p_nom=loads["max_power"],  # Nominal capacity of the powerplant/generator
         p_min_pu=p_set,
-        p_max_pu=p_set + 1,
+        p_max_pu=p_set,
         marginal_cost=p_set,
         sign=-1,
         **loads_c,
+    )
+
+
+def add_redispatch_dsm(
+    network: pypsa.Network,
+    industrial_dsm_units: pd.DataFrame,
+) -> None:
+    """
+    Adds dsm_units as loads to the grid.
+
+    Also adds dsm units with flexible capacities as upward and downward generators.
+
+    Args:
+        network (pypsa.Network): the pypsa network to which the loads are
+        industrial_dsm_units (pandas.DataFrame): the loads dataframe
+    """
+
+    dsm_units = pd.DataFrame()
+    for unit in industrial_dsm_units.values():
+        dsm_units = pd.concat([dsm_units, unit])
+
+    p_set = pd.DataFrame(
+        np.zeros((len(network.snapshots), len(dsm_units.index))),
+        index=network.snapshots,
+        columns=dsm_units.index,
+    )
+
+    # add dsm units as loads
+    network.madd(
+        "Load",
+        names=dsm_units.index,
+        bus=dsm_units["node"],  # bus to which the generator is connected to
+        p_set=p_set,
+        sign=1,
+    )
+
+    # add redispatch generator for upward redispatch (i.e. ramping down of dsm units)
+    network.madd(
+        "Generator",
+        names=dsm_units.index,
+        suffix="_up",
+        bus=dsm_units["node"],  # bus to which the generator is connected to
+        p_nom=1,  # Set to 1 since we want to set p_max_pu to the actual capacity
+        p_min_pu=p_set,
+        p_max_pu=p_set,
+        marginal_cost=p_set,
+        sign=-1,  # set sign to -1 to mimic a load increase for positive flexibility
+    )
+
+    # add redispatch generator for downward redispatch (i.e. ramping up of dsm units)
+    network.madd(
+        "Generator",
+        names=dsm_units.index,
+        suffix="_down",
+        bus=dsm_units["node"],  # bus to which the generator is connected to
+        p_nom=1,  # Set to 1 since we want to set p_max_pu to the actual capacity
+        p_min_pu=p_set,
+        p_max_pu=p_set,
+        marginal_cost=p_set,
+        sign=1,  # set sign to 1 to mimic a load decrease for negative flexibility
     )
 
 
