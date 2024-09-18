@@ -86,7 +86,7 @@ class SteelPlant(SupportsMinMax, DSMFlex):
             **kwargs,
         )
 
-        self.natural_gas_price = self.forecaster["fuel_price_natural_gas"]
+        self.natural_gas_price = self.forecaster["fuel_price_natural gas"]
         self.electricity_price = self.forecaster["price_EOM"]
         self.iron_ore_price = self.forecaster.get_price("iron_ore")
         self.steel_demand = demand

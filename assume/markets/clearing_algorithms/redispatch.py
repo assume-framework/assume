@@ -135,14 +135,10 @@ class RedispatchMarketRole(MarketRole):
 
         # TODO: remove division by max power since now we are using the p_max_pu as actual capacity values and p_nom=1
         # Calculate p_max_pu_up as difference between max_power and accepted volume
-        p_max_pu_up = (max_power_pivot - volume_pivot).div(
-            max_power_pivot.where(max_power_pivot != 0, np.inf)
-        )
+        p_max_pu_up = max_power_pivot - volume_pivot
 
         # Calculate p_max_pu_down as difference between accepted volume and min_power
-        p_max_pu_down = (volume_pivot - min_power_pivot).div(
-            max_power_pivot.where(max_power_pivot != 0, np.inf)
-        )
+        p_max_pu_down = volume_pivot - min_power_pivot
         p_max_pu_down = p_max_pu_down.clip(lower=0)  # Ensure no negative values
 
         # Determine the costs directly from the price pivot
@@ -174,22 +170,10 @@ class RedispatchMarketRole(MarketRole):
             p_max_pu_down.add_suffix("_down")
         )
 
-        # Update p_max_pu for generators with _up and _down suffixes
-        redispatch_network.generators_t.p_max_pu.update(p_max_pu_up.add_suffix("_pos"))
-        redispatch_network.generators_t.p_max_pu.update(
-            p_max_pu_down.add_suffix("_neg")
-        )
-
         # Add _up and _down suffix to costs and update the network
         redispatch_network.generators_t.marginal_cost.update(costs.add_suffix("_up"))
         redispatch_network.generators_t.marginal_cost.update(
             costs.add_suffix("_down") * (-1)
-        )
-
-        # Add _up and _down suffix to costs and update the network
-        redispatch_network.generators_t.marginal_cost.update(costs.add_suffix("_pos"))
-        redispatch_network.generators_t.marginal_cost.update(
-            costs.add_suffix("_neg") * (-1)
         )
 
         # run linear powerflow

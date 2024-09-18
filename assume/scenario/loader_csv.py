@@ -160,6 +160,7 @@ def load_dsm_units(
         "demand",
         "cost_tolerance",
         "unit_type",
+        "node",
     ]
     bidding_columns = [
         col for col in industrial_dsm_units.columns if col.startswith("bidding_")
@@ -300,16 +301,10 @@ def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame]:
     network_path = Path(network_path)
     buses = pd.read_csv(network_path / "buses.csv", index_col=0)
     lines = pd.read_csv(network_path / "lines.csv", index_col=0)
-    generators = pd.read_csv(network_path / "powerplant_units.csv", index_col=0)
-    loads = pd.read_csv(network_path / "demand_units.csv", index_col=0)
-    industrial_dsm_units= pd.read_csv(network_path / "industrial_dsm_units.csv", index_col=0)
 
     return {
         "buses": buses,
         "lines": lines,
-        "generators": generators,
-        "loads": loads,
-        "industrial_dsm_units":industrial_dsm_units
     }
 
 
@@ -615,6 +610,9 @@ async def async_setup_world(
         )
         if "network_path" in market_config.param_dict.keys():
             grid_data = read_grid(market_config.param_dict["network_path"])
+            grid_data["generators"] = powerplant_units
+            grid_data["loads"] = demand_units
+            grid_data["industrial_dsm_units"] = industrial_dsm_units
             market_config.param_dict["grid_data"] = grid_data
 
         operator_id = str(market_params["operator"])

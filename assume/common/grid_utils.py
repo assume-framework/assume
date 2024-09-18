@@ -100,7 +100,7 @@ def add_redispatch_generators(
         names=generators.index,
         suffix="_up",
         bus=generators["node"],  # bus to which the generator is connected to
-        p_nom=generators["max_power"],  # Nominal capacity of the powerplant/generator
+        p_nom=1,  # Set to 1 since we want to set p_max_pu to the actual capacity
         p_min_pu=p_set,
         p_max_pu=p_set + 1,
         marginal_cost=p_set,
@@ -112,7 +112,7 @@ def add_redispatch_generators(
         names=generators.index,
         suffix="_down",
         bus=generators["node"],  # bus to which the generator is connected to
-        p_nom=generators["max_power"],  # Nominal capacity of the powerplant/generator
+        p_nom=1,  # Set to 1 since we want to set p_max_pu to the actual capacity
         p_min_pu=p_set,
         p_max_pu=p_set + 1,
         marginal_cost=p_set,
@@ -196,60 +196,57 @@ def add_redispatch_dsm(
     industrial_dsm_units: pd.DataFrame,
 ) -> None:
     """
-    Adds sold capacities of dsm_units as loads to the grid
+    Adds dsm_units as loads to the grid.
 
-    Also adds dsm units with flexible capacities as upward and downward generator
+    Also adds dsm units with flexible capacities as upward and downward generators.
 
     Args:
         network (pypsa.Network): the pypsa network to which the loads are
         industrial_dsm_units (pandas.DataFrame): the loads dataframe
     """
 
+    dsm_units = pd.DataFrame()
+    for unit in industrial_dsm_units.values():
+        dsm_units = pd.concat([dsm_units, unit])
+
     p_set = pd.DataFrame(
-        np.zeros((len(network.snapshots), len(industrial_dsm_units.index))),
+        np.zeros((len(network.snapshots), len(dsm_units.index))),
         index=network.snapshots,
-        columns=industrial_dsm_units.index,
+        columns=dsm_units.index,
     )
 
     # add dsm units as loads
     network.madd(
-        "load",
-        names=industrial_dsm_units.index,
-        bus=industrial_dsm_units["node"],  # bus to which the generator is connected to
-        sign=1,
-        suffix="_dsm",
-        **industrial_dsm_units,
-    )
-
-    # add redispatch generator for upward redispatch (i.e. ramping down of dsm units)
-    network.madd(
-        "Generator",
-        names=industrial_dsm_units.index,
-        bus=industrial_dsm_units["node"],  # bus to which the generator is connected to
-        suffix="_pos",
-        p_nom=industrial_dsm_units[
-            "max_power"
-        ],  # Nominal capacity of the powerplant/generator
-        p_min_pu=p_set,
-        p_max_pu=p_set + 1,
-        marginal_cost=p_set,
-        **industrial_dsm_units,
+        "Load",
+        names=dsm_units.index,
+        bus=dsm_units["node"],  # bus to which the generator is connected to
+        p_set=p_set,
     )
 
     # add redispatch generator for downward redispatch (i.e. ramping up of dsm units)
     network.madd(
         "Generator",
-        names=industrial_dsm_units.index,
-        bus=industrial_dsm_units["node"],  # bus to which the generator is connected to
-        suffix="_neg",
-        p_nom=industrial_dsm_units[
-            "max_power"
-        ],  # Nominal capacity of the powerplant/generator
+        names=dsm_units.index,
+        suffix="_down",
+        bus=dsm_units["node"],  # bus to which the generator is connected to
+        p_nom=1,  # Set to 1 since we want to set p_max_pu to the actual capacity
         p_min_pu=p_set,
         p_max_pu=p_set + 1,
         marginal_cost=p_set,
-        sign=-1,
-        **industrial_dsm_units,
+        sign=-1,  # set sign to -1 to mimic a load increase for positive flexibility
+    )
+
+    # add redispatch generator for upward redispatch (i.e. ramping down of dsm units)
+    network.madd(
+        "Generator",
+        names=dsm_units.index,
+        suffix="_up",
+        bus=dsm_units["node"],  # bus to which the generator is connected to
+        p_nom=1,  # Set to 1 since we want to set p_max_pu to the actual capacity
+        p_min_pu=p_set,
+        p_max_pu=p_set + 1,
+        marginal_cost=p_set,
+        sign=1,  # set sign to 1 to mimic a generation increase for negative flexibility
     )
 
 
