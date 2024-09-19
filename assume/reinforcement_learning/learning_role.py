@@ -40,8 +40,8 @@ class Learning(Role):
         )
         self.episodes_done = 0
         self.rl_strats: dict[int, LearningStrategy] = {}
-        self.rl_algorithm = learning_config["algorithm"]
-        self.actor_architecture = learning_config["actor_architecture"]
+        self.rl_algorithm = learning_config.get("algorithm", "matd3")
+        self.actor_architecture = learning_config.get("actor_architecture", "mlp")
         self.critics = {}
         self.target_critics = {}
 

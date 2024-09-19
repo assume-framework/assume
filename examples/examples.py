@@ -72,7 +72,7 @@ available_examples = {
     "small_learning_1_lstm": {"scenario": "example_02a", "study_case": "base_lstm"},
     "small_learning_2_lstm": {"scenario": "example_02b", "study_case": "base_lstm"},
     # Further DRL example simulation showcasing learning features
-    "learning_with_complex_bids": {"scenario": "example_02d", "study_case": "base"},
+    "learning_with_complex_bids": {"scenario": "example_02d", "study_case": "dam"},
     #
     # full year examples to show real-world scenarios
     "large_2019_eom": {"scenario": "example_03", "study_case": "base_case_2019"},
