@@ -487,11 +487,15 @@ class MarketRole(MarketMechanism, Role):
         Args:
             market_products (list[MarketProduct]): The products to be traded.
         """
-        (
-            accepted_orderbook,
-            rejected_orderbook,
-            market_meta,
-        ) = self.clear(self.all_orders, market_products)
+        try:
+            (
+                accepted_orderbook,
+                rejected_orderbook,
+                market_meta,
+            ) = self.clear(self.all_orders, market_products)
+        except Exception as e:
+            logger.error("clearing failed: %s", e)
+            raise e
 
         self.all_orders = []
 
