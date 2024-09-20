@@ -311,6 +311,7 @@ class ComplexClearingRole(MarketRole):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
 
+        self.zones_id = None
         self.incidence_matrix = None
         self.nodes = ["node0"]
 
@@ -378,11 +379,13 @@ class ComplexClearingRole(MarketRole):
                         order["node"] in self.nodes
                     ), f"node {order['node']} not in {self.nodes}"
             # if not, set the node to the first node in the network
-            else:
+            elif self.incidence_matrix is not None:
                 log.warning(
                     "Order without a node, setting node to the first node. Please check the bidding strategy if correct node is set."
                 )
                 order["node"] = self.nodes[0]
+            else:
+                order["node"] = "node0"
 
     def clear(
         self, orderbook: Orderbook, market_products
@@ -660,6 +663,16 @@ def extract_results(
             accepted_orders.append(order)
         else:
             rejected_orders.append(order)
+
+    for order in rejected_orders:
+        # set the accepted volume and price for each rejected order to zero
+        if order["bid_type"] == "SB":
+            order["accepted_volume"] = 0
+            order["accepted_price"] = 0
+
+        elif order["bid_type"] in ["BB", "LB"]:
+            order["accepted_volume"] = {t: 0 for t in order["volume"].keys()}
+            order["accepted_price"] = {t: 0 for t in order["volume"].keys()}
 
     # write the meta information for each hour of the clearing period
     for node in market_clearing_prices.keys():

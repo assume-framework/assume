@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class RLStrategy(LearningStrategy):
     """
-    Reinforcement Learning Strategy, that lets agent learn to bid on an Energy Only Makret.
+    Reinforcement Learning Strategy, that lets agent learn to bid on an Energy Only Market.
 
     The agent submittes two price bids
     - one for the infelxible (P_min) and one for the flexible part (P_max-P_min) of ist capacity.
@@ -57,7 +57,7 @@ class RLStrategy(LearningStrategy):
         self.max_bid_price = kwargs.get("max_bid_price", 100)
         self.max_demand = kwargs.get("max_demand", 10e3)
 
-        # tells us whether we are training the agents or just executing per-learnind stategies
+        # tells us whether we are training the agents or just executing per-learning strategies
         self.learning_mode = kwargs.get("learning_mode", False)
         self.perform_evaluation = kwargs.get("perform_evaluation", False)
 
@@ -65,16 +65,16 @@ class RLStrategy(LearningStrategy):
         self.algorithm = kwargs.get("algorithm", "matd3")
         actor_architecture = kwargs.get("actor_architecture", "mlp")
 
-        if actor_architecture in actor_architecture_aliases:
+        if actor_architecture in actor_architecture_aliases.keys():
             self.actor_architecture_class = actor_architecture_aliases[
                 actor_architecture
             ]
         else:
             raise ValueError(
-                f"Policy '{actor_architecture}' unknown. Please use supported architecture such as 'mlp' or 'lstm' in the config file."
+                f"Policy '{actor_architecture}' unknown. Supported architectures are {list(actor_architecture_aliases.keys())}"
             )
 
-        # sets the devide of the actor network
+        # sets the device of the actor network
         device = kwargs.get("device", "cpu")
         self.device = th.device(device if th.cuda.is_available() else "cpu")
         if not self.learning_mode:
@@ -87,7 +87,7 @@ class RLStrategy(LearningStrategy):
         # for definition of observation space
         self.foresight = kwargs.get("foresight", 24)
 
-        # define used order types
+        # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
 
         if self.learning_mode or self.perform_evaluation:
@@ -247,7 +247,7 @@ class RLStrategy(LearningStrategy):
                 curr_action = noise + base_bid.clone().detach()
 
             else:
-                # if we are not in the initial exploration phase we chose the action with the actor neural net
+                # if we are not in the initial exploration phase we choose the action with the actor neural net
                 # and add noise to the action
                 curr_action = self.actor(next_observation).detach()
                 noise = th.tensor(
@@ -356,7 +356,7 @@ class RLStrategy(LearningStrategy):
                 / scaling_factor_price
             )
 
-        # get last accapted bid volume and the current marginal costs of the unit
+        # get last accepted bid volume and the current marginal costs of the unit
         current_volume = unit.get_output_before(start)
         current_costs = unit.calculate_marginal_cost(start, current_volume)
 
@@ -477,10 +477,10 @@ class RLStrategy(LearningStrategy):
 
     def load_actor_params(self, load_path):
         """
-        Loads actor parameters.
+        Load actor parameters.
 
         Args:
-            load_path (str): Path to load from.
+            load_path (str): The path to load parameters from.
         """
         directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
 

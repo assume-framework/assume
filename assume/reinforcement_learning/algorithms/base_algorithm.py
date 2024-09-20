@@ -46,13 +46,13 @@ class RLAlgorithm:
         self.batch_size = batch_size
         self.gamma = gamma
 
-        if actor_architecture in actor_architecture_aliases:
+        if actor_architecture in actor_architecture_aliases.keys():
             self.actor_architecture_class = actor_architecture_aliases[
                 actor_architecture
             ]
         else:
             raise ValueError(
-                f"Policy '{actor_architecture}' unknown. Please use supported architecture such as 'mlp' or 'lstm' in the config file."
+                f"Policy '{actor_architecture}' unknown. Supported architectures are {list(actor_architecture_aliases.keys())}"
             )
 
         self.device = self.learning_role.device

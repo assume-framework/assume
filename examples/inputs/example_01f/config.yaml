@@ -14,9 +14,9 @@ eom_case:
 
       products:
         - duration: 1h
-          count: 1
+          count: 24
           first_delivery: 1h
-      opening_frequency: 1h
+      opening_frequency: 1d
       opening_duration: 1h
       volume_unit: MWh
       maximum_volume: 1000000
@@ -32,12 +32,12 @@ ltm_case:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2018-12-31 23:00
+      start_date: 2019-01-01 00:00
       products:
         - duration: 1h
-          count: 1
+          count: 24
           first_delivery: 1h
-      opening_frequency: 1h
+      opening_frequency: 1d
       opening_duration: 1h
       volume_unit: MWh
       maximum_volume: 1000000
@@ -48,7 +48,7 @@ ltm_case:
     LTM_OTC:
       operator: LTM_operator
       product_type: energy
-      start_date: 2018-12-31 22:00
+      start_date: 2019-01-01 00:00
       products:
         - duration: 7d
           count: 1
