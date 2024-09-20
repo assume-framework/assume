@@ -91,6 +91,82 @@ class CriticTD3(nn.Module):
         return x
 
 
+class CriticPPO(nn.Module):
+    """Critic Network for Proximal Policy Optimization (PPO) in a Multi-Agent Setting.
+
+    Args:
+        n_agents (int): Number of agents
+        obs_dim (int): Dimension of each state
+        unique_obs_dim (int): Unique observation dimension per agent
+        float_type: Data type for the model parameters
+    """
+    # Actor dimension missing compared to MATD3 -> not needed for PPO
+    def __init__(
+        self, 
+        n_agents: int, 
+        obs_dim: int, 
+        float_type,
+        unique_obs_dim: int, 
+       ):
+
+        super(CriticPPO, self).__init__()
+
+        # Define the combined observation dimension
+        combined_obs_dim = obs_dim + unique_obs_dim * (n_agents - 1)
+
+        # Define the architecture of the Critic network
+        self.fc1 = nn.Linear(combined_obs_dim, 256, dtype=float_type)
+        self.fc2 = nn.Linear(256, 128, dtype=float_type)
+        self.fc3 = nn.Linear(128, 1, dtype=float_type)
+
+    def forward(self, x):
+        """Forward pass through the network."""
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        value = self.fc3(x)
+        return value
+
+class ActorPPO(nn.Module):
+    """
+    Actor network for PPO using MLP architecture with action sampling.
+
+    Args:
+        obs_dim (int): Dimension of the observation space.
+        act_dim (int): Dimension of the action space.
+        float_type: Data type for the model parameters.
+    """
+    def __init__(self, obs_dim: int, act_dim: int, float_type):
+        super().__init__()
+        # Define the actor network layers
+        self.fc1 = nn.Linear(obs_dim, 256, dtype=float_type)
+        self.fc2 = nn.Linear(256, 128, dtype=float_type)
+        self.fc3 = nn.Linear(128, act_dim, dtype=float_type)
+
+    def forward(self, obs):
+        """Forward pass to generate action logits."""
+        x = F.relu(self.fc1(obs))
+        x = F.relu(self.fc2(x))
+        action_logits = self.fc3(x) # action_logits are mean values for continuous action space
+        return F.tanh(action_logits)  # Bound action space between [-1, 1]
+
+    def act(self, obs):
+        """
+        Samples an action and returns both the action and its log probability.
+
+        Args:
+            obs (torch.Tensor): The observation input.
+
+        Returns:
+            action (torch.Tensor): The sampled action.
+            log_prob (torch.Tensor): Log probability of the action.
+        """
+        action_logits = self.forward(obs)
+        action_dist = th.distributions.Normal(action_logits, 1.0)  # Assuming standard deviation of 1 for simplicity
+        action = action_dist.sample() # Choose a random action from the distribution
+        log_prob = action_dist.log_prob(action).sum(dim=-1)  # Summing log probs across action dimensions
+        return action, log_prob
+
+
 class Actor(nn.Module):
     """
     Parent class for actor networks.

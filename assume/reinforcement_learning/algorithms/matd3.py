@@ -46,16 +46,16 @@ class TD3(RLAlgorithm):
         super().__init__(
             learning_role,
             learning_rate,
-            episodes_collecting_initial_experience,
             batch_size,
-            tau,
             gamma,
-            gradient_steps,
-            policy_delay,
-            target_policy_noise,
-            target_noise_clip,
             actor_architecture,
         )
+        self.episodes_collecting_initial_experience = episodes_collecting_initial_experience
+        self.tau = tau
+        self.gradient_steps = gradient_steps
+        self.policy_delay = policy_delay
+        self.target_policy_noise = target_policy_noise
+        self.target_noise_clip = target_noise_clip
         self.n_updates = 0
 
     def save_params(self, directory):
@@ -200,17 +200,6 @@ class TD3(RLAlgorithm):
                 )
             except Exception:
                 logger.warning(f"No actor values loaded for agent {u_id}")
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -519,6 +508,7 @@ class TD3(RLAlgorithm):
                     all_actions_clone[:, i, :] = action_i
                     all_actions_clone = all_actions_clone.view(self.batch_size, -1)
 
+                    # Policy gradient calculation start (different for PPO)
                     actor_loss = -critic.q1_forward(
                         all_states, all_actions_clone
                     ).mean()
@@ -526,6 +516,7 @@ class TD3(RLAlgorithm):
                     actor.optimizer.zero_grad()
                     actor_loss.backward()
                     actor.optimizer.step()
+                    # Policy gradient calculation end
 
                     polyak_update(
                         critic.parameters(), critic_target.parameters(), self.tau
@@ -534,4 +525,5 @@ class TD3(RLAlgorithm):
                         actor.parameters(), actor_target.parameters(), self.tau
                     )
                 i += 1
+
 

@@ -874,75 +874,74 @@ def run_learning(
     verbose: bool = False,
 ) -> None:
     """
-    Train Deep Reinforcement Learning (DRL) agents to act in a simulated market environment.
-
-    This function runs multiple episodes of simulation to train DRL agents, performs evaluation, and saves the best runs. It maintains the buffer and learned agents in memory to avoid resetting them with each new run.
-
-    Args:
-        world (World): An instance of the World class representing the simulation environment.
-        inputs_path (str): The path to the folder containing input files necessary for the simulation.
-        scenario (str): The name of the scenario for the simulation.
-        study_case (str): The specific study case for the simulation.
-
-    Note:
-        - The function uses a ReplayBuffer to store experiences for training the DRL agents.
-        - It iterates through training episodes, updating the agents and evaluating their performance at regular intervals.
-        - Initial exploration is active at the beginning and is disabled after a certain number of episodes to improve the performance of DRL algorithms.
-        - Upon completion of training, the function performs an evaluation run using the best policy learned during training.
-        - The best policies are chosen based on the average reward obtained during the evaluation runs, and they are saved for future use.
+    Train Deep Reinforcement Learning (DRL) agents (either MATD3 or PPO) to act in a simulated market environment.
+    This function runs multiple episodes of simulation to train DRL agents, performs evaluation, and saves the best runs.
+    It maintains the buffer and learned agents in memory to avoid resetting them with each new run.
     """
-    from assume.reinforcement_learning.buffer import ReplayBuffer
+    from assume.reinforcement_learning.buffer import ReplayBuffer, RolloutBuffer
 
     if not verbose:
         logger.setLevel(logging.WARNING)
 
-    # remove csv path so that nothing is written while learning
     temp_csv_path = world.export_csv_path
     world.export_csv_path = ""
 
-    # initialize policies already here to set the obs_dim and act_dim in the learning role
     actors_and_critics = None
-    world.learning_role.initialize_policy(actors_and_critics=actors_and_critics)
+    world.learning_role.initialize_policy(actors_and_critics=actors_and_critics) # Leads to the initialization of the Learning role, makes world.learning_role.rl_algorithm_name accessible
     world.output_role.del_similar_runs()
 
-    # check if we already stored policies for this simualtion
     save_path = world.learning_config["trained_policies_save_path"]
 
     if Path(save_path).is_dir():
-        # we are in learning mode and about to train new policies, which might overwrite existing ones
-        accept = input(
-            f"{save_path=} exists - should we overwrite current learnings? (y/N) "
-        )
+        accept = input(f"{save_path=} exists - should we overwrite current learnings? (y/N) ")
         if not accept.lower().startswith("y"):
-            # stop here - do not start learning or save anything
-            raise AssumeException("don't overwrite existing strategies")
+            raise AssumeException("Don't overwrite existing strategies")
 
-    # -----------------------------------------
-    # Load scenario data to reuse across episodes
+    # Load scenario data
     scenario_data = load_config_and_create_forecaster(inputs_path, scenario, study_case)
 
-    # -----------------------------------------
-    # Information that needs to be stored across episodes, aka one simulation run
-    inter_episodic_data = {
-        "buffer": ReplayBuffer(
+    print(world.learning_role.rl_algorithm_name)
+
+    if world.learning_role.rl_algorithm_name == "matd3":
+        buffer = ReplayBuffer(
             buffer_size=int(world.learning_config.get("replay_buffer_size", 5e5)),
             obs_dim=world.learning_role.rl_algorithm.obs_dim,
             act_dim=world.learning_role.rl_algorithm.act_dim,
             n_rl_units=len(world.learning_role.rl_strats),
             device=world.learning_role.device,
             float_type=world.learning_role.float_type,
-        ),
+        )
+    elif world.learning_role.rl_algorithm_name == "ppo":
+        buffer = RolloutBuffer(
+            buffer_size=int(world.learning_config.get("rollout_buffer_size", 2048)),
+            obs_dim=world.learning_role.rl_algorithm.obs_dim,
+            act_dim=world.learning_role.rl_algorithm.act_dim,
+            n_rl_units=len(world.learning_role.rl_strats),
+            device=world.learning_role.device,
+            float_type=world.learning_role.float_type,
+        )
+
+    inter_episodic_data = {
+        "buffer": buffer,
         "actors_and_critics": None,
         "max_eval": defaultdict(lambda: -1e9),
         "all_eval": defaultdict(list),
         "avg_all_eval": [],
         "episodes_done": 0,
         "eval_episodes_done": 0,
-        "noise_scale": world.learning_config.get("noise_scale", 1.0),
     }
 
-    # -----------------------------------------
+    if world.learning_role.rl_algorithm_name == "matd3":
+        # In MATD3, noise_scale is relevant because it adds noise to the actions taken by the agents
+        # during exploration. This is essential in deterministic policy gradient methods like TD3 and MATD3,
+        # where the agents need to explore the environment sufficiently to avoid getting stuck in local optima.
+        # Noise is added to the actions to encourage exploration. In contrast, PPO uses stochastic policies
+        # that naturally explore the environment by sampling actions from a probability distribution, making
+        # external noise addition unnecessary.
+        inter_episodic_data["noise_scale"] = world.learning_config.get("noise_scale", 1.0)
 
+
+    # Sets the validation interval: After how many episodes does validation take place
     validation_interval = min(
         world.learning_role.training_episodes,
         world.learning_config.get("validation_episodes_interval", 5),
@@ -954,7 +953,6 @@ def run_learning(
         range(1, world.learning_role.training_episodes + 1),
         desc="Training Episodes",
     ):
-        # TODO normally, loading twice should not create issues, somehow a scheduling issue is raised currently
         if episode != 1:
             setup_world(
                 world=world,
@@ -963,27 +961,27 @@ def run_learning(
                 episode=episode,
             )
 
-        # -----------------------------------------
-        # Give the newly initliazed learning role the needed information across episodes
         world.learning_role.load_inter_episodic_data(inter_episodic_data)
-
         world.run()
 
-        # -----------------------------------------
-        # Store updated information across episodes
         inter_episodic_data = world.learning_role.get_inter_episodic_data()
         inter_episodic_data["episodes_done"] = episode
 
-        # evaluation run:
+        # Reset the PPO Rollout Buffer after each episode
+        if world.learning_role.rl_algorithm_name == "ppo":
+            inter_episodic_data["buffer"].reset()
+
+
+
+
+
+        # Perform validation at regular intervals
         if (
             episode % validation_interval == 0
-            and episode
-            >= world.learning_role.episodes_collecting_initial_experience
-            + validation_interval
+            and episode >= world.learning_role.episodes_collecting_initial_experience + validation_interval
         ):
             world.reset()
 
-            # load evaluation run
             setup_world(
                 world=world,
                 scenario_data=scenario_data,
@@ -993,20 +991,24 @@ def run_learning(
             )
 
             world.learning_role.load_inter_episodic_data(inter_episodic_data)
-
             world.run()
 
-            total_rewards = world.output_role.get_sum_reward()
-            avg_reward = np.mean(total_rewards)
-            # check reward improvement in evaluation run
-            # and store best run in eval folder
-            terminate = world.learning_role.compare_and_save_policies(
-                {"avg_reward": avg_reward}
-            )
+            if world.learning_role.rl_algorithm_name == "ppo":
+                advantages, returns = compute_advantages_and_returns(world, inter_episodic_data)
+                world.learning_role.update_policy_with_ppo(advantages, returns)
+                surrogate_loss = compute_surrogate_loss(world, inter_episodic_data)
+                terminate = world.learning_role.compare_and_save_policies({"surrogate_loss": surrogate_loss})
+
+                # Reset the PPO Rollout Buffer after validation
+                inter_episodic_data["buffer"].reset()
+
+            elif world.learning_role.rl_algorithm_name == "matd3":
+                total_rewards = world.output_role.get_sum_reward()
+                avg_reward = np.mean(total_rewards)
+                terminate = world.learning_role.compare_and_save_policies({"avg_reward": avg_reward})
 
             inter_episodic_data["eval_episodes_done"] = eval_episode
 
-            # if we have not improved in the last x evaluations, we stop loop
             if terminate:
                 break
 
@@ -1014,20 +1016,18 @@ def run_learning(
 
         world.reset()
 
-        # if at end of simulation save last policies
         if episode == (world.learning_role.training_episodes):
             world.learning_role.rl_algorithm.save_params(
                 directory=f"{world.learning_role.trained_policies_save_path}/last_policies"
             )
 
-        # container shutdown implicitly with new initialisation
     logger.info("################")
     logger.info("Training finished, Start evaluation run")
     world.export_csv_path = temp_csv_path
 
     world.reset()
 
-    # load scenario for evaluation
+    # Based on the parameters for setup_world, it is automatically recognized if training or evaluation is to be performed. Now the evaluation is performed.
     setup_world(
         world=world,
         scenario_data=scenario_data,
@@ -1036,6 +1036,179 @@ def run_learning(
     )
 
     world.learning_role.load_inter_episodic_data(inter_episodic_data)
+
+
+
+# def run_learning(
+#     world: World,
+#     inputs_path: str,
+#     scenario: str,
+#     study_case: str,
+#     verbose: bool = False,
+# ) -> None:
+#     """
+#     Train Deep Reinforcement Learning (DRL) agents to act in a simulated market environment.
+
+#     This function runs multiple episodes of simulation to train DRL agents, performs evaluation, and saves the best runs. It maintains the buffer and learned agents in memory to avoid resetting them with each new run.
+
+#     Args:
+#         world (World): An instance of the World class representing the simulation environment.
+#         inputs_path (str): The path to the folder containing input files necessary for the simulation.
+#         scenario (str): The name of the scenario for the simulation.
+#         study_case (str): The specific study case for the simulation.
+
+#     Note:
+#         - The function uses a ReplayBuffer to store experiences for training the DRL agents.
+#         - It iterates through training episodes, updating the agents and evaluating their performance at regular intervals.
+#         - Initial exploration is active at the beginning and is disabled after a certain number of episodes to improve the performance of DRL algorithms.
+#         - Upon completion of training, the function performs an evaluation run using the best policy learned during training.
+#         - The best policies are chosen based on the average reward obtained during the evaluation runs, and they are saved for future use.
+#     """
+#     from assume.reinforcement_learning.buffer import ReplayBuffer, RolloutBuffer
+
+#     if not verbose:
+#         logger.setLevel(logging.WARNING)
+
+#     # remove csv path so that nothing is written while learning
+#     temp_csv_path = world.export_csv_path
+#     world.export_csv_path = ""
+
+#     # initialize policies already here to set the obs_dim and act_dim in the learning role
+#     actors_and_critics = None
+#     world.learning_role.initialize_policy(actors_and_critics=actors_and_critics)
+#     world.output_role.del_similar_runs()
+
+#     # check if we already stored policies for this simualtion
+#     save_path = world.learning_config["trained_policies_save_path"]
+
+#     if Path(save_path).is_dir():
+#         # we are in learning mode and about to train new policies, which might overwrite existing ones
+#         accept = input(
+#             f"{save_path=} exists - should we overwrite current learnings? (y/N) "
+#         )
+#         if not accept.lower().startswith("y"):
+#             # stop here - do not start learning or save anything
+#             raise AssumeException("don't overwrite existing strategies")
+
+#     # -----------------------------------------
+#     # Load scenario data to reuse across episodes
+#     scenario_data = load_config_and_create_forecaster(inputs_path, scenario, study_case)
+
+#     # -----------------------------------------
+#     # Information that needs to be stored across episodes, aka one simulation run
+#     inter_episodic_data = {
+#         "buffer": ReplayBuffer(
+#             buffer_size=int(world.learning_config.get("replay_buffer_size", 5e5)),
+#             obs_dim=world.learning_role.rl_algorithm.obs_dim,
+#             act_dim=world.learning_role.rl_algorithm.act_dim,
+#             n_rl_units=len(world.learning_role.rl_strats),
+#             device=world.learning_role.device,
+#             float_type=world.learning_role.float_type,
+#         ),
+#         "actors_and_critics": None,
+#         "max_eval": defaultdict(lambda: -1e9),
+#         "all_eval": defaultdict(list),
+#         "avg_all_eval": [],
+#         "episodes_done": 0,
+#         "eval_episodes_done": 0,
+#         "noise_scale": world.learning_config.get("noise_scale", 1.0),
+#     }
+
+#     # -----------------------------------------
+
+#     validation_interval = min(
+#         world.learning_role.training_episodes,
+#         world.learning_config.get("validation_episodes_interval", 5),
+#     )
+
+#     eval_episode = 1
+
+#     for episode in tqdm(
+#         range(1, world.learning_role.training_episodes + 1),
+#         desc="Training Episodes",
+#     ):
+#         # TODO normally, loading twice should not create issues, somehow a scheduling issue is raised currently
+#         if episode != 1:
+#             setup_world(
+#                 world=world,
+#                 scenario_data=scenario_data,
+#                 study_case=study_case,
+#                 episode=episode,
+#             )
+
+#         # -----------------------------------------
+#         # Give the newly initliazed learning role the needed information across episodes
+#         world.learning_role.load_inter_episodic_data(inter_episodic_data)
+
+#         world.run()
+
+#         # -----------------------------------------
+#         # Store updated information across episodes
+#         inter_episodic_data = world.learning_role.get_inter_episodic_data()
+#         inter_episodic_data["episodes_done"] = episode
+
+#         # evaluation run:
+#         if (
+#             episode % validation_interval == 0
+#             and episode
+#             >= world.learning_role.episodes_collecting_initial_experience
+#             + validation_interval
+#         ):
+#             world.reset()
+
+#             # load evaluation run
+#             setup_world(
+#                 world=world,
+#                 scenario_data=scenario_data,
+#                 study_case=study_case,
+#                 perform_evaluation=True,
+#                 eval_episode=eval_episode,
+#             )
+
+#             world.learning_role.load_inter_episodic_data(inter_episodic_data)
+
+#             world.run()
+
+#             total_rewards = world.output_role.get_sum_reward()
+#             avg_reward = np.mean(total_rewards)
+#             # check reward improvement in evaluation run
+#             # and store best run in eval folder
+#             terminate = world.learning_role.compare_and_save_policies(
+#                 {"avg_reward": avg_reward}
+#             )
+
+#             inter_episodic_data["eval_episodes_done"] = eval_episode
+
+#             # if we have not improved in the last x evaluations, we stop loop
+#             if terminate:
+#                 break
+
+#             eval_episode += 1
+
+#         world.reset()
+
+#         # if at end of simulation save last policies
+#         if episode == (world.learning_role.training_episodes):
+#             world.learning_role.rl_algorithm.save_params(
+#                 directory=f"{world.learning_role.trained_policies_save_path}/last_policies"
+#             )
+
+#         # container shutdown implicitly with new initialisation
+#     logger.info("################")
+#     logger.info("Training finished, Start evaluation run")
+#     world.export_csv_path = temp_csv_path
+
+#     world.reset()
+
+#     # load scenario for evaluation
+#     setup_world(
+#         world=world,
+#         scenario_data=scenario_data,
+#         study_case=study_case,
+#         terminate_learning=True,
+#     )
+
+#     world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
 
 if __name__ == "__main__":

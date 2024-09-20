@@ -781,6 +781,9 @@ class LearningStrategy(BaseStrategy):
         # them into suitable format for recurrent neural networks
         self.num_timeseries_obs_dim = num_timeseries_obs_dim
 
+        print("TEST")
+        print(kwargs.get("algorithm", "lel"))
+
 
 class LearningConfig(TypedDict):
     """

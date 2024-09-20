@@ -11,8 +11,7 @@ from torch.optim import Adam
 
 from assume.common.base import LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
-# Check later
-from assume.reinforcement_learning.learning_utils import Actor, CriticPPO, polyak_update
+from assume.reinforcement_learning.neural_network_architecture import ActorPPO, CriticPPO
 
 logger = logging.getLogger(__name__)
 
@@ -34,44 +33,31 @@ class PPO(RLAlgorithm):
     def __init__(
         self,
         learning_role,
-        learning_rate=1e-4, 
-        batch_size=1024, 
-        gamma=0.99, # Discount factor used for future reward consideration.
-
-        # Added PPO parameters
-        epochs=10, # Number of epochs to train each policy update.
-        clip_ratio=0.2, # Clipping ratio for PPO's policy loss to limit the change in policy update. Anstatt den vollen Wert der Änderung zu maximieren, wird das Ziel in einem bestimmten Bereich begrenzt. Der Bereich ist durch einen Parameter (den Clipping-Faktor) definiert, der angibt, wie weit die neue Policy von der alten Policy abweichen darf. Wenn das Verhältnis der Wahrscheinlichkeiten zu weit von 1 abweicht, wird die Verbesserung beschnitten.
-        vf_coef=0.5, # Coefficient for value function loss in PPO.
-        entropy_coef=0.01, # Coefficient for entropy bonus (to encourage exploration).
-        max_grad_norm=0.5, # Maximum gradient norm for gradient clipping.
-
-        # Removed MATD3 parameters
-        # episodes_collecting_initial_experience=100,
-        # tau=0.005,
-        # gradient_steps=-1,
-        # policy_delay=2,
-        # target_policy_noise=0.2,
-        # target_noise_clip=0.5,
+        learning_rate=1e-4,
+        batch_size=1024,
+        gamma=0.99,
+        epochs=10,  # PPO specific
+        clip_ratio=0.2,  # PPO specific
+        vf_coef=0.5,  # PPO specific
+        entropy_coef=0.01,  # PPO specific
+        max_grad_norm=0.5,  # PPO specific
+        gae_lambda=0.95,  # PPO specific
+        actor_architecture="mlp",
     ):
         super().__init__(
             learning_role,
             learning_rate,
             batch_size,
             gamma,
-
-            # episodes_collecting_initial_experience,
-            # tau,
-            # gradient_steps,
-            # policy_delay,
-            # target_policy_noise,
-            # target_noise_clip,
+            actor_architecture,
         )
-        #self.n_updates = 0
+        self.epochs = epochs
         self.clip_ratio = clip_ratio
         self.vf_coef = vf_coef
         self.entropy_coef = entropy_coef
         self.max_grad_norm = max_grad_norm
-        self.epochs = epochs
+        self.gae_lambda = gae_lambda
+        
 
     # Unchanged method from MATD3
     def save_params(self, directory):
@@ -108,7 +94,7 @@ class PPO(RLAlgorithm):
             path = f"{directory}/critic_{u_id}.pt"
             th.save(obj, path)
 
-    # Removed actor_target in comparison to MATD3
+    # Removed actor_target in comparison to MATD3 (Actor network = policy network)
     def save_actor_params(self, directory):
         """
         Save the parameters of actor networks.
@@ -148,7 +134,7 @@ class PPO(RLAlgorithm):
         self.load_critic_params(directory)
         self.load_actor_params(directory)
 
-    # Removed critic_target in comparison to MATD3
+    # Removed critic_target in comparison to MATD3 (critic network = value function network)
     def load_critic_params(self, directory: str) -> None:
         """
         Load the parameters of critic networks from a specified directory.
@@ -269,7 +255,7 @@ class PPO(RLAlgorithm):
         act_dim_list = []
 
         for _, unit_strategy in self.learning_role.rl_strats.items():
-            unit_strategy.actor = Actor(
+            unit_strategy.actor = ActorPPO(
                 obs_dim=unit_strategy.obs_dim,
                 act_dim=unit_strategy.act_dim,
                 float_type=self.float_type,
@@ -320,13 +306,6 @@ class PPO(RLAlgorithm):
 
         for u_id, strategy in self.learning_role.rl_strats.items():
 
-            self, 
-            n_agents: int, 
-            obs_dim: int, 
-            float_type,
-            unique_obs_dim: int, 
-
-            
             self.learning_role.critics[u_id] = CriticPPO(
                 n_agents=n_agents,
                 obs_dim=strategy.obs_dim,

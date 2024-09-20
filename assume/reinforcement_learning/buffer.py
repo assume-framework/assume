@@ -205,7 +205,7 @@ class RolloutBuffer:
         self.values = np.zeros((buffer_size, n_agents), dtype=np.float32)
         self.advantages = np.zeros((buffer_size, n_agents), dtype=np.float32)
         self.returns = np.zeros((buffer_size, n_agents), dtype=np.float32)
-        self.masks = np.ones((buffer_size, n_agents), dtype=np.float32)  # Used to indicate episode boundaries
+        self.masks = np.ones((buffer_size, n_agents), dtype=np.float32)  # Mask to indicate episode boundaries (1 for ongoing episode, 0 if episode ended)
 
         self.pos = 0
 
@@ -238,18 +238,44 @@ class RolloutBuffer:
             last_values (np.array): Value estimates for the last observation.
             dones (np.array): Whether the episode has finished for each agent.
         """
+        # Initialize the last advantage to 0. This will accumulate as we move backwards in time.
         last_advantage = 0
+        
+        # Loop backward through all the steps in the buffer to calculate returns and advantages.
+        # This is because GAE (Generalized Advantage Estimation) relies on future rewards,
+        # so we compute it from the last step back to the first step.
         for step in reversed(range(self.pos)):
+            
+            # If we are at the last step in the buffer
             if step == self.pos - 1:
+                # If it's the last step, check whether the episode has finished using `dones`.
+                # `next_non_terminal` is 0 if the episode has ended, 1 if it's ongoing.
                 next_non_terminal = 1.0 - dones
+                # Use the provided last values (value estimates for the final observation in the episode)
                 next_values = last_values
             else:
+                # For other steps, use the mask to determine if the episode is ongoing.
+                # If `masks[step + 1]` is 1, the episode is ongoing; if it's 0, the episode has ended.
                 next_non_terminal = self.masks[step + 1]
+                # Use the value of the next time step to compute the future returns
                 next_values = self.values[step + 1]
 
+            # Temporal difference (TD) error, also known as delta:
+            # This is the difference between the reward obtained at this step and the estimated value of this step
+            # plus the discounted value of the next step (if the episode is ongoing).
+            # This measures how "off" the value function is at predicting the future return.
             delta = self.rewards[step] + self.gamma * next_values * next_non_terminal - self.values[step]
+
+            # Compute the advantage for this step using GAE:
+            # `delta` is the immediate advantage, and we add to it the discounted future advantage,
+            # scaled by the factor `lambda` (from GAE). This allows for a more smooth approximation of advantage.
+            # `next_non_terminal` ensures that if the episode has ended, the future advantage stops accumulating.
             self.advantages[step] = last_advantage = delta + self.gamma * self.gae_lambda * next_non_terminal * last_advantage
+
+            # The return is the advantage plus the baseline value estimate.
+            # This makes sure that the return includes both the immediate rewards and the learned value of future rewards.
             self.returns[step] = self.advantages[step] + self.values[step]
+
 
     def get(self):
         """

@@ -14,32 +14,19 @@ tiny:
     trained_policies_save_path: null
     max_bid_price: 100
     algorithm: matd3
+    actor_architecture: mlp
+    learning_rate: 0.001
+    training_episodes: 10
+    episodes_collecting_initial_experience: 3
+    train_freq: 24h
+    gradient_steps: -1
+    batch_size: 64
+    gamma: 0.99
     device: cpu
-    matd3:
-      actor_architecture: mlp
-      learning_rate: 0.001
-      training_episodes: 10
-      episodes_collecting_initial_experience: 3
-      train_freq: 24h
-      gradient_steps: -1
-      batch_size: 64
-      gamma: 0.99
-      noise_sigma: 0.1
-      noise_scale: 1
-      noise_dt: 1
-      validation_episodes_interval: 5
-    ppo: 
-      actor_architecture: mlp
-      learning_rate: 0.001
-      training_episodes: 10
-      train_freq: 24h
-      gradient_steps: -1
-      batch_size: 64
-      gamma: 0.99
-      noise_sigma: 0.1
-      noise_scale: 1
-      noise_dt: 1
-      validation_episodes_interval: 5
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
 
   markets_config:
     EOM:
@@ -71,38 +58,21 @@ base:
     trained_policies_save_path: null
     max_bid_price: 100
     algorithm: matd3
-    matd3:
-      actor_architecture: mlp
-      learning_rate: 0.001
-      training_episodes: 50
-      episodes_collecting_initial_experience: 5
-      train_freq: 24h
-      gradient_steps: -1
-      batch_size: 256
-      gamma: 0.99
-      device: cpu
-      noise_sigma: 0.1
-      noise_scale: 1
-      noise_dt: 1
-      validation_episodes_interval: 5
-      early_stopping_steps: 10
-      early_stopping_threshold: 0.05
-    ppo:
-      actor_architecture: mlp
-      learning_rate: 0.001
-      training_episodes: 50
-      episodes_collecting_initial_experience: 5
-      train_freq: 24h
-      gradient_steps: -1
-      batch_size: 256
-      gamma: 0.99
-      device: cpu
-      noise_sigma: 0.1
-      noise_scale: 1
-      noise_dt: 1
-      validation_episodes_interval: 5
-      early_stopping_steps: 10
-      early_stopping_threshold: 0.05
+    actor_architecture: mlp
+    learning_rate: 0.001
+    training_episodes: 50
+    episodes_collecting_initial_experience: 5
+    train_freq: 24h
+    gradient_steps: -1
+    batch_size: 256
+    gamma: 0.99
+    device: cpu
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+    early_stopping_steps: 10
+    early_stopping_threshold: 0.05
 
   markets_config:
     EOM:

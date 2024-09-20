@@ -34,32 +34,17 @@ class RLAlgorithm:
         # init learning_role as object of Learning class
         learning_role,
         learning_rate=1e-4,
-        episodes_collecting_initial_experience=100,
         batch_size=1024,
-        tau=0.005,
         gamma=0.99,
-        gradient_steps=-1,
-        policy_delay=2,
-        target_policy_noise=0.2,
-        target_noise_clip=0.5,
         actor_architecture="mlp",
+        **kwargs,  # allow additional params for specific algorithms
     ):
         super().__init__()
 
         self.learning_role = learning_role
         self.learning_rate = learning_rate
-        self.episodes_collecting_initial_experience = (
-            episodes_collecting_initial_experience
-        )
         self.batch_size = batch_size
         self.gamma = gamma
-        self.tau = tau
-
-        self.gradient_steps = gradient_steps
-
-        self.policy_delay = policy_delay
-        self.target_noise_clip = target_noise_clip
-        self.target_policy_noise = target_policy_noise
 
         if actor_architecture in actor_architecture_aliases:
             self.actor_architecture_class = actor_architecture_aliases[

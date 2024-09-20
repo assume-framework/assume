@@ -12,7 +12,9 @@ from mango import Role
 from assume.common.base import LearningConfig, LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
+from assume.reinforcement_learning.algorithms.ppo import PPO
 from assume.reinforcement_learning.buffer import ReplayBuffer
+from assume.reinforcement_learning.buffer import RolloutBuffer
 
 logger = logging.getLogger(__name__)
 
@@ -33,21 +35,16 @@ class Learning(Role):
         self,
         learning_config: LearningConfig,
     ):
-        # how many learning roles do exist and how are they named
-        self.buffer: ReplayBuffer = None
-        self.early_stopping_steps = learning_config.get("early_stopping_steps", 10)
-        self.early_stopping_threshold = learning_config.get(
-            "early_stopping_threshold", 0.05
-        )
+        # General parameters
+        self.rl_algorithm_name = learning_config["algorithm"]
+        self.early_stopping_steps = learning_config.get(self.rl_algorithm_name, {}).get("early_stopping_steps", 10)
+        self.early_stopping_threshold = learning_config.get(self.rl_algorithm_name, {}).get("early_stopping_threshold", 0.05)
         self.episodes_done = 0
         self.rl_strats: dict[int, LearningStrategy] = {}
-        self.rl_algorithm = learning_config["algorithm"]
-        self.actor_architecture = learning_config["actor_architecture"]
+        
         self.critics = {}
-        self.target_critics = {}
 
         # define whether we train model or evaluate it
-        self.training_episodes = learning_config["training_episodes"]
         self.learning_mode = learning_config["learning_mode"]
         self.continue_learning = learning_config["continue_learning"]
         self.perform_evaluation = learning_config["perform_evaluation"]
@@ -56,48 +53,66 @@ class Learning(Role):
             "trained_policies_load_path", self.trained_policies_save_path
         )
 
-        cuda_device = (
-            learning_config["device"]
-            if "cuda" in learning_config.get("device", "cpu")
-            else "cpu"
-        )
-        self.device = th.device(cuda_device if th.cuda.is_available() else "cpu")
+        self.device = th.device(learning_config["device"] if th.cuda.is_available() else "cpu")
 
+        # Algorithm-specific parameters
+        if self.rl_algorithm_name == "matd3":
+            self.buffer: ReplayBuffer = None
+            self.target_critics = {}
+
+            self.actor_architecture = learning_config.get(self.rl_algorithm_name, {}).get("actor_architecture", "mlp")
+            self.training_episodes = learning_config["matd3"]["training_episodes"]
+            self.train_freq = learning_config["matd3"]["train_freq"]
+            self.gradient_steps = int(self.train_freq[:-1]) if learning_config["matd3"].get("gradient_steps", -1) == -1 else learning_config["matd3"]["gradient_steps"]
+            # self.batch_size = learning_config["matd3"]["batch_size"]
+            # self.gamma = learning_config["matd3"]["gamma"]
+
+            self.batch_size = learning_config.get(self.rl_algorithm_name, {}).get("batch_size", 128)
+            self.gamma = learning_config.get(self.rl_algorithm_name, {}).get("gamma", 0.99)
+
+            self.learning_rate = learning_config["matd3"]["learning_rate"]
+            self.noise_sigma = learning_config["matd3"]["noise_sigma"]
+            self.noise_scale = learning_config["matd3"]["noise_scale"]
+            self.episodes_collecting_initial_experience = max(learning_config.get(self.rl_algorithm_name, {}).get("episodes_collecting_initial_experience", 5), 1)
+            
+        elif self.rl_algorithm_name == "ppo":
+            self.buffer: RolloutBuffer = None
+            self.actor_architecture = learning_config.get(self.rl_algorithm_name, {}).get("actor_architecture", "mlp")
+            self.training_episodes = learning_config["ppo"]["training_episodes"]
+            self.steps_per_epoch = learning_config["ppo"]["steps_per_epoch"]
+            # self.batch_size = learning_config["matd3"]["batch_size"]
+            # self.gamma = learning_config["matd3"]["gamma"]
+
+            self.batch_size = learning_config.get(self.rl_algorithm_name, {}).get("batch_size", 128)
+            self.gamma = learning_config.get(self.rl_algorithm_name, {}).get("gamma", 0.99)
+
+            self.clip_ratio = learning_config["ppo"]["clip_ratio"]
+            self.entropy_coeff = learning_config["ppo"]["entropy_coeff"]
+            self.value_coeff = learning_config["ppo"]["value_coeff"]
+            self.device = th.device(learning_config["ppo"]["device"] if th.cuda.is_available() else "cpu")
+            self.learning_rate = learning_config["ppo"]["learning_rate"]
+
+        
+       
+
+        # Set up CUDA and float types
+        th.backends.cuda.matmul.allow_tf32 = True
+        th.backends.cudnn.allow_tf32 = True
+        
         # future: add option to choose between float16 and float32
         # float_type = learning_config.get("float_type", "float32")
         self.float_type = th.float
 
-        th.backends.cuda.matmul.allow_tf32 = True
-        th.backends.cudnn.allow_tf32 = True
+        # Initialize the algorithm depending on the type
+        self.create_learning_algorithm(self.rl_algorithm_name)
 
-        self.learning_rate = learning_config.get("learning_rate", 1e-4)
-
-        # if we do not have initital experience collected we will get an error as no samples are avaiable on the
-        # buffer from which we can draw exprience to adapt the strategy, hence we set it to minium one episode
-
-        self.episodes_collecting_initial_experience = max(
-            learning_config.get("episodes_collecting_initial_experience", 5), 1
-        )
-
-        self.train_freq = learning_config.get("train_freq", "1h")
-        self.gradient_steps = (
-            int(self.train_freq[:-1])
-            if learning_config.get("gradient_steps", -1) == -1
-            else learning_config["gradient_steps"]
-        )
-        self.batch_size = learning_config.get("batch_size", 128)
-        self.gamma = learning_config.get("gamma", 0.99)
-
+        # Initialize evaluation metrics
         self.eval_episodes_done = 0
-
-        # function that initializes learning, needs to be an extra function so that it can be called after buffer is given to Role
-        self.create_learning_algorithm(self.rl_algorithm)
-
-        # store evaluation values
         self.max_eval = defaultdict(lambda: -1e9)
         self.rl_eval = defaultdict(list)
-        # list of avg_changes
+        # List of avg changes
         self.avg_rewards = []
+   
 
     # TD3 and PPO
     def load_inter_episodic_data(self, inter_episodic_data):
@@ -214,16 +229,10 @@ class Learning(Role):
         stored_scale = list(self.rl_strats.values())[0].action_noise.scale
 
         return stored_scale
-
-    def create_learning_algorithm(self, algorithm: RLAlgorithm):
+    
+    def create_learning_algorithm(self, algorithm: str):
         """
-        Create and initialize the reinforcement learning algorithm.
-
-        This method creates and initializes the reinforcement learning algorithm based on the specified algorithm name. The algorithm
-        is associated with the learning role and configured with relevant hyperparameters.
-
-        Args:
-            algorithm (RLAlgorithm): The name of the reinforcement learning algorithm.
+        Algorithm initialization depending on the type
         """
         if algorithm == "matd3":
             self.rl_algorithm = TD3(
@@ -235,8 +244,26 @@ class Learning(Role):
                 gamma=self.gamma,
                 actor_architecture=self.actor_architecture,
             )
+        elif algorithm == "ppo":
+            self.rl_algorithm = PPO(
+                learning_role=self,
+                learning_rate=self.learning_rate,
+                steps_per_epoch=self.steps_per_epoch,
+                batch_size=self.batch_size,
+                gamma=self.gamma,
+                clip_ratio=self.clip_ratio,
+                entropy_coeff=self.entropy_coeff,
+                value_coeff=self.value_coeff,
+                actor_architecture=self.actor_architecture,
+            )
         else:
             logger.error(f"Learning algorithm {algorithm} not implemented!")
+
+        # Loop over rl_strats
+        # self.rl_algorithm an die Learning Strategy übergeben 
+        # Damit die Learning Strategy auf act/get_actions zugreifen kann
+
+
 
     # TD3
     def initialize_policy(self, actors_and_critics: dict = None) -> None:
@@ -343,3 +370,97 @@ class Learning(Role):
 
                         return True
             return False
+
+ # def __init__(
+    #     self,
+    #     learning_config: LearningConfig,
+    # ):
+    #     # how many learning roles do exist and how are they named
+    #     self.buffer: ReplayBuffer = None
+    #     self.early_stopping_steps = learning_config.get("early_stopping_steps", 10)
+    #     self.early_stopping_threshold = learning_config.get(
+    #         "early_stopping_threshold", 0.05
+    #     )
+    #     self.episodes_done = 0
+    #     self.rl_strats: dict[int, LearningStrategy] = {}
+    #     self.rl_algorithm = learning_config["algorithm"]
+    #     self.actor_architecture = learning_config["actor_architecture"]
+    #     self.critics = {}
+    #     self.target_critics = {}
+
+    #     # define whether we train model or evaluate it
+    #     self.training_episodes = learning_config["training_episodes"]
+    #     self.learning_mode = learning_config["learning_mode"]
+    #     self.continue_learning = learning_config["continue_learning"]
+    #     self.perform_evaluation = learning_config["perform_evaluation"]
+    #     self.trained_policies_save_path = learning_config["trained_policies_save_path"]
+    #     self.trained_policies_load_path = learning_config.get(
+    #         "trained_policies_load_path", self.trained_policies_save_path
+    #     )
+
+    #     cuda_device = (
+    #         learning_config["device"]
+    #         if "cuda" in learning_config.get("device", "cpu")
+    #         else "cpu"
+    #     )
+    #     self.device = th.device(cuda_device if th.cuda.is_available() else "cpu")
+
+    #     # future: add option to choose between float16 and float32
+    #     # float_type = learning_config.get("float_type", "float32")
+    #     self.float_type = th.float
+
+    #     th.backends.cuda.matmul.allow_tf32 = True
+    #     th.backends.cudnn.allow_tf32 = True
+
+    #     self.learning_rate = learning_config.get("learning_rate", 1e-4)
+
+    #     # if we do not have initital experience collected we will get an error as no samples are avaiable on the
+    #     # buffer from which we can draw exprience to adapt the strategy, hence we set it to minium one episode
+
+    #     self.episodes_collecting_initial_experience = max(
+    #         learning_config.get("episodes_collecting_initial_experience", 5), 1
+    #     )
+
+    #     self.train_freq = learning_config.get("train_freq", "1h")
+    #     self.gradient_steps = (
+    #         int(self.train_freq[:-1])
+    #         if learning_config.get("gradient_steps", -1) == -1
+    #         else learning_config["gradient_steps"]
+    #     )
+    #     self.batch_size = learning_config.get("batch_size", 128)
+    #     self.gamma = learning_config.get("gamma", 0.99)
+
+    #     self.eval_episodes_done = 0
+
+    #     # function that initializes learning, needs to be an extra function so that it can be called after buffer is given to Role
+    #     self.create_learning_algorithm(self.rl_algorithm)
+
+    #     # store evaluation values
+    #     self.max_eval = defaultdict(lambda: -1e9)
+    #     self.rl_eval = defaultdict(list)
+    #     # list of avg_changes
+    #     self.avg_rewards = []
+
+    # MATD3 version
+    # def create_learning_algorithm(self, algorithm: RLAlgorithm):
+    #     """
+    #     Create and initialize the reinforcement learning algorithm.
+
+    #     This method creates and initializes the reinforcement learning algorithm based on the specified algorithm name. The algorithm
+    #     is associated with the learning role and configured with relevant hyperparameters.
+
+    #     Args:
+    #         algorithm (RLAlgorithm): The name of the reinforcement learning algorithm.
+    #     """
+    #     if algorithm == "matd3":
+    #         self.rl_algorithm = TD3(
+    #             learning_role=self,
+    #             learning_rate=self.learning_rate,
+    #             episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,
+    #             gradient_steps=self.gradient_steps,
+    #             batch_size=self.batch_size,
+    #             gamma=self.gamma,
+    #             actor_architecture=self.actor_architecture,
+    #         )
+    #     else:
+    #         logger.error(f"Learning algorithm {algorithm} not implemented!")
