@@ -613,9 +613,8 @@ class SupportsMinMaxCharge(BaseUnit):
         Returns:
             float: The discharging power adjusted to the ramping constraints.
         """
-        # vorher laden  -800 MW  möchte zu 200 MW - muss aber vorher gucken ob das vom Laden überhaupt klappt
-        # - 800 MW nach 0 mit charge ramp down und dann 200 MW mit discharge_ramp_up
-
+        # previously charging -800 MW wants to go to 200 MW - but must first check if charging is even possible
+        # - 800 MW to 0 with charge ramp down and then 200 MW with discharge ramp up
         # if storage was charging before we need to check if we can ramp back to zero
         # assert power_discharge >= 0
         if (

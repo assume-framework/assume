@@ -123,7 +123,7 @@ class Storage(SupportsMinMaxCharge):
         self.emission_factor = emission_factor
 
         # The ramp up/down rate of charging/discharging the storage unit.
-        # if ramp_up_charge == 0, the ramp_up_charge is set to the max_power_charge
+        # if ramp_up_charge == 0, the ramp_up_charge is set to enable ramping between full charge and discharge power
         # else the ramp_up_charge is set to the negative value of the ramp_up_charge
         self.ramp_up_charge = (
             self.max_power_charge - self.max_power_discharge
