@@ -500,17 +500,31 @@ class ComplexClearingRole(MarketRole):
             if all(order_surplus >= 0 for order_surplus in orders_surplus):
                 break
 
+        # extract flows
+        flows = instance.flows
+
+        flows_filtered = {}
+
+        # filter flows and only use positive flows to half the size of the dict
+        flows_filtered = {
+            index: flow.value for index, flow in flows.items() if not flow.stale
+        }
+        flows_filtered = {
+            index: flow for index, flow in flows_filtered.items() if flow > 0
+        }
+
         accepted_orders, rejected_orders, meta = extract_results(
             model=instance,
             orders=orderbook,
             rejected_orders=rejected_orders,
             market_products=market_products,
             market_clearing_prices=market_clearing_prices,
+            flows=flows_filtered,
         )
 
         self.all_orders = []
 
-        return accepted_orders, rejected_orders, meta
+        return accepted_orders, rejected_orders, meta, flows_filtered
 
 
 def calculate_order_surplus(
