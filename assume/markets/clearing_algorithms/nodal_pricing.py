@@ -172,8 +172,11 @@ class NodalMarketRole(MarketRole):
             meta.extend(
                 calculate_network_meta(network=nodal_network, product=product, i=i)
             )
+        # wirte network flows here if applicable
+        flows = []
 
-        return accepted_orders, rejected_orders, meta
+        # accepted orders can not be used in future
+        return accepted_orders, rejected_orders, meta, flows
 
     def process_dispatch_data(self, network: pypsa.Network, orderbook_df: pd.DataFrame):
         """

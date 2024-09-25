@@ -167,7 +167,11 @@ class PayAsClearRole(MarketRole):
                 )
             )
 
-        return accepted_orders, rejected_orders, meta
+        # wirte network flows here if applicable
+        flows = []
+
+        # accepted orders can not be used in future
+        return accepted_orders, rejected_orders, meta, flows
 
 
 class PayAsBidRole(MarketRole):
