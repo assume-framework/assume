@@ -34,10 +34,6 @@ class Learning(Role):
     ):
         # how many learning roles do exist and how are they named
         self.buffer: ReplayBuffer = None
-        self.early_stopping_steps = learning_config.get("early_stopping_steps", 10)
-        self.early_stopping_threshold = learning_config.get(
-            "early_stopping_threshold", 0.05
-        )
         self.episodes_done = 0
         self.rl_strats: dict[int, LearningStrategy] = {}
         self.rl_algorithm = learning_config.get("algorithm", "matd3")
@@ -53,6 +49,19 @@ class Learning(Role):
         self.trained_policies_save_path = learning_config["trained_policies_save_path"]
         self.trained_policies_load_path = learning_config.get(
             "trained_policies_load_path", self.trained_policies_save_path
+        )
+
+        # if early_stopping_steps are not provided then set default to no early stopping (early_stopping_steps need to be greater than validation_episodes)
+        self.early_stopping_steps = learning_config.get(
+            "early_stopping_steps",
+            int(
+                self.training_episodes
+                / learning_config.get("validation_episodes_interval", 5)
+                + 1
+            ),
+        )
+        self.early_stopping_threshold = learning_config.get(
+            "early_stopping_threshold", 0
         )
 
         cuda_device = (
