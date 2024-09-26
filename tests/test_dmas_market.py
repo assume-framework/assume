@@ -587,7 +587,7 @@ def test_clearing():
     assert meta[0]["price"] == 0.2
 
     # maximum_bid_price should not be too high.. Some floating point issue in pyomo..?
-    # I don't konw why this happens
+    # I don't know why this happens
     simple_dayahead_auction_config.maximum_bid_price = 1e12
     mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
     accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
