@@ -16,7 +16,7 @@ from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.scenario.oeds.infrastructure import InfrastructureInterface
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 async def load_oeds_async(
@@ -50,7 +50,7 @@ async def load_oeds_async(
         freq="h",
     )
     sim_id = f"{scenario}_{study_case}"
-    log.info(f"loading scenario {sim_id}")
+    logger.info(f"loading scenario {sim_id}")
     infra_interface = InfrastructureInterface("test", infra_uri)
 
     if not nuts_config:
@@ -83,10 +83,10 @@ async def load_oeds_async(
 
     # for each area - add demand and generation
     for area in nuts_config:
-        log.info(f"loading config {area} for {year}")
+        logger.info(f"loading config {area} for {year}")
         config_path = Path.home() / ".assume" / f"{area}_{year}"
         if not config_path.is_dir():
-            log.info("query database time series")
+            logger.info("query database time series")
             demand = infra_interface.get_demand_series_in_area(area, year)
             demand = demand.resample("h").mean()
             # demand in MW
@@ -100,12 +100,12 @@ async def load_oeds_async(
                 demand.to_csv(config_path / "demand.csv")
                 solar.to_csv(config_path / "solar.csv")
                 if isinstance(wind, float):
-                    log.info(wind, area, year)
+                    logger.info(wind, area, year)
                 wind.to_csv(config_path / "wind.csv")
             except Exception:
                 shutil.rmtree(config_path, ignore_errors=True)
         else:
-            log.info("use existing local time series")
+            logger.info("use existing local time series")
             demand = pd.read_csv(config_path / "demand.csv", index_col=0).squeeze()
             solar = pd.read_csv(config_path / "solar.csv", index_col=0).squeeze()
             wind = pd.read_csv(config_path / "wind.csv", index_col=0).squeeze()
