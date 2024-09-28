@@ -131,6 +131,8 @@ class RLStrategy(LearningStrategy):
 
         """
 
+        print("calculate_bids in learning_strategies.py (STEP)")
+
         bid_quantity_inflex, bid_price_inflex = 0, 0
         bid_quantity_flex, bid_price_flex = 0, 0
 
@@ -154,7 +156,10 @@ class RLStrategy(LearningStrategy):
         # =============================================================================
         # 2. Get the Actions, based on the observations
         # =============================================================================
-        actions, noise = self.get_actions(next_observation)
+        # actions, noise = self.get_actions(next_observation) # Old implementation with get_actions inside this class
+        # actions, noise = self.get_actions(self, next_observation)
+        # Depending on the algorithm, extra_info is either noise (MATD3) or log_probs (PPO)
+        actions, extra_info = self.get_actions(self, next_observation)
 
         # =============================================================================
         # 3. Transform Actions into bids
@@ -199,70 +204,20 @@ class RLStrategy(LearningStrategy):
 
         # store results in unit outputs as series to be written to the database by the unit operator
         unit.outputs["actions"][start] = actions
-        unit.outputs["exploration_noise"][start] = noise
+        # unit.outputs["exploration_noise"][start] = noise
+
+        # Check if extra_info is noise or log_probs and store it accordingly
+        if isinstance(extra_info, th.Tensor) and extra_info.shape == actions.shape:
+            unit.outputs["exploration_noise"][start] = extra_info  # It's noise
+        else:
+            # print("Type of extra_info: ", extra_info)
+            # print(type(extra_info))
+            unit.outputs["rl_log_probs"].append(extra_info)  # It's log_probs
+            # unit.outputs["dones"][start] = False
 
         bids = self.remove_empty_bids(bids)
 
         return bids
-
-    def get_actions(self, next_observation):
-        """
-        Gets actions for a unit containing two bid prices depending on the observation.
-
-        Args:
-            next_observation (torch.Tensor): Next observation.
-
-        Returns:
-            Actions (torch.Tensor): Actions containing two bid prices.
-
-        Note:
-            If the agent is in learning mode, the actions are chosen by the actor neuronal net and noise is added to the action
-            In the first x episodes the agent is in initial exploration mode, where the action is chosen by noise only to explore the entire action space.
-            X is defined by episodes_collecting_initial_experience.
-            If the agent is not in learning mode, the actions are chosen by the actor neuronal net without noise.
-        """
-
-        # distinction whether we are in learning mode or not to handle exploration realised with noise
-        if self.learning_mode and not self.perform_evaluation:
-            # if we are in learning mode the first x episodes we want to explore the entire action space
-            # to get a good initial experience, in the area around the costs of the agent
-            if self.collect_initial_experience_mode:
-                # define current action as soley noise
-                noise = (
-                    th.normal(
-                        mean=0.0, std=0.2, size=(1, self.act_dim), dtype=self.float_type
-                    )
-                    .to(self.device)
-                    .squeeze()
-                )
-
-                # =============================================================================
-                # 2.1 Get Actions and handle exploration
-                # =============================================================================
-                base_bid = next_observation[-1]
-
-                # add noise to the last dimension of the observation
-                # needs to be adjusted if observation space is changed, because only makes sense
-                # if the last dimension of the observation space are the marginal cost
-                curr_action = noise + base_bid.clone().detach()
-
-            else:
-                # if we are not in the initial exploration phase we choose the action with the actor neural net
-                # and add noise to the action
-                curr_action = self.actor(next_observation).detach()
-                noise = th.tensor(
-                    self.action_noise.noise(), device=self.device, dtype=self.float_type
-                )
-                curr_action += noise
-        else:
-            # if we are not in learning mode we just use the actor neural net to get the action without adding noise
-
-            curr_action = self.actor(next_observation).detach()
-            noise = tuple(0 for _ in range(self.act_dim))
-
-        curr_action = curr_action.clamp(-1, 1)
-
-        return curr_action, noise
 
     def create_observation(
         self,

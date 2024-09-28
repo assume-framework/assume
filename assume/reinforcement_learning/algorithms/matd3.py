@@ -508,7 +508,6 @@ class TD3(RLAlgorithm):
                     all_actions_clone[:, i, :] = action_i
                     all_actions_clone = all_actions_clone.view(self.batch_size, -1)
 
-                    # Policy gradient calculation start (different for PPO)
                     actor_loss = -critic.q1_forward(
                         all_states, all_actions_clone
                     ).mean()
@@ -516,7 +515,6 @@ class TD3(RLAlgorithm):
                     actor.optimizer.zero_grad()
                     actor_loss.backward()
                     actor.optimizer.step()
-                    # Policy gradient calculation end
 
                     polyak_update(
                         critic.parameters(), critic_target.parameters(), self.tau
@@ -526,4 +524,72 @@ class TD3(RLAlgorithm):
                     )
                 i += 1
 
+
+def get_actions(rl_strategy, next_observation):
+    """
+    Gets actions for a unit based on the observation using MATD3.
+
+    Args:
+        rl_strategy (RLStrategy): The strategy containing relevant information.
+        next_observation (torch.Tensor): The observation.
+
+    Returns:
+        torch.Tensor: The actions containing two bid prices.
+        tuple: The noise (if applicable).
+
+    Note:
+        If the agent is in learning mode, the actions are chosen by the actor neuronal net and noise is added to the action.
+        In the first x episodes, the agent is in initial exploration mode, where the action is chosen by noise only to explore 
+        the entire action space. X is defined by episodes_collecting_initial_experience.
+        If the agent is not in learning mode, the actions are chosen by the actor neuronal net without noise.
+    """
+
+    actor = rl_strategy.actor
+    device = rl_strategy.device
+    float_type = rl_strategy.float_type
+    act_dim = rl_strategy.act_dim
+    learning_mode = rl_strategy.learning_mode
+    perform_evaluation = rl_strategy.perform_evaluation
+    action_noise = rl_strategy.action_noise
+    collect_initial_experience_mode = rl_strategy.collect_initial_experience_mode
+
+    # distinction whether we are in learning mode or not to handle exploration realised with noise
+    if learning_mode and not perform_evaluation:
+        # if we are in learning mode the first x episodes we want to explore the entire action space
+        # to get a good initial experience, in the area around the costs of the agent
+        if collect_initial_experience_mode:
+            # define current action as solely noise
+            noise = (
+                th.normal(mean=0.0, std=0.2, size=(1, act_dim), dtype=float_type)
+                .to(device)
+                .squeeze()
+            )
+
+            # =============================================================================
+            # 2.1 Get Actions and handle exploration
+            # =============================================================================
+            base_bid = next_observation[-1]
+
+            # add noise to the last dimension of the observation
+            # needs to be adjusted if observation space is changed, because only makes sense
+            # if the last dimension of the observation space are the marginal cost
+            curr_action = noise + base_bid.clone().detach()
+
+        else:
+            # if we are not in the initial exploration phase we choose the action with the actor neural net
+            # and add noise to the action
+            curr_action = actor(next_observation).detach()  # calls the forward method of the actor network
+            noise = th.tensor(
+                action_noise.noise(), device=device, dtype=float_type
+            )
+            curr_action += noise
+    else:
+        # if we are not in learning mode we just use the actor neural net to get the action without adding noise
+        curr_action = actor(next_observation).detach()
+        noise = tuple(0 for _ in range(act_dim))
+
+    # Clamp actions to be within the valid action space bounds
+    curr_action = curr_action.clamp(-1, 1)
+
+    return curr_action, noise
 

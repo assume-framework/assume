@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from datetime import timedelta
+import pandas as pd
 from datetime import datetime
 from typing import TypedDict
 
@@ -97,3 +99,51 @@ def polyak_update(params, target_params, tau: float):
         for param, target_param in zip(params, target_params):
             target_param.data.mul_(1 - tau)
             th.add(target_param.data, param.data, alpha=tau, out=target_param.data)
+
+
+# # For non-dynamic PPO buffer size calculation (remove if buffer stays dynamic)
+# def convert_to_timedelta(time_str):
+#     # Wenn bereits ein Timedelta-Objekt, direkt zurückgeben
+#     if isinstance(time_str, pd.Timedelta):
+#         return time_str
+
+#     # Extrahiere den Zeitwert und die Einheit aus dem String
+#     time_value, time_unit = int(time_str[:-1]), time_str[-1]
+    
+#     if time_unit == 'h':
+#         return timedelta(hours=time_value)
+#     elif time_unit == 'd':
+#         return timedelta(days=time_value)
+#     elif time_unit == 'm':
+#         return timedelta(minutes=time_value)
+#     else:
+#         raise ValueError(f"Unsupported time unit: {time_unit}")
+
+# # For non-dynamic PPO buffer size calculation (remove if buffer stays dynamic)
+# def calculate_total_timesteps_per_episode(start_date, end_date, time_step):
+#     # Wenn start_date und end_date bereits Timestamps sind, direkt nutzen
+#     if isinstance(start_date, str):
+#         start_dt = datetime.strptime(start_date, "%Y-%m-%d %H:%M")
+#     else:
+#         start_dt = start_date
+
+#     if isinstance(end_date, str):
+#         end_dt = datetime.strptime(end_date, "%Y-%m-%d %H:%M")
+#     else:
+#         end_dt = end_date
+    
+#     # Berechne den gesamten Zeitraum
+#     total_time = end_dt - start_dt
+    
+#     # Konvertiere time_step in ein timedelta-Objekt, wenn es kein Timedelta ist
+#     time_step_td = convert_to_timedelta(time_step)
+    
+#     # Berechne die Gesamtanzahl der Zeitschritte für die gesamte Dauer
+#     total_timesteps = total_time // time_step_td
+    
+#     # print("Total timesteps:")
+#     # print(total_timesteps)
+
+#     return total_timesteps
+
+

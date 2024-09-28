@@ -6,7 +6,7 @@ import asyncio
 import logging
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from sys import platform
 
@@ -384,11 +384,44 @@ class World:
                     "learning_agent_id": self.learning_agent_addr[1],
                 }
             )
+            
+            
+            # Extract algorithm from the Learning_Config
+            algorithm = self.learning_config.get("algorithm", "matd3")
+
+            # Select correct train_freq based on the algorithm
+            if algorithm == "matd3":
+                train_freq = self.learning_config.get("matd3", {}).get("train_freq", "24h")
+            elif algorithm == "ppo":
+                train_freq = self.learning_config.get("ppo", {}).get("train_freq", "24h")
+            else:
+                train_freq = "24h"  # Standard value if algorithm is not defined
+
+            # Continue code with the selected frequency
             recurrency_task = create_rrule(
                 start=self.start,
                 end=self.end,
-                freq=self.learning_config.get("train_freq", "24h"),
+                freq=train_freq,
             )
+            
+            # Convert train_freq to hours for comparison
+            freq_value = int(train_freq[:-1])  # Extract the numerical value
+            freq_unit = train_freq[-1]  # Extract the time unit (h for hours, d for days)
+
+            # Convert the train_freq into hours
+            if freq_unit == "h":
+                train_freq_hours = freq_value
+            elif freq_unit == "d":
+                train_freq_hours = freq_value * 24
+            else:
+                train_freq_hours = 24  # Default to 24 hours
+
+            # Calculate time difference in hours
+            duration_hours = int((self.end - self.start) / timedelta(hours=1))
+
+            # Check if train_freq is larger than the time difference
+            if train_freq_hours > duration_hours:
+                print(f"Warning: The train frequency ({train_freq_hours}h) is larger than the time difference between start and end ({duration_hours}h).")
 
             units_operator.context.schedule_recurrent_task(
                 units_operator.write_to_learning_role, recurrency_task

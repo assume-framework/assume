@@ -36,7 +36,7 @@ class Learning(Role):
         learning_config: LearningConfig,
     ):
         # General parameters
-        self.rl_algorithm_name = learning_config["algorithm"]
+        self.rl_algorithm_name = learning_config.get("algorithm", "matd3")
         self.early_stopping_steps = learning_config.get(self.rl_algorithm_name, {}).get("early_stopping_steps", 10)
         self.early_stopping_threshold = learning_config.get(self.rl_algorithm_name, {}).get("early_stopping_threshold", 0.05)
         self.episodes_done = 0
@@ -55,6 +55,8 @@ class Learning(Role):
 
         self.device = th.device(learning_config["device"] if th.cuda.is_available() else "cpu")
 
+        self.learning_rate = learning_config["learning_rate"]
+
         # Algorithm-specific parameters
         if self.rl_algorithm_name == "matd3":
             self.buffer: ReplayBuffer = None
@@ -64,13 +66,9 @@ class Learning(Role):
             self.training_episodes = learning_config["matd3"]["training_episodes"]
             self.train_freq = learning_config["matd3"]["train_freq"]
             self.gradient_steps = int(self.train_freq[:-1]) if learning_config["matd3"].get("gradient_steps", -1) == -1 else learning_config["matd3"]["gradient_steps"]
-            # self.batch_size = learning_config["matd3"]["batch_size"]
-            # self.gamma = learning_config["matd3"]["gamma"]
-
             self.batch_size = learning_config.get(self.rl_algorithm_name, {}).get("batch_size", 128)
             self.gamma = learning_config.get(self.rl_algorithm_name, {}).get("gamma", 0.99)
 
-            self.learning_rate = learning_config["matd3"]["learning_rate"]
             self.noise_sigma = learning_config["matd3"]["noise_sigma"]
             self.noise_scale = learning_config["matd3"]["noise_scale"]
             self.episodes_collecting_initial_experience = max(learning_config.get(self.rl_algorithm_name, {}).get("episodes_collecting_initial_experience", 5), 1)
@@ -79,21 +77,15 @@ class Learning(Role):
             self.buffer: RolloutBuffer = None
             self.actor_architecture = learning_config.get(self.rl_algorithm_name, {}).get("actor_architecture", "mlp")
             self.training_episodes = learning_config["ppo"]["training_episodes"]
-            self.steps_per_epoch = learning_config["ppo"]["steps_per_epoch"]
+            self.train_freq = learning_config["ppo"]["train_freq"]
+            # self.steps_per_epoch = learning_config["ppo"]["steps_per_epoch"]
             # self.batch_size = learning_config["matd3"]["batch_size"]
             # self.gamma = learning_config["matd3"]["gamma"]
-
-            self.batch_size = learning_config.get(self.rl_algorithm_name, {}).get("batch_size", 128)
-            self.gamma = learning_config.get(self.rl_algorithm_name, {}).get("gamma", 0.99)
-
-            self.clip_ratio = learning_config["ppo"]["clip_ratio"]
-            self.entropy_coeff = learning_config["ppo"]["entropy_coeff"]
-            self.value_coeff = learning_config["ppo"]["value_coeff"]
-            self.device = th.device(learning_config["ppo"]["device"] if th.cuda.is_available() else "cpu")
-            self.learning_rate = learning_config["ppo"]["learning_rate"]
-
-        
-       
+            # self.clip_ratio = learning_config["ppo"]["clip_ratio"]
+            # self.entropy_coeff = learning_config["ppo"]["entropy_coeff"]
+            # self.value_coeff = learning_config["ppo"]["value_coeff"]
+            # self.device = th.device(learning_config["ppo"]["device"] if th.cuda.is_available() else "cpu")
+            # self.learning_rate = learning_config["ppo"]["learning_rate"]
 
         # Set up CUDA and float types
         th.backends.cuda.matmul.allow_tf32 = True
@@ -130,12 +122,13 @@ class Learning(Role):
         self.avg_rewards = inter_episodic_data["avg_all_eval"]
         self.buffer = inter_episodic_data["buffer"]
 
-        # if enough initial experience was collected according to specifications in learning config
-        # turn off initial exploration and go into full learning mode
-        if self.episodes_done > self.episodes_collecting_initial_experience:
-            self.turn_off_initial_exploration()
+        if self.rl_algorithm_name == "matd3":
+            # if enough initial experience was collected according to specifications in learning config
+            # turn off initial exploration and go into full learning mode
+            if self.episodes_done > self.episodes_collecting_initial_experience:
+                self.turn_off_initial_exploration()
 
-        self.set_noise_scale(inter_episodic_data["noise_scale"])
+            self.set_noise_scale(inter_episodic_data["noise_scale"])
 
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
@@ -186,15 +179,31 @@ class Learning(Role):
             meta (dict): The metadata associated with the message. (not needed yet)
         """
 
-        if content.get("type") == "save_buffer_and_update":
-            data = content["data"]
-            self.buffer.add(
-                obs=data[0],
-                actions=data[1],
-                reward=data[2],
-            )
+        if self.rl_algorithm_name == "matd3":
+            if content.get("type") == "save_buffer_and_update":
+                data = content["data"]
+                self.buffer.add(
+                    obs=data[0],
+                    actions=data[1],
+                    reward=data[2],
+                )
 
-        self.update_policy()
+            self.update_policy()
+
+        elif self.rl_algorithm_name == "ppo":
+            # print("save_buffer_and_update in learning_role.py")
+            if content.get("type") == "save_buffer_and_update":
+                data = content["data"]
+                self.buffer.add(
+                    obs=data[0],
+                    actions=data[1],
+                    reward=data[2],
+                    log_probs=data[3],
+                    # values=data[4],
+                    # dones=data[5],
+                )
+
+            self.update_policy()
 
     # TD3
     def turn_off_initial_exploration(self) -> None:
@@ -246,16 +255,18 @@ class Learning(Role):
             )
         elif algorithm == "ppo":
             self.rl_algorithm = PPO(
-                learning_role=self,
-                learning_rate=self.learning_rate,
-                steps_per_epoch=self.steps_per_epoch,
-                batch_size=self.batch_size,
-                gamma=self.gamma,
-                clip_ratio=self.clip_ratio,
-                entropy_coeff=self.entropy_coeff,
-                value_coeff=self.value_coeff,
-                actor_architecture=self.actor_architecture,
-            )
+            learning_role=self,
+            learning_rate=self.learning_rate,
+            gamma=self.gamma,  # Discount factor
+            epochs=self.epochs,  # Number of epochs for policy updates
+            clip_ratio=self.clip_ratio,  # PPO-specific clipping parameter
+            vf_coef=self.vf_coef,  # Coefficient for value function loss
+            entropy_coef=self.entropy_coef,  # Coefficient for entropy to encourage exploration
+            max_grad_norm=self.max_grad_norm,  # Maximum gradient norm for clipping
+            gae_lambda=self.gae_lambda,  # Lambda for Generalized Advantage Estimation (GAE)
+            batch_size=self.batch_size,  # Batch size for mini-batch updates (optional)
+            actor_architecture=self.actor_architecture,  # Actor network architecture
+        )
         else:
             logger.error(f"Learning algorithm {algorithm} not implemented!")
 
@@ -299,8 +310,12 @@ class Learning(Role):
         Notes:
             This method is typically scheduled to run periodically during training to continuously improve the agent's policy.
         """
-        if self.episodes_done > self.episodes_collecting_initial_experience:
-            self.rl_algorithm.update_policy()
+        if self.rl_algorithm_name == "ppo":
+            self.rl_algorithm.update_policy()  
+        else:
+            if self.episodes_done > self.episodes_collecting_initial_experience:
+                self.rl_algorithm.update_policy()
+
 
     def compare_and_save_policies(self, metrics: dict) -> bool:
         """

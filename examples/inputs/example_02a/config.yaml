@@ -4,7 +4,7 @@
 
 tiny:
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-05 00:00
+  end_date: 2019-01-02 00:00  # Changed from 2019-01-05 00:00 to 2019-01-02 00:00
   time_step: 1h
   save_frequency_hours: null
   learning_mode: True
@@ -13,14 +13,14 @@ tiny:
     continue_learning: False
     trained_policies_save_path: null
     max_bid_price: 100
-    algorithm: matd3
+    algorithm: ppo
     device: cpu
+    learning_rate: 0.001
     matd3:
       actor_architecture: mlp
-      learning_rate: 0.001
       training_episodes: 10
       episodes_collecting_initial_experience: 3
-      train_freq: 24h
+      train_freq: 48h
       gradient_steps: -1
       batch_size: 64
       gamma: 0.99
@@ -30,16 +30,17 @@ tiny:
       validation_episodes_interval: 5
     ppo: 
       actor_architecture: mlp
-      learning_rate: 0.001
       training_episodes: 10
-      train_freq: 24h
-      gradient_steps: -1
-      batch_size: 64
-      gamma: 0.99
-      noise_sigma: 0.1
-      noise_scale: 1
-      noise_dt: 1
-      validation_episodes_interval: 5
+      validation_episodes_interval: 5 # after how many episodes the validation starts and the policy is updated
+      train_freq: 24h # how often write_to_learning_role gets called
+      gamma: 0.99  # Discount factor for future rewards
+      epochs: 4  # Number of epochs for updating the policy
+      clip_ratio: 0.2  # Clipping parameter for policy updates
+      vf_coef: 0.5  # Value function coefficient in the loss function
+      entropy_coef: 0.01  # Entropy coefficient for exploration
+      max_grad_norm: 0.5  # Gradient clipping value
+      gae_lambda: 0.95  # GAE lambda for advantage estimation
+      batch_size: 5  # Batch size for each update, if mini-batch approach is used (currently not implemented)
 
   markets_config:
     EOM:

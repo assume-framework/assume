@@ -70,6 +70,8 @@ class BaseUnit:
         self.outputs["rl_observations"] = []
         self.outputs["rl_actions"] = []
         self.outputs["rl_rewards"] = []
+        # For PPO
+        self.outputs["rl_log_probs"] = []
 
         # some data is stored as series to allow to store it in the outputs
         self.outputs["actions"] = pd.Series(0.0, index=self.index, dtype=object)
@@ -781,8 +783,13 @@ class LearningStrategy(BaseStrategy):
         # them into suitable format for recurrent neural networks
         self.num_timeseries_obs_dim = num_timeseries_obs_dim
 
-        print("TEST")
-        print(kwargs.get("algorithm", "lel"))
+        self.rl_algorithm_name = kwargs.get("algorithm", "matd3")
+        if self.rl_algorithm_name == "matd3":
+            from assume.reinforcement_learning.algorithms.matd3 import get_actions
+            self.get_actions = get_actions
+        elif self.rl_algorithm_name == "ppo":
+            from assume.reinforcement_learning.algorithms.ppo import get_actions
+            self.get_actions = get_actions
 
 
 class LearningConfig(TypedDict):
