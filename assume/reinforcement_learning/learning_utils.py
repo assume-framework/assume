@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from collections.abc import Callable
 from datetime import datetime
 from typing import TypedDict
 
@@ -16,6 +17,10 @@ class ObsActRew(TypedDict):
 
 
 observation_dict = dict[list[datetime], ObsActRew]
+
+# A schedule takes the remaining progress as input
+# and outputs a scalar (e.g. learning rate, action noise scale ...)
+Schedule = Callable[[float], float]
 
 
 # Ornstein-Uhlenbeck Noise
@@ -91,3 +96,76 @@ def polyak_update(params, target_params, tau: float):
         for param, target_param in zip(params, target_params):
             target_param.data.mul_(1 - tau)
             th.add(target_param.data, param.data, alpha=tau, out=target_param.data)
+
+
+def update_learning_rate(optimizer: th.optim.Optimizer, learning_rate: float) -> None:
+    """
+    From: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L68
+
+    Update the learning rate for a given optimizer.
+    Useful when doing linear schedule.
+
+    :param optimizer: Pytorch optimizer
+    :param learning_rate: New learning rate value
+    """
+    for param_group in optimizer.param_groups:
+        param_group["lr"] = learning_rate
+
+
+def get_schedule_fn(value_schedule: Schedule | float) -> Schedule:
+    """
+    Transform (if needed) learning rate and clip range (for PPO)
+    to callable.
+
+    :param value_schedule: Constant value of schedule function
+    :return: Schedule function (can return constant value)
+    """
+    # If the passed schedule is a float
+    # create a constant function
+    if isinstance(value_schedule, float | int):
+        # Cast to float to avoid errors
+        value_schedule = constant_schedule(float(value_schedule))
+    else:
+        assert callable(value_schedule)
+    # Cast to float to avoid unpickling errors to enable weights_only=True, see GH#1900
+    # Some types are have odd behaviors when part of a Schedule, like numpy floats
+    return lambda progress_remaining: float(value_schedule(progress_remaining))
+
+
+def linear_schedule(start: float, end: float, end_fraction: float) -> Schedule:
+    """
+    Create a function that interpolates linearly between start and end
+    between ``progress_remaining`` = 1 and ``progress_remaining`` = ``end_fraction``.
+    This is used in DQN for linearly annealing the exploration fraction
+    (epsilon for the epsilon-greedy strategy).
+
+    :params start: value to start with if ``progress_remaining`` = 1
+    :params end: value to end with if ``progress_remaining`` = 0
+    :params end_fraction: fraction of ``progress_remaining``
+        where end is reached e.g 0.1 then end is reached after 10%
+        of the complete training process.
+    :return: Linear schedule function.
+    """
+
+    def func(progress_remaining: float) -> float:
+        if (1 - progress_remaining) > end_fraction:
+            return end
+        else:
+            return start + (1 - progress_remaining) * (end - start) / end_fraction
+
+    return func
+
+
+def constant_schedule(val: float) -> Schedule:
+    """
+    Create a function that returns a constant
+    It is useful for learning rate schedule (to avoid code duplication)
+
+    :param val: constant value
+    :return: Constant schedule function.
+    """
+
+    def func(_):
+        return val
+
+    return func

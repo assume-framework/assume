@@ -198,6 +198,43 @@ class Learning(Role):
         for _, unit in self.rl_strats.items():
             unit.collect_initial_experience_mode = False
 
+    def get_progress_remaining(self) -> float:
+        """
+        Get the remaining progress.
+
+        Function based on:
+        - num_steps: how many optimizer steps (actor policy updates) performed until now
+        - training_episodes: how many times to iterate through simulation horizon
+        - episodes_collecting_initial_experience: exploration episodes without policy updates
+        - total_simulation_steps: how many simulation steps are performed in each episode (based on start_date, end_date, freq)
+        - policy_delay: actor network update only every x (default: 2) updates
+        - gradient_steps: how many update steps during each policy update
+
+        Notes:
+            All learning strategies (units) are equipped with the same actor neural network architecture.
+            The remaining progress can be derived from the first learning strategy (unit) in rl_strats.
+        """
+
+        rl_strat = list(self.rl_strats.values())[0]
+
+        num_steps = 0
+
+        for param, state in rl_strat.actor.optimizer.state.items():
+            if "step" in state:
+                num_steps = state["step"]
+                break  # Exit after finding the first available step count
+
+        progress_remaining = 1 - (
+            num_steps
+            / (
+                (self.training_episodes - self.episodes_collecting_initial_experience)
+                * int(self.total_simulation_steps / self.rl_algorithm.policy_delay)
+                * self.rl_algorithm.gradient_steps
+            )
+        )
+
+        return progress_remaining
+
     def set_noise_scale(self, stored_scale) -> None:
         """
         Set the noise scale for all learning strategies (units) in rl_strats.
@@ -216,6 +253,9 @@ class Learning(Role):
 
         """
         stored_scale = list(self.rl_strats.values())[0].action_noise.scale
+
+        # TODO: option to set scale according to schedule (include constant, linear and logistic)
+        stored_scale = self.noise_schedule(self.get_progress_remaining())
 
         return stored_scale
 
