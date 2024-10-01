@@ -11,7 +11,7 @@ from assume.markets.base_market import MarketRole
 
 from .simple import calculate_meta
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def cumsum(orderbook: Orderbook):
@@ -63,7 +63,7 @@ class PayAsClearAonRole(MarketRole):
             product_orders = list(product_orders)
             if product not in market_products:
                 rejected_orders.extend(product_orders)
-                # log.debug(f'found unwanted bids for {product} should be {market_products}')
+                # logger.debug(f'found unwanted bids for {product} should be {market_products}')
                 continue
 
             # groupby does only group consecutive groups
@@ -150,7 +150,7 @@ class PayAsBidAonRole(MarketRole):
             product_orders = list(product_orders)
             if product not in market_products:
                 rejected_orders.extend(product_orders)
-                # log.debug(f'found unwanted bids for {product} should be {market_products}')
+                # logger.debug(f'found unwanted bids for {product} should be {market_products}')
                 continue
 
             product_orders.sort(key=lambda x: abs(x["volume"]))
