@@ -64,7 +64,6 @@ class WriteOutput(Role):
         # store needed date
         self.simulation_id = simulation_id
         self.save_frequency_hours = save_frequency_hours or (end - start).days * 24
-        logger.debug("saving results every %s hours", self.save_frequency_hours)
 
         # make directory if not already present
         if export_csv_path:
@@ -228,6 +227,9 @@ class WriteOutput(Role):
         elif content.get("type") == "grid_topology":
             self.store_grid(content.get("data"), content.get("market_id"))
 
+        elif content.get("type") == "store_flows":
+            self.write_flows(content.get("data"))
+
     def write_rl_params(self, rl_params: dict):
         """
         Writes the RL parameters such as reward, regret, and profit to the corresponding data frame.
@@ -338,7 +340,9 @@ class WriteOutput(Role):
             grid["generators"]["wkt_srid_4326"] = grid["generators"][grid_col].apply(
                 translate_point_dict.get
             )
-            grid_col = "node" if "node" in grid["loads"].columns else "bus"
+            grid_col = (
+                "node" if "node" in grid["loads"].columns else "bus"
+            )  # TODO: anschauen ob da die loads drauf sind
             grid["loads"]["wkt_srid_4326"] = grid["loads"][grid_col].apply(
                 translate_point_dict.get
             )
@@ -584,3 +588,27 @@ class WriteOutput(Role):
         rewards_by_unit = np.array(rewards_by_unit)
 
         return rewards_by_unit
+
+    def write_flows(self, data: any):
+        """
+        Writes the actual dispatch of the units to a CSV and database.
+
+        Args:
+            data (any): The records to be put into the table. Formatted like, "datetime, power, market_id, unit_id".
+        """
+        # Daten in ein DataFrame umwandeln
+        records = [
+            {
+                "timestamp": timestamp,
+                "from_node": from_node,
+                "to_node": to_node,
+                "flow": flow,
+            }
+            for (timestamp, from_node, to_node), flow in data.items()
+        ]
+        df = pd.DataFrame(records)
+
+        df["simulation"] = self.simulation_id
+
+        with self.locks["flows"]:
+            self.write_dfs["flows"].append(df)
