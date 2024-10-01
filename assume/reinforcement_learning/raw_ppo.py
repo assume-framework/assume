@@ -1,21 +1,25 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+from collections import deque
+
 import gym
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from collections import deque
-import numpy as np
+
 
 class MLPActorCritic(nn.Module):
     """
     Simple MLP Actor-Critic network with separate actor and critic heads.
     """
+
     def __init__(self, obs_dim, act_dim):
-        super(MLPActorCritic, self).__init__()
+        super().__init__()
         self.shared = nn.Sequential(
-            nn.Linear(obs_dim, 64),
-            nn.ReLU(),
-            nn.Linear(64, 64),
-            nn.ReLU()
+            nn.Linear(obs_dim, 64), nn.ReLU(), nn.Linear(64, 64), nn.ReLU()
         )
         # Actor head
         self.actor = nn.Linear(64, act_dim)
@@ -44,7 +48,19 @@ class PPO:
     """
     Proximal Policy Optimization (PPO) implementation in PyTorch.
     """
-    def __init__(self, env, actor_critic, clip_param=0.2, entcoeff=0.01, optim_stepsize=1e-3, optim_epochs=4, gamma=0.99, lam=0.95, batch_size=64):
+
+    def __init__(
+        self,
+        env,
+        actor_critic,
+        clip_param=0.2,
+        entcoeff=0.01,
+        optim_stepsize=1e-3,
+        optim_epochs=4,
+        gamma=0.99,
+        lam=0.95,
+        batch_size=64,
+    ):
         self.env = env
         self.actor_critic = actor_critic
         self.clip_param = clip_param
@@ -54,7 +70,9 @@ class PPO:
         self.gamma = gamma
         self.lam = lam
         self.batch_size = batch_size
-        self.optimizer = optim.Adam(self.actor_critic.parameters(), lr=self.optim_stepsize)
+        self.optimizer = optim.Adam(
+            self.actor_critic.parameters(), lr=self.optim_stepsize
+        )
 
     def discount_rewards(self, rewards, dones, gamma):
         """
@@ -87,7 +105,14 @@ class PPO:
         """
         # Reset env
         obs = self.env.reset()
-        obs_list, actions_list, rewards_list, dones_list, log_probs_list, values_list = [], [], [], [], [], []
+        (
+            obs_list,
+            actions_list,
+            rewards_list,
+            dones_list,
+            log_probs_list,
+            values_list,
+        ) = [], [], [], [], [], []
         for _ in range(timesteps_per_actorbatch):
             obs_tensor = torch.FloatTensor(obs).unsqueeze(0)
             action, log_prob, value = self.actor_critic.act(obs_tensor)
@@ -126,7 +151,9 @@ class PPO:
         observations, actions, old_log_probs, returns, advantages = batch
 
         for _ in range(self.optim_epochs):
-            new_log_probs, values, entropy = self.actor_critic.evaluate_actions(observations, actions)
+            new_log_probs, values, entropy = self.actor_critic.evaluate_actions(
+                observations, actions
+            )
 
             ratio = torch.exp(new_log_probs - old_log_probs)
             surr1 = ratio * advantages
@@ -160,8 +187,12 @@ class PPO:
             values = batch["values"].detach()
 
             # Compute discounted rewards and advantages
-            returns = torch.FloatTensor(self.discount_rewards(rewards, dones, self.gamma))
-            advantages = torch.FloatTensor(self.compute_gae(rewards, values.numpy(), dones, self.gamma, self.lam))
+            returns = torch.FloatTensor(
+                self.discount_rewards(rewards, dones, self.gamma)
+            )
+            advantages = torch.FloatTensor(
+                self.compute_gae(rewards, values.numpy(), dones, self.gamma, self.lam)
+            )
 
             # Normalize advantages
             advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
@@ -175,15 +206,26 @@ class PPO:
             reward_history.append(avg_reward)
 
             if total_timesteps_done % log_interval == 0:
-                print(f"Timesteps: {total_timesteps_done}, Avg Reward: {np.mean(reward_history)}")
+                print(
+                    f"Timesteps: {total_timesteps_done}, Avg Reward: {np.mean(reward_history)}"
+                )
 
 
 # Example usage with CartPole environment
-env = gym.make('CartPole-v1')
+env = gym.make("CartPole-v1")
 obs_dim = env.observation_space.shape[0]
 act_dim = env.action_space.n
 
 actor_critic = MLPActorCritic(obs_dim, act_dim)
-ppo = PPO(env, actor_critic, clip_param=0.2, entcoeff=0.01, optim_stepsize=1e-3, optim_epochs=4, gamma=0.99, lam=0.95)
+ppo = PPO(
+    env,
+    actor_critic,
+    clip_param=0.2,
+    entcoeff=0.01,
+    optim_stepsize=1e-3,
+    optim_epochs=4,
+    gamma=0.99,
+    lam=0.95,
+)
 
 ppo.train(total_timesteps=10000, timesteps_per_actorbatch=256)

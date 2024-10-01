@@ -11,7 +11,7 @@ from assume.scenario.loader_csv import load_scenario_folder, run_learning
 
 log = logging.getLogger(__name__)
 
-csv_path = "C:/Users/manuk/OneDrive - bwedu/01_Studium/Master/6. Semester/Spezialveranstaltung/CSVs"
+csv_path = ""
 
 os.makedirs("./examples/local_db", exist_ok=True)
 
@@ -65,7 +65,10 @@ available_examples = {
     # example_01g is used in the tutorial notebook #6: Advanced order types example
     #
     # DRL references case for learning advancement testing
-    "small_learning_1": {"scenario": "example_02a", "study_case": "tiny"}, # Changed from base to tiny for testing
+    "small_learning_1": {
+        "scenario": "example_02a",
+        "study_case": "tiny",
+    },  # Changed from base to tiny for testing
     "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
     "small_learning_3": {"scenario": "example_02c", "study_case": "base"},
     # DRL cases with lstm instead of mlp as actor neural network architecture

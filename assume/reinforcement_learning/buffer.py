@@ -7,7 +7,6 @@ from typing import NamedTuple
 
 import numpy as np
 import torch as th
-import datetime
 
 try:
     # Check memory used by replay buffer when possible
@@ -176,9 +175,10 @@ class ReplayBuffer:
 
         return ReplayBufferSamples(*tuple(map(self.to_torch, data)))
 
+
 class RolloutBufferTransitions(NamedTuple):
     """
-    A named tuple that represents the data stored in a rollout buffer for PPO. 
+    A named tuple that represents the data stored in a rollout buffer for PPO.
 
     Attributes:
         observations (torch.Tensor): The observations of the agents.
@@ -187,10 +187,12 @@ class RolloutBufferTransitions(NamedTuple):
         advantages (torch.Tensor): The advantages calculated using GAE.
         returns (torch.Tensor): The returns (discounted rewards) calculated.
     """
+
     observations: th.Tensor
     actions: th.Tensor
     rewards: th.Tensor
     log_probs: th.Tensor
+
 
 class RolloutBuffer:
     def __init__(
@@ -200,33 +202,38 @@ class RolloutBuffer:
         n_rl_units: int,
         device: str,
         float_type,
-        initial_size: int = 0,
+        buffer_size: int,
     ):
         """
         A class that represents a rollout buffer for storing observations, actions, and rewards.
         The buffer starts empty and is dynamically expanded when needed.
-        
+
         Args:
             obs_dim (int): The dimension of the observation space.
             act_dim (int): The dimension of the action space.
             n_rl_units (int): The number of reinforcement learning units.
             device (str): The device to use for storing the data (e.g., 'cpu' or 'cuda').
             float_type (torch.dtype): The data type to use for the stored data.
-            initial_size (int): The initial size of the buffer (default is 0).
+            buffer_size (int): The maximal size of the buffer
         """
-        
+
         self.obs_dim = obs_dim
         self.act_dim = act_dim
         self.n_rl_units = n_rl_units
         self.device = device
+        self.buffer_size = buffer_size
 
         # Start with no buffer (None), will be created dynamically when first data is added
-        self.observations = None  # Stores the agent's observations (states) at each timestep
+        self.observations = (
+            None  # Stores the agent's observations (states) at each timestep
+        )
         self.actions = None  # Stores the actions taken by the agent
         self.rewards = None  # Stores the rewards received after each action
-        self.log_probs = None  # Stores the log-probabilities of the actions, used to compute the ratio for policy update 
+        self.log_probs = None  # Stores the log-probabilities of the actions, used to compute the ratio for policy update
 
-        self.values = None  # Stores the value estimates (critic's predictions) of each state
+        self.values = (
+            None  # Stores the value estimates (critic's predictions) of each state
+        )
         self.advantages = None  # Stores the computed advantages using GAE (Generalized Advantage Estimation), central to PPO's policy updates
         self.returns = None  # Stores the discounted rewards (also known as returns), used to compute the value loss for training the critic
 
@@ -245,76 +252,116 @@ class RolloutBuffer:
         self.actions = np.zeros(
             (size, self.n_rl_units, self.act_dim), dtype=self.np_float_type
         )
-        self.rewards = np.zeros(
-            (size, self.n_rl_units), dtype=self.np_float_type
-        )
-        self.log_probs = np.zeros(
-            (size, self.n_rl_units), dtype=np.float32
-        )
-        self.values = np.zeros(
-            (size, self.n_rl_units), dtype=np.float32
-        )  
-        self.advantages = np.zeros(
-            (size, self.n_rl_units), dtype=np.float32
-        ) 
-        self.returns = np.zeros(
-            (size, self.n_rl_units), dtype=np.float32
-        ) 
+        self.rewards = np.zeros((size, self.n_rl_units), dtype=self.np_float_type)
+        self.log_probs = np.zeros((size, self.n_rl_units), dtype=np.float32)
+        self.values = np.zeros((size, self.n_rl_units), dtype=np.float32)
+        self.advantages = np.zeros((size, self.n_rl_units), dtype=np.float32)
+        self.returns = np.zeros((size, self.n_rl_units), dtype=np.float32)
 
-def expand_buffer(self, additional_size):
-    """Expands the buffer by the given additional size and checks if there is enough memory available."""
-    
-    # Calculation of the memory requirement for all 7 arrays
-    additional_memory_usage = (
-        np.zeros((additional_size, self.n_rl_units, self.obs_dim), dtype=self.np_float_type).nbytes +
-        np.zeros((additional_size, self.n_rl_units, self.act_dim), dtype=self.np_float_type).nbytes +
-        np.zeros((additional_size, self.n_rl_units), dtype=self.np_float_type).nbytes +    # rewards
-        np.zeros((additional_size, self.n_rl_units), dtype=np.float32).nbytes +           # log_probs
-        np.zeros((additional_size, self.n_rl_units), dtype=np.float32).nbytes +           # values
-        np.zeros((additional_size, self.n_rl_units), dtype=np.float32).nbytes +           # advantages
-        np.zeros((additional_size, self.n_rl_units), dtype=np.float32).nbytes             # returns
-    )
+    def expand_buffer(self, additional_size):
+        """Expands the buffer by the given additional size and checks if there is enough memory available."""
 
-    # Check whether enough memory is available
-    if psutil is not None:
-        mem_available = psutil.virtual_memory().available
-        if additional_memory_usage > mem_available:
-            # Conversion to GB
-            additional_memory_usage_gb = additional_memory_usage / 1e9
-            mem_available_gb = mem_available / 1e9
-            warnings.warn(
-                f"Not enough memory to expand the RolloutBuffer: "
-                f"{additional_memory_usage_gb:.2f}GB required, but only {mem_available_gb:.2f}GB available."
+        # Calculation of the memory requirement for all 7 arrays
+        additional_memory_usage = (
+            np.zeros(
+                (additional_size, self.n_rl_units, self.obs_dim),
+                dtype=self.np_float_type,
+            ).nbytes
+            + np.zeros(
+                (additional_size, self.n_rl_units, self.act_dim),
+                dtype=self.np_float_type,
+            ).nbytes
+            + np.zeros(
+                (additional_size, self.n_rl_units), dtype=self.np_float_type
+            ).nbytes  # rewards
+            + np.zeros(
+                (additional_size, self.n_rl_units), dtype=np.float32
+            ).nbytes  # log_probs
+            + np.zeros(
+                (additional_size, self.n_rl_units), dtype=np.float32
+            ).nbytes  # values
+            + np.zeros(
+                (additional_size, self.n_rl_units), dtype=np.float32
+            ).nbytes  # advantages
+            + np.zeros(
+                (additional_size, self.n_rl_units), dtype=np.float32
+            ).nbytes  # returns
+        )
+
+        # Check whether enough memory is available
+        if psutil is not None:
+            mem_available = psutil.virtual_memory().available
+            if additional_memory_usage > mem_available:
+                # Conversion to GB
+                additional_memory_usage_gb = additional_memory_usage / 1e9
+                mem_available_gb = mem_available / 1e9
+                raise MemoryError(
+                    f"{additional_memory_usage_gb:.2f}GB required, but only {mem_available_gb:.2f}GB available."
+                )
+
+            if self.pos + additional_size > self.buffer_size:
+                warnings.warn(
+                    f"Expanding the buffer will exceed the maximum buffer size of {self.buffer_size}. "
+                    f"Current position: {self.pos}, additional size: {additional_size}."
+                )
+
+            self.observations = np.concatenate(
+                (
+                    self.observations,
+                    np.zeros(
+                        (additional_size, self.n_rl_units, self.obs_dim),
+                        dtype=self.np_float_type,
+                    ),
+                ),
+                axis=0,
             )
-
-        self.observations = np.concatenate(
-            (self.observations, np.zeros((additional_size, self.n_rl_units, self.obs_dim), dtype=self.np_float_type)),
-            axis=0
-        )
-        self.actions = np.concatenate(
-            (self.actions, np.zeros((additional_size, self.n_rl_units, self.act_dim), dtype=self.np_float_type)),
-            axis=0
-        )
-        self.rewards = np.concatenate(
-            (self.rewards, np.zeros((additional_size, self.n_rl_units), dtype=self.np_float_type)),
-            axis=0
-        )
-        self.log_probs = np.concatenate(
-            (self.log_probs, np.zeros((additional_size, self.n_rl_units), dtype=np.float32)),
-            axis=0
-        )
-        self.values = np.concatenate(
-            (self.values, np.zeros((additional_size, self.n_rl_units), dtype=np.float32)), 
-            axis=0
-        )  
-        self.advantages = np.concatenate(
-            (self.advantages, np.zeros((additional_size, self.n_rl_units), dtype=np.float32)),
-            axis=0
-        )
-        self.returns = np.concatenate(
-            (self.returns, np.zeros((additional_size, self.n_rl_units), dtype=np.float32)),
-            axis=0
-        )
+            self.actions = np.concatenate(
+                (
+                    self.actions,
+                    np.zeros(
+                        (additional_size, self.n_rl_units, self.act_dim),
+                        dtype=self.np_float_type,
+                    ),
+                ),
+                axis=0,
+            )
+            self.rewards = np.concatenate(
+                (
+                    self.rewards,
+                    np.zeros(
+                        (additional_size, self.n_rl_units), dtype=self.np_float_type
+                    ),
+                ),
+                axis=0,
+            )
+            self.log_probs = np.concatenate(
+                (
+                    self.log_probs,
+                    np.zeros((additional_size, self.n_rl_units), dtype=np.float32),
+                ),
+                axis=0,
+            )
+            self.values = np.concatenate(
+                (
+                    self.values,
+                    np.zeros((additional_size, self.n_rl_units), dtype=np.float32),
+                ),
+                axis=0,
+            )
+            self.advantages = np.concatenate(
+                (
+                    self.advantages,
+                    np.zeros((additional_size, self.n_rl_units), dtype=np.float32),
+                ),
+                axis=0,
+            )
+            self.returns = np.concatenate(
+                (
+                    self.returns,
+                    np.zeros((additional_size, self.n_rl_units), dtype=np.float32),
+                ),
+                axis=0,
+            )
 
     def add(
         self,
@@ -326,7 +373,7 @@ def expand_buffer(self, additional_size):
         """
         Adds an observation, action, reward, and log probabilities of all agents to the rollout buffer.
         If the buffer does not exist, it will be initialized. If the buffer is full, it will be expanded.
-        
+
         Args:
             obs (numpy.ndarray): The observation to add.
             actions (numpy.ndarray): The actions to add.
@@ -358,14 +405,18 @@ def expand_buffer(self, additional_size):
         # print(self.log_probs)
 
     def reset(self):
-        """Resets the buffer, clearing all stored data."""
+        """
+        Resets the buffer, clearing all stored data.
+        Might be needed if policy is changed within one episode, then it needs to be killed and initalized again.
+
+        """
         self.observations = None
         self.actions = None
         self.rewards = None
         self.log_probs = None
         self.pos = 0
         self.full = False
-    
+
     # def compute_returns_and_advantages(self, last_values, dones):
     #     """
     #     Compute the returns and advantages using Generalized Advantage Estimation (GAE).
@@ -376,12 +427,12 @@ def expand_buffer(self, additional_size):
     #     """
     #     # Initialize the last advantage to 0. This will accumulate as we move backwards in time.
     #     last_advantage = 0
-        
+
     #     # Loop backward through all the steps in the buffer to calculate returns and advantages.
     #     # This is because GAE (Generalized Advantage Estimation) relies on future rewards,
     #     # so we compute it from the last step back to the first step.
     #     for step in reversed(range(self.pos)):
-            
+
     #         # If we are at the last step in the buffer
     #         if step == self.pos - 1:
     #             # If it's the last step, check whether the episode has finished using `dones`.
@@ -436,17 +487,11 @@ def expand_buffer(self, additional_size):
         Returns the observations, actions, log_probs, advantages, returns, and masks.
         """
         data = (
-            self.observations[:self.pos],
-            self.actions[:self.pos],
-            self.rewards[:self.pos],
-            self.log_probs[:self.pos]
+            self.observations[: self.pos],
+            self.actions[: self.pos],
+            self.rewards[: self.pos],
+            self.log_probs[: self.pos],
             # self.masks[:self.pos],
         )
 
         return RolloutBufferTransitions(*tuple(map(self.to_torch, data)))
-
-    def reset(self):
-        """Reset the buffer after each update."""
-        self.pos = 0
-
-

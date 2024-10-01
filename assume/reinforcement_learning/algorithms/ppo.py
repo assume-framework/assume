@@ -18,38 +18,36 @@ logger = logging.getLogger(__name__)
 
 class PPO(RLAlgorithm):
     """
-    Proximal Policy Optimization (PPO) is a robust and efficient policy gradient method for reinforcement learning. 
-    It strikes a balance between trust-region methods and simpler approaches by using clipped objective functions. 
-    PPO avoids large updates to the policy by restricting changes to stay within a specified range, which helps stabilize training. 
-    The key improvements include the introduction of a surrogate objective that limits policy updates and ensures efficient learning, 
+    Proximal Policy Optimization (PPO) is a robust and efficient policy gradient method for reinforcement learning.
+    It strikes a balance between trust-region methods and simpler approaches by using clipped objective functions.
+    PPO avoids large updates to the policy by restricting changes to stay within a specified range, which helps stabilize training.
+    The key improvements include the introduction of a surrogate objective that limits policy updates and ensures efficient learning,
     as well as the use of multiple epochs of stochastic gradient descent on batches of data.
 
     Open AI Spinning guide: https://spinningup.openai.com/en/latest/algorithms/ppo.html#
 
     Original paper: https://arxiv.org/pdf/1802.09477.pdf
     """
-    
+
     # Change order and mandatory parameters in the superclass, removed and newly added parameters
     def __init__(
         self,
         learning_role,
-        learning_rate=1e-4,
-        gamma=0.99, # Discount factor for future rewards
-        epochs=10,  # Number of epochs for updating the policy
-        clip_ratio=0.2,  # Clipping parameter for policy updates
-        vf_coef=0.5,  # Value function coefficient in the loss function
-        entropy_coef=0.02,  # Entropy coefficient for exploration
-        max_grad_norm=0.5,  # Gradient clipping value
-        gae_lambda=0.95,  # GAE lambda for advantage estimation
-        batch_size=5, # Batch size for each update, if mini-batch approach is used (currently not implemented)
-        actor_architecture="mlp",
+        learning_rate: float,
+        gamma: float,  # Discount factor for future rewards
+        epochs: int,  # Number of epochs for updating the policy
+        clip_ratio: float,  # Clipping parameter for policy updates
+        vf_coef: float,  # Value function coefficient in the loss function
+        entropy_coef: float,  # Entropy coefficient for exploration
+        max_grad_norm: float,  # Gradient clipping value
+        gae_lambda: float,  # GAE lambda for advantage estimation
+        actor_architecture: str,
     ):
         super().__init__(
-            learning_role,
-            learning_rate,
-            batch_size,
-            gamma,
-            actor_architecture,
+            learning_role=learning_role,
+            learning_rate=learning_rate,
+            gamma=gamma,
+            actor_architecture=actor_architecture,
         )
         self.epochs = epochs
         self.clip_ratio = clip_ratio
@@ -57,8 +55,7 @@ class PPO(RLAlgorithm):
         self.entropy_coef = entropy_coef
         self.max_grad_norm = max_grad_norm
         self.gae_lambda = gae_lambda
-        self.n_updates = 0 # Number of updates performed
-        
+        self.n_updates = 0  # Number of updates performed
 
     # Unchanged method from MATD3
     def save_params(self, directory):
@@ -208,7 +205,6 @@ class PPO(RLAlgorithm):
             except Exception:
                 logger.warning(f"No actor values loaded for agent {u_id}")
 
-
     # Removed target_critics and actor_target in comparison to MATD3
     def initialize_policy(self, actors_and_critics: dict = None) -> None:
         """
@@ -264,14 +260,6 @@ class PPO(RLAlgorithm):
                 num_timeseries_obs_dim=unit_strategy.num_timeseries_obs_dim,
             ).to(self.device)
 
-            # unit_strategy.actor_target = Actor(
-            #     obs_dim=unit_strategy.obs_dim,
-            #     act_dim=unit_strategy.act_dim,
-            #     float_type=self.float_type,
-            # ).to(self.device)
-            # unit_strategy.actor_target.load_state_dict(unit_strategy.actor.state_dict())
-            # unit_strategy.actor_target.train(mode=False)
-
             unit_strategy.actor.optimizer = Adam(
                 unit_strategy.actor.parameters(), lr=self.learning_rate
             )
@@ -292,7 +280,7 @@ class PPO(RLAlgorithm):
             self.act_dim = act_dim_list[0]
 
     # Removed target_critics in comparison to MATD3
-    # Changed initialization of CriticPPO compared to MATD3 
+    # Changed initialization of CriticPPO compared to MATD3
     def create_critics(self) -> None:
         """
         Create decentralized critic networks for reinforcement learning.
@@ -303,12 +291,11 @@ class PPO(RLAlgorithm):
         Notes:
             Each agent has its own critic, so the critic is no longer shared among all agents.
         """
-        n_agents = len(self.learning_role.rl_strats)
+
         strategy: LearningStrategy
         unique_obs_dim_list = []
 
         for u_id, strategy in self.learning_role.rl_strats.items():
-
             self.learning_role.critics[u_id] = CriticPPO(
                 obs_dim=strategy.obs_dim,
                 float_type=self.float_type,
@@ -318,17 +305,9 @@ class PPO(RLAlgorithm):
                 self.learning_role.critics[u_id].parameters(), lr=self.learning_rate
             )
 
-            # self.learning_role.target_critics[u_id].load_state_dict(
-            #     self.learning_role.critics[u_id].state_dict()
-            # )
-            # self.learning_role.target_critics[u_id].train(mode=False)
-
             self.learning_role.critics[u_id] = self.learning_role.critics[u_id].to(
                 self.device
             )
-            # self.learning_role.target_critics[u_id] = self.learning_role.target_critics[
-            #     u_id
-            # ].to(self.device)
 
             unique_obs_dim_list.append(strategy.unique_obs_dim)
 
@@ -353,44 +332,38 @@ class PPO(RLAlgorithm):
             dict: The extracted actor and critic networks.
         """
         actors = {}
-        actor_targets = {}
 
         for u_id, unit_strategy in self.learning_role.rl_strats.items():
             actors[u_id] = unit_strategy.actor
-            # actor_targets[u_id] = unit_strategy.actor_target
 
         actors_and_critics = {
             "actors": actors,
-            # "actor_targets": actor_targets,
             "critics": self.learning_role.critics,
-            # "target_critics": self.learning_role.target_critics,
             "obs_dim": self.obs_dim,
             "act_dim": self.act_dim,
             "unique_obs_dim": self.unique_obs_dim,
         }
 
         return actors_and_critics
-    
+
     def update_policy(self):
         """
         Perform policy updates using PPO with the clipped objective.
         """
 
-
         logger.debug("Updating Policy")
         # We will iterate for multiple epochs to update both the policy (actor) and value (critic) networks
         # The number of epochs controls how many times we update using the same collected data (from the buffer).
-        n_rl_agents = len(self.learning_role.rl_strats.keys())
-        for _ in range(self.epochs): 
+
+        for _ in range(self.epochs):
             self.n_updates += 1
-            i = 0
 
             # Iterate through over each agent's strategy
             # Each agent has its own actor and critic. Critic (value network) is in comparison to MATD3 decentralized, meaning each agent learns its own value function.
             for u_id in self.learning_role.rl_strats.keys():
                 critic = self.learning_role.critics[u_id]
                 actor = self.learning_role.rl_strats[u_id].actor
-        
+
                 # Retrieve experiences from the buffer
                 # The collected experiences (observations, actions, rewards, log_probs) are stored in the buffer.
                 transitions = self.learning_role.buffer.get()
@@ -399,28 +372,22 @@ class PPO(RLAlgorithm):
                 rewards = transitions.rewards
                 log_probs = transitions.log_probs
 
-
-
-
                 # STARTING FROM HERE, THE IMPLEMENTATION NEEDS TO BE FIXED
                 # Potentially, it could be useful to source some functionality out into methods stored in buffer.py
 
-
-
                 # Pass the current states through the critic network to get value estimates.
-                values = critic(states) 
-                
+                values = critic(states).squeeze(dim=2)
+
                 # Store the calculated values in the rollout buffer
                 # These values are used later to calculate the advantage estimates (for policy updates).
                 self.learning_role.buffer.values = values.detach().cpu().numpy()
 
-                print("Buffer values")
-                print(self.learning_role.buffer.values)
-        
                 # Compute advantages using Generalized Advantage Estimation (GAE)
                 advantages = []
                 last_advantage = 0
                 returns = []
+
+                # Iterate through the collected experiences in reverse order to calculate advantages and returns
                 for t in reversed(range(len(rewards))):
                     if t == len(rewards) - 1:
                         next_value = 0
@@ -428,10 +395,14 @@ class PPO(RLAlgorithm):
                         next_value = values[t + 1]
 
                     # Temporal difference delta
-                    delta = rewards[t] + self.gamma * next_value - values[t]  # Use self.gamma for discount factor
-                    
+                    delta = (
+                        rewards[t] + self.gamma * next_value - values[t]
+                    )  # Use self.gamma for discount factor
+
                     # GAE advantage
-                    last_advantage = delta + self.gamma * self.gae_lambda * last_advantage  # Use self.gae_lambda for advantage estimation
+                    last_advantage = (
+                        delta + self.gamma * self.gae_lambda * last_advantage
+                    )  # Use self.gae_lambda for advantage estimation
                     advantages.insert(0, last_advantage)
                     returns.insert(0, last_advantage + values[t])
 
@@ -441,7 +412,9 @@ class PPO(RLAlgorithm):
 
                 # Evaluate the new log-probabilities and entropy under the current policy
                 action_means = actor(states)
-                action_stddev = th.ones_like(action_means)  # Assuming fixed standard deviation for simplicity
+                action_stddev = th.ones_like(
+                    action_means
+                )  # Assuming fixed standard deviation for simplicity
                 dist = th.distributions.Normal(action_means, action_stddev)
                 new_log_probs = dist.log_prob(actions).sum(-1)
                 entropy = dist.entropy().sum(-1)
@@ -451,16 +424,23 @@ class PPO(RLAlgorithm):
 
                 # Surrogate loss calculation
                 surrogate1 = ratio * advantages
-                surrogate2 = th.clamp(ratio, 1.0 - self.clip_ratio, 1.0 + self.clip_ratio) * advantages  # Use self.clip_ratio
+                surrogate2 = (
+                    th.clamp(ratio, 1.0 - self.clip_ratio, 1.0 + self.clip_ratio)
+                    * advantages
+                )  # Use self.clip_ratio
 
                 # Final policy loss (clipped surrogate loss)
                 policy_loss = -th.min(surrogate1, surrogate2).mean()
 
                 # Value loss (mean squared error between the predicted values and returns)
-                value_loss = F.mse_loss(returns, values)
+                value_loss = F.mse_loss(returns, values.squeeze())
 
                 # Total loss: policy loss + value loss - entropy bonus
-                total_loss = policy_loss + self.vf_coef * value_loss - self.entropy_coef * entropy.mean()  # Use self.vf_coef and self.entropy_coef
+                total_loss = (
+                    policy_loss
+                    + self.vf_coef * value_loss
+                    - self.entropy_coef * entropy.mean()
+                )  # Use self.vf_coef and self.entropy_coef
 
                 # Zero the gradients and perform backpropagation for both actor and critic
                 actor.optimizer.zero_grad()
@@ -468,8 +448,12 @@ class PPO(RLAlgorithm):
                 total_loss.backward()
 
                 # Clip gradients to prevent gradient explosion
-                th.nn.utils.clip_grad_norm_(actor.parameters(), self.max_grad_norm)  # Use self.max_grad_norm
-                th.nn.utils.clip_grad_norm_(critic.parameters(), self.max_grad_norm)  # Use self.max_grad_norm
+                th.nn.utils.clip_grad_norm_(
+                    actor.parameters(), self.max_grad_norm
+                )  # Use self.max_grad_norm
+                th.nn.utils.clip_grad_norm_(
+                    critic.parameters(), self.max_grad_norm
+                )  # Use self.max_grad_norm
 
                 # Perform optimization steps
                 actor.optimizer.step()
@@ -511,4 +495,3 @@ def get_actions(rl_strategy, next_observation):
     sampled_action = sampled_action.clamp(-1, 1)
 
     return sampled_action, log_prob_action
-

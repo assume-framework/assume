@@ -26,7 +26,7 @@ from assume.common.utils import (
 from assume.strategies import BaseStrategy
 from assume.world import World
 
-#from assume.reinforcement_learning.learning_utils import calculate_total_timesteps_per_episode
+# from assume.reinforcement_learning.learning_utils import calculate_total_timesteps_per_episode
 
 logger = logging.getLogger(__name__)
 
@@ -894,13 +894,17 @@ def run_learning(
     world.export_csv_path = ""
 
     actors_and_critics = None
-    world.learning_role.initialize_policy(actors_and_critics=actors_and_critics) # Leads to the initialization of the Learning role, makes world.learning_role.rl_algorithm_name accessible
+    world.learning_role.initialize_policy(
+        actors_and_critics=actors_and_critics
+    )  # Leads to the initialization of the Learning role, makes world.learning_role.rl_algorithm_name accessible
     world.output_role.del_similar_runs()
 
     save_path = world.learning_config["trained_policies_save_path"]
 
     if Path(save_path).is_dir():
-        accept = input(f"{save_path=} exists - should we overwrite current learnings? (y/N) ")
+        accept = input(
+            f"{save_path=} exists - should we overwrite current learnings? (y/N) "
+        )
         if not accept.lower().startswith("y"):
             raise AssumeException("Don't overwrite existing strategies")
 
@@ -908,30 +912,23 @@ def run_learning(
     scenario_data = load_config_and_create_forecaster(inputs_path, scenario, study_case)
 
     # For PPO buffer size calculation
-    validation_interval_from_config = world.learning_config.get("validation_episodes_interval", 5)
+    validation_interval_from_config = world.learning_config.get(
+        "validation_episodes_interval", 5
+    )
 
-    if world.learning_role.rl_algorithm_name == "matd3":
-        buffer = ReplayBuffer(
-            buffer_size=int(world.learning_config.get("replay_buffer_size", 5e5)),
-            obs_dim=world.learning_role.rl_algorithm.obs_dim,
-            act_dim=world.learning_role.rl_algorithm.act_dim,
-            n_rl_units=len(world.learning_role.rl_strats),
-            device=world.learning_role.device,
-            float_type=world.learning_role.float_type,
-        )
-    elif world.learning_role.rl_algorithm_name == "ppo":
-
-        # For non-dynamic buffer size: Calculate number of timesteps here for a full episode
-        # total_timesteps_per_episode = calculate_total_timesteps_per_episode(scenario_data['start'], scenario_data['end'], scenario_data['time_step'])
-
-        buffer = RolloutBuffer(
-            # buffer_size=int(total_timesteps_per_episode * validation_interval_from_config), # For non-dynamic buffer size
-            obs_dim=world.learning_role.rl_algorithm.obs_dim,
-            act_dim=world.learning_role.rl_algorithm.act_dim,
-            n_rl_units=len(world.learning_role.rl_strats),
-            device=world.learning_role.device,
-            float_type=world.learning_role.float_type,
-        )
+    buffer_cls = (
+        ReplayBuffer
+        if world.learning_role.rl_algorithm_name == "matd3"
+        else RolloutBuffer
+    )
+    buffer = buffer_cls(
+        buffer_size=int(world.learning_config.get("replay_buffer_size", 5e5)),
+        obs_dim=world.learning_role.rl_algorithm.obs_dim,
+        act_dim=world.learning_role.rl_algorithm.act_dim,
+        n_rl_units=len(world.learning_role.rl_strats),
+        device=world.learning_role.device,
+        float_type=world.learning_role.float_type,
+    )
 
     inter_episodic_data = {
         "buffer": buffer,
@@ -950,7 +947,10 @@ def run_learning(
         # Noise is added to the actions to encourage exploration. In contrast, PPO uses stochastic policies
         # that naturally explore the environment by sampling actions from a probability distribution, making
         # external noise addition unnecessary.
-        inter_episodic_data["noise_scale"] = world.learning_config.get("noise_scale", 1.0)
+        # TODO: delete noise scale here as new sheduler makes it obsolete in future, leave like this now
+        inter_episodic_data["noise_scale"] = world.learning_config.get(
+            "noise_scale", 1.0
+        )
 
     # if world.learning_role.rl_algorithm_name == "matd3":
     # Sets the validation interval: After how many episodes does validation take place
@@ -975,22 +975,19 @@ def run_learning(
             )
 
         world.learning_role.load_inter_episodic_data(inter_episodic_data)
-        world.run() # triggers calculate_bids() which equals to step
+        world.run()  # triggers calculate_bids() which equals to step
 
         inter_episodic_data = world.learning_role.get_inter_episodic_data()
         inter_episodic_data["episodes_done"] = episode
 
-
         # Perform validation at regular intervals
-        if (
-            episode % validation_interval == 0
-            and (
-                episode >= world.learning_role.episodes_collecting_initial_experience + validation_interval
-                if world.learning_role.rl_algorithm_name == "matd3"
-                else episode > validation_interval # For PPO
-            )
+        if episode % validation_interval == 0 and (
+            episode
+            >= world.learning_role.episodes_collecting_initial_experience
+            + validation_interval
+            if world.learning_role.rl_algorithm_name == "matd3"
+            else episode > validation_interval  # For PPO
         ):
-            
             world.reset()
 
             setup_world(
@@ -1007,9 +1004,10 @@ def run_learning(
             if world.learning_role.rl_algorithm_name == "matd3":
                 total_rewards = world.output_role.get_sum_reward()
                 avg_reward = np.mean(total_rewards)
-                terminate = world.learning_role.compare_and_save_policies({"avg_reward": avg_reward})
+                terminate = world.learning_role.compare_and_save_policies(
+                    {"avg_reward": avg_reward}
+                )
 
-     
             if world.learning_role.rl_algorithm_name == "ppo":
                 # PPO uses the surrogate loss to monitor policy updates.
                 # The surrogate loss quantifies how much the new policy has changed compared to the old one.
@@ -1017,17 +1015,24 @@ def run_learning(
                 # - A very small value may mean that the policy is near its optimum.
                 # - A large value could indicate excessive policy updates, leading to instability.
                 #
-                # It may be useful to terminate the training early based on the surrogate loss, 
+                # It may be useful to terminate the training early based on the surrogate loss,
                 # especially if no significant improvement is expected, or if the model becomes unstable.
                 #
-                # In this example, the surrogate_loss could be computed, and then 
+                # In this example, the surrogate_loss could be computed, and then
                 # `compare_and_save_policies` can be used to check whether the training should be terminated.
-                
+
                 # surrogate_loss = <code to calculate the surrogate loss>
                 # terminate = world.learning_role.compare_and_save_policies({"surrogate_loss": surrogate_loss})
 
                 # Reset the PPO Rollout Buffer after each update
+                # TODO: add surrogate loss as a parameter to compare_and_save_policies
                 inter_episodic_data["buffer"].reset()
+
+                total_rewards = world.output_role.get_sum_reward()
+                avg_reward = np.mean(total_rewards)
+                terminate = world.learning_role.compare_and_save_policies(
+                    {"avg_reward": avg_reward}
+                )
 
             inter_episodic_data["eval_episodes_done"] = eval_episode
 
@@ -1035,10 +1040,6 @@ def run_learning(
                 break
 
             eval_episode += 1
-
-            
-
-            
 
         world.reset()
 
@@ -1064,6 +1065,7 @@ def run_learning(
     world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
     print("Evaluation finished")
+
 
 if __name__ == "__main__":
     data = read_grid(Path("examples/inputs/example_01d"))

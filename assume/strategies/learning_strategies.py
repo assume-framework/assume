@@ -131,8 +131,6 @@ class RLStrategy(LearningStrategy):
 
         """
 
-        print("calculate_bids in learning_strategies.py (STEP)")
-
         bid_quantity_inflex, bid_price_inflex = 0, 0
         bid_quantity_flex, bid_price_flex = 0, 0
 
@@ -156,9 +154,8 @@ class RLStrategy(LearningStrategy):
         # =============================================================================
         # 2. Get the Actions, based on the observations
         # =============================================================================
-        # actions, noise = self.get_actions(next_observation) # Old implementation with get_actions inside this class
-        # actions, noise = self.get_actions(self, next_observation)
-        # Depending on the algorithm, extra_info is either noise (MATD3) or log_probs (PPO)
+        # Depending on the algorithm, we call specific function that passes obs through actor and generates actions
+        # extra_info is either noise (MATD3) or log_probs (PPO)
         actions, extra_info = self.get_actions(self, next_observation)
 
         # =============================================================================
@@ -205,7 +202,7 @@ class RLStrategy(LearningStrategy):
         # store results in unit outputs as series to be written to the database by the unit operator
         unit.outputs["actions"][start] = actions
         # unit.outputs["exploration_noise"][start] = noise
-
+        # TODO: Make this algo specific function
         # Check if extra_info is noise or log_probs and store it accordingly
         if isinstance(extra_info, th.Tensor) and extra_info.shape == actions.shape:
             unit.outputs["exploration_noise"][start] = extra_info  # It's noise
