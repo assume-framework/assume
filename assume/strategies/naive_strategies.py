@@ -152,10 +152,6 @@ class NaiveDASteelplantStrategy(BaseStrategy):
         start = product_tuples[0][0]  # start time of the first product
 
         unit.calculate_optimal_operation_if_needed()
-
-        # unit.run_modified_optimization()
-
-        bids = []
         for product in product_tuples:
             """
             for each product, calculate the marginal cost of the unit at the start time of the product
@@ -163,13 +159,13 @@ class NaiveDASteelplantStrategy(BaseStrategy):
             """
             start = product[0]
             volume = unit.opt_power_requirement.loc[start]
-            price = 3000
+            marginal_price = unit.calculate_marginal_cost(start, volume)
             bids.append(
                 {
                     "start_time": product[0],
                     "end_time": product[1],
                     "only_hours": product[2],
-                    "price": price,
+                    "price": marginal_price,
                     "volume": -volume,
                 }
             )
