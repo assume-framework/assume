@@ -158,6 +158,8 @@ class NaiveDASteelplantStrategy(BaseStrategy):
             and the volume of the product. Dispatch the order to the market.
             """
             start = product[0]
+            if unit.flex_power_requirement is not None:
+                volume = unit.flex_power_requirement.loc[start]
             volume = unit.opt_power_requirement.loc[start]
             marginal_price = unit.calculate_marginal_cost(start, volume)
             bids.append(
