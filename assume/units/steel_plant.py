@@ -476,6 +476,11 @@ class SteelPlant(SupportsMinMax, DSMFlex):
         self.flex_power_requirement = pd.Series(data=temp)
         self.flex_power_requirement.index = self.index
 
+        # Variable cost series
+        temp_1 = instance.variable_cost.get_values()
+        self.variable_cost_series = pd.Series(data=temp_1)
+        self.variable_cost_series.index = self.index
+
     def set_dispatch_plan(
         self,
         marketconfig: MarketConfig,
