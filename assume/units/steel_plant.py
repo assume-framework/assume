@@ -120,6 +120,7 @@ class SteelPlant(SupportsMinMax, DSMFlex):
 
         self.opt_power_requirement = None
         self.flex_power_requirement = None
+
         self.variable_cost_series = None
 
     def switch_to_opt(self, instance):
