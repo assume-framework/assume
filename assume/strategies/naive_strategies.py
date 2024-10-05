@@ -158,6 +158,7 @@ class NaiveDASteelplantStrategy(BaseStrategy):
             and the volume of the product. Dispatch the order to the market.
             """
             start = product[0]
+
             volume = unit.opt_power_requirement.loc[start]
             marginal_price = unit.calculate_marginal_cost(start, volume)
             bids.append(
@@ -196,13 +197,13 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
             """
             start = product[0]
             volume = unit.flex_power_requirement.loc[start]
-            price = 3000
+            marginal_price = unit.calculate_marginal_cost(start, volume)
             bids.append(
                 {
                     "start_time": product[0],
                     "end_time": product[1],
                     "only_hours": product[2],
-                    "price": price,
+                    "price": marginal_price,
                     "volume": -volume,
                 }
             )

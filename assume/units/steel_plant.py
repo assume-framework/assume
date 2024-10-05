@@ -120,6 +120,7 @@ class SteelPlant(SupportsMinMax, DSMFlex):
 
         self.opt_power_requirement = None
         self.flex_power_requirement = None
+
         self.variable_cost_series = None
 
     def switch_to_opt(self, instance):
@@ -475,6 +476,11 @@ class SteelPlant(SupportsMinMax, DSMFlex):
         temp = instance.total_power_input.get_values()
         self.flex_power_requirement = pd.Series(data=temp)
         self.flex_power_requirement.index = self.index
+
+        # Variable cost series
+        temp_1 = instance.variable_cost.get_values()
+        self.variable_cost_series = pd.Series(data=temp_1)
+        self.variable_cost_series.index = self.index
 
     def set_dispatch_plan(
         self,
