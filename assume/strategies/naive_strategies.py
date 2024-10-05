@@ -188,8 +188,6 @@ class NaiveDABuildingStrategy(BaseStrategy):
         start = product_tuples[0][0]  # start time of the first product
 
         unit.calculate_optimal_operation_if_needed()
-
-        bids = []
         for product in product_tuples:
             """
             for each product, calculate the marginal cost of the unit at the start time of the product
