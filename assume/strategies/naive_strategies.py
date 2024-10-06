@@ -185,6 +185,7 @@ class NaiveDABuildingStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
+        bids = []
         start = product_tuples[0][0]  # start time of the first product
 
         unit.calculate_optimal_operation_if_needed()

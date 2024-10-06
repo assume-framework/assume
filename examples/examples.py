@@ -60,7 +60,7 @@ availabe_examples = {
         "scenario": "example_05",
         "study_case": "base_case_building_2019",
     },
-    "small_with_building_pv_ev_st": {
+    "small_with_building_mh": {
         "scenario": "example_06",
         "study_case": "base_case_building_2019",
     },
@@ -89,13 +89,15 @@ if __name__ == "__main__":
     - timescale: with database and grafana (note: you need docker installed)
     """
     data_format = "timescale"  # "local_db" or "timescale"
-    example = "small_with_building_pv_ev_st"
+    example = "small_with_building_mh"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
     elif data_format == "timescale":
         db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
+    scenario = availabe_examples[example]["scenario"]
+    csv_path = f"examples/outputs/{scenario}"
     # create world
     world = World(database_uri=db_uri, export_csv_path=csv_path)
 
@@ -103,7 +105,7 @@ if __name__ == "__main__":
     load_scenario_folder(
         world,
         inputs_path="examples/inputs",
-        scenario=availabe_examples[example]["scenario"],
+        scenario=scenario,
         study_case=availabe_examples[example]["study_case"],
     )
 

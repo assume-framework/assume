@@ -85,12 +85,15 @@ class Building(SupportsMinMax, DSMFlex):
         )
 
         self.electricity_price = self.forecaster["price_EOM"]
-        self.natural_gas_price = self.forecaster["fuel_price_natural_gas"]
+        self.natural_gas_price = self.forecaster["fuel_price_natural gas"]
         self.heat_demand = self.forecaster["heat_demand"]
         self.ev_load_profile = self.forecaster["ev_load_profile"]
         self.battery_load_profile = self.forecaster["battery_load_profile"]
         self.additional_electricity_load = self.forecaster[
             f"{self.id}_load_profile"
+        ]
+        self.pv_power_profile = self.forecaster[
+            f"{self.id}_pv_power_profile"
         ]
         self.demand = demand
         self.flexibility_measure = flexibility_measure
@@ -100,9 +103,17 @@ class Building(SupportsMinMax, DSMFlex):
         self.model = pyo.ConcreteModel()
         self.define_sets()
         self.define_parameters()
+
+        self.has_heatpump = "heatpump" in components
+        self.has_boiler = "boiler" in components
+        self.has_thermal_storage = "thermal_storage" in components
+        self.has_ev = "ev" in components
+        self.has_battery_storage = "battery_storage" in components
+        self.has_pv = "pv_plant" in components
+
         # Create availability DataFrame for EVs
         # Parse the availability periods
-        if "ev" in components:
+        if self.has_ev:
             if "availability_periods" in components["ev"]:
                 try:
                     # Convert the string to a list of tuples
@@ -122,7 +133,7 @@ class Building(SupportsMinMax, DSMFlex):
                 )
 
         # Parse the availability of the PV plant
-        if "pv_plant" in components:
+        if self.has_pv:
             pv_availability = self.forecaster["availability_Solar"]
             if pv_availability is not None:
                 components["pv_plant"]["availability"] = pv_availability
@@ -130,13 +141,6 @@ class Building(SupportsMinMax, DSMFlex):
                 raise KeyError(
                     "Missing 'availability' of PV plants in availability file."
                 )
-
-        self.has_heatpump = "heatpump" in components
-        self.has_boiler = "boiler" in components
-        self.has_thermal_storage = "thermal_storage" in components
-        self.has_ev = "ev" in components
-        self.has_battery_storage = "battery_storage" in components
-        self.has_pv = "pv_plant" in components
 
         self.define_variables()
         self.initialize_components(components)
@@ -217,7 +221,7 @@ class Building(SupportsMinMax, DSMFlex):
 
                 """
                 return (self.model.dsm_blocks["battery_storage"].charge[t]
-                        == self.model.charge_battery_from_grid[t]
+                        == self.model.charge_battery_from_grid[t] # TODO: Is it possible, also for LEC? Check if possible!! Or just future scenario
                         + (self.model.charge_battery_from_pv[t] if self.has_pv else 0)
                         )
 
@@ -495,28 +499,34 @@ class Building(SupportsMinMax, DSMFlex):
                 "Termination Condition: ", results.solver.termination_condition
             )
 
-        # power_input = instance.total_power_input.get_values()
-        # power_output = instance.total_power_output.get_values()
-        # temp_1 = {key: power_input[key] - power_output[key] for key in power_input.keys()}
-        # self.opt_power_requirement = pd.Series(data=temp_1)
-        # self.opt_power_requirement.index = self.index
-        #
-        # # Variable cost series
-        # variable_costs = instance.variable_cost.get_values()
-        # variable_revenues = instance.variable_revenue.get_values()
-        # temp_2 = {key: variable_costs[key] - variable_revenues[key] for key in variable_costs.keys()}
-        # self.variable_cost_series = pd.Series(data=temp_2)
-        # self.variable_cost_series.index = self.index
-
-        # Total power input series
-        temp_1 = instance.total_power_input.get_values()
+        power_input = instance.total_power_input.get_values()
+        power_output = instance.total_power_output.get_values()
+        temp_1 = {key: power_input[key] - power_output[key] for key in power_input.keys()}
         self.opt_power_requirement = pd.Series(data=temp_1)
         self.opt_power_requirement.index = self.index
 
         # Variable cost series
-        temp_2 = instance.variable_cost.get_values()
+        variable_costs = instance.variable_cost.get_values()
+        variable_revenues = instance.variable_revenue.get_values()
+        temp_2 = {key: abs(variable_costs[key] - variable_revenues[key])  for key in variable_costs.keys()}
         self.variable_cost_series = pd.Series(data=temp_2)
         self.variable_cost_series.index = self.index
+
+        self.write_additional_outputs(instance)
+
+    def write_additional_outputs(self, instance):
+        if self.has_battery_storage:
+            soc = pd.Series(
+                data=instance.dsm_blocks["battery_storage"].soc.get_values(), dtype=float
+            )
+            soc.index = self.index
+            self.outputs["soc"] = soc
+        if self.has_ev:
+            ev_soc = pd.Series(
+                data=instance.dsm_blocks["ev"].ev_battery_soc.get_values(), index=self.index, dtype=object
+            )
+            ev_soc.index = self.index
+            self.outputs["ev_soc"] = ev_soc
 
     def set_dispatch_plan(
         self,
@@ -549,6 +559,7 @@ class Building(SupportsMinMax, DSMFlex):
         self.calculate_cashflow("energy", orderbook)
 
         for start in products_index:
+            # TODO: For what is this needed??
             current_power = self.outputs["energy"][start]
             self.outputs["energy"][start] = current_power
 
