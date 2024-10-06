@@ -1,0 +1,685 @@
+start_time,end_time,price,volume,node,bid_id,unit_id,accepted_volume,accepted_price,market_id,bid_type,simulation
+2019-01-01 01:00:00,2019-01-01 02:00:00,25.452,50,south,KKW PHILIPPSBURG 2_1,KKW PHILIPPSBURG 2,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 02:00:00,2019-01-01 03:00:00,25.452,100,south,KKW PHILIPPSBURG 2_2,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 03:00:00,2019-01-01 04:00:00,25.452,100,south,KKW PHILIPPSBURG 2_3,KKW PHILIPPSBURG 2,67.287,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 04:00:00,2019-01-01 05:00:00,25.452,100,south,KKW PHILIPPSBURG 2_4,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 05:00:00,2019-01-01 06:00:00,25.452,100,south,KKW PHILIPPSBURG 2_5,KKW PHILIPPSBURG 2,88.477,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 06:00:00,2019-01-01 07:00:00,25.452,100,south,KKW PHILIPPSBURG 2_6,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 07:00:00,2019-01-01 08:00:00,25.452,100,south,KKW PHILIPPSBURG 2_7,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 08:00:00,2019-01-01 09:00:00,25.452,100,south,KKW PHILIPPSBURG 2_8,KKW PHILIPPSBURG 2,70.62,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 09:00:00,2019-01-01 10:00:00,25.452,100,south,KKW PHILIPPSBURG 2_9,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 10:00:00,2019-01-01 11:00:00,25.452,100,south,KKW PHILIPPSBURG 2_10,KKW PHILIPPSBURG 2,30.298,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 11:00:00,2019-01-01 12:00:00,25.452,100,south,KKW PHILIPPSBURG 2_11,KKW PHILIPPSBURG 2,5.2238,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 12:00:00,2019-01-01 13:00:00,25.452,100,south,KKW PHILIPPSBURG 2_12,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 13:00:00,2019-01-01 14:00:00,25.452,100,south,KKW PHILIPPSBURG 2_13,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 18:00:00,2019-01-01 19:00:00,25.452,100,south,KKW PHILIPPSBURG 2_18,KKW PHILIPPSBURG 2,90.927,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 19:00:00,2019-01-01 20:00:00,25.452,100,south,KKW PHILIPPSBURG 2_19,KKW PHILIPPSBURG 2,97.297,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 20:00:00,2019-01-01 21:00:00,25.452,100,south,KKW PHILIPPSBURG 2_20,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 21:00:00,2019-01-01 22:00:00,25.452,100,south,KKW PHILIPPSBURG 2_21,KKW PHILIPPSBURG 2,28.247,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 22:00:00,2019-01-01 23:00:00,25.452,100,south,KKW PHILIPPSBURG 2_22,KKW PHILIPPSBURG 2,50.703,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 23:00:00,2019-01-02 00:00:00,25.452,100,south,KKW PHILIPPSBURG 2_23,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 00:00:00,2019-01-02 01:00:00,25.452,100,south,KKW PHILIPPSBURG 2_24,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 01:00:00,2019-01-01 02:00:00,25.452,50,south,KKW BROKDORF_1,KKW BROKDORF,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 01:00:00,2019-01-01 02:00:00,25.452,50,south,KKW ISAR 2_1,KKW ISAR 2,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 02:00:00,2019-01-01 03:00:00,25.452,100,south,KKW BROKDORF_2,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 02:00:00,2019-01-01 03:00:00,25.452,100,south,KKW ISAR 2_2,KKW ISAR 2,48.266,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 03:00:00,2019-01-01 04:00:00,25.452,100,south,KKW BROKDORF_3,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 03:00:00,2019-01-01 04:00:00,25.452,100,south,KKW ISAR 2_3,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 04:00:00,2019-01-01 05:00:00,25.452,100,south,KKW BROKDORF_4,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 04:00:00,2019-01-01 05:00:00,25.452,100,south,KKW ISAR 2_4,KKW ISAR 2,81.005,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 05:00:00,2019-01-01 06:00:00,25.452,100,south,KKW BROKDORF_5,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 05:00:00,2019-01-01 06:00:00,25.452,100,south,KKW ISAR 2_5,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 06:00:00,2019-01-01 07:00:00,25.452,100,south,KKW BROKDORF_6,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 06:00:00,2019-01-01 07:00:00,25.452,100,south,KKW ISAR 2_6,KKW ISAR 2,89.192,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 07:00:00,2019-01-01 08:00:00,25.452,100,south,KKW BROKDORF_7,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 07:00:00,2019-01-01 08:00:00,25.452,100,south,KKW ISAR 2_7,KKW ISAR 2,83.1,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 08:00:00,2019-01-01 09:00:00,25.452,100,south,KKW BROKDORF_8,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 08:00:00,2019-01-01 09:00:00,25.452,100,south,KKW ISAR 2_8,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 09:00:00,2019-01-01 10:00:00,25.452,100,south,KKW BROKDORF_9,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 09:00:00,2019-01-01 10:00:00,25.452,100,south,KKW ISAR 2_9,KKW ISAR 2,52.607,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 10:00:00,2019-01-01 11:00:00,25.452,100,south,KKW BROKDORF_10,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 10:00:00,2019-01-01 11:00:00,25.452,100,south,KKW ISAR 2_10,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 11:00:00,2019-01-01 12:00:00,25.452,100,south,KKW ISAR 2_11,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 11:00:00,2019-01-01 12:00:00,25.452,100,south,KKW BROKDORF_11,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 12:00:00,2019-01-01 13:00:00,25.452,100,south,KKW BROKDORF_12,KKW BROKDORF,79.105,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 13:00:00,2019-01-01 14:00:00,25.452,100,south,KKW ISAR 2_13,KKW ISAR 2,53.734,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 14:00:00,2019-01-01 15:00:00,25.452,100,south,KKW ISAR 2_14,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 14:00:00,2019-01-01 15:00:00,25.452,100,south,KKW BROKDORF_14,KKW BROKDORF,30.851,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 15:00:00,2019-01-01 16:00:00,25.452,100,south,KKW BROKDORF_15,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 15:00:00,2019-01-01 16:00:00,25.452,100,south,KKW ISAR 2_15,KKW ISAR 2,12.027,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 16:00:00,2019-01-01 17:00:00,25.452,100,south,KKW BROKDORF_16,KKW BROKDORF,98.554,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 17:00:00,2019-01-01 18:00:00,25.452,100,south,KKW ISAR 2_17,KKW ISAR 2,91.356,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 20:00:00,2019-01-01 21:00:00,25.452,100,south,KKW BROKDORF_20,KKW BROKDORF,10.028,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 21:00:00,2019-01-01 22:00:00,25.452,100,south,KKW ISAR 2_21,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 22:00:00,2019-01-01 23:00:00,25.452,100,south,KKW ISAR 2_22,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 23:00:00,2019-01-02 00:00:00,25.452,100,south,KKW ISAR 2_23,KKW ISAR 2,75.856,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 00:00:00,2019-01-02 01:00:00,25.452,100,south,KKW ISAR 2_24,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 00:00:00,2019-01-02 01:00:00,25.452,100,south,KKW BROKDORF_24,KKW BROKDORF,1.9795,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 01:00:00,2019-01-01 02:00:00,3000,-535.25,north,demand_EOM_1,demand_EOM,-460,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 02:00:00,2019-01-01 03:00:00,3000,-558.27,north,demand_EOM_2,demand_EOM,-558.27,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 03:00:00,2019-01-01 04:00:00,3000,-577.29,north,demand_EOM_3,demand_EOM,-577.29,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 04:00:00,2019-01-01 05:00:00,3000,-591,north,demand_EOM_4,demand_EOM,-591,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 05:00:00,2019-01-01 06:00:00,3000,-598.48,north,demand_EOM_5,demand_EOM,-598.48,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 06:00:00,2019-01-01 07:00:00,3000,-599.19,north,demand_EOM_6,demand_EOM,-599.19,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 07:00:00,2019-01-01 08:00:00,3000,-593.1,north,demand_EOM_7,demand_EOM,-593.1,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 08:00:00,2019-01-01 09:00:00,3000,-580.62,north,demand_EOM_8,demand_EOM,-580.62,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 09:00:00,2019-01-01 10:00:00,3000,-562.61,north,demand_EOM_9,demand_EOM,-562.61,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 10:00:00,2019-01-01 11:00:00,3000,-540.3,north,demand_EOM_10,demand_EOM,-540.3,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 11:00:00,2019-01-01 12:00:00,3000,-515.22,north,demand_EOM_11,demand_EOM,-515.22,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 12:00:00,2019-01-01 13:00:00,3000,-489.1,north,demand_EOM_12,demand_EOM,-489.1,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 13:00:00,2019-01-01 14:00:00,3000,-463.73,north,demand_EOM_13,demand_EOM,-463.73,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 14:00:00,2019-01-01 15:00:00,3000,-440.85,north,demand_EOM_14,demand_EOM,-440.85,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 15:00:00,2019-01-01 16:00:00,3000,-422.03,north,demand_EOM_15,demand_EOM,-422.03,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 16:00:00,2019-01-01 17:00:00,3000,-408.55,north,demand_EOM_16,demand_EOM,-408.55,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 17:00:00,2019-01-01 18:00:00,3000,-401.36,north,demand_EOM_17,demand_EOM,-401.36,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 18:00:00,2019-01-01 19:00:00,3000,-400.93,north,demand_EOM_18,demand_EOM,-400.93,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 19:00:00,2019-01-01 20:00:00,3000,-407.3,north,demand_EOM_19,demand_EOM,-407.3,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 20:00:00,2019-01-01 21:00:00,3000,-420.03,north,demand_EOM_20,demand_EOM,-420.03,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 21:00:00,2019-01-01 22:00:00,3000,-438.25,north,demand_EOM_21,demand_EOM,-438.25,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 22:00:00,2019-01-01 23:00:00,3000,-460.7,north,demand_EOM_22,demand_EOM,-460.7,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 23:00:00,2019-01-02 00:00:00,3000,-485.86,north,demand_EOM_23,demand_EOM,-485.86,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 00:00:00,2019-01-02 01:00:00,3000,-511.98,north,demand_EOM_24,demand_EOM,-511.98,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 01:00:00,2019-01-01 02:00:00,0,100,north,Biomass_1,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 01:00:00,2019-01-01 02:00:00,0,30,north,Hydro_1,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 01:00:00,2019-01-01 02:00:00,0,60,north,Wind offshore_1,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 01:00:00,2019-01-01 02:00:00,0,70,north,Solar_1,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 01:00:00,2019-01-01 02:00:00,0,50,north,Wind onshore_1,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 02:00:00,2019-01-01 03:00:00,0,30,north,Hydro_2,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 02:00:00,2019-01-01 03:00:00,0,60,north,Wind offshore_2,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 02:00:00,2019-01-01 03:00:00,0,50,north,Wind onshore_2,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 02:00:00,2019-01-01 03:00:00,0,100,north,Biomass_2,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 02:00:00,2019-01-01 03:00:00,0,70,north,Solar_2,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 03:00:00,2019-01-01 04:00:00,0,100,north,Biomass_3,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 03:00:00,2019-01-01 04:00:00,0,50,north,Wind onshore_3,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 03:00:00,2019-01-01 04:00:00,0,70,north,Solar_3,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 03:00:00,2019-01-01 04:00:00,0,60,north,Wind offshore_3,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 03:00:00,2019-01-01 04:00:00,0,30,north,Hydro_3,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 04:00:00,2019-01-01 05:00:00,0,50,north,Wind onshore_4,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 04:00:00,2019-01-01 05:00:00,0,30,north,Hydro_4,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 04:00:00,2019-01-01 05:00:00,0,60,north,Wind offshore_4,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 04:00:00,2019-01-01 05:00:00,0,100,north,Biomass_4,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 04:00:00,2019-01-01 05:00:00,0,70,north,Solar_4,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 05:00:00,2019-01-01 06:00:00,0,70,north,Solar_5,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 05:00:00,2019-01-01 06:00:00,0,100,north,Biomass_5,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 05:00:00,2019-01-01 06:00:00,0,30,north,Hydro_5,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 05:00:00,2019-01-01 06:00:00,0,60,north,Wind offshore_5,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 05:00:00,2019-01-01 06:00:00,0,50,north,Wind onshore_5,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 06:00:00,2019-01-01 07:00:00,0,70,north,Solar_6,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 06:00:00,2019-01-01 07:00:00,0,100,north,Biomass_6,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 06:00:00,2019-01-01 07:00:00,0,50,north,Wind onshore_6,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 06:00:00,2019-01-01 07:00:00,0,60,north,Wind offshore_6,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 06:00:00,2019-01-01 07:00:00,0,30,north,Hydro_6,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 07:00:00,2019-01-01 08:00:00,0,50,north,Wind onshore_7,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 07:00:00,2019-01-01 08:00:00,0,70,north,Solar_7,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 07:00:00,2019-01-01 08:00:00,0,30,north,Hydro_7,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 07:00:00,2019-01-01 08:00:00,0,60,north,Wind offshore_7,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 07:00:00,2019-01-01 08:00:00,0,100,north,Biomass_7,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 08:00:00,2019-01-01 09:00:00,0,30,north,Hydro_8,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 08:00:00,2019-01-01 09:00:00,0,100,north,Biomass_8,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 08:00:00,2019-01-01 09:00:00,0,60,north,Wind offshore_8,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 08:00:00,2019-01-01 09:00:00,0,70,north,Solar_8,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 08:00:00,2019-01-01 09:00:00,0,50,north,Wind onshore_8,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 09:00:00,2019-01-01 10:00:00,0,60,north,Wind offshore_9,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 09:00:00,2019-01-01 10:00:00,0,30,north,Hydro_9,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 09:00:00,2019-01-01 10:00:00,0,70,north,Solar_9,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 09:00:00,2019-01-01 10:00:00,0,100,north,Biomass_9,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 09:00:00,2019-01-01 10:00:00,0,50,north,Wind onshore_9,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 10:00:00,2019-01-01 11:00:00,0,70,north,Solar_10,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 10:00:00,2019-01-01 11:00:00,0,30,north,Hydro_10,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 10:00:00,2019-01-01 11:00:00,0,50,north,Wind onshore_10,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 10:00:00,2019-01-01 11:00:00,0,100,north,Biomass_10,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 10:00:00,2019-01-01 11:00:00,0,60,north,Wind offshore_10,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 11:00:00,2019-01-01 12:00:00,0,50,north,Wind onshore_11,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 11:00:00,2019-01-01 12:00:00,0,30,north,Hydro_11,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 11:00:00,2019-01-01 12:00:00,0,60,north,Wind offshore_11,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 11:00:00,2019-01-01 12:00:00,0,100,north,Biomass_11,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 11:00:00,2019-01-01 12:00:00,0,70,north,Solar_11,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 12:00:00,2019-01-01 13:00:00,0,30,north,Hydro_12,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 12:00:00,2019-01-01 13:00:00,0,50,north,Wind onshore_12,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 12:00:00,2019-01-01 13:00:00,0,100,north,Biomass_12,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 12:00:00,2019-01-01 13:00:00,0,60,north,Wind offshore_12,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 12:00:00,2019-01-01 13:00:00,0,70,north,Solar_12,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 13:00:00,2019-01-01 14:00:00,0,30,north,Hydro_13,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 13:00:00,2019-01-01 14:00:00,0,100,north,Biomass_13,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 13:00:00,2019-01-01 14:00:00,0,50,north,Wind onshore_13,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 13:00:00,2019-01-01 14:00:00,0,60,north,Wind offshore_13,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 13:00:00,2019-01-01 14:00:00,0,70,north,Solar_13,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 14:00:00,2019-01-01 15:00:00,0,70,north,Solar_14,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 14:00:00,2019-01-01 15:00:00,0,50,north,Wind onshore_14,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 14:00:00,2019-01-01 15:00:00,0,100,north,Biomass_14,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 14:00:00,2019-01-01 15:00:00,0,60,north,Wind offshore_14,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 14:00:00,2019-01-01 15:00:00,0,30,north,Hydro_14,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 15:00:00,2019-01-01 16:00:00,0,100,north,Biomass_15,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 15:00:00,2019-01-01 16:00:00,0,60,north,Wind offshore_15,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 15:00:00,2019-01-01 16:00:00,0,50,north,Wind onshore_15,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 15:00:00,2019-01-01 16:00:00,0,30,north,Hydro_15,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 15:00:00,2019-01-01 16:00:00,0,70,north,Solar_15,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 16:00:00,2019-01-01 17:00:00,0,60,north,Wind offshore_16,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 16:00:00,2019-01-01 17:00:00,0,30,north,Hydro_16,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 16:00:00,2019-01-01 17:00:00,0,70,north,Solar_16,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 16:00:00,2019-01-01 17:00:00,0,100,north,Biomass_16,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 16:00:00,2019-01-01 17:00:00,0,50,north,Wind onshore_16,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 17:00:00,2019-01-01 18:00:00,0,70,north,Solar_17,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 17:00:00,2019-01-01 18:00:00,0,100,north,Biomass_17,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 17:00:00,2019-01-01 18:00:00,0,30,north,Hydro_17,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 17:00:00,2019-01-01 18:00:00,0,60,north,Wind offshore_17,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 17:00:00,2019-01-01 18:00:00,0,50,north,Wind onshore_17,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 18:00:00,2019-01-01 19:00:00,0,70,north,Solar_18,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 18:00:00,2019-01-01 19:00:00,0,100,north,Biomass_18,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 18:00:00,2019-01-01 19:00:00,0,30,north,Hydro_18,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 18:00:00,2019-01-01 19:00:00,0,60,north,Wind offshore_18,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 18:00:00,2019-01-01 19:00:00,0,50,north,Wind onshore_18,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 19:00:00,2019-01-01 20:00:00,0,60,north,Wind offshore_19,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 19:00:00,2019-01-01 20:00:00,0,50,north,Wind onshore_19,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 19:00:00,2019-01-01 20:00:00,0,70,north,Solar_19,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 19:00:00,2019-01-01 20:00:00,0,100,north,Biomass_19,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 19:00:00,2019-01-01 20:00:00,0,30,north,Hydro_19,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 20:00:00,2019-01-01 21:00:00,0,30,north,Hydro_20,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 20:00:00,2019-01-01 21:00:00,0,100,north,Biomass_20,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 20:00:00,2019-01-01 21:00:00,0,60,north,Wind offshore_20,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 20:00:00,2019-01-01 21:00:00,0,70,north,Solar_20,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 20:00:00,2019-01-01 21:00:00,0,50,north,Wind onshore_20,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 21:00:00,2019-01-01 22:00:00,0,100,north,Biomass_21,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 21:00:00,2019-01-01 22:00:00,0,60,north,Wind offshore_21,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 21:00:00,2019-01-01 22:00:00,0,50,north,Wind onshore_21,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 21:00:00,2019-01-01 22:00:00,0,70,north,Solar_21,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 21:00:00,2019-01-01 22:00:00,0,30,north,Hydro_21,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 22:00:00,2019-01-01 23:00:00,0,50,north,Wind onshore_22,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 22:00:00,2019-01-01 23:00:00,0,30,north,Hydro_22,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 22:00:00,2019-01-01 23:00:00,0,60,north,Wind offshore_22,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 22:00:00,2019-01-01 23:00:00,0,100,north,Biomass_22,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 22:00:00,2019-01-01 23:00:00,0,70,north,Solar_22,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 23:00:00,2019-01-02 00:00:00,0,30,north,Hydro_23,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 23:00:00,2019-01-02 00:00:00,0,100,north,Biomass_23,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 23:00:00,2019-01-02 00:00:00,0,50,north,Wind onshore_23,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 23:00:00,2019-01-02 00:00:00,0,70,north,Solar_23,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 23:00:00,2019-01-02 00:00:00,0,60,north,Wind offshore_23,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 00:00:00,2019-01-02 01:00:00,0,70,north,Solar_24,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 00:00:00,2019-01-02 01:00:00,0,60,north,Wind offshore_24,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 00:00:00,2019-01-02 01:00:00,0,30,north,Hydro_24,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 00:00:00,2019-01-02 01:00:00,0,50,north,Wind onshore_24,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 00:00:00,2019-01-02 01:00:00,0,100,north,Biomass_24,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 14:00:00,2019-01-01 15:00:00,25.452,100,south,KKW PHILIPPSBURG 2_14,KKW PHILIPPSBURG 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 15:00:00,2019-01-01 16:00:00,25.452,100,south,KKW PHILIPPSBURG 2_15,KKW PHILIPPSBURG 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 16:00:00,2019-01-01 17:00:00,25.452,100,south,KKW PHILIPPSBURG 2_16,KKW PHILIPPSBURG 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 17:00:00,2019-01-01 18:00:00,25.452,100,south,KKW PHILIPPSBURG 2_17,KKW PHILIPPSBURG 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 12:00:00,2019-01-01 13:00:00,25.452,100,south,KKW ISAR 2_12,KKW ISAR 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 13:00:00,2019-01-01 14:00:00,25.452,100,south,KKW BROKDORF_13,KKW BROKDORF,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 16:00:00,2019-01-01 17:00:00,25.452,100,south,KKW ISAR 2_16,KKW ISAR 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 17:00:00,2019-01-01 18:00:00,25.452,100,south,KKW BROKDORF_17,KKW BROKDORF,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 18:00:00,2019-01-01 19:00:00,25.452,100,south,KKW ISAR 2_18,KKW ISAR 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 18:00:00,2019-01-01 19:00:00,25.452,100,south,KKW BROKDORF_18,KKW BROKDORF,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 19:00:00,2019-01-01 20:00:00,25.452,100,south,KKW ISAR 2_19,KKW ISAR 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 19:00:00,2019-01-01 20:00:00,25.452,100,south,KKW BROKDORF_19,KKW BROKDORF,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 20:00:00,2019-01-01 21:00:00,25.452,100,south,KKW ISAR 2_20,KKW ISAR 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 21:00:00,2019-01-01 22:00:00,25.452,100,south,KKW BROKDORF_21,KKW BROKDORF,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 22:00:00,2019-01-01 23:00:00,25.452,100,south,KKW BROKDORF_22,KKW BROKDORF,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-01 23:00:00,2019-01-02 00:00:00,25.452,100,south,KKW BROKDORF_23,KKW BROKDORF,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 01:00:00,2019-01-02 02:00:00,25.452,100,south,KKW PHILIPPSBURG 2_1,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 02:00:00,2019-01-02 03:00:00,25.452,100,south,KKW PHILIPPSBURG 2_2,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 03:00:00,2019-01-02 04:00:00,25.452,100,south,KKW PHILIPPSBURG 2_3,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 04:00:00,2019-01-02 05:00:00,25.452,100,south,KKW PHILIPPSBURG 2_4,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 05:00:00,2019-01-02 06:00:00,25.452,100,south,KKW PHILIPPSBURG 2_5,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 06:00:00,2019-01-02 07:00:00,25.452,100,south,KKW PHILIPPSBURG 2_6,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 07:00:00,2019-01-02 08:00:00,25.452,100,south,KKW PHILIPPSBURG 2_7,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 08:00:00,2019-01-02 09:00:00,25.452,100,south,KKW PHILIPPSBURG 2_8,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 09:00:00,2019-01-02 10:00:00,25.452,100,south,KKW PHILIPPSBURG 2_9,KKW PHILIPPSBURG 2,50.892,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 10:00:00,2019-01-02 11:00:00,25.452,100,south,KKW PHILIPPSBURG 2_10,KKW PHILIPPSBURG 2,28.291,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 11:00:00,2019-01-02 12:00:00,25.452,100,south,KKW PHILIPPSBURG 2_11,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 12:00:00,2019-01-02 13:00:00,25.452,100,south,KKW PHILIPPSBURG 2_12,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 13:00:00,2019-01-02 14:00:00,25.452,100,south,KKW PHILIPPSBURG 2_13,KKW PHILIPPSBURG 2,51.709,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 15:00:00,2019-01-02 16:00:00,25.452,100,south,KKW PHILIPPSBURG 2_15,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 16:00:00,2019-01-02 17:00:00,25.452,100,south,KKW PHILIPPSBURG 2_16,KKW PHILIPPSBURG 2,97.705,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 17:00:00,2019-01-02 18:00:00,25.452,100,south,KKW PHILIPPSBURG 2_17,KKW PHILIPPSBURG 2,91.059,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 20:00:00,2019-01-02 21:00:00,25.452,100,south,KKW PHILIPPSBURG 2_20,KKW PHILIPPSBURG 2,11.352,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 21:00:00,2019-01-02 22:00:00,25.452,100,south,KKW PHILIPPSBURG 2_21,KKW PHILIPPSBURG 2,29.976,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 22:00:00,2019-01-02 23:00:00,25.452,100,south,KKW PHILIPPSBURG 2_22,KKW PHILIPPSBURG 2,52.719,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 23:00:00,2019-01-03 00:00:00,25.452,100,south,KKW PHILIPPSBURG 2_23,KKW PHILIPPSBURG 2,78.02,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 00:00:00,2019-01-03 01:00:00,25.452,100,south,KKW PHILIPPSBURG 2_24,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 01:00:00,2019-01-02 02:00:00,25.452,60,south,KKW BROKDORF_1,KKW BROKDORF,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 01:00:00,2019-01-02 02:00:00,25.452,100,south,KKW ISAR 2_1,KKW ISAR 2,67.281,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 02:00:00,2019-01-02 03:00:00,25.452,100,south,KKW BROKDORF_2,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 02:00:00,2019-01-02 03:00:00,25.452,100,south,KKW ISAR 2_2,KKW ISAR 2,50.024,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 03:00:00,2019-01-02 04:00:00,25.452,100,south,KKW ISAR 2_3,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 03:00:00,2019-01-02 04:00:00,25.452,100,south,KKW BROKDORF_3,KKW BROKDORF,68.648,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 04:00:00,2019-01-02 05:00:00,25.452,100,south,KKW ISAR 2_4,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 04:00:00,2019-01-02 05:00:00,25.452,100,south,KKW BROKDORF_4,KKW BROKDORF,81.876,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 05:00:00,2019-01-02 06:00:00,25.452,100,south,KKW ISAR 2_5,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 05:00:00,2019-01-02 06:00:00,25.452,100,south,KKW BROKDORF_5,KKW BROKDORF,88.798,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 06:00:00,2019-01-02 07:00:00,25.452,100,south,KKW BROKDORF_6,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 06:00:00,2019-01-02 07:00:00,25.452,100,south,KKW ISAR 2_6,KKW ISAR 2,88.941,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 07:00:00,2019-01-02 08:00:00,25.452,100,south,KKW ISAR 2_7,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 07:00:00,2019-01-02 08:00:00,25.452,100,south,KKW BROKDORF_7,KKW BROKDORF,82.295,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 08:00:00,2019-01-02 09:00:00,25.452,100,south,KKW BROKDORF_8,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 08:00:00,2019-01-02 09:00:00,25.452,100,south,KKW ISAR 2_8,KKW ISAR 2,69.315,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 09:00:00,2019-01-02 10:00:00,25.452,100,south,KKW BROKDORF_9,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 09:00:00,2019-01-02 10:00:00,25.452,100,south,KKW ISAR 2_9,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 10:00:00,2019-01-02 11:00:00,25.452,100,south,KKW BROKDORF_10,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 10:00:00,2019-01-02 11:00:00,25.452,100,south,KKW ISAR 2_10,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 11:00:00,2019-01-02 12:00:00,25.452,100,south,KKW BROKDORF_11,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 11:00:00,2019-01-02 12:00:00,25.452,100,south,KKW ISAR 2_11,KKW ISAR 2,3.0626,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 12:00:00,2019-01-02 13:00:00,25.452,100,south,KKW BROKDORF_12,KKW BROKDORF,76.937,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 13:00:00,2019-01-02 14:00:00,25.452,100,south,KKW BROKDORF_13,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 14:00:00,2019-01-02 15:00:00,25.452,100,south,KKW ISAR 2_14,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 14:00:00,2019-01-02 15:00:00,25.452,100,south,KKW BROKDORF_14,KKW BROKDORF,29.108,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 15:00:00,2019-01-02 16:00:00,25.452,100,south,KKW ISAR 2_15,KKW ISAR 2,10.685,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 18:00:00,2019-01-02 19:00:00,25.452,100,south,KKW ISAR 2_18,KKW ISAR 2,91.202,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 19:00:00,2019-01-02 20:00:00,25.452,100,south,KKW ISAR 2_19,KKW ISAR 2,98.124,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 20:00:00,2019-01-02 21:00:00,25.452,100,south,KKW BROKDORF_20,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 21:00:00,2019-01-02 22:00:00,25.452,100,south,KKW BROKDORF_21,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 22:00:00,2019-01-02 23:00:00,25.452,100,south,KKW BROKDORF_22,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 23:00:00,2019-01-03 00:00:00,25.452,100,south,KKW ISAR 2_23,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 00:00:00,2019-01-03 01:00:00,25.452,100,south,KKW BROKDORF_24,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 00:00:00,2019-01-03 01:00:00,25.452,100,south,KKW ISAR 2_24,KKW ISAR 2,4.144,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 14:00:00,2019-01-02 15:00:00,25,-130.76,,A360_14,A360,2.8422e-14,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 15:00:00,2019-01-02 16:00:00,18.787,-130.76,,A360_15,A360,-2.8422e-14,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 16:00:00,2019-01-02 17:00:00,14.019,-130.76,,A360_16,A360,2.8422e-14,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 17:00:00,2019-01-02 18:00:00,11.022,-130.76,,A360_17,A360,-2.8422e-14,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 18:00:00,2019-01-02 19:00:00,10,-130.76,,A360_18,A360,2.8422e-14,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 19:00:00,2019-01-02 20:00:00,11.022,-130.76,,A360_19,A360,2.8422e-14,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 20:00:00,2019-01-02 21:00:00,14.019,-130.76,,A360_20,A360,2.8422e-14,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 21:00:00,2019-01-02 22:00:00,18.787,-130.76,,A360_21,A360,2.8422e-14,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 22:00:00,2019-01-02 23:00:00,25,-130.76,,A360_22,A360,2.8422e-14,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 01:00:00,2019-01-02 02:00:00,3000,-537.28,north,demand_EOM_1,demand_EOM,-537.28,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 02:00:00,2019-01-02 03:00:00,3000,-560.02,north,demand_EOM_2,demand_EOM,-560.02,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 03:00:00,2019-01-02 04:00:00,3000,-578.65,north,demand_EOM_3,demand_EOM,-578.65,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 04:00:00,2019-01-02 05:00:00,3000,-591.88,north,demand_EOM_4,demand_EOM,-591.88,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 05:00:00,2019-01-02 06:00:00,3000,-598.8,north,demand_EOM_5,demand_EOM,-598.8,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 06:00:00,2019-01-02 07:00:00,3000,-598.94,north,demand_EOM_6,demand_EOM,-598.94,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 07:00:00,2019-01-02 08:00:00,3000,-592.29,north,demand_EOM_7,demand_EOM,-592.29,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 08:00:00,2019-01-02 09:00:00,3000,-579.32,north,demand_EOM_8,demand_EOM,-579.32,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 09:00:00,2019-01-02 10:00:00,3000,-560.89,north,demand_EOM_9,demand_EOM,-560.89,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 10:00:00,2019-01-02 11:00:00,3000,-538.29,north,demand_EOM_10,demand_EOM,-538.29,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 11:00:00,2019-01-02 12:00:00,3000,-513.06,north,demand_EOM_11,demand_EOM,-513.06,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 12:00:00,2019-01-02 13:00:00,3000,-486.94,north,demand_EOM_12,demand_EOM,-486.94,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 13:00:00,2019-01-02 14:00:00,3000,-461.71,north,demand_EOM_13,demand_EOM,-461.71,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 14:00:00,2019-01-02 15:00:00,3000,-439.11,north,demand_EOM_14,demand_EOM,-439.11,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 15:00:00,2019-01-02 16:00:00,3000,-420.68,north,demand_EOM_15,demand_EOM,-420.68,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 16:00:00,2019-01-02 17:00:00,3000,-407.71,north,demand_EOM_16,demand_EOM,-407.71,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 17:00:00,2019-01-02 18:00:00,3000,-401.06,north,demand_EOM_17,demand_EOM,-401.06,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 18:00:00,2019-01-02 19:00:00,3000,-401.2,north,demand_EOM_18,demand_EOM,-401.2,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 19:00:00,2019-01-02 20:00:00,3000,-408.12,north,demand_EOM_19,demand_EOM,-408.12,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 20:00:00,2019-01-02 21:00:00,3000,-421.35,north,demand_EOM_20,demand_EOM,-421.35,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 21:00:00,2019-01-02 22:00:00,3000,-439.98,north,demand_EOM_21,demand_EOM,-439.98,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 22:00:00,2019-01-02 23:00:00,3000,-462.72,north,demand_EOM_22,demand_EOM,-462.72,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 23:00:00,2019-01-03 00:00:00,3000,-488.02,north,demand_EOM_23,demand_EOM,-488.02,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 00:00:00,2019-01-03 01:00:00,3000,-514.14,north,demand_EOM_24,demand_EOM,-514.14,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 01:00:00,2019-01-02 02:00:00,0,100,north,Biomass_1,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 01:00:00,2019-01-02 02:00:00,0,60,north,Wind offshore_1,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 01:00:00,2019-01-02 02:00:00,0,70,north,Solar_1,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 01:00:00,2019-01-02 02:00:00,0,50,north,Wind onshore_1,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 01:00:00,2019-01-02 02:00:00,0,30,north,Hydro_1,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 02:00:00,2019-01-02 03:00:00,0,50,north,Wind onshore_2,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 02:00:00,2019-01-02 03:00:00,0,100,north,Biomass_2,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 02:00:00,2019-01-02 03:00:00,0,60,north,Wind offshore_2,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 02:00:00,2019-01-02 03:00:00,0,30,north,Hydro_2,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 02:00:00,2019-01-02 03:00:00,0,70,north,Solar_2,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 03:00:00,2019-01-02 04:00:00,0,50,north,Wind onshore_3,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 03:00:00,2019-01-02 04:00:00,0,30,north,Hydro_3,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 03:00:00,2019-01-02 04:00:00,0,100,north,Biomass_3,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 03:00:00,2019-01-02 04:00:00,0,70,north,Solar_3,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 03:00:00,2019-01-02 04:00:00,0,60,north,Wind offshore_3,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 04:00:00,2019-01-02 05:00:00,0,50,north,Wind onshore_4,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 04:00:00,2019-01-02 05:00:00,0,60,north,Wind offshore_4,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 04:00:00,2019-01-02 05:00:00,0,100,north,Biomass_4,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 04:00:00,2019-01-02 05:00:00,0,70,north,Solar_4,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 04:00:00,2019-01-02 05:00:00,0,30,north,Hydro_4,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 05:00:00,2019-01-02 06:00:00,0,70,north,Solar_5,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 05:00:00,2019-01-02 06:00:00,0,30,north,Hydro_5,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 05:00:00,2019-01-02 06:00:00,0,100,north,Biomass_5,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 05:00:00,2019-01-02 06:00:00,0,60,north,Wind offshore_5,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 05:00:00,2019-01-02 06:00:00,0,50,north,Wind onshore_5,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 06:00:00,2019-01-02 07:00:00,0,30,north,Hydro_6,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 06:00:00,2019-01-02 07:00:00,0,70,north,Solar_6,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 06:00:00,2019-01-02 07:00:00,0,60,north,Wind offshore_6,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 06:00:00,2019-01-02 07:00:00,0,100,north,Biomass_6,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 06:00:00,2019-01-02 07:00:00,0,50,north,Wind onshore_6,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 07:00:00,2019-01-02 08:00:00,0,70,north,Solar_7,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 07:00:00,2019-01-02 08:00:00,0,100,north,Biomass_7,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 07:00:00,2019-01-02 08:00:00,0,50,north,Wind onshore_7,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 07:00:00,2019-01-02 08:00:00,0,60,north,Wind offshore_7,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 07:00:00,2019-01-02 08:00:00,0,30,north,Hydro_7,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 08:00:00,2019-01-02 09:00:00,0,100,north,Biomass_8,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 08:00:00,2019-01-02 09:00:00,0,50,north,Wind onshore_8,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 08:00:00,2019-01-02 09:00:00,0,60,north,Wind offshore_8,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 08:00:00,2019-01-02 09:00:00,0,70,north,Solar_8,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 08:00:00,2019-01-02 09:00:00,0,30,north,Hydro_8,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 09:00:00,2019-01-02 10:00:00,0,50,north,Wind onshore_9,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 09:00:00,2019-01-02 10:00:00,0,100,north,Biomass_9,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 09:00:00,2019-01-02 10:00:00,0,70,north,Solar_9,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 09:00:00,2019-01-02 10:00:00,0,30,north,Hydro_9,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 09:00:00,2019-01-02 10:00:00,0,60,north,Wind offshore_9,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 10:00:00,2019-01-02 11:00:00,0,60,north,Wind offshore_10,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 10:00:00,2019-01-02 11:00:00,0,50,north,Wind onshore_10,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 10:00:00,2019-01-02 11:00:00,0,70,north,Solar_10,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 10:00:00,2019-01-02 11:00:00,0,30,north,Hydro_10,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 10:00:00,2019-01-02 11:00:00,0,100,north,Biomass_10,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 11:00:00,2019-01-02 12:00:00,0,30,north,Hydro_11,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 11:00:00,2019-01-02 12:00:00,0,60,north,Wind offshore_11,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 11:00:00,2019-01-02 12:00:00,0,100,north,Biomass_11,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 11:00:00,2019-01-02 12:00:00,0,70,north,Solar_11,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 11:00:00,2019-01-02 12:00:00,0,50,north,Wind onshore_11,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 12:00:00,2019-01-02 13:00:00,0,30,north,Hydro_12,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 12:00:00,2019-01-02 13:00:00,0,70,north,Solar_12,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 12:00:00,2019-01-02 13:00:00,0,60,north,Wind offshore_12,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 12:00:00,2019-01-02 13:00:00,0,50,north,Wind onshore_12,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 12:00:00,2019-01-02 13:00:00,0,100,north,Biomass_12,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 13:00:00,2019-01-02 14:00:00,0,100,north,Biomass_13,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 13:00:00,2019-01-02 14:00:00,0,50,north,Wind onshore_13,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 13:00:00,2019-01-02 14:00:00,0,30,north,Hydro_13,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 13:00:00,2019-01-02 14:00:00,0,70,north,Solar_13,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 13:00:00,2019-01-02 14:00:00,0,60,north,Wind offshore_13,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 14:00:00,2019-01-02 15:00:00,0,60,north,Wind offshore_14,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 14:00:00,2019-01-02 15:00:00,0,50,north,Wind onshore_14,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 14:00:00,2019-01-02 15:00:00,0,100,north,Biomass_14,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 14:00:00,2019-01-02 15:00:00,0,30,north,Hydro_14,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 14:00:00,2019-01-02 15:00:00,0,70,north,Solar_14,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 15:00:00,2019-01-02 16:00:00,0,30,north,Hydro_15,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 15:00:00,2019-01-02 16:00:00,0,100,north,Biomass_15,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 15:00:00,2019-01-02 16:00:00,0,50,north,Wind onshore_15,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 15:00:00,2019-01-02 16:00:00,0,70,north,Solar_15,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 15:00:00,2019-01-02 16:00:00,0,60,north,Wind offshore_15,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 16:00:00,2019-01-02 17:00:00,0,70,north,Solar_16,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 16:00:00,2019-01-02 17:00:00,0,100,north,Biomass_16,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 16:00:00,2019-01-02 17:00:00,0,30,north,Hydro_16,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 16:00:00,2019-01-02 17:00:00,0,50,north,Wind onshore_16,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 16:00:00,2019-01-02 17:00:00,0,60,north,Wind offshore_16,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 17:00:00,2019-01-02 18:00:00,0,60,north,Wind offshore_17,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 17:00:00,2019-01-02 18:00:00,0,50,north,Wind onshore_17,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 17:00:00,2019-01-02 18:00:00,0,70,north,Solar_17,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 17:00:00,2019-01-02 18:00:00,0,100,north,Biomass_17,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 17:00:00,2019-01-02 18:00:00,0,30,north,Hydro_17,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 18:00:00,2019-01-02 19:00:00,0,60,north,Wind offshore_18,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 18:00:00,2019-01-02 19:00:00,0,70,north,Solar_18,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 18:00:00,2019-01-02 19:00:00,0,50,north,Wind onshore_18,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 18:00:00,2019-01-02 19:00:00,0,30,north,Hydro_18,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 18:00:00,2019-01-02 19:00:00,0,100,north,Biomass_18,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 19:00:00,2019-01-02 20:00:00,0,60,north,Wind offshore_19,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 19:00:00,2019-01-02 20:00:00,0,50,north,Wind onshore_19,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 19:00:00,2019-01-02 20:00:00,0,30,north,Hydro_19,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 19:00:00,2019-01-02 20:00:00,0,100,north,Biomass_19,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 19:00:00,2019-01-02 20:00:00,0,70,north,Solar_19,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 20:00:00,2019-01-02 21:00:00,0,100,north,Biomass_20,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 20:00:00,2019-01-02 21:00:00,0,70,north,Solar_20,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 20:00:00,2019-01-02 21:00:00,0,60,north,Wind offshore_20,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 20:00:00,2019-01-02 21:00:00,0,30,north,Hydro_20,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 20:00:00,2019-01-02 21:00:00,0,50,north,Wind onshore_20,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 21:00:00,2019-01-02 22:00:00,0,100,north,Biomass_21,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 21:00:00,2019-01-02 22:00:00,0,30,north,Hydro_21,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 21:00:00,2019-01-02 22:00:00,0,70,north,Solar_21,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 21:00:00,2019-01-02 22:00:00,0,50,north,Wind onshore_21,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 21:00:00,2019-01-02 22:00:00,0,60,north,Wind offshore_21,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 22:00:00,2019-01-02 23:00:00,0,70,north,Solar_22,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 22:00:00,2019-01-02 23:00:00,0,60,north,Wind offshore_22,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 22:00:00,2019-01-02 23:00:00,0,100,north,Biomass_22,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 22:00:00,2019-01-02 23:00:00,0,50,north,Wind onshore_22,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 22:00:00,2019-01-02 23:00:00,0,30,north,Hydro_22,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 23:00:00,2019-01-03 00:00:00,0,70,north,Solar_23,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 23:00:00,2019-01-03 00:00:00,0,100,north,Biomass_23,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 23:00:00,2019-01-03 00:00:00,0,30,north,Hydro_23,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 23:00:00,2019-01-03 00:00:00,0,60,north,Wind offshore_23,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 23:00:00,2019-01-03 00:00:00,0,50,north,Wind onshore_23,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 00:00:00,2019-01-03 01:00:00,0,60,north,Wind offshore_24,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 00:00:00,2019-01-03 01:00:00,0,70,north,Solar_24,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 00:00:00,2019-01-03 01:00:00,0,100,north,Biomass_24,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 00:00:00,2019-01-03 01:00:00,0,30,north,Hydro_24,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 00:00:00,2019-01-03 01:00:00,0,50,north,Wind onshore_24,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 14:00:00,2019-01-02 15:00:00,25.452,100,south,KKW PHILIPPSBURG 2_14,KKW PHILIPPSBURG 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 16:00:00,2019-01-02 17:00:00,25.452,100,south,KKW PHILIPPSBURG 2_16,KKW PHILIPPSBURG 2,97.705,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 17:00:00,2019-01-02 18:00:00,25.452,100,south,KKW PHILIPPSBURG 2_17,KKW PHILIPPSBURG 2,91.059,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 18:00:00,2019-01-02 19:00:00,25.452,100,south,KKW PHILIPPSBURG 2_18,KKW PHILIPPSBURG 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 19:00:00,2019-01-02 20:00:00,25.452,100,south,KKW PHILIPPSBURG 2_19,KKW PHILIPPSBURG 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 20:00:00,2019-01-02 21:00:00,25.452,100,south,KKW PHILIPPSBURG 2_20,KKW PHILIPPSBURG 2,11.352,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 21:00:00,2019-01-02 22:00:00,25.452,100,south,KKW PHILIPPSBURG 2_21,KKW PHILIPPSBURG 2,29.976,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 22:00:00,2019-01-02 23:00:00,25.452,100,south,KKW PHILIPPSBURG 2_22,KKW PHILIPPSBURG 2,52.719,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 12:00:00,2019-01-02 13:00:00,25.452,100,south,KKW ISAR 2_12,KKW ISAR 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 13:00:00,2019-01-02 14:00:00,25.452,100,south,KKW ISAR 2_13,KKW ISAR 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 14:00:00,2019-01-02 15:00:00,25.452,100,south,KKW BROKDORF_14,KKW BROKDORF,29.108,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 15:00:00,2019-01-02 16:00:00,25.452,100,south,KKW ISAR 2_15,KKW ISAR 2,10.685,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 15:00:00,2019-01-02 16:00:00,25.452,100,south,KKW BROKDORF_15,KKW BROKDORF,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 16:00:00,2019-01-02 17:00:00,25.452,100,south,KKW BROKDORF_16,KKW BROKDORF,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 16:00:00,2019-01-02 17:00:00,25.452,100,south,KKW ISAR 2_16,KKW ISAR 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 17:00:00,2019-01-02 18:00:00,25.452,100,south,KKW ISAR 2_17,KKW ISAR 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 17:00:00,2019-01-02 18:00:00,25.452,100,south,KKW BROKDORF_17,KKW BROKDORF,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 18:00:00,2019-01-02 19:00:00,25.452,100,south,KKW ISAR 2_18,KKW ISAR 2,91.202,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 18:00:00,2019-01-02 19:00:00,25.452,100,south,KKW BROKDORF_18,KKW BROKDORF,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 19:00:00,2019-01-02 20:00:00,25.452,100,south,KKW ISAR 2_19,KKW ISAR 2,98.124,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 19:00:00,2019-01-02 20:00:00,25.452,100,south,KKW BROKDORF_19,KKW BROKDORF,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 20:00:00,2019-01-02 21:00:00,25.452,100,south,KKW ISAR 2_20,KKW ISAR 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 21:00:00,2019-01-02 22:00:00,25.452,100,south,KKW ISAR 2_21,KKW ISAR 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 22:00:00,2019-01-02 23:00:00,25.452,100,south,KKW ISAR 2_22,KKW ISAR 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-02 23:00:00,2019-01-03 00:00:00,25.452,100,south,KKW BROKDORF_23,KKW BROKDORF,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 01:00:00,2019-01-03 02:00:00,25.452,100,south,KKW PHILIPPSBURG 2_1,KKW PHILIPPSBURG 2,69.297,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 02:00:00,2019-01-03 03:00:00,25.452,100,south,KKW PHILIPPSBURG 2_2,KKW PHILIPPSBURG 2,51.753,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 03:00:00,2019-01-03 04:00:00,25.452,100,south,KKW PHILIPPSBURG 2_3,KKW PHILIPPSBURG 2,69.972,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 04:00:00,2019-01-03 05:00:00,25.452,100,south,KKW PHILIPPSBURG 2_4,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 05:00:00,2019-01-03 06:00:00,25.452,100,south,KKW PHILIPPSBURG 2_5,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 06:00:00,2019-01-03 07:00:00,25.452,100,south,KKW PHILIPPSBURG 2_6,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 07:00:00,2019-01-03 08:00:00,25.452,100,south,KKW PHILIPPSBURG 2_7,KKW PHILIPPSBURG 2,81.446,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 08:00:00,2019-01-03 09:00:00,25.452,100,south,KKW PHILIPPSBURG 2_8,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 09:00:00,2019-01-03 10:00:00,25.452,100,south,KKW PHILIPPSBURG 2_9,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 10:00:00,2019-01-03 11:00:00,25.452,100,south,KKW PHILIPPSBURG 2_10,KKW PHILIPPSBURG 2,26.266,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 11:00:00,2019-01-03 12:00:00,25.452,100,south,KKW PHILIPPSBURG 2_11,KKW PHILIPPSBURG 2,0.89504,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 12:00:00,2019-01-03 13:00:00,25.452,100,south,KKW PHILIPPSBURG 2_12,KKW PHILIPPSBURG 2,74.776,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 13:00:00,2019-01-03 14:00:00,25.452,100,south,KKW PHILIPPSBURG 2_13,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 14:00:00,2019-01-03 15:00:00,25.452,100,south,KKW PHILIPPSBURG 2_14,KKW PHILIPPSBURG 2,27.393,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 15:00:00,2019-01-03 16:00:00,25.452,100,south,KKW PHILIPPSBURG 2_15,KKW PHILIPPSBURG 2,9.3805,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 18:00:00,2019-01-03 19:00:00,25.452,100,south,KKW PHILIPPSBURG 2_18,KKW PHILIPPSBURG 2,91.523,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 21:00:00,2019-01-03 22:00:00,25.452,100,south,KKW PHILIPPSBURG 2_21,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 22:00:00,2019-01-03 23:00:00,25.452,100,south,KKW PHILIPPSBURG 2_22,KKW PHILIPPSBURG 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 01:00:00,2019-01-03 02:00:00,25.452,100,south,KKW BROKDORF_1,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 01:00:00,2019-01-03 02:00:00,25.452,60,south,KKW ISAR 2_1,KKW ISAR 2,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 02:00:00,2019-01-03 03:00:00,25.452,100,south,KKW ISAR 2_2,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 02:00:00,2019-01-03 03:00:00,25.452,100,south,KKW BROKDORF_2,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 03:00:00,2019-01-03 04:00:00,25.452,100,south,KKW ISAR 2_3,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 03:00:00,2019-01-03 04:00:00,25.452,100,south,KKW BROKDORF_3,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 04:00:00,2019-01-03 05:00:00,25.452,100,south,KKW BROKDORF_4,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 04:00:00,2019-01-03 05:00:00,25.452,100,south,KKW ISAR 2_4,KKW ISAR 2,82.703,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 05:00:00,2019-01-03 06:00:00,25.452,100,south,KKW ISAR 2_5,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 05:00:00,2019-01-03 06:00:00,25.452,100,south,KKW BROKDORF_5,KKW BROKDORF,89.073,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 06:00:00,2019-01-03 07:00:00,25.452,100,south,KKW ISAR 2_6,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 06:00:00,2019-01-03 07:00:00,25.452,100,south,KKW BROKDORF_6,KKW BROKDORF,88.644,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 07:00:00,2019-01-03 08:00:00,25.452,100,south,KKW ISAR 2_7,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 07:00:00,2019-01-03 08:00:00,25.452,100,south,KKW BROKDORF_7,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 08:00:00,2019-01-03 09:00:00,25.452,100,south,KKW BROKDORF_8,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 08:00:00,2019-01-03 09:00:00,25.452,100,south,KKW ISAR 2_8,KKW ISAR 2,67.973,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 09:00:00,2019-01-03 10:00:00,25.452,100,south,KKW BROKDORF_9,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 09:00:00,2019-01-03 10:00:00,25.452,100,south,KKW ISAR 2_9,KKW ISAR 2,49.149,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 10:00:00,2019-01-03 11:00:00,25.452,100,south,KKW BROKDORF_10,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 10:00:00,2019-01-03 11:00:00,25.452,100,south,KKW ISAR 2_10,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 11:00:00,2019-01-03 12:00:00,25.452,100,south,KKW ISAR 2_11,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 11:00:00,2019-01-03 12:00:00,25.452,100,south,KKW BROKDORF_11,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 12:00:00,2019-01-03 13:00:00,25.452,100,south,KKW ISAR 2_12,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 13:00:00,2019-01-03 14:00:00,25.452,100,south,KKW ISAR 2_13,KKW ISAR 2,49.702,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 14:00:00,2019-01-03 15:00:00,25.452,100,south,KKW BROKDORF_14,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 15:00:00,2019-01-03 16:00:00,25.452,100,south,KKW BROKDORF_15,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 16:00:00,2019-01-03 17:00:00,25.452,100,south,KKW BROKDORF_16,KKW BROKDORF,96.9,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 17:00:00,2019-01-03 18:00:00,25.452,100,south,KKW ISAR 2_17,KKW ISAR 2,90.808,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 19:00:00,2019-01-03 20:00:00,25.452,100,south,KKW ISAR 2_19,KKW ISAR 2,98.995,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 20:00:00,2019-01-03 21:00:00,25.452,100,south,KKW ISAR 2_20,KKW ISAR 2,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 20:00:00,2019-01-03 21:00:00,25.452,100,south,KKW BROKDORF_20,KKW BROKDORF,12.713,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 21:00:00,2019-01-03 22:00:00,25.452,100,south,KKW BROKDORF_21,KKW BROKDORF,31.734,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 22:00:00,2019-01-03 23:00:00,25.452,100,south,KKW ISAR 2_22,KKW ISAR 2,54.753,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 23:00:00,2019-01-04 00:00:00,25.452,100,south,KKW BROKDORF_23,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 23:00:00,2019-01-04 00:00:00,25.452,100,south,KKW ISAR 2_23,KKW ISAR 2,80.191,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-04 00:00:00,2019-01-04 01:00:00,25.452,100,south,KKW BROKDORF_24,KKW BROKDORF,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-04 00:00:00,2019-01-04 01:00:00,25.452,100,south,KKW ISAR 2_24,KKW ISAR 2,99.809,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 14:00:00,2019-01-03 15:00:00,25,-130.76,,A360_14,A360,-2.8422e-14,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 15:00:00,2019-01-03 16:00:00,18.787,-130.76,,A360_15,A360,2.8422e-14,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 16:00:00,2019-01-03 17:00:00,14.019,-130.76,,A360_16,A360,2.8422e-14,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 17:00:00,2019-01-03 18:00:00,11.022,-130.76,,A360_17,A360,-2.8422e-14,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 18:00:00,2019-01-03 19:00:00,10,-130.76,,A360_18,A360,2.8422e-14,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 19:00:00,2019-01-03 20:00:00,11.022,-130.76,,A360_19,A360,-2.8422e-14,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 20:00:00,2019-01-03 21:00:00,14.019,-130.76,,A360_20,A360,-2.8422e-14,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 21:00:00,2019-01-03 22:00:00,18.787,-130.76,,A360_21,A360,-2.8422e-14,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 22:00:00,2019-01-03 23:00:00,25,-130.76,,A360_22,A360,2.8422e-14,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 01:00:00,2019-01-03 02:00:00,3000,-539.3,north,demand_EOM_1,demand_EOM,-539.3,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 02:00:00,2019-01-03 03:00:00,3000,-561.75,north,demand_EOM_2,demand_EOM,-561.75,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 03:00:00,2019-01-03 04:00:00,3000,-579.97,north,demand_EOM_3,demand_EOM,-579.97,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 04:00:00,2019-01-03 05:00:00,3000,-592.7,north,demand_EOM_4,demand_EOM,-592.7,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 05:00:00,2019-01-03 06:00:00,3000,-599.07,north,demand_EOM_5,demand_EOM,-599.07,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 06:00:00,2019-01-03 07:00:00,3000,-598.64,north,demand_EOM_6,demand_EOM,-598.64,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 07:00:00,2019-01-03 08:00:00,3000,-591.45,north,demand_EOM_7,demand_EOM,-591.45,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 08:00:00,2019-01-03 09:00:00,3000,-577.97,north,demand_EOM_8,demand_EOM,-577.97,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 09:00:00,2019-01-03 10:00:00,3000,-559.15,north,demand_EOM_9,demand_EOM,-559.15,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 10:00:00,2019-01-03 11:00:00,3000,-536.27,north,demand_EOM_10,demand_EOM,-536.27,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 11:00:00,2019-01-03 12:00:00,3000,-510.9,north,demand_EOM_11,demand_EOM,-510.9,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 12:00:00,2019-01-03 13:00:00,3000,-484.78,north,demand_EOM_12,demand_EOM,-484.78,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 13:00:00,2019-01-03 14:00:00,3000,-459.7,north,demand_EOM_13,demand_EOM,-459.7,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 14:00:00,2019-01-03 15:00:00,3000,-437.39,north,demand_EOM_14,demand_EOM,-437.39,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 15:00:00,2019-01-03 16:00:00,3000,-419.38,north,demand_EOM_15,demand_EOM,-419.38,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 16:00:00,2019-01-03 17:00:00,3000,-406.9,north,demand_EOM_16,demand_EOM,-406.9,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 17:00:00,2019-01-03 18:00:00,3000,-400.81,north,demand_EOM_17,demand_EOM,-400.81,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 18:00:00,2019-01-03 19:00:00,3000,-401.52,north,demand_EOM_18,demand_EOM,-401.52,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 19:00:00,2019-01-03 20:00:00,3000,-409,north,demand_EOM_19,demand_EOM,-409,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 20:00:00,2019-01-03 21:00:00,3000,-422.71,north,demand_EOM_20,demand_EOM,-422.71,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 21:00:00,2019-01-03 22:00:00,3000,-441.73,north,demand_EOM_21,demand_EOM,-441.73,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 22:00:00,2019-01-03 23:00:00,3000,-464.75,north,demand_EOM_22,demand_EOM,-464.75,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 23:00:00,2019-01-04 00:00:00,3000,-490.19,north,demand_EOM_23,demand_EOM,-490.19,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-04 00:00:00,2019-01-04 01:00:00,3000,-509.81,north,demand_EOM_24,demand_EOM,-509.81,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 01:00:00,2019-01-03 02:00:00,0,50,north,Wind onshore_1,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 01:00:00,2019-01-03 02:00:00,0,60,north,Wind offshore_1,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 01:00:00,2019-01-03 02:00:00,0,30,north,Hydro_1,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 01:00:00,2019-01-03 02:00:00,0,100,north,Biomass_1,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 01:00:00,2019-01-03 02:00:00,0,70,north,Solar_1,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 02:00:00,2019-01-03 03:00:00,0,70,north,Solar_2,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 02:00:00,2019-01-03 03:00:00,0,50,north,Wind onshore_2,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 02:00:00,2019-01-03 03:00:00,0,30,north,Hydro_2,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 02:00:00,2019-01-03 03:00:00,0,60,north,Wind offshore_2,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 02:00:00,2019-01-03 03:00:00,0,100,north,Biomass_2,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 03:00:00,2019-01-03 04:00:00,0,100,north,Biomass_3,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 03:00:00,2019-01-03 04:00:00,0,30,north,Hydro_3,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 03:00:00,2019-01-03 04:00:00,0,60,north,Wind offshore_3,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 03:00:00,2019-01-03 04:00:00,0,50,north,Wind onshore_3,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 03:00:00,2019-01-03 04:00:00,0,70,north,Solar_3,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 04:00:00,2019-01-03 05:00:00,0,100,north,Biomass_4,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 04:00:00,2019-01-03 05:00:00,0,30,north,Hydro_4,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 04:00:00,2019-01-03 05:00:00,0,60,north,Wind offshore_4,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 04:00:00,2019-01-03 05:00:00,0,70,north,Solar_4,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 04:00:00,2019-01-03 05:00:00,0,50,north,Wind onshore_4,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 05:00:00,2019-01-03 06:00:00,0,50,north,Wind onshore_5,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 05:00:00,2019-01-03 06:00:00,0,30,north,Hydro_5,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 05:00:00,2019-01-03 06:00:00,0,70,north,Solar_5,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 05:00:00,2019-01-03 06:00:00,0,60,north,Wind offshore_5,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 05:00:00,2019-01-03 06:00:00,0,100,north,Biomass_5,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 06:00:00,2019-01-03 07:00:00,0,70,north,Solar_6,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 06:00:00,2019-01-03 07:00:00,0,100,north,Biomass_6,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 06:00:00,2019-01-03 07:00:00,0,60,north,Wind offshore_6,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 06:00:00,2019-01-03 07:00:00,0,30,north,Hydro_6,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 06:00:00,2019-01-03 07:00:00,0,50,north,Wind onshore_6,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 07:00:00,2019-01-03 08:00:00,0,50,north,Wind onshore_7,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 07:00:00,2019-01-03 08:00:00,0,30,north,Hydro_7,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 07:00:00,2019-01-03 08:00:00,0,60,north,Wind offshore_7,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 07:00:00,2019-01-03 08:00:00,0,70,north,Solar_7,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 07:00:00,2019-01-03 08:00:00,0,100,north,Biomass_7,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 08:00:00,2019-01-03 09:00:00,0,100,north,Biomass_8,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 08:00:00,2019-01-03 09:00:00,0,60,north,Wind offshore_8,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 08:00:00,2019-01-03 09:00:00,0,30,north,Hydro_8,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 08:00:00,2019-01-03 09:00:00,0,70,north,Solar_8,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 08:00:00,2019-01-03 09:00:00,0,50,north,Wind onshore_8,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 09:00:00,2019-01-03 10:00:00,0,30,north,Hydro_9,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 09:00:00,2019-01-03 10:00:00,0,50,north,Wind onshore_9,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 09:00:00,2019-01-03 10:00:00,0,70,north,Solar_9,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 09:00:00,2019-01-03 10:00:00,0,60,north,Wind offshore_9,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 09:00:00,2019-01-03 10:00:00,0,100,north,Biomass_9,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 10:00:00,2019-01-03 11:00:00,0,60,north,Wind offshore_10,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 10:00:00,2019-01-03 11:00:00,0,100,north,Biomass_10,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 10:00:00,2019-01-03 11:00:00,0,70,north,Solar_10,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 10:00:00,2019-01-03 11:00:00,0,30,north,Hydro_10,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 10:00:00,2019-01-03 11:00:00,0,50,north,Wind onshore_10,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 11:00:00,2019-01-03 12:00:00,0,60,north,Wind offshore_11,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 11:00:00,2019-01-03 12:00:00,0,30,north,Hydro_11,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 11:00:00,2019-01-03 12:00:00,0,100,north,Biomass_11,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 11:00:00,2019-01-03 12:00:00,0,50,north,Wind onshore_11,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 11:00:00,2019-01-03 12:00:00,0,70,north,Solar_11,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 12:00:00,2019-01-03 13:00:00,0,30,north,Hydro_12,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 12:00:00,2019-01-03 13:00:00,0,50,north,Wind onshore_12,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 12:00:00,2019-01-03 13:00:00,0,70,north,Solar_12,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 12:00:00,2019-01-03 13:00:00,0,60,north,Wind offshore_12,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 12:00:00,2019-01-03 13:00:00,0,100,north,Biomass_12,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 13:00:00,2019-01-03 14:00:00,0,60,north,Wind offshore_13,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 13:00:00,2019-01-03 14:00:00,0,100,north,Biomass_13,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 13:00:00,2019-01-03 14:00:00,0,50,north,Wind onshore_13,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 13:00:00,2019-01-03 14:00:00,0,30,north,Hydro_13,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 13:00:00,2019-01-03 14:00:00,0,70,north,Solar_13,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 14:00:00,2019-01-03 15:00:00,0,50,north,Wind onshore_14,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 14:00:00,2019-01-03 15:00:00,0,70,north,Solar_14,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 14:00:00,2019-01-03 15:00:00,0,60,north,Wind offshore_14,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 14:00:00,2019-01-03 15:00:00,0,100,north,Biomass_14,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 14:00:00,2019-01-03 15:00:00,0,30,north,Hydro_14,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 15:00:00,2019-01-03 16:00:00,0,60,north,Wind offshore_15,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 15:00:00,2019-01-03 16:00:00,0,30,north,Hydro_15,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 15:00:00,2019-01-03 16:00:00,0,70,north,Solar_15,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 15:00:00,2019-01-03 16:00:00,0,100,north,Biomass_15,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 15:00:00,2019-01-03 16:00:00,0,50,north,Wind onshore_15,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 16:00:00,2019-01-03 17:00:00,0,100,north,Biomass_16,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 16:00:00,2019-01-03 17:00:00,0,30,north,Hydro_16,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 16:00:00,2019-01-03 17:00:00,0,70,north,Solar_16,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 16:00:00,2019-01-03 17:00:00,0,60,north,Wind offshore_16,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 16:00:00,2019-01-03 17:00:00,0,50,north,Wind onshore_16,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 17:00:00,2019-01-03 18:00:00,0,60,north,Wind offshore_17,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 17:00:00,2019-01-03 18:00:00,0,70,north,Solar_17,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 17:00:00,2019-01-03 18:00:00,0,50,north,Wind onshore_17,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 17:00:00,2019-01-03 18:00:00,0,100,north,Biomass_17,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 17:00:00,2019-01-03 18:00:00,0,30,north,Hydro_17,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 18:00:00,2019-01-03 19:00:00,0,100,north,Biomass_18,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 18:00:00,2019-01-03 19:00:00,0,70,north,Solar_18,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 18:00:00,2019-01-03 19:00:00,0,60,north,Wind offshore_18,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 18:00:00,2019-01-03 19:00:00,0,50,north,Wind onshore_18,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 18:00:00,2019-01-03 19:00:00,0,30,north,Hydro_18,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 19:00:00,2019-01-03 20:00:00,0,30,north,Hydro_19,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 19:00:00,2019-01-03 20:00:00,0,100,north,Biomass_19,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 19:00:00,2019-01-03 20:00:00,0,50,north,Wind onshore_19,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 19:00:00,2019-01-03 20:00:00,0,70,north,Solar_19,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 19:00:00,2019-01-03 20:00:00,0,60,north,Wind offshore_19,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 20:00:00,2019-01-03 21:00:00,0,30,north,Hydro_20,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 20:00:00,2019-01-03 21:00:00,0,100,north,Biomass_20,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 20:00:00,2019-01-03 21:00:00,0,70,north,Solar_20,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 20:00:00,2019-01-03 21:00:00,0,50,north,Wind onshore_20,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 20:00:00,2019-01-03 21:00:00,0,60,north,Wind offshore_20,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 21:00:00,2019-01-03 22:00:00,0,60,north,Wind offshore_21,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 21:00:00,2019-01-03 22:00:00,0,100,north,Biomass_21,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 21:00:00,2019-01-03 22:00:00,0,70,north,Solar_21,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 21:00:00,2019-01-03 22:00:00,0,30,north,Hydro_21,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 21:00:00,2019-01-03 22:00:00,0,50,north,Wind onshore_21,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 22:00:00,2019-01-03 23:00:00,0,60,north,Wind offshore_22,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 22:00:00,2019-01-03 23:00:00,0,50,north,Wind onshore_22,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 22:00:00,2019-01-03 23:00:00,0,30,north,Hydro_22,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 22:00:00,2019-01-03 23:00:00,0,70,north,Solar_22,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 22:00:00,2019-01-03 23:00:00,0,100,north,Biomass_22,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 23:00:00,2019-01-04 00:00:00,0,60,north,Wind offshore_23,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 23:00:00,2019-01-04 00:00:00,0,30,north,Hydro_23,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 23:00:00,2019-01-04 00:00:00,0,50,north,Wind onshore_23,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 23:00:00,2019-01-04 00:00:00,0,70,north,Solar_23,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 23:00:00,2019-01-04 00:00:00,0,100,north,Biomass_23,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-04 00:00:00,2019-01-04 01:00:00,0,30,north,Hydro_24,Hydro,30,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-04 00:00:00,2019-01-04 01:00:00,0,100,north,Biomass_24,Biomass,100,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-04 00:00:00,2019-01-04 01:00:00,0,70,north,Solar_24,Solar,70,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-04 00:00:00,2019-01-04 01:00:00,0,60,north,Wind offshore_24,Wind offshore,60,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-04 00:00:00,2019-01-04 01:00:00,0,50,north,Wind onshore_24,Wind onshore,50,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 14:00:00,2019-01-03 15:00:00,25.452,100,south,KKW PHILIPPSBURG 2_14,KKW PHILIPPSBURG 2,27.393,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 15:00:00,2019-01-03 16:00:00,25.452,100,south,KKW PHILIPPSBURG 2_15,KKW PHILIPPSBURG 2,9.3805,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 16:00:00,2019-01-03 17:00:00,25.452,100,south,KKW PHILIPPSBURG 2_16,KKW PHILIPPSBURG 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 17:00:00,2019-01-03 18:00:00,25.452,100,south,KKW PHILIPPSBURG 2_17,KKW PHILIPPSBURG 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 18:00:00,2019-01-03 19:00:00,25.452,100,south,KKW PHILIPPSBURG 2_18,KKW PHILIPPSBURG 2,91.523,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 19:00:00,2019-01-03 20:00:00,25.452,100,south,KKW PHILIPPSBURG 2_19,KKW PHILIPPSBURG 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 20:00:00,2019-01-03 21:00:00,25.452,100,south,KKW PHILIPPSBURG 2_20,KKW PHILIPPSBURG 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 23:00:00,2019-01-04 00:00:00,25.452,100,south,KKW PHILIPPSBURG 2_23,KKW PHILIPPSBURG 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-04 00:00:00,2019-01-04 01:00:00,25.452,100,south,KKW PHILIPPSBURG 2_24,KKW PHILIPPSBURG 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 12:00:00,2019-01-03 13:00:00,25.452,100,south,KKW BROKDORF_12,KKW BROKDORF,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 13:00:00,2019-01-03 14:00:00,25.452,100,south,KKW BROKDORF_13,KKW BROKDORF,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 14:00:00,2019-01-03 15:00:00,25.452,100,south,KKW ISAR 2_14,KKW ISAR 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 15:00:00,2019-01-03 16:00:00,25.452,100,south,KKW ISAR 2_15,KKW ISAR 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 16:00:00,2019-01-03 17:00:00,25.452,100,south,KKW BROKDORF_16,KKW BROKDORF,96.9,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 16:00:00,2019-01-03 17:00:00,25.452,100,south,KKW ISAR 2_16,KKW ISAR 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 17:00:00,2019-01-03 18:00:00,25.452,100,south,KKW ISAR 2_17,KKW ISAR 2,90.808,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 17:00:00,2019-01-03 18:00:00,25.452,100,south,KKW BROKDORF_17,KKW BROKDORF,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 18:00:00,2019-01-03 19:00:00,25.452,100,south,KKW ISAR 2_18,KKW ISAR 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 18:00:00,2019-01-03 19:00:00,25.452,100,south,KKW BROKDORF_18,KKW BROKDORF,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 19:00:00,2019-01-03 20:00:00,25.452,100,south,KKW ISAR 2_19,KKW ISAR 2,98.995,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 19:00:00,2019-01-03 20:00:00,25.452,100,south,KKW BROKDORF_19,KKW BROKDORF,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 20:00:00,2019-01-03 21:00:00,25.452,100,south,KKW BROKDORF_20,KKW BROKDORF,12.713,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 21:00:00,2019-01-03 22:00:00,25.452,100,south,KKW BROKDORF_21,KKW BROKDORF,31.734,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 21:00:00,2019-01-03 22:00:00,25.452,100,south,KKW ISAR 2_21,KKW ISAR 2,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 22:00:00,2019-01-03 23:00:00,25.452,100,south,KKW ISAR 2_22,KKW ISAR 2,54.753,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
+2019-01-03 22:00:00,2019-01-03 23:00:00,25.452,100,south,KKW BROKDORF_22,KKW BROKDORF,0,25.452,EOM,,tutorial_09_steel_plant_Day_Ahead
