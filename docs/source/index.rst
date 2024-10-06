@@ -99,6 +99,7 @@ Documentation
    buffers
    support_policies
    distributed_simulation
+   manual_simulation
    command_line_interface
    assume
 

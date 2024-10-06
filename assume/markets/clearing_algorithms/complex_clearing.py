@@ -18,7 +18,7 @@ from assume.common.utils import (
 )
 from assume.markets.base_market import MarketRole
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 SOLVERS = ["gurobi", "glpk"]
 EPS = 1e-4
@@ -311,6 +311,7 @@ class ComplexClearingRole(MarketRole):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
 
+        self.zones_id = None
         self.incidence_matrix = None
         self.nodes = ["node0"]
 
@@ -338,51 +339,59 @@ class ComplexClearingRole(MarketRole):
 
         Args:
             orderbook (Orderbook): The orderbook to be validated.
-            agent_tuple (tuple[str, str]): The agent tuple of the market (agent_adrr, agent_id).
+            agent_tuple (tuple[str, str]): The agent tuple of the market (agent_addr, agent_id).
 
         Raises:
-            AssertionError: If the bid type is not valid or the volumes are not within the maximum bid volume.
+            ValueError: If the bid type is invalid.
         """
-        for order in orderbook:
-            order["bid_type"] = "SB" if order["bid_type"] is None else order["bid_type"]
-
-        super().validate_orderbook(orderbook, agent_tuple)
-
+        market_id = self.marketconfig.market_id
         max_volume = self.marketconfig.maximum_bid_volume
 
         for order in orderbook:
-            assert order["bid_type"] in [
-                "SB",
-                "BB",
-                "LB",
-            ], f"bid_type {order['bid_type']} not in ['SB', 'BB', 'LB']"
-
-            if order["bid_type"] in ["BB", "LB"]:
-                assert False not in [
-                    abs(volume) <= max_volume for _, volume in order["volume"].items()
-                ], f"max_volume {order['volume']}"
-            elif order["bid_type"] == "SB":
-                assert (
-                    abs(order["volume"]) <= max_volume
-                ), f"max_volume {order['volume']}"
-
-            # check if the node is in the network
-            if "node" in order.keys():
-                if self.zones_id:
-                    order["node"] = self.node_to_zone.get(order["node"], self.nodes[0])
-                    assert (
-                        order["node"] in self.nodes
-                    ), f"node {order['node']} not in {self.nodes}"
-                else:
-                    assert (
-                        order["node"] in self.nodes
-                    ), f"node {order['node']} not in {self.nodes}"
-            # if not, set the node to the first node in the network
-            else:
-                log.warning(
-                    "Order without a node, setting node to the first node. Please check the bidding strategy if correct node is set."
+            # if bid_type is None, set to default bid_type
+            if order["bid_type"] is None:
+                order["bid_type"] = "SB"
+            # Validate bid_type
+            elif order["bid_type"] not in ["SB", "BB", "LB"]:
+                logger.warning(
+                    f"Market '{market_id}': Invalid bid_type '{order['bid_type']}' in order {order}. Setting to 'SB'."
                 )
-                order["node"] = self.nodes[0]
+                order["bid_type"] = "SB"  # Set to default bid_type
+
+        super().validate_orderbook(orderbook, agent_tuple)
+
+        for order in orderbook:
+            # Validate volumes
+            if order["bid_type"] in ["BB", "LB"]:
+                for key, volume in order.get("volume", {}).items():
+                    if abs(volume) > max_volume:
+                        logger.warning(
+                            f"Market '{market_id}': Volume '{volume}' for key '{key}' exceeds max_volume {max_volume} in order {order}. Setting to max_volume."
+                        )
+                        order["volume"][key] = max_volume if volume > 0 else -max_volume
+
+            # Node validation
+            node = order.get("node")
+            if node:
+                if self.zones_id:
+                    node = self.node_to_zone.get(node, self.nodes[0])
+                    order["node"] = node
+                if node not in self.nodes:
+                    logger.warning(
+                        f"Market '{market_id}': Node '{node}' not in nodes list {self.nodes}. Setting to first node '{self.nodes[0]}'. Order details: {order}"
+                    )
+                    order["node"] = self.nodes[0]
+            else:
+                if self.incidence_matrix is not None:
+                    logger.warning(
+                        f"Market '{market_id}': Order without a node, setting node to the first node '{self.nodes[0]}'. Please check the bidding strategy if correct node is set. Order details: {order}"
+                    )
+                    order["node"] = self.nodes[0]
+                else:
+                    logger.warning(
+                        f"Market '{market_id}': Order without a node and no incidence matrix, setting node to 'node0'. Order details: {order}"
+                    )
+                    order["node"] = "node0"
 
     def clear(
         self, orderbook: Orderbook, market_products
@@ -429,7 +438,7 @@ class ComplexClearingRole(MarketRole):
                 )
                 if parent_bid is None:
                     order["parent_bid_id"] = None
-                    log.warning(f"Parent bid {parent_bid_id} not in orderbook")
+                    logger.warning(f"Parent bid {parent_bid_id} not in orderbook")
                 else:
                     child_orders.append(order)
 
@@ -660,6 +669,16 @@ def extract_results(
             accepted_orders.append(order)
         else:
             rejected_orders.append(order)
+
+    for order in rejected_orders:
+        # set the accepted volume and price for each rejected order to zero
+        if order["bid_type"] == "SB":
+            order["accepted_volume"] = 0
+            order["accepted_price"] = 0
+
+        elif order["bid_type"] in ["BB", "LB"]:
+            order["accepted_volume"] = {t: 0 for t in order["volume"].keys()}
+            order["accepted_price"] = {t: 0 for t in order["volume"].keys()}
 
     # write the meta information for each hour of the clearing period
     for node in market_clearing_prices.keys():

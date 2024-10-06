@@ -94,6 +94,10 @@ ignore = ["E501", "G004", "E731"]
     "ARG",  # allow unused arguments for pytest fixtures
     "F841", # allow unused local variables
 ]
+"examples/notebooks/*" = [
+    "E999", # allow no expressions
+    "F841", # allow unused local variables
+]
 
 [tool.pytest]
 testpaths = "tests"

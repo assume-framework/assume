@@ -109,11 +109,11 @@ def test_minmaxcharge():
         "Test", "TestOperator", "TestTechnology", {}, None, "empty"
     )
 
-    mmc.ramp_down_charge = 100
+    mmc.ramp_down_charge = -100
     mmc.ramp_down_discharge = 100
-    mmc.ramp_up_charge = 100
+    mmc.ramp_up_charge = -100
     mmc.ramp_up_discharge = 100
-    mmc.max_power_charge = 1000
+    mmc.max_power_charge = -1000
     mmc.max_power_discharge = 1000
     mmc.min_power_charge = 0
     mmc.min_power_discharge = 0
@@ -131,6 +131,42 @@ def test_minmaxcharge():
         )
         == 0
     )
+
+    # calculate ramping
+    # should be previous_power + 100
+    assert mmc.calculate_ramp_discharge(0, 992, 0) == 100
+    assert mmc.calculate_ramp_discharge(-10, 992, 0) == 100
+
+    assert mmc.calculate_ramp_charge(-10, -200, 0) == -110
+
+
+def test_minmaxcharge_unconstrained():
+    mmc = SupportsMinMaxCharge(
+        "Test", "TestOperator", "TestTechnology", {}, None, "empty"
+    )
+
+    # 1. wenn ramp nicht definiert ist, sollte es auch keine constraints erzeugen
+    # 2. alle maximal/minimal und ramp werte werden positiv angegeben
+    #
+
+    mmc.max_power_charge = -1000  # MW
+    mmc.max_power_discharge = 1000  # MW
+    # ramp constraints
+    mmc.ramp_up_charge = -2000
+    mmc.ramp_down_charge = -2000
+    mmc.ramp_up_discharge = 2000
+    mmc.ramp_down_discharge = 2000
+    # min power
+    mmc.min_power_charge = -0
+    mmc.min_power_discharge = 0
+
+    # calculate ramping
+    # should be previous_power + max_power
+    assert mmc.calculate_ramp_discharge(0, 992, 0) == 992
+    assert mmc.calculate_ramp_discharge(-10, 992, 0) == 992
+
+    assert mmc.calculate_ramp_charge(0, -992, 0) == -992
+    assert mmc.calculate_ramp_charge(-10, -992, 0) == -992
 
 
 def test_minmax_operationtime():

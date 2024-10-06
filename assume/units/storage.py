@@ -97,14 +97,10 @@ class Storage(SupportsMinMaxCharge):
             **kwargs,
         )
 
-        self.max_power_charge = (
-            max_power_charge if max_power_charge <= 0 else -max_power_charge
-        )
-        self.min_power_charge = (
-            min_power_charge if min_power_charge <= 0 else -min_power_charge
-        )
-        self.max_power_discharge = max_power_discharge
-        self.min_power_discharge = min_power_discharge
+        self.max_power_charge = -abs(max_power_charge)
+        self.min_power_charge = -abs(min_power_charge)
+        self.max_power_discharge = abs(max_power_discharge)
+        self.min_power_discharge = abs(min_power_discharge)
         self.initial_soc = initial_soc
         self.outputs["soc"] = pd.Series(self.initial_soc, index=self.index, dtype=float)
 
@@ -127,22 +123,26 @@ class Storage(SupportsMinMaxCharge):
         self.emission_factor = emission_factor
 
         # The ramp up/down rate of charging/discharging the storage unit.
-        # if ramp_up_charge == 0, the ramp_up_charge is set to the max_power_charge
+        # if ramp_up_charge == 0, the ramp_up_charge is set to enable ramping between full charge and discharge power
         # else the ramp_up_charge is set to the negative value of the ramp_up_charge
         self.ramp_up_charge = (
-            self.max_power_charge if ramp_up_charge is None else -abs(ramp_up_charge)
+            self.max_power_charge - self.max_power_discharge
+            if not ramp_up_charge
+            else -abs(ramp_up_charge)
         )
         self.ramp_down_charge = (
-            self.min_power_charge
-            if ramp_down_charge is None
+            self.max_power_charge - self.max_power_discharge
+            if not ramp_down_charge
             else -abs(ramp_down_charge)
         )
         self.ramp_up_discharge = (
-            self.max_power_discharge if ramp_up_discharge is None else ramp_up_discharge
+            self.max_power_discharge - self.max_power_charge
+            if not ramp_up_discharge
+            else ramp_up_discharge
         )
         self.ramp_down_discharge = (
-            self.min_power_discharge
-            if ramp_down_discharge is None
+            self.max_power_discharge - self.max_power_charge
+            if not ramp_down_discharge
             else ramp_down_discharge
         )
 
@@ -380,6 +380,8 @@ class Storage(SupportsMinMaxCharge):
     ) -> tuple[pd.Series]:
         """
         Calculates the min and max charging power for the given time period.
+        This is relative to the already sold output on other markets for the same period.
+        It also adheres to reserved positive and negative capacities.
 
         Args:
             start (pandas.Timestamp): The start of the current dispatch.
@@ -428,6 +430,8 @@ class Storage(SupportsMinMaxCharge):
     ) -> tuple[pd.Series]:
         """
         Calculates the min and max discharging power for the given time period.
+        This is relative to the already sold output on other markets for the same period.
+        It also adheres to reserved positive and negative capacities.
 
         Args:
             start (pandas.Timestamp): The start of the current dispatch.

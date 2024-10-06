@@ -29,7 +29,7 @@ from pyomo.opt import (
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def get_solver_factory(solvers_str=["glpk", "cbc", "gurobi", "cplex"]):
@@ -314,7 +314,7 @@ class DmasPowerplantStrategy(BaseStrategy):
             fuel_prices = unit.forecaster.get_price(unit.fuel_type)
             emission_prices = unit.forecaster.get_price("co2")
         except KeyError:
-            log.error(f"no price for {unit.fuel_type=} with {steps=} and {start=}")
+            logger.error(f"no price for {unit.fuel_type=} with {steps=} and {start=}")
             raise Exception(f"No Fuel prices given for fuel {unit.fuel_type}")
 
         for step in steps:
@@ -327,7 +327,7 @@ class DmasPowerplantStrategy(BaseStrategy):
             if (r.solver.status == SolverStatus.ok) and (
                 r.solver.termination_condition == TerminationCondition.optimal
             ):
-                log.debug("find optimal solution in step: %s", step)
+                logger.debug("find optimal solution in step: %s", step)
 
                 self._set_results(
                     unit,
@@ -407,9 +407,9 @@ class DmasPowerplantStrategy(BaseStrategy):
 
             else:
                 if r.solver.termination_condition == TerminationCondition.infeasible:
-                    log.error(f"infeasible model in step: {step}")
+                    logger.error(f"infeasible model in step: {step}")
                 else:
-                    log.error(f"{step} - {r.solver}")
+                    logger.error(f"{step} - {r.solver}")
                 for key in ["power", "emission", "fuel", "start", "profit"]:
                     self.opt_results[step][key] = np.zeros(self.T)
                 self.opt_results[step]["obj"] = 0
