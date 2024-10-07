@@ -6,16 +6,12 @@ import logging
 from datetime import timedelta
 from operator import itemgetter
 
-import numpy as np
 import pandas as pd
 import pyomo.environ as pyo
 from pyomo.opt import SolverFactory, TerminationCondition, check_available_solvers
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
-from assume.common.utils import (
-    create_nodal_incidence_matrix,
-    create_zonal_incidence_matrix,
-)
+from assume.common.utils import create_incidence_matrix
 from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
@@ -29,8 +25,8 @@ def market_clearing_opt(
     market_products: list[MarketProduct],
     mode: str,
     with_linked_bids: bool,
-    nodes: list[str] = ["node0"],
     incidence_matrix: pd.DataFrame = None,
+    lines: pd.DataFrame = None,
 ):
     """
     Sets up and solves the market clearing optimization problem.
@@ -40,8 +36,8 @@ def market_clearing_opt(
         market_products (list[MarketProduct]): The products to be traded.
         mode (str): The mode of the market clearing determining whether the minimum acceptance ratio is considered.
         with_linked_bids (bool): Whether the market clearing should include linked bids.
-        nodes (list[str]): The list of nodes in the network.
-        incidence_matrix (pd.DataFrame): The incidence matrix of the network. (HSows the connections between nodes.)
+        incidence_matrix (pd.DataFrame): The incidence matrix of the network. (Shows the connections between nodes.)
+        lines (pd.DataFrame): The lines and their capacities of the network.
 
     Returns:
         tuple[pyomo.core.base.PyomoModel.ConcreteModel, pyomo.opt.results.SolverResults]: The solved pyomo model and the solver results
@@ -68,6 +64,13 @@ def market_clearing_opt(
         This removes all binary variables from the model and allows to extract the market clearing prices from the dual variables of the energy balance constraint.
 
     """
+    # Set nodes and lines based on the incidence matrix and lines DataFrame
+    if incidence_matrix is not None:
+        nodes = list(incidence_matrix.index)
+        line_ids = list(incidence_matrix.columns)
+    else:
+        nodes = ["node0"]
+        line_ids = ["line0"]
 
     model = pyo.ConcreteModel()
 
@@ -93,6 +96,7 @@ def market_clearing_opt(
     )
 
     model.nodes = pyo.Set(initialize=nodes, doc="nodes")
+    model.lines = pyo.Set(initialize=line_ids, doc="lines")
 
     # decision variables for the acceptance ratio of simple and block bids (including linked bids)
     model.xs = pyo.Var(
@@ -111,9 +115,8 @@ def market_clearing_opt(
     # decision variables that define flows between nodes
     # assuming the orders contain the node and are collected in nodes
     if incidence_matrix is not None:
-        model.flows = pyo.Var(
-            model.T, model.nodes, model.nodes, domain=pyo.Reals, doc="power_flows"
-        )
+        # Decision variables for flows on each line at each timestep
+        model.flows = pyo.Var(model.T, model.lines, domain=pyo.Reals, doc="power_flows")
 
     if mode == "with_min_acceptance_ratio":
         model.Bids = pyo.Set(
@@ -188,13 +191,13 @@ def market_clearing_opt(
                     if start_time == t:
                         balance_expr += volume * model.xb[order["bid_id"]]
 
+        # Add contributions from line flows based on the incidence matrix
         if incidence_matrix is not None:
-            # Adjust flow subtraction to account for actual connections
-            for node2, capacity in incidence_matrix.loc[node].items():
-                if node != node2 and capacity != 0:
-                    balance_expr -= model.flows[t, node, node2]
+            for line in model.lines:
+                incidence_value = incidence_matrix.loc[node, line]
+                if incidence_value != 0:
+                    balance_expr += incidence_value * model.flows[t, line]
 
-        # The balance for each node and time must equal zero
         return balance_expr == 0
 
     # Add the energy balance constraints for each node and time period using the rule
@@ -204,26 +207,13 @@ def market_clearing_opt(
     )
 
     if incidence_matrix is not None:
-        # Transmission constraints based on the incidence matrix
         model.transmission_constr = pyo.ConstraintList()
         for t in model.T:
-            # Iterate only over non-zero entries
-            for node1, node2 in zip(*np.where(incidence_matrix > 0)):
-                capacity = incidence_matrix.iloc[node1, node2]
-                # Limit flow based on the incidence matrix
-                model.transmission_constr.add(
-                    model.flows[t, nodes[node1], nodes[node2]] <= capacity
-                )
-                # Ensure flow is non-negative if capacity is positive
-                model.transmission_constr.add(
-                    model.flows[t, nodes[node1], nodes[node2]] >= -capacity
-                )
-
-                # Add the flow in the opposite direction as negative
-                model.transmission_constr.add(
-                    model.flows[t, nodes[node2], nodes[node1]]
-                    == -model.flows[t, nodes[node1], nodes[node2]]
-                )
+            for line in model.lines:
+                capacity = lines.at[line, "s_nom"]
+                # Limit the flow on each line
+                model.transmission_constr.add(model.flows[t, line] <= capacity)
+                model.transmission_constr.add(model.flows[t, line] >= -capacity)
 
     # define the objective function as cost minimization
     obj_expr = 0
@@ -316,21 +306,23 @@ class ComplexClearingRole(MarketRole):
         self.nodes = ["node0"]
 
         if self.grid_data:
-            lines = self.grid_data["lines"]
+            self.lines = self.grid_data["lines"]
             buses = self.grid_data["buses"]
 
             self.zones_id = self.marketconfig.param_dict.get("zones_identifier")
             self.node_to_zone = None
 
+            # Generate the incidence matrix and set the nodes based on zones or individual buses
             if self.zones_id:
-                self.incidence_matrix = create_zonal_incidence_matrix(
-                    lines, buses, self.zones_id
+                # Zonal Case
+                self.incidence_matrix = create_incidence_matrix(
+                    self.lines, buses, zones_id=self.zones_id
                 )
                 self.nodes = buses[self.zones_id].unique()
-                self.node_to_zone = self.grid_data["buses"][self.zones_id].to_dict()
-
+                self.node_to_zone = buses[self.zones_id].to_dict()
             else:
-                self.incidence_matrix = create_nodal_incidence_matrix(lines, buses)
+                # Nodal Case
+                self.incidence_matrix = create_incidence_matrix(self.lines, buses)
                 self.nodes = buses.index.values
 
     def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> None:
@@ -458,8 +450,8 @@ class ComplexClearingRole(MarketRole):
                 market_products=market_products,
                 mode=mode,
                 with_linked_bids=with_linked_bids,
-                nodes=self.nodes,
                 incidence_matrix=self.incidence_matrix,
+                lines=self.lines,
             )
 
             if results.solver.termination_condition == TerminationCondition.infeasible:
