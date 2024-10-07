@@ -301,9 +301,10 @@ class ComplexClearingRole(MarketRole):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
 
+        self.nodes = ["node0"]
         self.zones_id = None
         self.incidence_matrix = None
-        self.nodes = ["node0"]
+        self.lines = None
 
         if self.grid_data:
             self.lines = self.grid_data["lines"]
