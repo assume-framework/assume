@@ -616,7 +616,6 @@ class SupportsMinMaxCharge(BaseUnit):
         # previously charging -800 MW wants to go to 200 MW - but must first check if charging is even possible
         # - 800 MW to 0 with charge ramp down and then 200 MW with discharge ramp up
         # if storage was charging before we need to check if we can ramp back to zero
-        # assert power_discharge >= 0
         if (
             previous_power < 0
             and self.calculate_ramp_charge(previous_power, 0, current_power) < 0
@@ -663,7 +662,6 @@ class SupportsMinMaxCharge(BaseUnit):
             float: The charging power adjusted to the ramping constraints.
         """
 
-        # assert power_charge <= 0
         if (
             previous_power > 0
             and self.calculate_ramp_discharge(previous_power, 0, current_power) > 0

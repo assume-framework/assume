@@ -30,7 +30,7 @@ WEATHER_PARAMS_ECMWF = [
     "wind_speed",
 ]
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class InfrastructureInterface:
@@ -571,7 +571,7 @@ class InfrastructureInterface:
         if df.empty:
             return df
 
-        log.info(df["name"])
+        logger.info(df["name"])
         # set charge and discharge power
         df["PPlus_max"] = df["PPlus_max"].fillna(
             df["PMinus_max"]
@@ -854,7 +854,7 @@ def get_solar_series(solar_systems: pd.DataFrame, weather_df: pd.DataFrame):
 def get_pwp_agents(interface, areas):
     pwp_agents = []
     for area in areas:
-        log.info(area)
+        logger.info(area)
         plants = False
         for fuel in ["lignite", "gas", "oil", "hard coal", "nuclear"]:
             df = interface.get_power_plant_in_area(area=area, fuel_type=fuel)
@@ -869,7 +869,7 @@ def get_pwp_agents(interface, areas):
 def get_res_agents(interface, areas):
     res_agents = []
     for area in areas:
-        log.info(area)
+        logger.info(area)
         wind = interface.get_wind_turbines_in_area(area=area)
         solar = interface.get_solar_storage_systems_in_area(area=area)
         bio = interface.get_biomass_systems_in_area(area=area)
@@ -882,12 +882,12 @@ def get_res_agents(interface, areas):
 def get_storage_agents(interface, areas):
     str_agents = []
     for area in areas:
-        log.info(area)
+        logger.info(area)
         str = interface.get_water_storage_systems(area)
         if str.empty:
             continue
         if any(str["PMinus_max"] > 1) and any(str["VMax"] > 1):
-            log.info(f"add {area}")
+            logger.info(f"add {area}")
             str_agents.append(area)
     return str_agents
 
