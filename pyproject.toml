@@ -35,8 +35,7 @@ dependencies = [
     "pandas >=2.0.0",
     "psycopg2-binary >=2.9.5",
     "pyyaml >=6.0",
-    "pyyaml-include <2.0",
-    # until https://github.com/tanbro/pyyaml-include/pull/48 is released
+    "pyyaml-include >=2.2a",
 ]
 
 [project.optional-dependencies]
