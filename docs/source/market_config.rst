@@ -88,7 +88,7 @@ It then makes sense to reschedule the market clearing all 4 hours, but it would 
 
 
 Please note, Trade Convention
-----------------
+-----------------------------
 
 In our market trading system, we follow this convention for representing the volume and price of trades in any market:
 

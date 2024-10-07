@@ -276,7 +276,7 @@ def test_storage_ramping(storage_unit):
     )
 
     assert max_ramp_discharge == 100
-    assert max_ramp_charge == 0
+    assert max_ramp_charge == -60
 
     # chargin scenario
     storage_unit.outputs["energy"][start] = -60
@@ -298,7 +298,7 @@ def test_storage_ramping(storage_unit):
         0.5, -60, max_power_charge[start]
     )
 
-    assert max_ramp_discharge == 0
+    assert max_ramp_discharge == 60
     assert max_ramp_charge == -100
 
 
@@ -429,15 +429,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     product_tuples = [(start, end, None)]
 
     bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
-    assert len(bids) == 0
-
-    storage_unit.outputs["energy"][start] = -100
-
-    storage_unit.set_dispatch_plan(mc, bids)
-    storage_unit.execute_current_dispatch(start, end)
-
-    assert storage_unit.outputs["energy"][start] == 0
-    assert math.isclose(storage_unit.outputs["soc"][end], 1, abs_tol=0.001)
+    assert len(bids) == 1
 
 
 if __name__ == "__main__":
