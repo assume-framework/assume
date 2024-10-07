@@ -278,9 +278,9 @@ class RLUnitsOperator(UnitsOperator):
                 order["agent_id"] = (self.context.addr, self.context.aid)
                 # check for tensors and convert to numpy
                 if isinstance(order["volume"], th.Tensor):
-                    order["volume"] = order["volume"].cpu().numpy().item()
+                    order["volume"] = np.float64(order["volume"].cpu().numpy())
                 if isinstance(order["price"], th.Tensor):
-                    order["price"] = order["price"].cpu().numpy().item()
+                    order["price"] = np.float64(order["price"].cpu().numpy())
 
                 if market.volume_tick:
                     order["volume"] = round(order["volume"] / market.volume_tick)
