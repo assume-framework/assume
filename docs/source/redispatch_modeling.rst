@@ -2,22 +2,22 @@
 ..
 .. SPDX-License-Identifier: AGPL-3.0-or-later
 
-===============================================
+==============================================
 Congestion Management and Redispatch Modelling
-===============================================
+==============================================
 
 This section demonstrates the modelling and simulation of the redispatch mechanism using PyPSA as a plug-and-play module within the ASSUME framework.
 The model primarily considers grid constraints to identify bottlenecks in the grid, resolve them using the redispatch algorithm, and account for dispatches from the EOM (Energy-Only Market).
 
 Concept of Redispatch
-======================
+=====================
 The locational mismatch between electricity demand and generation requires the transmission of electricity from low-demand regions to high-demand regions. The transmission capacity limits the maximum amount of electricity that can be transmitted at any point in time.
 When transmission capacity is insufficient to meet demand, generation must be reduced at locations with low demand and increased at locations with high demand.
 This process is known as **Redispatch**. In addition to spot markets, the redispatch mechanism is used to regulate grid flows and avoid congestion issues. It is operated and controlled by the system operators (SO).
 
---------------------------------------------
+-----------------------------------------
 Overview of Redispatch Modelling in PyPSA
---------------------------------------------
+-----------------------------------------
 The PyPSA network model can be created to visualize line flows using EOM clearing outcomes of generation and loads at different nodes (locations).
 
 PyPSA uses the following terminology to define grid infrastructure:
@@ -71,9 +71,9 @@ Currently, a limitation of the PyPSA model is the inability to define flexible l
 
 Modelling redispatch in the ASSUME framework using PyPSA primarily includes two parts:
 
---------------------------------------------
-1. **Congestion Identification**
---------------------------------------------
+--------------------------------
+1. Congestion Identification
+--------------------------------
 
 The first step is to check for congestion in the network. The linear power flow (LPF) method is particularly useful for quick assessments of congestion and redispatch needs. PyPSA provides the `network.lpf()` function for running linear power flow. This method is significantly faster than a full non-linear AC power flow, making it suitable for real-time analysis or large network studies.
 
@@ -85,9 +85,9 @@ The active power flows through the lines can be retrieved using `network.lines_t
 
 If line loading exceeds 1, it suggests there is congestion.
 
---------------------------------------------
-2. **Redispatch of Power Plants**
---------------------------------------------
+---------------------------------
+2. Redispatch of Power Plants
+---------------------------------
 
 Once congestion is identified at any line or timestep, the redispatch mechanism is applied to alleviate it.
 
@@ -97,15 +97,13 @@ The idea is to adjust upward and downward redispatch accordingly.
 
 The redispatch process in the ASSUME framework follows these steps:
 
-    1. **Fixing Dispatches from the EOM Market**: EOM market dispatches are fixed to model redispatch from power plants with accurate cost considerations. EOM dispatches are treated as a `Load` in the network, with dispatches specified via `p_set`. Generators are assigned a positive sign, and demands are given a negative sign.
+1. **Fixing Dispatches from the EOM Market**: EOM market dispatches are fixed to model redispatch from power plants with accurate cost considerations. EOM dispatches are treated as a `Load` in the network, with dispatches specified via `p_set`. Generators are assigned a positive sign, and demands are given a negative sign.
+2. **Upward Redispatch from Market and Reserved Power Plants**: Due to PyPSA’s limitations in modelling load flexibility, upward redispatch is added as a `Generator` with a positive sign. The maximum available capacity for upward redispatch is restricted using the `p_max_pu` factor, estimated as the difference between the current generation and the maximum power of the power plant.
 
-    2. **Upward Redispatch from Market and Reserved Power Plants**: Due to PyPSA’s limitations in modelling load flexibility, upward redispatch is added as a `Generator` with a positive sign. The maximum available capacity for upward redispatch is restricted using the `p_max_pu` factor, estimated as the difference between the current generation and the maximum power of the power plant.
+    `p_max_pu_up = (max_power - volume) / max_power`
 
-        `p_max_pu_up = (max_power - volume) / max_power`
-
-    3. **Downward Redispatch from Market Power Plants**: Similarly, downward redispatch is modelled as a `Generator` with a negative sign. The maximum available capacity for downward redispatch is restricted by the `p_max_pu` factor, which is calculated as the difference between current generation and maximum power.
-
-    4. **Upward and Downward Redispatch from Other Flexibilities**: Flexibility for redispatch is also modelled as generators, with positive signs for upward redispatch and negative signs for downward redispatch.
+3. **Downward Redispatch from Market Power Plants**: Similarly, downward redispatch is modelled as a `Generator` with a negative sign. The maximum available capacity for downward redispatch is restricted by the `p_max_pu` factor, which is calculated as the difference between current generation and maximum power.
+4. **Upward and Downward Redispatch from Other Flexibilities**: Flexibility for redispatch is also modelled as generators, with positive signs for upward redispatch and negative signs for downward redispatch.
 
 The transmission line capacity can be restricted from expanding by setting `s_nom_extendable=False`.
 
