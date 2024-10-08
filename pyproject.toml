@@ -100,6 +100,7 @@ ignore = ["E501", "G004", "E731"]
 "examples/notebooks/*" = [
     "E999", # allow no expressions
     "F841", # allow unused local variables
+    "F811", # allow import redeclaration
 ]
 
 [tool.pytest]
