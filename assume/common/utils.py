@@ -597,3 +597,28 @@ def rename_study_case(path: str, old_key: str, new_key: str):
     # Write the modified data back to the file
     with open(path, "w") as file:
         yaml.safe_dump(data, file, sort_keys=False)
+
+
+def check_for_tensors(data: pd.Series):
+        """
+        Checks if the data contains tensors and converts them to floats.
+
+        Args:
+            data (pandas.Series): The data to be checked.
+        """
+        try:
+            import torch as th
+            if isinstance(data, pd.Series):
+                if data.map(lambda x: isinstance(x, th.Tensor)).any():
+                    for i, value in enumerate(data):
+                        if isinstance(value, th.Tensor):
+                            data.iat[i] = value.item()
+
+            else:
+                # If data is a single value, check its type directly
+                if isinstance(data, th.Tensor):
+                    data = data.item()
+        except ImportError:
+            pass
+
+        return data
