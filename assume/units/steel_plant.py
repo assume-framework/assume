@@ -430,18 +430,18 @@ class SteelPlant(SupportsMinMax, DSMFlex):
                 "Termination Condition: ", results.solver.termination_condition
             )
 
-        temp = instance.total_power_input.get_values()
-        self.opt_power_requirement = pd.Series(data=temp)
-        self.opt_power_requirement.index = self.index
+        self.opt_power_requirement = pd.Series(
+            data=instance.total_power_input.get_values()
+        )
+        self.opt_power_requirement.set_index(self.index, inplace=True)
 
         self.total_cost = sum(
             instance.variable_cost[t].value for t in instance.time_steps
         )
 
         # Variable cost series
-        temp_1 = instance.variable_cost.get_values()
-        self.variable_cost_series = pd.Series(data=temp_1)
-        self.variable_cost_series.index = self.index
+        self.variable_cost_series = pd.Series(data=instance.variable_cost.get_values())
+        self.variable_cost_series.set_index(self.index, inplace=True)
 
     def determine_optimal_operation_with_flex(self):
         """
@@ -545,6 +545,7 @@ class SteelPlant(SupportsMinMax, DSMFlex):
             marginal_cost = (
                 self.variable_cost_series[start] / self.opt_power_requirement[start]
             )
+
         return marginal_cost
 
     def as_dict(self) -> dict:

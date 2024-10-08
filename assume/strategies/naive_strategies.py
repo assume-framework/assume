@@ -148,10 +148,10 @@ class NaiveDASteelplantStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        bids = []
-        start = product_tuples[0][0]  # start time of the first product
-
+        # calculate the optimal operation of the unit
         unit.calculate_optimal_operation_if_needed()
+
+        bids = []
         for product in product_tuples:
             """
             for each product, calculate the marginal cost of the unit at the start time of the product
@@ -182,12 +182,8 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        bids = []
-        start = product_tuples[0][0]  # start time of the first product
-
+        # calculate the optimal operation of the unit according to the objective function
         unit.calculate_optimal_operation_if_needed()
-
-        # introduce marginal cost
 
         bids = []
         for product in product_tuples:
