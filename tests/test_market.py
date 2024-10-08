@@ -124,8 +124,8 @@ async def test_market_max(market_role: MarketRole):
         }
     ]
     market_role.handle_orderbook(content={"orderbook": orderbook}, meta=meta)
-    # volume is too high
-    assert len(market_role.all_orders) == 0
+    # assert if the volume was reduced to the maximum
+    assert market_role.all_orders[0]["volume"] == 9090
 
     orderbook = [
         {
@@ -138,8 +138,8 @@ async def test_market_max(market_role: MarketRole):
         }
     ]
     market_role.handle_orderbook(content={"orderbook": orderbook}, meta=meta)
-    # price is too high
-    assert len(market_role.all_orders) == 0
+    # assert if the price was reduced to the maximum
+    assert market_role.all_orders[1]["price"] == 1000
 
     orderbook = [
         {
@@ -152,8 +152,8 @@ async def test_market_max(market_role: MarketRole):
         }
     ]
     market_role.handle_orderbook(content={"orderbook": orderbook}, meta=meta)
-    # price is too low
-    assert len(market_role.all_orders) == 0
+    # assert if the price was increased to the minimum
+    assert market_role.all_orders[2]["price"] == -500
 
     orderbook = [
         {
@@ -166,9 +166,9 @@ async def test_market_max(market_role: MarketRole):
         }
     ]
     market_role.handle_orderbook(content={"orderbook": orderbook}, meta=meta)
-    assert len(market_role.all_orders) == 1
-    assert market_role.all_orders[0]["price"] == 1000
-    assert market_role.all_orders[0]["volume"] == 9090
+    assert len(market_role.all_orders) == 4
+    assert market_role.all_orders[3]["price"] == 1000
+    assert market_role.all_orders[3]["volume"] == 9090
 
 
 async def test_market_for_BB(market_role: MarketRole):

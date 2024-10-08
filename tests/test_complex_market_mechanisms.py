@@ -180,6 +180,7 @@ def test_market_coupling_with_island():
 
     # Convert the dictionary to a Pandas DataFrame
     lines = pd.DataFrame(lines)
+    lines.set_index("name", inplace=True)
 
     grid_data = {"buses": nodes, "lines": lines}
     market_config.param_dict["grid_data"] = grid_data
@@ -250,8 +251,8 @@ def test_market_coupling_with_island():
                     "bus0": ["node2"],
                     "bus1": ["node3"],
                     "s_nom": [200.0],
-                }
-            ),
+                },
+            ).set_index("name"),
         ]
     )
     grid_data = {"buses": nodes, "lines": lines}
