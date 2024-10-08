@@ -1,9 +1,31 @@
+#!/usr/bin/python3
+
 # SPDX-FileCopyrightText: ASSUME Developers
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-version: "3.9"
-services:
+import sys
+
+image_repo = "ghcr.io/assume-framework/assume:latest"
+total_agents = int(sys.argv[1])
+
+output = []
+output.append("services:")
+MQTT = "mqtt-broker"
+# MQTT = ""
+
+
+agents = [f"agent{i}" for i in range(total_agents)]
+
+
+def agent_name(agent_nr):
+    if MQTT:
+        return f"agent{agent_nr}"
+    else:
+        return 9000 + int(agent_nr)
+
+
+output.append("""
   assume_db:
     image: timescaledev/timescaledb-ha:pg15-oss
     # smaller without postgis support:
@@ -42,8 +64,6 @@ services:
       GF_INSTALL_PLUGINS: "marcusolsson-dynamictext-panel,orchestracities-map-panel"
       GF_SECURITY_ADMIN_USER: assume
       GF_SECURITY_ADMIN_PASSWORD: "assume"
-      GF_RENDERING_SERVER_URL: http://renderer:8081/render
-      GF_RENDERING_CALLBACK_URL: http://grafana:3000/
       GF_LOG_FILTERS: rendering:debug
     volumes:
       - ./docker_configs/grafana.ini:/etc/grafana/grafana.ini
@@ -56,33 +76,15 @@ services:
       replicas: 1
       placement:
         constraints: [node.role == manager]
+""")
 
-  # to enable rendering png screenshots directly from grafana
-  # for example to embed them in an iframe, you can use this
-  renderer:
-    image: grafana/grafana-image-renderer:latest
-    container_name: renderer
-    profiles: ["renderer"]
-    ports:
-      - 8081
-
-
-  # to run a single simulation in
-  simulation:
-    container_name: simulation
-    image: ghcr.io/assume-framework/assume:latest
-    profiles: ["simulation"]
-    build: .
-    depends_on:
-      - assume_db
-    command: -s example_01a -c tiny -db "postgresql://assume:assume@assume_db:5432/assume"
-
-  # to run the simulation distributed with MQTT
+if MQTT:
+    # Add MQTT agent
+    output.append("""
   mqtt-broker:
     container_name: mqtt-broker
     image: eclipse-mosquitto:2
     restart: always
-    profiles: ["mqtt"]
     ports:
       - "1883:1883/tcp"
     volumes:
@@ -92,48 +94,34 @@ services:
       interval: 45s
       timeout: 5s
       retries: 5
-
-  # to run a distributed simulation with docker compose
+""")
+# Add one management agent
+output.append(f"""
   simulation_mgr:
     container_name: simulation_mgr
-    image: ghcr.io/assume-framework/assume:latest
-    profiles: ["mqtt"]
+    image: {image_repo}
     depends_on:
       - assume_db
-      - mqtt-broker
     environment:
       DB_URI: "postgresql://assume:assume@assume_db:5432/assume"
-      MQTT_BROKER: mqtt-broker
+      MQTT_BROKER: "{MQTT}"
     volumes:
-      - ./examples/distributed_simulation/config.py:/src/examples/distributed_simulation/config.py
-    entrypoint: python3 -m examples.distributed_simulation.world_manager agent agent2
+      - ./examples/distributed_simulation:/src/examples/distributed_simulation
+    entrypoint: python3 -m examples.distributed_simulation.world_manager {" ".join(agents)}
 
-  simulation_client01:
-    container_name: simulation_client01
-    image: ghcr.io/assume-framework/assume:latest
-    profiles: ["mqtt"]
-    build: .
-    environment:
-      DB_URI: "postgresql://assume:assume@assume_db:5432/assume"
-      MQTT_BROKER: mqtt-broker
-    depends_on:
-      - assume_db
-      - mqtt-broker
-    volumes:
-      - ./examples/distributed_simulation/config.py:/src/examples/distributed_simulation/config.py
-    entrypoint: python3 -m examples.distributed_simulation.world_agent 0 2 agent
+""")
 
-  simulation_client02:
-    container_name: simulation_client02
-    image: ghcr.io/assume-framework/assume:latest
-    profiles: ["mqtt"]
-    build: .
+# Add Bidding Agents
+for agent in range(total_agents):
+    output.append(f"""
+  simulation_client{agent}:
+    image: {image_repo}
     environment:
-      DB_URI: "postgresql://assume:assume@assume_db:5432/assume"
-      MQTT_BROKER: mqtt-broker
-    depends_on:
-      - assume_db
-      - mqtt-broker
+      MQTT_BROKER: "{MQTT}"
     volumes:
-      - ./examples/distributed_simulation/config.py:/src/examples/distributed_simulation/config.py
-    entrypoint: python3 -m examples.distributed_simulation.world_agent 1 2 agent2
+      - ./examples/distributed_simulation:/src/examples/distributed_simulation
+    entrypoint: python3 -m examples.distributed_simulation.world_agent {agent} {total_agents} {agent_name(agent)}
+""")
+
+with open("compose.yml", "w") as f:
+    f.writelines(output)
