@@ -45,7 +45,7 @@ learning = [
 optimization = [
     "glpk >=0.4.7",
     "pyomo >=6.6.1",
-    "pypsa >=0.26.3",
+    "pypsa <=0.30.3",
 ]
 oeds = [
     "demandlib >=0.1.9",
