@@ -27,6 +27,7 @@ def market_clearing_opt(
     with_linked_bids: bool,
     incidence_matrix: pd.DataFrame = None,
     lines: pd.DataFrame = None,
+    solver: str = "glpk",
 ):
     """
     Sets up and solves the market clearing optimization problem.
@@ -55,9 +56,8 @@ def market_clearing_opt(
 
         If linked bids are considered, the acceptance of a child bid is bounded by the acceptance of its parent bid.
 
-        The market clearing is solved using pyomo with the gurobi solver.
-        If the gurobi solver is not available, the model is solved using the glpk solver.
-        Otherwise, the solvers cplex and cbc are tried.
+        The market clearing is solved using pyomo with the specified solver (glpk is used by default).
+        If the specified solver is not available, the model is solved using available solver.
         If none of the solvers are available, an exception is raised.
 
         After solving the model, the acceptance of each order is fixed to the value in the solution and the model is solved again.
@@ -231,7 +231,11 @@ def market_clearing_opt(
     if len(solvers) < 1:
         raise Exception(f"None of {SOLVERS} are available")
 
-    solver = SolverFactory(solvers[0])
+    if solver not in solvers:
+        logger.warning(f"Solver {solver} not available, using {solvers[0]}")
+        solver = SolverFactory(solvers[0])
+    else:
+        solver = SolverFactory(solver)
 
     if solver.name == "gurobi":
         options = {"cutoff": -1.0, "MIPGap": EPS}
@@ -300,6 +304,8 @@ class ComplexClearingRole(MarketRole):
 
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
+
+        self.solver = marketconfig.param_dict.get("solver", "glpk")
 
         self.nodes = ["node0"]
         self.zones_id = None
@@ -455,6 +461,7 @@ class ComplexClearingRole(MarketRole):
                 with_linked_bids=with_linked_bids,
                 incidence_matrix=self.incidence_matrix,
                 lines=self.lines,
+                solver=self.solver,
             )
 
             if results.solver.termination_condition == TerminationCondition.infeasible:

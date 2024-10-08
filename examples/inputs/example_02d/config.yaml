@@ -51,7 +51,8 @@ dam:
         - bid_type
         - min_acceptance_ratio
         - parent_bid_id
-
+      param_dict:
+        solver: glpk
 
 tiny:
   start_date: 2019-01-01 00:00
