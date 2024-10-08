@@ -432,16 +432,16 @@ class SteelPlant(SupportsMinMax, DSMFlex):
 
         self.opt_power_requirement = pd.Series(
             data=instance.total_power_input.get_values()
-        )
-        self.opt_power_requirement.set_index(self.index, inplace=True)
+        ).set_axis(self.index)
 
         self.total_cost = sum(
             instance.variable_cost[t].value for t in instance.time_steps
         )
 
         # Variable cost series
-        self.variable_cost_series = pd.Series(data=instance.variable_cost.get_values())
-        self.variable_cost_series.set_index(self.index, inplace=True)
+        self.variable_cost_series = pd.Series(
+            data=instance.variable_cost.get_values()
+        ).set_axis(self.index)
 
     def determine_optimal_operation_with_flex(self):
         """
