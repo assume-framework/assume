@@ -12,6 +12,9 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. pip install git+https://github.com/assume-framework/assume
 
+**Minor changes:**
+- add the ability to define the solver for the optimization-based market clearing inside the param_dict of the config file
+
 
 v0.4.0 - latest release (8th August 2024)
 =========================================
@@ -72,6 +75,7 @@ v0.4.0 - latest release (8th August 2024)
 - Resolved various issues with learning and policy saving
 - Fixed missing market dispatch values in day-ahead markets
 - Added a check for availability_df.csv file to check for any values larger than 1
+- Fixed compatibility issues between new pyomo and RL due to tensor handling
 
 **Other Changes:**
 
