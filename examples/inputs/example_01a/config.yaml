@@ -115,4 +115,3 @@ dam_with_complex_clearing:
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 5
-

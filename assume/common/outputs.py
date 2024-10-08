@@ -20,7 +20,7 @@ from sqlalchemy import inspect, text
 from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 
 from assume.common.market_objects import MetaDict
-from assume.common.utils import separate_orders, check_for_tensors
+from assume.common.utils import check_for_tensors, separate_orders
 
 logger = logging.getLogger(__name__)
 
@@ -401,8 +401,6 @@ class WriteOutput(Role):
             query = f"ALTER TABLE {table} ADD COLUMN {df.index.name} {column_type}"
             with self.db.begin() as db:
                 db.execute(text(query))
-
-    
 
     def write_market_orders(self, market_orders: any, market_id: str):
         """

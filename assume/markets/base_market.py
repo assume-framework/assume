@@ -26,7 +26,6 @@ from assume.common.utils import (
     get_available_products,
     separate_orders,
     timestamp2datetime,
-    check_for_tensors,
 )
 
 logger = logging.getLogger(__name__)
@@ -136,9 +135,6 @@ class MarketMechanism:
         # Process separated orders
         sep_orders = separate_orders(orderbook.copy())
         for order in sep_orders:
-            # Check for tensors in order
-            order["price"]=check_for_tensors(order["price"])
-
             # Adjust order price if it exceeds max_price or is below min_price
             if order["price"] > max_price:
                 logger.warning(

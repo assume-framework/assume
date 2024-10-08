@@ -599,26 +599,43 @@ def rename_study_case(path: str, old_key: str, new_key: str):
         yaml.safe_dump(data, file, sort_keys=False)
 
 
-def check_for_tensors(data: pd.Series):
-        """
-        Checks if the data contains tensors and converts them to floats.
+def check_for_tensors(data):
+    """
+    Checks if the data contains tensors and converts them to native Python types.
 
-        Args:
-            data (pandas.Series): The data to be checked.
-        """
-        try:
-            import torch as th
-            if isinstance(data, pd.Series):
-                if data.map(lambda x: isinstance(x, th.Tensor)).any():
-                    for i, value in enumerate(data):
+    Supports both pandas.Series and list of dictionaries.
+
+    Args:
+        data (pandas.Series or list of dicts): The data to be checked.
+
+    Returns:
+        The data with tensors converted to native Python types.
+    """
+    try:
+        import torch as th
+
+        if isinstance(data, pd.Series):
+            # Vectorized check for tensors
+            tensor_mask = data.apply(lambda x: isinstance(x, th.Tensor))
+            if tensor_mask.any():
+                # Convert tensors to their scalar values
+                data[tensor_mask] = data[tensor_mask].apply(lambda x: x.item())
+
+        elif isinstance(data, list):
+            # Check if it's a list of dictionaries
+            if all(isinstance(item, dict) for item in data):
+                for d in data:
+                    for key, value in d.items():
                         if isinstance(value, th.Tensor):
-                            data.iat[i] = value.item()
+                            d[key] = value.item()
 
-            else:
-                # If data is a single value, check its type directly
-                if isinstance(data, th.Tensor):
-                    data = data.item()
-        except ImportError:
-            pass
+        else:
+            # If data is a single value, check its type directly
+            if isinstance(data, th.Tensor):
+                data = data.item()
 
-        return data
+    except ImportError:
+        # If torch is not installed, return the data unchanged
+        pass
+
+    return data

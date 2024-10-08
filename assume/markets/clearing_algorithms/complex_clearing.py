@@ -11,7 +11,7 @@ import pyomo.environ as pyo
 from pyomo.opt import SolverFactory, TerminationCondition, check_available_solvers
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
-from assume.common.utils import create_incidence_matrix
+from assume.common.utils import check_for_tensors, create_incidence_matrix
 from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
@@ -416,6 +416,8 @@ class ComplexClearingRole(MarketRole):
             return [], [], []
 
         orderbook.sort(key=itemgetter("start_time", "end_time", "only_hours"))
+
+        orderbook = check_for_tensors(orderbook)
 
         # create a list of all orders linked as child to a bid
         child_orders = []
