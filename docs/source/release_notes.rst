@@ -72,6 +72,7 @@ v0.4.0 - latest release (8th August 2024)
 - Resolved various issues with learning and policy saving
 - Fixed missing market dispatch values in day-ahead markets
 - Added a check for availability_df.csv file to check for any values larger than 1
+- Fixed compatibility issues between new pyomo and RL due to tensor handling
 
 **Other Changes:**
 
