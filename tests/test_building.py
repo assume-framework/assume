@@ -25,7 +25,7 @@ def index() -> pd.DatetimeIndex:
 def forecast(index) -> CsvForecaster:
     forecaster = CsvForecaster(index=index)
     forecaster.forecasts = pd.DataFrame()
-    forecaster.forecasts["test_building_load_profile"] = pd.Series(0.1, index=index)
+    forecaster.forecasts["test_building_load_profile"] = pd.Series(1, index=index)
     forecaster.forecasts["availability_Solar"] = pd.Series(0.25, index=index)
     forecaster.forecasts["price_EOM"] = pd.Series(2, index=index)
 
@@ -43,9 +43,9 @@ def building_components_1() -> dict:
         'ev':
             {'availability_periods': '[("1/1/2019  1:00:00 AM", "1/1/2019  3:00:00 AM")]', 'charging_profile': 'No',
              'initial_soc': 0.0, 'max_capacity': 3.0, 'min_capacity': 0.0, 'node': 'north', 'ramp_down': 3.0,
-             'ramp_up': 3.0, 'unit_type': 'building'},
+             'ramp_up': 3.0, 'unit_type': 'building', 'max_charging_rate': 3.0},
         'pv_plant':
-            {'bidding_EOM': 'naive_da_building', 'max_power': 8.0, 'min_power': 0.0, 'node': 'north',
+            {'bidding_EOM': 'naive_da_building', 'max_power': 16.0, 'min_power': 0.0, 'node': 'north',
              'objective': 'minimize_expenses', 'power_profile': 'No', 'unit_operator': 'test_operator',
              'unit_type': 'building'}
     }
@@ -111,7 +111,7 @@ def test_initialization(building_1, building_2):
     assert building_1.has_heatpump is False
     assert building_1.has_boiler is False
     assert building_1.has_thermal_storage is False
-    assert all(building_1.additional_electricity_load == 0.1)
+    assert all(building_1.additional_electricity_load == 1.0)
     assert all(building_1.electricity_price == 2)
     assert building_1.sells_battery_energy_to_market is True
     assert building_2.sells_battery_energy_to_market is False
@@ -129,7 +129,7 @@ def test_initialization(building_1, building_2):
     assert_is_pyo_var(building_1.model.variable_revenue)
     assert_is_pyo_var(building_1.model.total_power_output)
     assert_is_pyo_var(building_1.model.total_power_self_usage)
-    assert_is_pyo_var(building_1.model.electricity_load_self_covered)
+    assert_is_pyo_var(building_1.model.additional_load_from_grid)
     assert_is_pyo_var(building_1.model.charge_ev_from_grid)
     assert_attribute_error(building_2.model, "charge_ev_from_grid")
     assert_is_pyo_var(building_1.model.energy_self_consumption_pv)
@@ -157,11 +157,17 @@ def test_optimal_operation(building_1, index):
     assert isinstance(building_1.opt_power_requirement, pd.Series)
     building_1.solver.solve(instance, tee=False)
 
+    # Check additional load constraints are valid
+    load_pv = pd.Series([pyo.value(instance.additional_load_from_pv[i]) for i in range(len(index))])
+    load_battery = pd.Series([pyo.value(instance.additional_load_from_battery[i]) for i in range(len(index))])
+    load_grid = pd.Series([pyo.value(instance.additional_load_from_grid[i]) for i in range(len(index))])
+    assert all(load_pv + load_battery + load_grid == electricity_load.values)
+
     # Check if PV constraints valid
     pv_energy_out = pd.Series([pyo.value(instance.dsm_blocks['pv_plant'].energy_out[i]) for i in range(len(index))])
     pv_self = pd.Series([pyo.value(instance.energy_self_consumption_pv[i]) for i in range(len(index))])
     pv_sell = pd.Series([pyo.value(instance.energy_sell_pv[i]) for i in range(len(index))])
-    assert all(pv_energy_out == 2.0)
+    assert all(pv_energy_out == 4.0)
     assert all(pv_self + pv_sell == pv_energy_out)
 
     # Check if battery constraints valid
@@ -188,10 +194,9 @@ def test_optimal_operation(building_1, index):
     assert all(charge_ev_from_grid + charge_ev_from_bat + charge_ev_from_pv == charge_ev)
 
     # Check if energy got distributed and charged right
-    # TODO: Check why additional load not handled!
-    assert all(charge_bat_from_pv + charge_ev_from_pv == pv_self)
-    assert all(charge_ev_from_bat == discharge_self)
-    building_energy = (electricity_load.values - pv_sell + charge_bat_from_grid - discharge_sell + charge_ev_from_grid)
+    assert all(charge_bat_from_pv + charge_ev_from_pv + load_pv == pv_self)
+    assert all(charge_ev_from_bat + load_battery == discharge_self)
+    building_energy = ((load_pv + load_battery + load_grid) - pv_sell + charge_bat_from_grid - discharge_sell + charge_ev_from_grid)
     power_input = pd.Series([instance.total_power_input[t].value for t in instance.time_steps])
     power_output = pd.Series([instance.total_power_output[t].value for t in instance.time_steps])
     assert all(power_input - power_output == building_energy)

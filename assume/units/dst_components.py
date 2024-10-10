@@ -94,7 +94,7 @@ def create_heatpump(
 
     @model_part.Constraint(time_steps)
     def operating_cost_constraint(b, t):
-        return b.operating_cost_hp[t] == b.power_in[t] * model.electricity_price[t]
+        return b.operating_cost_hp[t] == model.energy_hp_from_grid[t] * model.electricity_price[t]
 
     return model_part
 
@@ -195,7 +195,7 @@ def create_boiler(
     def operating_cost_constraint(b, t):
         if fuel_type == "electric":
             return (
-                b.operating_cost_boiler[t] == b.power_in[t] * model.electricity_price[t]
+                b.operating_cost_boiler[t] == model.energy_boiler_from_grid[t] * model.electricity_price[t]
             )
         elif fuel_type == "natural_gas":
             return (
@@ -324,6 +324,7 @@ def create_ev(
     model,
     max_capacity,
     min_capacity,
+    max_charging_rate,
     initial_soc,
     ramp_up,
     ramp_down,
@@ -339,6 +340,7 @@ def create_ev(
         model: A Pyomo ConcreteModel object representing the optimization model.
         max_capacity: The maximum capacity of the EV battery.
         min_capacity: The minimum capacity of the EV battery.
+        max_charging_rate: The maximum charging rate of the ev.
         initial_soc: The initial state of charge (SOC) of the EV battery.
         ramp_up: The ramp-up rate for charging.
         ramp_down: The ramp-down rate for charging.
@@ -351,6 +353,7 @@ def create_ev(
     # define parameters
     model_part.max_ev_battery_capacity = pyo.Param(initialize=max_capacity)
     model_part.min_ev_battery_capacity = pyo.Param(initialize=min_capacity)
+    model_part.max_charging_rate = pyo.Param(initialize=max_charging_rate)
     model_part.initial_ev_battery_soc = pyo.Param(initialize=initial_soc)
     model_part.ramp_up_ev = pyo.Param(initialize=ramp_up)
     model_part.ramp_down_ev = pyo.Param(initialize=ramp_down)
@@ -384,6 +387,13 @@ def create_ev(
             if t == 0:
                 return pyo.Constraint.Skip
             return b.charge_ev[t] - b.charge_ev[t - 1] <= b.ramp_up_ev
+
+        @model_part.Constraint(time_steps)
+        def max_charging_rate_constraint(b, t):
+            """
+            Limits the charging rate of the EV charging.
+            """
+            return b.charge_ev[t] <= b.max_charging_rate
 
         @model_part.Constraint(time_steps)
         def ramp_down_constraint(b, t):
@@ -1488,7 +1498,7 @@ def create_pv_plant(
             """
             Ensures the power output of the PV unit gets calculated from its availability.
             """
-            return b.energy_out[t] == b.max_power * availability[t]
+            return b.energy_out[t] == b.max_power * availability.iloc[t]
 
     @model_part.Constraint(time_steps)
     def min_power_pv_constraint(b, t):

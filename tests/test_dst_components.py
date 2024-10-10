@@ -44,6 +44,7 @@ def heatpump_model(heatpump_config):
     time_steps = range(10)
     model.time_steps = pyo.Set(initialize=time_steps)
     model.electricity_price = pyo.Param(model.time_steps, initialize=1, mutable=True)
+    model.energy_hp_from_grid = pyo.Var(model.time_steps, initialize=1)
     model_part = create_heatpump(model, time_steps=model.time_steps, **heatpump_config)
     model.heatpump = model_part
 
@@ -105,6 +106,7 @@ def boiler_model(boiler_config):
     time_steps = range(10)
     model.time_steps = pyo.Set(initialize=time_steps)
     model.electricity_price = pyo.Param(model.time_steps, initialize=1, mutable=True)
+    model.energy_boiler_from_grid = pyo.Var(model.time_steps, initialize=1)
     model_part = create_boiler(model, time_steps=model.time_steps, **boiler_config)
     model.boiler = model_part
 
@@ -194,7 +196,7 @@ def ev_config():
     return {
         "max_capacity": 100,  # EV's maximum battery capacity in kWh
         "min_capacity": 20,  # Minimum SOC (state of charge) in kWh
-        "charge_rate": 20,  # Maximum charge rate in kW
+        "max_charging_rate": 20,  # Maximum charge rate in kW
         "discharge_rate": 20,  # Maximum discharge rate in kW
         "initial_soc": 50,  # Initial SOC in kWh
         "ramp_up": 10,  # Ramp-up rate in kW
@@ -208,16 +210,16 @@ def ev_config():
         "time_steps": range(10),  # Time steps for the model
         "charging_profile": "Yes",  # Charging profile available
         "load_profile": [
-            0,
-            0,
-            20,
-            20,
-            0,
-            30,
-            30,
-            0,
-            0,
-            0,
+            0.,
+            0.,
+            20.,
+            20.,
+            0.,
+            30.,
+            30.,
+            0.,
+            0.,
+            0.,
         ],  # Charging profile in kWh for each time step
     }
 
