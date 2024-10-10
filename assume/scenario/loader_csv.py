@@ -491,7 +491,7 @@ def load_config_and_create_forecaster(
         file_name="residential_dsm_units",
     )
 
-    if powerplant_units is None or demand_units is None:
+    if residential_dsm_units is None and (powerplant_units is None or demand_units is None):
         raise ValueError("No power plant or no demand units were provided!")
 
     forecasts_df = load_file(

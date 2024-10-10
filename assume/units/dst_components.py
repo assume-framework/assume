@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pyomo.environ as pyo
+from distutils.util import strtobool
 
 
 def create_heatpump(
@@ -93,7 +94,7 @@ def create_heatpump(
 
     @model_part.Constraint(time_steps)
     def operating_cost_constraint(b, t):
-        return b.operating_cost_hp[t] == b.power_in[t] * model.electricity_price[t]
+        return b.operating_cost_hp[t] == model.energy_hp_from_grid[t] * model.electricity_price[t]
 
     return model_part
 
@@ -194,7 +195,7 @@ def create_boiler(
     def operating_cost_constraint(b, t):
         if fuel_type == "electric":
             return (
-                b.operating_cost_boiler[t] == b.power_in[t] * model.electricity_price[t]
+                b.operating_cost_boiler[t] == model.energy_boiler_from_grid[t] * model.electricity_price[t]
             )
         elif fuel_type == "natural_gas":
             return (
@@ -323,6 +324,7 @@ def create_ev(
     model,
     max_capacity,
     min_capacity,
+    max_charging_rate,
     initial_soc,
     ramp_up,
     ramp_down,
@@ -338,6 +340,7 @@ def create_ev(
         model: A Pyomo ConcreteModel object representing the optimization model.
         max_capacity: The maximum capacity of the EV battery.
         min_capacity: The minimum capacity of the EV battery.
+        max_charging_rate: The maximum charging rate of the ev.
         initial_soc: The initial state of charge (SOC) of the EV battery.
         ramp_up: The ramp-up rate for charging.
         ramp_down: The ramp-down rate for charging.
@@ -350,28 +353,30 @@ def create_ev(
     # define parameters
     model_part.max_ev_battery_capacity = pyo.Param(initialize=max_capacity)
     model_part.min_ev_battery_capacity = pyo.Param(initialize=min_capacity)
+    model_part.max_charging_rate = pyo.Param(initialize=max_charging_rate)
     model_part.initial_ev_battery_soc = pyo.Param(initialize=initial_soc)
     model_part.ramp_up_ev = pyo.Param(initialize=ramp_up)
     model_part.ramp_down_ev = pyo.Param(initialize=ramp_down)
+    if bool(strtobool(charging_profile)) and "load_profile" in kwargs:
+        model_part.load_profile_ev = pyo.Param(
+            time_steps,
+            initialize=kwargs["load_profile"]
+        )
 
     # define variables
     model_part.ev_battery_soc = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.charge_ev = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.operating_cost_ev = pyo.Var(time_steps, within=pyo.NonNegativeReals)
-    if charging_profile == "Yes":
-        model_part.load_profile_ev = pyo.Param(
-            time_steps, initialize=kwargs["load_profile"]
-        )
 
     # define constraints
-    if charging_profile == "Yes":
+    if bool(strtobool(charging_profile)):
 
         @model_part.Constraint(time_steps)
         def charging_profile_constraint(b, t):
             """
             Ensures the EV follows the predefined charging profile.
             """
-            return b.charge_ev[t] == model.load_profile_ev[t]
+            return b.charge_ev[t] == model_part.load_profile_ev[t] * availability_df.iloc[t]
     else:
 
         @model_part.Constraint(time_steps)
@@ -382,6 +387,13 @@ def create_ev(
             if t == 0:
                 return pyo.Constraint.Skip
             return b.charge_ev[t] - b.charge_ev[t - 1] <= b.ramp_up_ev
+
+        @model_part.Constraint(time_steps)
+        def max_charging_rate_constraint(b, t):
+            """
+            Limits the charging rate of the EV charging.
+            """
+            return b.charge_ev[t] <= b.max_charging_rate
 
         @model_part.Constraint(time_steps)
         def ramp_down_constraint(b, t):
@@ -419,7 +431,7 @@ def create_ev(
         Defines the change in SOC of the EV over time.
         """
         return b.ev_battery_soc[t] == (
-            (b.ev_battery_soc[t - 1] if t > 0 else b.initial_ev_battery_soc)
+            (b.ev_battery_soc[t - 1] if (t > 0 and availability_df.iloc[t] == 1) else b.initial_ev_battery_soc)
             + b.charge_ev[t]
         )
 
@@ -429,7 +441,7 @@ def create_ev(
         Calculates the operating cost of the ev based on the electricity price.
 
         """
-        return b.operating_cost_ev[t] == b.charge_ev[t] * model.electricity_price[t]
+        return b.operating_cost_ev[t] == model.charge_ev_from_grid[t] * model.electricity_price[t]
 
     return model_part
 
@@ -1435,3 +1447,188 @@ def create_dristorage(
         )
 
     return model_part
+
+def create_pv_plant(
+    model,
+    max_power,
+    min_power,
+    time_steps,
+    availability,
+    power_profile,
+    **kwargs
+):
+    """
+        Represents a Photovoltaic (PV) power plant.
+
+        Args:
+            model: A Pyomo ConcreteModel object representing the optimization model.
+            id (str): A unique identifier for the PV unit.
+            max_power (float): The maximum power output of the PV unit.
+            min_power (float): The minimum power output of the PV unit.
+            time_steps (list): List of time steps for which the model will be defined.
+            availability (list): List of availability factors for each time step.
+            power_profile (str): Indicates whether the PV unit follows a predefined power profile.
+
+        Constraints:
+            max_power_pv_constraint: Ensures the power output of the PV unit does not exceed the maximum power limit.
+            min_power_pv_constraint: Ensures the power output of the PV unit does not fall below the minimum power requirement.
+            pv_self_consumption_and_sell_constraint: Ensures the power output of the PV unit is self consumed and sold to the market.
+            operating_revenue_pv_constraint: Calculates the revenue of the PV unit based on the electricity price.
+    """
+    #define parameters
+    model_part = pyo.Block()
+    model_part.max_power = pyo.Param(initialize=max_power)
+    model_part.min_power = pyo.Param(initialize=min_power)
+
+    #define variables
+    model_part.energy_out = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+    model_part.operating_revenue_pv = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+
+    # define constraints
+    if bool(strtobool(power_profile)):
+        @model_part.Constraint(time_steps)
+        def power_profile_constraint(b, t):
+            """
+            Ensures the PV follows the predefined power profile.
+            """
+            return b.energy_out[t] == model.pv_power_profile[t]
+    else:
+        @model_part.Constraint(time_steps)
+        def power_pv_constraint(b, t):
+            """
+            Ensures the power output of the PV unit gets calculated from its availability.
+            """
+            return b.energy_out[t] == b.max_power * availability.iloc[t]
+
+    @model_part.Constraint(time_steps)
+    def min_power_pv_constraint(b, t):
+        """
+        Ensures the power output of the PV unit does not fall below the minimum power requirement.
+        """
+        return b.energy_out[t] >= b.min_power
+
+    @model_part.Constraint(time_steps)
+    def operating_revenue_pv_constraint(b, t):
+        """
+        Calculates the revenue of the PV unit based on the electricity price.
+        """
+        return b.operating_revenue_pv[t] == model.energy_sell_pv[t] * model.electricity_price[t]
+
+    return model_part
+
+
+def create_battery_storage(
+        model,
+        max_capacity,
+        min_capacity,
+        initial_soc,
+        charge_loss_rate,
+        discharge_loss_rate,
+        max_charging_rate,
+        max_discharging_rate,
+        charging_profile,
+        sells_energy_to_market,
+        time_steps,
+        **kwargs,
+):
+    """
+        Represents battery storage.
+
+        Args:
+            model: A Pyomo ConcreteModel object representing the optimization model.
+            id (str): A unique identifier for the storage unit.
+            max_capacity (float): The maximum storage capacity of the unit.
+            min_capacity (float): The minimum storage capacity of the unit.
+            initial_soc (float): The initial state of charge (SOC) of the storage unit.
+            charge_loss_rate (float): The rate of energy loss during charging.
+            discharge_loss_rate (float): The rate of energy loss during discharging.
+            max_charging_rate (float): The maximum rate at which the battery can be charged (in MW).
+            max_discharging_rate (float): The maximum rate at which the battery can be discharged (in MW).
+            charging_profile (str): Indicates whether the battery follows a predefined charging profile.
+            sells_energy_to_market (str): Indicates whether the battery can sell energy to the market.
+            time_steps (list): List of time steps for which the model will be defined.
+            **kwargs: Additional keyword arguments.
+
+        Constraints:
+            operating_cost_battery_constraint: Calculates the operating (charging) cost of the battery based on the electricity price.
+            battery_self_consumption_and_sell_constraint: Ensures the power output of the battery unit is self consumed and sold to the market.
+            operating_revenue_battery_constraint: Calculates the revenue of the battery unit based on the electricity price.
+            battery_no_energy_sell_constraint: Ensures that no energy gets sold to the market if not wanted.
+            charging_profile_constraint: Ensures the battery storage follows the predefined charging profile.
+            discharging_profile_constraint: Ensures the battery storage follows the predefined charging profile.
+            charging_rate_limit: Limits the charging rate of the battery to its maximum charging rate.
+            discharging_rate_limit: Limits the charging rate of the battery to its maximum discharging rate.
+    """
+    model_part = create_storage(
+        model,
+        max_capacity,
+        min_capacity,
+        initial_soc,
+        0,
+        charge_loss_rate,
+        discharge_loss_rate,
+        time_steps,
+        **kwargs
+    )
+
+    model_part.max_battery_charging_rate = pyo.Param(initialize=max_charging_rate)
+    model_part.max_battery_discharging_rate = pyo.Param(initialize=max_discharging_rate)
+    model_part.operating_cost_battery = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+    model_part.operating_revenue_battery = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+
+    @model_part.Constraint(time_steps)
+    def operating_cost_battery_constraint(b, t):
+        """
+        Calculates the operating cost of the battery based on the electricity price.
+
+        """
+        return b.operating_cost_battery[t] == model.charge_battery_from_grid[t] * model.electricity_price[t]
+
+    if bool(strtobool(sells_energy_to_market)):
+        @model_part.Constraint(time_steps)
+        def operating_revenue_battery_constraint(b, t):
+            """
+            Calculates the revenue of the battery unit based on the electricity price.
+            """
+            return b.operating_revenue_battery[t] == model.discharge_battery_sell[t] * model.electricity_price[t]
+    else:
+        @model_part.Constraint(time_steps)
+        def operating_revenue_battery_constraint(b, t):
+            """
+            Ensures that no profit will be made.
+            """
+            return b.operating_revenue_battery[t] == 0
+
+    if bool(strtobool(charging_profile)):
+        @model_part.Constraint(time_steps)
+        def charging_profile_constraint(b, t):
+            """
+            Ensures the battery storage follows the predefined charging profile.
+            """
+            battery_load = model.battery_load_profile[t]
+            return b.charge[t] == (battery_load if battery_load >= 0 else 0)
+
+        @model_part.Constraint(time_steps)
+        def discharging_profile_constraint(b, t):
+            """
+            Ensures the battery storage follows the predefined charging profile.
+            """
+            battery_load = model.battery_load_profile[t]
+            return b.discharge[t] == (abs(battery_load) if battery_load < 0 else 0)
+    else:
+        @model_part.Constraint(time_steps)
+        def charging_rate_limit(b, t):
+            """
+            Limits the charging rate of the battery to its maximum charging rate.
+            """
+            return b.charge[t] <= b.max_battery_charging_rate
+
+        @model_part.Constraint(time_steps)
+        def discharging_rate_limit(b, t):
+            """
+            Limits the charging rate of the battery to its maximum discharging rate.
+            """
+            return b.discharge[t] <= b.max_battery_discharging_rate
+
+    return model_part
+
