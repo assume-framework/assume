@@ -13,6 +13,7 @@ from pyomo.opt import (
     TerminationCondition,
     check_available_solvers,
 )
+from distutils.util import strtobool
 
 from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook
@@ -142,12 +143,12 @@ class Building(SupportsMinMax, DSMFlex):
                     "Missing 'availability' of PV plants in availability file."
                 )
 
-        self.define_variables()
-        self.initialize_components(components)
-
         if self.has_battery_storage:
             sells_energy_input = components["battery_storage"].get("sells_energy_to_market")
-            self.sells_battery_energy_to_market = sells_energy_input if sells_energy_input else "No"
+            self.sells_battery_energy_to_market = bool(strtobool(sells_energy_input))
+
+        self.define_variables()
+        self.initialize_components(components)
 
         self.define_constraints()
         self.define_objective()
@@ -232,7 +233,7 @@ class Building(SupportsMinMax, DSMFlex):
                 """
                 return (self.model.dsm_blocks["battery_storage"].discharge[t]
                         == m.discharge_battery_self_consumption[t]
-                        + (self.model.discharge_battery_sell[t] if self.sells_battery_energy_to_market == "Yes" else 0)
+                        + (self.model.discharge_battery_sell[t] if self.sells_battery_energy_to_market else 0)
                         )
 
             @self.model.Constraint(self.model.time_steps)
@@ -355,8 +356,9 @@ class Building(SupportsMinMax, DSMFlex):
                 self.model.charge_ev_from_pv = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
         if self.has_battery_storage:
             self.model.discharge_battery_self_consumption = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
-            self.model.discharge_battery_sell = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
             self.model.charge_battery_from_grid = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
+            if self.sells_battery_energy_to_market:
+                self.model.discharge_battery_sell = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
             if self.has_ev:
                 self.model.charge_ev_from_battery = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
 
@@ -370,7 +372,7 @@ class Building(SupportsMinMax, DSMFlex):
                 - (self.model.charge_ev_from_pv[t] if self.has_pv and self.has_ev else 0)
                 - (self.model.charge_ev_from_battery[t] if self.has_ev and self.has_battery_storage else 0)
                 - (self.model.charge_battery_from_pv[t] if self.has_pv and self.has_battery_storage else 0)
-                - (self.model.discharge_battery_sell[t] if self.has_battery_storage else 0)
+                - (self.model.discharge_battery_sell[t] if self.has_battery_storage and self.sells_battery_energy_to_market else 0)
                 - (self.model.energy_sell_pv[t] if self.has_pv else 0)
             )
 
@@ -399,7 +401,7 @@ class Building(SupportsMinMax, DSMFlex):
             return (
                     m.total_power_output[t]
                     == (self.model.energy_sell_pv[t] if self.has_pv else 0)
-                    + (self.model.discharge_battery_sell[t] if self.has_battery_storage else 0)
+                    + (self.model.discharge_battery_sell[t] if self.has_battery_storage and self.sells_battery_energy_to_market else 0)
             )
 
         @self.model.Constraint(self.model.time_steps)

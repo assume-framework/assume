@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pyomo.environ as pyo
+from distutils.util import strtobool
 
 
 def create_heatpump(
@@ -353,7 +354,7 @@ def create_ev(
     model_part.initial_ev_battery_soc = pyo.Param(initialize=initial_soc)
     model_part.ramp_up_ev = pyo.Param(initialize=ramp_up)
     model_part.ramp_down_ev = pyo.Param(initialize=ramp_down)
-    if charging_profile == "Yes" and "load_profile" in kwargs:
+    if bool(strtobool(charging_profile)) and "load_profile" in kwargs:
         model_part.load_profile_ev = pyo.Param(
             time_steps,
             initialize=kwargs["load_profile"]
@@ -365,7 +366,7 @@ def create_ev(
     model_part.operating_cost_ev = pyo.Var(time_steps, within=pyo.NonNegativeReals)
 
     # define constraints
-    if charging_profile == "Yes":
+    if bool(strtobool(charging_profile)):
 
         @model_part.Constraint(time_steps)
         def charging_profile_constraint(b, t):
@@ -1474,7 +1475,7 @@ def create_pv_plant(
     model_part.operating_revenue_pv = pyo.Var(time_steps, within=pyo.NonNegativeReals)
 
     # define constraints
-    if power_profile == "Yes":
+    if bool(strtobool(power_profile)):
         @model_part.Constraint(time_steps)
         def power_profile_constraint(b, t):
             """
@@ -1487,7 +1488,7 @@ def create_pv_plant(
             """
             Ensures the power output of the PV unit gets calculated from its availability.
             """
-            return b.energy_out[t] == b.max_power * availability.iloc[t]
+            return b.energy_out[t] == b.max_power * availability[t]
 
     @model_part.Constraint(time_steps)
     def min_power_pv_constraint(b, t):
@@ -1573,7 +1574,7 @@ def create_battery_storage(
         """
         return b.operating_cost_battery[t] == model.charge_battery_from_grid[t] * model.electricity_price[t]
 
-    if sells_energy_to_market == "Yes":
+    if bool(strtobool(sells_energy_to_market)):
         @model_part.Constraint(time_steps)
         def operating_revenue_battery_constraint(b, t):
             """
@@ -1588,14 +1589,7 @@ def create_battery_storage(
             """
             return b.operating_revenue_battery[t] == 0
 
-        @model_part.Constraint(time_steps)
-        def battery_no_energy_sell_constraint(b, t):
-            """
-            Ensures that no energy gets sold to the market if not wanted.
-            """
-            return b.discharge_sell[t] == 0
-
-    if charging_profile == "Yes":
+    if bool(strtobool(charging_profile)):
         @model_part.Constraint(time_steps)
         def charging_profile_constraint(b, t):
             """
