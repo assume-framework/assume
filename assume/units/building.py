@@ -399,7 +399,10 @@ class Building(SupportsMinMax, DSMFlex):
         self.model.additional_load_from_grid = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
         )
-
+        # Indicates if a household is consumer or producer -> to ensure self produced energy is used first
+        self.model.consumer_indicator = pyo.Var(
+            self.model.time_steps, within=pyo.Binary
+        )
         if self.has_heatpump:
             self.model.energy_hp_from_grid = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
             if self.has_pv:
@@ -440,7 +443,7 @@ class Building(SupportsMinMax, DSMFlex):
             produced/stored energy.
             """
             return (
-                m.total_power_input[t]
+                    (m.total_power_input[t] * self.model.consumer_indicator[t])
                 == (self.model.energy_hp_from_grid[t] if self.has_heatpump else 0)
                 + (self.model.energy_boiler_from_grid[t] if self.has_boiler and self.is_boiler_electric else 0)
                 + (self.model.dsm_blocks["boiler"].power_in[t] if self.has_boiler and not self.is_boiler_electric else 0)
@@ -455,7 +458,7 @@ class Building(SupportsMinMax, DSMFlex):
             Ensures the total power output is the sum of power outputs of all components.
             """
             return (
-                    m.total_power_output[t]
+                    (m.total_power_output[t] * (1 - self.model.consumer_indicator[t]))
                     == (self.model.energy_sell_pv[t] if self.has_pv else 0)
                     + (self.model.discharge_battery_sell[t] if self.has_battery_storage and self.sells_battery_energy_to_market else 0)
             )

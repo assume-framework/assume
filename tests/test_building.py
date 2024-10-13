@@ -131,6 +131,7 @@ def test_initialization(building_1, building_2):
     assert_is_pyo_var(building_1.model.total_power_self_usage)
     assert_is_pyo_var(building_1.model.additional_load_from_grid)
     assert_is_pyo_var(building_1.model.charge_ev_from_grid)
+    assert_is_pyo_var(building_1.model.consumer_indicator)
     assert_attribute_error(building_2.model, "charge_ev_from_grid")
     assert_is_pyo_var(building_1.model.energy_self_consumption_pv)
     assert_attribute_error(building_2.model, "energy_self_consumption_pv")
@@ -196,7 +197,7 @@ def test_optimal_operation(building_1, index):
     # Check if energy got distributed and charged right
     assert all(charge_bat_from_pv + charge_ev_from_pv + load_pv == pv_self)
     assert all(charge_ev_from_bat + load_battery == discharge_self)
-    building_energy = ((load_pv + load_battery + load_grid) - pv_sell + charge_bat_from_grid - discharge_sell + charge_ev_from_grid)
+    building_energy = ((load_grid + charge_ev_from_grid + charge_bat_from_grid)-(pv_sell + discharge_sell))
     power_input = pd.Series([instance.total_power_input[t].value for t in instance.time_steps])
     power_output = pd.Series([instance.total_power_output[t].value for t in instance.time_steps])
     assert all(power_input - power_output == building_energy)
