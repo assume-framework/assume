@@ -6,7 +6,6 @@ import logging
 
 import pandas as pd
 import pyomo.environ as pyo
-from pyomo.environ import value
 from pyomo.opt import (
     SolverFactory,
     SolverStatus,
@@ -121,6 +120,8 @@ class SteelPlant(SupportsMinMax, DSMFlex):
 
         self.opt_power_requirement = None
         self.flex_power_requirement = None
+
+        self.variable_cost_series = None
 
     def switch_to_opt(self, instance):
         """
@@ -429,13 +430,18 @@ class SteelPlant(SupportsMinMax, DSMFlex):
                 "Termination Condition: ", results.solver.termination_condition
             )
 
-        temp = instance.total_power_input.get_values()
-        self.opt_power_requirement = pd.Series(data=temp)
-        self.opt_power_requirement.index = self.index
+        self.opt_power_requirement = pd.Series(
+            data=instance.total_power_input.get_values()
+        ).set_axis(self.index)
 
         self.total_cost = sum(
             instance.variable_cost[t].value for t in instance.time_steps
         )
+
+        # Variable cost series
+        self.variable_cost_series = pd.Series(
+            data=instance.variable_cost.get_values()
+        ).set_axis(self.index)
 
     def determine_optimal_operation_with_flex(self):
         """
@@ -470,6 +476,11 @@ class SteelPlant(SupportsMinMax, DSMFlex):
         temp = instance.total_power_input.get_values()
         self.flex_power_requirement = pd.Series(data=temp)
         self.flex_power_requirement.index = self.index
+
+        # Variable cost series
+        temp_1 = instance.variable_cost.get_values()
+        self.variable_cost_series = pd.Series(data=temp_1)
+        self.variable_cost_series.index = self.index
 
     def set_dispatch_plan(
         self,
@@ -518,7 +529,7 @@ class SteelPlant(SupportsMinMax, DSMFlex):
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         """
-        Calculate the marginal cost of the unit returns the marginal cost of the unit based on the provided time and power.
+        Calculate the marginal cost of the unit based on the provided time and power.
 
         Args:
             start (pandas.Timestamp): The start time of the dispatch.
@@ -527,32 +538,15 @@ class SteelPlant(SupportsMinMax, DSMFlex):
         Returns:
             float: the marginal cost of the unit for the given power.
         """
-        for t in self.model.time_steps:
-            # Calculate total variable costs for the current time step
-            total_variable_costs = (
-                +value(
-                    self.model.dsm_blocks["electrolyser"].electrolyser_operating_cost[t]
-                )
-                + value(self.model.dsm_blocks["dri_plant"].dri_operating_cost[t])
-                + value(self.model.dsm_blocks["eaf"].eaf_operating_cost[t])
+        # Initialize marginal cost
+        marginal_cost = 0
+
+        if self.opt_power_requirement[start] > 0:
+            marginal_cost = (
+                self.variable_cost_series[start] / self.opt_power_requirement[start]
             )
 
-            # Calculate total energy consumption for the current time step
-            total_energy_consumption = (
-                value(self.model.dsm_blocks["electrolyser"].power_in[t])
-                + value(self.model.dsm_blocks["eaf"].power_eaf[t])
-                + +value(self.model.dsm_blocks["dri_plant"].power_dri[t])
-            )
-
-            # Calculate marginal cost per unit of energy
-            if total_energy_consumption > 0:
-                marginal_cost_per_unit_energy = (
-                    total_variable_costs / total_energy_consumption
-                )
-            else:
-                marginal_cost_per_unit_energy = 0  # Avoid division by zero
-
-            return marginal_cost_per_unit_energy
+        return marginal_cost
 
     def as_dict(self) -> dict:
         """

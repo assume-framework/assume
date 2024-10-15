@@ -14,13 +14,36 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
+  jupyter:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+        cache-dependency-path: '**/pyproject.toml'
+    - name: Run Jupyter notebooks
+      run: |
+        pip install -e .
+        pip install jupyter
+        cd examples/notebooks
+        jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=60 --output output.ipynb 01_minimal_manual_example.ipynb
+        jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=60 --output output.ipynb 02_automated_run_example.ipynb
+        jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=60 --output output.ipynb 03_custom_unit_example.ipynb
+  test:
 
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11"]
+        python-version: ["3.10", "3.11", "3.12"]
 
     steps:
     - uses: actions/checkout@v4

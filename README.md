@@ -46,19 +46,19 @@ pip install assume-framework
 To install with reinforcement learning capabilities:
 
 ```bash
-pip install assume-framework[learning]
+pip install 'assume-framework[learning]'
 ```
 
 We also include market clearing algorithms for complex bids. These clearing algorithms require pyomo and a solver (we use GLPK). To install the package with these capabilities, use:
 
 ```bash
-pip install assume-framework[optimization]
+pip install 'assume-framework[optimization]'
 ```
 
 To install with testing capabilities:
 
 ```bash
-pip install assume-framework[test]
+pip install 'assume-framework[test]'
 ```
 
 ### Timescale Database and Grafana Dashboards
@@ -97,12 +97,15 @@ To ease your way into ASSUME we provided some examples and tutorials. The former
 The tutorials work completly detached from your own machine on google colab. They provide code snippets and task that show you, how you can work with the software package one your own. We have two tutorials prepared, one for introducing a new unit and one for getting reinforcement learning ready on ASSUME.
 
 How to configure a new unit in ASSUME?
-**Coming Soon**
+[![Open Learning Tutorial in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/assume-framework/assume/blob/main/examples/notebooks/03_custom_unit_example.ipynb)
 
-How to introduce reinforcement learning to ASSUME?
+How to use reinforcement learning for new market participants in ASSUME?
 
 [![Open Learning Tutorial in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/assume-framework/assume/blob/main/examples/notebooks/04_reinforcement_learning_example.ipynb)
 
+How to change and adapt reinforcement learning algorithms in ASSUME?
+
+[![Open Learning Tutorial in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/assume-framework/assume/blob/main/examples/notebooks/04_reinforcement_learning_algorithm_example.ipynb)
 
 
 ### The Examples
@@ -185,7 +188,7 @@ sphinx-apidoc -o docs/source -Fa assume
 To create and serve the documentation locally, use:
 
 ```bash
-cd docs/source && python -m sphinx . ../build && cd ../.. && python -m http.server --directory docs/build/html
+cd docs/source && python -m sphinx . ../build && cd ../.. && python -m http.server --directory docs/build
 ```
 
 ## Contributors and Funding

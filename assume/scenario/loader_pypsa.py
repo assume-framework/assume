@@ -13,7 +13,7 @@ from assume import World
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 async def load_pypsa_async(
@@ -42,7 +42,7 @@ async def load_pypsa_async(
     start = index[0]
     end = index[-1]
     sim_id = f"{scenario}_{study_case}"
-    log.info(f"loading scenario {sim_id}")
+    logger.info(f"loading scenario {sim_id}")
 
     await world.setup(
         start=start,
@@ -182,7 +182,7 @@ if __name__ == "__main__":
         case "storage_hvdc":
             network = pypsa.examples.storage_hvdc(True)
         case _:
-            log.info(f"invalid studycase: {study_case}")
+            logger.info(f"invalid studycase: {study_case}")
             network = pd.DataFrame()
 
     study_case += market_mechanism

@@ -7,8 +7,6 @@ from typing import TypedDict
 
 import numpy as np
 import torch as th
-from torch import nn
-from torch.nn import functional as F
 
 
 class ObsActRew(TypedDict):
@@ -18,111 +16,6 @@ class ObsActRew(TypedDict):
 
 
 observation_dict = dict[list[datetime], ObsActRew]
-
-
-class CriticTD3(nn.Module):
-    """Initialize parameters and build model.
-
-    Args:
-        n_agents (int): Number of agents
-        obs_dim (int): Dimension of each state
-        act_dim (int): Dimension of each action
-    """
-
-    def __init__(
-        self,
-        n_agents: int,
-        obs_dim: int,
-        act_dim: int,
-        float_type,
-        unique_obs_dim: int = 0,
-    ):
-        super().__init__()
-
-        self.obs_dim = obs_dim + unique_obs_dim * (n_agents - 1)
-        self.act_dim = act_dim * n_agents
-
-        # Q1 architecture
-        if n_agents <= 50:
-            self.FC1_1 = nn.Linear(self.obs_dim + self.act_dim, 512, dtype=float_type)
-            self.FC1_2 = nn.Linear(512, 256, dtype=float_type)
-            self.FC1_3 = nn.Linear(256, 128, dtype=float_type)
-            self.FC1_4 = nn.Linear(128, 1, dtype=float_type)
-        else:
-            self.FC1_1 = nn.Linear(self.obs_dim + self.act_dim, 1024, dtype=float_type)
-            self.FC1_2 = nn.Linear(1024, 512, dtype=float_type)
-            self.FC1_3 = nn.Linear(512, 128, dtype=float_type)
-            self.FC1_4 = nn.Linear(128, 1, dtype=float_type)
-
-        # Q2 architecture
-        if n_agents <= 50:
-            self.FC2_1 = nn.Linear(self.obs_dim + self.act_dim, 512, dtype=float_type)
-            self.FC2_2 = nn.Linear(512, 256, dtype=float_type)
-            self.FC2_3 = nn.Linear(256, 128, dtype=float_type)
-            self.FC2_4 = nn.Linear(128, 1, dtype=float_type)
-        else:
-            self.FC2_1 = nn.Linear(self.obs_dim + self.act_dim, 1024, dtype=float_type)
-            self.FC2_2 = nn.Linear(1024, 512, dtype=float_type)
-            self.FC2_3 = nn.Linear(512, 128, dtype=float_type)
-            self.FC2_4 = nn.Linear(128, 1, dtype=float_type)
-
-    def forward(self, obs, actions):
-        """
-        Forward pass through the network, from observation to actions.
-        """
-        xu = th.cat([obs, actions], 1)
-
-        x1 = F.relu(self.FC1_1(xu))
-        x1 = F.relu(self.FC1_2(x1))
-        x1 = F.relu(self.FC1_3(x1))
-        x1 = self.FC1_4(x1)
-
-        x2 = F.relu(self.FC2_1(xu))
-        x2 = F.relu(self.FC2_2(x2))
-        x2 = F.relu(self.FC2_3(x2))
-        x2 = self.FC2_4(x2)
-
-        return x1, x2
-
-    def q1_forward(self, obs, actions):
-        """
-        Only predict the Q-value using the first network.
-        This allows to reduce computation when all the estimates are not needed
-        (e.g. when updating the policy in TD3).
-
-        Args:
-            obs (torch.Tensor): The observations
-            actions (torch.Tensor): The actions
-
-        """
-        x = th.cat([obs, actions], 1)
-        x = F.relu(self.FC1_1(x))
-        x = F.relu(self.FC1_2(x))
-        x = F.relu(self.FC1_3(x))
-        x = self.FC1_4(x)
-
-        return x
-
-
-class Actor(nn.Module):
-    """
-    The neurnal network for the actor.
-    """
-
-    def __init__(self, obs_dim: int, act_dim: int, float_type):
-        super().__init__()
-
-        self.FC1 = nn.Linear(obs_dim, 256, dtype=float_type)
-        self.FC2 = nn.Linear(256, 128, dtype=float_type)
-        self.FC3 = nn.Linear(128, act_dim, dtype=float_type)
-
-    def forward(self, obs):
-        x = F.relu(self.FC1(obs))
-        x = F.relu(self.FC2(x))
-        x = F.softsign(self.FC3(x))
-        # x = th.tanh(self.FC3(x))
-
-        return x
 
 
 # Ornstein-Uhlenbeck Noise

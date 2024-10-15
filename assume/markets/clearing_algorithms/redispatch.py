@@ -18,7 +18,7 @@ from assume.common.grid_utils import (
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.markets.base_market import MarketRole
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 logging.getLogger("linopy").setLevel(logging.WARNING)
 logging.getLogger("pypsa").setLevel(logging.WARNING)
@@ -49,7 +49,10 @@ class RedispatchMarketRole(MarketRole):
         self.network = pypsa.Network()
         # set snapshots as list from the value marketconfig.producs.count converted to list
         self.network.snapshots = range(marketconfig.market_products[0].count)
-        assert self.grid_data
+
+        if not self.grid_data:
+            logger.error(f"Market '{marketconfig.market_id}': grid_data is missing.")
+            raise ValueError("grid_data is missing.")
 
         read_pypsa_grid(
             network=self.network,
@@ -82,7 +85,7 @@ class RedispatchMarketRole(MarketRole):
                 self.env = Env()
                 self.env.setParam("LogToConsole", 0)
             except ImportError:
-                log.error("gurobi not installed - using GLPK")
+                logger.error("gurobi not installed - using GLPK")
                 self.solver = "glpk"
 
         # set the market clearing principle
@@ -90,7 +93,12 @@ class RedispatchMarketRole(MarketRole):
         self.payment_mechanism = marketconfig.param_dict.get(
             "payment_mechanism", "pay_as_bid"
         )
-        assert self.payment_mechanism in ["pay_as_bid", "pay_as_clear"]
+
+        if self.payment_mechanism not in ["pay_as_bid", "pay_as_clear"]:
+            logger.error(
+                f"Market '{marketconfig.market_id}': Invalid payment mechanism '{self.payment_mechanism}'."
+            )
+            raise ValueError("Invalid payment mechanism.")
 
     def setup(self):
         super().setup()
@@ -178,7 +186,7 @@ class RedispatchMarketRole(MarketRole):
 
         # if any line is congested, perform redispatch
         if line_loading.max().max() > 1:
-            log.debug("Congestion detected")
+            logger.debug("Congestion detected")
 
             status, termination_condition = redispatch_network.optimize(
                 solver_name=self.solver,
@@ -186,7 +194,7 @@ class RedispatchMarketRole(MarketRole):
             )
 
             if status != "ok":
-                log.error(f"Solver exited with {termination_condition}")
+                logger.error(f"Solver exited with {termination_condition}")
                 raise Exception("Solver in redispatch market did not converge")
 
             # process dispatch data
@@ -196,7 +204,7 @@ class RedispatchMarketRole(MarketRole):
 
         # if no congestion is detected set accepted volume and price to 0
         else:
-            log.debug("No congestion detected")
+            logger.debug("No congestion detected")
 
         # return orderbook_df back to orderbook format as list of dicts
         accepted_orders = orderbook_df.to_dict("records")

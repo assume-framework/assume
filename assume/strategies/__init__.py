@@ -20,6 +20,7 @@ from assume.strategies.naive_strategies import (
     NaiveRedispatchStrategy,
     NaiveSingleBidStrategy,
 )
+from assume.strategies.manual_strategies import SimpleManualTerminalStrategy
 
 bidding_strategies: dict[str, BaseStrategy] = {
     "naive_eom": NaiveSingleBidStrategy,
@@ -38,6 +39,7 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "naive_redispatch": NaiveRedispatchStrategy,
     "naive_da_steelplant": NaiveDASteelplantStrategy,
     "naive_steel_redispatch": NaiveRedispatchSteelplantStrategy,
+    "manual_strategy": SimpleManualTerminalStrategy,
 }
 
 try:

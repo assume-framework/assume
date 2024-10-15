@@ -442,7 +442,7 @@ def add_agent_to_world(
 
 
 def read_amiris_yaml(base_path):
-    Constructor.add_to_loader_class(loader_class=yaml.FullLoader, base_dir=base_path)
+    yaml.add_constructor("!include", Constructor(base_dir=base_path))
 
     with open(base_path + "/scenario.yaml", "rb") as f:
         amiris_scenario = yaml.load(f, Loader=yaml.FullLoader)

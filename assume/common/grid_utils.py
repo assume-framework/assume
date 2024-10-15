@@ -334,6 +334,7 @@ def read_pypsa_grid(
     # setup the network
     add_buses(network, grid_dict["buses"])
     add_lines(network, grid_dict["lines"])
+    network.add("Carrier", "AC")
     return network
 
 

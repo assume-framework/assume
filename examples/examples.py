@@ -15,7 +15,7 @@ csv_path = ""
 
 os.makedirs("./examples/local_db", exist_ok=True)
 
-availabe_examples = {
+available_examples = {
     # small examples for easier understanding of different features and configurations
     "small": {"scenario": "example_01a", "study_case": "base"},
     "small_dam": {"scenario": "example_01a", "study_case": "dam"},
@@ -68,8 +68,11 @@ availabe_examples = {
     "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
     "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
     "small_learning_3": {"scenario": "example_02c", "study_case": "base"},
+    # DRL cases with lstm instead of mlp as actor neural network architecture
+    "small_learning_1_lstm": {"scenario": "example_02a", "study_case": "base_lstm"},
+    "small_learning_2_lstm": {"scenario": "example_02b", "study_case": "base_lstm"},
     # Further DRL example simulation showcasing learning features
-    "learning_with_complex_bids": {"scenario": "example_02d", "study_case": "base"},
+    "learning_with_complex_bids": {"scenario": "example_02d", "study_case": "dam"},
     #
     # full year examples to show real-world scenarios
     "large_2019_eom": {"scenario": "example_03", "study_case": "base_case_2019"},
@@ -93,6 +96,7 @@ availabe_examples = {
     },
 }
 
+
 # %%
 if __name__ == "__main__":
     """
@@ -115,8 +119,8 @@ if __name__ == "__main__":
     load_scenario_folder(
         world,
         inputs_path="examples/inputs",
-        scenario=availabe_examples[example]["scenario"],
-        study_case=availabe_examples[example]["study_case"],
+        scenario=available_examples[example]["scenario"],
+        study_case=available_examples[example]["study_case"],
     )
 
     # to add custom bidding strategies, you need to import them
@@ -144,8 +148,8 @@ if __name__ == "__main__":
         run_learning(
             world,
             inputs_path="examples/inputs",
-            scenario=availabe_examples[example]["scenario"],
-            study_case=availabe_examples[example]["study_case"],
+            scenario=available_examples[example]["scenario"],
+            study_case=available_examples[example]["study_case"],
         )
 
     world.run()
