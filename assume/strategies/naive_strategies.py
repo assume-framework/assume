@@ -148,12 +148,8 @@ class NaiveDASteelplantStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        bids = []
-        start = product_tuples[0][0]  # start time of the first product
-
+        # calculate the optimal operation of the unit
         unit.calculate_optimal_operation_if_needed()
-
-        # unit.run_modified_optimization()
 
         bids = []
         for product in product_tuples:
@@ -162,14 +158,15 @@ class NaiveDASteelplantStrategy(BaseStrategy):
             and the volume of the product. Dispatch the order to the market.
             """
             start = product[0]
+
             volume = unit.opt_power_requirement.loc[start]
-            price = 3000
+            marginal_price = unit.calculate_marginal_cost(start, volume)
             bids.append(
                 {
                     "start_time": product[0],
                     "end_time": product[1],
                     "only_hours": product[2],
-                    "price": price,
+                    "price": marginal_price,
                     "volume": -volume,
                 }
             )
@@ -403,6 +400,47 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
                     "max_power": -1500,
                     "min_power": -700,
                     "node": unit.node,
+                }
+            )
+
+        return bids
+
+
+class NaiveDSAPosRedispatchStrategy(BaseStrategy):
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        # calculate the optimal operation of the unit according to the objective function
+        unit.calculate_optimal_operation_if_needed()
+
+        bids = []
+        for product in product_tuples:
+            """
+            for each product, calculate the marginal cost of the unit at the start time of the product
+            and the volume of the product. Dispatch the order to the market.
+            """
+            start = product[0]
+            volume_flex = unit.flex_power_requirement.loc[start]
+            volume_redispatch = (
+                unit.opt_power_requirement.loc[start]
+                - unit.flex_power_requirement.loc[start]
+            )
+
+            # Ensure volume_redispatch is non-negative i.e. only bidding the Ramped-down volume
+            volume_redispatch = max(volume_redispatch, 0)
+
+            marginal_price = unit.calculate_marginal_cost(start, volume_flex)
+            bids.append(
+                {
+                    "start_time": product[0],
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": marginal_price,
+                    "volume": -volume_redispatch,
                 }
             )
 
