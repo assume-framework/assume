@@ -441,6 +441,7 @@ class NaiveDSAPosRedispatchStrategy(BaseStrategy):
                     "only_hours": product[2],
                     "price": marginal_price,
                     "volume": -volume_redispatch,
+                    "node": unit.node,
                 }
             )
 
