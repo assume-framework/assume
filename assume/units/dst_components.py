@@ -29,7 +29,6 @@ def create_heatpump(
 
     model_part.power_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.heat_out = pyo.Var(time_steps, within=pyo.NonNegativeReals)
-    model_part.operating_cost_hp = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.operational_status = pyo.Var(time_steps, within=pyo.Binary)
 
     @model_part.Constraint(time_steps)
@@ -92,10 +91,6 @@ def create_heatpump(
                 for i in range(t - min_downtime_units + 1, t + 1)
             ) <= 1 - min_downtime_units * (1 - b.operational_status[t])
 
-    @model_part.Constraint(time_steps)
-    def operating_cost_constraint(b, t):
-        return b.operating_cost_hp[t] == model.energy_hp_from_grid[t] * model.electricity_price[t]
-
     return model_part
 
 
@@ -124,7 +119,6 @@ def create_boiler(
     model_part.natural_gas_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.power_in = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.heat_out = pyo.Var(time_steps, within=pyo.NonNegativeReals)
-    model_part.operating_cost_boiler = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.operational_status = pyo.Var(time_steps, within=pyo.Binary)
 
     @model_part.Constraint(time_steps)
@@ -190,17 +184,6 @@ def create_boiler(
                 b.operational_status[i]
                 for i in range(t - min_downtime_units + 1, t + 1)
             ) <= 1 - min_downtime_units * (1 - b.operational_status[t])
-
-    @model_part.Constraint(time_steps)
-    def operating_cost_constraint(b, t):
-        if fuel_type == "electric":
-            return (
-                b.operating_cost_boiler[t] == model.energy_boiler_from_grid[t] * model.electricity_price[t]
-            )
-        elif fuel_type == "natural_gas":
-            return (
-                b.operating_cost_boiler[t] == b.power_in[t] * model.natural_gas_price[t]
-            )
 
     return model_part
 
@@ -366,7 +349,6 @@ def create_ev(
     # define variables
     model_part.ev_battery_soc = pyo.Var(time_steps, within=pyo.NonNegativeReals)
     model_part.charge_ev = pyo.Var(time_steps, within=pyo.NonNegativeReals)
-    model_part.operating_cost_ev = pyo.Var(time_steps, within=pyo.NonNegativeReals)
 
     # define constraints
     if bool(strtobool(charging_profile)):
@@ -434,14 +416,6 @@ def create_ev(
             (b.ev_battery_soc[t - 1] if (t > 0 and availability_df.iloc[t] == 1) else b.initial_ev_battery_soc)
             + b.charge_ev[t]
         )
-
-    @model_part.Constraint(time_steps)
-    def operating_cost_ev_constraint(b, t):
-        """
-        Calculates the operating cost of the ev based on the electricity price.
-
-        """
-        return b.operating_cost_ev[t] == model.charge_ev_from_grid[t] * model.electricity_price[t]
 
     return model_part
 
@@ -1473,7 +1447,6 @@ def create_pv_plant(
             max_power_pv_constraint: Ensures the power output of the PV unit does not exceed the maximum power limit.
             min_power_pv_constraint: Ensures the power output of the PV unit does not fall below the minimum power requirement.
             pv_self_consumption_and_sell_constraint: Ensures the power output of the PV unit is self consumed and sold to the market.
-            operating_revenue_pv_constraint: Calculates the revenue of the PV unit based on the electricity price.
     """
     #define parameters
     model_part = pyo.Block()
@@ -1481,8 +1454,7 @@ def create_pv_plant(
     model_part.min_power = pyo.Param(initialize=min_power)
 
     #define variables
-    model_part.energy_out = pyo.Var(time_steps, within=pyo.NonNegativeReals)
-    model_part.operating_revenue_pv = pyo.Var(time_steps, within=pyo.NonNegativeReals)
+    model_part.power_out = pyo.Var(time_steps, within=pyo.NonNegativeReals)
 
     # define constraints
     if bool(strtobool(power_profile)):
@@ -1491,28 +1463,21 @@ def create_pv_plant(
             """
             Ensures the PV follows the predefined power profile.
             """
-            return b.energy_out[t] == model.pv_power_profile[t]
+            return b.power_out[t] == model.pv_power_profile[t]
     else:
         @model_part.Constraint(time_steps)
         def power_pv_constraint(b, t):
             """
             Ensures the power output of the PV unit gets calculated from its availability.
             """
-            return b.energy_out[t] == b.max_power * availability.iloc[t]
+            return b.power_out[t] == b.max_power * availability.iloc[t]
 
     @model_part.Constraint(time_steps)
     def min_power_pv_constraint(b, t):
         """
         Ensures the power output of the PV unit does not fall below the minimum power requirement.
         """
-        return b.energy_out[t] >= b.min_power
-
-    @model_part.Constraint(time_steps)
-    def operating_revenue_pv_constraint(b, t):
-        """
-        Calculates the revenue of the PV unit based on the electricity price.
-        """
-        return b.operating_revenue_pv[t] == model.energy_sell_pv[t] * model.electricity_price_sell[t]
+        return b.power_out[t] >= b.min_power
 
     return model_part
 
@@ -1527,7 +1492,6 @@ def create_battery_storage(
         max_charging_rate,
         max_discharging_rate,
         charging_profile,
-        sells_energy_to_market,
         time_steps,
         **kwargs,
 ):
@@ -1545,15 +1509,10 @@ def create_battery_storage(
             max_charging_rate (float): The maximum rate at which the battery can be charged (in MW).
             max_discharging_rate (float): The maximum rate at which the battery can be discharged (in MW).
             charging_profile (str): Indicates whether the battery follows a predefined charging profile.
-            sells_energy_to_market (str): Indicates whether the battery can sell energy to the market.
             time_steps (list): List of time steps for which the model will be defined.
             **kwargs: Additional keyword arguments.
 
         Constraints:
-            operating_cost_battery_constraint: Calculates the operating (charging) cost of the battery based on the electricity price.
-            battery_self_consumption_and_sell_constraint: Ensures the power output of the battery unit is self consumed and sold to the market.
-            operating_revenue_battery_constraint: Calculates the revenue of the battery unit based on the electricity price.
-            battery_no_energy_sell_constraint: Ensures that no energy gets sold to the market if not wanted.
             charging_profile_constraint: Ensures the battery storage follows the predefined charging profile.
             discharging_profile_constraint: Ensures the battery storage follows the predefined charging profile.
             charging_rate_limit: Limits the charging rate of the battery to its maximum charging rate.
@@ -1574,30 +1533,6 @@ def create_battery_storage(
     model_part.max_battery_charging_rate = pyo.Param(initialize=max_charging_rate)
     model_part.max_battery_discharging_rate = pyo.Param(initialize=max_discharging_rate)
     model_part.operating_cost_battery = pyo.Var(time_steps, within=pyo.NonNegativeReals)
-    model_part.operating_revenue_battery = pyo.Var(time_steps, within=pyo.NonNegativeReals)
-
-    @model_part.Constraint(time_steps)
-    def operating_cost_battery_constraint(b, t):
-        """
-        Calculates the operating cost of the battery based on the electricity price.
-
-        """
-        return b.operating_cost_battery[t] == model.charge_battery_from_grid[t] * model.electricity_price[t]
-
-    if bool(strtobool(sells_energy_to_market)):
-        @model_part.Constraint(time_steps)
-        def operating_revenue_battery_constraint(b, t):
-            """
-            Calculates the revenue of the battery unit based on the electricity price.
-            """
-            return b.operating_revenue_battery[t] == model.discharge_battery_sell[t] * model.electricity_price_sell[t]
-    else:
-        @model_part.Constraint(time_steps)
-        def operating_revenue_battery_constraint(b, t):
-            """
-            Ensures that no profit will be made.
-            """
-            return b.operating_revenue_battery[t] == 0
 
     if bool(strtobool(charging_profile)):
         @model_part.Constraint(time_steps)
