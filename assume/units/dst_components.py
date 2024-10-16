@@ -1512,7 +1512,7 @@ def create_pv_plant(
         """
         Calculates the revenue of the PV unit based on the electricity price.
         """
-        return b.operating_revenue_pv[t] == model.energy_sell_pv[t] * model.electricity_price[t]
+        return b.operating_revenue_pv[t] == model.energy_sell_pv[t] * model.electricity_price_sell[t]
 
     return model_part
 
@@ -1590,7 +1590,7 @@ def create_battery_storage(
             """
             Calculates the revenue of the battery unit based on the electricity price.
             """
-            return b.operating_revenue_battery[t] == model.discharge_battery_sell[t] * model.electricity_price[t]
+            return b.operating_revenue_battery[t] == model.discharge_battery_sell[t] * model.electricity_price_sell[t]
     else:
         @model_part.Constraint(time_steps)
         def operating_revenue_battery_constraint(b, t):

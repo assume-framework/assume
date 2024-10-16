@@ -85,7 +85,8 @@ class Building(SupportsMinMax, DSMFlex):
             **kwargs,
         )
 
-        self.electricity_price = self.forecaster["price_EOM"]
+        self.electricity_price = self.forecaster["price_EOM"]*(1-self.forecaster["availability_Solar"])
+        self.electricity_price_sell = self.forecaster["price_EOM_sell"]
         self.natural_gas_price = self.forecaster["fuel_price_natural gas"]
         self.heat_demand = self.forecaster["heat_demand"]
         self.ev_load_profile = self.forecaster["ev_load_profile"]
@@ -353,6 +354,10 @@ class Building(SupportsMinMax, DSMFlex):
         self.model.electricity_price = pyo.Param(
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.electricity_price)},
+        )
+        self.model.electricity_price_sell = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.electricity_price_sell)},
         )
         self.model.natural_gas_price = pyo.Param(
             self.model.time_steps,
@@ -644,8 +649,8 @@ class Building(SupportsMinMax, DSMFlex):
         # Initialize marginal cost
         marginal_cost = 0
 
-        if self.opt_power_requirement[start] > 0:
-            marginal_cost = (
+        if self.opt_power_requirement[start] != 0:
+            marginal_cost = abs(
                 self.variable_cost_series[start] / self.opt_power_requirement[start]
             )
         return marginal_cost
