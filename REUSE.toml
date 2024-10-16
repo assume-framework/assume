@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+version = 1
+SPDX-PackageName = "ASSUME"
+SPDX-PackageSupplier = "ASSUME Developers <contact@assume-project.de>"
+SPDX-PackageDownloadLocation = "https://github.com/assume-framework/assume/"
+annotations = []
