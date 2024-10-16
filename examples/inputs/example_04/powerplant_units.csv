@@ -1,5 +1,6 @@
-name,technology,bidding_EOM,,bidding_redispatch,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,additional_cost,hot_start_cost,warm_start_cost,cold_start_cost,min_operating_time,min_down_time,heat_extraction,max_heat_extraction,node,unit_operator
-Wind onshore,wind_onshore,naive_eom,,naive_redispatch,renewable,0,5319,0,1,,,0,0,0,0,0,0,0,0,north,renewables_operator
-KKW ISAR 2,nuclear,naive_eom,,naive_redispatch,uranium,0,1485,590,0.33,890,890,10,140,140,140,72,10,no,0,south,UNIPER
-KKW BROKDORF,nuclear,naive_eom,,naive_redispatch,uranium,0,1480,590,0.33,890,890,12,140,140,140,72,10,no,0,south,UNIPER
-KKW PHILIPPSBURG 2,nuclear,naive_eom,,naive_redispatch,uranium,0,1468,590,0.33,880,880,14,140,140,140,72,10,no,0,south,ENBW ENERGIE BADEN-WURTTEMBERG
+name,technology,bidding_EOM,bidding_redispatch,fuel_type,emission_factor,max_power,min_power,efficiency,additional_cost,node,unit_operator
+Wind onshore,wind_onshore,naive_eom,naive_redispatch,renewable,0,5319,0,1,0,north,operator_north
+Gas North,combined cycle gas turbine,naive_eom,naive_redispatch,natural gas,0.201,5000,0,0.33,50,north,operator_north
+KKW ISAR 2,nuclear,naive_eom,naive_redispatch,uranium,0,1485,0,0.33,10,south,operator_south
+KKW BROKDORF,nuclear,naive_eom,naive_redispatch,uranium,0,1480,0,0.33,12,south,operator_south
+KKW PHILIPPSBURG 2,nuclear,naive_eom,naive_redispatch,uranium,0,1468,0,0.33,14,south,operator_south

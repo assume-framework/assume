@@ -69,11 +69,11 @@ class RedispatchMarketRole(MarketRole):
             network=self.network,
             loads=self.grid_data["loads"],
         )
-
-        add_redispatch_dsm(
-            network=self.network,
-            industrial_dsm_units=self.grid_data["industrial_dsm_units"],
-        )
+        if self.grid_data.get("industrial_dsm_units", None) is not None:
+            add_redispatch_dsm(
+                network=self.network,
+                industrial_dsm_units=self.grid_data["industrial_dsm_units"],
+            )
 
         self.solver = marketconfig.param_dict.get("solver", "glpk")
         self.env = None
