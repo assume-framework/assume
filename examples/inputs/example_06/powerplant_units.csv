@@ -1,3 +1,2 @@
 name,technology,bidding_EOM,,bidding_redispatch,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,additional_cost,hot_start_cost,warm_start_cost,cold_start_cost,min_operating_time,min_down_time,heat_extraction,max_heat_extraction,node,unit_operator
-Solar,solar,naive_eom,,naive_redispatch,renewable,0,1,0,1,,,0,0,0,0,0,0,0,0,north,dsm_operator_0
-EnergyProvider,nuclear,naive_eom,,naive_redispatch,uranium,0,1468,590,0.33,880,880,1,140,140,140,72,10,no,0,north,ENBW ENERGIE BADEN-WURTTEMBERG
+Backup_Energy_Provider,nuclear,naive_eom,,naive_redispatch,uranium,0,1468,590,0.33,880,880,1,140,140,140,72,10,no,0,north,ENBW ENERGIE BADEN-WURTTEMBERG

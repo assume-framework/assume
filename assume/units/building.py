@@ -86,11 +86,12 @@ class Building(SupportsMinMax, DSMFlex):
         )
 
         self.electricity_price = self.forecaster["price_EOM"]
+        self.electricity_price_sell = self.forecaster["price_EOM_sell"]
         self.natural_gas_price = self.forecaster["fuel_price_natural gas"]
         self.heat_demand = self.forecaster["heat_demand"]
         self.ev_load_profile = self.forecaster["ev_load_profile"]
         self.battery_load_profile = self.forecaster["battery_load_profile"]
-        self.additional_electricity_load = self.forecaster[
+        self.inflex_demand = self.forecaster[
             f"{self.id}_load_profile"
         ]
         self.pv_power_profile = self.forecaster[
@@ -226,10 +227,10 @@ class Building(SupportsMinMax, DSMFlex):
             Ensures the heat flow from the heat pump or electric boiler to the thermal storage or directly to the demand.
             """
             return (
-                    (self.model.additional_load_from_pv[t] if self.has_pv else 0)
-                    + (self.model.additional_load_from_battery[t] if self.has_battery_storage else 0)
-                    + (self.model.additional_load_from_grid[t])
-                    == self.model.additional_electricity_load[t]
+                    (self.model.inflex_demand_covered_by_pv[t] if self.has_pv else 0)
+                    + (self.model.inflex_demand_covered_by_battery[t] if self.has_battery_storage else 0)
+                    + (self.model.inflex_demand_covered_by_grid[t])
+                    == self.model.inflex_demand[t]
             )
 
         if self.has_heatpump:
@@ -280,7 +281,7 @@ class Building(SupportsMinMax, DSMFlex):
                 """
                 return (
                         self.model.discharge_battery_self_consumption[t]
-                        == self.model.additional_load_from_battery[t]
+                        == self.model.inflex_demand_covered_by_battery[t]
                         + (self.model.energy_hp_from_battery[t] if self.has_heatpump else 0)
                         + (self.model.energy_boiler_from_battery[t] if (
                             self.has_boiler and self.is_boiler_electric) else 0)
@@ -306,7 +307,7 @@ class Building(SupportsMinMax, DSMFlex):
                 """
                 return (
                         self.model.energy_self_consumption_pv[t]
-                        == self.model.additional_load_from_pv[t]
+                        == self.model.inflex_demand_covered_by_pv[t]
                         + (self.model.energy_hp_from_pv[t] if self.has_heatpump else 0)
                         + (self.model.energy_boiler_from_pv[t] if (self.has_boiler and self.is_boiler_electric) else 0)
                         + (self.model.charge_ev_from_pv[t] if self.has_ev else 0)
@@ -354,6 +355,10 @@ class Building(SupportsMinMax, DSMFlex):
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.electricity_price)},
         )
+        self.model.electricity_price_sell = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.electricity_price_sell)},
+        )
         self.model.natural_gas_price = pyo.Param(
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.natural_gas_price)},
@@ -366,15 +371,19 @@ class Building(SupportsMinMax, DSMFlex):
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.ev_load_profile)},
         )
-        self.model.additional_electricity_load = pyo.Param(
+        self.model.inflex_demand = pyo.Param(
             self.model.time_steps,
             initialize={
-                t: value for t, value in enumerate(self.additional_electricity_load)
+                t: value for t, value in enumerate(self.inflex_demand)
             },
         )
         self.model.battery_load_profile = pyo.Param(
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.battery_load_profile)},
+        )
+        self.model.pv_power_profile = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.pv_power_profile)},
         )
 
     def define_variables(self):
@@ -396,7 +405,7 @@ class Building(SupportsMinMax, DSMFlex):
         self.model.total_power_self_usage = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
         )
-        self.model.additional_load_from_grid = pyo.Var(
+        self.model.inflex_demand_covered_by_grid = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
         )
         # Indicates if a household is consumer or producer -> to ensure self produced energy is used first
@@ -420,7 +429,7 @@ class Building(SupportsMinMax, DSMFlex):
         if self.has_pv:
             self.model.energy_self_consumption_pv = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
             self.model.energy_sell_pv = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
-            self.model.additional_load_from_pv = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
+            self.model.inflex_demand_covered_by_pv = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
             if self.has_battery_storage:
                 self.model.charge_battery_from_pv = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
             if self.has_ev:
@@ -428,7 +437,7 @@ class Building(SupportsMinMax, DSMFlex):
         if self.has_battery_storage:
             self.model.discharge_battery_self_consumption = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
             self.model.charge_battery_from_grid = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
-            self.model.additional_load_from_battery = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
+            self.model.inflex_demand_covered_by_battery = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
             if self.sells_battery_energy_to_market:
                 self.model.discharge_battery_sell = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
             if self.has_ev:
@@ -449,7 +458,7 @@ class Building(SupportsMinMax, DSMFlex):
                 + (self.model.dsm_blocks["boiler"].power_in[t] if self.has_boiler and not self.is_boiler_electric else 0)
                 + (self.model.charge_ev_from_grid[t] if self.has_ev else 0)
                 + (self.model.charge_battery_from_grid[t] if self.has_battery_storage else 0)
-                + self.model.additional_load_from_grid[t]
+                + self.model.inflex_demand_covered_by_grid[t]
             )
 
         @self.model.Constraint(self.model.time_steps)
@@ -496,7 +505,7 @@ class Building(SupportsMinMax, DSMFlex):
                 + (self.model.dsm_blocks["boiler"].operating_cost_boiler[t] if self.has_boiler else 0)
                 + (self.model.dsm_blocks["ev"].operating_cost_ev[t] if self.has_ev else 0)
                 + (self.model.dsm_blocks["battery_storage"].operating_cost_battery[t] if self.has_battery_storage else 0)
-                + self.model.additional_load_from_grid[t]
+                + self.model.inflex_demand_covered_by_grid[t]
                 * self.model.electricity_price[t]
             )
 
@@ -644,8 +653,8 @@ class Building(SupportsMinMax, DSMFlex):
         # Initialize marginal cost
         marginal_cost = 0
 
-        if self.opt_power_requirement[start] > 0:
-            marginal_cost = (
+        if self.opt_power_requirement[start] != 0:
+            marginal_cost = abs(
                 self.variable_cost_series[start] / self.opt_power_requirement[start]
             )
         return marginal_cost

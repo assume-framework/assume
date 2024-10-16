@@ -111,7 +111,7 @@ def test_initialization(building_1, building_2):
     assert building_1.has_heatpump is False
     assert building_1.has_boiler is False
     assert building_1.has_thermal_storage is False
-    assert all(building_1.additional_electricity_load == 1.0)
+    assert all(building_1.inflex_demand == 1.0)
     assert all(building_1.electricity_price == 2)
     assert building_1.sells_battery_energy_to_market is True
     assert building_2.sells_battery_energy_to_market is False
@@ -150,7 +150,7 @@ def test_initialization(building_1, building_2):
 
 
 def test_optimal_operation(building_1, index):
-    electricity_load = building_1.additional_electricity_load
+    electricity_load = building_1.inflex_demand
     energy_prices = building_1.forecaster['price_EOM'].values
     instance = building_1.model.create_instance()
     building_1.calculate_optimal_operation_if_needed()
