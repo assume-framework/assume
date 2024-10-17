@@ -17,26 +17,10 @@ from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
 from assume.units.dsm_load_shift import DSMFlex
-from assume.units.dst_components import (
-    create_driplant,
-    create_dristorage,
-    create_electric_arc_furnance,
-    create_electrolyser,
-    create_hydrogen_storage,
-)
 
 SOLVERS = ["gurobi", "glpk", "cbc", "cplex"]
 
 logger = logging.getLogger(__name__)
-
-# Mapping of component type identifiers to their respective classes
-dst_components = {
-    "electrolyser": create_electrolyser,
-    "h2storage": create_hydrogen_storage,
-    "dri_plant": create_driplant,
-    "dri_storage": create_dristorage,
-    "eaf": create_electric_arc_furnance,
-}
 
 
 class SteelPlant(SupportsMinMax, DSMFlex):
@@ -162,30 +146,12 @@ class SteelPlant(SupportsMinMax, DSMFlex):
 
         return instance
 
-    def initialize_components(self, components: dict[str, dict]):
-        """
-        Initializes the components of the steel plant.
-
-        Args:
-            components (dict[str, dict]): The components of the steel plant.
-            model (pyomo.ConcreteModel): The Pyomo model.
-        """
-        self.model.dsm_blocks = pyo.Block(list(components.keys()))
-        for technology, component_data in components.items():
-            if technology in dst_components:
-                factory_method = dst_components[technology]
-                self.model.dsm_blocks[technology].transfer_attributes_from(
-                    factory_method(
-                        self.model, time_steps=self.model.time_steps, **component_data
-                    )
-                )
-
     def initialize_process_sequence(self):
         """
         Initializes the process sequence and constraints for the steel plant. Here, the components/ technologies are connected to establish a process for steel production
         """
-        # Assuming the presence of 'h2storage' indicates the desire for dynamic flow management
-        has_h2storage = "h2storage" in self.model.dsm_blocks.keys()
+        # Assuming the presence of 'hydrogen_storage' indicates the desire for dynamic flow management
+        has_h2storage = "hydrogen_storage" in self.model.dsm_blocks.keys()
 
         # Constraint for direct hydrogen flow from Electrolyser to dri plant
         @self.model.Constraint(self.model.time_steps)
@@ -198,9 +164,9 @@ class SteelPlant(SupportsMinMax, DSMFlex):
             if has_h2storage:
                 return (
                     self.model.dsm_blocks["electrolyser"].hydrogen_out[t]
-                    + self.model.dsm_blocks["h2storage"].discharge[t]
+                    + self.model.dsm_blocks["hydrogen_storage"].discharge[t]
                     == self.model.dsm_blocks["dri_plant"].hydrogen_in[t]
-                    + self.model.dsm_blocks["h2storage"].charge[t]
+                    + self.model.dsm_blocks["hydrogen_storage"].charge[t]
                 )
             else:
                 return (

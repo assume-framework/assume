@@ -12,6 +12,11 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. pip install git+https://github.com/assume-framework/assume
 
+**New Features:**
+- Converted DST components from functions to classes for improved modularity and reusability.
+- Added new residential DST components like PV, EV, Heat Pump, and Boiler, with refined docstrings for better usability.
+- Created a `GenericStorage` class for storage components, with classes like EV and Hydrogen Storage inheriting from it.
+
 
 v0.4.1 - latest release (8th October 2024)
 ===========================================

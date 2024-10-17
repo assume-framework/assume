@@ -6,6 +6,44 @@ import pyomo.environ as pyo
 
 
 class DSMFlex:
+    def initialize_components(self, components: dict[str, dict]):
+        """
+        Initializes the DSM components by creating and adding blocks to the model.
+
+        This method iterates over the provided components, instantiates their corresponding classes,
+        and adds the respective blocks to the Pyomo model.
+
+        Args
+        ----
+            components (dict[str, dict]): A dictionary where each key is a technology name and
+                                        the value is a dictionary of parameters for the respective technology.
+                                        Each technology is mapped to a corresponding class in `demand_side_components`.
+
+        The method:
+        ----------
+        - Looks up the corresponding class for each technology in `demand_side_components`.
+        - Instantiates the class by passing the required parameters.
+        - Adds the resulting block to the model under the `dsm_blocks` attribute.
+        """
+        from assume.units import demand_side_components
+
+        self.model.dsm_blocks = pyo.Block(list(components.keys()))
+
+        for technology, component_data in components.items():
+            if technology in demand_side_components:
+                # Get the class from the dictionary mapping (adjust `demand_side_components` to hold classes)
+                component_class = demand_side_components[technology]
+
+                # Instantiate the component with the required parameters (unpack the component_data dictionary)
+                component_instance = component_class(
+                    time_steps=self.model.time_steps, **component_data
+                )
+
+                # Add the component's block to the model
+                component_instance.add_to_model(
+                    self.model, self.model.dsm_blocks[technology]
+                )
+
     def flexibility_cost_tolerance(self, model):
         """
         Modify the optimization model to include constraints for flexibility within cost tolerance.
