@@ -40,6 +40,7 @@ dependencies = [
     "psycopg2-binary >=2.9.5",
     "pyyaml >=6.0",
     "pyyaml-include >=2.2a",
+    "pyomo >=6.8.0",
 ]
 
 [project.optional-dependencies]
@@ -47,7 +48,6 @@ learning = [
     "torch >=2.0.1",
 ]
 optimization = [
-    "pyomo >=6.8.0",
     "pypsa <=0.30.3",
 ]
 oeds = [
