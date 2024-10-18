@@ -15,7 +15,9 @@ unit_types: dict[str, BaseUnit] = {
 
 try:
     from assume.units.steel_plant import SteelPlant
+    from assume.units.dst_components import demand_side_components
 
     unit_types["steel_plant"] = SteelPlant
+
 except ImportError:
-    pass
+    demand_side_components = {}
