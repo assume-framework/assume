@@ -691,43 +691,6 @@ class SupportsMinMaxCharge(BaseUnit):
         return power_charge
 
 
-class BaseDSTComponent:
-    """
-    A generic parent class for all Dst components in an energy system model.
-
-    This class serves as a base class for all Dst components such as Electrolyser, DRI Plant, Electric Arc Furnace, etc.
-    Future common functionality for these components can be added here.
-
-    Attributes
-    ----------
-        None currently.
-
-    Methods
-    -------
-        None currently.
-    """
-
-    def __init__(self, **kwargs):
-        """
-        Initializes the DstComponent class.
-        Currently, no attributes are defined, but this is a placeholder for future functionality.
-        """
-
-    def add_to_model(self, model):
-        """
-        Placeholder method to add the component to the Pyomo model.
-        This method should be overridden by the child classes to add the respective blocks to the model.
-
-        Args
-        ----
-            model (pyomo.environ.ConcreteModel): The Pyomo model to which the component is to be added.
-
-        Returns
-        -------
-            None
-        """
-
-
 class BaseStrategy:
     """
     A base class for a bidding strategy.

@@ -7,12 +7,10 @@ import logging
 import pandas as pd
 import pyomo.environ as pyo
 
-from assume.common.base import BaseDSTComponent
-
 logger = logging.getLogger(__name__)
 
 
-class HeatPump(BaseDSTComponent):
+class HeatPump:
     """
     A class to represent a generic heat pump unit in an energy system model.
 
@@ -20,8 +18,7 @@ class HeatPump(BaseDSTComponent):
     the behavior of a heat pump, such as power input, heat output, and operational limitations
     (like ramp rates and minimum operating times).
 
-    Attributes
-    ----------
+    Args:
         max_power (float): Maximum allowable power input to the heat pump.
         cop (float): Coefficient of performance of the heat pump, i.e., the ratio of heat output to power input.
         time_steps (list[int]): A list of time steps over which the heat pump operates.
@@ -30,35 +27,6 @@ class HeatPump(BaseDSTComponent):
         ramp_down (float, optional): Maximum allowed decrease in power input per time step. Defaults to `max_power` if not provided.
         min_operating_steps (int, optional): Minimum number of consecutive time steps the heat pump must operate once it starts. Defaults to 0 (no restriction).
         min_down_steps (int, optional): Minimum number of consecutive time steps the heat pump must remain off after being shut down. Defaults to 0 (no restriction).
-
-    Methods
-    -------
-        add_to_model(self, model: pyo.ConcreteModel, model_part: pyo.Block) -> pyo.Block:
-            Adds a heat pump block to the Pyomo model, defining parameters, variables, and constraints.
-
-            Pyomo Components:
-                - **Parameters**:
-                    - `max_power`: The maximum allowable power input.
-                    - `min_power`: The minimum allowable power input.
-                    - `cop`: Coefficient of performance of the heat pump.
-                    - `ramp_up`: Maximum allowed increase in power per time step.
-                    - `ramp_down`: Maximum allowed decrease in power per time step.
-                    - `min_operating_steps`: Minimum number of consecutive time steps the heat pump must operate.
-                    - `min_down_steps`: Minimum number of consecutive time steps the heat pump must remain off.
-
-                - **Variables**:
-                    - `power_in[t]`: Power input to the heat pump at each time step `t` (continuous, non-negative).
-                    - `heat_out[t]`: Heat output of the heat pump at each time step `t` (continuous, non-negative).
-                    - `operational_status[t]` (optional): A binary variable indicating whether the heat pump is operational (1) or off (0) at each time step `t`.
-
-                - **Constraints**:
-                    - `min_power_constraint[t]`: Ensures that the power input is at least the minimum power input when the heat pump is operational.
-                    - `max_power_constraint[t]`: Ensures that the power input does not exceed the maximum power input when the heat pump is operational.
-                    - `cop_constraint[t]`: Enforces the relationship between power input and heat output based on the coefficient of performance (COP).
-                    - `ramp_up_constraint[t]`: Limits the increase in power input from one time step to the next according to the ramp-up rate.
-                    - `ramp_down_constraint[t]`: Limits the decrease in power input from one time step to the next according to the ramp-down rate.
-                    - `min_operating_time_constraint[t]`: Ensures the heat pump operates for at least the specified minimum number of consecutive time steps.
-                    - `min_downtime_constraint[t]`: Ensures the heat pump remains off for at least the specified minimum number of consecutive time steps after shutdown.
     """
 
     def __init__(
@@ -86,32 +54,57 @@ class HeatPump(BaseDSTComponent):
         self.kwargs = kwargs
 
     def add_to_model(
-        self, model: pyo.ConcreteModel, model_part: pyo.Block
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
     ) -> pyo.Block:
         """
-        Creates and returns a Pyomo Block for the heat pump component.
+        Adds a heat pump block to the Pyomo model, defining parameters, variables, and constraints.
+
+        Pyomo Components:
+            - **Parameters**:
+                - `max_power`: The maximum allowable power input.
+                - `min_power`: The minimum allowable power input.
+                - `cop`: Coefficient of performance of the heat pump.
+                - `ramp_up`: Maximum allowed increase in power per time step.
+                - `ramp_down`: Maximum allowed decrease in power per time step.
+                - `min_operating_steps`: Minimum number of consecutive time steps the heat pump must operate.
+                - `min_down_steps`: Minimum number of consecutive time steps the heat pump must remain off.
+
+            - **Variables**:
+                - `power_in[t]`: Power input to the heat pump at each time step `t` (continuous, non-negative).
+                - `heat_out[t]`: Heat output of the heat pump at each time step `t` (continuous, non-negative).
+                - `operational_status[t]` (optional): A binary variable indicating whether the heat pump is operational (1) or off (0) at each time step `t`.
+
+            - **Constraints**:
+                - `min_power_constraint[t]`: Ensures that the power input is at least the minimum power input when the heat pump is operational.
+                - `max_power_constraint[t]`: Ensures that the power input does not exceed the maximum power input when the heat pump is operational.
+                - `cop_constraint[t]`: Enforces the relationship between power input and heat output based on the coefficient of performance (COP).
+                - `ramp_up_constraint[t]`: Limits the increase in power input from one time step to the next according to the ramp-up rate.
+                - `ramp_down_constraint[t]`: Limits the decrease in power input from one time step to the next according to the ramp-down rate.
+                - `min_operating_time_constraint[t]`: Ensures the heat pump operates for at least the specified minimum number of consecutive time steps.
+                - `min_downtime_constraint[t]`: Ensures the heat pump remains off for at least the specified minimum number of consecutive time steps after shutdown.
 
         Args:
-            model (ConcreteModel): A Pyomo ConcreteModel object representing the optimization model.
+            model (pyo.ConcreteModel): A Pyomo ConcreteModel object representing the optimization model.
+            model_block (pyo.Block): A Pyomo Block object to which the heat pump block will be added.
 
         Returns:
             pyo.Block: A Pyomo block representing the heat pump with variables and constraints.
         """
 
         # Define parameters
-        model_part.max_power = pyo.Param(initialize=self.max_power)
-        model_part.min_power = pyo.Param(initialize=self.min_power)
-        model_part.cop = pyo.Param(initialize=self.cop)
-        model_part.ramp_up = pyo.Param(initialize=self.ramp_up)
-        model_part.ramp_down = pyo.Param(initialize=self.ramp_down)
-        model_part.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
-        model_part.min_down_steps = pyo.Param(initialize=self.min_down_steps)
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.min_power = pyo.Param(initialize=self.min_power)
+        model_block.cop = pyo.Param(initialize=self.cop)
+        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
+        model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
 
         # Define variables
-        model_part.power_in = pyo.Var(
+        model_block.power_in = pyo.Var(
             self.time_steps, within=pyo.NonNegativeReals, bounds=(0, self.max_power)
         )
-        model_part.heat_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.heat_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
 
         # Define operational status variable if necessary
         if (
@@ -119,30 +112,30 @@ class HeatPump(BaseDSTComponent):
             or self.min_down_steps > 0
             or self.min_power > 0
         ):
-            model_part.operational_status = pyo.Var(self.time_steps, within=pyo.Binary)
+            model_block.operational_status = pyo.Var(self.time_steps, within=pyo.Binary)
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def min_power_constraint(b, t):
                 return b.power_in[t] >= b.min_power * b.operational_status[t]
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def max_power_constraint(b, t):
                 return b.power_in[t] <= b.max_power * b.operational_status[t]
 
         # Coefficient of performance (COP) constraint
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def cop_constraint(b, t):
             return b.heat_out[t] == b.power_in[t] * b.cop
 
         # Ramp-up constraint
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def ramp_up_constraint(b, t):
             if t == self.time_steps.at(1):
                 return pyo.Constraint.Skip
             return b.power_in[t] - b.power_in[t - 1] <= b.ramp_up
 
         # Ramp-down constraint
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def ramp_down_constraint(b, t):
             if t == self.time_steps.at(1):
                 return pyo.Constraint.Skip
@@ -151,7 +144,7 @@ class HeatPump(BaseDSTComponent):
         # Minimum operating time constraint
         if self.min_operating_steps > 0:
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def min_operating_time_constraint(b, t):
                 if t < self.min_operating_steps - 1:
                     return pyo.Constraint.Skip
@@ -165,7 +158,7 @@ class HeatPump(BaseDSTComponent):
         # Minimum downtime constraint
         if self.min_down_steps > 0:
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def min_downtime_constraint(b, t):
                 if t < self.min_down_steps - 1:
                     return pyo.Constraint.Skip
@@ -175,10 +168,10 @@ class HeatPump(BaseDSTComponent):
                     1 - b.operational_status[i] for i in relevant_time_steps
                 ) >= self.min_down_steps * (1 - b.operational_status[t])
 
-        return model_part
+        return model_block
 
 
-class Boiler(BaseDSTComponent):
+class Boiler:
     """
     A class to represent a generic boiler unit in an energy system model.
 
@@ -186,8 +179,7 @@ class Boiler(BaseDSTComponent):
     of a boiler, which can be either electric or natural gas-based, along with ramp rates and operational
     limitations.
 
-    Attributes
-    ----------
+    Args:
         max_power (float): Maximum allowable power input to the boiler.
         efficiency (float): Efficiency of the boiler, defined as the ratio of heat output to power input (or fuel input).
         time_steps (list[int]): A list of time steps over which the boiler operates.
@@ -197,34 +189,6 @@ class Boiler(BaseDSTComponent):
         ramp_down (float, optional): Maximum allowed decrease in power input per time step. Defaults to `max_power` if not provided.
         min_operating_steps (int, optional): Minimum number of consecutive time steps the boiler must operate once started. Defaults to 0.
         min_down_steps (int, optional): Minimum number of consecutive time steps the boiler must remain off after being shut down. Defaults to 0.
-
-    Methods
-    -------
-        add_to_model(self, model: pyo.ConcreteModel, model_part: pyo.Block) -> pyo.Block:
-            Adds a boiler block to the Pyomo model, defining parameters, variables, and constraints.
-
-            Pyomo Components:
-                - **Parameters**:
-                    - `max_power`: The maximum allowable power input.
-                    - `min_power`: The minimum allowable power input.
-                    - `efficiency`: Efficiency of the boiler.
-                    - `ramp_up`: Maximum allowed increase in power per time step.
-                    - `ramp_down`: Maximum allowed decrease in power per time step.
-
-                - **Variables**:
-                    - `power_in[t]` (for electric boilers): Power input at each time step `t` (continuous, non-negative).
-                    - `natural_gas_in[t]` (for natural gas boilers): Natural gas input at each time step `t` (continuous, non-negative).
-                    - `heat_out[t]`: Heat output at each time step `t` (continuous, non-negative).
-                    - `operational_status[t]` (optional, for electric boilers): A binary variable indicating whether the boiler is operational (1) or off (0) at each time step `t`.
-
-                - **Constraints**:
-                    - `min_power_constraint[t]` (for electric boilers): Ensures that the power input is at least the minimum power input when the boiler is operational.
-                    - `max_power_constraint[t]` (for electric boilers): Ensures that the power input does not exceed the maximum power input when the boiler is operational.
-                    - `efficiency_constraint[t]`: Enforces the relationship between input (power or natural gas) and heat output based on the boiler's efficiency.
-                    - `ramp_up_constraint[t]`: Limits the increase in power input from one time step to the next according to the ramp-up rate.
-                    - `ramp_down_constraint[t]`: Limits the decrease in power input from one time step to the next according to the ramp-down rate.
-                    - `min_operating_time_constraint[t]`: Ensures the boiler operates for at least the specified minimum number of consecutive time steps.
-                    - `min_downtime_constraint[t]`: Ensures the boiler remains off for at least the specified minimum number of consecutive time steps after shutdown.
     """
 
     def __init__(
@@ -259,36 +223,60 @@ class Boiler(BaseDSTComponent):
             )
 
     def add_to_model(
-        self, model: pyo.ConcreteModel, model_part: pyo.Block
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
     ) -> pyo.Block:
         """
-        Creates and returns a Pyomo Block for the boiler component.
+        Adds a boiler block to the Pyomo model, defining parameters, variables, and constraints.
+
+        Pyomo Components:
+            - **Parameters**:
+                - `max_power`: The maximum allowable power input.
+                - `min_power`: The minimum allowable power input.
+                - `efficiency`: Efficiency of the boiler.
+                - `ramp_up`: Maximum allowed increase in power per time step.
+                - `ramp_down`: Maximum allowed decrease in power per time step.
+
+            - **Variables**:
+                - `power_in[t]` (for electric boilers): Power input at each time step `t` (continuous, non-negative).
+                - `natural_gas_in[t]` (for natural gas boilers): Natural gas input at each time step `t` (continuous, non-negative).
+                - `heat_out[t]`: Heat output at each time step `t` (continuous, non-negative).
+                - `operational_status[t]` (optional, for electric boilers): A binary variable indicating whether the boiler is operational (1) or off (0) at each time step `t`.
+
+            - **Constraints**:
+                - `min_power_constraint[t]` (for electric boilers): Ensures that the power input is at least the minimum power input when the boiler is operational.
+                - `max_power_constraint[t]` (for electric boilers): Ensures that the power input does not exceed the maximum power input when the boiler is operational.
+                - `efficiency_constraint[t]`: Enforces the relationship between input (power or natural gas) and heat output based on the boiler's efficiency.
+                - `ramp_up_constraint[t]`: Limits the increase in power input from one time step to the next according to the ramp-up rate.
+                - `ramp_down_constraint[t]`: Limits the decrease in power input from one time step to the next according to the ramp-down rate.
+                - `min_operating_time_constraint[t]`: Ensures the boiler operates for at least the specified minimum number of consecutive time steps.
+                - `min_downtime_constraint[t]`: Ensures the boiler remains off for at least the specified minimum number of consecutive time steps after shutdown.
 
         Args:
-            model (ConcreteModel): A Pyomo ConcreteModel object representing the optimization model.
+            model (pyo.ConcreteModel): A Pyomo ConcreteModel object representing the optimization model.
+            model_block (pyo.Block): A Pyomo Block object to which the boiler block will be added.
 
         Returns:
             pyo.Block: A Pyomo block representing the boiler with variables and constraints.
         """
 
         # Define parameters
-        model_part.max_power = pyo.Param(initialize=self.max_power)
-        model_part.min_power = pyo.Param(initialize=self.min_power)
-        model_part.efficiency = pyo.Param(initialize=self.efficiency)
-        model_part.ramp_up = pyo.Param(initialize=self.ramp_up)
-        model_part.ramp_down = pyo.Param(initialize=self.ramp_down)
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.min_power = pyo.Param(initialize=self.min_power)
+        model_block.efficiency = pyo.Param(initialize=self.efficiency)
+        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
 
         # Define variables
         if self.fuel_type == "electricity":
-            model_part.power_in = pyo.Var(
+            model_block.power_in = pyo.Var(
                 self.time_steps, within=pyo.NonNegativeReals, bounds=(0, self.max_power)
             )
         elif self.fuel_type == "natural_gas":
-            model_part.natural_gas_in = pyo.Var(
+            model_block.natural_gas_in = pyo.Var(
                 self.time_steps, within=pyo.NonNegativeReals
             )
 
-        model_part.heat_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.heat_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
 
         # Define operational status variable if min operating time, downtime, or min_power is required (for electric boilers)
         if (
@@ -300,18 +288,18 @@ class Boiler(BaseDSTComponent):
                 raise ValueError(
                     "Operational status constraints are only supported for electric boilers. Use 'electricity' as the fuel_type."
                 )
-            model_part.operational_status = pyo.Var(self.time_steps, within=pyo.Binary)
+            model_block.operational_status = pyo.Var(self.time_steps, within=pyo.Binary)
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def min_power_constraint(b, t):
                 return b.power_in[t] >= b.min_power * b.operational_status[t]
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def max_power_constraint(b, t):
                 return b.power_in[t] <= b.max_power * b.operational_status[t]
 
         # Efficiency constraint based on fuel type
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def efficiency_constraint(b, t):
             if self.fuel_type == "electricity":
                 return b.heat_out[t] == b.power_in[t] * b.efficiency
@@ -323,14 +311,14 @@ class Boiler(BaseDSTComponent):
                 )
 
         # Ramp-up constraint
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def ramp_up_constraint(b, t):
             if t == self.time_steps.at(1):
                 return pyo.Constraint.Skip
             return b.power_in[t] - b.power_in[t - 1] <= b.ramp_up
 
         # Ramp-down constraint
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def ramp_down_constraint(b, t):
             if t == self.time_steps.at(1):
                 return pyo.Constraint.Skip
@@ -339,7 +327,7 @@ class Boiler(BaseDSTComponent):
         # Minimum operating time constraint
         if self.min_operating_steps > 0:
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def min_operating_time_constraint(b, t):
                 if t < self.min_operating_steps - 1:
                     return pyo.Constraint.Skip
@@ -353,7 +341,7 @@ class Boiler(BaseDSTComponent):
         # Minimum downtime constraint
         if self.min_down_steps > 0:
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def min_downtime_constraint(b, t):
                 if t < self.min_down_steps - 1:
                     return pyo.Constraint.Skip
@@ -363,10 +351,10 @@ class Boiler(BaseDSTComponent):
                     1 - b.operational_status[i] for i in relevant_time_steps
                 ) >= self.min_down_steps * (1 - b.operational_status[t])
 
-        return model_part
+        return model_block
 
 
-class GenericStorage(BaseDSTComponent):
+class GenericStorage:
     """
     A class to represent a generic storage unit (e.g., battery) in an energy system model.
 
@@ -374,8 +362,7 @@ class GenericStorage(BaseDSTComponent):
     the behavior of a storage system, including charging, discharging, state of charge (SOC),
     ramp rates, and storage losses.
 
-    Attributes
-    ----------
+    Args:
         max_capacity (float): Maximum energy storage capacity of the storage unit.
         min_capacity (float, optional): Minimum allowable state of charge (SOC). Defaults to 0.0.
         max_power_charge (float, optional): Maximum charging power of the storage unit. Defaults to `max_capacity` if not provided.
@@ -386,36 +373,6 @@ class GenericStorage(BaseDSTComponent):
         ramp_up (float, optional): Maximum allowed increase in charging/discharging power per time step. Defaults to None (no ramp constraint).
         ramp_down (float, optional): Maximum allowed decrease in charging/discharging power per time step. Defaults to None (no ramp constraint).
         storage_loss_rate (float, optional): Fraction of energy lost per time step due to storage inefficiencies. Defaults to 0.0.
-
-    Methods
-    -------
-        add_to_model(self, model: pyo.ConcreteModel, model_part: pyo.Block) -> pyo.Block:
-            Adds a generic storage block to the Pyomo model, defining parameters, variables, and constraints.
-
-            Pyomo Components:
-                - **Parameters**:
-                    - `max_capacity`: Maximum capacity of the storage unit.
-                    - `min_capacity`: Minimum state of charge (SOC).
-                    - `max_power_charge`: Maximum charging power.
-                    - `max_power_discharge`: Maximum discharging power.
-                    - `efficiency_charge`: Charging efficiency.
-                    - `efficiency_discharge`: Discharging efficiency.
-                    - `initial_soc`: Initial state of charge.
-                    - `ramp_up`: Maximum allowed ramp-up rate for charging and discharging.
-                    - `ramp_down`: Maximum allowed ramp-down rate for charging and discharging.
-                    - `storage_loss_rate`: Fraction of energy lost during storage.
-
-                - **Variables**:
-                    - `soc[t]`: State of charge (SOC) at each time step `t`.
-                    - `charge[t]`: Charging power at each time step `t`.
-                    - `discharge[t]`: Discharging power at each time step `t`.
-
-                - **Constraints**:
-                    - `soc_balance_rule[t]`: Tracks SOC changes over time based on charging, discharging, and storage loss.
-                    - `charge_ramp_up_constraint[t]`: Limits the ramp-up rate for charging if specified.
-                    - `discharge_ramp_up_constraint[t]`: Limits the ramp-up rate for discharging if specified.
-                    - `charge_ramp_down_constraint[t]`: Limits the ramp-down rate for charging if specified.
-                    - `discharge_ramp_down_constraint[t]`: Limits the ramp-down rate for discharging if specified.
     """
 
     def __init__(
@@ -458,52 +415,74 @@ class GenericStorage(BaseDSTComponent):
         self.kwargs = kwargs
 
     def add_to_model(
-        self, model: pyo.ConcreteModel, model_part: pyo.Block
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
     ) -> pyo.Block:
         """
-        Creates and returns a Pyomo Block for the storage component.
+        Adds a generic storage block to the Pyomo model, defining parameters, variables, and constraints.
 
-        Parameters
-        ----------
-        model : pyo.ConcreteModel
-            A Pyomo ConcreteModel object representing the optimization model.
+        Pyomo Components:
+            - **Parameters**:
+                - `max_capacity`: Maximum capacity of the storage unit.
+                - `min_capacity`: Minimum state of charge (SOC).
+                - `max_power_charge`: Maximum charging power.
+                - `max_power_discharge`: Maximum discharging power.
+                - `efficiency_charge`: Charging efficiency.
+                - `efficiency_discharge`: Discharging efficiency.
+                - `initial_soc`: Initial state of charge.
+                - `ramp_up`: Maximum allowed ramp-up rate for charging and discharging.
+                - `ramp_down`: Maximum allowed ramp-down rate for charging and discharging.
+                - `storage_loss_rate`: Fraction of energy lost during storage.
 
-        Returns
-        -------
-        pyo.Block
-            A Pyomo block representing the storage system with variables and constraints.
+            - **Variables**:
+                - `soc[t]`: State of charge (SOC) at each time step `t`.
+                - `charge[t]`: Charging power at each time step `t`.
+                - `discharge[t]`: Discharging power at each time step `t`.
+
+            - **Constraints**:
+                - `soc_balance_rule[t]`: Tracks SOC changes over time based on charging, discharging, and storage loss.
+                - `charge_ramp_up_constraint[t]`: Limits the ramp-up rate for charging if specified.
+                - `discharge_ramp_up_constraint[t]`: Limits the ramp-up rate for discharging if specified.
+                - `charge_ramp_down_constraint[t]`: Limits the ramp-down rate for charging if specified.
+                - `discharge_ramp_down_constraint[t]`: Limits the ramp-down rate for discharging if specified.
+
+        Args:
+            model (pyo.ConcreteModel): A Pyomo ConcreteModel object representing the optimization model.
+            model_block (pyo.Block): A Pyomo Block object to which the storage block will be added.
+
+        Returns:
+            pyo.Block: A Pyomo block representing the storage system with variables and constraints.
         """
 
         # Define parameters
-        model_part.max_capacity = pyo.Param(initialize=self.max_capacity)
-        model_part.min_capacity = pyo.Param(initialize=self.min_capacity)
-        model_part.max_power_charge = pyo.Param(initialize=self.max_power_charge)
-        model_part.max_power_discharge = pyo.Param(initialize=self.max_power_discharge)
-        model_part.efficiency_charge = pyo.Param(initialize=self.efficiency_charge)
-        model_part.efficiency_discharge = pyo.Param(
+        model_block.max_capacity = pyo.Param(initialize=self.max_capacity)
+        model_block.min_capacity = pyo.Param(initialize=self.min_capacity)
+        model_block.max_power_charge = pyo.Param(initialize=self.max_power_charge)
+        model_block.max_power_discharge = pyo.Param(initialize=self.max_power_discharge)
+        model_block.efficiency_charge = pyo.Param(initialize=self.efficiency_charge)
+        model_block.efficiency_discharge = pyo.Param(
             initialize=self.efficiency_discharge
         )
-        model_part.initial_soc = pyo.Param(
+        model_block.initial_soc = pyo.Param(
             initialize=self.initial_soc * self.max_capacity
         )
-        model_part.ramp_up = pyo.Param(initialize=self.ramp_up)
-        model_part.ramp_down = pyo.Param(initialize=self.ramp_down)
-        model_part.storage_loss_rate = pyo.Param(initialize=self.storage_loss_rate)
+        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        model_block.storage_loss_rate = pyo.Param(initialize=self.storage_loss_rate)
 
         # Define variables
-        model_part.soc = pyo.Var(
+        model_block.soc = pyo.Var(
             self.time_steps,
             within=pyo.NonNegativeReals,
             bounds=(self.min_capacity, self.max_capacity),
             doc="State of Charge at each time step",
         )
-        model_part.charge = pyo.Var(
+        model_block.charge = pyo.Var(
             self.time_steps,
             within=pyo.NonNegativeReals,
             bounds=(0, self.max_power_charge),
             doc="Charging power at each time step",
         )
-        model_part.discharge = pyo.Var(
+        model_block.discharge = pyo.Var(
             self.time_steps,
             within=pyo.NonNegativeReals,
             bounds=(0, self.max_power_discharge),
@@ -511,7 +490,7 @@ class GenericStorage(BaseDSTComponent):
         )
 
         # Define SOC dynamics with energy loss and efficiency
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def soc_balance_rule(b, t):
             if t == self.time_steps.at(1):
                 prev_soc = b.initial_soc
@@ -527,13 +506,13 @@ class GenericStorage(BaseDSTComponent):
         # Apply ramp-up constraints if ramp_up is specified
         if self.ramp_up is not None:
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def charge_ramp_up_constraint(b, t):
                 if t == self.time_steps.at(1):
                     return pyo.Constraint.Skip
                 return b.charge[t] - b.charge[t - 1] <= self.ramp_up
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def discharge_ramp_up_constraint(b, t):
                 if t == self.time_steps.at(1):
                     return pyo.Constraint.Skip
@@ -542,52 +521,34 @@ class GenericStorage(BaseDSTComponent):
         # Apply ramp-down constraints if ramp_down is specified
         if self.ramp_down is not None:
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def charge_ramp_down_constraint(b, t):
                 if t == self.time_steps.at(1):
                     return pyo.Constraint.Skip
                 return b.charge[t - 1] - b.charge[t] <= self.ramp_down
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def discharge_ramp_down_constraint(b, t):
                 if t == self.time_steps.at(1):
                     return pyo.Constraint.Skip
                 return b.discharge[t - 1] - b.discharge[t] <= self.ramp_down
 
-        return model_part
+        return model_block
 
 
-class PVPlant(BaseDSTComponent):
+class PVPlant:
     """
     A class to represent a Photovoltaic (PV) power plant unit in an energy system model.
 
     The class encapsulates the parameters, variables, and constraints necessary to model
     the behavior of a PV plant, including availability profiles and predefined power output profiles.
 
-    Attributes
-    ----------
+    Args:
         max_power (float): The maximum power output of the PV unit.
         time_steps (list[int]): A list of time steps over which the PV operates.
         availability_profile (pd.Series | None, optional): A pandas Series indicating the PV's availability with time_steps as indices
             and binary values (1 available, 0 unavailable). Defaults to None.
         power_profile (pd.Series | None, optional): A predefined power output profile. If provided, the PV follows this profile instead of optimizing the power output. Defaults to None.
-
-    Methods
-    -------
-        add_to_model(self, model: pyo.ConcreteModel, model_part: pyo.Block) -> pyo.Block:
-            Adds a PV plant block to the Pyomo model, defining parameters, variables, and constraints.
-
-            Pyomo Components:
-                - **Parameters**:
-                    - `max_power`: Maximum allowable power output.
-
-                - **Variables**:
-                    - `power[t]`: Power output of the PV plant at each time step `t`.
-
-                - **Constraints**:
-                    - `power_profile_constraint`: Ensures the PV follows a predefined power profile if provided.
-                    - `availability_pv_constraint`: Ensures the PV operates only during available periods.
-                    - `max_power_pv_constraint`: Ensures the power output of the PV unit does not exceed the maximum power limit.
     """
 
     def __init__(
@@ -617,29 +578,38 @@ class PVPlant(BaseDSTComponent):
             )
 
     def add_to_model(
-        self, model: pyo.ConcreteModel, model_part: pyo.Block
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
     ) -> pyo.Block:
         """
-        Creates and returns a Pyomo Block for the PV plant component.
+        Adds a PV plant block to the Pyomo model, defining parameters, variables, and constraints.
 
-        Parameters
-        ----------
-        model : pyo.ConcreteModel
-            A Pyomo ConcreteModel object representing the optimization model.
+        Pyomo Components:
+            - **Parameters**:
+                - `max_power`: Maximum allowable power output.
 
-        Returns
-        -------
-        pyo.Block
-            A Pyomo block representing the PV plant with variables and constraints.
+            - **Variables**:
+                - `power[t]`: Power output of the PV plant at each time step `t`.
+
+            - **Constraints**:
+                - `power_profile_constraint`: Ensures the PV follows a predefined power profile if provided.
+                - `availability_pv_constraint`: Ensures the PV operates only during available periods.
+                - `max_power_pv_constraint`: Ensures the power output of the PV unit does not exceed the maximum power limit.
+
+        Args:
+            model (pyo.ConcreteModel): A Pyomo ConcreteModel object representing the optimization model.
+            model_block (pyo.Block): A Pyomo Block object to which the PV plant block will be added.
+
+        Returns:
+            pyo.Block: A Pyomo block representing the PV plant with variables and constraints.
         """
 
         # Define parameters
-        model_part.max_power = pyo.Param(
+        model_block.max_power = pyo.Param(
             initialize=self.max_power, within=pyo.NonNegativeReals
         )
 
         # Define variables
-        model_part.power = pyo.Var(
+        model_block.power = pyo.Var(
             self.time_steps,
             within=pyo.NonNegativeReals,
             bounds=(0, self.max_power),
@@ -658,7 +628,7 @@ class PVPlant(BaseDSTComponent):
                     "All `time_steps` must be present in residential PV `power_profile` index."
                 )
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def power_profile_constraint(b, t):
                 """
                 Ensures the PV follows the predefined power profile.
@@ -676,7 +646,7 @@ class PVPlant(BaseDSTComponent):
                     "All `time_steps` must be present in residential PV `availability_profile` index."
                 )
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def availability_pv_constraint(b, t):
                 """
                 Ensures the PV operates only during available periods.
@@ -684,25 +654,24 @@ class PVPlant(BaseDSTComponent):
                 return b.power[t] <= self.availability_profile[t] * b.max_power
 
         # Maximum power constraint (redundant due to variable bounds, included for clarity)
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def max_power_pv_constraint(b, t):
             """
             Ensures the power output of the PV unit does not exceed the maximum power limit.
             """
             return b.power[t] <= b.max_power
 
-        return model_part
+        return model_block
 
 
-class Electrolyser(BaseDSTComponent):
+class Electrolyser:
     """
     A class to represent an electrolyser unit used for hydrogen production through electrolysis.
 
     The class encapsulates the parameters, variables, and constraints necessary to model the behavior
     of an electrolyser, including power input, hydrogen output, ramp rates, and operating times.
 
-    Attributes
-    ----------
+    Args:
         max_power (float): The rated power capacity of the electrolyser.
         efficiency (float): The efficiency of the electrolysis process (0-1).
         min_power (float): The minimum power required for operation.
@@ -711,37 +680,6 @@ class Electrolyser(BaseDSTComponent):
         min_operating_steps (int, optional): The minimum number of steps the electrolyser must operate continuously. Defaults to 0.
         min_down_steps (int, optional): The minimum number of downtime steps required between operating cycles. Defaults to 0.
         time_steps (list[int]): A list of time steps over which the electrolyser operates.
-
-    Methods
-    -------
-        add_to_model(self, model: pyo.ConcreteModel, model_part: pyo.Block) -> pyo.Block:
-            Adds an electrolyser block to the Pyomo model, defining parameters, variables, and constraints.
-
-            Pyomo Components:
-                - **Parameters**:
-                    - `max_power`: Maximum allowable power input.
-                    - `efficiency`: Efficiency of the electrolyser.
-                    - `min_power`: Minimum allowable power input.
-                    - `ramp_up`: Maximum ramp-up rate.
-                    - `ramp_down`: Maximum ramp-down rate.
-                    - `min_operating_steps`: Minimum operating time.
-                    - `min_down_steps`: Minimum downtime between operating cycles.
-
-                - **Variables**:
-                    - `power_in[t]`: Power input to the electrolyser at each time step `t`.
-                    - `hydrogen_out[t]`: Hydrogen output at each time step `t`.
-                    - `electrolyser_operating_cost[t]`: Operating cost at each time step `t`.
-                    - `operational_status[t]` (optional): Binary variable indicating whether the electrolyser is operational.
-
-                - **Constraints**:
-                    - `min_power_constraint[t]`: Ensures that the power input is at least the minimum power input when the electrolyser is operational.
-                    - `max_power_constraint[t]`: Ensures that the power input does not exceed the maximum power input.
-                    - `hydrogen_production_constraint[t]`: Relates power input to hydrogen output based on efficiency.
-                    - `ramp_up_constraint[t]`: Limits the ramp-up rate of power input.
-                    - `ramp_down_constraint[t]`: Limits the ramp-down rate of power input.
-                    - `min_operating_time_constraint[t]`: Ensures the electrolyser operates for a minimum duration.
-                    - `min_downtime_constraint[t]`: Ensures the electrolyser remains off for a minimum duration between operations.
-                    - `operating_cost_with_el_price[t]`: Calculates the operating cost based on power input and electricity price.
     """
 
     def __init__(
@@ -769,37 +707,60 @@ class Electrolyser(BaseDSTComponent):
         self.kwargs = kwargs
 
     def add_to_model(
-        self, model: pyo.ConcreteModel, model_part: pyo.Block
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
     ) -> pyo.Block:
         """
-        Creates and returns a Pyomo Block for the electrolyser component.
+        Adds an electrolyser block to the Pyomo model, defining parameters, variables, and constraints.
 
-        Parameters
-        ----------
-        model : pyo.ConcreteModel
-            A Pyomo ConcreteModel object representing the optimization model.
+        Pyomo Components:
+            - **Parameters**:
+                - `max_power`: Maximum allowable power input.
+                - `efficiency`: Efficiency of the electrolyser.
+                - `min_power`: Minimum allowable power input.
+                - `ramp_up`: Maximum ramp-up rate.
+                - `ramp_down`: Maximum ramp-down rate.
+                - `min_operating_steps`: Minimum operating time.
+                - `min_down_steps`: Minimum downtime between operating cycles.
 
-        Returns
-        -------
-        pyo.Block
-            A Pyomo block representing the electrolyser with variables and constraints.
+            - **Variables**:
+                - `power_in[t]`: Power input to the electrolyser at each time step `t`.
+                - `hydrogen_out[t]`: Hydrogen output at each time step `t`.
+                - `electrolyser_operating_cost[t]`: Operating cost at each time step `t`.
+                - `operational_status[t]` (optional): Binary variable indicating whether the electrolyser is operational.
+
+            - **Constraints**:
+                - `min_power_constraint[t]`: Ensures that the power input is at least the minimum power input when the electrolyser is operational.
+                - `max_power_constraint[t]`: Ensures that the power input does not exceed the maximum power input.
+                - `hydrogen_production_constraint[t]`: Relates power input to hydrogen output based on efficiency.
+                - `ramp_up_constraint[t]`: Limits the ramp-up rate of power input.
+                - `ramp_down_constraint[t]`: Limits the ramp-down rate of power input.
+                - `min_operating_time_constraint[t]`: Ensures the electrolyser operates for a minimum duration.
+                - `min_downtime_constraint[t]`: Ensures the electrolyser remains off for a minimum duration between operations.
+                - `operating_cost_with_el_price[t]`: Calculates the operating cost based on power input and electricity price.
+
+        Args:
+            model (pyo.ConcreteModel): A Pyomo ConcreteModel object representing the optimization model.
+            model_block (pyo.Block): A Pyomo Block object to which the electrolyser block will be added.
+
+        Returns:
+            pyo.Block: A Pyomo block representing the electrolyser with variables and constraints.
         """
 
         # Define parameters
-        model_part.max_power = pyo.Param(initialize=self.max_power)
-        model_part.efficiency = pyo.Param(initialize=self.efficiency)
-        model_part.min_power = pyo.Param(initialize=self.min_power)
-        model_part.ramp_up = pyo.Param(initialize=self.ramp_up)
-        model_part.ramp_down = pyo.Param(initialize=self.ramp_down)
-        model_part.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
-        model_part.min_down_steps = pyo.Param(initialize=self.min_down_steps)
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.efficiency = pyo.Param(initialize=self.efficiency)
+        model_block.min_power = pyo.Param(initialize=self.min_power)
+        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
+        model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
 
         # Define variables
-        model_part.power_in = pyo.Var(
+        model_block.power_in = pyo.Var(
             self.time_steps, within=pyo.NonNegativeReals, bounds=(0, self.max_power)
         )
-        model_part.hydrogen_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
-        model_part.electrolyser_operating_cost = pyo.Var(
+        model_block.hydrogen_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.electrolyser_operating_cost = pyo.Var(
             self.time_steps, within=pyo.NonNegativeReals
         )
 
@@ -809,30 +770,30 @@ class Electrolyser(BaseDSTComponent):
             or self.min_down_steps > 0
             or self.min_power > 0
         ):
-            model_part.operational_status = pyo.Var(self.time_steps, within=pyo.Binary)
+            model_block.operational_status = pyo.Var(self.time_steps, within=pyo.Binary)
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def min_power_constraint(b, t):
                 return b.power_in[t] >= b.min_power * b.operational_status[t]
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def max_power_constraint(b, t):
                 return b.power_in[t] <= b.max_power * b.operational_status[t]
 
         # Efficiency constraint
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def hydrogen_production_constraint(b, t):
             return b.power_in[t] == b.hydrogen_out[t] / b.efficiency
 
         # Ramp-up constraint
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def ramp_up_constraint(b, t):
             if t == self.time_steps.at(1):
                 return pyo.Constraint.Skip
             return b.power_in[t] - b.power_in[t - 1] <= b.ramp_up
 
         # Ramp-down constraint
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def ramp_down_constraint(b, t):
             if t == self.time_steps.at(1):
                 return pyo.Constraint.Skip
@@ -841,7 +802,7 @@ class Electrolyser(BaseDSTComponent):
         # Minimum operating time constraint
         if self.min_operating_steps > 0:
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def min_operating_time_constraint(b, t):
                 if t < self.min_operating_steps - 1:
                     return pyo.Constraint.Skip
@@ -854,7 +815,7 @@ class Electrolyser(BaseDSTComponent):
         # Minimum downtime constraint
         if self.min_down_steps > 0:
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def min_downtime_constraint(b, t):
                 if t < self.min_down_steps - 1:
                     return pyo.Constraint.Skip
@@ -864,17 +825,17 @@ class Electrolyser(BaseDSTComponent):
                 ) >= self.min_down_steps * (1 - b.operational_status[t])
 
         # Operating cost constraint
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def operating_cost_with_el_price(b, t):
             return (
                 b.electrolyser_operating_cost[t]
                 == b.power_in[t] * model.electricity_price[t]
             )
 
-        return model_part
+        return model_block
 
 
-class DRIPlant(BaseDSTComponent):
+class DRIPlant:
     """
     A class to represent a DRI (Direct Reduced Iron) plant in an energy system model.
 
@@ -882,8 +843,7 @@ class DRIPlant(BaseDSTComponent):
     of a DRI plant, including power consumption, fuel consumption (hydrogen, natural gas, or both),
     iron ore input, and ramp rates.
 
-    Attributes
-    ----------
+    Args:
         specific_hydrogen_consumption (float): The specific hydrogen consumption of the DRI plant (in MWh per ton of DRI).
         specific_natural_gas_consumption (float): The specific natural gas consumption of the DRI plant (in MWh per ton of DRI).
         specific_electricity_consumption (float): The specific electricity consumption of the DRI plant (in MWh per ton of DRI).
@@ -896,46 +856,6 @@ class DRIPlant(BaseDSTComponent):
         min_operating_steps (int, optional): The minimum number of steps the DRI plant must operate continuously. Defaults to 0.
         min_down_steps (int, optional): The minimum number of downtime steps required between operating cycles. Defaults to 0.
         time_steps (list[int]): A list of time steps over which the DRI plant operates.
-
-    Methods
-    -------
-        add_to_model(self, model: pyo.ConcreteModel, model_part: pyo.Block) -> pyo.Block:
-            Adds a DRI plant block to the Pyomo model, defining parameters, variables, and constraints.
-
-            Pyomo Components:
-            -----------------
-                - **Parameters**:
-                    - `specific_hydrogen_consumption`: Hydrogen consumption per ton of DRI.
-                    - `specific_natural_gas_consumption`: Natural gas consumption per ton of DRI.
-                    - `specific_electricity_consumption`: Electricity consumption per ton of DRI.
-                    - `specific_iron_ore_consumption`: Iron ore consumption per ton of DRI.
-                    - `max_power`: Maximum allowable power input.
-                    - `min_power`: Minimum allowable power input.
-                    - `ramp_up`: Maximum ramp-up rate.
-                    - `ramp_down`: Maximum ramp-down rate.
-                    - `min_operating_steps`: Minimum operating time.
-                    - `min_down_steps`: Minimum downtime between operating cycles.
-
-                - **Variables**:
-                    - `power_dri[t]`: Power input to the DRI plant at each time step `t`.
-                    - `dri_output[t]`: DRI output at each time step `t`.
-                    - `natural_gas_in[t]`: Natural gas input at each time step `t`.
-                    - `hydrogen_in[t]`: Hydrogen input at each time step `t`.
-                    - `iron_ore_in[t]`: Iron ore input at each time step `t`.
-                    - `dri_operating_cost[t]`: Operating cost at each time step `t`.
-                    - `operational_status[t]` (optional): Binary variable indicating whether the DRI plant is operational.
-
-                - **Constraints**:
-                    - `min_power_constraint[t]`: Ensures that the power input is at least the minimum power input when the DRI plant is operational.
-                    - `max_power_constraint[t]`: Ensures that the power input does not exceed the maximum power input.
-                    - `dri_output_constraint[t]`: Links DRI output to fuel (hydrogen or natural gas) consumption.
-                    - `electricity_consumption_constraint[t]`: Ensures that electricity consumption is proportional to DRI output.
-                    - `iron_ore_constraint[t]`: Links iron ore input to DRI output.
-                    - `ramp_up_constraint[t]`: Limits the ramp-up rate of power input.
-                    - `ramp_down_constraint[t]`: Limits the ramp-down rate of power input.
-                    - `min_operating_time_constraint[t]`: Ensures the DRI plant operates for a minimum duration.
-                    - `min_downtime_constraint[t]`: Ensures the DRI plant remains off for a minimum duration between operations.
-                    - `dri_operating_cost_constraint[t]`: Calculates the operating cost based on fuel and electricity consumption.
     """
 
     def __init__(
@@ -971,53 +891,84 @@ class DRIPlant(BaseDSTComponent):
         self.kwargs = kwargs
 
     def add_to_model(
-        self, model: pyo.ConcreteModel, model_part: pyo.Block
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
     ) -> pyo.Block:
         """
-        Creates and returns a Pyomo Block for the DRI plant component.
+        Adds a DRI plant block to the Pyomo model, defining parameters, variables, and constraints.
 
-        Parameters
-        ----------
-        model : pyo.ConcreteModel
-            A Pyomo ConcreteModel object representing the optimization model.
+        Pyomo Components:
+            - **Parameters**:
+                - `specific_hydrogen_consumption`: Hydrogen consumption per ton of DRI.
+                - `specific_natural_gas_consumption`: Natural gas consumption per ton of DRI.
+                - `specific_electricity_consumption`: Electricity consumption per ton of DRI.
+                - `specific_iron_ore_consumption`: Iron ore consumption per ton of DRI.
+                - `max_power`: Maximum allowable power input.
+                - `min_power`: Minimum allowable power input.
+                - `ramp_up`: Maximum ramp-up rate.
+                - `ramp_down`: Maximum ramp-down rate.
+                - `min_operating_steps`: Minimum operating time.
+                - `min_down_steps`: Minimum downtime between operating cycles.
 
-        Returns
-        -------
-        pyo.Block
-            A Pyomo block representing the DRI plant with variables and constraints.
+            - **Variables**:
+                - `power_dri[t]`: Power input to the DRI plant at each time step `t`.
+                - `dri_output[t]`: DRI output at each time step `t`.
+                - `natural_gas_in[t]`: Natural gas input at each time step `t`.
+                - `hydrogen_in[t]`: Hydrogen input at each time step `t`.
+                - `iron_ore_in[t]`: Iron ore input at each time step `t`.
+                - `dri_operating_cost[t]`: Operating cost at each time step `t`.
+                - `operational_status[t]` (optional): Binary variable indicating whether the DRI plant is operational.
+
+            - **Constraints**:
+                - `min_power_constraint[t]`: Ensures that the power input is at least the minimum power input when the DRI plant is operational.
+                - `max_power_constraint[t]`: Ensures that the power input does not exceed the maximum power input.
+                - `dri_output_constraint[t]`: Links DRI output to fuel (hydrogen or natural gas) consumption.
+                - `electricity_consumption_constraint[t]`: Ensures that electricity consumption is proportional to DRI output.
+                - `iron_ore_constraint[t]`: Links iron ore input to DRI output.
+                - `ramp_up_constraint[t]`: Limits the ramp-up rate of power input.
+                - `ramp_down_constraint[t]`: Limits the ramp-down rate of power input.
+                - `min_operating_time_constraint[t]`: Ensures the DRI plant operates for a minimum duration.
+                - `min_downtime_constraint[t]`: Ensures the DRI plant remains off for a minimum duration between operations.
+                - `dri_operating_cost_constraint[t]`: Calculates the operating cost based on fuel and electricity consumption.
+
+        Args:
+            model (pyo.ConcreteModel): A Pyomo ConcreteModel object representing the optimization model.
+            model_block (pyo.Block): A Pyomo Block object to which the DRI plant component will be added.
+
+        Returns:
+            pyo.Block: A Pyomo block representing the DRI plant with variables and constraints.
         """
 
         # Define parameters
-        model_part.specific_hydrogen_consumption = pyo.Param(
+        model_block.specific_hydrogen_consumption = pyo.Param(
             initialize=self.specific_hydrogen_consumption
         )
-        model_part.specific_natural_gas_consumption = pyo.Param(
+        model_block.specific_natural_gas_consumption = pyo.Param(
             initialize=self.specific_natural_gas_consumption
         )
-        model_part.specific_electricity_consumption = pyo.Param(
+        model_block.specific_electricity_consumption = pyo.Param(
             initialize=self.specific_electricity_consumption
         )
-        model_part.specific_iron_ore_consumption = pyo.Param(
+        model_block.specific_iron_ore_consumption = pyo.Param(
             initialize=self.specific_iron_ore_consumption
         )
-        model_part.max_power = pyo.Param(initialize=self.max_power)
-        model_part.min_power = pyo.Param(initialize=self.min_power)
-        model_part.ramp_up = pyo.Param(initialize=self.ramp_up)
-        model_part.ramp_down = pyo.Param(initialize=self.ramp_down)
-        model_part.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
-        model_part.min_down_steps = pyo.Param(initialize=self.min_down_steps)
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.min_power = pyo.Param(initialize=self.min_power)
+        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
+        model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
 
         # Define variables
-        model_part.power_dri = pyo.Var(
+        model_block.power_dri = pyo.Var(
             self.time_steps, within=pyo.NonNegativeReals, bounds=(0, self.max_power)
         )
-        model_part.iron_ore_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
-        model_part.natural_gas_in = pyo.Var(
+        model_block.iron_ore_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.natural_gas_in = pyo.Var(
             self.time_steps, within=pyo.NonNegativeReals
         )
-        model_part.hydrogen_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
-        model_part.dri_output = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
-        model_part.dri_operating_cost = pyo.Var(
+        model_block.hydrogen_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.dri_output = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.dri_operating_cost = pyo.Var(
             self.time_steps, within=pyo.NonNegativeReals
         )
 
@@ -1027,18 +978,18 @@ class DRIPlant(BaseDSTComponent):
             or self.min_down_steps > 0
             or self.min_power > 0
         ):
-            model_part.operational_status = pyo.Var(self.time_steps, within=pyo.Binary)
+            model_block.operational_status = pyo.Var(self.time_steps, within=pyo.Binary)
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def min_power_constraint(b, t):
                 return b.power_dri[t] >= b.min_power * b.operational_status[t]
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def max_power_constraint(b, t):
                 return b.power_dri[t] <= b.max_power * b.operational_status[t]
 
         # Fuel consumption constraint
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def dri_output_constraint(b, t):
             if self.fuel_type == "hydrogen":
                 return (
@@ -1056,26 +1007,26 @@ class DRIPlant(BaseDSTComponent):
                 ) + (b.natural_gas_in[t] / b.specific_natural_gas_consumption)
 
         # Electricity consumption constraint
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def electricity_consumption_constraint(b, t):
             return (
                 b.power_dri[t] == b.dri_output[t] * b.specific_electricity_consumption
             )
 
         # Iron ore consumption constraint
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def iron_ore_constraint(b, t):
             return b.iron_ore_in[t] == b.dri_output[t] * b.specific_iron_ore_consumption
 
         # Ramp-up constraint
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def ramp_up_constraint(b, t):
             if t == 0:
                 return pyo.Constraint.Skip
             return b.power_dri[t] - b.power_dri[t - 1] <= b.ramp_up
 
         # Ramp-down constraint
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def ramp_down_constraint(b, t):
             if t == 0:
                 return pyo.Constraint.Skip
@@ -1084,7 +1035,7 @@ class DRIPlant(BaseDSTComponent):
         # Minimum operating time constraint
         if self.min_operating_steps > 0:
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def min_operating_time_constraint(b, t):
                 if t < self.min_operating_steps - 1:
                     return pyo.Constraint.Skip
@@ -1097,7 +1048,7 @@ class DRIPlant(BaseDSTComponent):
         # Minimum downtime constraint
         if self.min_down_steps > 0:
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def min_downtime_constraint(b, t):
                 if t < self.min_down_steps - 1:
                     return pyo.Constraint.Skip
@@ -1107,7 +1058,7 @@ class DRIPlant(BaseDSTComponent):
                 ) >= self.min_down_steps * (1 - b.operational_status[t])
 
         # Operating cost constraint
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def dri_operating_cost_constraint(b, t):
             return (
                 b.dri_operating_cost[t]
@@ -1116,18 +1067,17 @@ class DRIPlant(BaseDSTComponent):
                 + b.iron_ore_in[t] * model.iron_ore_price
             )
 
-        return model_part
+        return model_block
 
 
-class ElectricArcFurnace(BaseDSTComponent):
+class ElectricArcFurnace:
     """
     A class to represent an Electric Arc Furnace (EAF) in an energy system model.
 
     The class encapsulates the parameters, variables, and constraints necessary to model the behavior
     of an EAF, including power consumption, DRI input, lime demand, and ramp rates.
 
-    Attributes
-    ----------
+    Args:
         max_power (float): The rated power capacity of the electric arc furnace.
         min_power (float): The minimum power requirement of the electric arc furnace.
         specific_electricity_consumption (float): The specific electricity consumption of the electric arc furnace (in MWh per ton of steel produced).
@@ -1138,45 +1088,6 @@ class ElectricArcFurnace(BaseDSTComponent):
         min_operating_steps (int, optional): The minimum number of steps the EAF must operate continuously. Defaults to 0.
         min_down_steps (int, optional): The minimum number of downtime steps required between operating cycles. Defaults to 0.
         time_steps (list[int]): A list of time steps over which the EAF operates.
-
-    Methods
-    -------
-        add_to_model(self, model: pyo.ConcreteModel, model_part: pyo.Block) -> pyo.Block:
-            Adds an EAF block to the Pyomo model, defining parameters, variables, and constraints.
-
-            Pyomo Components:
-                - **Parameters**:
-                    - `max_power`: Maximum allowable power input.
-                    - `min_power`: Minimum allowable power input.
-                    - `specific_electricity_consumption`: Electricity consumption per ton of steel produced.
-                    - `specific_dri_demand`: DRI demand per ton of steel produced.
-                    - `specific_lime_demand`: Lime demand per ton of steel produced.
-                    - `ramp_up`: Maximum ramp-up rate.
-                    - `ramp_down`: Maximum ramp-down rate.
-                    - `min_operating_steps`: Minimum operating time.
-                    - `min_down_steps`: Minimum downtime between operating cycles.
-
-                - **Variables**:
-                    - `power_eaf[t]`: Power input to the EAF at each time step `t`.
-                    - `dri_input[t]`: DRI input at each time step `t`.
-                    - `steel_output[t]`: Steel output at each time step `t`.
-                    - `eaf_operating_cost[t]`: Operating cost at each time step `t`.
-                    - `emission_eaf[t]`: Emissions at each time step `t`.
-                    - `lime_demand[t]`: Lime demand at each time step `t`.
-                    - `operational_status[t]` (optional): Binary variable indicating whether the EAF is operational.
-
-                - **Constraints**:
-                    - `min_power_constraint[t]`: Ensures that the power input is at least the minimum power input when the EAF is operational.
-                    - `max_power_constraint[t]`: Ensures that the power input does not exceed the maximum power input.
-                    - `steel_output_dri_relation[t]`: Links steel output to DRI input.
-                    - `steel_output_power_relation[t]`: Links steel output to power consumption.
-                    - `eaf_lime_demand[t]`: Links lime demand to steel output.
-                    - `eaf_co2_emission[t]`: Links CO2 emissions to lime demand.
-                    - `ramp_up_eaf_constraint[t]`: Limits the ramp-up rate of power input.
-                    - `ramp_down_eaf_constraint[t]`: Limits the ramp-down rate of power input.
-                    - `min_operating_time_constraint[t]`: Ensures the EAF operates for a minimum duration.
-                    - `min_down_time_constraint[t]`: Ensures the EAF remains off for a minimum duration between operations.
-                    - `eaf_operating_cost_constraint[t]`: Calculates the operating cost based on power input, CO2 emissions, and lime consumption.
     """
 
     def __init__(
@@ -1208,48 +1119,79 @@ class ElectricArcFurnace(BaseDSTComponent):
         self.kwargs = kwargs
 
     def add_to_model(
-        self, model: pyo.ConcreteModel, model_part: pyo.Block
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
     ) -> pyo.Block:
         """
-        Creates and returns a Pyomo Block for the EAF component.
+        Adds an EAF block to the Pyomo model, defining parameters, variables, and constraints.
 
-        Parameters
-        ----------
-        model : pyo.ConcreteModel
-            A Pyomo ConcreteModel object representing the optimization model.
+        Pyomo Components:
+            - **Parameters**:
+                - `max_power`: Maximum allowable power input.
+                - `min_power`: Minimum allowable power input.
+                - `specific_electricity_consumption`: Electricity consumption per ton of steel produced.
+                - `specific_dri_demand`: DRI demand per ton of steel produced.
+                - `specific_lime_demand`: Lime demand per ton of steel produced.
+                - `ramp_up`: Maximum ramp-up rate.
+                - `ramp_down`: Maximum ramp-down rate.
+                - `min_operating_steps`: Minimum operating time.
+                - `min_down_steps`: Minimum downtime between operating cycles.
 
-        Returns
-        -------
-        pyo.Block
-            A Pyomo block representing the EAF with variables and constraints.
+            - **Variables**:
+                - `power_eaf[t]`: Power input to the EAF at each time step `t`.
+                - `dri_input[t]`: DRI input at each time step `t`.
+                - `steel_output[t]`: Steel output at each time step `t`.
+                - `eaf_operating_cost[t]`: Operating cost at each time step `t`.
+                - `emission_eaf[t]`: Emissions at each time step `t`.
+                - `lime_demand[t]`: Lime demand at each time step `t`.
+                - `operational_status[t]` (optional): Binary variable indicating whether the EAF is operational.
+
+            - **Constraints**:
+                - `min_power_constraint[t]`: Ensures that the power input is at least the minimum power input when the EAF is operational.
+                - `max_power_constraint[t]`: Ensures that the power input does not exceed the maximum power input.
+                - `steel_output_dri_relation[t]`: Links steel output to DRI input.
+                - `steel_output_power_relation[t]`: Links steel output to power consumption.
+                - `eaf_lime_demand[t]`: Links lime demand to steel output.
+                - `eaf_co2_emission[t]`: Links CO2 emissions to lime demand.
+                - `ramp_up_eaf_constraint[t]`: Limits the ramp-up rate of power input.
+                - `ramp_down_eaf_constraint[t]`: Limits the ramp-down rate of power input.
+                - `min_operating_time_constraint[t]`: Ensures the EAF operates for a minimum duration.
+                - `min_down_time_constraint[t]`: Ensures the EAF remains off for a minimum duration between operations.
+                - `eaf_operating_cost_constraint[t]`: Calculates the operating cost based on power input, CO2 emissions, and lime consumption.
+
+        Args:
+            model (pyo.ConcreteModel): A Pyomo ConcreteModel object representing the optimization model.
+            model_block (pyo.Block): A Pyomo Block object to which the EAF component will be added.
+
+        Returns:
+            pyo.Block: A Pyomo block representing the EAF with variables and constraints.
         """
 
         # Define parameters
-        model_part.max_power = pyo.Param(initialize=self.max_power)
-        model_part.min_power = pyo.Param(initialize=self.min_power)
-        model_part.specific_electricity_consumption = pyo.Param(
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.min_power = pyo.Param(initialize=self.min_power)
+        model_block.specific_electricity_consumption = pyo.Param(
             initialize=self.specific_electricity_consumption
         )
-        model_part.specific_dri_demand = pyo.Param(initialize=self.specific_dri_demand)
-        model_part.specific_lime_demand = pyo.Param(
+        model_block.specific_dri_demand = pyo.Param(initialize=self.specific_dri_demand)
+        model_block.specific_lime_demand = pyo.Param(
             initialize=self.specific_lime_demand
         )
-        model_part.ramp_up = pyo.Param(initialize=self.ramp_up)
-        model_part.ramp_down = pyo.Param(initialize=self.ramp_down)
-        model_part.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
-        model_part.min_down_steps = pyo.Param(initialize=self.min_down_steps)
+        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
+        model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
 
         # Define variables
-        model_part.power_eaf = pyo.Var(
+        model_block.power_eaf = pyo.Var(
             self.time_steps, within=pyo.NonNegativeReals, bounds=(0, self.max_power)
         )
-        model_part.dri_input = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
-        model_part.steel_output = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
-        model_part.eaf_operating_cost = pyo.Var(
+        model_block.dri_input = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.steel_output = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.eaf_operating_cost = pyo.Var(
             self.time_steps, within=pyo.NonNegativeReals
         )
-        model_part.emission_eaf = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
-        model_part.lime_demand = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.emission_eaf = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.lime_demand = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
 
         # Define operational status variable if needed
         if (
@@ -1257,47 +1199,47 @@ class ElectricArcFurnace(BaseDSTComponent):
             or self.min_down_steps > 0
             or self.min_power > 0
         ):
-            model_part.operational_status = pyo.Var(self.time_steps, within=pyo.Binary)
+            model_block.operational_status = pyo.Var(self.time_steps, within=pyo.Binary)
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def min_power_constraint(b, t):
                 return b.power_eaf[t] >= b.min_power * b.operational_status[t]
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def max_power_constraint(b, t):
                 return b.power_eaf[t] <= b.max_power * b.operational_status[t]
 
         # Steel output based on DRI input
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def steel_output_dri_relation(b, t):
             return b.steel_output[t] == b.dri_input[t] / b.specific_dri_demand
 
         # Steel output based on power consumption
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def steel_output_power_relation(b, t):
             return (
                 b.power_eaf[t] == b.steel_output[t] * b.specific_electricity_consumption
             )
 
         # Lime demand based on steel output
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def eaf_lime_demand(b, t):
             return b.lime_demand[t] == b.steel_output[t] * b.specific_lime_demand
 
         # CO2 emissions based on lime demand
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def eaf_co2_emission(b, t):
             return b.emission_eaf[t] == b.lime_demand[t] * model.lime_co2_factor
 
         # Ramp-up constraint
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def ramp_up_eaf_constraint(b, t):
             if t == 0:
                 return pyo.Constraint.Skip
             return b.power_eaf[t] - b.power_eaf[t - 1] <= b.ramp_up
 
         # Ramp-down constraint
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def ramp_down_eaf_constraint(b, t):
             if t == 0:
                 return pyo.Constraint.Skip
@@ -1306,7 +1248,7 @@ class ElectricArcFurnace(BaseDSTComponent):
         # Minimum operating time constraint
         if self.min_operating_steps > 0:
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def min_operating_time_constraint(b, t):
                 if t < self.min_operating_steps - 1:
                     return pyo.Constraint.Skip
@@ -1319,7 +1261,7 @@ class ElectricArcFurnace(BaseDSTComponent):
         # Minimum downtime constraint
         if self.min_down_steps > 0:
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def min_down_time_constraint(b, t):
                 if t < self.min_down_steps - 1:
                     return pyo.Constraint.Skip
@@ -1329,7 +1271,7 @@ class ElectricArcFurnace(BaseDSTComponent):
                 ) >= self.min_down_steps * (1 - b.operational_status[t])
 
         # Operating cost constraint
-        @model_part.Constraint(self.time_steps)
+        @model_block.Constraint(self.time_steps)
         def eaf_operating_cost_constraint(b, t):
             return (
                 b.eaf_operating_cost[t]
@@ -1338,7 +1280,7 @@ class ElectricArcFurnace(BaseDSTComponent):
                 + b.lime_demand[t] * model.lime_price
             )
 
-        return model_part
+        return model_block
 
 
 class ElectricVehicle(GenericStorage):
@@ -1352,8 +1294,7 @@ class ElectricVehicle(GenericStorage):
     Inherits from GenericStorage and adds EV-specific functionality, such as availability profiles
     and predefined charging profiles.
 
-    Attributes
-    ----------
+    Args:
         max_capacity (float): Maximum capacity of the EV battery.
         min_capacity (float): Minimum capacity of the EV battery.
         max_power_charge (float): Maximum allowable charging power.
@@ -1366,31 +1307,6 @@ class ElectricVehicle(GenericStorage):
         ramp_up (float, optional): Maximum allowed increase in charging power per time step. Defaults to None (no ramp constraint).
         ramp_down (float, optional): Maximum allowed decrease in charging power per time step. Defaults to None (no ramp constraint).
         charging_profile (pd.Series | None, optional): A predefined charging profile. If provided, the EV follows this profile instead of optimizing the charge. Defaults to None.
-
-    Methods
-    -------
-        add_to_model(self, model: pyo.ConcreteModel, model_part: pyo.Block) -> pyo.Block:
-            Adds an EV block to the Pyomo model, defining parameters, variables, and constraints.
-
-            Pyomo Components:
-                - **Parameters**:
-                    - `max_capacity`: Maximum battery capacity of the EV.
-                    - `min_capacity`: Minimum allowable battery capacity.
-                    - `max_power_charge`: Maximum charging power.
-                    - `max_power_discharge`: Maximum discharging power.
-                    - `efficiency_charge`: Charging efficiency.
-                    - `efficiency_discharge`: Discharging efficiency.
-
-                - **Variables**:
-                    - `charge[t]`: Charging power input at each time step `t`.
-                    - `discharge[t]`: Discharging power output at each time step `t`.
-                    - `soc[t]`: State of charge (SOC) of the EV battery at each time step `t`.
-
-                - **Constraints**:
-                    - `availability_constraints`: Ensures charging and discharging occur only during available periods.
-                    - `charging_profile_constraints`: Enforces predefined charging profiles if provided.
-                    - `soc_constraints`: Keeps SOC between `min_capacity` and `max_capacity`.
-                    - `ramp_constraints`: Limits ramp-up and ramp-down rates for charging.
     """
 
     def __init__(
@@ -1431,24 +1347,41 @@ class ElectricVehicle(GenericStorage):
         self.charging_profile = charging_profile
 
     def add_to_model(
-        self, model: pyo.ConcreteModel, model_part: pyo.Block
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
     ) -> pyo.Block:
         """
-        Creates and returns a Pyomo Block for the Electric Vehicle (EV) component.
+        Adds an EV block to the Pyomo model, defining parameters, variables, and constraints.
 
-        Parameters
-        ----------
-        model : pyo.ConcreteModel
-            A Pyomo ConcreteModel object representing the optimization model.
+        Pyomo Components:
+            - **Parameters**:
+                - `max_capacity`: Maximum battery capacity of the EV.
+                - `min_capacity`: Minimum allowable battery capacity.
+                - `max_power_charge`: Maximum charging power.
+                - `max_power_discharge`: Maximum discharging power.
+                - `efficiency_charge`: Charging efficiency.
+                - `efficiency_discharge`: Discharging efficiency.
 
-        Returns
-        -------
-        pyo.Block
-            A Pyomo block representing the EV with variables and constraints.
+            - **Variables**:
+                - `charge[t]`: Charging power input at each time step `t`.
+                - `discharge[t]`: Discharging power output at each time step `t`.
+                - `soc[t]`: State of charge (SOC) of the EV battery at each time step `t`.
+
+            - **Constraints**:
+                - `availability_constraints`: Ensures charging and discharging occur only during available periods.
+                - `charging_profile_constraints`: Enforces predefined charging profiles if provided.
+                - `soc_constraints`: Keeps SOC between `min_capacity` and `max_capacity`.
+                - `ramp_constraints`: Limits ramp-up and ramp-down rates for charging.
+
+        Args:
+            model (pyo.ConcreteModel): A Pyomo ConcreteModel object representing the optimization model.
+            model_block (pyo.Block): A Pyomo Block object to which the EV component will be added.
+
+        Returns:
+            pyo.Block: A Pyomo block representing the EV with variables and constraints.
         """
 
         # Call the parent class (GenericStorage) add_to_model method
-        model_part = super().add_to_model(model, model_part)
+        model_block = super().add_to_model(model, model_block)
 
         # Apply availability profile constraints if provided
         if self.availability_profile is not None:
@@ -1459,12 +1392,12 @@ class ElectricVehicle(GenericStorage):
                     "All `time_steps` must be present in `availability_profile` index."
                 )
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def discharge_availability_constraint(b, t):
                 availability = self.availability_profile[t]
                 return b.discharge[t] <= availability * b.max_power_discharge
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def charge_availability_constraint(b, t):
                 availability = self.availability_profile[t]
                 return b.charge[t] <= availability * b.max_power_charge
@@ -1478,11 +1411,11 @@ class ElectricVehicle(GenericStorage):
                     "All `time_steps` must be present in `charging_profile` index."
                 )
 
-            @model_part.Constraint(self.time_steps)
+            @model_block.Constraint(self.time_steps)
             def charging_profile_constraint(b, t):
                 return b.charge[t] == self.charging_profile[t]
 
-        return model_part
+        return model_block
 
 
 class HydrogenStorage(GenericStorage):
@@ -1492,15 +1425,8 @@ class HydrogenStorage(GenericStorage):
     Inherits all the functionality from GenericStorage and can be extended in the future
     with hydrogen-specific constraints or attributes.
 
-    Attributes
-    ----------
+    Args:
         Inherits all attributes from the GenericStorage class.
-
-    Methods
-    -------
-        add_to_model(self, model: pyo.ConcreteModel, model_part: pyo.Block) -> pyo.Block:
-            Inherits from GenericStorage. Adds a hydrogen storage block to the Pyomo model,
-            defining parameters, variables, and constraints.
     """
 
     def __init__(
@@ -1534,14 +1460,26 @@ class HydrogenStorage(GenericStorage):
         )
 
     def add_to_model(
-        self, model: pyo.ConcreteModel, model_part: pyo.Block
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
     ) -> pyo.Block:
+        """
+        Creates and returns a Pyomo Block for the hydrogen storage component. This method can be extended
+        to add hydrogen-specific constraints or variables.
+
+        Args:
+            model (pyo.ConcreteModel): A Pyomo ConcreteModel object representing the optimization model.
+            model_block (pyo.Block): A Pyomo Block object to which the hydrogen storage component will be added.
+
+        Returns:
+            pyo.Block: A Pyomo block representing the hydrogen storage with variables and constraints.
+        """
+
         # Call the parent class (GenericStorage) add_to_model method
-        model_part = super().add_to_model(model, model_part)
+        model_block = super().add_to_model(model, model_block)
 
         # add further constraints or variables specific to hydrogen storage here
 
-        return model_part
+        return model_block
 
 
 class DRIStorage(GenericStorage):
@@ -1551,15 +1489,8 @@ class DRIStorage(GenericStorage):
     Inherits all the functionality from GenericStorage and can be extended in the future
     with DRI-specific constraints or attributes.
 
-    Attributes
-    ----------
+    Args:
         Inherits all attributes from the GenericStorage class.
-
-    Methods
-    -------
-        add_to_model(self, model: pyo.ConcreteModel, model_part: pyo.Block) -> pyo.Block:
-            Inherits from GenericStorage. Adds a DRI storage block to the Pyomo model,
-            defining parameters, variables, and constraints.
     """
 
     def __init__(
@@ -1591,3 +1522,40 @@ class DRIStorage(GenericStorage):
             storage_loss_rate=storage_loss_rate,
             **kwargs,
         )
+
+    def add_to_model(
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
+    ) -> pyo.Block:
+        """
+        Creates and returns a Pyomo Block for the DRI storage component. This method can be extended
+        in the future with DRI-specific constraints or variables.
+
+        Args:
+            model (pyo.ConcreteModel): A Pyomo ConcreteModel object representing the optimization model.
+            model_block (pyo.Block): A Pyomo Block object to which the DRI storage component will be added.
+
+        Returns:
+            pyo.Block: A Pyomo block representing the DRI storage with variables and constraints.
+        """
+
+        # Call the parent class (GenericStorage) add_to_model method
+        model_block = super().add_to_model(model, model_block)
+
+        # add further constraints or variables specific to DRI storage here
+
+        return model_block
+
+
+# Mapping of component type identifiers to their respective classes
+demand_side_components: dict = {
+    "electrolyser": Electrolyser,
+    "hydrogen_storage": HydrogenStorage,
+    "dri_plant": DRIPlant,
+    "dri_storage": DRIStorage,
+    "eaf": ElectricArcFurnace,
+    "heat_pump": HeatPump,
+    "boiler": Boiler,
+    "electric_vehicle": ElectricVehicle,
+    "generic_storage": GenericStorage,
+    "pv_plant": PVPlant,
+}

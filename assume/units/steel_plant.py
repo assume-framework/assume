@@ -23,7 +23,7 @@ SOLVERS = ["gurobi", "glpk", "cbc", "cplex"]
 logger = logging.getLogger(__name__)
 
 
-class SteelPlant(SupportsMinMax, DSMFlex):
+class SteelPlant(DSMFlex, SupportsMinMax):
     """
     The SteelPlant class represents a steel plant unit in the energy system.
 
