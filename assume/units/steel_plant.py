@@ -294,8 +294,8 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             return (
                 m.total_power_input[t]
                 == self.model.dsm_blocks["electrolyser"].power_in[t]
-                + self.model.dsm_blocks["eaf"].power_eaf[t]
-                + self.model.dsm_blocks["dri_plant"].power_dri[t]
+                + self.model.dsm_blocks["eaf"].power_in[t]
+                + self.model.dsm_blocks["dri_plant"].power_in[t]
             )
 
         @self.model.Constraint(self.model.time_steps)
@@ -305,9 +305,9 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             """
             return (
                 self.model.variable_cost[t]
-                == self.model.dsm_blocks["electrolyser"].electrolyser_operating_cost[t]
-                + self.model.dsm_blocks["dri_plant"].dri_operating_cost[t]
-                + self.model.dsm_blocks["eaf"].eaf_operating_cost[t]
+                == self.model.dsm_blocks["electrolyser"].operating_cost[t]
+                + self.model.dsm_blocks["dri_plant"].operating_cost[t]
+                + self.model.dsm_blocks["eaf"].operating_cost[t]
             )
 
     def define_objective_opt(self):

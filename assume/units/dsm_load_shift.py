@@ -71,8 +71,8 @@ class DSMFlex:
             return (
                 m.total_power_input[t] - m.load_shift[t]
                 == self.model.dsm_blocks["electrolyser"].power_in[t]
-                + self.model.dsm_blocks["eaf"].power_eaf[t]
-                + self.model.dsm_blocks["dri_plant"].power_dri[t]
+                + self.model.dsm_blocks["eaf"].power_in[t]
+                + self.model.dsm_blocks["dri_plant"].power_in[t]
             )
 
     def recalculate_with_accepted_offers(self, model):
