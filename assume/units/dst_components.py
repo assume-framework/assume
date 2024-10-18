@@ -912,6 +912,13 @@ class DRIPlant:
             pyo.Block: A Pyomo block representing the DRI plant with variables and constraints.
         """
 
+        # dependig on the fuel type, check if the model has the price profile for the fuel
+        if self.fuel_type == "natural_gas":
+            if not hasattr(model, "natural_gas_price"):
+                raise ValueError(
+                    "DRI plant requires a natural gas price profile if 'natural_gas' is used as the fuel type."
+                )
+
         # Define parameters
         model_block.specific_hydrogen_consumption = pyo.Param(
             initialize=self.specific_hydrogen_consumption
