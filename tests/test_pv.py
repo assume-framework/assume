@@ -8,7 +8,7 @@ import pytest
 
 from assume.units.dst_components import PVPlant
 
-use_solver = "appsi_highs"
+use_solver = "glpk"
 
 
 # Fixture for creating an electricity price profile, including negative prices
