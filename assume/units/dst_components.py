@@ -230,6 +230,7 @@ class Boiler:
                 - `ramp_down_constraint[t]`: Limits the decrease in power input from one time step to the next according to the ramp-down rate.
                 - `min_operating_time_constraint[t]`: Ensures the boiler operates for at least the specified minimum number of consecutive time steps.
                 - `min_downtime_constraint[t]`: Ensures the boiler remains off for at least the specified minimum number of consecutive time steps after shutdown.
+                - `operating_cost_constraint[t]`: Calculates the operating cost based on the power input and electricity price (for electric boilers).
 
         Args:
             model (pyo.ConcreteModel): A Pyomo ConcreteModel object representing the optimization model.
@@ -588,6 +589,7 @@ class PVPlant:
                 - `power_profile_constraint`: Ensures the PV follows a predefined power profile if provided.
                 - `availability_pv_constraint`: Ensures the PV operates only during available periods.
                 - `max_power_pv_constraint`: Ensures the power output of the PV unit does not exceed the maximum power limit.
+                - `operating_cost_constraint_rule`: Calculates the operating cost based on the power output and electricity price.
 
         Args:
             model (pyo.ConcreteModel): A Pyomo ConcreteModel object representing the optimization model.
