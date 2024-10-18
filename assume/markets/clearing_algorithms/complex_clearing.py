@@ -11,7 +11,7 @@ import pyomo.environ as pyo
 from pyomo.opt import SolverFactory, TerminationCondition, check_available_solvers
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
-from assume.common.utils import create_incidence_matrix
+from assume.common.utils import check_for_tensors, create_incidence_matrix
 from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,7 @@ def market_clearing_opt(
     with_linked_bids: bool,
     incidence_matrix: pd.DataFrame = None,
     lines: pd.DataFrame = None,
+    solver: str = "glpk",
 ):
     """
     Sets up and solves the market clearing optimization problem.
@@ -55,9 +56,8 @@ def market_clearing_opt(
 
         If linked bids are considered, the acceptance of a child bid is bounded by the acceptance of its parent bid.
 
-        The market clearing is solved using pyomo with the gurobi solver.
-        If the gurobi solver is not available, the model is solved using the glpk solver.
-        Otherwise, the solvers cplex and cbc are tried.
+        The market clearing is solved using pyomo with the specified solver (glpk is used by default).
+        If the specified solver is not available, the model is solved using available solver.
         If none of the solvers are available, an exception is raised.
 
         After solving the model, the acceptance of each order is fixed to the value in the solution and the model is solved again.
@@ -231,7 +231,11 @@ def market_clearing_opt(
     if len(solvers) < 1:
         raise Exception(f"None of {SOLVERS} are available")
 
-    solver = SolverFactory(solvers[0])
+    if solver not in solvers:
+        logger.warning(f"Solver {solver} not available, using {solvers[0]}")
+        solver = SolverFactory(solvers[0])
+    else:
+        solver = SolverFactory(solver)
 
     if solver.name == "gurobi":
         options = {"cutoff": -1.0, "MIPGap": EPS}
@@ -300,6 +304,8 @@ class ComplexClearingRole(MarketRole):
 
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
+
+        self.solver = marketconfig.param_dict.get("solver", "glpk")
 
         self.nodes = ["node0"]
         self.zones_id = None
@@ -417,6 +423,8 @@ class ComplexClearingRole(MarketRole):
 
         orderbook.sort(key=itemgetter("start_time", "end_time", "only_hours"))
 
+        orderbook = check_for_tensors(orderbook)
+
         # create a list of all orders linked as child to a bid
         child_orders = []
         for order in orderbook:
@@ -453,6 +461,7 @@ class ComplexClearingRole(MarketRole):
                 with_linked_bids=with_linked_bids,
                 incidence_matrix=self.incidence_matrix,
                 lines=self.lines,
+                solver=self.solver,
             )
 
             if results.solver.termination_condition == TerminationCondition.infeasible:

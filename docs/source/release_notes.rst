@@ -13,6 +13,27 @@ Upcoming Release
   e.g. pip install git+https://github.com/assume-framework/assume
 
 
+v0.4.1 - latest release (8th October 2024)
+===========================================
+
+**New Features:**
+
+- improve LSTM learning strategy (#382)
+- add python 3.12 compatibility (#334)
+- manual strategy for interactive market simulation (#403)
+
+**Improvements:**
+
+- add the ability to define the solver for the optimization-based market clearing inside the param_dict of the config file (#432)
+- shallow clone in Jupyter notebooks so that cloning is faster (#433)
+- fixes in storage operation bidding (#417)
+- update GitHub Actions versions (#402)
+
+**Bug Fixes:**
+- add compatibility with pyyaml-include (#421)
+- make complex clearing compatible to RL (#430)
+- pin PyPSA to remove DeprecationWarnings for now (#431)
+
 v0.4.0 - latest release (8th August 2024)
 =========================================
 
@@ -72,6 +93,7 @@ v0.4.0 - latest release (8th August 2024)
 - Resolved various issues with learning and policy saving
 - Fixed missing market dispatch values in day-ahead markets
 - Added a check for availability_df.csv file to check for any values larger than 1
+- Fixed compatibility issues between new pyomo and RL due to tensor handling
 
 **Other Changes:**
 

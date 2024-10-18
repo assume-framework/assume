@@ -10,7 +10,7 @@ One unique characteristic of ASSUME is the usage of Reinforcement Learning (RL) 
 To enable this the architecture of the simulation is designed in a way to accommodate the learning process. In this part of
 the documentation, we give a short introduction to reinforcement learning in general and then pinpoint you to the
 relevant parts of the code. the descriptions are mostly based on the following paper
-Harder, Nick & Qussous, Ramiz & Weidlich, Anke. (2023). Fit for purpose: Modeling wholesale electricity markets realistically with multi-agent deep reinforcement learning. Energy and AI. 14. 100295. 10.1016/j.egyai.2023.100295.
+Harder, Nick & Qussous, Ramiz & Weidlich, Anke. (2023). Fit for purpose: Modeling wholesale electricity markets realistically with multi-agent deep reinforcement learning. Energy and AI. 14. 100295. `10.1016/j.egyai.2023.100295 <https://doi.org/10.1016/j.egyai.2023.100295>`.
 
 If you want a hands-on introduction check out the prepared tutorial in Colab: https://colab.research.google.com/github/assume-framework/assume
 
