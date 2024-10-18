@@ -12,6 +12,7 @@ unit_types: dict[str, BaseUnit] = {
     "demand": Demand,
     "storage": Storage,
 }
+demand_side_components: dict[str, BaseDSTComponent] = {}
 
 try:
     from assume.units.steel_plant import SteelPlant
