@@ -270,6 +270,7 @@ class Boiler:
         )
 
         model_block.heat_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.operating_cost = pyo.Var(self.time_steps, within=pyo.Reals)
 
         # Efficiency constraint based on fuel type
         @model_block.Constraint(self.time_steps)

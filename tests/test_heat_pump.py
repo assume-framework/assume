@@ -58,10 +58,7 @@ def heat_pump_model(heat_pump_config, price_profile):
 
     # Objective function to minimize operating cost
     model.total_cost = pyo.Objective(
-        expr=sum(
-            model.heat_pump.power_in[t] * model.electricity_price[t]
-            for t in model.time_steps
-        ),
+        expr=sum(model.heat_pump.operating_cost[t] for t in model.time_steps),
         sense=pyo.minimize,
     )
 
@@ -89,7 +86,9 @@ def test_total_heat_production(heat_pump_model):
     """
     model, _ = heat_pump_model
     total_heat = sum(pyo.value(model.heat_pump.heat_out[t]) for t in model.time_steps)
-    assert total_heat == 400, f"Total heat production is {total_heat}, expected 400."
+    assert (
+        abs(total_heat - 400) < 1e-5
+    ), f"Total heat production is {total_heat}, expected 400."
 
 
 def test_heat_pump_ramping_constraints(heat_pump_model, heat_pump_config):

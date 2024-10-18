@@ -52,10 +52,7 @@ def pv_plant_model_with_availability_and_price(pv_plant_config, price_profile):
 
     # Objective: Maximize revenue (electricity price * power output)
     def objective_rule(model):
-        return sum(
-            model.electricity_price[t] * model.pv_plant.power[t]
-            for t in model.time_steps
-        )
+        return sum(model.pv_plant.operating_cost[t] for t in model.time_steps)
 
     model.objective = pyo.Objective(rule=objective_rule, sense=pyo.maximize)
 
@@ -93,10 +90,7 @@ def pv_plant_model_with_power_profile_and_price(pv_plant_config, price_profile):
 
     # Objective: Maximize revenue (electricity price * power output)
     def objective_rule(model):
-        return sum(
-            model.electricity_price[t] * model.pv_plant.power[t]
-            for t in model.time_steps
-        )
+        return sum(model.pv_plant.operating_cost[t] for t in model.time_steps)
 
     model.objective = pyo.Objective(rule=objective_rule, sense=pyo.maximize)
 

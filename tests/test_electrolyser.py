@@ -15,7 +15,7 @@ use_solver = "glpk"  # Replace with the appropriate solver
 # Fixture for creating an electricity price profile, including negative prices
 @pytest.fixture
 def price_profile():
-    return pd.Series([50, 45, 55, 40, -10, 55, -5, 65, 45, 70], index=range(10))
+    return pd.Series([50, 45, 55, 40, 1000, 55, 1000, 65, 45, 70], index=range(10))
 
 
 # Fixture for electrolyser configuration
@@ -137,19 +137,19 @@ def test_electrolyser_power_bounds(electrolyser_model, electrolyser_config):
         )
 
 
-def test_electrolyser_off_when_price_negative(electrolyser_model, price_profile):
+def test_electrolyser_off_when_high_price(electrolyser_model, price_profile):
     """
-    Test that the electrolyser is turned off when the electricity price is negative.
+    Test that the electrolyser is turned off when the electricity price is high.
     """
     model, _ = electrolyser_model
 
     for t in model.time_steps:
         price = price_profile[t]
         power_in = pyo.value(model.electrolyser.power_in[t])
-        if price < 0:
+        if price > 500:
             assert (
                 power_in == 0
-            ), f"Electrolyser is on at time {t} despite negative price {price}."
+            ), f"Electrolyser is on at time {t} despite high price {price}."
 
 
 def test_min_operating_steps(electrolyser_model, electrolyser_config):

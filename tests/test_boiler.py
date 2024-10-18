@@ -95,7 +95,7 @@ def gas_boiler_model(gas_boiler_config, price_profile):
     model.time_steps = pyo.Set(initialize=range(10))
 
     # Add the price profile to the model (not used for natural_gas, but kept for consistency)
-    model.electricity_price = pyo.Param(
+    model.natural_gas_price = pyo.Param(
         model.time_steps, initialize=price_profile.to_dict()
     )
 
@@ -113,13 +113,7 @@ def gas_boiler_model(gas_boiler_config, price_profile):
 
     # Objective function to minimize operating cost
     model.total_cost = pyo.Objective(
-        expr=sum(
-            # For natural_gas, power_in is set to 0, and natural_gas_in is used for cost if applicable
-            # Assuming cost is still based on electricity_price for simplicity
-            # Adjust as needed based on actual cost definitions
-            model.boiler.natural_gas_in[t] * model.electricity_price[t]
-            for t in model.time_steps
-        ),
+        expr=sum(model.boiler.operating_cost[t] for t in model.time_steps),
         sense=pyo.minimize,
     )
 
