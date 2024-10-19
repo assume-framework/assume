@@ -46,6 +46,15 @@ class PayAsClearRole(MarketRole):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
 
+    def sort_orders(self, supply_orders: list[Orderbook], demand_orders: list[Orderbook]):
+        # Sort supply orders by price with randomness for tie-breaking
+        supply_orders.sort(key=lambda x: (x["price"], random.random()))
+
+        # Sort demand orders by price in descending order with randomness for tie-breaking
+        demand_orders.sort(
+            key=lambda x: (x["price"], random.random()), reverse=True
+        )
+
     def clear(
         self, orderbook: Orderbook, market_products
     ) -> (Orderbook, Orderbook, list[dict]):
@@ -79,13 +88,7 @@ class PayAsClearRole(MarketRole):
             demand_orders = [x for x in product_orders if x["volume"] < 0]
             # volume 0 is ignored/invalid
 
-            # Sort supply orders by price with randomness for tie-breaking
-            supply_orders.sort(key=lambda x: (x["price"], random.random()))
-
-            # Sort demand orders by price in descending order with randomness for tie-breaking
-            demand_orders.sort(
-                key=lambda x: (x["price"], random.random()), reverse=True
-            )
+            self.sort_orders(supply_orders, demand_orders)
 
             dem_vol, gen_vol = 0, 0
             # the following algorithm is inspired by one bar for generation and one for demand
@@ -174,6 +177,14 @@ class PayAsBidRole(MarketRole):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
 
+    def sort_orders(self, supply_orders: list[Orderbook], demand_orders: list[Orderbook]):
+        # Sort supply orders by price with randomness for tie-breaking
+        supply_orders.sort(key=lambda i: (i["price"], random.random()))
+        # Sort demand orders by price in descending order with randomness for tie-breaking
+        demand_orders.sort(
+            key=lambda i: (i["price"], random.random()), reverse=True
+        )
+
     def clear(
         self, orderbook: Orderbook, market_products: list[MarketProduct]
     ) -> (Orderbook, Orderbook, list[dict]):
@@ -206,6 +217,7 @@ class PayAsBidRole(MarketRole):
             demand_orders = [x for x in product_orders if x["volume"] < 0]
             # volume 0 is ignored/invalid
 
+            self.sort_orders(supply_orders, demand_orders)
             # Sort supply orders by price with randomness for tie-breaking
             supply_orders.sort(key=lambda i: (i["price"], random.random()))
             # Sort demand orders by price in descending order with randomness for tie-breaking
@@ -284,3 +296,41 @@ class PayAsBidRole(MarketRole):
                 )
             )
         return accepted_orders, rejected_orders, meta
+
+class PayAsBidBuildingRole(PayAsBidRole):
+    def __init__(self, marketconfig: MarketConfig):
+        super().__init__(marketconfig)
+
+    def sort_orders(self, supply_orders: list[Orderbook], demand_orders: list[Orderbook]):
+        # Sort supply orders by price with preference for 'building' units and randomness for tie-breaking
+        supply_orders.sort(key=lambda i: (
+            0 if "building" in i["bid_id"] else 1,  # Prioritize bids with 'building' in bid_id
+            i["price"],  # Sort by price
+            random.random()
+        ))
+
+        # Sort demand orders by price in descending order with preference for 'building' units and randomness for tie-breaking
+        demand_orders.sort(key=lambda i: (
+            0 if "building" in i["bid_id"] else 1,  # Prioritize bids with 'building' in bid_id
+            -i["price"],  # Sort by price
+            random.random()
+        ))
+
+class PayAsClearBuildingRole(PayAsClearRole):
+    def __init__(self, marketconfig: MarketConfig):
+        super().__init__(marketconfig)
+
+    def sort_orders(self, supply_orders: list[Orderbook], demand_orders: list[Orderbook]):
+        # Sort supply orders by price with preference for 'building' units and randomness for tie-breaking
+        supply_orders.sort(key=lambda i: (
+            0 if "building" in i["bid_id"] else 1,  # Prioritize bids with 'building' in bid_id
+            i["price"],  # Sort by price
+            random.random()
+        ))
+
+        # Sort demand orders by price in descending order with preference for 'building' units and randomness for tie-breaking
+        demand_orders.sort(key=lambda i: (
+            0 if "building" in i["bid_id"] else 1,  # Prioritize bids with 'building' in bid_id
+            -i["price"],  # Sort by price
+            random.random()
+        ))
