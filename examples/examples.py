@@ -68,6 +68,14 @@ availabe_examples = {
         "scenario": "experiment_01_EEGH_base",
         "study_case": "EEGH_2024_base",
     },
+    "EEGH_2024_single_storage": {
+        "scenario": "experiment_01_EEGH_single_storage",
+        "study_case": "EEGH_2024_single_storage",
+    },
+    "EEGH_2024_multi_storage": {
+        "scenario": "experiment_01_EEGH_multi_storage",
+        "study_case": "EEGH_2024_multi_storage",
+    },
     "large_2019_eom": {"scenario": "example_02", "study_case": "base_case_2019"},
     "large_2019_eom_crm": {
         "scenario": "example_03",

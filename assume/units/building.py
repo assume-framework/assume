@@ -586,15 +586,17 @@ class Building(SupportsMinMax, DSMFlex):
 
     def write_additional_outputs(self, instance):
         if self.has_battery_storage:
+            model_block = instance.dsm_blocks["battery_storage"]
             soc = pd.Series(
-                data=instance.dsm_blocks["battery_storage"].soc.get_values(), dtype=float
-            )
+                data=model_block.soc.get_values(), dtype=float
+            ) / pyo.value(model_block.max_capacity)
             soc.index = self.index
             self.outputs["soc"] = soc
         if self.has_ev:
+            model_block = instance.dsm_blocks["ev"]
             ev_soc = pd.Series(
-                data=instance.dsm_blocks["ev"].ev_battery_soc.get_values(), index=self.index, dtype=object
-            )
+                data=model_block.ev_battery_soc.get_values(), dtype=float
+            ) / pyo.value(model_block.max_capacity)
             ev_soc.index = self.index
             self.outputs["ev_soc"] = ev_soc
 
@@ -654,9 +656,9 @@ class Building(SupportsMinMax, DSMFlex):
         marginal_cost = 0
 
         if self.opt_power_requirement[start] != 0:
-            marginal_cost = abs(
+            marginal_cost = round(abs(
                 self.variable_cost_series[start] / self.opt_power_requirement[start]
-            )
+            ),2)
         return marginal_cost
 
     def as_dict(self) -> dict:
