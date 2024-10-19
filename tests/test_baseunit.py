@@ -34,10 +34,10 @@ class BasicStrategy(BaseStrategy):
         return bids
 
 
-@pytest.fixture
-def base_unit() -> BaseUnit:
+@pytest.fixture(params=["h", "15min"])
+def base_unit(request) -> BaseUnit:
     # Create a PowerPlant instance with some example parameters
-    index = pd.date_range("2022-01-01", periods=4, freq="h")
+    index = pd.date_range("2022-01-01", periods=4, freq=request.param)
     NaiveForecast(
         index, availability=1, fuel_price=[10, 11, 12, 13], co2_price=[10, 20, 30, 30]
     )
@@ -234,3 +234,7 @@ def test_clear_empty_bids(base_unit, mock_market_config):
         mock_market_config.market_id
     ].remove_empty_bids(mixed_bids)
     assert mixed_bids_result == [bid for bid in mixed_bids if bid["volume"] > 0]
+
+
+if __name__ == "__main__":
+    pytest.main(["-s", __file__])
