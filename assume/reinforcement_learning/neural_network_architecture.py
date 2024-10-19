@@ -147,8 +147,13 @@ class MLPActor(Actor):
     def forward(self, obs):
         x = F.relu(self.FC1(obs))
         x = F.relu(self.FC2(x))
-        x = F.softsign(self.FC3(x))
+        # Works with MATD3, output of softsign: [-1, 1]
+        # x = F.softsign(self.FC3(x))
+        
         # x = th.tanh(self.FC3(x))
+
+        # Tested for PPO, scales the output to [0, 1] range
+        x = th.sigmoid(self.FC3(x))
 
         return x
 

@@ -292,7 +292,7 @@ class TD3(RLAlgorithm):
         This method initializes critic networks for each agent in the reinforcement learning setup.
 
         Notes:
-            The observation dimension need to be the same, due to the centralized criic that all actors share.
+            The observation dimension need to be the same, due to the centralized critic that all actors share.
             If you have units with different observation dimensions. They need to have different critics and hence learning roles.
         """
         n_agents = len(self.learning_role.rl_strats)

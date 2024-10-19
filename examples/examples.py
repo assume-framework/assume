@@ -67,8 +67,8 @@ available_examples = {
     # DRL references case for learning advancement testing
     "small_learning_1": {
         "scenario": "example_02a",
-        "study_case": "tiny",
-    },  # Changed from base to tiny for testing
+        "study_case": "base",
+    }, 
     "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
     "small_learning_3": {"scenario": "example_02c", "study_case": "base"},
     # DRL cases with lstm instead of mlp as actor neural network architecture

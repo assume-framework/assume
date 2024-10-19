@@ -167,9 +167,9 @@ class ReplayBuffer:
         batch_inds = np.random.randint(0, upper_bound - 1, size=batch_size)
 
         data = (
-            self.observations[batch_inds, :, :],
+            self.observations[batch_inds, :, :], # current observation
             self.actions[batch_inds, :, :],
-            self.observations[batch_inds + 1, :, :],
+            self.observations[batch_inds + 1, :, :], # next observation
             self.rewards[batch_inds],
         )
 
@@ -231,11 +231,11 @@ class RolloutBuffer:
         self.rewards = None  # Stores the rewards received after each action
         self.log_probs = None  # Stores the log-probabilities of the actions, used to compute the ratio for policy update
 
-        self.values = (
-            None  # Stores the value estimates (critic's predictions) of each state
-        )
-        self.advantages = None  # Stores the computed advantages using GAE (Generalized Advantage Estimation), central to PPO's policy updates
-        self.returns = None  # Stores the discounted rewards (also known as returns), used to compute the value loss for training the critic
+        # self.values = (
+        #     None  # Stores the value estimates (critic's predictions) of each state
+        # )
+        # self.advantages = None  # Stores the computed advantages using GAE (Generalized Advantage Estimation), central to PPO's policy updates
+        # self.returns = None  # Stores the discounted rewards (also known as returns), used to compute the value loss for training the critic
 
         self.pos = 0
         self.full = False
@@ -254,9 +254,9 @@ class RolloutBuffer:
         )
         self.rewards = np.zeros((size, self.n_rl_units), dtype=self.np_float_type)
         self.log_probs = np.zeros((size, self.n_rl_units), dtype=np.float32)
-        self.values = np.zeros((size, self.n_rl_units), dtype=np.float32)
-        self.advantages = np.zeros((size, self.n_rl_units), dtype=np.float32)
-        self.returns = np.zeros((size, self.n_rl_units), dtype=np.float32)
+        # self.values = np.zeros((size, self.n_rl_units), dtype=np.float32)
+        # self.advantages = np.zeros((size, self.n_rl_units), dtype=np.float32)
+        # self.returns = np.zeros((size, self.n_rl_units), dtype=np.float32)
 
     def expand_buffer(self, additional_size):
         """Expands the buffer by the given additional size and checks if there is enough memory available."""
@@ -277,15 +277,15 @@ class RolloutBuffer:
             + np.zeros(
                 (additional_size, self.n_rl_units), dtype=np.float32
             ).nbytes  # log_probs
-            + np.zeros(
-                (additional_size, self.n_rl_units), dtype=np.float32
-            ).nbytes  # values
-            + np.zeros(
-                (additional_size, self.n_rl_units), dtype=np.float32
-            ).nbytes  # advantages
-            + np.zeros(
-                (additional_size, self.n_rl_units), dtype=np.float32
-            ).nbytes  # returns
+            # + np.zeros(
+            #     (additional_size, self.n_rl_units), dtype=np.float32
+            # ).nbytes  # values
+            # + np.zeros(
+            #     (additional_size, self.n_rl_units), dtype=np.float32
+            # ).nbytes  # advantages
+            # + np.zeros(
+            #     (additional_size, self.n_rl_units), dtype=np.float32
+            # ).nbytes  # returns
         )
 
         # Check whether enough memory is available
@@ -341,27 +341,27 @@ class RolloutBuffer:
                 ),
                 axis=0,
             )
-            self.values = np.concatenate(
-                (
-                    self.values,
-                    np.zeros((additional_size, self.n_rl_units), dtype=np.float32),
-                ),
-                axis=0,
-            )
-            self.advantages = np.concatenate(
-                (
-                    self.advantages,
-                    np.zeros((additional_size, self.n_rl_units), dtype=np.float32),
-                ),
-                axis=0,
-            )
-            self.returns = np.concatenate(
-                (
-                    self.returns,
-                    np.zeros((additional_size, self.n_rl_units), dtype=np.float32),
-                ),
-                axis=0,
-            )
+            # self.values = np.concatenate(
+            #     (
+            #         self.values,
+            #         np.zeros((additional_size, self.n_rl_units), dtype=np.float32),
+            #     ),
+            #     axis=0,
+            # )
+            # self.advantages = np.concatenate(
+            #     (
+            #         self.advantages,
+            #         np.zeros((additional_size, self.n_rl_units), dtype=np.float32),
+            #     ),
+            #     axis=0,
+            # )
+            # self.returns = np.concatenate(
+            #     (
+            #         self.returns,
+            #         np.zeros((additional_size, self.n_rl_units), dtype=np.float32),
+            #     ),
+            #     axis=0,
+            # )
 
     def add(
         self,
@@ -398,12 +398,6 @@ class RolloutBuffer:
 
         self.pos += len_obs
 
-        # print("buffer.add() in buffer.py")
-        # print(self.observations)
-        # print(self.actions)
-        # print(self.rewards)
-        # print(self.log_probs)
-
     def reset(self):
         """
         Resets the buffer, clearing all stored data.
@@ -414,8 +408,11 @@ class RolloutBuffer:
         self.actions = None
         self.rewards = None
         self.log_probs = None
-        self.pos = 0
-        self.full = False
+        # self.values = None
+        # self.advantages = None
+        # self.returns = None
+        # self.pos = 0
+        # self.full = False
 
     # def compute_returns_and_advantages(self, last_values, dones):
     #     """

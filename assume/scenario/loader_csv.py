@@ -922,7 +922,7 @@ def run_learning(
         else RolloutBuffer
     )
     buffer = buffer_cls(
-        buffer_size=int(world.learning_config.get("replay_buffer_size", 5e5)),
+        buffer_size=int(world.learning_config.get("buffer_size", 5e5)),
         obs_dim=world.learning_role.rl_algorithm.obs_dim,
         act_dim=world.learning_role.rl_algorithm.act_dim,
         n_rl_units=len(world.learning_role.rl_strats),
@@ -966,6 +966,9 @@ def run_learning(
         range(1, world.learning_role.training_episodes + 1),
         desc="Training Episodes",
     ):
+        
+        # print("loader_csv: Episode: ", episode)
+        
         if episode != 1:
             setup_world(
                 world=world,
@@ -975,6 +978,7 @@ def run_learning(
             )
 
         world.learning_role.load_inter_episodic_data(inter_episodic_data)
+
         world.run()  # triggers calculate_bids() which equals to step
 
         inter_episodic_data = world.learning_role.get_inter_episodic_data()
@@ -986,15 +990,18 @@ def run_learning(
             >= world.learning_role.episodes_collecting_initial_experience
             + validation_interval
             if world.learning_role.rl_algorithm_name == "matd3"
-            else episode > validation_interval  # For PPO
+            else episode >= validation_interval  # For PPO
         ):
+            
+            logger.debug(f"Validation of loader_csv after episode {episode}")
+            
             world.reset()
 
             setup_world(
                 world=world,
                 scenario_data=scenario_data,
                 study_case=study_case,
-                perform_evaluation=True,
+                perform_evaluation=True, # perform evaluation triggers save_buffer_and_update, which triggers update_policy()
                 eval_episode=eval_episode,
             )
 
@@ -1064,7 +1071,7 @@ def run_learning(
 
     world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
-    print("Evaluation finished")
+    logger.debug("Evaluation finished")
 
 
 if __name__ == "__main__":

@@ -42,8 +42,10 @@ class Learning(Role):
             self.rl_algorithm_name, {}
         ).get("early_stopping_threshold", 0.05)
         self.episodes_done = 0
+        # dict[key, value]
         self.rl_strats: dict[int, LearningStrategy] = {}
 
+        # For centralized critic in MATD3
         self.critics = {}
 
         # define whether we train model or evaluate it
@@ -206,7 +208,9 @@ class Learning(Role):
             self.update_policy()
 
         elif self.rl_algorithm_name == "ppo":
-            # print("save_buffer_and_update in learning_role.py")
+            
+            logger.debug("save_buffer_and_update in learning_role.py")
+
             if content.get("type") == "save_buffer_and_update":
                 data = content["data"]
                 self.buffer.add(
@@ -214,8 +218,6 @@ class Learning(Role):
                     actions=data[1],
                     reward=data[2],
                     log_probs=data[3],
-                    # values=data[4],
-                    # dones=data[5],
                 )
 
             self.update_policy()

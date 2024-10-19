@@ -105,10 +105,14 @@ class RLStrategy(LearningStrategy):
 
         elif Path(kwargs["trained_policies_save_path"]).is_dir():
             self.load_actor_params(load_path=kwargs["trained_policies_save_path"])
+            # Ensure action_noise is defined even when not in learning or evaluation mode
+            self.action_noise = None
+            self.collect_initial_experience_mode = None
         else:
             raise FileNotFoundError(
                 f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
             )
+
 
     def calculate_bids(
         self,
@@ -204,11 +208,10 @@ class RLStrategy(LearningStrategy):
         # unit.outputs["exploration_noise"][start] = noise
         # TODO: Make this algo specific function
         # Check if extra_info is noise or log_probs and store it accordingly
+
         if isinstance(extra_info, th.Tensor) and extra_info.shape == actions.shape:
             unit.outputs["exploration_noise"][start] = extra_info  # It's noise
         else:
-            # print("Type of extra_info: ", extra_info)
-            # print(type(extra_info))
             unit.outputs["rl_log_probs"].append(extra_info)  # It's log_probs
             # unit.outputs["dones"][start] = False
 

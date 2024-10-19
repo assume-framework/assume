@@ -246,7 +246,7 @@ class RLUnitsOperator(UnitsOperator):
 
             # For PPO
             # Check whether the list of tensors is not empty and whether the tensors contain elements
-            if unit.outputs["rl_log_probs"] and all(t.numel() > 0 for t in unit.outputs["rl_log_probs"][:values_len]):
+            if unit.outputs["rl_log_probs"]: # and all(t.numel() > 0 for t in unit.outputs["rl_log_probs"][:values_len]):
                 
                 log_prob_tensor = th.stack(
                     unit.outputs["rl_log_probs"][:values_len], dim=0
@@ -275,20 +275,8 @@ class RLUnitsOperator(UnitsOperator):
         all_rewards = np.array(all_rewards).reshape(-1, learning_unit_count)
 
         # For PPO
-        if unit.outputs["rl_log_probs"] and all(t.numel() > 0 for t in unit.outputs["rl_log_probs"][:values_len]):
+        if unit.outputs["rl_log_probs"]: # and all(t.numel() > 0 for t in unit.outputs["rl_log_probs"][:values_len]):
             all_log_probs = all_log_probs.detach().cpu().numpy().reshape(-1, learning_unit_count, 1)
-            
-            # print("ALL_OBSERVATIONS")
-            # print(all_observations)
-
-            # print("ALL_ACTIONS")
-            # print(all_actions)
-
-            # print("ALL_REWARDS")
-            # print(all_rewards)
-
-            # print("ALL_LOG_PROBS")
-            # print(all_log_probs)
 
             rl_agent_data = (all_observations, all_actions, all_rewards, all_log_probs)
         # For MATD3
