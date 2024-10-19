@@ -278,9 +278,6 @@ class Building(SupportsMinMax, DSMFlex):
         self.model.variable_power = pyo.Var(
             self.model.time_steps, within=pyo.Reals
         )
-        self.model.variable_expenses = pyo.Var(
-            self.model.time_steps, within=pyo.Reals
-        )
 
     def define_constraints(self):
 
@@ -299,21 +296,16 @@ class Building(SupportsMinMax, DSMFlex):
                     + (self.model.dsm_blocks["ev"].charge_ev[t] if self.has_ev else 0)
                     + (self.model.dsm_blocks["battery_storage"].charge[t] if self.has_battery_storage else 0)
                     - (self.model.dsm_blocks["pv_plant"].power_out[t] if self.has_pv else 0)
-                    # TODO: My idea with sells_battery_energy_to_market is not working since there is no split up anymore!
                     - (self.model.dsm_blocks["battery_storage"].discharge[t] if self.has_battery_storage else 0)
             )
 
-        @self.model.Constraint(self.model.time_steps)
-        def variable_expenses_constraint(m, t):
-            """
-            Calculates the variable expense per time step.
-            """
-            return (
-                # TODO: Also Idea not really possible to have two different prices for buying and selling (variable_power negtive or positive)
-                    self.model.variable_expenses[t]
-                    == self.model.variable_power[t]
-                    * self.model.electricity_price_buy[t]
-            )
+    def calculate_current_costs(self, t):
+        """
+        Calculates the cost for a single time step 't' based on the variable power.
+        """
+        # Use Pyomo's conditional expression (use ternary-like expressions for modeling)
+        return self.model.variable_power[t] * self.model.electricity_price_buy[t] if self.model.variable_power[t] > 0 \
+            else self.model.variable_power[t] * self.model.electricity_price_sell[t]
 
     def define_objective(self):
         """
@@ -327,20 +319,20 @@ class Building(SupportsMinMax, DSMFlex):
                 Minimizes the total variable cost over all time steps.
                 """
                 total_variable_cost = sum(
-                    self.model.variable_expenses[t] for t in self.model.time_steps
+                    self.calculate_current_costs(t) for t in self.model.time_steps
                 )
                 return total_variable_cost
 
         elif self.objective == "maximize_revenue":
 
-            @self.model.Objective(sense=pyo.minimize)
+            @self.model.Objective(sense=pyo.maximize)
             def obj_rule(m):
                 """
                 Maximizes the total variable revenue over all time steps by minimizing the variable power.
                 The lower the power, the more power got used for self-consumption and therefore the revenue gets maximized.
                 """
                 total_variable_revenue = sum(
-                    self.model.variable_power[t] for t in self.model.time_steps
+                    -self.calculate_current_costs(t) for t in self.model.time_steps
                 )
                 return total_variable_revenue
         else:
@@ -382,7 +374,7 @@ class Building(SupportsMinMax, DSMFlex):
         self.opt_power_requirement.index = self.index
 
         # Variable expense series
-        expenses = instance.variable_expenses.get_values()
+        expenses = power * (self.electricity_price_sell if power < 0 else self.electricity_price)
         self.variable_expenses_series = pd.Series(data=expenses)
         self.variable_expenses_series.index = self.index
 
