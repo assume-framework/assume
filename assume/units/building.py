@@ -390,14 +390,16 @@ class Building(SupportsMinMax, DSMFlex):
 
     def write_additional_outputs(self, instance):
         if self.has_battery_storage:
+            model_block = instance.dsm_blocks["battery_storage"]
             soc = pd.Series(
-                data=instance.dsm_blocks["battery_storage"].soc.get_values(), dtype=float
+                data=model_block.soc.get_values()/model_block.max_capacity, dtype=float
             )
             soc.index = self.index
             self.outputs["soc"] = soc
         if self.has_ev:
+            model_block = instance.dsm_blocks["ev"]
             ev_soc = pd.Series(
-                data=instance.dsm_blocks["ev"].ev_battery_soc.get_values(), index=self.index, dtype=object
+                data=model_block.ev_battery_soc.get_values()/model_block.max_capacity, index=self.index, dtype=object
             )
             ev_soc.index = self.index
             self.outputs["ev_soc"] = ev_soc
