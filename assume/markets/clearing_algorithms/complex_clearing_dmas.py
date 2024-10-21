@@ -156,7 +156,6 @@ class ComplexDmasClearingRole(MarketRole):
             within=Reals,
             bounds=(0, 1),
             initialize=0,
-
         )
         model_vars["single_ask"] = model.use_hourly_ask
         # Step 3 initialize binary variables for ask order in block per agent
