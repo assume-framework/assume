@@ -27,7 +27,7 @@ from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
 
-SOLVERS = ["appsi_highs", "glpk", "cbc", "gurobi", "cplex"]
+SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
 
 order_types = ["single_ask", "single_bid", "linked_ask", "exclusive_ask"]
 

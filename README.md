@@ -52,7 +52,7 @@ pip install 'assume-framework[learning]'
 We also include market clearing algorithms for complex bids. These clearing algorithms require pyomo and a solver (we use GLPK). To install the package with these capabilities, use:
 
 ```bash
-pip install 'assume-framework[optimization]'
+pip install 'assume-framework[network]'
 ```
 
 To install with testing capabilities:

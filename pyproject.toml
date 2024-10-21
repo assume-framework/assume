@@ -47,7 +47,7 @@ dependencies = [
 learning = [
     "torch >=2.0.1",
 ]
-optimization = [
+network = [
     "pypsa <=0.30.3",
 ]
 oeds = [

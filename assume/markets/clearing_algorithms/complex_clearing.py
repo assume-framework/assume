@@ -16,7 +16,7 @@ from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
 
-SOLVERS = ["appsi_highs", "gurobi", "glpk"]
+SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
 EPS = 1e-4
 
 
