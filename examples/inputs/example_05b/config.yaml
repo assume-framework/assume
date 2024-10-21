@@ -3,14 +3,14 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 base:
-  start_date: 2019-01-01 00:00
-  end_date: 2019-01-06 00:00
+  start_date: 2023-01-01 00:00
+  end_date: 2023-01-03 00:00
   time_step: 1h
   save_frequency_hours: 24
 
   markets_config:
     EOM:
-      start_date: 2019-01-01 00:00
+      start_date: 2023-01-01 00:00
       operator: EOM_operator
       product_type: energy
       products:
@@ -27,7 +27,7 @@ base:
       market_mechanism: pay_as_clear
 
     redispatch:
-      start_date: 2019-01-01 21:00
+      start_date: 2023-01-01 21:00
       operator: network_operator
       product_type: energy
       products:
@@ -54,8 +54,8 @@ base:
 
 
 nodal_case:
-  start_date: 2019-01-01 00:00
-  end_date: 2019-01-06 00:00
+  start_date: 2023-01-01 00:00
+  end_date: 2023-01-06 00:00
   time_step: 1h
   save_frequency_hours: 24
 
@@ -86,8 +86,8 @@ nodal_case:
         backup_marginal_cost: 10000
 
 zonal_case:
-  start_date: 2019-01-01 00:00
-  end_date: 2019-01-06 00:00
+  start_date: 2023-01-01 00:00
+  end_date: 2023-01-06 00:00
   time_step: 1h
   save_frequency_hours: 24
 
