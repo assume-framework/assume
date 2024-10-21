@@ -85,8 +85,7 @@ class Building(SupportsMinMax, DSMFlex):
             **kwargs,
         )
 
-        self.electricity_price = self.forecaster["price_EOM"]
-        self.electricity_price_sell = self.forecaster["price_EOM_sell"]
+        self.electricity_price, self.electricity_price_sell = self.create_prices_given_solar_forecast()
         self.natural_gas_price = self.forecaster["fuel_price_natural gas"]
         self.heat_demand = self.forecaster["heat_demand"]
         self.ev_load_profile = self.forecaster["ev_load_profile"]
@@ -168,6 +167,16 @@ class Building(SupportsMinMax, DSMFlex):
 
         self.opt_power_requirement = None
         self.variable_cost_series = None
+
+    def create_prices_given_solar_forecast(self):
+        electricity_price_buy = self.forecaster["price_EOM"]
+        electricity_price_sell = self.forecaster["price_EOM_sell"]
+
+        price = round(electricity_price_sell * (1 - self.forecaster["availability_Solar"]), 2)
+
+        #price_delta = ((electricity_price_buy - electricity_price_sell) / 2) * (self.forecaster["availability_Solar"])
+        return price, price
+
 
     def create_availability_df(self, availability_periods):
         """
