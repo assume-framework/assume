@@ -6,6 +6,7 @@ import logging
 
 import numpy as np
 import torch as th
+from mango import AgentAddress
 
 from assume.common import UnitsOperator
 from assume.common.market_objects import (
@@ -75,14 +76,9 @@ class RLUnitsOperator(UnitsOperator):
                 "type": "store_units",
                 "data": self.units[unit.id].as_dict(),
             }
-            await self.context.send_acl_message(
-                receiver_id=db_aid,
-                receiver_addr=db_addr,
+            await self.context.send_message(
+                receiver_addr=AgentAddress(db_addr, db_aid),
                 content=message,
-                acl_metadata={
-                    "sender_addr": self.context.addr,
-                    "sender_id": self.context.aid,
-                },
             )
 
     def handle_market_feedback(self, content: ClearingMessage, meta: MetaDict) -> None:
@@ -171,9 +167,8 @@ class RLUnitsOperator(UnitsOperator):
         db_addr = self.context.data.get("learning_output_agent_addr")
 
         if db_aid and db_addr and output_agent_list:
-            self.context.schedule_instant_acl_message(
-                receiver_id=db_aid,
-                receiver_addr=db_addr,
+            self.context.schedule_instant_message(
+                receiver_addr=AgentAddress(db_addr, db_aid),
                 content={
                     "context": "write_results",
                     "type": "rl_learning_params",
@@ -243,14 +238,13 @@ class RLUnitsOperator(UnitsOperator):
         learning_role_addr = self.context.data.get("learning_agent_addr")
 
         if learning_role_id and learning_role_addr:
-            self.context.schedule_instant_acl_message(
-                receiver_id=learning_role_id,
-                receiver_addr=learning_role_addr,
+            self.context.schedule_instant_message(
                 content={
                     "context": "rl_training",
                     "type": "save_buffer_and_update",
                     "data": rl_agent_data,
                 },
+                receiver_addr=AgentAddress(learning_role_addr, learning_role_id),
             )
 
     async def formulate_bids(

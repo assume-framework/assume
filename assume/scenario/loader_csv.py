@@ -618,7 +618,7 @@ async def async_setup_world(
 
     world.reset()
 
-    await world.setup(
+    world.setup(
         start=start,
         end=end,
         save_frequency_hours=save_frequency_hours,
@@ -699,7 +699,7 @@ async def async_setup_world(
     if world.distributed_role is True:
         logger.info("Adding unit operators and units - with subprocesses")
         for op, op_units in units.items():
-            await world.add_units_with_operator_subprocess(op, op_units)
+            world.add_units_with_operator_subprocess(op, op_units)
     else:
         logger.info("Adding unit operators and units")
         for company_name in set(units.keys()):
@@ -711,7 +711,7 @@ async def async_setup_world(
         # add the units to corresponding unit operators
         for op, op_units in units.items():
             for unit in op_units:
-                await world.async_add_unit(**unit)
+                world.add_unit(**unit)
 
     if (
         world.learning_mode

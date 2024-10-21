@@ -8,7 +8,7 @@ from datetime import datetime
 import pandas as pd
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
-from mango import Agent, RoleAgent, create_container
+from mango import Agent, AgentAddress, RoleAgent, create_acl, create_ec_container
 from mango.util.clock import ExternalClock
 
 from assume.common.forecasts import NaiveForecast
@@ -23,23 +23,24 @@ end = datetime(2020, 12, 2)
 
 
 class DataRequester(Agent):
-    def __init__(self, container, suggested_aid):
-        super().__init__(container, suggested_aid)
+    def __init__(self):
+        super().__init__()
         self.await_message: asyncio.Future = None
 
     async def send_data_request(
         self, receiver_addr, receiver_id, content: dict, reply_with
     ):
         self.await_message = asyncio.Future()
-        await self.send_acl_message(
-            content,
-            receiver_addr=receiver_addr,
-            receiver_id=receiver_id,
-            acl_metadata={
-                "sender_addr": self.addr,
-                "sender_id": self.aid,
-                "reply_with": reply_with,
-            },
+        await self.send_message(
+            create_acl(
+                content,
+                receiver_addr=AgentAddress(receiver_addr, receiver_id),
+                sender_addr=self.addr,
+                acl_metadata={
+                    "reply_with": reply_with,
+                },
+            ),
+            receiver_addr=AgentAddress(receiver_addr, receiver_id),
         )
 
         return await self.await_message
@@ -58,10 +59,11 @@ async def test_request_messages():
         market_products=[MarketProduct(rd(hours=1), 1, rd(hours=1))],
     )
     clock = ExternalClock(0)
-    container = await create_container(
+    container = create_ec_container(
         addr="world", connection_type="external_connection", clock=clock
     )
-    units_agent = RoleAgent(container, "test_operator")
+    units_agent = RoleAgent()
+    container.register(units_agent, suggested_aid="test_operator")
     units_role = UnitsOperator(available_markets=[marketconfig])
     units_agent.add_role(units_role)
 
@@ -76,13 +78,16 @@ async def test_request_messages():
         "forecaster": NaiveForecast(index, demand=1000),
     }
     unit = Demand("testdemand", index=index, **params_dict)
-    await units_role.add_unit(unit)
+    units_role.add_unit(unit)
 
     market_role = MarketRole(marketconfig)
-    market_agent = RoleAgent(container, "market")
+    market_agent = RoleAgent()
+    container.register(market_agent, suggested_aid="market")
     market_agent.add_role(market_role)
 
-    dr = DataRequester(container, "data_requester")
+    dr = DataRequester()
+
+    container.register(dr, suggested_aid="data_requester")
 
     market_content = {
         "context": "data_request",

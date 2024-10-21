@@ -9,7 +9,7 @@ from itertools import groupby
 from operator import itemgetter
 
 import pandas as pd
-from mango import Role
+from mango import AgentAddress, Role, create_acl, sender_addr
 from mango.messages.message import Performatives
 
 from assume.common.market_objects import (
@@ -101,14 +101,31 @@ class UnitsOperator(Role):
             lambda content, meta: content.get("context") == "data_request",
         )
 
+    def on_ready(self):
+        super().on_ready()
+
         for market in self.available_markets:
             if self.participate(market):
                 self.context.schedule_timestamp_task(
                     self.register_market(market),
                     1,  # register after time was updated for the first time
                 )
+        db_aid = self.context.data.get("output_agent_id")
+        db_addr = self.context.data.get("output_agent_addr")
+        if db_aid and db_addr:
+            # send unit data to db agent to store it
+            for unit in self.units.values():
+                message = {
+                    "context": "write_results",
+                    "type": "store_units",
+                    "data": unit.as_dict(),
+                }
+                self.context.schedule_instant_message(
+                    content=message,
+                    receiver_addr=AgentAddress(db_aid, db_addr),
+                )
 
-    async def add_unit(
+    def add_unit(
         self,
         unit: BaseUnit,
     ) -> None:
@@ -119,25 +136,6 @@ class UnitsOperator(Role):
             unit (BaseUnit): The unit to be added.
         """
         self.units[unit.id] = unit
-
-        db_aid = self.context.data.get("output_agent_id")
-        db_addr = self.context.data.get("output_agent_addr")
-        if db_aid and db_addr:
-            # send unit data to db agent to store it
-            message = {
-                "context": "write_results",
-                "type": "store_units",
-                "data": self.units[unit.id].as_dict(),
-            }
-            await self.context.send_acl_message(
-                receiver_id=db_aid,
-                receiver_addr=db_addr,
-                content=message,
-                acl_metadata={
-                    "sender_addr": self.context.addr,
-                    "sender_id": self.context.aid,
-                },
-            )
 
     def participate(self, market: MarketConfig) -> bool:
         """
@@ -160,19 +158,20 @@ class UnitsOperator(Role):
             market (MarketConfig): The market to register.
         """
 
-        await self.context.send_acl_message(
-            {
-                "context": "registration",
-                "market_id": market.market_id,
-                "information": [u.as_dict() for u in self.units.values()],
-            },
+        await self.context.send_message(
+            create_acl(
+                {
+                    "context": "registration",
+                    "market_id": market.market_id,
+                    "information": [u.as_dict() for u in self.units.values()],
+                },
+                market.addr,
+                self.context.addr,
+                acl_metadata={
+                    "reply_with": market.market_id,
+                },
+            ),
             receiver_addr=market.addr,
-            receiver_id=market.aid,
-            acl_metadata={
-                "sender_addr": self.context.addr,
-                "sender_id": self.context.aid,
-                "reply_with": market.market_id,
-            },
         )
         logger.debug(f"{self.id} sent market registration to {market.market_id}")
 
@@ -253,18 +252,19 @@ class UnitsOperator(Role):
             data = self.units[unit].outputs[metric_type][start:end]
         except Exception:
             logger.exception("error handling data request")
-        self.context.schedule_instant_acl_message(
-            content={
-                "context": "data_response",
-                "data": data,
-            },
-            receiver_addr=meta["sender_addr"],
-            receiver_id=meta["sender_id"],
-            acl_metadata={
-                "sender_addr": self.context.addr,
-                "sender_id": self.context.aid,
-                "in_reply_to": meta.get("reply_with"),
-            },
+        self.context.schedule_instant_message(
+            create_acl(
+                content={
+                    "context": "data_response",
+                    "data": data,
+                },
+                receiver_addr=sender_addr(meta),
+                sender_addr=self.context.addr,
+                acl_metadata={
+                    "in_reply_to": meta.get("reply_with"),
+                },
+            ),
+            receiver_addr=sender_addr(meta),
         )
 
     def set_unit_dispatch(
@@ -360,9 +360,8 @@ class UnitsOperator(Role):
         db_aid = self.context.data.get("output_agent_id")
         db_addr = self.context.data.get("output_agent_addr")
         if db_aid and db_addr:
-            self.context.schedule_instant_acl_message(
-                receiver_id=db_aid,
-                receiver_addr=db_addr,
+            self.context.schedule_instant_message(
+                receiver_addr=AgentAddress(db_addr, db_aid),
                 content={
                     "context": "write_results",
                     "type": "market_dispatch",
@@ -371,9 +370,8 @@ class UnitsOperator(Role):
             )
             if unit_dispatch_dfs:
                 unit_dispatch = pd.concat(unit_dispatch_dfs)
-                self.context.schedule_instant_acl_message(
-                    receiver_id=db_aid,
-                    receiver_addr=db_addr,
+                self.context.schedule_instant_message(
+                    receiver_addr=AgentAddress(db_addr, db_aid),
                     content={
                         "context": "write_results",
                         "type": "unit_dispatch",
@@ -412,22 +410,22 @@ class UnitsOperator(Role):
                 market=market,
                 products=products,
             )
-        acl_metadata = {
-            "performative": Performatives.inform,
-            "sender_id": self.context.aid,
-            "sender_addr": self.context.addr,
-            "conversation_id": "conversation01",
-            "in_reply_to": meta.get("reply_with"),
-        }
-        await self.context.send_acl_message(
-            content={
-                "context": "submit_bids",
-                "market_id": market.market_id,
-                "orderbook": orderbook,
-            },
+        await self.context.send_message(
+            create_acl(
+                content={
+                    "context": "submit_bids",
+                    "market_id": market.market_id,
+                    "orderbook": orderbook,
+                },
+                receiver_addr=market.addr,
+                sender_addr=self.context.addr,
+                acl_metadata={
+                    "performative": Performatives.inform,
+                    "conversation_id": "conversation01",
+                    "in_reply_to": meta.get("reply_with"),
+                },
+            ),
             receiver_addr=market.addr,
-            receiver_id=market.aid,
-            acl_metadata=acl_metadata,
         )
 
     async def formulate_bids_portfolio(
@@ -477,7 +475,7 @@ class UnitsOperator(Role):
                 product_tuples=products,
             )
             for i, order in enumerate(product_bids):
-                order["agent_id"] = (self.context.addr, self.context.aid)
+                order["agent_id"] = self.context.addr
                 if market.volume_tick:
                     order["volume"] = round(order["volume"] / market.volume_tick)
                 if market.price_tick:

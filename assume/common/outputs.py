@@ -187,6 +187,7 @@ class WriteOutput(Role):
             lambda content, meta: content.get("context") == "write_results",
         )
 
+    def on_ready(self):
         if self.save_frequency_hours is not None:
             recurrency_task = rr.rrule(
                 freq=rr.HOURLY,
@@ -198,6 +199,7 @@ class WriteOutput(Role):
             self.context.schedule_recurrent_task(
                 self.store_dfs, recurrency_task, src="no_wait"
             )
+
 
     def handle_message(self, content: dict, meta: MetaDict):
         """

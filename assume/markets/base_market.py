@@ -7,7 +7,7 @@ import math
 from itertools import groupby
 from operator import itemgetter
 
-from mango import Role
+from mango import AgentAddress, Role, create_acl, sender_addr
 
 from assume.common.market_objects import (
     ClearingMessage,
@@ -250,7 +250,6 @@ class MarketRole(MarketMechanism, Role):
 
         super().setup()
         self.marketconfig.addr = self.context.addr
-        self.marketconfig.aid = self.context.aid
 
         market_id = getattr(self.marketconfig, "market_id", "Unknown Market ID")
 
@@ -322,6 +321,7 @@ class MarketRole(MarketMechanism, Role):
                 self, self.handle_get_unmatched, accept_get_unmatched
             )
 
+    def on_ready(self):
         current = timestamp2datetime(self.context.current_timestamp)
         next_opening = self.marketconfig.opening_hours.after(current, inc=True)
         opening_ts = datetime2timestamp(next_opening)
@@ -329,15 +329,17 @@ class MarketRole(MarketMechanism, Role):
 
         # send grid topology data once
         if self.grid_data is not None:
-            self.context.schedule_instant_acl_message(
+            self.context.schedule_instant_message(
                 {
                     "context": "write_results",
                     "type": "grid_topology",
                     "data": self.grid_data,
                     "market_id": self.marketconfig.market_id,
                 },
-                receiver_addr=self.context.data.get("output_agent_addr"),
-                receiver_id=self.context.data.get("output_agent_id"),
+                receiver_addr=AgentAddress(
+                    self.context.data.get("output_agent_addr"),
+                    self.context.data.get("output_agent_id"),
+                ),
             )
 
     async def opening(self):
@@ -367,16 +369,16 @@ class MarketRole(MarketMechanism, Role):
         self.open_auctions |= set(opening_message["products"])
 
         for agent in self.registered_agents.keys():
-            agent_addr, agent_id = agent
-            await self.context.send_acl_message(
-                opening_message,
-                receiver_addr=agent_addr,
-                receiver_id=agent_id,
-                acl_metadata={
-                    "sender_addr": self.context.addr,
-                    "sender_id": self.context.aid,
-                    "reply_with": f"{self.marketconfig.market_id}_{market_open}",
-                },
+            await self.context.send_message(
+                create_acl(
+                    opening_message,
+                    receiver_addr=agent,
+                    sender_addr=self.context.addr,
+                    acl_metadata={
+                        "reply_with": f"{self.marketconfig.market_id}_{market_open}",
+                    },
+                ),
+                receiver_addr=agent,
             )
 
         # schedule closing this market
@@ -414,8 +416,7 @@ class MarketRole(MarketMechanism, Role):
         Raises:
             KeyError: If required keys are missing in `content` or `meta`.
         """
-        agent_id = meta["sender_id"]
-        agent_addr = meta["sender_addr"]
+        agent_addr = sender_addr(meta)
 
         incoming_market_id = content.get("market_id")
         current_market_id = self.marketconfig.market_id
@@ -429,15 +430,15 @@ class MarketRole(MarketMechanism, Role):
         else:
             # Validate registration details
             if self.validate_registration(content, meta):
-                self.registered_agents[(agent_addr, agent_id)] = content["information"]
+                self.registered_agents[agent_addr] = content["information"]
                 accepted = True
                 logger.debug(
-                    f"Agent '{agent_id}' at '{agent_addr}' successfully registered for market '{current_market_id}'."
+                    f"Agent '{agent_addr}' successfully registered for market '{current_market_id}'."
                 )
             else:
                 accepted = False
                 logger.warning(
-                    f"Agent '{agent_id}' at '{agent_addr}' failed registration validation for market '{current_market_id}'."
+                    f"Agent '{agent_addr}' failed registration validation for market '{current_market_id}'."
                 )
 
         # Prepare the registration reply message
@@ -447,18 +448,19 @@ class MarketRole(MarketMechanism, Role):
             "accepted": accepted,
         }
 
-        self.context.schedule_instant_acl_message(
-            content=msg,
+        self.context.schedule_instant_message(
+            create_acl(
+                content=msg,
+                receiver_addr=agent_addr,
+                sender_addr=self.context.addr,
+                acl_metadata={
+                    "in_reply_to": meta.get("reply_with"),
+                },
+            ),
             receiver_addr=agent_addr,
-            receiver_id=agent_id,
-            acl_metadata={
-                "sender_addr": self.context.addr,
-                "sender_id": self.context.aid,
-                "in_reply_to": meta.get("reply_with"),
-            },
         )
         logger.debug(
-            f"Sent registration reply to agent '{agent_id}' at '{agent_addr}': {msg}"
+            f"Sent registration reply to agent '{agent_addr}': {msg}"
         )
 
     def handle_orderbook(self, content: OrderBookMessage, meta: MetaDict):
@@ -484,7 +486,7 @@ class MarketRole(MarketMechanism, Role):
                 raise KeyError("Missing 'orderbook' in content.")
 
             agent_addr = meta.get("sender_addr")
-            if agent_addr is None:
+            if "sender_addr" not in meta.keys():
                 raise KeyError("Missing 'sender_addr' in meta.")
 
             agent_id = meta.get("sender_id")
@@ -501,7 +503,7 @@ class MarketRole(MarketMechanism, Role):
         except Exception as e:
             # Log the error with agent details for better traceability
             logger.error(
-                f"Error handling orderbook message from agent '{agent_id}' at '{agent_addr}': {e}"
+                f"Error handling orderbook message from agent '{agent_addr}': {e}"
             )
 
             # Prepare a rejection message with a generic error description
@@ -511,15 +513,16 @@ class MarketRole(MarketMechanism, Role):
             }
 
             # Send the single rejection message back to the agent
-            self.context.schedule_instant_acl_message(
-                content=rejection_message,
-                receiver_addr=agent_addr,
-                receiver_id=agent_id,
-                acl_metadata={
-                    "sender_addr": self.context.addr,
-                    "sender_id": self.context.aid,
-                    "in_reply_to": meta.get("reply_with", 1),
-                },
+            self.context.schedule_instant_message(
+                create_acl(
+                    content=rejection_message,
+                    receiver_addr=AgentAddress(agent_addr, agent_id),
+                    sender_addr=self.context.addr,
+                    acl_metadata={
+                        "in_reply_to": meta.get("reply_with", 1),
+                    },
+                ),
+                receiver_addr=AgentAddress(agent_addr, agent_id),
             )
             logger.debug(
                 f"Sent rejection message to agent '{agent_id}' at '{agent_addr}': {rejection_message}"
@@ -548,18 +551,19 @@ class MarketRole(MarketMechanism, Role):
         except Exception:
             logger.exception("Error handling data request")
 
-        self.context.schedule_instant_acl_message(
-            content={
-                "context": "data_response",
-                "data": data,
-            },
-            receiver_addr=meta["sender_addr"],
-            receiver_id=meta["sender_id"],
-            acl_metadata={
-                "sender_addr": self.context.addr,
-                "sender_id": self.context.aid,
-                "in_reply_to": meta.get("reply_with"),
-            },
+        self.context.schedule_instant_message(
+            create_acl(
+                content={
+                    "context": "data_response",
+                    "data": data,
+                },
+                receiver_addr=sender_addr(meta),
+                sender_addr=self.context.addr,
+                acl_metadata={
+                    "in_reply_to": meta.get("reply_with"),
+                },
+            ),
+            receiver_addr=sender_addr(meta),
         )
 
     def handle_get_unmatched(self, content: dict, meta: MetaDict):
@@ -591,18 +595,12 @@ class MarketRole(MarketMechanism, Role):
             else:
                 available_orders = self.all_orders
 
-            self.context.schedule_instant_acl_message(
+            self.context.schedule_instant_message(
                 content={
                     "context": "get_unmatched",
                     "available_orders": available_orders,
                 },
-                receiver_addr=agent_addr,
-                receiver_id=agent_id,
-                acl_metadata={
-                    "sender_addr": self.context.addr,
-                    "sender_id": self.context.aid,
-                    "in_reply_to": 1,
-                },
+                receiver_addr=AgentAddress(agent_addr, agent_id),
             )
             logger.debug(
                 f"Sent unmatched orders to agent '{agent_id}' at '{agent_addr}'."
@@ -668,11 +666,14 @@ class MarketRole(MarketMechanism, Role):
                 "accepted_orders": accepted_orders.get(agent, []),
                 "rejected_orders": rejected_orders.get(agent, []),
             }
-            await self.context.send_acl_message(
-                closing,
-                receiver_addr=addr,
-                receiver_id=aid,
-                acl_metadata=meta,
+            await self.context.send_message(
+                create_acl(
+                    closing,
+                    acl_metadata=meta,
+                    receiver_addr=AgentAddress(addr, aid),
+                    sender_addr=self.context.addr,
+                ),
+                receiver_addr=AgentAddress(addr, aid),
             )
         # store order book in db agent
         if not accepted_orderbook:
@@ -716,9 +717,8 @@ class MarketRole(MarketMechanism, Role):
                 "market_id": self.marketconfig.market_id,
                 "data": orderbook,
             }
-            await self.context.send_acl_message(
-                receiver_id=db_aid,
-                receiver_addr=db_addr,
+            await self.context.send_message(
+                receiver_addr=AgentAddress(db_addr, db_aid),
                 content=message,
             )
 
@@ -740,8 +740,7 @@ class MarketRole(MarketMechanism, Role):
                 "market_id": self.marketconfig.market_id,
                 "data": market_meta,
             }
-            await self.context.send_acl_message(
-                receiver_id=db_aid,
-                receiver_addr=db_addr,
+            await self.context.send_message(
+                receiver_addr=AgentAddress(db_addr, db_aid),
                 content=message,
             )
