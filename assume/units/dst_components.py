@@ -1404,6 +1404,18 @@ class HydrogenStorage(GenericStorage):
         # Call the parent class (GenericStorage) add_to_model method
         model_block = super().add_to_model(model, model_block)
 
+        # add a binary variable to disallow discharging and charging at the same time
+        model_block.status = pyo.Var(self.time_steps, within=pyo.Binary)
+
+        # add a constraint that disallows discharging and charging at the same time
+        @model_block.Constraint(self.time_steps)
+        def max_charge_power_constraint(b, t):
+            return b.charge[t] <= b.max_power_charge * b.status[t]
+
+        @model_block.Constraint(self.time_steps)
+        def max_discharge_power_constraint(b, t):
+            return b.discharge[t] <= b.max_power_discharge * (1 - b.status[t])
+
         # add further constraints or variables specific to hydrogen storage here
 
         return model_block
@@ -1467,6 +1479,18 @@ class DRIStorage(GenericStorage):
 
         # Call the parent class (GenericStorage) add_to_model method
         model_block = super().add_to_model(model, model_block)
+
+        # add a binary variable to disallow discharging and charging at the same time
+        model_block.status = pyo.Var(self.time_steps, within=pyo.Binary)
+
+        # add a constraint that disallows discharging and charging at the same time
+        @model_block.Constraint(self.time_steps)
+        def max_charge_power_constraint(b, t):
+            return b.charge[t] <= b.max_power_charge * b.status[t]
+
+        @model_block.Constraint(self.time_steps)
+        def max_discharge_power_constraint(b, t):
+            return b.discharge[t] <= b.max_power_discharge * (1 - b.status[t])
 
         # add further constraints or variables specific to DRI storage here
 
