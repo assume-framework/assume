@@ -428,6 +428,8 @@ def create_storage(
     storage_loss_rate,
     charge_loss_rate,
     discharge_loss_rate,
+    max_charging_rate,
+    max_discharging_rate,
     time_steps,
     **kwargs,
 ):
@@ -443,6 +445,8 @@ def create_storage(
         storage_loss_rate (float): The rate of energy loss due to storage inefficiency.
         charge_loss_rate (float): The rate of energy loss during charging.
         discharge_loss_rate (float): The rate of energy loss during discharging.
+        max_charging_rate (float): The maximum rate at which the battery can be charged (in MW).
+        max_discharging_rate (float): The maximum rate at which the battery can be discharged (in MW).
         **kwargs: Additional keyword arguments.
 
     Constraints:
@@ -462,6 +466,8 @@ def create_storage(
     model_part.storage_loss_rate = pyo.Param(initialize=storage_loss_rate)
     model_part.charge_loss_rate = pyo.Param(initialize=charge_loss_rate)
     model_part.discharge_loss_rate = pyo.Param(initialize=discharge_loss_rate)
+    model_part.max_charging_rate = pyo.Param(initialize=max_charging_rate)
+    model_part.max_discharging_rate = pyo.Param(initialize=max_discharging_rate)
 
     # define variables
     model_part.soc = pyo.Var(time_steps, within=pyo.NonNegativeReals)
@@ -487,36 +493,20 @@ def create_storage(
         return b.soc[t] <= b.max_capacity
 
     """
-    Limits the charging of the storage unit to its maximum capacity.
-    """
-
-    @model_part.Constraint(time_steps)
-    def energy_in_max_capacity_constraint(b, t):
-        return b.charge[t] <= b.max_capacity
-
-    """
-    Limits the discharging of the storage unit to its maximum capacity.
-    """
-
-    @model_part.Constraint(time_steps)
-    def energy_out_max_capacity_constraint(b, t):
-        return b.discharge[t] <= b.max_capacity
-
-    """
-    Ensures uniformity in charging the storage unit.
+    Ensures uniformity and charging rate in the storage unit.
     """
 
     @model_part.Constraint(time_steps)
     def energy_in_uniformity_constraint(b, t):
-        return b.charge[t] <= b.max_capacity * b.uniformity_indicator[t]
+        return b.charge[t] <= b.max_charging_rate * b.uniformity_indicator[t]
 
     """
-    Ensures uniformity in discharging the storage unit.
+    Ensures uniformity and discharging rate in the storage unit.
     """
 
     @model_part.Constraint(time_steps)
     def energy_out_uniformity_constraint(b, t):
-        return b.discharge[t] <= b.max_capacity * (1 - b.uniformity_indicator[t])
+        return b.discharge[t] <= b.max_discharging_rate * (1 - b.uniformity_indicator[t])
 
     """
     Defines the change in SOC of the storage unit over time.
@@ -1506,8 +1496,6 @@ def create_battery_storage(
             initial_soc (float): The initial state of charge (SOC) of the storage unit.
             charge_loss_rate (float): The rate of energy loss during charging.
             discharge_loss_rate (float): The rate of energy loss during discharging.
-            max_charging_rate (float): The maximum rate at which the battery can be charged (in MW).
-            max_discharging_rate (float): The maximum rate at which the battery can be discharged (in MW).
             charging_profile (str): Indicates whether the battery follows a predefined charging profile.
             time_steps (list): List of time steps for which the model will be defined.
             **kwargs: Additional keyword arguments.
@@ -1515,8 +1503,6 @@ def create_battery_storage(
         Constraints:
             charging_profile_constraint: Ensures the battery storage follows the predefined charging profile.
             discharging_profile_constraint: Ensures the battery storage follows the predefined charging profile.
-            charging_rate_limit: Limits the charging rate of the battery to its maximum charging rate.
-            discharging_rate_limit: Limits the charging rate of the battery to its maximum discharging rate.
     """
     model_part = create_storage(
         model,
@@ -1526,12 +1512,12 @@ def create_battery_storage(
         0,
         charge_loss_rate,
         discharge_loss_rate,
+        max_charging_rate,
+        max_discharging_rate,
         time_steps,
         **kwargs
     )
 
-    model_part.max_battery_charging_rate = pyo.Param(initialize=max_charging_rate)
-    model_part.max_battery_discharging_rate = pyo.Param(initialize=max_discharging_rate)
     model_part.operating_cost_battery = pyo.Var(time_steps, within=pyo.NonNegativeReals)
 
     if bool(strtobool(charging_profile)):
@@ -1550,20 +1536,6 @@ def create_battery_storage(
             """
             battery_load = model.battery_load_profile[t]
             return b.discharge[t] == (abs(battery_load) if battery_load < 0 else 0)
-    else:
-        @model_part.Constraint(time_steps)
-        def charging_rate_limit(b, t):
-            """
-            Limits the charging rate of the battery to its maximum charging rate.
-            """
-            return b.charge[t] <= b.max_battery_charging_rate
-
-        @model_part.Constraint(time_steps)
-        def discharging_rate_limit(b, t):
-            """
-            Limits the charging rate of the battery to its maximum discharging rate.
-            """
-            return b.discharge[t] <= b.max_battery_discharging_rate
 
     return model_part
 
