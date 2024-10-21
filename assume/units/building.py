@@ -85,8 +85,7 @@ class Building(SupportsMinMax, DSMFlex):
             **kwargs,
         )
 
-        self.electricity_price = self.forecaster["price_EOM"]
-        self.electricity_price_sell = self.forecaster["price_EOM_sell"]
+        self.electricity_price, self.electricity_price_sell = self.create_prices_given_solar_forecast()
         self.natural_gas_price = self.forecaster["fuel_price_natural gas"]
         self.heat_demand = self.forecaster["heat_demand"]
         self.ev_load_profile = self.forecaster["ev_load_profile"]
@@ -168,6 +167,13 @@ class Building(SupportsMinMax, DSMFlex):
 
         self.opt_power_requirement = None
         self.variable_expenses_series = None
+
+    def create_prices_given_solar_forecast(self):
+        buy_forecast = self.forecaster["price_EOM"]
+        sell_forecast = self.forecaster["price_EOM_sell"]
+
+        price_delta = round((buy_forecast - sell_forecast) * (self.forecaster["availability_Solar"]), 2)
+        return buy_forecast - price_delta, buy_forecast - price_delta
 
     def create_availability_df(self, availability_periods):
         """
@@ -278,6 +284,9 @@ class Building(SupportsMinMax, DSMFlex):
         self.model.variable_power = pyo.Var(
             self.model.time_steps, within=pyo.Reals
         )
+        self.model.variable_expenses = pyo.Var(
+            self.model.time_steps, within=pyo.Reals
+        )
 
     def define_constraints(self):
 
@@ -296,16 +305,21 @@ class Building(SupportsMinMax, DSMFlex):
                     + (self.model.dsm_blocks["ev"].charge_ev[t] if self.has_ev else 0)
                     + (self.model.dsm_blocks["battery_storage"].charge[t] if self.has_battery_storage else 0)
                     - (self.model.dsm_blocks["pv_plant"].power_out[t] if self.has_pv else 0)
+                    # TODO: My idea with sells_battery_energy_to_market is not working since there is no split up anymore!
                     - (self.model.dsm_blocks["battery_storage"].discharge[t] if self.has_battery_storage else 0)
             )
 
-    def calculate_current_costs(self, t):
-        """
-        Calculates the cost for a single time step 't' based on the variable power.
-        """
-        # Use Pyomo's conditional expression (use ternary-like expressions for modeling)
-        return self.model.variable_power[t] * self.model.electricity_price_buy[t] if self.model.variable_power[t] > 0 \
-            else self.model.variable_power[t] * self.model.electricity_price_sell[t]
+        @self.model.Constraint(self.model.time_steps)
+        def variable_expenses_constraint(m, t):
+            """
+            Calculates the variable expense per time step.
+            """
+            return (
+                # TODO: Also Idea not really possible to have two different prices for buying and selling (variable_power negtive or positive)
+                    self.model.variable_expenses[t]
+                    == self.model.variable_power[t]
+                    * self.model.electricity_price_buy[t]
+            )
 
     def define_objective(self):
         """
@@ -319,28 +333,15 @@ class Building(SupportsMinMax, DSMFlex):
                 Minimizes the total variable cost over all time steps.
                 """
                 total_variable_cost = sum(
-                    self.calculate_current_costs(t) for t in self.model.time_steps
+                    self.model.variable_expenses[t] for t in self.model.time_steps
                 )
                 return total_variable_cost
-
-        elif self.objective == "maximize_revenue":
-
-            @self.model.Objective(sense=pyo.maximize)
-            def obj_rule(m):
-                """
-                Maximizes the total variable revenue over all time steps by minimizing the variable power.
-                The lower the power, the more power got used for self-consumption and therefore the revenue gets maximized.
-                """
-                total_variable_revenue = sum(
-                    -self.calculate_current_costs(t) for t in self.model.time_steps
-                )
-                return total_variable_revenue
         else:
             raise ValueError(f"Unknown objective: {self.objective}")
 
     def calculate_optimal_operation_if_needed(self):
         if self.opt_power_requirement is None and self.variable_expenses_series is None and \
-                self.objective in ["minimize_expenses", "maximize_revenue"]:
+                self.objective in ["minimize_expenses"]:
             self.calculate_optimal_operation()
 
     def calculate_optimal_operation(self):
@@ -374,7 +375,7 @@ class Building(SupportsMinMax, DSMFlex):
         self.opt_power_requirement.index = self.index
 
         # Variable expense series
-        expenses = power * (self.electricity_price_sell if power < 0 else self.electricity_price)
+        expenses = instance.variable_expenses.get_values()
         self.variable_expenses_series = pd.Series(data=expenses)
         self.variable_expenses_series.index = self.index
 
@@ -384,23 +385,17 @@ class Building(SupportsMinMax, DSMFlex):
         if self.has_battery_storage:
             model_block = instance.dsm_blocks["battery_storage"]
             soc = pd.Series(
-                data=model_block.soc.get_values()/model_block.max_capacity, dtype=float
-            )
+                data=model_block.soc.get_values(), dtype=float
+            ) / pyo.value(model_block.max_capacity)
             soc.index = self.index
             self.outputs["soc"] = soc
         if self.has_ev:
             model_block = instance.dsm_blocks["ev"]
             ev_soc = pd.Series(
-                data=model_block.ev_battery_soc.get_values()/model_block.max_capacity, index=self.index, dtype=object
-            )
+                data=model_block.ev_battery_soc.get_values(), dtype=float
+            ) / pyo.value(model_block.max_capacity)
             ev_soc.index = self.index
             self.outputs["ev_soc"] = ev_soc
-        if self.has_pv:
-            pv_power = pd.Series(
-                data=instance.dsm_blocks["pv_plant"].power_out.get_values(), index=self.index, dtype=object
-            )
-            pv_power.index = self.index
-            self.outputs["pv_power"] = pv_power
 
     def set_dispatch_plan(
         self,

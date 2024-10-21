@@ -1,3 +1,3 @@
 name,unit_type,technology,node,bidding_EOM,fuel_type,bidding_redispatch,unit_operator,objective,flexibility_measure,cost_tolerance,charging_profile,power_profile,availability_periods,demand,rated_power,max_power,min_power,ramp_up,ramp_down,min_operating_time,min_down_time,efficiency,cop,max_capacity,min_capacity,initial_soc,storage_loss_rate,charge_loss_rate,discharge_loss_rate,max_charging_rate,max_discharging_rate,sells_energy_to_market
-A360_building,building,pv_plant,north,naive_da_building,,,dsm_operator_1,maximize_revenue,,,,No,,,,5,0,,,,,,,,,,,,,,,
-A361_building,building,battery_storage,north,naive_da_building,,,dsm_operator_2,maximize_revenue,,,No,,,,,,,,,,,,,8,1,0,,0,0,1,1,Yes
+A360_building,building,pv_plant,north,naive_da_building,,,dsm_operator_1,minimize_expenses,,,,No,,,,5,0,,,,,,,,,,,,,,,
+A361_building,building,battery_storage,north,naive_da_building,,,dsm_operator_2,minimize_expenses,,,No,,,,,,,,,,,,,8,1,0,,0,0,1,1,Yes
