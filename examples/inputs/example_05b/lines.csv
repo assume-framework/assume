@@ -1,0 +1,4 @@
+name,bus0,bus1,s_nom,x,r
+Line_N_W,north,west,14,0.01,0.00001
+Line_N_E,north,east,14,0.01,0.00001
+Line_S_E,south,east,14,0.01,0.00001

@@ -11,7 +11,7 @@ from assume.scenario.loader_csv import load_scenario_folder, run_learning
 
 log = logging.getLogger(__name__)
 
-csv_path = ""
+csv_path = "examples/outputs"
 
 os.makedirs("./examples/local_db", exist_ok=True)
 
@@ -92,8 +92,10 @@ available_examples = {
     "large_2021_rl": {"scenario": "example_03b", "study_case": "base_case_2021"},
     
     # redispatch validation examples
-    "redispatch_validation_2019": {"scenario": "example_04a", "study_case": "base"},
-    "redispatch_validation_2023": {"scenario": "example_04b", "study_case": "base"},
+    "redisp_valid_2_nodes": {"scenario": "example_05a", "study_case": "base"},
+    "redisp_valid_3_nodes": {"scenario": "example_05b", "study_case": "base"},
+    "redisp_valid_Germany_2019": {"scenario": "example_05c", "study_case": "base"},
+    "redisp_valid_Germany_2023": {"scenario": "example_05d", "study_case": "base"},
 
 }
 
@@ -106,7 +108,7 @@ if __name__ == "__main__":
     - timescale: with database and grafana (note: you need docker installed)
     """
     data_format = "local_db"  # "local_db" or "timescale"
-    example = "redispatch_validation_2019"
+    example = "redisp_valid_2_nodes"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
