@@ -25,7 +25,7 @@ from assume.units.dst_components import (
     create_hydrogen_storage,
 )
 
-SOLVERS = ["gurobi", "glpk", "cbc", "cplex"]
+SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
 
 logger = logging.getLogger(__name__)
 
