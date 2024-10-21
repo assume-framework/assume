@@ -63,7 +63,7 @@ class WriteOutput(Role):
 
         # store needed date
         self.simulation_id = simulation_id
-        self.save_frequency_hours = save_frequency_hours or (end - start).days * 24
+        self.save_frequency_hours = save_frequency_hours
         logger.debug("saving results every %s hours", self.save_frequency_hours)
 
         # make directory if not already present
@@ -187,16 +187,17 @@ class WriteOutput(Role):
             lambda content, meta: content.get("context") == "write_results",
         )
 
-        recurrency_task = rr.rrule(
-            freq=rr.HOURLY,
-            interval=self.save_frequency_hours,
-            dtstart=self.start,
-            until=self.end,
-            cache=True,
-        )
-        self.context.schedule_recurrent_task(
-            self.store_dfs, recurrency_task, src="no_wait"
-        )
+        if self.save_frequency_hours is not None:
+            recurrency_task = rr.rrule(
+                freq=rr.HOURLY,
+                interval=self.save_frequency_hours,
+                dtstart=self.start,
+                until=self.end,
+                cache=True,
+            )
+            self.context.schedule_recurrent_task(
+                self.store_dfs, recurrency_task, src="no_wait"
+            )
 
     def handle_message(self, content: dict, meta: MetaDict):
         """
@@ -273,7 +274,10 @@ class WriteOutput(Role):
                 if len(self.write_dfs[table]) == 0:
                     continue
 
-                df = pd.concat(self.write_dfs[table], axis=0)
+                # concat all dataframes
+                # use join='outer' to keep all columns and fill missing values with NaN
+                df = pd.concat(self.write_dfs[table], axis=0, join="outer")
+
                 df.reset_index()
                 if df.empty:
                     continue
