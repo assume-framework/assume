@@ -207,7 +207,7 @@ class MarketRole(MarketMechanism, Role):
     longitude: float
     latitude: float
     marketconfig: MarketConfig
-    registered_agents: dict[tuple[str, str], dict]
+    registered_agents: dict[AgentAddress, dict]
     required_fields: list[str] = []
 
     def __init__(self, marketconfig: MarketConfig):
@@ -277,8 +277,7 @@ class MarketRole(MarketMechanism, Role):
             return (
                 content.get("market_id") == self.marketconfig.market_id
                 and content.get("orderbook") is not None
-                and (meta["sender_addr"], meta["sender_id"])
-                in self.registered_agents.keys()
+                and sender_addr(meta) in self.registered_agents.keys()
             )
 
         def accept_registration(content: RegistrationMessage, meta: MetaDict):
@@ -328,7 +327,7 @@ class MarketRole(MarketMechanism, Role):
         self.context.schedule_timestamp_task(self.opening(), opening_ts)
 
         # send grid topology data once
-        if self.grid_data is not None:
+        if self.grid_data is not None and self.context.data.get("output_agent_addr"):
             self.context.schedule_instant_message(
                 {
                     "context": "write_results",
@@ -336,10 +335,7 @@ class MarketRole(MarketMechanism, Role):
                     "data": self.grid_data,
                     "market_id": self.marketconfig.market_id,
                 },
-                receiver_addr=AgentAddress(
-                    self.context.data.get("output_agent_addr"),
-                    self.context.data.get("output_agent_id"),
-                ),
+                receiver_addr=self.context.data.get("output_agent_addr"),
             )
 
     async def opening(self):
@@ -459,9 +455,7 @@ class MarketRole(MarketMechanism, Role):
             ),
             receiver_addr=agent_addr,
         )
-        logger.debug(
-            f"Sent registration reply to agent '{agent_addr}': {msg}"
-        )
+        logger.debug(f"Sent registration reply to agent '{agent_addr}': {msg}")
 
     def handle_orderbook(self, content: OrderBookMessage, meta: MetaDict):
         """
@@ -658,7 +652,6 @@ class MarketRole(MarketMechanism, Role):
         }
 
         for agent in self.registered_agents.keys():
-            addr, aid = agent
             meta = {"sender_addr": self.context.addr, "sender_id": self.context.aid}
             closing: ClearingMessage = {
                 "context": "clearing",
@@ -670,10 +663,10 @@ class MarketRole(MarketMechanism, Role):
                 create_acl(
                     closing,
                     acl_metadata=meta,
-                    receiver_addr=AgentAddress(addr, aid),
+                    receiver_addr=agent,
                     sender_addr=self.context.addr,
                 ),
-                receiver_addr=AgentAddress(addr, aid),
+                receiver_addr=agent,
             )
         # store order book in db agent
         if not accepted_orderbook:
@@ -707,10 +700,9 @@ class MarketRole(MarketMechanism, Role):
             orderbook (Orderbook): The order book to be stored.
         """
 
-        db_aid = self.context.data.get("output_agent_id")
         db_addr = self.context.data.get("output_agent_addr")
 
-        if db_aid and db_addr:
+        if db_addr:
             message = {
                 "context": "write_results",
                 "type": "store_order_book",
@@ -718,7 +710,7 @@ class MarketRole(MarketMechanism, Role):
                 "data": orderbook,
             }
             await self.context.send_message(
-                receiver_addr=AgentAddress(db_addr, db_aid),
+                receiver_addr=db_addr,
                 content=message,
             )
 
@@ -730,10 +722,9 @@ class MarketRole(MarketMechanism, Role):
             market_meta: The metadata of the market.
         """
 
-        db_aid = self.context.data.get("output_agent_id")
         db_addr = self.context.data.get("output_agent_addr")
 
-        if db_aid and db_addr:
+        if db_addr:
             message = {
                 "context": "write_results",
                 "type": "store_market_results",
@@ -741,6 +732,6 @@ class MarketRole(MarketMechanism, Role):
                 "data": market_meta,
             }
             await self.context.send_message(
-                receiver_addr=AgentAddress(db_addr, db_aid),
+                receiver_addr=db_addr,
                 content=message,
             )

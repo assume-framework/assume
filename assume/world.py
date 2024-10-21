@@ -8,10 +8,10 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from sys import platform
 
 import pandas as pd
 from mango import (
+    AgentAddress,
     RoleAgent,
     activate,
     agent_composed_of,
@@ -144,7 +144,7 @@ class World:
         self.clearing_mechanisms: dict[str, MarketRole] = clearing_mechanisms
         self.additional_kpis: dict[str, OutputDef] = {}
         self.addresses = []
-        self.loop = asyncio.get_event_loop()
+        self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
     def setup(
@@ -213,19 +213,23 @@ class World:
             **container_kwargs,
         )
         self.learning_mode = self.learning_config.get("learning_mode", False)
-        self.output_agent_addr = (self.addr, "export_agent_1")
+        if not self.db and not self.export_csv_path:
+            self.output_agent_addr = AgentAddress(None, None)
+        else:
+            self.output_agent_addr = AgentAddress(self.addr, "export_agent_1")
         if self.distributed_role is False:
             # if distributed_role is False - we are a ChildContainer
             # and only connect to the manager_address, which can set/sync our clock
             self.clock_agent = DistributedClockAgent()
             self.container.register(self.clock_agent)
-            self.output_agent_addr = (manager_address, "export_agent_1")
+            self.output_agent_addr = AgentAddress(manager_address, "export_agent_1")
 
             # def stop(fut):
             #     self.loop.run_until_complete(self.container.shutdown())
 
             # # when the clock_agent is stopped, we should gracefully shutdown our container
             # self.clock_agent.stopped.add_done_callback(stop)
+            self.container.register(self.clock_agent, suggested_aid="clock_agent")
         else:
             self.setup_learning()
             self.setup_output_agent(simulation_id, save_frequency_hours)
@@ -249,11 +253,11 @@ class World:
 
             self.learning_role = Learning(self.learning_config)
             # separate process does not support buffer and learning
-            self.learning_agent_addr = (self.addr, "learning_agent")
+            self.learning_agent_addr = AgentAddress(self.addr, "learning_agent")
             rl_agent = agent_composed_of(
                 self.clock_agent,
                 register_in=self.container,
-                suggested_aid=self.learning_agent_addr[1],
+                suggested_aid=self.learning_agent_addr.aid,
             )
             rl_agent.suspendable_tasks = False
 
@@ -287,24 +291,24 @@ class World:
 
         # mango multiprocessing is currently only supported on linux
         # with single
-        if platform == "linux" and self.distributed_role is not None:
-            self.addresses.append((self.addr, "clock_agent"))
+        if False and self.distributed_role is not None:
+            self.addresses.append(AgentAddress(self.addr, "clock_agent"))
 
             def creator(container):
                 agent = agent_composed_of(
                     self.output_role,
                     register_in=container,
-                    suggested_aid=self.output_agent_addr[1],
+                    suggested_aid=self.output_agent_addr.aid,
                 )
                 agent.suspendable_tasks = False
-                self.container.register(DistributedClockAgent())
+                self.container.register(DistributedClockAgent(), "clock_agent")
 
             self.container.as_agent_process(agent_creator=creator)
         else:
             output_agent = agent_composed_of(
                 self.output_role,
                 register_in=self.container,
-                suggested_aid=self.output_agent_addr[1],
+                suggested_aid=self.output_agent_addr.aid,
             )
             output_agent.suspendable_tasks = False
 
@@ -336,8 +340,7 @@ class World:
         if not self.learning_mode:
             unit_operator_agent._role_context.data.update(
                 {
-                    "output_agent_addr": self.output_agent_addr[0],
-                    "output_agent_id": self.output_agent_addr[1],
+                    "output_agent_addr": self.output_agent_addr,
                 }
             )
 
@@ -371,8 +374,7 @@ class World:
 
         unit_operator_agent._role_context.data.update(
             {
-                "learning_output_agent_addr": self.output_agent_addr[0],
-                "learning_output_agent_id": self.output_agent_addr[1],
+                "learning_output_agent_addr": self.output_agent_addr,
             }
         )
 
@@ -380,8 +382,7 @@ class World:
         if self.learning_mode:
             unit_operator_agent._role_context.data.update(
                 {
-                    "learning_agent_addr": self.learning_agent_addr[0],
-                    "learning_agent_id": self.learning_agent_addr[1],
+                    "learning_agent_addr": self.learning_agent_addr,
                 }
             )
             recurrency_task = create_rrule(
@@ -397,8 +398,7 @@ class World:
         else:
             unit_operator_agent._role_context.data.update(
                 {
-                    "output_agent_addr": self.output_agent_addr[0],
-                    "output_agent_id": self.output_agent_addr[1],
+                    "output_agent_addr": self.output_agent_addr,
                 }
             )
 
@@ -413,7 +413,7 @@ class World:
             units (list[dict]): list of unit dictionaries forwarded to create_unit
         """
         clock_agent_name = f"clock_agent_{id}"
-        self.addresses.append((self.addr, clock_agent_name))
+        self.addresses.append(AgentAddress(self.addr, clock_agent_name))
 
         def creator(container):
             # creating a new role agent and apply the role of a units operator
@@ -426,10 +426,8 @@ class World:
             unit_operator_agent.suspendable_tasks = False
             unit_operator_agent._role_context.data.update(
                 {
-                    "output_agent_addr": self.output_agent_addr[0],
-                    "output_agent_id": self.output_agent_addr[1],
-                    "learning_output_agent_addr": self.output_agent_addr[0],
-                    "learning_output_agent_id": self.output_agent_addr[1],
+                    "output_agent_addr": self.output_agent_addr,
+                    "learning_output_agent_addr": self.output_agent_addr,
                 }
             )
             container.register(DistributedClockAgent(), suggested_aid=clock_agent_name)
@@ -549,10 +547,7 @@ class World:
         # after creation of an agent - we set additional context params
         if not self.learning_mode and not self.perform_evaluation:
             market_operator_agent._role_context.data.update(
-                {
-                    "output_agent_addr": self.output_agent_addr[0],
-                    "output_agent_id": self.output_agent_addr[1],
-                }
+                {"output_agent_addr": self.output_agent_addr}
             )
         self.market_operators[id] = market_operator_agent
 

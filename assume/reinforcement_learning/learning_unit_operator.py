@@ -6,7 +6,6 @@ import logging
 
 import numpy as np
 import torch as th
-from mango import AgentAddress
 
 from assume.common import UnitsOperator
 from assume.common.market_objects import (
@@ -66,20 +65,6 @@ class RLUnitsOperator(UnitsOperator):
 
                 self.rl_units.append(unit)
                 break
-
-        db_aid = self.context.data.get("output_agent_id")
-        db_addr = self.context.data.get("output_agent_addr")
-        if db_aid and db_addr:
-            # send unit data to db agent to store it
-            message = {
-                "context": "write_results",
-                "type": "store_units",
-                "data": self.units[unit.id].as_dict(),
-            }
-            await self.context.send_message(
-                receiver_addr=AgentAddress(db_addr, db_aid),
-                content=message,
-            )
 
     def handle_market_feedback(self, content: ClearingMessage, meta: MetaDict) -> None:
         """
@@ -163,12 +148,11 @@ class RLUnitsOperator(UnitsOperator):
 
                 output_agent_list.append(output_dict)
 
-        db_aid = self.context.data.get("learning_output_agent_id")
         db_addr = self.context.data.get("learning_output_agent_addr")
 
-        if db_aid and db_addr and output_agent_list:
+        if db_addr and output_agent_list:
             self.context.schedule_instant_message(
-                receiver_addr=AgentAddress(db_addr, db_aid),
+                receiver_addr=db_addr,
                 content={
                     "context": "write_results",
                     "type": "rl_learning_params",
@@ -234,17 +218,16 @@ class RLUnitsOperator(UnitsOperator):
         all_rewards = np.array(all_rewards).reshape(-1, learning_unit_count)
         rl_agent_data = (all_observations, all_actions, all_rewards)
 
-        learning_role_id = self.context.data.get("learning_agent_id")
         learning_role_addr = self.context.data.get("learning_agent_addr")
 
-        if learning_role_id and learning_role_addr:
+        if learning_role_addr:
             self.context.schedule_instant_message(
                 content={
                     "context": "rl_training",
                     "type": "save_buffer_and_update",
                     "data": rl_agent_data,
                 },
-                receiver_addr=AgentAddress(learning_role_addr, learning_role_id),
+                receiver_addr=learning_role_addr,
             )
 
     async def formulate_bids(

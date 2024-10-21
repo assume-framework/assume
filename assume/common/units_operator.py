@@ -9,7 +9,7 @@ from itertools import groupby
 from operator import itemgetter
 
 import pandas as pd
-from mango import AgentAddress, Role, create_acl, sender_addr
+from mango import Role, create_acl, sender_addr
 from mango.messages.message import Performatives
 
 from assume.common.market_objects import (
@@ -110,9 +110,8 @@ class UnitsOperator(Role):
                     self.register_market(market),
                     1,  # register after time was updated for the first time
                 )
-        db_aid = self.context.data.get("output_agent_id")
         db_addr = self.context.data.get("output_agent_addr")
-        if db_aid and db_addr:
+        if db_addr:
             # send unit data to db agent to store it
             for unit in self.units.values():
                 message = {
@@ -122,7 +121,7 @@ class UnitsOperator(Role):
                 }
                 self.context.schedule_instant_message(
                     content=message,
-                    receiver_addr=AgentAddress(db_aid, db_addr),
+                    receiver_addr=db_addr,
                 )
 
     def add_unit(
@@ -357,11 +356,10 @@ class UnitsOperator(Role):
             )
         )
 
-        db_aid = self.context.data.get("output_agent_id")
         db_addr = self.context.data.get("output_agent_addr")
-        if db_aid and db_addr:
+        if db_addr:
             self.context.schedule_instant_message(
-                receiver_addr=AgentAddress(db_addr, db_aid),
+                receiver_addr=db_addr,
                 content={
                     "context": "write_results",
                     "type": "market_dispatch",
@@ -371,7 +369,7 @@ class UnitsOperator(Role):
             if unit_dispatch_dfs:
                 unit_dispatch = pd.concat(unit_dispatch_dfs)
                 self.context.schedule_instant_message(
-                    receiver_addr=AgentAddress(db_addr, db_aid),
+                    receiver_addr=db_addr,
                     content={
                         "context": "write_results",
                         "type": "unit_dispatch",

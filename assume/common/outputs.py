@@ -183,7 +183,7 @@ class WriteOutput(Role):
 
         self.context.subscribe_message(
             self,
-            self.handle_message,
+            self.handle_output_message,
             lambda content, meta: content.get("context") == "write_results",
         )
 
@@ -201,7 +201,7 @@ class WriteOutput(Role):
             )
 
 
-    def handle_message(self, content: dict, meta: MetaDict):
+    def handle_output_message(self, content: dict, meta: MetaDict):
         """
         Handles the incoming messages and performs corresponding actions.
 
