@@ -33,7 +33,7 @@ from assume.common.base import LearningConfig
 from assume.common.utils import create_rrule, datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import LearningStrategy, bidding_strategies
-from assume.units import BaseUnit, demand_side_components, unit_types
+from assume.units import BaseUnit, demand_side_technologies, unit_types
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
 stdout_handler = logging.StreamHandler(stream=sys.stdout)
@@ -127,7 +127,7 @@ class World:
         self.markets: dict[str, MarketConfig] = {}
         self.unit_operators: dict[str, UnitsOperator] = {}
         self.unit_types = unit_types
-        self.dst_components = demand_side_components
+        self.dst_components = demand_side_technologies
 
         self.bidding_strategies = bidding_strategies
         if "pp_learning" not in bidding_strategies:

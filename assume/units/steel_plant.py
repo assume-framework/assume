@@ -42,6 +42,9 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         cost_tolerance (float): The cost tolerance of the unit - the maximum cost that can be tolerated when shifting the load.
     """
 
+    required_technologies = ["dri_plant", "eaf"]
+    optional_technologies = ["electrolyser", "hydrogen_storage", "dri_storage"]
+
     def __init__(
         self,
         id: str,
@@ -68,6 +71,23 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             location=location,
             **kwargs,
         )
+
+        # check if the required components are present in the components dictionary
+        for component in self.required_technologies:
+            if component not in components.keys():
+                raise ValueError(
+                    f"Component {component} is required for the steel plant unit."
+                )
+
+        # check if the provided components are valid and do not contain any unknown components
+        for component in components.keys():
+            if (
+                component not in self.required_technologies
+                and component not in self.optional_technologies
+            ):
+                raise ValueError(
+                    f"Components {component} is not a valid component for the steel plant unit."
+                )
 
         self.natural_gas_price = self.forecaster["fuel_price_natural_gas"]
         self.electricity_price = self.forecaster["price_EOM"]
@@ -188,9 +208,9 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             if has_dristorage:
                 return (
                     self.model.dsm_blocks["dri_plant"].dri_output[t]
-                    + self.model.dsm_blocks["dri_storage"].discharge_dri[t]
+                    + self.model.dsm_blocks["dri_storage"].discharge[t]
                     == self.model.dsm_blocks["eaf"].dri_input[t]
-                    + self.model.dsm_blocks["dri_storage"].charge_dri[t]
+                    + self.model.dsm_blocks["dri_storage"].charge[t]
                 )
             else:
                 return (

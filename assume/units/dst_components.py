@@ -1474,7 +1474,7 @@ class DRIStorage(GenericStorage):
 
 
 # Mapping of component type identifiers to their respective classes
-demand_side_components: dict = {
+demand_side_technologies: dict = {
     "electrolyser": Electrolyser,
     "hydrogen_storage": HydrogenStorage,
     "dri_plant": DRIPlant,
