@@ -141,6 +141,7 @@ local_db
 assume-db
 learned_strategies
 examples/outputs
+assume-repo
 
 examples/notebooks/inputs
 examples/notebooks/outputs
