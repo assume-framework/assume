@@ -50,7 +50,7 @@ class RLUnitsOperator(UnitsOperator):
             self.write_to_learning_role, recurrency_task
         )
 
-    async def add_unit(
+    def add_unit(
         self,
         unit: BaseUnit,
     ) -> None:

@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
-from mango import RoleAgent, activate, create_tcp_container
+from mango import AgentAddress, RoleAgent, activate, create_tcp_container
 from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 
@@ -103,6 +103,13 @@ async def rl_units_operator() -> RLUnitsOperator:
     start_ts = datetime2timestamp(start)
     clock.set_time(start_ts)
 
+    units_role.context.data.update({
+            "train_start": start,
+            "train_end": end,
+            "train_freq": "24h",
+        }
+    )
+
     async with activate(container):
         yield units_role
         end_ts = datetime2timestamp(end)
@@ -183,10 +190,8 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
 
     rl_units_operator.context.data.update(
         {
-            "learning_output_agent_addr": "world",
-            "learning_output_agent_id": "export_agent_1",
-            "learning_agent_addr": "world_0",
-            "learning_agent_id": "learning_agent",
+            "learning_output_agent_addr": AgentAddress("world", "export_agent_1"),
+            "learning_agent_addr": AgentAddress("world_0", "learning_agent"),
         }
     )
 
@@ -217,13 +222,13 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
     products = get_available_products(marketconfig.market_products, start)
     orderbook = await rl_units_operator.formulate_bids(marketconfig, products)
 
-    open_tasks = len(rl_units_operator.context._scheduler._scheduled_tasks)
+    open_tasks = len(rl_units_operator.context.scheduler._scheduled_tasks)
 
     rl_units_operator.write_learning_to_output(
         orderbook, market_id=marketconfig.market_id
     )
 
-    assert len(rl_units_operator.context._scheduler._scheduled_tasks) == open_tasks + 1
+    assert len(rl_units_operator.context.scheduler._scheduled_tasks) == open_tasks + 1
 
 
 async def test_get_actual_dispatch(units_operator: UnitsOperator):

@@ -8,7 +8,14 @@ from datetime import datetime
 import pandas as pd
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
-from mango import Agent, AgentAddress, RoleAgent, create_acl, create_ec_container
+from mango import (
+    Agent,
+    AgentAddress,
+    RoleAgent,
+    activate,
+    create_acl,
+    create_ec_container,
+)
 from mango.util.clock import ExternalClock
 
 from assume.common.forecasts import NaiveForecast
@@ -103,34 +110,33 @@ async def test_request_messages():
         "start_time": index[0],
         "end_time": index[3],
     }
+    async with activate(container):
+        # market results are empty for now
+        content, meta = await dr.send_data_request(
+            "world", "market", market_content, "market_request"
+        )
+        assert meta["in_reply_to"] == "market_request"
+        assert content["context"] == "data_response"
+        assert content["data"].empty
 
-    # market results are empty for now
-    content, meta = await dr.send_data_request(
-        "world", "market", market_content, "market_request"
-    )
-    assert meta["in_reply_to"] == "market_request"
-    assert content["context"] == "data_response"
-    assert content["data"].empty
+        market_role.results.append({"time": index[0], "price": 12})
+        market_role.results.append({"time": index[1], "price": 18})
+        content, meta = await dr.send_data_request(
+            "world", "market", market_content, "market_request"
+        )
+        # price is now returned correctly
+        assert content["data"][index[0]] == 12
 
-    market_role.results.append({"time": index[0], "price": 12})
-    market_role.results.append({"time": index[1], "price": 18})
-    content, meta = await dr.send_data_request(
-        "world", "market", market_content, "market_request"
-    )
-    # price is now returned correctly
-    assert content["data"][index[0]] == 12
+        unit.outputs["energy"][index[1]] = 100
+        unit.outputs["energy"][index[3]] = 200
 
-    unit.outputs["energy"][index[1]] = 100
-    unit.outputs["energy"][index[3]] = 200
-
-    content, meta = await dr.send_data_request(
-        "world", "test_operator", unit_content, "unit_request"
-    )
-    assert meta["in_reply_to"] == "unit_request"
-    assert content["context"] == "data_response"
-    assert isinstance(content["data"], pd.Series)
-    assert content["data"][index[1]] == 100
-    assert content["data"][index[2]] == 0
-    assert content["data"][index[3]] == 200
-    clock.set_time(end.timestamp() + 1)
-    await container.shutdown()
+        content, meta = await dr.send_data_request(
+            "world", "test_operator", unit_content, "unit_request"
+        )
+        assert meta["in_reply_to"] == "unit_request"
+        assert content["context"] == "data_response"
+        assert isinstance(content["data"], pd.Series)
+        assert content["data"][index[1]] == 100
+        assert content["data"][index[2]] == 0
+        assert content["data"][index[3]] == 200
+        clock.set_time(end.timestamp() + 1)

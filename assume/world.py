@@ -224,9 +224,6 @@ class World:
             self.container.register(self.clock_agent)
             self.output_agent_addr = AgentAddress(manager_address, "export_agent_1")
 
-            # def stop(fut):
-            #     self.loop.run_until_complete(self.container.shutdown())
-
             # # when the clock_agent is stopped, we should gracefully shutdown our container
             # self.clock_agent.stopped.add_done_callback(stop)
             self.container.register(self.clock_agent, suggested_aid="clock_agent")
