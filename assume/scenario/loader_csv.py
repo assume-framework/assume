@@ -938,7 +938,6 @@ def run_learning(
         "avg_all_eval": [],
         "episodes_done": 0,
         "eval_episodes_done": 0,
-        "noise_scale": world.learning_config.get("noise_scale", 1.0),
     }
 
     # -----------------------------------------

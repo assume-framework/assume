@@ -69,9 +69,17 @@ class NormalActionNoise:
         self.dt = dt
 
     def noise(self):
-        noise = self.scale * np.random.normal(self.mu, self.sigma, self.act_dimension)
-        self.scale = self.dt * self.scale  # if self.scale >= 0.1 else self.scale
+        # TODO: document changes to normal action noise and different usage of dt parameter?
+        noise = (
+            self.dt
+            * self.scale
+            * np.random.normal(self.mu, self.sigma, self.act_dimension)
+        )
+        # self.scale = self.dt * self.scale  # if self.scale >= 0.1 else self.scale
         return noise
+
+    def update_noise_decay(self, updated_decay: float):
+        self.dt = updated_decay
 
 
 def polyak_update(params, target_params, tau: float):
@@ -98,24 +106,11 @@ def polyak_update(params, target_params, tau: float):
             th.add(target_param.data, param.data, alpha=tau, out=target_param.data)
 
 
-def update_learning_rate(optimizer: th.optim.Optimizer, learning_rate: float) -> None:
-    """
-    From: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L68
-
-    Update the learning rate for a given optimizer.
-    Useful when doing linear schedule.
-
-    :param optimizer: Pytorch optimizer
-    :param learning_rate: New learning rate value
-    """
-    for param_group in optimizer.param_groups:
-        param_group["lr"] = learning_rate
-
-
 def get_schedule_fn(value_schedule: Schedule | float) -> Schedule:
     """
-    Transform (if needed) learning rate and clip range (for PPO)
-    to callable.
+    Transform (if needed) values (e.g. learning rate, action noise scale, ...) to Schedule function.
+
+    Adapted from SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L80
 
     :param value_schedule: Constant value of schedule function
     :return: Schedule function (can return constant value)
@@ -132,12 +127,12 @@ def get_schedule_fn(value_schedule: Schedule | float) -> Schedule:
     return lambda progress_remaining: float(value_schedule(progress_remaining))
 
 
-def linear_schedule(start: float, end: float, end_fraction: float) -> Schedule:
+def linear_schedule(start: float, end: float = 0, end_fraction: float = 1) -> Schedule:
     """
     Create a function that interpolates linearly between start and end
     between ``progress_remaining`` = 1 and ``progress_remaining`` = ``end_fraction``.
-    This is used in DQN for linearly annealing the exploration fraction
-    (epsilon for the epsilon-greedy strategy).
+
+    Adapted from SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L100
 
     :params start: value to start with if ``progress_remaining`` = 1
     :params end: value to end with if ``progress_remaining`` = 0
@@ -160,6 +155,8 @@ def constant_schedule(val: float) -> Schedule:
     """
     Create a function that returns a constant
     It is useful for learning rate schedule (to avoid code duplication)
+
+    From SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L124
 
     :param val: constant value
     :return: Constant schedule function.

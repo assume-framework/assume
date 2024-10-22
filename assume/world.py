@@ -246,7 +246,7 @@ class World:
             from assume.reinforcement_learning.learning_role import Learning
 
             self.learning_role = Learning(self.learning_config)
-            self._add_total_timesteps_to_learning_role()
+            self._add_simulation_horizon_to_learning_role()
             # separate process does not support buffer and learning
             self.learning_agent_addr = (self.addr, "learning_agent")
             rl_agent = RoleAgent(
@@ -496,18 +496,13 @@ class World:
 
         await self.unit_operators[unit_operator_id].add_unit(unit)
 
-    def _add_total_timesteps_to_learning_role(self):
+    def _add_simulation_horizon_to_learning_role(self):
         """
-        Add total simulation steps to learning role for calculation of decay.
+        Add simulation horizon to learning role for calculation of decay.
         """
 
-        recurrency_task = create_rrule(
-            start=self.start,
-            end=self.end,
-            freq=self.learning_config.get("train_freq", "24h"),
-        )
-
-        self.learning_role.total_simulation_steps = len(list(recurrency_task))
+        self.learning_role.start = datetime2timestamp(self.start)
+        self.learning_role.end = datetime2timestamp(self.end)
 
     def _add_bidding_strategies_to_learning_role(self, unit_id, bidding_strategies):
         """

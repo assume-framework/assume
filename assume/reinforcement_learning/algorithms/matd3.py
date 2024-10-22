@@ -265,7 +265,10 @@ class TD3(RLAlgorithm):
             unit_strategy.actor_target.train(mode=False)
 
             unit_strategy.actor.optimizer = Adam(
-                unit_strategy.actor.parameters(), lr=self.learning_rate
+                unit_strategy.actor.parameters(),
+                lr=self.learning_role.lr_schedule(
+                    1
+                ),  # 1=100% of simulation remaining, uses learning_rate from config as starting point
             )
 
             obs_dim_list.append(unit_strategy.obs_dim)
@@ -314,7 +317,10 @@ class TD3(RLAlgorithm):
             )
 
             self.learning_role.critics[u_id].optimizer = Adam(
-                self.learning_role.critics[u_id].parameters(), lr=self.learning_rate
+                self.learning_role.critics[u_id].parameters(),
+                lr=self.learning_role.lr_schedule(
+                    1
+                ),  # 1 = 100% of simulation remaining, uses learning_rate from config as starting point
             )
 
             self.learning_role.target_critics[u_id].load_state_dict(
@@ -401,6 +407,8 @@ class TD3(RLAlgorithm):
                 critic = self.learning_role.critics[u_id]
                 actor = self.learning_role.rl_strats[u_id].actor
                 actor_target = self.learning_role.rl_strats[u_id].actor_target
+
+                self.update_learning_rate([critic.optimizer, actor.optimizer])
 
                 if i % 100 == 0:
                     # only update target netwroks every 100 steps, to have delayed network update
@@ -521,3 +529,10 @@ class TD3(RLAlgorithm):
                         actor.parameters(), actor_target.parameters(), self.tau
                     )
                 i += 1
+
+        # TODO: possible place to scale noise; only every policy update - same as learning rate
+        updated_noise_decay = self.learning_role.noise_schedule(
+            self.learning_role.get_progress_remaining()
+        )
+        for unit_strategy in self.learning_role.rl_strats.values():
+            unit_strategy.action_noise.update_noise_decay(updated_noise_decay)

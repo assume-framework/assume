@@ -13,6 +13,10 @@ from assume.common.base import LearningConfig, LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
+from assume.reinforcement_learning.learning_utils import (
+    get_schedule_fn,
+    linear_schedule,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +83,21 @@ class Learning(Role):
         th.backends.cudnn.allow_tf32 = True
 
         self.learning_rate = learning_config.get("learning_rate", 1e-4)
+        # TODO: documentation (+ include in configs?)
+        # for now: disable linear schedule by commenting out the next linee
+        self.learning_rate = linear_schedule(
+            self.learning_rate
+        )  # TODO: discuss defaults for end value and fraction
+        self.lr_schedule = get_schedule_fn(self.learning_rate)
+
+        # provide linear schedule for action noise scale decay
+        noise_dt = learning_config.get("noise_dt", 1)
+        # TODO: documentation (+ include in configs?)
+        # for now: disable linear schedule by commenting out the next line
+        noise_dt = linear_schedule(
+            noise_dt
+        )  # TODO: discuss defaults for end value and fraction
+        self.noise_schedule = get_schedule_fn(noise_dt)
 
         # if we do not have initital experience collected we will get an error as no samples are avaiable on the
         # buffer from which we can draw exprience to adapt the strategy, hence we set it to minium one episode
@@ -127,8 +146,6 @@ class Learning(Role):
         if self.episodes_done > self.episodes_collecting_initial_experience:
             self.turn_off_initial_exploration()
 
-        self.set_noise_scale(inter_episodic_data["noise_scale"])
-
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
     def get_inter_episodic_data(self):
@@ -147,7 +164,6 @@ class Learning(Role):
             "avg_all_eval": self.avg_rewards,
             "buffer": self.buffer,
             "actors_and_critics": self.rl_algorithm.extract_policy(),
-            "noise_scale": self.get_noise_scale(),
         }
 
     def setup(self) -> None:
@@ -200,64 +216,29 @@ class Learning(Role):
 
     def get_progress_remaining(self) -> float:
         """
-        Get the remaining progress.
+        Get the remaining learning progress.
 
-        Function based on:
-        - num_steps: how many optimizer steps (actor policy updates) performed until now
-        - training_episodes: how many times to iterate through simulation horizon
-        - episodes_collecting_initial_experience: exploration episodes without policy updates
-        - total_simulation_steps: how many simulation steps are performed in each episode (based on start_date, end_date, freq)
-        - policy_delay: actor network update only every x (default: 2) updates
-        - gradient_steps: how many update steps during each policy update
-
-        Notes:
-            All learning strategies (units) are equipped with the same actor neural network architecture.
-            The remaining progress can be derived from the first learning strategy (unit) in rl_strats.
         """
+        total_duration = self.end - self.start
+        elapsed_duration = self.context.current_timestamp - self.start
 
-        rl_strat = list(self.rl_strats.values())[0]
-
-        num_steps = 0
-
-        for param, state in rl_strat.actor.optimizer.state.items():
-            if "step" in state:
-                num_steps = state["step"]
-                break  # Exit after finding the first available step count
-
-        progress_remaining = 1 - (
-            num_steps
-            / (
-                (self.training_episodes - self.episodes_collecting_initial_experience)
-                * int(self.total_simulation_steps / self.rl_algorithm.policy_delay)
-                * self.rl_algorithm.gradient_steps
-            )
+        learning_episodes = (
+            self.training_episodes - self.episodes_collecting_initial_experience
         )
 
+        if self.episodes_done < self.episodes_collecting_initial_experience:
+            progress_remaining = 1
+        else:
+            progress_remaining = (
+                1
+                - (
+                    (self.episodes_done - self.episodes_collecting_initial_experience)
+                    / learning_episodes
+                )
+                - ((1 / learning_episodes) * (elapsed_duration / total_duration))
+            )
+
         return progress_remaining
-
-    def set_noise_scale(self, stored_scale) -> None:
-        """
-        Set the noise scale for all learning strategies (units) in rl_strats.
-
-        """
-        for _, unit in self.rl_strats.items():
-            unit.action_noise.scale = stored_scale
-
-    def get_noise_scale(self) -> None:
-        """
-        Get the noise scale from the first learning strategy (unit) in rl_strats.
-
-        Notes:
-            The noise scale is the same for all learning strategies (units) in rl_strats, so we only need to get it from one unit.
-            It is only depended on the number of updates done so far, which is determined by the number of episodes done and the update frequency.
-
-        """
-        stored_scale = list(self.rl_strats.values())[0].action_noise.scale
-
-        # TODO: option to set scale according to schedule (include constant, linear and logistic)
-        stored_scale = self.noise_schedule(self.get_progress_remaining())
-
-        return stored_scale
 
     def create_learning_algorithm(self, algorithm: RLAlgorithm):
         """

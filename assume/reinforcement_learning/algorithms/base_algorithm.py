@@ -73,6 +73,30 @@ class RLAlgorithm:
         self.device = self.learning_role.device
         self.float_type = self.learning_role.float_type
 
+    def update_learning_rate(
+        self, optimizers: list[th.optim.Optimizer] | th.optim.Optimizer
+    ) -> None:
+        """
+        Adapted from SB3:
+        - https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/base_class.py#L286
+        - https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L68
+
+        Update the optimizers learning rate using the current learning rate schedule
+        and the current progress remaining (from 1 to 0).
+
+        Args:
+            optimizers (List[th.optim.Optimizer] | th.optim.Optimizer): An optimizer or a list of optimizers.
+        """
+        learning_rate = self.learning_role.lr_schedule(
+            self.learning_role.get_progress_remaining()
+        )
+
+        if not isinstance(optimizers, list):
+            optimizers = [optimizers]
+        for optimizer in optimizers:
+            for param_group in optimizer.param_groups:
+                param_group["lr"] = learning_rate
+
     def update_policy(self):
         logger.error(
             "No policy update function of the used Rl algorithm was defined. Please define how the policies should be updated in the specific algorithm you use"
