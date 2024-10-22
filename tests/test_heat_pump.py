@@ -9,7 +9,7 @@ import pytest
 from assume.units.dst_components import HeatPump
 
 # Define the solver to use
-use_solver = "glpk"  # Replace with the appropriate solver
+use_solver = "appsi_highs"  # Replace with the appropriate solver
 
 
 # Fixture for creating an electricity price profile, including high prices to test logic

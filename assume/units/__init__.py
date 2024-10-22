@@ -7,6 +7,7 @@ from assume.units.demand import Demand
 from assume.units.powerplant import PowerPlant
 from assume.units.storage import Storage
 from assume.units.steel_plant import SteelPlant
+from assume.units.dst_components import demand_side_technologies
 
 unit_types: dict[str, BaseUnit] = {
     "power_plant": PowerPlant,
