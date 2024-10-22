@@ -8,7 +8,7 @@ import pytest
 
 from assume.units.dst_components import ElectricVehicle
 
-use_solver = "glpk"
+use_solver = "appsi_highs"
 
 
 # Fixture for EV configuration (without profiles)

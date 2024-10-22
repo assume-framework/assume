@@ -8,9 +8,10 @@ Release Notes
 
 Upcoming Release
 =======================
+
 .. warning::
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
-  e.g. pip install git+https://github.com/assume-framework/assume
+  e.g. ``pip install git+https://github.com/assume-framework/assume``
 
 **New Features:**
 - Converted DST components from functions to classes for improved modularity and reusability.

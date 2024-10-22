@@ -18,9 +18,12 @@ from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
 from assume.units.dsm_load_shift import DSMFlex
 
-SOLVERS = ["gurobi", "glpk", "cbc", "cplex"]
+SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
 
 logger = logging.getLogger(__name__)
+
+# Set the log level to ERROR
+logging.getLogger("pyomo").setLevel(logging.WARNING)
 
 
 class SteelPlant(DSMFlex, SupportsMinMax):
@@ -120,7 +123,13 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         solvers = check_available_solvers(*SOLVERS)
         if len(solvers) < 1:
             raise Exception(f"None of {SOLVERS} are available")
+
         self.solver = SolverFactory(solvers[0])
+        self.solver_options = {
+            "output_flag": False,
+            "log_to_console": False,
+            "LogToConsole": 0,
+        }
 
         self.opt_power_requirement = None
         self.flex_power_requirement = None
@@ -395,7 +404,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         # switch the instance to the optimal mode by deactivating the flexibility constraints and objective
         instance = self.switch_to_opt(instance)
         # solve the instance
-        results = self.solver.solve(instance, tee=False)  # , tee=True
+        results = self.solver.solve(instance, options=self.solver_options)
 
         # Check solver status and termination condition
         if (results.solver.status == SolverStatus.ok) and (
@@ -438,7 +447,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         # switch the instance to the flexibility mode by deactivating the optimal constraints and objective
         instance = self.switch_to_flex(instance)
         # solve the instance
-        results = self.solver.solve(instance, tee=False)  # , tee=True
+        results = self.solver.solve(instance, options=self.solver_options)
 
         # Check solver status and termination condition
         if (results.solver.status == SolverStatus.ok) and (

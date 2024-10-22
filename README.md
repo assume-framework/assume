@@ -49,10 +49,10 @@ To install with reinforcement learning capabilities:
 pip install 'assume-framework[learning]'
 ```
 
-We also include market clearing algorithms for complex bids. These clearing algorithms require pyomo and a solver (we use GLPK). To install the package with these capabilities, use:
+We also include network-based market clearing algorithms such as for the re-dispatch or nodal market clearing, which requires the PyPSA library. To install the package with these capabilities, use:
 
 ```bash
-pip install 'assume-framework[optimization]'
+pip install 'assume-framework[network]'
 ```
 
 To install with testing capabilities:

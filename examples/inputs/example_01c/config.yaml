@@ -27,7 +27,7 @@ eom_only:
         - bid_type
       market_mechanism: pay_as_clear_complex
       param_dict:
-        solver: glpk
+        solver: highs
 
 eom_and_crm:
   start_date: 2019-01-01 00:00
@@ -57,7 +57,7 @@ eom_and_crm:
         - bid_type
       market_mechanism: pay_as_clear_complex
       param_dict:
-        solver: glpk
+        solver: highs
 
     CRM_pos:
       operator: CRM_operator
@@ -120,4 +120,4 @@ dam_with_complex_opt_clearing:
         - min_acceptance_ratio
         - parent_bid_id
       param_dict:
-        solver: glpk
+        solver: highs
