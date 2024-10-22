@@ -36,7 +36,7 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.common.base import LearningConfig
-from assume.common.utils import create_rrule, datetime2timestamp, timestamp2datetime
+from assume.common.utils import datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import LearningStrategy, bidding_strategies
 from assume.units import BaseUnit, demand_side_technologies, unit_types
@@ -255,7 +255,7 @@ class World:
             # separate process does not support buffer and learning
             self.learning_agent_addr = AgentAddress(self.addr, "learning_agent")
             rl_agent = agent_composed_of(
-                self.clock_agent,
+                self.learning_role,
                 register_in=self.container,
                 suggested_aid=self.learning_agent_addr.aid,
             )
@@ -364,10 +364,12 @@ class World:
 
         units_operator = RLUnitsOperator(available_markets=list(self.markets.values()))
         # creating a new role agent and apply the role of a units operator
-        unit_operator_agent = RoleAgent(
-            self.container, suggested_aid=f"{id}", suspendable_tasks=False
+        unit_operator_agent = agent_composed_of(
+            units_operator,
+            register_in=self.container,
+            suggested_aid=f"{id}",
         )
-        unit_operator_agent.add_role(units_operator)
+        unit_operator_agent.suspendable_tasks = False
 
         # add the current unitsoperator to the list of operators currently existing
         self.unit_operators[id] = units_operator
@@ -383,16 +385,10 @@ class World:
             unit_operator_agent._role_context.data.update(
                 {
                     "learning_agent_addr": self.learning_agent_addr,
+                    "train_start": self.start,
+                    "train_end": self.end,
+                    "train_freq": self.learning_config.get("train_freq", "24h"),
                 }
-            )
-            recurrency_task = create_rrule(
-                start=self.start,
-                end=self.end,
-                freq=self.learning_config.get("train_freq", "24h"),
-            )
-
-            units_operator.context.schedule_recurrent_task(
-                units_operator.write_to_learning_role, recurrency_task
             )
 
         else:

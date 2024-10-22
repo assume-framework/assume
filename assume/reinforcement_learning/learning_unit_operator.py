@@ -14,9 +14,7 @@ from assume.common.market_objects import (
     MetaDict,
     Orderbook,
 )
-from assume.common.utils import (
-    get_products_index,
-)
+from assume.common.utils import create_rrule, get_products_index
 from assume.strategies import BaseStrategy, LearningStrategy, RLAdvancedOrderStrategy
 from assume.units import BaseUnit
 
@@ -37,6 +35,20 @@ class RLUnitsOperator(UnitsOperator):
             "act_dim": 0,
             "device": "cpu",
         }
+
+    def on_ready(self):
+        super().on_ready()
+
+        # todo
+        recurrency_task = create_rrule(
+            start=self.context.data["train_start"],
+            end=self.context.data["train_end"],
+            freq=self.context.data.get("train_freq", "24h"),
+        )
+
+        self.context.schedule_recurrent_task(
+            self.write_to_learning_role, recurrency_task
+        )
 
     async def add_unit(
         self,

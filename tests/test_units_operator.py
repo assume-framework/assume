@@ -195,13 +195,13 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
     products = get_available_products(marketconfig.market_products, start)
     orderbook = await rl_units_operator.formulate_bids(marketconfig, products)
 
-    open_tasks = len(rl_units_operator.context._scheduler._scheduled_tasks)
+    open_tasks = len(rl_units_operator.context.scheduler._scheduled_tasks)
 
     rl_units_operator.write_learning_to_output(
         orderbook, market_id=marketconfig.market_id
     )
 
-    assert len(rl_units_operator.context._scheduler._scheduled_tasks) == open_tasks + 1
+    assert len(rl_units_operator.context.scheduler._scheduled_tasks) == open_tasks + 1
 
     rl_units_operator.units["testplant"].bidding_strategies[
         "EOM"
@@ -229,7 +229,7 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
 async def test_get_actual_dispatch(units_operator: UnitsOperator):
     # GIVEN the first hour happened
     # the UnitOperator does not
-    clock = units_operator.context._agent_context._container.clock
+    clock = units_operator.context.context.clock
 
     last = clock.time
     clock.set_time(clock.time + 3600)
