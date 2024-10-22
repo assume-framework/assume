@@ -89,7 +89,9 @@ PRICE_FUNCS = {
 }
 
 
-def get_solver_factory(solvers_str=["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]) -> SolverFactory:
+def get_solver_factory(
+    solvers_str=["appsi_highs", "gurobi", "glpk", "cbc", "cplex"],
+) -> SolverFactory:
     """
     Returns the first available solver from the list of solvers
 

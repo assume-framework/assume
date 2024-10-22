@@ -28,9 +28,8 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo apt-get update && sudo apt-get install --no-install-recommends -y coinor-cbc gcc g++ libglpk-dev glpk-utils && sudo rm -rf /var/lib/apt/lists/*
         python -m pip install --upgrade pip
-        python -m pip install .[test,learning,optimization,oeds]
+        python -m pip install .[test,learning,network,oeds]
 
     - name: Lint with ruff
       run: |

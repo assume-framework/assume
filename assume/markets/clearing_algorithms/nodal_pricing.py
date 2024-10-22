@@ -71,18 +71,22 @@ class NodalMarketRole(MarketRole):
             loads=self.grid_data["loads"],
         )
 
-        self.solver = marketconfig.param_dict.get("solver", "glpk")
-        self.env = None
+        self.solver = marketconfig.param_dict.get("solver", "highs")
 
+        self.env = None
         if self.solver == "gurobi":
             try:
                 from gurobipy import Env
 
+                self.solver_options = {"LogToConsole": 0}
                 self.env = Env()
                 self.env.setParam("LogToConsole", 0)
             except ImportError:
-                logger.error("gurobi not installed - using GLPK")
-                self.solver = "glpk"
+                logger.error("gurobi not installed - using highs")
+                self.solver = "highs"
+
+        if self.solver == "highs":
+            self.solver_options = {"output_flag": False, "log_to_console": False}
 
         # set the market clearing principle
         # as pay as bid or pay as clear
@@ -160,6 +164,7 @@ class NodalMarketRole(MarketRole):
         status, termination_condition = nodal_network.optimize(
             solver_name=self.solver,
             env=self.env,
+            solver_options={"output_flag": False, "log_to_console": False},
         )
 
         if status != "ok":
