@@ -14,7 +14,7 @@ from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.common.utils import check_for_tensors, create_incidence_matrix
 from assume.markets.base_market import MarketRole
 
-# Set the log level to ERROR
+# Set the log level to WARNING
 logging.getLogger("pyomo").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)

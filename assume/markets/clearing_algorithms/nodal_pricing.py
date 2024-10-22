@@ -16,6 +16,7 @@ from assume.common.grid_utils import (
     read_pypsa_grid,
 )
 from assume.common.market_objects import MarketConfig, Orderbook
+from assume.common.utils import suppress_output
 from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
@@ -72,20 +73,9 @@ class NodalMarketRole(MarketRole):
         )
 
         self.solver = marketconfig.param_dict.get("solver", "highs")
-
-        self.env = None
         if self.solver == "gurobi":
-            try:
-                from gurobipy import Env
-
-                self.solver_options = {"LogToConsole": 0}
-                self.env = Env()
-                self.env.setParam("LogToConsole", 0)
-            except ImportError:
-                logger.error("gurobi not installed - using highs")
-                self.solver = "highs"
-
-        if self.solver == "highs":
+            self.solver_options = {"LogToConsole": 0, "OutputFlag": 0}
+        elif self.solver == "highs":
             self.solver_options = {"output_flag": False, "log_to_console": False}
 
         # set the market clearing principle
@@ -161,11 +151,11 @@ class NodalMarketRole(MarketRole):
         # Update marginal costs for generators
         nodal_network.generators_t.marginal_cost.update(costs)
 
-        status, termination_condition = nodal_network.optimize(
-            solver_name=self.solver,
-            env=self.env,
-            solver_options={"output_flag": False, "log_to_console": False},
-        )
+        with suppress_output():
+            status, termination_condition = nodal_network.optimize(
+                solver_name=self.solver,
+                solver_options=self.solver_options,
+            )
 
         if status != "ok":
             logger.error(f"Solver exited with {termination_condition}")
