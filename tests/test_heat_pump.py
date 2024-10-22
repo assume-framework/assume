@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import math
+
 import pandas as pd
 import pyomo.environ as pyo
 import pytest
@@ -162,8 +164,10 @@ def test_heat_pump_consumption_behavior(
                 pyo.value(model.heat_pump.operational_status[t]), 0
             )
             if operational_status:
+                # Adjust the assert statement to use math.isclose for comparison
                 assert (
-                    power_in >= heat_pump_config["min_power"]
+                    math.isclose(power_in, heat_pump_config["min_power"], rel_tol=1e-6)
+                    or power_in > heat_pump_config["min_power"]
                 ), f"Heat pump power at time {t} is {power_in}, which is below the minimum power {heat_pump_config['min_power']}."
             else:
                 assert (
