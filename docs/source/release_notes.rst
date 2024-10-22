@@ -12,6 +12,32 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. pip install git+https://github.com/assume-framework/assume
 
+**New Features:**
+- Converted DST components from functions to classes for improved modularity and reusability.
+- Added new residential DST components like PV, EV, Heat Pump, and Boiler, with refined docstrings for better usability.
+- Created a `GenericStorage` class for storage components, with classes like EV and Hydrogen Storage inheriting from it.
+
+
+v0.4.1 - latest release (8th October 2024)
+===========================================
+
+**New Features:**
+
+- improve LSTM learning strategy (#382)
+- add python 3.12 compatibility (#334)
+- manual strategy for interactive market simulation (#403)
+
+**Improvements:**
+
+- add the ability to define the solver for the optimization-based market clearing inside the param_dict of the config file (#432)
+- shallow clone in Jupyter notebooks so that cloning is faster (#433)
+- fixes in storage operation bidding (#417)
+- update GitHub Actions versions (#402)
+
+**Bug Fixes:**
+- add compatibility with pyyaml-include (#421)
+- make complex clearing compatible to RL (#430)
+- pin PyPSA to remove DeprecationWarnings for now (#431)
 
 v0.4.0 - latest release (8th August 2024)
 =========================================
@@ -36,6 +62,10 @@ v0.4.0 - latest release (8th August 2024)
   characteristics of steel production processes. The process can be optimized to minimize costs or to maximize the available flexibility, depending
   on the user's requirements. A tutorial and detailed documentation on how to use this feature are coming soon.
 
+- **LSTM Actor Architectures:** The framework now supports long short-term memory (LSTM) networks as actor architectures for reinforcement learning.
+  This feature enables users to apply more advanced neural network architectures to their learning agents, enhancing the learning process and
+  enabling more accurate and efficient decision-making especially with time series data.
+
 **Improvements:**
 
 - Significant speed up of the framework and especially of the learning process
@@ -54,6 +84,7 @@ v0.4.0 - latest release (8th August 2024)
   and run a method to normalize the values to [0, 1].
 - Examples have been restructed to easier orientation and understanding: example_01.. cover all feature demonstration examples,
   example_02.. cover all learning examples, example_03.. cover all full year examples
+- Added the option of integrating different actor network architectures to the reinforcement learning algorithm, currently a multilayer perceptron (mlp) and long short-term memory (lstm) are implemented
 
 **Bug Fixes:**
 
@@ -67,6 +98,7 @@ v0.4.0 - latest release (8th August 2024)
 - Resolved various issues with learning and policy saving
 - Fixed missing market dispatch values in day-ahead markets
 - Added a check for availability_df.csv file to check for any values larger than 1
+- Fixed compatibility issues between new pyomo and RL due to tensor handling
 
 **Other Changes:**
 

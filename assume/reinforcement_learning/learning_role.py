@@ -40,7 +40,8 @@ class Learning(Role):
         )
         self.episodes_done = 0
         self.rl_strats: dict[int, LearningStrategy] = {}
-        self.rl_algorithm = learning_config["algorithm"]
+        self.rl_algorithm = learning_config.get("algorithm", "matd3")
+        self.actor_architecture = learning_config.get("actor_architecture", "mlp")
         self.critics = {}
         self.target_critics = {}
 
@@ -77,7 +78,7 @@ class Learning(Role):
             learning_config.get("episodes_collecting_initial_experience", 5), 1
         )
 
-        self.train_freq = learning_config.get("train_freq", 1)
+        self.train_freq = learning_config.get("train_freq", "1h")
         self.gradient_steps = (
             int(self.train_freq[:-1])
             if learning_config.get("gradient_steps", -1) == -1
@@ -117,6 +118,8 @@ class Learning(Role):
         if self.episodes_done > self.episodes_collecting_initial_experience:
             self.turn_off_initial_exploration()
 
+        self.set_noise_scale(inter_episodic_data["noise_scale"])
+
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
     def get_inter_episodic_data(self):
@@ -135,6 +138,7 @@ class Learning(Role):
             "avg_all_eval": self.avg_rewards,
             "buffer": self.buffer,
             "actors_and_critics": self.rl_algorithm.extract_policy(),
+            "noise_scale": self.get_noise_scale(),
         }
 
     def setup(self) -> None:
@@ -185,6 +189,27 @@ class Learning(Role):
         for _, unit in self.rl_strats.items():
             unit.collect_initial_experience_mode = False
 
+    def set_noise_scale(self, stored_scale) -> None:
+        """
+        Set the noise scale for all learning strategies (units) in rl_strats.
+
+        """
+        for _, unit in self.rl_strats.items():
+            unit.action_noise.scale = stored_scale
+
+    def get_noise_scale(self) -> None:
+        """
+        Get the noise scale from the first learning strategy (unit) in rl_strats.
+
+        Notes:
+            The noise scale is the same for all learning strategies (units) in rl_strats, so we only need to get it from one unit.
+            It is only depended on the number of updates done so far, which is determined by the number of episodes done and the update frequency.
+
+        """
+        stored_scale = list(self.rl_strats.values())[0].action_noise.scale
+
+        return stored_scale
+
     def create_learning_algorithm(self, algorithm: RLAlgorithm):
         """
         Create and initialize the reinforcement learning algorithm.
@@ -203,6 +228,7 @@ class Learning(Role):
                 gradient_steps=self.gradient_steps,
                 batch_size=self.batch_size,
                 gamma=self.gamma,
+                actor_architecture=self.actor_architecture,
             )
         else:
             logger.error(f"Learning algorithm {algorithm} not implemented!")
@@ -242,7 +268,7 @@ class Learning(Role):
         if self.episodes_done > self.episodes_collecting_initial_experience:
             self.rl_algorithm.update_policy()
 
-    def compare_and_save_policies(self, metrics: dict) -> None:
+    def compare_and_save_policies(self, metrics: dict) -> bool:
         """
         Compare evaluation metrics and save policies based on the best achieved performance according to the metrics calculated.
 
@@ -254,6 +280,9 @@ class Learning(Role):
         metrics contain a metric key like "reward" and the current value.
         This function stores the policies with the highest metric.
         So if minimize is required one should add for example "minus_regret" which is then maximized.
+
+        Returns:
+            bool: True if early stopping criteria is triggered.
 
         Notes:
             This method is typically used during the evaluation phase to save policies that achieve superior performance.
@@ -267,6 +296,8 @@ class Learning(Role):
         # add current reward to list of all rewards
         for metric, value in metrics.items():
             self.rl_eval[metric].append(value)
+
+            # check if the current value is the best value
             if self.rl_eval[metric][-1] > self.max_eval[metric]:
                 self.max_eval[metric] = self.rl_eval[metric][-1]
 

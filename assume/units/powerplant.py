@@ -326,7 +326,6 @@ class PowerPlant(SupportsMinMax):
 
         base_load = self.outputs["energy"][start:end_excl]
         heat_demand = self.outputs["heat"][start:end_excl]
-        # assert heat_demand.min() >= 0
 
         capacity_neg = self.outputs["capacity_neg"][start:end_excl]
         # needed minimum + capacity_neg - what is already sold is actual minimum

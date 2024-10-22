@@ -139,9 +139,9 @@ dmypy.json
 
 local_db
 assume-db
-forecasts_df.csv
 learned_strategies
 examples/outputs
+assume-repo
 
 examples/notebooks/inputs
 examples/notebooks/outputs

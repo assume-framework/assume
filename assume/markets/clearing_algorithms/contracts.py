@@ -23,7 +23,7 @@ from assume.common.market_objects import (
 )
 from assume.markets.base_market import MarketRole
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class PayAsBidContractRole(MarketRole):
@@ -76,7 +76,7 @@ class PayAsBidContractRole(MarketRole):
             meta (MetaDict): message meta
         """
         if meta["in_reply_to"] not in self.futures:
-            log.error(f'data response {meta["in_reply_to"]} not in awaited futures')
+            logger.error(f'data response {meta["in_reply_to"]} not in awaited futures')
         else:
             self.futures[meta["in_reply_to"]].set_result(content["data"])
 
@@ -105,7 +105,7 @@ class PayAsBidContractRole(MarketRole):
             elif self.limitation == "only_renewables":
                 requirement = lambda x: x in ["demand", "wind", "solar", "biomass"]
             else:
-                log.error(f"unknown limitation {self.limitation}")
+                logger.error(f"unknown limitation {self.limitation}")
             return all(
                 [requirement(info["technology"]) for info in content["information"]]
             )
@@ -145,7 +145,7 @@ class PayAsBidContractRole(MarketRole):
             accepted_supply_orders: Orderbook = []
             if product[0:3] not in market_products:
                 rejected_orders.extend(product_orders)
-                # log.debug(f'found unwanted bids for {product} should be {market_products}')
+                # logger.debug(f'found unwanted bids for {product} should be {market_products}')
                 continue
 
             accepted_product_orders = []

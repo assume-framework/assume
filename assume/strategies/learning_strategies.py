@@ -12,14 +12,15 @@ import torch as th
 
 from assume.common.base import LearningStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.reinforcement_learning.learning_utils import Actor, NormalActionNoise
+from assume.reinforcement_learning.algorithms import actor_architecture_aliases
+from assume.reinforcement_learning.learning_utils import NormalActionNoise
 
 logger = logging.getLogger(__name__)
 
 
 class RLStrategy(LearningStrategy):
     """
-    Reinforcement Learning Strategy, that lets agent learn to bid on an Energy Only Makret.
+    Reinforcement Learning Strategy, that lets agent learn to bid on an Energy Only Market.
 
     The agent submittes two price bids
     - one for the infelxible (P_min) and one for the flexible part (P_max-P_min) of ist capacity.
@@ -35,7 +36,9 @@ class RLStrategy(LearningStrategy):
         device (str): Device to run on. Defaults to "cpu".
         float_type (str): Float type to use. Defaults to "float32".
         learning_mode (bool): Whether to use learning mode. Defaults to False.
-        actor (torch.nn.Module): Actor network. Defaults to None.
+        algorithm (str): RL algorithm. Defaults to "matd3".
+        actor_architecture_class (type[torch.nn.Module]): Actor network class. Defaults to "MLPActor".
+        actor (torch.nn.Module): The actor network.
         order_types (list[str]): Order types to use. Defaults to ["SB"].
         action_noise (NormalActionNoise): Action noise. Defaults to None.
         collect_initial_experience_mode (bool): Whether to collect initial experience. Defaults to True.
@@ -54,11 +57,24 @@ class RLStrategy(LearningStrategy):
         self.max_bid_price = kwargs.get("max_bid_price", 100)
         self.max_demand = kwargs.get("max_demand", 10e3)
 
-        # tells us whether we are training the agents or just executing per-learnind stategies
+        # tells us whether we are training the agents or just executing per-learning strategies
         self.learning_mode = kwargs.get("learning_mode", False)
         self.perform_evaluation = kwargs.get("perform_evaluation", False)
 
-        # sets the devide of the actor network
+        # based on learning config
+        self.algorithm = kwargs.get("algorithm", "matd3")
+        actor_architecture = kwargs.get("actor_architecture", "mlp")
+
+        if actor_architecture in actor_architecture_aliases.keys():
+            self.actor_architecture_class = actor_architecture_aliases[
+                actor_architecture
+            ]
+        else:
+            raise ValueError(
+                f"Policy '{actor_architecture}' unknown. Supported architectures are {list(actor_architecture_aliases.keys())}"
+            )
+
+        # sets the device of the actor network
         device = kwargs.get("device", "cpu")
         self.device = th.device(device if th.cuda.is_available() else "cpu")
         if not self.learning_mode:
@@ -71,7 +87,7 @@ class RLStrategy(LearningStrategy):
         # for definition of observation space
         self.foresight = kwargs.get("foresight", 24)
 
-        # define used order types
+        # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
 
         if self.learning_mode or self.perform_evaluation:
@@ -231,7 +247,7 @@ class RLStrategy(LearningStrategy):
                 curr_action = noise + base_bid.clone().detach()
 
             else:
-                # if we are not in the initial exploration phase we chose the action with the actor neural net
+                # if we are not in the initial exploration phase we choose the action with the actor neural net
                 # and add noise to the action
                 curr_action = self.actor(next_observation).detach()
                 noise = th.tensor(
@@ -340,7 +356,7 @@ class RLStrategy(LearningStrategy):
                 / scaling_factor_price
             )
 
-        # get last accapted bid volume and the current marginal costs of the unit
+        # get last accepted bid volume and the current marginal costs of the unit
         current_volume = unit.get_output_before(start)
         current_costs = unit.calculate_marginal_cost(start, current_volume)
 
@@ -454,27 +470,39 @@ class RLStrategy(LearningStrategy):
         # store results in unit outputs which are written to database by unit operator
         unit.outputs["profit"].loc[start:end_excl] += profit
         unit.outputs["reward"].loc[start:end_excl] = reward
-        unit.outputs["regret"].loc[start:end_excl] = opportunity_cost
+        unit.outputs["regret"].loc[start:end_excl] = regret_scale * opportunity_cost
         unit.outputs["total_costs"].loc[start:end_excl] = costs
 
         unit.outputs["rl_rewards"].append(reward)
 
     def load_actor_params(self, load_path):
         """
-        Loads actor parameters.
+        Load actor parameters.
 
         Args:
-            load_path (str): Path to load from.
+            load_path (str): The path to load parameters from.
         """
         directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
 
         params = th.load(directory, map_location=self.device)
 
-        self.actor = Actor(self.obs_dim, self.act_dim, self.float_type)
+        self.actor = self.actor_architecture_class(
+            obs_dim=self.obs_dim,
+            act_dim=self.act_dim,
+            float_type=self.float_type,
+            unique_obs_dim=self.unique_obs_dim,
+            num_timeseries_obs_dim=self.num_timeseries_obs_dim,
+        ).to(self.device)
         self.actor.load_state_dict(params["actor"])
 
         if self.learning_mode:
-            self.actor_target = Actor(self.obs_dim, self.act_dim, self.float_type)
+            self.actor_target = self.actor_architecture_class(
+                obs_dim=self.obs_dim,
+                act_dim=self.act_dim,
+                float_type=self.float_type,
+                unique_obs_dim=self.unique_obs_dim,
+                num_timeseries_obs_dim=self.num_timeseries_obs_dim,
+            ).to(self.device)
             self.actor_target.load_state_dict(params["actor_target"])
             self.actor_target.eval()
             self.actor.optimizer.load_state_dict(params["actor_optimizer"])

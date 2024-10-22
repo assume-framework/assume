@@ -3,19 +3,18 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from datetime import datetime
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import torch as th
 
-from assume.common.base import LearningStrategy, SupportsMinMax
+from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_products_index
-from assume.reinforcement_learning.learning_utils import Actor, NormalActionNoise
+from assume.strategies.learning_strategies import RLStrategy
 
 
-class RLAdvancedOrderStrategy(LearningStrategy):
+class RLAdvancedOrderStrategy(RLStrategy):
     """
     Reinforcement Learning Strategy for an Energy-Only-Market with simple hourly, block and linked orders.
 
@@ -26,6 +25,8 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         device (str): The device to run on.
         float_type (str): The float type to use.
         learning_mode (bool): Whether to use learning mode.
+        algorithm (str): RL algorithm. Defaults to "matd3".
+        actor_architecture_class (type[torch.nn.Module]): Actor network class. Defaults to "MLPActor".
         actor (torch.nn.Module): The actor network.
         order_types (list[str]): The list of order types to use (SB, LB, BB).
         episodes_collecting_initial_experience (int): Number of episodes to collect initial experience.
@@ -49,55 +50,6 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         and LB for the flexible power, exept the inflexible power is 0,
         then it will use SB for the flexible power (as for VREs).
     """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=51, act_dim=2, unique_obs_dim=3, *args, **kwargs)
-
-        self.unit_id = kwargs["unit_id"]
-
-        # defines bounds of actions space
-        self.max_bid_price = kwargs.get("max_bid_price", 100)
-        self.max_demand = kwargs.get("max_demand", 10e3)
-
-        # tells us whether we are training the agents or just executing per-learnind stategies
-        self.learning_mode = kwargs.get("learning_mode", False)
-        self.perform_evaluation = kwargs.get("perform_evaluation", False)
-
-        # sets the devide of the actor network
-        device = kwargs.get("device", "cpu")
-        self.device = th.device(device if th.cuda.is_available() else "cpu")
-        if not self.learning_mode:
-            self.device = th.device("cpu")
-
-        # future: add option to choose between float16 and float32
-        # float_type = kwargs.get("float_type", "float32")
-        self.float_type = th.float
-
-        # for definition of observation space
-        self.foresight = kwargs.get("foresight", 24)
-
-        # define allowed order types
-        self.order_types = kwargs.get("order_types", ["SB"])
-
-        if self.learning_mode or self.perform_evaluation:
-            self.collect_initial_experience_mode = kwargs.get(
-                "episodes_collecting_initial_experience", True
-            )
-
-            self.action_noise = NormalActionNoise(
-                mu=0.0,
-                sigma=kwargs.get("noise_sigma", 0.1),
-                action_dimension=self.act_dim,
-                scale=kwargs.get("noise_scale", 1.0),
-                dt=kwargs.get("noise_dt", 1.0),
-            )
-
-        elif Path(kwargs["trained_policies_save_path"]).is_dir():
-            self.load_actor_params(load_path=kwargs["trained_policies_save_path"])
-        else:
-            raise FileNotFoundError(
-                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
-            )
 
     def calculate_bids(
         self,
@@ -269,67 +221,6 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         bids = self.remove_empty_bids(bids)
 
         return bids
-
-    def get_actions(self, next_observation):
-        """
-        Gets actions for a unit containing two bid prices depending on the observation
-
-        Args:
-            next_observation (torch.Tensor): Next observation
-
-        Returns:
-            Actions (torch.Tensor): Actions containing two bid prices
-
-        Note:
-            If the agent is in learning mode, the actions are chosen by the actor neuronal net and noise is
-            added to the action.
-            In the first X episodes the agent is in initial exploration mode,
-            where the action is chosen by noise only to explore the entire action space.
-            X is defined by episodes_collecting_initial_experience.
-            If the agent is not in learning mode, the actions are chosen by the actor neuronal net without noise.
-        """
-
-        # distinction wethere we are in learning mode or not to handle exploration realised with noise
-        if self.learning_mode and not self.perform_evaluation:
-            # if we are in learning mode the first x episodes we want to explore the entire action space
-            # to get a good initial experience, in the area around the costs of the agent
-            if self.collect_initial_experience_mode:
-                # define current action as soley noise
-                noise = (
-                    th.normal(
-                        mean=0.0, std=0.2, size=(1, self.act_dim), dtype=self.float_type
-                    )
-                    .to(self.device)
-                    .squeeze()
-                )
-
-                # =============================================================================
-                # 2.1 Get Actions and handle exploration
-                # =============================================================================
-                base_bid = next_observation[-1]
-
-                # add noise to the last dimension of the observation
-                # needs to be adjusted if observation space is changed, because only makes sense
-                # if the last dimension of the observation space are the marginal cost
-                curr_action = noise + base_bid.clone().detach()
-
-            else:
-                # if we are not in the initial exploration phase we chose the action with the actor neuronal net
-                # and add noise to the action
-                curr_action = self.actor(next_observation).detach()
-                noise = th.tensor(
-                    self.action_noise.noise(), device=self.device, dtype=self.float_type
-                )
-                curr_action += noise
-        else:
-            # if we are not in learning mode we just use the actor neuronal net to get the action without adding noise
-
-            curr_action = self.actor(next_observation).detach()
-            noise = tuple(0 for _ in range(self.act_dim))
-
-        curr_action = curr_action.clamp(-1, 1)
-
-        return curr_action, noise
 
     def create_observation(
         self,
@@ -570,23 +461,3 @@ class RLAdvancedOrderStrategy(LearningStrategy):
         unit.outputs["total_costs"].loc[products_index] = costs
 
         unit.outputs["rl_rewards"].append(reward)
-
-    def load_actor_params(self, load_path):
-        """
-        Load actor parameters.
-
-        Args:
-            load_path (str): Thze path to load parameters from.
-        """
-        directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
-
-        params = th.load(directory, map_location=self.device)
-
-        self.actor = Actor(self.obs_dim, self.act_dim, self.float_type)
-        self.actor.load_state_dict(params["actor"])
-
-        if self.learning_mode:
-            self.actor_target = Actor(self.obs_dim, self.act_dim, self.float_type)
-            self.actor_target.load_state_dict(params["actor_target"])
-            self.actor_target.eval()
-            self.actor.optimizer.load_state_dict(params["actor_optimizer"])

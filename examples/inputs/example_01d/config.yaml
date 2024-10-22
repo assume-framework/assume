@@ -112,4 +112,5 @@ zonal_case:
         - node
       param_dict:
         network_path: .
+        solver: glpk
         zones_identifier: zone_id

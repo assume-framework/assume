@@ -12,7 +12,10 @@ try:
         LearningConfig,
         LearningStrategy,
     )
-    from assume.reinforcement_learning.learning_utils import Actor, CriticTD3
+    from assume.reinforcement_learning.neural_network_architecture import (
+        Actor,
+        CriticTD3,
+    )
 except ImportError:
     pass
 
@@ -28,6 +31,7 @@ def test_learning_init():
         "train_freq": "1h",
         "unique_obs_dim": 0,
         "algorithm": "matd3",
+        "actor_architecture": "mlp",
         "learning_mode": False,
         "perform_evaluation": False,
         "training_episodes": 3,

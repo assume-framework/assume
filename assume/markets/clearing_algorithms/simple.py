@@ -11,7 +11,7 @@ from operator import itemgetter
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.markets.base_market import MarketRole
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def calculate_meta(accepted_supply_orders, accepted_demand_orders, product):
@@ -89,7 +89,7 @@ class PayAsClearRole(MarketRole):
             product_orders = list(product_orders)
             if product not in market_products:
                 rejected_orders.extend(product_orders)
-                # log.debug(f'found unwanted bids for {product} should be {market_products}')
+                # logger.debug(f'found unwanted bids for {product} should be {market_products}')
                 continue
 
             supply_orders = [x for x in product_orders if x["volume"] > 0]
@@ -108,7 +108,6 @@ class PayAsClearRole(MarketRole):
                     rejected_orders.append(demand_order)
                     continue
 
-                # assert dem_vol == gen_vol
                 # now add the next demand order
                 dem_vol += -demand_order["volume"]
                 demand_order["accepted_volume"] = demand_order["volume"]
@@ -217,7 +216,7 @@ class PayAsBidRole(MarketRole):
             accepted_supply_orders: Orderbook = []
             if product not in market_products:
                 rejected_orders.extend(product_orders)
-                # log.debug(f'found unwanted bids for {product} should be {market_products}')
+                # logger.debug(f'found unwanted bids for {product} should be {market_products}')
                 continue
 
             product_orders = list(product_orders)
