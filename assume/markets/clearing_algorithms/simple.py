@@ -305,14 +305,14 @@ class PayAsBidBuildingRole(PayAsBidRole):
     def sort_orders(self, supply_orders: list[Orderbook], demand_orders: list[Orderbook]):
         # Sort supply orders by price with preference for 'building' units and randomness for tie-breaking
         supply_orders.sort(key=lambda i: (
-            0 if "building" in i["bid_id"] else 1,  # Prioritize bids with 'building' in bid_id
+            0 if "building" in i["unit_id"] else 1,  # Prioritize bids with 'building'
             i["price"],  # Sort by price ascending
             random.random()
         ))
 
         # Sort demand orders by price in descending order with preference for 'building' units and randomness for tie-breaking
         demand_orders.sort(key=lambda i: (
-            0 if "building" in i["bid_id"] else 1,  # Prioritize bids with 'building' in bid_id
+            0 if "building" in i["unit_id"] else 1,  # Prioritize bids with 'building'
             -i["price"],  # Sort by price descending
             random.random()
         ))
@@ -446,14 +446,14 @@ class PayAsClearBuildingRole(PayAsClearRole):
     def sort_orders(self, supply_orders: list[Orderbook], demand_orders: list[Orderbook]):
         # Sort supply orders by price with preference for 'building' units and randomness for tie-breaking
         supply_orders.sort(key=lambda i: (
-            0 if "building" in i["bid_id"] else 1,  # Prioritize bids with 'building' in bid_id
+            0 if "building" in i["unit_id"] else 1,  # Prioritize bids with 'building'
             i["price"],  # Sort by price
             random.random()
         ))
 
         # Sort demand orders by price in descending order with preference for 'building' units and randomness for tie-breaking
         demand_orders.sort(key=lambda i: (
-            0 if "building" in i["bid_id"] else 1,  # Prioritize bids with 'building' in bid_id
+            0 if "building" in i["unit_id"] else 1,  # Prioritize bids with 'building'
             -i["price"],  # Sort by price
             random.random()
         ))

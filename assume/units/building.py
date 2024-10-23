@@ -7,6 +7,7 @@ import logging
 from distutils.util import strtobool
 
 import pandas as pd
+import numpy as np
 import pyomo.environ as pyo
 from pyomo.opt import (
     SolverFactory,
@@ -76,7 +77,7 @@ class Building(DSMFlex, SupportsMinMax):
                 component not in self.optional_technologies
             ):
                 raise ValueError(
-                    f"Components {component} is not a valid component for the building unit."
+                    f"Component {component} is not a valid component for the building unit."
                 )
 
         self.electricity_price = self.create_price_given_solar_forecast()
@@ -155,8 +156,16 @@ class Building(DSMFlex, SupportsMinMax):
     def create_price_given_solar_forecast(self):
         buy_forecast = self.forecaster["price_EOM"].values
         sell_forecast = self.forecaster["price_EOM_sell"].values
+        community_load = self.forecaster["total_community_load"].values.copy()
 
-        price_delta = round((buy_forecast - sell_forecast) * (self.forecaster["availability_Solar"]), 2)
+        # I am only interested in negative values where overproduction is happening, based on that I want to change the price
+        community_load[community_load > 0] = 0
+        min_val = min(community_load)
+        # Normalize the data to be between 1 and 0
+        community_load /= min_val
+
+        price_delta = np.array((buy_forecast - sell_forecast) * community_load).round(2)
+        #price_delta = round((buy_forecast - sell_forecast) * (self.forecaster["availability_Solar"]), 2)
         return buy_forecast - price_delta
 
     def create_availability_df(self, availability_periods):
