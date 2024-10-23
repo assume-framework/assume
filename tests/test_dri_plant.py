@@ -28,7 +28,7 @@ def dri_plant_config():
         "specific_iron_ore_consumption": 1,
         "max_power": 50,
         "min_power": 10,  # Changed from 0 to 10 to test min_power constraints
-        "fuel_type": "hydrogen",
+        "fuel_type": "natural_gas",
         "ramp_up": 50,
         "ramp_down": 50,
         "min_operating_steps": 2,

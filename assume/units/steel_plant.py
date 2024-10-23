@@ -68,6 +68,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             id=id,
             unit_operator=unit_operator,
             technology=technology,
+            components=components,
             bidding_strategies=bidding_strategies,
             index=index,
             node=node,
@@ -106,13 +107,18 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.flexibility_measure = flexibility_measure
         self.cost_tolerance = cost_tolerance
 
+        # Check for the presence of components
+        self.has_h2storage = "hydrogen_storage" in self.components.keys()
+        self.has_dristorage = "dri_storage" in self.components.keys()
+        self.has_electrolyser = "electrolyser" in self.components.keys()
+
         # Main Model part
         self.model = pyo.ConcreteModel()
         self.define_sets()
         self.define_parameters()
         self.define_variables()
 
-        self.initialize_components(components)
+        self.initialize_components()
         self.initialize_process_sequence()
 
         self.define_constraints()
@@ -138,11 +144,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
 
         self.variable_cost_series = None
 
-        # Check for the presence of components
-        self.has_h2storage = "hydrogen_storage" in self.components.keys()
-        self.has_dristorage = "dri_storage" in self.components.keys()
-        self.has_electrolyser = "electrolyser" in self.components.keys()
-
     def define_sets(self) -> None:
         """
         Defines the sets for the Pyomo model.
@@ -160,12 +161,12 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             initialize={t: value for t, value in enumerate(self.electricity_price)},
         )
 
-        if self.components["dri_plant"].fuel_type in ["natural_gas", "both"]:
+        if self.components["dri_plant"]["fuel_type"] in ["natural_gas", "both"]:
             self.model.natural_gas_price = pyo.Param(
                 self.model.time_steps,
                 initialize={t: value for t, value in enumerate(self.natural_gas_price)},
             )
-        elif self.components["dri_plant"].fuel_type in ["hydrogen", "both"]:
+        elif self.components["dri_plant"]["fuel_type"] in ["hydrogen", "both"]:
             if self.has_electrolyser:
                 self.model.hydrogen_price = pyo.Param(
                     self.model.time_steps,

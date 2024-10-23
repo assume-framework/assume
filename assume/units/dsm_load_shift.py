@@ -8,12 +8,12 @@ from assume.units.dst_components import demand_side_technologies
 
 
 class DSMFlex:
-    def __init__(self, **kwargs):
+    def __init__(self, components, **kwargs):
         super().__init__(**kwargs)
 
-        self.components = {}
+        self.components = components
 
-    def initialize_components(self, components: dict[str, dict]):
+    def initialize_components(self):
         """
         Initializes the DSM components by creating and adding blocks to the model.
 
@@ -30,6 +30,7 @@ class DSMFlex:
         - Instantiates the class by passing the required parameters.
         - Adds the resulting block to the model under the `dsm_blocks` attribute.
         """
+        components = self.components.copy()
         self.model.dsm_blocks = pyo.Block(list(components.keys()))
 
         for technology, component_data in components.items():
