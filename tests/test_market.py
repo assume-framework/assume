@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
-from mango import RoleAgent, create_container
+from mango import RoleAgent, activate, create_tcp_container, sender_addr
 from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 
@@ -31,17 +31,18 @@ async def market_role() -> MarketRole:
         market_products=[MarketProduct(rd(hours=1), 1, rd(hours=1))],
     )
     clock = ExternalClock(0)
-    container = await create_container(addr=("0.0.0.0", 9098), clock=clock)
-    market_agent = RoleAgent(container)
+    container = create_tcp_container(addr=("0.0.0.0", 9098), clock=clock)
+    market_agent = RoleAgent()
     market_role = MarketRole(marketconfig=marketconfig)
     market_agent.add_role(market_role)
+    container.register(market_agent)
 
-    yield market_role
+    async with activate(container):
+        yield market_role
 
-    end_ts = datetime2timestamp(end)
-    clock.set_time(end_ts)
-    await tasks_complete_or_sleeping(container)
-    await container.shutdown()
+        end_ts = datetime2timestamp(end)
+        clock.set_time(end_ts)
+        await tasks_complete_or_sleeping(container)
 
 
 async def test_market_init(market_role: MarketRole):
@@ -214,7 +215,7 @@ async def test_market_registration(market_role: MarketRole):
         meta=meta,
     )
     assert len(market_role.registered_agents.keys()) == 1
-    assert market_role.registered_agents[tuple(meta.values())] == info
+    assert market_role.registered_agents[sender_addr(meta)] == info
 
 
 async def test_market_unmatched(market_role: MarketRole):

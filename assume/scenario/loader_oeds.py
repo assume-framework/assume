@@ -19,7 +19,7 @@ from assume.scenario.oeds.infrastructure import InfrastructureInterface
 logger = logging.getLogger(__name__)
 
 
-async def load_oeds_async(
+async def load_oeds(
     world: World,
     scenario: str,
     study_case: str,
@@ -56,7 +56,7 @@ async def load_oeds_async(
     if not nuts_config:
         nuts_config = list(infra_interface.plz_nuts["nuts3"].unique())
 
-    await world.setup(
+    world.setup(
         start=start,
         end=end,
         save_frequency_hours=48,
@@ -247,18 +247,16 @@ if __name__ == "__main__":
         "solar": default_naive_strategy,
         "demand": default_naive_strategy,
     }
-    world.loop.run_until_complete(
-        load_oeds_async(
-            world,
-            scenario,
-            study_case,
-            start,
-            end,
-            infra_uri,
-            marketdesign,
-            bidding_strategies,
-            nuts_config,
-        )
+    load_oeds(
+        world,
+        scenario,
+        study_case,
+        start,
+        end,
+        infra_uri,
+        marketdesign,
+        bidding_strategies,
+        nuts_config,
     )
 
     world.run()

@@ -16,12 +16,8 @@ from assume.markets.clearing_algorithms.extended import PayAsBidContractRole
 
 log = logging.getLogger(__name__)
 
-db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
-world = World(database_uri=db_uri)
-
-
-async def init():
+def init(world: World):
     """
     Init function of the Policy Script Scenario
     """
@@ -39,7 +35,7 @@ async def init():
 
     world.bidding_strategies["support"] = SupportStrategy
 
-    await world.setup(
+    world.setup(
         start=start,
         end=end,
         save_frequency_hours=48,
@@ -135,5 +131,8 @@ async def init():
     )
 
 
-world.loop.run_until_complete(init())
-world.run()
+if __name__ == "__main__":
+    db_uri = "postgresql://assume:assume@localhost:5432/assume"
+    world = World(database_uri=db_uri)
+    init(world)
+    world.run()

@@ -4,6 +4,8 @@
 
 from multiprocessing import Process
 
+from mango import AgentAddress
+
 from assume import World
 
 # import common simulation config from distributed_simulation/config.py
@@ -11,7 +13,7 @@ from .config import (
     agent_adress,
     agent_adresses,
     db_uri,
-    manager_addr,
+    manager_protocol_addr,
     marketdesign,
     tcp_host,
     worker,
@@ -23,7 +25,9 @@ from .world_manager import create_worker as create_manager
 
 
 def manager():
-    world = World(database_uri=db_uri, addr=manager_addr, distributed_role=True)
+    world = World(
+        database_uri=db_uri, addr=manager_protocol_addr, distributed_role=True
+    )
     world.loop.run_until_complete(worker(world, marketdesign, create_manager))
 
 
@@ -45,7 +49,7 @@ if __name__ == "__main__":
     man = Process(target=manager)
     n = 1
     for i in range(n - 1):
-        agent_adresses.append(((tcp_host, 9099 + i), "clock_agent"))
+        agent_adresses.append(AgentAddress((tcp_host, 9099 + i), "clock_agent"))
     ags = []
     for i in range(n):
         ag = Process(target=agent, args=(i, n))

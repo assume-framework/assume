@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 from dateutil import rrule as rr
+from mango import AgentAddress, activate
 
 from assume import World
 from assume.common.market_objects import MarketConfig, MarketProduct
@@ -24,17 +25,15 @@ use_mqtt = False
 tcp_host = os.getenv("TCP_HOST", "0.0.0.0")
 tcp_port = int(os.getenv("TCP_PORT", "9097"))
 if use_mqtt:
-    manager_addr = "manager"
+    manager_protocol_addr = "manager"
     agent_adress = "agent"
-    agent_adresses = [("agent", "clock_agent")]
-    market_operator_addr = "manager"
+    agent_adresses = [AgentAddress("agent", "clock_agent")]
 else:
-    manager_addr = (tcp_host, tcp_port)
+    manager_protocol_addr = (tcp_host, tcp_port)
     agent_adress = (tcp_host, 9098)
-    agent_adresses = [((tcp_host, 9098), "clock_agent")]
-    market_operator_addr = (tcp_host, tcp_port)
+    agent_adresses = [AgentAddress((tcp_host, 9098), "clock_agent")]
 
-market_operator_aid = "market_operator"
+market_operator_addr = AgentAddress(manager_protocol_addr, "market_operator")
 broker_addr = os.getenv("MQTT_BROKER", ("0.0.0.0", 1883, 600))
 
 start = datetime(2019, 1, 1)
@@ -69,13 +68,13 @@ async def worker(
     if world.distributed_role:
         world.addresses.extend(agent_adresses)
 
-    await world.setup(
+    world.setup(
         start=start,
         end=end,
         save_frequency_hours=48,
         simulation_id=sim_id,
         index=index,
-        manager_address=manager_addr,
+        manager_address=manager_protocol_addr,
         broker_addr=broker_addr,
     )
 
@@ -93,5 +92,5 @@ async def worker(
             end_ts=datetime2timestamp(world.end),
         )
     elif world.distributed_role is False:
-        await world.clock_agent.stopped
-        await world.container.shutdown()
+        async with activate(world.container):
+            await world.clock_agent.stopped

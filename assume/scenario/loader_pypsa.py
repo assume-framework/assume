@@ -16,7 +16,7 @@ from assume.common.market_objects import MarketConfig, MarketProduct
 logger = logging.getLogger(__name__)
 
 
-async def load_pypsa_async(
+def load_pypsa_async(
     world: World,
     scenario: str,
     study_case: str,
@@ -44,7 +44,7 @@ async def load_pypsa_async(
     sim_id = f"{scenario}_{study_case}"
     logger.info(f"loading scenario {sim_id}")
 
-    await world.setup(
+    world.setup(
         start=start,
         end=end,
         save_frequency_hours=save_frequency_hours,
@@ -211,9 +211,7 @@ if __name__ == "__main__":
 
     bidding_strategies = defaultdict(lambda: default_strategies)
 
-    world.loop.run_until_complete(
-        load_pypsa_async(
-            world, scenario, study_case, network, marketdesign, bidding_strategies
-        )
+    load_pypsa_async(
+        world, scenario, study_case, network, marketdesign, bidding_strategies
     )
     world.run()
