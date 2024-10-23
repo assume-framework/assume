@@ -144,6 +144,10 @@ class World:
         self.clearing_mechanisms: dict[str, MarketRole] = clearing_mechanisms
         self.additional_kpis: dict[str, OutputDef] = {}
         self.addresses = []
+        # required for jupyter notebooks
+        # as they already have a running loop
+        import nest_asyncio
+        nest_asyncio.apply()
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
