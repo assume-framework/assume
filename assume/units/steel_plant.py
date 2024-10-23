@@ -110,10 +110,11 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.model = pyo.ConcreteModel()
         self.define_sets()
         self.define_parameters()
+        self.define_variables()
+
         self.initialize_components(components)
         self.initialize_process_sequence()
 
-        self.define_variables()
         self.define_constraints()
         self.define_objective_opt()
 
@@ -142,44 +143,69 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.has_dristorage = "dri_storage" in self.components.keys()
         self.has_electrolyser = "electrolyser" in self.components.keys()
 
-    def switch_to_opt(self, instance):
+    def define_sets(self) -> None:
         """
-        Switches the instance to solve a cost based optimisation problem by deactivating the flexibility constraints and objective.
-
-        Args:
-            instance (pyomo.ConcreteModel): The instance of the Pyomo model.
-
-        Returns:
-            pyomo.ConcreteModel: The modified instance with flexibility constraints and objective deactivated.
+        Defines the sets for the Pyomo model.
         """
-        # deactivate the flexibility constraints and objective
-        instance.obj_rule_flex.deactivate()
+        self.model.time_steps = pyo.Set(
+            initialize=[idx for idx, _ in enumerate(self.index)]
+        )
 
-        instance.total_cost_upper_limit.deactivate()
-        instance.total_power_input_constraint_with_flex.deactivate()
-
-        return instance
-
-    def switch_to_flex(self, instance):
+    def define_parameters(self):
         """
-        Switches the instance to flexibility mode by deactivating few constraints and objective function.
-
-        Args:
-            instance (pyomo.ConcreteModel): The instance of the Pyomo model.
-
-        Returns:
-            pyomo.ConcreteModel: The modified instance with optimal constraints and objective deactivated.
+        Defines the parameters for the Pyomo model.
         """
-        # deactivate the optimal constraints and objective
-        instance.obj_rule_opt.deactivate()
-        instance.total_power_input_constraint.deactivate()
+        self.model.electricity_price = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.electricity_price)},
+        )
 
-        # fix values of model.total_power_input
-        for t in instance.time_steps:
-            instance.total_power_input[t].fix(self.opt_power_requirement.iloc[t])
-        instance.total_cost = self.total_cost
+        if self.components["dri_plant"].fuel_type in ["natural_gas", "both"]:
+            self.model.natural_gas_price = pyo.Param(
+                self.model.time_steps,
+                initialize={t: value for t, value in enumerate(self.natural_gas_price)},
+            )
+        elif self.components["dri_plant"].fuel_type in ["hydrogen", "both"]:
+            if self.has_electrolyser:
+                self.model.hydrogen_price = pyo.Param(
+                    self.model.time_steps,
+                    initialize={t: 0 for t in self.model.time_steps},
+                )
+            else:
+                self.model.hydrogen_price = pyo.Param(
+                    self.model.time_steps,
+                    initialize={
+                        t: value for t, value in enumerate(self.hydrogen_price)
+                    },
+                )
 
-        return instance
+        self.model.steel_demand = pyo.Param(initialize=self.steel_demand)
+        self.model.steel_price = pyo.Param(
+            initialize=self.steel_price.mean(), within=pyo.NonNegativeReals
+        )
+        self.model.lime_co2_factor = pyo.Param(
+            initialize=self.lime_co2_factor.mean(), within=pyo.NonNegativeReals
+        )
+        self.model.co2_price = pyo.Param(
+            initialize=self.co2_price.mean(), within=pyo.NonNegativeReals
+        )
+        self.model.lime_price = pyo.Param(
+            initialize=self.lime_price.mean(), within=pyo.NonNegativeReals
+        )
+        self.model.iron_ore_price = pyo.Param(
+            initialize=self.iron_ore_price.mean(), within=pyo.NonNegativeReals
+        )
+
+    def define_variables(self):
+        """
+        Defines the variables for the Pyomo model.
+        """
+        self.model.total_power_input = pyo.Var(
+            self.model.time_steps, within=pyo.NonNegativeReals
+        )
+        self.model.variable_cost = pyo.Var(
+            self.model.time_steps, within=pyo.NonNegativeReals
+        )
 
     def initialize_process_sequence(self):
         """
@@ -203,7 +229,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 else:
                     return (
                         self.model.dsm_blocks["electrolyser"].hydrogen_out[t]
-                        >= self.model.dsm_blocks["dri_plant"].hydrogen_in[t]
+                        == self.model.dsm_blocks["dri_plant"].hydrogen_in[t]
                     )
 
         # Constraint for direct hydrogen flow from Electrolyser to dri plant
@@ -237,58 +263,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 self.model.dsm_blocks["dri_plant"].dri_output[t]
                 == self.model.dsm_blocks["eaf"].dri_input[t]
             )
-
-    def define_sets(self) -> None:
-        """
-        Defines the sets for the Pyomo model.
-        """
-        self.model.time_steps = pyo.Set(
-            initialize=[idx for idx, _ in enumerate(self.index)]
-        )
-
-    def define_parameters(self):
-        """
-        Defines the parameters for the Pyomo model.
-        """
-        self.model.electricity_price = pyo.Param(
-            self.model.time_steps,
-            initialize={t: value for t, value in enumerate(self.electricity_price)},
-        )
-        self.model.natural_gas_price = pyo.Param(
-            self.model.time_steps,
-            initialize={t: value for t, value in enumerate(self.natural_gas_price)},
-        )
-        self.model.hydrogen_price = pyo.Param(
-            self.model.time_steps,
-            initialize={t: value for t, value in enumerate(self.hydrogen_price)},
-        )
-        self.model.steel_demand = pyo.Param(initialize=self.steel_demand)
-        self.model.steel_price = pyo.Param(
-            initialize=self.steel_price.mean(), within=pyo.NonNegativeReals
-        )
-        self.model.lime_co2_factor = pyo.Param(
-            initialize=self.lime_co2_factor.mean(), within=pyo.NonNegativeReals
-        )
-        self.model.co2_price = pyo.Param(
-            initialize=self.co2_price.mean(), within=pyo.NonNegativeReals
-        )
-        self.model.lime_price = pyo.Param(
-            initialize=self.lime_price.mean(), within=pyo.NonNegativeReals
-        )
-        self.model.iron_ore_price = pyo.Param(
-            initialize=self.iron_ore_price.mean(), within=pyo.NonNegativeReals
-        )
-
-    def define_variables(self):
-        """
-        Defines the variables for the Pyomo model.
-        """
-        self.model.total_power_input = pyo.Var(
-            self.model.time_steps, within=pyo.NonNegativeReals
-        )
-        self.model.variable_cost = pyo.Var(
-            self.model.time_steps, within=pyo.NonNegativeReals
-        )
 
     def define_constraints(self):
         @self.model.Constraint(self.model.time_steps)
@@ -339,12 +313,14 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             """
             Calculates the variable cost per time step.
             """
+
             variable_cost = (
                 self.model.dsm_blocks["eaf"].operating_cost[t]
                 + self.model.dsm_blocks["dri_plant"].operating_cost[t]
             )
             if self.has_electrolyser:
                 variable_cost += self.model.dsm_blocks["electrolyser"].operating_cost[t]
+
             return self.model.variable_cost[t] == variable_cost
 
     def define_objective_opt(self):
@@ -484,6 +460,45 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         temp_1 = instance.variable_cost.get_values()
         self.variable_cost_series = pd.Series(data=temp_1)
         self.variable_cost_series.index = self.index
+
+    def switch_to_opt(self, instance):
+        """
+        Switches the instance to solve a cost based optimisation problem by deactivating the flexibility constraints and objective.
+
+        Args:
+            instance (pyomo.ConcreteModel): The instance of the Pyomo model.
+
+        Returns:
+            pyomo.ConcreteModel: The modified instance with flexibility constraints and objective deactivated.
+        """
+        # deactivate the flexibility constraints and objective
+        instance.obj_rule_flex.deactivate()
+
+        instance.total_cost_upper_limit.deactivate()
+        instance.total_power_input_constraint_with_flex.deactivate()
+
+        return instance
+
+    def switch_to_flex(self, instance):
+        """
+        Switches the instance to flexibility mode by deactivating few constraints and objective function.
+
+        Args:
+            instance (pyomo.ConcreteModel): The instance of the Pyomo model.
+
+        Returns:
+            pyomo.ConcreteModel: The modified instance with optimal constraints and objective deactivated.
+        """
+        # deactivate the optimal constraints and objective
+        instance.obj_rule_opt.deactivate()
+        instance.total_power_input_constraint.deactivate()
+
+        # fix values of model.total_power_input
+        for t in instance.time_steps:
+            instance.total_power_input[t].fix(self.opt_power_requirement.iloc[t])
+        instance.total_cost = self.total_cost
+
+        return instance
 
     def set_dispatch_plan(
         self,

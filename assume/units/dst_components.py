@@ -924,10 +924,15 @@ class DRIPlant:
         """
 
         # dependig on the fuel type, check if the model has the price profile for the fuel
-        if self.fuel_type == "natural_gas":
+        if self.fuel_type in ["natural_gas", "both"]:
             if not hasattr(model, "natural_gas_price"):
                 raise ValueError(
                     "DRI plant requires a natural gas price profile if 'natural_gas' is used as the fuel type."
+                )
+        elif self.fuel_type in ["hydrogen", "both"]:
+            if not hasattr(model, "hydrogen_price"):
+                raise ValueError(
+                    "DRI plant requires a hydrogen price profile if 'hydrogen' is used as the fuel type."
                 )
 
         # Define parameters
@@ -1020,6 +1025,11 @@ class DRIPlant:
                 operating_cost += b.natural_gas_in[t] * model.natural_gas_price[t]
             elif self.fuel_type == "hydrogen":
                 operating_cost += b.hydrogen_in[t] * model.hydrogen_price[t]
+            elif self.fuel_type == "both":
+                operating_cost += (
+                    b.natural_gas_in[t] * model.natural_gas_price[t]
+                    + b.hydrogen_in[t] * model.hydrogen_price[t]
+                )
 
             return b.operating_cost[t] == operating_cost
 
