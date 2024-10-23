@@ -487,6 +487,7 @@ class GenericStorage:
             bounds=(0, self.max_power_discharge),
             doc="Discharging power at each time step",
         )
+        model_block.operational_status = pyo.Var(self.time_steps, within=pyo.Binary)
 
         # Define SOC dynamics with energy loss and efficiency
         @model_block.Constraint(self.time_steps)
@@ -506,27 +507,27 @@ class GenericStorage:
         @model_block.Constraint(self.time_steps)
         def charge_ramp_up_constraint(b, t):
             if t == self.time_steps.at(1):
-                return b.charge[t] <= self.ramp_up
-            return b.charge[t] - b.charge[t - 1] <= self.ramp_up
+                return b.charge[t] <= b.ramp_up * b.operational_status[t]
+            return b.charge[t] - b.charge[t - 1] <= b.ramp_up * b.operational_status[t]
 
         @model_block.Constraint(self.time_steps)
         def discharge_ramp_up_constraint(b, t):
             if t == self.time_steps.at(1):
-                return b.discharge[t] <= self.ramp_up
-            return b.discharge[t] - b.discharge[t - 1] <= self.ramp_up
+                return b.discharge[t] <= b.ramp_up * (1 - b.operational_status[t])
+            return b.discharge[t] - b.discharge[t - 1] <= b.ramp_up * (1 - b.operational_status[t])
 
         # Apply ramp-down constraints if ramp_down is specified
         @model_block.Constraint(self.time_steps)
         def charge_ramp_down_constraint(b, t):
             if t == self.time_steps.at(1):
-                return b.charge[t] <= self.ramp_down
-            return b.charge[t - 1] - b.charge[t] <= self.ramp_down
+                return b.charge[t] <= b.ramp_down * b.operational_status[t]
+            return b.charge[t - 1] - b.charge[t] <= b.ramp_down * b.operational_status[t]
 
         @model_block.Constraint(self.time_steps)
         def discharge_ramp_down_constraint(b, t):
             if t == self.time_steps.at(1):
-                return b.discharge[t] <= self.ramp_down
-            return b.discharge[t - 1] - b.discharge[t] <= self.ramp_down
+                return b.discharge[t] <= b.ramp_down * (1 - b.operational_status[t])
+            return b.discharge[t - 1] - b.discharge[t] <= b.ramp_down * (1 - b.operational_status[t])
 
         return model_block
 
@@ -1512,19 +1513,19 @@ demand_side_technologies: dict = {
 }
 
 
-def add_ramping_constraints(model_block, ramp_up, ramp_down, time_steps):
+def add_ramping_constraints(model_block, time_steps):
     # Ramp-up constraint
     @model_block.Constraint(time_steps)
     def ramp_up_constraint(b, t):
         if t == time_steps.at(1):
-            return b.power_in[t] <= ramp_up
+            return b.power_in[t] <= b.ramp_up
         return b.power_in[t] - b.power_in[t - 1] <= b.ramp_up
 
     # Ramp-down constraint
     @model_block.Constraint(time_steps)
     def ramp_down_constraint(b, t):
         if t == time_steps.at(1):
-            return b.power_in[t] <= ramp_down
+            return b.power_in[t] <= b.ramp_down
         return b.power_in[t - 1] - b.power_in[t] <= b.ramp_down
 
     return model_block

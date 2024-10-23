@@ -4,6 +4,7 @@
 
 import ast
 import logging
+from distutils.util import strtobool
 
 import pandas as pd
 import pyomo.environ as pyo
@@ -13,37 +14,18 @@ from pyomo.opt import (
     TerminationCondition,
     check_available_solvers,
 )
-from distutils.util import strtobool
 
 from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
 from assume.units.dsm_load_shift import DSMFlex
-from assume.units.dst_components import (
-    create_boiler,
-    create_ev,
-    create_heatpump,
-    create_thermal_storage,
-    create_battery_storage,
-    create_pv_plant
-)
 
 SOLVERS = ["gurobi", "glpk", "cbc", "cplex"]
 
 logger = logging.getLogger(__name__)
 
-# Mapping of component type identifiers to their respective classes
-building_components = {
-    "heatpump": create_heatpump,
-    "boiler": create_boiler,
-    "thermal_storage": create_thermal_storage,
-    "ev": create_ev,
-    "battery_storage": create_battery_storage,
-    "pv_plant": create_pv_plant,
-}
 
-
-class Building(SupportsMinMax, DSMFlex):
+class Building(DSMFlex, SupportsMinMax):
     """
     The Building class represents a building unit in the energy system.
 
@@ -58,6 +40,9 @@ class Building(SupportsMinMax, DSMFlex):
         components (dict[str, dict]): The components of the unit such as heat pump, electric boiler, and thermal storage.
         objective (str): The objective of the unit, e.g. minimize expenses ("minimize_expenses").
     """
+
+    # There are no mandatory components for the building unit since it can also be a pure demand unit.
+    optional_technologies = ["heatpump", "boiler", "thermal_storage", "electric_vehicle", "generic_storage", "pv_plant"]
 
     def __init__(
         self,
@@ -85,7 +70,16 @@ class Building(SupportsMinMax, DSMFlex):
             **kwargs,
         )
 
-        self.electricity_price, self.electricity_price_sell = self.create_prices_given_solar_forecast()
+        # check if the provided components are valid and do not contain any unknown components
+        for component in components.keys():
+            if (
+                component not in self.optional_technologies
+            ):
+                raise ValueError(
+                    f"Components {component} is not a valid component for the building unit."
+                )
+
+        self.electricity_price = self.create_price_given_solar_forecast()
         self.natural_gas_price = self.forecaster["fuel_price_natural gas"]
         self.heat_demand = self.forecaster["heat_demand"]
         self.ev_load_profile = self.forecaster["ev_load_profile"]
@@ -93,41 +87,35 @@ class Building(SupportsMinMax, DSMFlex):
         self.inflex_demand = self.forecaster[
             f"{self.id}_load_profile"
         ]
-        self.pv_power_profile = self.forecaster[
-            f"{self.id}_pv_power_profile"
-        ]
+
         self.demand = demand
         self.flexibility_measure = flexibility_measure
         self.objective = objective
 
-        self.has_heatpump = "heatpump" in components
-        self.has_boiler = "boiler" in components
-        self.has_thermal_storage = "thermal_storage" in components
-        self.has_ev = "ev" in components
-        self.has_battery_storage = "battery_storage" in components
-        self.has_pv = "pv_plant" in components
-
         # Main Model part
         self.model = pyo.ConcreteModel()
         self.define_sets()
-        self.define_parameters()
 
-        # Check fuel type of boiler
-        if self.has_boiler:
-            if "fuel_type" in components["boiler"]:
-                self.is_boiler_electric = True if components["boiler"]["fuel_type"] == "electric" else False
+        self.has_heatpump = "heatpump" in components
+        self.has_boiler = "boiler" in components
+        self.has_thermal_storage = "thermal_storage" in components
+        self.has_ev = "electric_vehicle" in components
+        self.has_battery_storage = "generic_storage" in components
+        self.has_pv = "pv_plant" in components
+
+        self.define_parameters()
 
         # Create availability DataFrame for EVs
         # Parse the availability periods
         if self.has_ev:
-            if "availability_periods" in components["ev"]:
+            if "availability_periods" in components["electric_vehicle"]:
                 try:
                     # Convert the string to a list of tuples
-                    components["ev"]["availability_periods"] = ast.literal_eval(
-                        components["ev"]["availability_periods"]
+                    components["electric_vehicle"]["availability_periods"] = ast.literal_eval(
+                        components["electric_vehicle"]["availability_periods"]
                     )
-                    components["ev"]["availability_df"] = self.create_availability_df(
-                        components["ev"]["availability_periods"]
+                    components["electric_vehicle"]["availability_df"] = self.create_availability_df(
+                        components["electric_vehicle"]["availability_periods"]
                     )
                 except Exception as e:
                     raise ValueError(
@@ -140,24 +128,20 @@ class Building(SupportsMinMax, DSMFlex):
 
         # Parse the availability of the PV plant
         if self.has_pv:
-            pv_availability = self.forecaster["availability_Solar"]
-            if pv_availability is not None:
-                components["pv_plant"]["availability"] = pv_availability
+            if not strtobool(components["pv_plant"]["uses_power_profile"]):
+                pv_availability = self.forecaster["availability_Solar"]
+                pv_availability.index = self.model.time_steps
+                components["pv_plant"]["availability_profile"] = pv_availability
             else:
-                raise KeyError(
-                    "Missing 'availability' of PV plants in availability file."
-                )
+                pv_power = self.forecaster[f"{self.id}_pv_power_profile"]
+                pv_power.index = self.model.time_steps
+                components["pv_plant"]["power_profile"] = pv_power
 
-        if self.has_battery_storage:
-            sells_energy_input = components["battery_storage"].get("sells_energy_to_market")
-            self.sells_battery_energy_to_market = bool(strtobool(sells_energy_input))
 
         self.define_variables()
         self.initialize_components(components)
-
         self.define_constraints()
         self.define_objective()
-
         self.initialize_process_sequence()
 
         solvers = check_available_solvers(*SOLVERS)
@@ -168,12 +152,12 @@ class Building(SupportsMinMax, DSMFlex):
         self.opt_power_requirement = None
         self.variable_expenses_series = None
 
-    def create_prices_given_solar_forecast(self):
-        buy_forecast = self.forecaster["price_EOM"]
-        sell_forecast = self.forecaster["price_EOM_sell"]
+    def create_price_given_solar_forecast(self):
+        buy_forecast = self.forecaster["price_EOM"].values
+        sell_forecast = self.forecaster["price_EOM_sell"].values
 
         price_delta = round((buy_forecast - sell_forecast) * (self.forecaster["availability_Solar"]), 2)
-        return buy_forecast - price_delta, buy_forecast - price_delta
+        return buy_forecast - price_delta
 
     def create_availability_df(self, availability_periods):
         """
@@ -192,22 +176,6 @@ class Building(SupportsMinMax, DSMFlex):
 
         return availability_series
 
-    def initialize_components(self, components: dict[str, dict]):
-        """
-        Initializes the components of the building.
-
-        Args:
-            components (dict[str, dict]): The components of the building.
-        """
-        self.model.dsm_blocks = pyo.Block(list(components.keys()))
-        for technology, component_data in components.items():
-            if technology in building_components:
-                factory_method = building_components[technology]
-                self.model.dsm_blocks[technology].transfer_attributes_from(
-                    factory_method(
-                        self.model, time_steps=self.model.time_steps, **component_data
-                    )
-                )
 
     def initialize_process_sequence(self):
         """
@@ -239,13 +207,9 @@ class Building(SupportsMinMax, DSMFlex):
         """
         Defines the parameters for the Pyomo model.
         """
-        self.model.electricity_price_buy = pyo.Param(
+        self.model.electricity_price = pyo.Param(
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.electricity_price)},
-        )
-        self.model.electricity_price_sell = pyo.Param(
-            self.model.time_steps,
-            initialize={t: value for t, value in enumerate(self.electricity_price_sell)},
         )
         self.model.natural_gas_price = pyo.Param(
             self.model.time_steps,
@@ -261,21 +225,6 @@ class Building(SupportsMinMax, DSMFlex):
                 t: value for t, value in enumerate(self.inflex_demand)
             },
         )
-        if self.has_ev:
-            self.model.ev_load_profile = pyo.Param(
-                self.model.time_steps,
-                initialize={t: value for t, value in enumerate(self.ev_load_profile)},
-            )
-        if self.has_battery_storage:
-            self.model.battery_load_profile = pyo.Param(
-                self.model.time_steps,
-                initialize={t: value for t, value in enumerate(self.battery_load_profile)},
-            )
-        if self.has_pv:
-            self.model.pv_power_profile = pyo.Param(
-                self.model.time_steps,
-                initialize={t: value for t, value in enumerate(self.pv_power_profile)},
-            )
 
     def define_variables(self):
         """
@@ -302,11 +251,12 @@ class Building(SupportsMinMax, DSMFlex):
                     + self.model.inflex_demand[t]
                     + (self.model.dsm_blocks["heatpump"].power_in[t] if self.has_heatpump else 0)
                     + (self.model.dsm_blocks["boiler"].power_in[t] if self.has_boiler else 0)
-                    + (self.model.dsm_blocks["ev"].charge_ev[t] if self.has_ev else 0)
-                    + (self.model.dsm_blocks["battery_storage"].charge[t] if self.has_battery_storage else 0)
-                    - (self.model.dsm_blocks["pv_plant"].power_out[t] if self.has_pv else 0)
+                    + (self.model.dsm_blocks["electric_vehicle"].charge[t] if self.has_ev else 0)
+                    + (self.model.dsm_blocks["generic_storage"].charge[t] if self.has_battery_storage else 0)
+                    - (self.model.dsm_blocks["pv_plant"].power[t] if self.has_pv else 0)
                     # TODO: My idea with sells_battery_energy_to_market is not working since there is no split up anymore!
-                    - (self.model.dsm_blocks["battery_storage"].discharge[t] if self.has_battery_storage else 0)
+                    - (self.model.dsm_blocks["generic_storage"].discharge[t] if self.has_battery_storage else 0)
+                    - (self.model.dsm_blocks["electric_vehicle"].discharge[t] if self.has_ev else 0)
             )
 
         @self.model.Constraint(self.model.time_steps)
@@ -318,7 +268,7 @@ class Building(SupportsMinMax, DSMFlex):
                 # TODO: Also Idea not really possible to have two different prices for buying and selling (variable_power negtive or positive)
                     self.model.variable_expenses[t]
                     == self.model.variable_power[t]
-                    * self.model.electricity_price_buy[t]
+                    * self.model.electricity_price[t]
             )
 
     def define_objective(self):
@@ -383,14 +333,14 @@ class Building(SupportsMinMax, DSMFlex):
 
     def write_additional_outputs(self, instance):
         if self.has_battery_storage:
-            model_block = instance.dsm_blocks["battery_storage"]
+            model_block = instance.dsm_blocks["generic_storage"]
             soc = pd.Series(
                 data=model_block.soc.get_values(), dtype=float
             ) / pyo.value(model_block.max_capacity)
             soc.index = self.index
             self.outputs["soc"] = soc
         if self.has_ev:
-            model_block = instance.dsm_blocks["ev"]
+            model_block = instance.dsm_blocks["electric_vehicle"]
             ev_soc = pd.Series(
                 data=model_block.ev_battery_soc.get_values(), dtype=float
             ) / pyo.value(model_block.max_capacity)

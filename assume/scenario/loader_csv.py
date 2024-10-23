@@ -615,7 +615,6 @@ async def async_setup_world(
     storage_units = scenario_data["storage_units"]
     demand_units = scenario_data["demand_units"]
     dsm_units = scenario_data["dsm_units"]
-    residential_dsm_units = scenario_data["residential_dsm_units"]
     forecaster = scenario_data["forecaster"]
 
     save_frequency_hours = config.get("save_frequency_hours", 48)
@@ -726,17 +725,6 @@ async def async_setup_world(
 
     if dsm_units is not None:
         for unit_type, units_df in dsm_units.items():
-            dsm_units = read_units(
-                units_df=units_df,
-                unit_type=unit_type,
-                forecaster=forecaster,
-                world_bidding_strategies=world.bidding_strategies,
-            )
-        for op, op_units in dsm_units.items():
-            units[op].extend(op_units)
-
-    if residential_dsm_units is not None:
-        for unit_type, units_df in residential_dsm_units.items():
             dsm_units = read_units(
                 units_df=units_df,
                 unit_type=unit_type,
