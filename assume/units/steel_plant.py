@@ -93,6 +93,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 )
 
         self.natural_gas_price = self.forecaster["fuel_price_natural_gas"]
+        self.hydrogen_price = self.forecaster["price_hydrogen"]
         self.electricity_price = self.forecaster["price_EOM"]
         self.iron_ore_price = self.forecaster.get_price("iron_ore")
         self.steel_demand = demand
@@ -135,6 +136,11 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.flex_power_requirement = None
 
         self.variable_cost_series = None
+
+        # Check for the presence of components
+        self.has_h2storage = "hydrogen_storage" in self.components.keys()
+        self.has_dristorage = "dri_storage" in self.components.keys()
+        self.has_electrolyser = "electrolyser" in self.components.keys()
 
     def switch_to_opt(self, instance):
         """
@@ -179,32 +185,26 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         """
         Initializes the process sequence and constraints for the steel plant. Here, the components/ technologies are connected to establish a process for steel production
         """
-        # Assuming the presence of 'hydrogen_storage' indicates the desire for dynamic flow management
-        has_h2storage = "hydrogen_storage" in self.model.dsm_blocks.keys()
 
-        # Constraint for direct hydrogen flow from Electrolyser to dri plant
+        # Constraint for direct hydrogen flow from Electrolyser to DRI plant
         @self.model.Constraint(self.model.time_steps)
         def direct_hydrogen_flow_constraint(m, t):
             """
             Ensures the direct hydrogen flow from the electrolyser to the DRI plant or storage.
             """
-            # This constraint allows part of the hydrogen produced by the dri plant to go directly to the EAF
-            # The actual amount should ensure that it does not exceed the capacity or demand of the EAF
-            if has_h2storage:
-                return (
-                    self.model.dsm_blocks["electrolyser"].hydrogen_out[t]
-                    + self.model.dsm_blocks["hydrogen_storage"].discharge[t]
-                    == self.model.dsm_blocks["dri_plant"].hydrogen_in[t]
-                    + self.model.dsm_blocks["hydrogen_storage"].charge[t]
-                )
-            else:
-                return (
-                    self.model.dsm_blocks["electrolyser"].hydrogen_out[t]
-                    >= self.model.dsm_blocks["dri_plant"].hydrogen_in[t]
-                )
-
-        # Assuming the presence of dristorage' indicates the desire for dynamic flow management
-        has_dristorage = "dri_storage" in self.model.dsm_blocks.keys()
+            if self.has_electrolyser:
+                if self.has_h2storage:
+                    return (
+                        self.model.dsm_blocks["electrolyser"].hydrogen_out[t]
+                        + self.model.dsm_blocks["hydrogen_storage"].discharge[t]
+                        == self.model.dsm_blocks["dri_plant"].hydrogen_in[t]
+                        + self.model.dsm_blocks["hydrogen_storage"].charge[t]
+                    )
+                else:
+                    return (
+                        self.model.dsm_blocks["electrolyser"].hydrogen_out[t]
+                        >= self.model.dsm_blocks["dri_plant"].hydrogen_in[t]
+                    )
 
         # Constraint for direct hydrogen flow from Electrolyser to dri plant
         @self.model.Constraint(self.model.time_steps)
@@ -214,7 +214,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             """
             # This constraint allows part of the dri produced by the dri plant to go directly to the dri storage
             # The actual amount should ensure that it does not exceed the capacity or demand of the EAF
-            if has_dristorage:
+            if self.has_dristorage:
                 return (
                     self.model.dsm_blocks["dri_plant"].dri_output[t]
                     + self.model.dsm_blocks["dri_storage"].discharge[t]
@@ -257,6 +257,10 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.model.natural_gas_price = pyo.Param(
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.natural_gas_price)},
+        )
+        self.model.hydrogen_price = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.hydrogen_price)},
         )
         self.model.steel_demand = pyo.Param(initialize=self.steel_demand)
         self.model.steel_price = pyo.Param(
@@ -315,29 +319,33 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         # def steel_output_association_constraint(m, t):
         #     return self.model.dsm_blocks["eaf"].steel_output[t] == self.model.steel_demand
 
+        # Constraint for total power input
         @self.model.Constraint(self.model.time_steps)
         def total_power_input_constraint(m, t):
             """
             Ensures the total power input is the sum of power inputs of all components.
             """
-            return (
-                m.total_power_input[t]
-                == self.model.dsm_blocks["electrolyser"].power_in[t]
-                + self.model.dsm_blocks["eaf"].power_in[t]
+            power_input = (
+                self.model.dsm_blocks["eaf"].power_in[t]
                 + self.model.dsm_blocks["dri_plant"].power_in[t]
             )
+            if self.has_electrolyser:
+                power_input += self.model.dsm_blocks["electrolyser"].power_in[t]
+            return m.total_power_input[t] == power_input
 
+        # Constraint for variable cost per time step
         @self.model.Constraint(self.model.time_steps)
         def cost_per_time_step(m, t):
             """
             Calculates the variable cost per time step.
             """
-            return (
-                self.model.variable_cost[t]
-                == self.model.dsm_blocks["electrolyser"].operating_cost[t]
+            variable_cost = (
+                self.model.dsm_blocks["eaf"].operating_cost[t]
                 + self.model.dsm_blocks["dri_plant"].operating_cost[t]
-                + self.model.dsm_blocks["eaf"].operating_cost[t]
             )
+            if self.has_electrolyser:
+                variable_cost += self.model.dsm_blocks["electrolyser"].operating_cost[t]
+            return self.model.variable_cost[t] == variable_cost
 
     def define_objective_opt(self):
         """
@@ -490,10 +498,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             orderbook (Orderbook): The orderbook.
         """
         products_index = get_products_index(orderbook)
-
-        # max_power = (
-        #     self.forecaster.get_availability(self.id)[products_index] * self.max_power
-        # )
 
         product_type = marketconfig.product_type
         for order in orderbook:
