@@ -922,7 +922,7 @@ def run_learning(
         else RolloutBuffer
     )
     buffer = buffer_cls(
-        buffer_size=int(world.learning_config.get("buffer_size", 5e5)),
+        buffer_size=int(float(world.learning_config.get("buffer_size", 5e5))),
         obs_dim=world.learning_role.rl_algorithm.obs_dim,
         act_dim=world.learning_role.rl_algorithm.act_dim,
         n_rl_units=len(world.learning_role.rl_strats),

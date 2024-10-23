@@ -94,33 +94,46 @@ class CriticTD3(nn.Module):
 class CriticPPO(nn.Module):
     """Critic Network for Proximal Policy Optimization (PPO).
 
-    Each agent has its own critic, so this class defines the architecture for an individual agent's critic.
+    Centralized critic.
 
     Args:
-        obs_dim (int): Dimension of the observation space.
-        float_type: Data type for the model parameters.
+        n_agents (int): Number of agents
+        obs_dim (int): Dimension of each state
+        act_dim (int): Dimension of each action
     """
 
-    def __init__(self, obs_dim: int, float_type):
+    def __init__(self, n_agents: int, obs_dim: int, act_dim: int, float_type, unique_obs_dim: int = 0):
         super().__init__()
 
-        # Define the architecture of the Critic network for an individual agent
-        self.fc1 = nn.Linear(obs_dim, 256, dtype=float_type)
-        self.fc2 = nn.Linear(256, 128, dtype=float_type)
-        self.fc3 = nn.Linear(128, 1, dtype=float_type)
+        self.obs_dim = obs_dim + unique_obs_dim * (n_agents - 1)
+        self.act_dim = act_dim * n_agents 
 
-    def forward(self, obs):
-        """Forward pass through the critic network.
+        if n_agents <= 50:
+            self.FC_1 = nn.Linear(self.obs_dim + self.act_dim, 512, dtype=float_type)
+            self.FC_2 = nn.Linear(512, 256, dtype=float_type)
+            self.FC_3 = nn.Linear(256, 128, dtype=float_type)
+            self.FC_4 = nn.Linear(128, 1, dtype=float_type)
+        else:
+            self.FC_1 = nn.Linear(self.obs_dim + self.act_dim, 1024, dtype=float_type)
+            self.FC_2 = nn.Linear(1024, 512, dtype=float_type)
+            self.FC_3 = nn.Linear(512, 128, dtype=float_type)
+            self.FC_4 = nn.Linear(128, 1, dtype=float_type)
 
-        Args:
-            obs (torch.Tensor): The observation input for the agent.
-
-        Returns:
-            torch.Tensor: The value output from the critic network.
+    def forward(self, obs, actions):
         """
-        x = F.relu(self.fc1(obs))
-        x = F.relu(self.fc2(x))
-        value = self.fc3(x)
+        Args:
+            obs (torch.Tensor): The observations
+            actions (torch.Tensor): The actions
+
+        """
+
+        xu = th.cat([obs, actions], dim=-1)
+
+        x = F.relu(self.FC_1(xu))
+        x = F.relu(self.FC_2(x))
+        x = F.relu(self.FC_3(x))
+        value = self.FC_4(x)
+
         return value
 
 class Actor(nn.Module):
@@ -148,12 +161,12 @@ class MLPActor(Actor):
         x = F.relu(self.FC1(obs))
         x = F.relu(self.FC2(x))
         # Works with MATD3, output of softsign: [-1, 1]
-        # x = F.softsign(self.FC3(x))
+        x = F.softsign(self.FC3(x))
         
         # x = th.tanh(self.FC3(x))
 
         # Tested for PPO, scales the output to [0, 1] range
-        x = th.sigmoid(self.FC3(x))
+        #x = th.sigmoid(self.FC3(x))
 
         return x
 
