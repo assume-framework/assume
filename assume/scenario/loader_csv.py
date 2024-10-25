@@ -979,7 +979,7 @@ def run_learning(
 
         world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
-        world.run()  # triggers calculate_bids() which equals to step
+        world.run()  # triggers calculate_bids()
 
         inter_episodic_data = world.learning_role.get_inter_episodic_data()
         inter_episodic_data["episodes_done"] = episode

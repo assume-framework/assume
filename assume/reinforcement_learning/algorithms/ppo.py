@@ -518,13 +518,12 @@ class PPO(RLAlgorithm):
             self.n_updates += 1
 
             # Iterate through over each agent's strategy
-            # Each agent has its own actor and critic. Critic (value network) is in comparison to MATD3 decentralized, meaning each agent learns its own value function.
+            # Each agent has its own actor. Critic (value network) is centralized.
             for u_id in self.learning_role.rl_strats.keys():
                 
                 # Centralized
                 critic = self.learning_role.critics[u_id]
                 # Decentralized
-                #critic = self.learning_role.rl_strats[u_id].critic
                 actor = self.learning_role.rl_strats[u_id].actor
 
                 # Retrieve experiences from the buffer
