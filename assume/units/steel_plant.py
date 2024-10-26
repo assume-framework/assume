@@ -97,6 +97,9 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.hydrogen_price = self.forecaster["price_hydrogen"]
         self.electricity_price = self.forecaster["price_EOM"]
         self.iron_ore_price = self.forecaster.get_price("iron_ore")
+        self.natural_gas_co2_factor = self.forecaster.get_price(
+            "natural_gas_co2_factor"
+        )
         self.steel_demand = demand
         self.steel_price = self.forecaster.get_price("steel")
         self.lime_co2_factor = self.forecaster.get_price("lime_co2_factor")
@@ -162,10 +165,20 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         )
 
         if self.components["dri_plant"]["fuel_type"] in ["natural_gas", "both"]:
-            self.model.natural_gas_price = pyo.Param(
-                self.model.time_steps,
-                initialize={t: value for t, value in enumerate(self.natural_gas_price)},
-            )
+            if self.has_electrolyser:
+                self.model.hydrogen_price = pyo.Param(
+                    self.model.time_steps,
+                    initialize={t: 0 for t in self.model.time_steps},
+                )
+
+            else:
+                self.model.hydrogen_price = pyo.Param(
+                    self.model.time_steps,
+                    initialize={
+                        t: value for t, value in enumerate(self.hydrogen_price)
+                    },
+                )
+
         elif self.components["dri_plant"]["fuel_type"] in ["hydrogen", "both"]:
             if self.has_electrolyser:
                 self.model.hydrogen_price = pyo.Param(
@@ -180,12 +193,19 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                     },
                 )
 
+        self.model.natural_gas_price = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.natural_gas_price)},
+        )
         self.model.steel_demand = pyo.Param(initialize=self.steel_demand)
         self.model.steel_price = pyo.Param(
             initialize=self.steel_price.mean(), within=pyo.NonNegativeReals
         )
         self.model.lime_co2_factor = pyo.Param(
             initialize=self.lime_co2_factor.mean(), within=pyo.NonNegativeReals
+        )
+        self.model.natural_gas_co2_factor = pyo.Param(
+            initialize=self.natural_gas_co2_factor.mean(), within=pyo.NonNegativeReals
         )
         self.model.co2_price = pyo.Param(
             initialize=self.co2_price.mean(), within=pyo.NonNegativeReals
@@ -232,6 +252,9 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                         self.model.dsm_blocks["electrolyser"].hydrogen_out[t]
                         == self.model.dsm_blocks["dri_plant"].hydrogen_in[t]
                     )
+            else:
+                # If no electrolyser, ensure DRI plant hydrogen input is as expected
+                return self.model.dsm_blocks["dri_plant"].hydrogen_in[t] >= 0
 
         # Constraint for direct hydrogen flow from Electrolyser to dri plant
         @self.model.Constraint(self.model.time_steps)

@@ -968,6 +968,7 @@ class DRIPlant:
         model_block.natural_gas_in = pyo.Var(
             self.time_steps, within=pyo.NonNegativeReals
         )
+        model_block.co2_emission = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.hydrogen_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.dri_output = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.operating_cost = pyo.Var(
@@ -989,8 +990,8 @@ class DRIPlant:
                 )
             elif self.fuel_type == "both":
                 return b.dri_output[t] == (
-                    b.hydrogen_in[t] / b.specific_hydrogen_consumption
-                ) + (b.natural_gas_in[t] / b.specific_natural_gas_consumption)
+                    b.natural_gas_in[t] / b.specific_natural_gas_consumption
+                ) + (b.hydrogen_in[t] / b.specific_hydrogen_consumption)
 
         # Add Constraints to Zero Unused Fuel Inputs**
         @model_block.Constraint(self.time_steps)
@@ -1014,12 +1015,20 @@ class DRIPlant:
         def iron_ore_constraint(b, t):
             return b.iron_ore_in[t] == b.dri_output[t] * b.specific_iron_ore_consumption
 
+        # CO2 emissions
+        @model_block.Constraint(self.time_steps)
+        def co2_emission_constraint_dri(b, t):
+            return (
+                b.co2_emission[t] == b.natural_gas_in[t] * model.natural_gas_co2_factor
+            )
+
         # Operating cost constraint
         @model_block.Constraint(self.time_steps)
         def operating_cost_constraint(b, t):
             operating_cost = (
                 b.power_in[t] * model.electricity_price[t]
                 + b.iron_ore_in[t] * model.iron_ore_price
+                + b.co2_emission[t] * model.co2_price
             )
             if self.fuel_type == "natural_gas":
                 operating_cost += b.natural_gas_in[t] * model.natural_gas_price[t]

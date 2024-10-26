@@ -69,12 +69,19 @@ class DSMFlex:
 
         @model.Constraint(model.time_steps)
         def total_power_input_constraint_with_flex(m, t):
-            return (
-                m.total_power_input[t] - m.load_shift[t]
-                == self.model.dsm_blocks["electrolyser"].power_in[t]
-                + self.model.dsm_blocks["eaf"].power_in[t]
-                + self.model.dsm_blocks["dri_plant"].power_in[t]
-            )
+            if self.has_electrolyser:
+                return (
+                    m.total_power_input[t] - m.load_shift[t]
+                    == self.model.dsm_blocks["electrolyser"].power_in[t]
+                    + self.model.dsm_blocks["eaf"].power_in[t]
+                    + self.model.dsm_blocks["dri_plant"].power_in[t]
+                )
+            else:
+                return (
+                    m.total_power_input[t] - m.load_shift[t]
+                    == self.model.dsm_blocks["eaf"].power_in[t]
+                    + self.model.dsm_blocks["dri_plant"].power_in[t]
+                )
 
     def recalculate_with_accepted_offers(self, model):
         self.reference_power = self.forecaster[f"{self.id}_power"]
