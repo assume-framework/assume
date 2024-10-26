@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import TypedDict
 
 import numpy as np
@@ -273,9 +273,9 @@ class BaseUnit:
                 cashflow = float(
                     order.get("accepted_price", 0) * order.get("accepted_volume", 0)
                 )
-                hours = (end - start) / timedelta(hours=1)
+                elapsed_intervals = (end - start) / pd.Timedelta(self.index.freq)
                 self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
-                    cashflow * hours
+                    cashflow * elapsed_intervals
                 )
 
     def get_starting_costs(self, op_time: int) -> float:

@@ -17,29 +17,16 @@ from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
 from assume.units.dsm_load_shift import DSMFlex
-from assume.units.dst_components import (
-    create_driplant,
-    create_dristorage,
-    create_electric_arc_furnance,
-    create_electrolyser,
-    create_hydrogen_storage,
-)
 
-SOLVERS = ["gurobi", "glpk", "cbc", "cplex"]
+SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
 
 logger = logging.getLogger(__name__)
 
-# Mapping of component type identifiers to their respective classes
-dst_components = {
-    "electrolyser": create_electrolyser,
-    "h2storage": create_hydrogen_storage,
-    "dri_plant": create_driplant,
-    "dri_storage": create_dristorage,
-    "eaf": create_electric_arc_furnance,
-}
+# Set the log level to ERROR
+logging.getLogger("pyomo").setLevel(logging.WARNING)
 
 
-class SteelPlant(SupportsMinMax, DSMFlex):
+class SteelPlant(DSMFlex, SupportsMinMax):
     """
     The SteelPlant class represents a steel plant unit in the energy system.
 
@@ -57,6 +44,9 @@ class SteelPlant(SupportsMinMax, DSMFlex):
         demand (float): The demand of the unit - the amount of steel to be produced.
         cost_tolerance (float): The cost tolerance of the unit - the maximum cost that can be tolerated when shifting the load.
     """
+
+    required_technologies = ["dri_plant", "eaf"]
+    optional_technologies = ["electrolyser", "hydrogen_storage", "dri_storage"]
 
     def __init__(
         self,
@@ -85,7 +75,24 @@ class SteelPlant(SupportsMinMax, DSMFlex):
             **kwargs,
         )
 
-        self.natural_gas_price = self.forecaster["fuel_price_natural gas"]
+        # check if the required components are present in the components dictionary
+        for component in self.required_technologies:
+            if component not in components.keys():
+                raise ValueError(
+                    f"Component {component} is required for the steel plant unit."
+                )
+
+        # check if the provided components are valid and do not contain any unknown components
+        for component in components.keys():
+            if (
+                component not in self.required_technologies
+                and component not in self.optional_technologies
+            ):
+                raise ValueError(
+                    f"Components {component} is not a valid component for the steel plant unit."
+                )
+
+        self.natural_gas_price = self.forecaster["fuel_price_natural_gas"]
         self.electricity_price = self.forecaster["price_EOM"]
         self.iron_ore_price = self.forecaster.get_price("iron_ore")
         self.steel_demand = demand
@@ -116,7 +123,13 @@ class SteelPlant(SupportsMinMax, DSMFlex):
         solvers = check_available_solvers(*SOLVERS)
         if len(solvers) < 1:
             raise Exception(f"None of {SOLVERS} are available")
+
         self.solver = SolverFactory(solvers[0])
+        self.solver_options = {
+            "output_flag": False,
+            "log_to_console": False,
+            "LogToConsole": 0,
+        }
 
         self.opt_power_requirement = None
         self.flex_power_requirement = None
@@ -162,30 +175,12 @@ class SteelPlant(SupportsMinMax, DSMFlex):
 
         return instance
 
-    def initialize_components(self, components: dict[str, dict]):
-        """
-        Initializes the components of the steel plant.
-
-        Args:
-            components (dict[str, dict]): The components of the steel plant.
-            model (pyomo.ConcreteModel): The Pyomo model.
-        """
-        self.model.dsm_blocks = pyo.Block(list(components.keys()))
-        for technology, component_data in components.items():
-            if technology in dst_components:
-                factory_method = dst_components[technology]
-                self.model.dsm_blocks[technology].transfer_attributes_from(
-                    factory_method(
-                        self.model, time_steps=self.model.time_steps, **component_data
-                    )
-                )
-
     def initialize_process_sequence(self):
         """
         Initializes the process sequence and constraints for the steel plant. Here, the components/ technologies are connected to establish a process for steel production
         """
-        # Assuming the presence of 'h2storage' indicates the desire for dynamic flow management
-        has_h2storage = "h2storage" in self.model.dsm_blocks.keys()
+        # Assuming the presence of 'hydrogen_storage' indicates the desire for dynamic flow management
+        has_h2storage = "hydrogen_storage" in self.model.dsm_blocks.keys()
 
         # Constraint for direct hydrogen flow from Electrolyser to dri plant
         @self.model.Constraint(self.model.time_steps)
@@ -198,9 +193,9 @@ class SteelPlant(SupportsMinMax, DSMFlex):
             if has_h2storage:
                 return (
                     self.model.dsm_blocks["electrolyser"].hydrogen_out[t]
-                    + self.model.dsm_blocks["h2storage"].discharge[t]
+                    + self.model.dsm_blocks["hydrogen_storage"].discharge[t]
                     == self.model.dsm_blocks["dri_plant"].hydrogen_in[t]
-                    + self.model.dsm_blocks["h2storage"].charge[t]
+                    + self.model.dsm_blocks["hydrogen_storage"].charge[t]
                 )
             else:
                 return (
@@ -222,9 +217,9 @@ class SteelPlant(SupportsMinMax, DSMFlex):
             if has_dristorage:
                 return (
                     self.model.dsm_blocks["dri_plant"].dri_output[t]
-                    + self.model.dsm_blocks["dri_storage"].discharge_dri[t]
+                    + self.model.dsm_blocks["dri_storage"].discharge[t]
                     == self.model.dsm_blocks["eaf"].dri_input[t]
-                    + self.model.dsm_blocks["dri_storage"].charge_dri[t]
+                    + self.model.dsm_blocks["dri_storage"].charge[t]
                 )
             else:
                 return (
@@ -328,8 +323,8 @@ class SteelPlant(SupportsMinMax, DSMFlex):
             return (
                 m.total_power_input[t]
                 == self.model.dsm_blocks["electrolyser"].power_in[t]
-                + self.model.dsm_blocks["eaf"].power_eaf[t]
-                + self.model.dsm_blocks["dri_plant"].power_dri[t]
+                + self.model.dsm_blocks["eaf"].power_in[t]
+                + self.model.dsm_blocks["dri_plant"].power_in[t]
             )
 
         @self.model.Constraint(self.model.time_steps)
@@ -339,9 +334,9 @@ class SteelPlant(SupportsMinMax, DSMFlex):
             """
             return (
                 self.model.variable_cost[t]
-                == self.model.dsm_blocks["electrolyser"].electrolyser_operating_cost[t]
-                + self.model.dsm_blocks["dri_plant"].dri_operating_cost[t]
-                + self.model.dsm_blocks["eaf"].eaf_operating_cost[t]
+                == self.model.dsm_blocks["electrolyser"].operating_cost[t]
+                + self.model.dsm_blocks["dri_plant"].operating_cost[t]
+                + self.model.dsm_blocks["eaf"].operating_cost[t]
             )
 
     def define_objective_opt(self):
@@ -409,7 +404,7 @@ class SteelPlant(SupportsMinMax, DSMFlex):
         # switch the instance to the optimal mode by deactivating the flexibility constraints and objective
         instance = self.switch_to_opt(instance)
         # solve the instance
-        results = self.solver.solve(instance, tee=False)  # , tee=True
+        results = self.solver.solve(instance, options=self.solver_options)
 
         # Check solver status and termination condition
         if (results.solver.status == SolverStatus.ok) and (
@@ -452,7 +447,7 @@ class SteelPlant(SupportsMinMax, DSMFlex):
         # switch the instance to the flexibility mode by deactivating the optimal constraints and objective
         instance = self.switch_to_flex(instance)
         # solve the instance
-        results = self.solver.solve(instance, tee=False)  # , tee=True
+        results = self.solver.solve(instance, options=self.solver_options)
 
         # Check solver status and termination condition
         if (results.solver.status == SolverStatus.ok) and (
