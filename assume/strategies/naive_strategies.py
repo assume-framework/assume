@@ -387,19 +387,49 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
             volume = abs(unit.outputs["energy"].at[start])
             # volume = unit.opt_power_requirement.loc[start]
             volume_flex = unit.flex_power_requirement.loc[start]
-
             marginal_price = unit.calculate_marginal_cost(start, volume_flex)
-            bids.append(
-                {
-                    "start_time": product[0],
-                    "end_time": product[1],
-                    "only_hours": product[2],
-                    "price": marginal_price,
-                    "volume": -volume,
-                    "max_power": -max(volume, volume_flex),
-                    "min_power": -min(volume, volume_flex),
-                    "node": unit.node,
-                }
-            )
+            if volume > volume_flex:
+                bids.append(
+                    {
+                        "start_time": product[0],
+                        "end_time": product[1],
+                        "only_hours": product[2],
+                        "price": marginal_price,
+                        "volume": -volume,
+                        # "max_power": -max(volume, volume_flex),
+                        # "min_power": -min(volume, volume_flex),
+                        "max_power": -volume,
+                        "min_power": -volume_flex,
+                        "node": unit.node,
+                    }
+                )
+            elif volume < volume_flex:
+                bids.append(
+                    {
+                        "start_time": product[0],
+                        "end_time": product[1],
+                        "only_hours": product[2],
+                        "price": marginal_price,
+                        "volume": -volume,
+                        # "max_power": -max(volume, volume_flex),
+                        # "min_power": -min(volume, volume_flex),
+                        "max_power": -volume_flex,
+                        "min_power": -volume,
+                        "node": unit.node,
+                    }
+                )
+            else:
+                bids.append(
+                    {
+                        "start_time": product[0],
+                        "end_time": product[1],
+                        "only_hours": product[2],
+                        "price": marginal_price,
+                        "volume": -volume,
+                        "max_power": 0,
+                        "min_power": 0,
+                        "node": unit.node,
+                    }
+                )
 
         return bids
