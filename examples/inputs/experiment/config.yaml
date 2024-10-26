@@ -1,0 +1,52 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+base_case_steel_plant_2019:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-27 23:00
+  time_step: 1h
+  save_frequency_hours: 24
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 1h
+      opening_frequency: 24h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+    redispatch:
+        start_date: 2019-01-01 00:00
+        operator: network_operator
+        product_type: energy
+        products:
+          - duration: 1h
+            count: 24
+            first_delivery: 1h
+        opening_frequency: 24h
+        opening_duration: 2h
+        volume_unit: MWh
+        maximum_bid_volume: 100000
+        maximum_bid_price: 3000
+        minimum_bid_price: -500
+        price_unit: EUR/MWh
+        market_mechanism: redispatch
+        additional_fields:
+          - node
+          - min_power
+          - max_power
+        param_dict:
+          network_path: .
+          solver: gurobi
+          payment_mechanism: pay_as_bid
+          backup_marginal_cost: 10000
