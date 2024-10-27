@@ -32,7 +32,7 @@ dependencies = [
     "argcomplete >=3.1.4",
     "nest-asyncio >=1.5.6",
     "mango-agents-assume >=1.1.4-6",
-    "numpy < 2", # Pyomo Incompatible
+    "numpy >=1.26.4",
     "tqdm >=4.64.1",
     "python-dateutil >=2.8.2",
     "sqlalchemy >=2.0.9",
@@ -40,15 +40,15 @@ dependencies = [
     "psycopg2-binary >=2.9.5",
     "pyyaml >=6.0",
     "pyyaml-include >=2.2a",
+    "pyomo >=6.8.0",
+    "highspy",
 ]
 
 [project.optional-dependencies]
 learning = [
     "torch >=2.0.1",
 ]
-optimization = [
-    "glpk >=0.4.7",
-    "pyomo >=6.6.1",
+network = [
     "pypsa <=0.30.3",
 ]
 oeds = [
@@ -56,7 +56,6 @@ oeds = [
     "holidays >=0.37",
     "pvlib >=0.10.2",
     "windpowerlib >=0.2.1",
-    "yaml-include",
 ]
 test = [
     "ruff >=0.4.9",
@@ -65,15 +64,17 @@ test = [
     "pytest >=7.2.2",
     "pytest-cov >=4.1.0",
     "pytest-asyncio >=0.21.1",
-    "glpk >=0.4.7",
 ]
 all = [
-    "assume-framework[oeds, optimization, learning]",
+    "assume-framework[oeds, network, learning]",
 ]
 
 [project.urls]
-homepage = "https://assume.readthedocs.io"
-repository = "https://github.com/assume-framework/assume"
+Homepage = "https://assume-project.de/"
+Repository = "https://github.com/assume-framework/assume"
+Documentation = "https://assume.readthedocs.io"
+Issues = "https://github.com/assume-framework/assume/issues"
+Changelog = "https://assume.readthedocs.io/en/latest/release_notes.html"
 
 [project.scripts]
 assume = "assume_cli.cli:cli"

@@ -18,9 +18,12 @@ from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
 from assume.units.dsm_load_shift import DSMFlex
 
-SOLVERS = ["gurobi", "glpk", "cbc", "cplex"]
+SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
 
 logger = logging.getLogger(__name__)
+
+# Set the log level to ERROR
+logging.getLogger("pyomo").setLevel(logging.WARNING)
 
 
 class SteelPlant(DSMFlex, SupportsMinMax):
@@ -41,6 +44,9 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         demand (float): The demand of the unit - the amount of steel to be produced.
         cost_tolerance (float): The cost tolerance of the unit - the maximum cost that can be tolerated when shifting the load.
     """
+
+    required_technologies = ["dri_plant", "eaf"]
+    optional_technologies = ["electrolyser", "hydrogen_storage", "dri_storage"]
 
     def __init__(
         self,
@@ -68,6 +74,23 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             location=location,
             **kwargs,
         )
+
+        # check if the required components are present in the components dictionary
+        for component in self.required_technologies:
+            if component not in components.keys():
+                raise ValueError(
+                    f"Component {component} is required for the steel plant unit."
+                )
+
+        # check if the provided components are valid and do not contain any unknown components
+        for component in components.keys():
+            if (
+                component not in self.required_technologies
+                and component not in self.optional_technologies
+            ):
+                raise ValueError(
+                    f"Components {component} is not a valid component for the steel plant unit."
+                )
 
         self.natural_gas_price = self.forecaster["fuel_price_natural_gas"]
         self.electricity_price = self.forecaster["price_EOM"]
@@ -100,7 +123,13 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         solvers = check_available_solvers(*SOLVERS)
         if len(solvers) < 1:
             raise Exception(f"None of {SOLVERS} are available")
+
         self.solver = SolverFactory(solvers[0])
+        self.solver_options = {
+            "output_flag": False,
+            "log_to_console": False,
+            "LogToConsole": 0,
+        }
 
         self.opt_power_requirement = None
         self.flex_power_requirement = None
@@ -188,9 +217,9 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             if has_dristorage:
                 return (
                     self.model.dsm_blocks["dri_plant"].dri_output[t]
-                    + self.model.dsm_blocks["dri_storage"].discharge_dri[t]
+                    + self.model.dsm_blocks["dri_storage"].discharge[t]
                     == self.model.dsm_blocks["eaf"].dri_input[t]
-                    + self.model.dsm_blocks["dri_storage"].charge_dri[t]
+                    + self.model.dsm_blocks["dri_storage"].charge[t]
                 )
             else:
                 return (
@@ -375,7 +404,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         # switch the instance to the optimal mode by deactivating the flexibility constraints and objective
         instance = self.switch_to_opt(instance)
         # solve the instance
-        results = self.solver.solve(instance, tee=False)  # , tee=True
+        results = self.solver.solve(instance, options=self.solver_options)
 
         # Check solver status and termination condition
         if (results.solver.status == SolverStatus.ok) and (
@@ -418,7 +447,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         # switch the instance to the flexibility mode by deactivating the optimal constraints and objective
         instance = self.switch_to_flex(instance)
         # solve the instance
-        results = self.solver.solve(instance, tee=False)  # , tee=True
+        results = self.solver.solve(instance, options=self.solver_options)
 
         # Check solver status and termination condition
         if (results.solver.status == SolverStatus.ok) and (

@@ -4,7 +4,7 @@
 
 import pyomo.environ as pyo
 
-from assume.units.dst_components import demand_side_components
+from assume.units.dst_components import demand_side_technologies
 
 
 class DSMFlex:
@@ -23,19 +23,19 @@ class DSMFlex:
         Args:
             components (dict[str, dict]): A dictionary where each key is a technology name and
                                         the value is a dictionary of parameters for the respective technology.
-                                        Each technology is mapped to a corresponding class in `demand_side_components`.
+                                        Each technology is mapped to a corresponding class in `demand_side_technologies`.
 
         The method:
-        - Looks up the corresponding class for each technology in `demand_side_components`.
+        - Looks up the corresponding class for each technology in `demand_side_technologies`.
         - Instantiates the class by passing the required parameters.
         - Adds the resulting block to the model under the `dsm_blocks` attribute.
         """
         self.model.dsm_blocks = pyo.Block(list(components.keys()))
 
         for technology, component_data in components.items():
-            if technology in demand_side_components:
-                # Get the class from the dictionary mapping (adjust `demand_side_components` to hold classes)
-                component_class = demand_side_components[technology]
+            if technology in demand_side_technologies:
+                # Get the class from the dictionary mapping (adjust `demand_side_technologies` to hold classes)
+                component_class = demand_side_technologies[technology]
 
                 # Instantiate the component with the required parameters (unpack the component_data dictionary)
                 component_instance = component_class(
