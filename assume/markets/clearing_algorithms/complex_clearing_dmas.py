@@ -523,7 +523,7 @@ class ComplexDmasClearingRole(MarketRole):
                 }
             )
 
-        # wirte network flows here if applicable
+        # write network flows here if applicable
         flows = []
 
         return orderbook, rejected, meta, flows

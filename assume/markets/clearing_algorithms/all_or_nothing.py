@@ -114,7 +114,7 @@ class PayAsClearAonRole(MarketRole):
                 )
             )
 
-        # wirte network flows here if applicable
+        # write network flows here if applicable
         flows = []
 
         # accepted orders can not be used in future
@@ -199,7 +199,7 @@ class PayAsBidAonRole(MarketRole):
                     product,
                 )
             )
-            # wirte network flows here if applicable
+            # write network flows here if applicable
             flows = []
 
         return accepted_orders, rejected_orders, meta, flows
