@@ -57,7 +57,7 @@ def test_complex_clearing():
     orderbook = extend_orderbook(products, 900, 50, orderbook)
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
 
     assert math.isclose(meta[0]["supply_volume"], 1000, abs_tol=eps)
     assert math.isclose(meta[0]["demand_volume"], 1000, abs_tol=eps)
@@ -124,7 +124,7 @@ def test_market_coupling():
     orderbook = extend_orderbook(products, 1000, 50, orderbook, node="node2")
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
 
     assert meta[0]["node"] == "node1"
     assert math.isclose(meta[0]["supply_volume"], 500, abs_tol=eps)
@@ -219,7 +219,7 @@ def test_market_coupling_with_island():
     )
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
 
     assert rejected_orders == []
     assert accepted_orders[0]["node"] == "node1"
@@ -259,7 +259,7 @@ def test_market_coupling_with_island():
     market_config.param_dict["grid_data"] = grid_data
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
 
     assert rejected_orders == []
     assert accepted_orders[0]["node"] == "node1"
@@ -316,7 +316,7 @@ def test_complex_clearing_BB():
     )
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     # accept only cheapes simple bids
     assert math.isclose(meta[0]["price"], 50, abs_tol=eps)
     assert rejected_orders[1]["agent_addr"] == "block_gen7"
@@ -333,7 +333,7 @@ def test_complex_clearing_BB():
     orderbook[3]["price"] = 45
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     # accept block order and part of cheaper simple order
     assert math.isclose(meta[0]["price"], 50, abs_tol=eps)
     assert accepted_orders[2]["agent_addr"] == "block_gen7"
@@ -347,7 +347,7 @@ def test_complex_clearing_BB():
     orderbook[2]["price"] = 41
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
 
     assert math.isclose(meta[0]["price"], 41, abs_tol=eps)
     assert math.isclose(meta[1]["price"], 50, abs_tol=eps)
@@ -366,7 +366,7 @@ def test_complex_clearing_BB():
     orderbook[2]["price"] = 39
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
 
     assert math.isclose(meta[0]["price"], 39, abs_tol=eps)
     assert math.isclose(meta[1]["price"], 50, abs_tol=eps)
@@ -385,7 +385,7 @@ def test_complex_clearing_BB():
     orderbook[2]["price"] = 40
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert math.isclose(meta[0]["price"], 40, abs_tol=eps)
     assert math.isclose(meta[1]["price"], 50, abs_tol=eps)
     # the acceptance depends on the solver:
@@ -405,7 +405,7 @@ def test_complex_clearing_BB():
     orderbook[3]["volume"][products[1][0]] = 900
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert math.isclose(meta[0]["price"], 40, abs_tol=eps)
     assert math.isclose(meta[1]["price"], 50, abs_tol=eps)
     # block bid should be accepted, because surplus is (40-45)*100+(50-45)*900=4000
@@ -466,7 +466,7 @@ def test_complex_clearing_LB():
     )
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     # accept only cheapes simple bids
     assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
     assert rejected_orders == []
@@ -477,7 +477,7 @@ def test_complex_clearing_LB():
     orderbook[2]["price"] = 120
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     # accept block order and part of cheaper simple order
     assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
     assert rejected_orders == []
@@ -488,7 +488,7 @@ def test_complex_clearing_LB():
     orderbook[2]["price"] = 130
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     # accept block order and part of cheaper simple order
     assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
     assert rejected_orders[0]["agent_addr"] == "block_gen5"
@@ -501,7 +501,7 @@ def test_complex_clearing_LB():
     orderbook[3]["price"] = 120
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
 
     assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
     assert rejected_orders[0]["agent_addr"] == "block_gen6"
@@ -519,7 +519,7 @@ def test_complex_clearing_LB():
     )
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
 
     assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
     assert rejected_orders == []
@@ -528,7 +528,7 @@ def test_complex_clearing_LB():
 if __name__ == "__main__":
     pass
     # from assume.common.utils import plot_orderbook
-    # clearing_result, meta = test_market_mechanism()
+    # clearing_result, meta, flows = test_market_mechanism()
     # only works with per node clearing
     # fig, ax = plot_orderbook(clearing_result, meta)
     # fig.show()

@@ -520,31 +520,20 @@ class ComplexClearingRole(MarketRole):
             if all(order_surplus >= 0 for order_surplus in orders_surplus):
                 break
 
-        # extract flows
-        flows = instance.flows
+        log_flows = True
 
-        flows_filtered = {}
-
-        # filter flows and only use positive flows to half the size of the dict
-        flows_filtered = {
-            index: flow.value for index, flow in flows.items() if not flow.stale
-        }
-        flows_filtered = {
-            index: flow for index, flow in flows_filtered.items() if flow > 0
-        }
-
-        accepted_orders, rejected_orders, meta = extract_results(
+        accepted_orders, rejected_orders, meta, flows = extract_results(
             model=instance,
             orders=orderbook,
             rejected_orders=rejected_orders,
             market_products=market_products,
             market_clearing_prices=market_clearing_prices,
-            flows=flows_filtered,
+            log_flows=log_flows,
         )
 
         self.all_orders = []
 
-        return accepted_orders, rejected_orders, meta, flows_filtered
+        return accepted_orders, rejected_orders, meta, flows
 
 
 def calculate_order_surplus(
@@ -630,6 +619,7 @@ def extract_results(
     rejected_orders: Orderbook,
     market_products: list[MarketProduct],
     market_clearing_prices: dict,
+    log_flows: bool = False,
 ):
     """
     Extracts the results of the market clearing from the solved pyomo model.
@@ -735,4 +725,18 @@ def extract_results(
                 }
             )
 
-    return accepted_orders, rejected_orders, meta
+        flows_filtered = {}
+
+        if log_flows:
+            # extract flows
+
+            # Check if the model has the 'flows' attribute
+            if hasattr(model, "flows"):
+                flows = model.flows
+
+                # filter flows and only use positive flows to half the size of the dict
+                flows_filtered = {
+                    index: flow.value for index, flow in flows.items() if not flow.stale
+                }
+
+    return accepted_orders, rejected_orders, meta, flows_filtered

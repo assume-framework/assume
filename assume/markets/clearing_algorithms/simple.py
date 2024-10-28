@@ -286,4 +286,8 @@ class PayAsBidRole(MarketRole):
                     product,
                 )
             )
-        return accepted_orders, rejected_orders, meta
+
+            # wirte network flows here if applicable
+            flows = []
+
+        return accepted_orders, rejected_orders, meta, flows

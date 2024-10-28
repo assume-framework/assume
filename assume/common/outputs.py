@@ -587,15 +587,17 @@ class WriteOutput(Role):
         records = [
             {
                 "timestamp": timestamp,
-                "from_node": from_node,
-                "to_node": to_node,
+                "line": line,
                 "flow": flow,
             }
-            for (timestamp, from_node, to_node), flow in data.items()
+            for (timestamp, line), flow in data.items()
         ]
         df = pd.DataFrame(records)
 
         df["simulation"] = self.simulation_id
+
+        # set timestamp to index
+        df.set_index("timestamp", inplace=True)
 
         with self.locks["flows"]:
             self.write_dfs["flows"].append(df)

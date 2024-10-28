@@ -90,6 +90,7 @@ v0.4.0 - latest release (8th August 2024)
 - Examples have been restructed to easier orientation and understanding: example_01.. cover all feature demonstration examples,
   example_02.. cover all learning examples, example_03.. cover all full year examples
 - Added the option of integrating different actor network architectures to the reinforcement learning algorithm, currently a multilayer perceptron (mlp) and long short-term memory (lstm) are implemented
+- Added storing of network flows for complex clearing
 
 **Bug Fixes:**
 

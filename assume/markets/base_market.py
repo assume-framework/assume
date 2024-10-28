@@ -238,13 +238,6 @@ class MarketRole(MarketMechanism, Role):
         Sets up the initial configuration and subscriptions for the market role.
 
         This method performs the following actions:
-            - Sets the address and agent ID of the market configuration to match the current context.
-            - Validates that all required fields are present in the market configuration.
-            - Defines filter methods (`accept_orderbook`, `accept_registration`, `accept_get_unmatched`, `accept_data_request`)
-            that serve as validation steps for different types of incoming messages.
-            - Subscribes the role to handle incoming messages using the appropriate handler methods.
-            - Schedules the `opening()` method to run at the next opening time of the market.
-            - Sends grid topology data once, if available.
 
         - Sets the address and agent ID of the market configuration to match the current context.
         - Validates that all required fields are present in the market configuration.
@@ -691,7 +684,8 @@ class MarketRole(MarketMechanism, Role):
 
         await self.store_market_results(market_meta)
 
-        await self.store_flows(flows)
+        if len(flows) > 0:
+            await self.store_flows(flows)
 
         return accepted_orderbook, market_meta
 
