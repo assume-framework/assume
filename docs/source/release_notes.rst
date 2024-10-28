@@ -12,6 +12,12 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. pip install git+https://github.com/assume-framework/assume
 
+**New Features:**
+
+- **PPO Integration:** The Proximal Policy Optimization (PPO) algorithm has been integrated into the framework, 
+providing users with an additional reinforcement learning algorithm option for training agents. 
+PPO is a popular policy gradient method that has been shown to be effective in a wide range of applications, 
+making it a valuable addition to the framework's learning capabilities. A tutorial on how to use this feature is coming soon.
 
 v0.4.0 - latest release (8th August 2024)
 =========================================

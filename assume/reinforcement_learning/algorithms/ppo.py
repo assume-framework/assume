@@ -659,23 +659,33 @@ def get_actions(rl_strategy, next_observation):
 
     actor = rl_strategy.actor
     device = rl_strategy.device
+    learning_mode = rl_strategy.learning_mode
+    perform_evaluation = rl_strategy.perform_evaluation
 
     # Pass observation through the actor network to get action logits (mean of action distribution)
     action_logits = actor(next_observation.to(device))
 
     logger.debug(f"Action logits: {action_logits}")
 
-    # Create a normal distribution for continuous actions (with assumed standard deviation of 1.0)
-    action_distribution = th.distributions.Normal(action_logits, 1.0)
+    if learning_mode and not perform_evaluation:
 
-    logger.debug(f"Action distribution: {action_distribution}")
+        # Create a normal distribution for continuous actions (with assumed standard deviation of 1.0)
+        action_distribution = th.distributions.Normal(next_observation[-1]-action_logits, 1.0)
 
-    # Sample an action from the distribution
-    sampled_action = action_distribution.sample()
+        logger.debug(f"Action distribution: {action_distribution}")
+
+        # Sample an action from the distribution
+        sampled_action = action_distribution.sample()
+
+
+    else:
+        # If not in learning mode or during evaluation, use the mean of the action distribution
+        sampled_action = action_logits
 
     logger.debug(f"Sampled action: {sampled_action}")
 
-    # Get the log probability of the sampled action (for later PPO loss calculation)
+    # Get the log probability of the sampled actions (for later PPO loss calculation)
+    # Sum the log probabilities across all action dimensions TODO: Why sum?
     log_prob_action = action_distribution.log_prob(sampled_action).sum(dim=-1)
 
     # Detach the log probability tensor to stop gradient tracking (since we only need the value for later)
@@ -685,8 +695,10 @@ def get_actions(rl_strategy, next_observation):
 
     # PREVIOUSLY SET TO (-1, 1)
     # Bound actions to [0, 1] range
+    # TODO: Does it make more sense o to log probaility of the action before or after clamping?
     sampled_action = sampled_action.clamp(0, 1)
 
     logger.debug(f"Clamped sampled action: {sampled_action}")
+
 
     return sampled_action, log_prob_action
