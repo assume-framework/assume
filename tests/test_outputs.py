@@ -166,7 +166,7 @@ def test_output_write_flows():
     content = {
         "context": "write_results",
         "type": "store_flows",
-        "data": {(datetime.datetime(2019, 1, 1, 0, 0), "north_south_example"): 0.0},
+        "data": {(datetime(2019, 1, 1, 0, 0), "north_south_example"): 0.0},
     }
 
     output_writer.handle_message(content, meta)
