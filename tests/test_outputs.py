@@ -166,13 +166,9 @@ def test_output_write_flows():
     content = {
         "context": "write_results",
         "type": "store_flows",
-        "data": pd.DataFrame(
-            {
-                "timestamp": pd.Timestamp("2019-01-01 00:00:00"),
-                "line": 'north_south_example',
-                "flow": 0.0,
-                },
-            ),
+        "data": {
+                (datetime.datetime(2019, 1, 1, 0, 0), 'north_south_example'): 0.0
+            }
         }
         
         
