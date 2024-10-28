@@ -53,7 +53,8 @@ network = [
 ]
 oeds = [
     "demandlib >=0.1.9",
-    "holidays >=0.37",
+    # see https://github.com/vacanza/holidays/discussions/1800
+    "holidays <1.0",
     "pvlib >=0.10.2",
     "windpowerlib >=0.2.1",
 ]
