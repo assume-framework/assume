@@ -26,8 +26,6 @@ async def create_worker(
     for market_config in marketdesign:
         world.add_market(market_operator_addr.aid, market_config)
 
-    world.add_unit_operator(f"my_operator{i}")
-
     world.add_unit_operator(f"my_demand{i}")
     world.add_unit(
         f"demand{i}",

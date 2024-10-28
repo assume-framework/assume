@@ -201,19 +201,25 @@ class World:
         container_kwargs = {}
         if self.addr == "world":
             container_func = create_ec_container
+            container_kwargs = {
+                "addr": self.addr,
+            }
         elif isinstance(self.addr, tuple):
             container_func = create_tcp_container
+            container_kwargs = {
+                "addr": self.addr,
+            }
         else:
             container_func = create_mqtt_container
-            container_kwargs["mqtt_kwargs"] = {
+            container_kwargs = {
                 "broker_addr": "localhost",
                 "client_id": self.addr,
+                "inbox_topic": self.addr,
             }
-            container_kwargs["mqtt_kwargs"].update(**kwargs)
+            container_kwargs.update(**kwargs)
 
         self.container = container_func(
             codec=mango_codec_factory(),
-            addr=self.addr,
             clock=self.clock,
             **container_kwargs,
         )
@@ -228,7 +234,6 @@ class World:
             # if distributed_role is False - we are a ChildContainer
             # and only connect to the manager_address, which can set/sync our clock
             self.clock_agent = DistributedClockAgent()
-            self.container.register(self.clock_agent)
             self.output_agent_addr = AgentAddress(manager_address, "export_agent_1")
 
             # # when the clock_agent is stopped, we should gracefully shutdown our container
