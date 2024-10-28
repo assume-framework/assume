@@ -347,7 +347,7 @@ class ComplexClearingRole(MarketRole):
 
         Args:
             orderbook (Orderbook): The orderbook to be validated.
-            agent_addr (AgentAddress): The agent address of the market (agent_addr, agent_id).
+            agent_addr (AgentAddress): The agent address of the market.
 
         Raises:
             ValueError: If the bid type is invalid.

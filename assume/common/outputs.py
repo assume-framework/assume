@@ -430,7 +430,7 @@ class WriteOutput(Role):
             )
 
         del df["only_hours"]
-        del df["agent_id"]
+        del df["agent_addr"]
 
         if "bid_type" not in df.columns:
             df["bid_type"] = None

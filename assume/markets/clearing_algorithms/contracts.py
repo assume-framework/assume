@@ -125,8 +125,8 @@ class PayAsBidContractRole(MarketRole):
         Returns:
             bool: True if the orders are compatible
         """
-        s_information = self.registered_agents[supply_order["agent_id"]]
-        d_information = self.registered_agents[demand_order["agent_id"]]
+        s_information = self.registered_agents[supply_order["agent_addr"]]
+        d_information = self.registered_agents[demand_order["agent_addr"]]
         return supply_order["eligible_lambda"](d_information) and demand_order[
             "eligible_lambda"
         ](s_information)
@@ -218,9 +218,9 @@ class PayAsBidContractRole(MarketRole):
                     supply_order["accepted_price"] = supply_order["price"]
                     demand_order["accepted_price"] = supply_order["price"]
                     supply_order["contractor_unit_id"] = demand_order["sender_id"]
-                    supply_order["contractor_id"] = demand_order["agent_id"]
+                    supply_order["contractor_id"] = demand_order["agent_addr"]
                     demand_order["contractor_unit_id"] = supply_order["sender_id"]
-                    demand_order["contractor_id"] = supply_order["agent_id"]
+                    demand_order["contractor_id"] = supply_order["agent_addr"]
                 accepted_supply_orders.extend(to_commit)
 
             for order in supply_orders:
@@ -281,7 +281,7 @@ class PayAsBidContractRole(MarketRole):
         # contract must be executed
         # contract from supply is given
         buyer, seller = contract["contractor_unit_id"], contract["unit_id"]
-        seller_agent = contract["agent_id"]
+        seller_agent = contract["agent_addr"]
         c_function: Callable[str, tuple[Orderbook, Orderbook]] = available_contracts[
             contract["contract"]
         ]
@@ -343,7 +343,7 @@ class PayAsBidContractRole(MarketRole):
 
         in_reply_to = f'{contract["contract"]}_{contract["start_time"]}'
         await self.send_contract_result(contract["contractor_id"], buyer, in_reply_to)
-        await self.send_contract_result(contract["agent_id"], seller, in_reply_to)
+        await self.send_contract_result(contract["agent_addr"], seller, in_reply_to)
 
     async def send_contract_result(
         self, receiver: tuple, orderbook: Orderbook, in_reply_to: str
@@ -397,7 +397,7 @@ def ppa(
     Returns:
         tuple[dict, dict]: the buyer order and the seller order as a tuple
     """
-    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_id"]
+    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_addr"]
     volume = sum(future_generation_series[start:end])
     buyer: Orderbook = [
         {
@@ -410,7 +410,7 @@ def ppa(
             "accepted_volume": volume,
             "accepted_price": contract["price"],
             "only_hours": None,
-            "agent_id": buyer_agent,
+            "agent_addr": buyer_agent,
         }
     ]
     seller: Orderbook = [
@@ -424,7 +424,7 @@ def ppa(
             "accepted_volume": -volume,
             "accepted_price": contract["price"],
             "only_hours": None,
-            "agent_id": seller_agent,
+            "agent_addr": seller_agent,
         }
     ]
     return buyer, seller
@@ -450,7 +450,7 @@ def swingcontract(
     Returns:
         tuple[dict, dict]: the buyer order and the seller order as a tuple
     """
-    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_id"]
+    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_addr"]
 
     minDCQ = 80  # daily constraint quantity
     maxDCQ = 100
@@ -475,7 +475,7 @@ def swingcontract(
             "accepted_volume": demand,
             "accepted_price": price,
             "only_hours": None,
-            "agent_id": buyer_agent,
+            "agent_addr": buyer_agent,
         }
     ]
     seller: Orderbook = [
@@ -489,7 +489,7 @@ def swingcontract(
             "accepted_volume": -demand,
             "accepted_price": price,
             "only_hours": None,
-            "agent_id": seller_agent,
+            "agent_addr": seller_agent,
         }
     ]
     return buyer, seller
@@ -515,7 +515,7 @@ def cfd(
     Returns:
         tuple[dict, dict]: the buyer order and the seller order as a tuple
     """
-    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_id"]
+    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_addr"]
 
     # TODO does not work with multiple markets with differing time scales..
     # this only works for whole trading hours (as x MW*1h == x MWh)
@@ -539,7 +539,7 @@ def cfd(
             "accepted_volume": volume,
             "accepted_price": price,
             "only_hours": None,
-            "agent_id": buyer_agent,
+            "agent_addr": buyer_agent,
         }
     ]
     seller: Orderbook = [
@@ -553,7 +553,7 @@ def cfd(
             "accepted_volume": -volume,
             "accepted_price": price,
             "only_hours": None,
-            "agent_id": seller_agent,
+            "agent_addr": seller_agent,
         }
     ]
     return buyer, seller
@@ -580,7 +580,7 @@ def market_premium(
     Returns:
         tuple[dict, dict]: the buyer order and the seller order as a tuple
     """
-    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_id"]
+    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_addr"]
     # TODO does not work with multiple markets with differing time scales..
     # this only works for whole trading hours (as x MW*1h == x MWh)
     price_series = (market_index[start:end] - contract["price"]) * gen_series[start:end]
@@ -601,7 +601,7 @@ def market_premium(
             "accepted_volume": volume,
             "accepted_price": price,
             "only_hours": None,
-            "agent_id": buyer_agent,
+            "agent_addr": buyer_agent,
         }
     ]
     seller: Orderbook = [
@@ -615,7 +615,7 @@ def market_premium(
             "accepted_volume": -volume,
             "accepted_price": price,
             "only_hours": None,
-            "agent_id": seller_agent,
+            "agent_addr": seller_agent,
         }
     ]
     return buyer, seller
@@ -628,7 +628,7 @@ def feed_in_tariff(
     start: datetime,
     end: datetime,
 ):
-    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_id"]
+    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_addr"]
     # TODO does not work with multiple markets with differing time scales..
     # this only works for whole trading hours (as x MW*1h == x MWh)
     price_series = contract["price"] * client_series[start:end]
@@ -647,7 +647,7 @@ def feed_in_tariff(
             "accepted_volume": volume,
             "accepted_price": price,
             "only_hours": None,
-            "agent_id": buyer_agent,
+            "agent_addr": buyer_agent,
         }
     ]
     seller: Orderbook = [
@@ -661,7 +661,7 @@ def feed_in_tariff(
             "accepted_volume": -volume,
             "accepted_price": price,
             "only_hours": None,
-            "agent_id": seller_agent,
+            "agent_addr": seller_agent,
         }
     ]
     return buyer, seller

@@ -119,7 +119,7 @@ class MarketMechanism:
 
         # Validate each order in the orderbook
         for order in orderbook:
-            order["agent_id"] = agent_addr
+            order["agent_addr"] = agent_addr
 
             # Ensure 'only_hours' field is present
             if not order.get("only_hours"):
@@ -631,17 +631,17 @@ class MarketRole(MarketMechanism, Role):
 
         self.open_auctions - set(market_products)
 
-        accepted_orderbook = sorted(accepted_orderbook, key=lambda x: str(x["agent_id"]))
-        rejected_orderbook = sorted(rejected_orderbook, key=lambda x: str(x["agent_id"]))
+        accepted_orderbook = sorted(accepted_orderbook, key=lambda x: str(x["agent_addr"]))
+        rejected_orderbook = sorted(rejected_orderbook, key=lambda x: str(x["agent_addr"]))
         
 
         accepted_orders = {
             agent: list(bids)
-            for agent, bids in groupby(accepted_orderbook, itemgetter("agent_id"))
+            for agent, bids in groupby(accepted_orderbook, itemgetter("agent_addr"))
         }
         rejected_orders = {
             agent: list(bids)
-            for agent, bids in groupby(rejected_orderbook, itemgetter("agent_id"))
+            for agent, bids in groupby(rejected_orderbook, itemgetter("agent_addr"))
         }
 
         for agent in self.registered_agents.keys():

@@ -36,7 +36,7 @@ def test_output_market_orders():
             "end_time": end,
             "volume": 120,
             "price": 120,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         },
         {
@@ -44,7 +44,7 @@ def test_output_market_orders():
             "end_time": end,
             "volume": 80,
             "price": 58,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         },
         {
@@ -52,7 +52,7 @@ def test_output_market_orders():
             "end_time": end,
             "volume": 100,
             "price": 53,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         },
         {
@@ -60,7 +60,7 @@ def test_output_market_orders():
             "end_time": end,
             "volume": -180,
             "price": 70,
-            "agent_id": "dem1",
+            "agent_addr": "dem1",
             "only_hours": None,
         },
     ]

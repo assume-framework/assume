@@ -473,7 +473,7 @@ class UnitsOperator(Role):
                 product_tuples=products,
             )
             for i, order in enumerate(product_bids):
-                order["agent_id"] = self.context.addr
+                order["agent_addr"] = self.context.addr
                 if market.volume_tick:
                     order["volume"] = round(order["volume"] / market.volume_tick)
                 if market.price_tick:

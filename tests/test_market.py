@@ -57,7 +57,7 @@ async def test_market_init(market_role: MarketRole):
             "end_time": end,
             "volume": 120,
             "price": 120,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         }
     ]
@@ -79,7 +79,7 @@ async def test_market_tick(market_role: MarketRole):
             "end_time": end,
             "volume": 120.123,
             "price": 1201,  # used to present 120.1 with precision 0.1
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         }
     ]
@@ -94,7 +94,7 @@ async def test_market_tick(market_role: MarketRole):
             "end_time": end,
             "volume": 120.123,
             "price": 120.123,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         }
     ]
@@ -120,7 +120,7 @@ async def test_market_max(market_role: MarketRole):
             "end_time": end,
             "volume": 9091,
             "price": 120,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         }
     ]
@@ -134,7 +134,7 @@ async def test_market_max(market_role: MarketRole):
             "end_time": end,
             "volume": 9090,
             "price": 1001,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         }
     ]
@@ -148,7 +148,7 @@ async def test_market_max(market_role: MarketRole):
             "end_time": end,
             "volume": 9090,
             "price": -550,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         }
     ]
@@ -162,7 +162,7 @@ async def test_market_max(market_role: MarketRole):
             "end_time": end,
             "volume": 9090,
             "price": 1000,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         }
     ]
@@ -193,7 +193,7 @@ async def test_market_for_BB(market_role: MarketRole):
             "end_time": end,
             "volume": {time: 50 for time in time_range},
             "price": {time: 1000 for time in time_range},
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
             "bid_type": "BB",
         }
@@ -230,7 +230,7 @@ async def test_market_unmatched(market_role: MarketRole):
             "end_time": end,
             "volume": 10,
             "price": 20,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         }
     ]
@@ -260,7 +260,7 @@ async def test_market_accepted(market_role: MarketRole):
             "end_time": end,
             "volume": 10,
             "price": 20,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         },
         {
@@ -268,7 +268,7 @@ async def test_market_accepted(market_role: MarketRole):
             "end_time": end,
             "volume": -10,
             "price": 20,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         }
     ]

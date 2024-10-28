@@ -34,7 +34,7 @@ def test_contract_functions():
         "sender_id": "nuclear1",
         "eligible_lambda": is_co2emissionless,
         "evaluation_frequency": rr.WEEKLY,
-        "agent_id": AgentAddress("world", "my_operator"),
+        "agent_addr": AgentAddress("world", "my_operator"),
         "bid_id": "nuclear1_1",
         "unit_id": "nuclear1",
         "accepted_volume": 1000,
