@@ -19,7 +19,7 @@ from assume.scenario.oeds.infrastructure import InfrastructureInterface
 logger = logging.getLogger(__name__)
 
 
-async def load_oeds(
+def load_oeds(
     world: World,
     scenario: str,
     study_case: str,
@@ -213,7 +213,7 @@ if __name__ == "__main__":
     # FH Aachen internal server
     infra_uri = os.getenv(
         "INFRASTRUCTURE_URI",
-        "postgresql://readonly:readonly@timescale.nowum.fh-aachen.de:5432",
+        "postgresql://readonly:readonly@timescale.nowum.fh-aachen.de:5432/opendata",
     )
 
     nuts_config = ["DE1", "DEA", "DEB", "DEC", "DED", "DEE", "DEF"]
