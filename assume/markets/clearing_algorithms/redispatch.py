@@ -15,6 +15,7 @@ from assume.common.grid_utils import (
     read_pypsa_grid,
 )
 from assume.common.market_objects import MarketConfig, Orderbook
+from assume.common.utils import suppress_output
 from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
@@ -69,18 +70,11 @@ class RedispatchMarketRole(MarketRole):
             loads=self.grid_data["loads"],
         )
 
-        self.solver = marketconfig.param_dict.get("solver", "glpk")
-        self.env = None
-
+        self.solver = marketconfig.param_dict.get("solver", "highs")
         if self.solver == "gurobi":
-            try:
-                from gurobipy import Env
-
-                self.env = Env()
-                self.env.setParam("LogToConsole", 0)
-            except ImportError:
-                logger.error("gurobi not installed - using GLPK")
-                self.solver = "glpk"
+            self.solver_options = {"LogToConsole": 0, "OutputFlag": 0}
+        elif self.solver == "highs":
+            self.solver_options = {"output_flag": False, "log_to_console": False}
 
         # set the market clearing principle
         # as pay as bid or pay as clear
@@ -193,10 +187,11 @@ class RedispatchMarketRole(MarketRole):
         if line_loading.max().max() > 1:
             logger.debug("Congestion detected")
 
-            status, termination_condition = redispatch_network.optimize(
-                solver_name=self.solver,
-                env=self.env,
-            )
+            with suppress_output():
+                status, termination_condition = redispatch_network.optimize(
+                    solver_name=self.solver,
+                    solver_options=self.solver_options,
+                )
 
             if status != "ok":
                 logger.error(f"Solver exited with {termination_condition}")

@@ -17,7 +17,7 @@ from assume.units.steel_plant import SteelPlant
 def dsm_components():
     return {
         "electrolyser": {
-            "rated_power": 100,
+            "max_power": 100,
             "min_power": 0,
             "ramp_up": 100,
             "ramp_down": 100,
@@ -30,7 +30,7 @@ def dsm_components():
             "specific_natural_gas_consumption": 1,
             "specific_electricity_consumption": 1,
             "specific_iron_ore_consumption": 1,
-            "rated_power": 100,
+            "max_power": 100,
             "min_power": 0,
             "fuel_type": "hydrogen",
             "ramp_up": 100,
@@ -39,7 +39,7 @@ def dsm_components():
             "min_down_time": 0,
         },
         "eaf": {
-            "rated_power": 100,
+            "max_power": 100,
             "min_power": 0,
             "specific_electricity_consumption": 1,
             "specific_dri_demand": 1,

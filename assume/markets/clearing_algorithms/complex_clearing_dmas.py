@@ -27,7 +27,7 @@ from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
 
-SOLVERS = ["glpk", "cbc", "gurobi", "cplex"]
+SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
 
 order_types = ["single_ask", "single_bid", "linked_ask", "exclusive_ask"]
 
@@ -155,6 +155,7 @@ class ComplexDmasClearingRole(MarketRole):
             ),
             within=Reals,
             bounds=(0, 1),
+            initialize=0,
         )
         model_vars["single_ask"] = model.use_hourly_ask
         # Step 3 initialize binary variables for ask order in block per agent
@@ -317,7 +318,7 @@ class ComplexDmasClearingRole(MarketRole):
         logger.info("start optimization/market clearing")
         t1 = time.time()
         try:
-            if opt.name == "gurobi":
+            if hasattr(opt, "name") and opt.name == "gurobi":
                 options = {"MIPGap": 0.1, "TimeLimit": 60}
             else:
                 options = {}

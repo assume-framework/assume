@@ -3,8 +3,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import calendar
+import contextlib
 import inspect
 import logging
+import os
+import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from functools import wraps
@@ -508,37 +511,46 @@ def adjust_unit_operator_for_learning(
     return unit_operator_id
 
 
-def create_zonal_incidence_matrix(lines, buses, zones_id):
-    nodes = buses[zones_id].unique()
-    node_to_zone = buses[zones_id].to_dict()
+def create_incidence_matrix(lines, buses, zones_id=None):
+    # Determine nodes based on whether we're working with zones or individual buses
+    if zones_id:
+        nodes = buses[zones_id].unique()  # Use zones as nodes
+        node_mapping = buses[zones_id].to_dict()  # Map bus IDs to zones
+    else:
+        nodes = buses.index.values  # Use buses as nodes
+        node_mapping = {bus: bus for bus in nodes}  # Identity mapping for buses
 
-    incidence_matrix = pd.DataFrame(0, index=nodes, columns=nodes)
+    # Use the line indices as columns for the incidence matrix
+    line_indices = lines.index.values
 
-    for _, line in lines.iterrows():
-        zone0, zone1 = node_to_zone[line["bus0"]], node_to_zone[line["bus1"]]
-        if zone0 != zone1:
-            incidence_matrix.loc[zone0, zone1] += line["s_nom"]
-            incidence_matrix.loc[zone1, zone0] += line["s_nom"]
+    # Initialize incidence matrix as a DataFrame for easier label-based indexing
+    incidence_matrix = pd.DataFrame(0, index=nodes, columns=line_indices)
 
-    # Convert values below the diagonal to negative
-    mask = np.tril(np.ones(incidence_matrix.shape), -1).astype(bool)
-    incidence_matrix.values[mask] = -incidence_matrix.values[mask]
+    # Fill in the incidence matrix by iterating over lines
+    for line_idx, line in lines.iterrows():
+        bus0 = line["bus0"]
+        bus1 = line["bus1"]
 
+        # Retrieve mapped nodes (zones or buses)
+        node0 = node_mapping.get(bus0)
+        node1 = node_mapping.get(bus1)
+
+        # Ensure both nodes are valid and part of the defined nodes
+        if (
+            node0 is not None
+            and node1 is not None
+            and node0 in nodes
+            and node1 in nodes
+        ):
+            if node0 != node1:  # Only create incidence for different nodes
+                # Set incidence values: +1 for the "from" node and -1 for the "to" node
+                incidence_matrix.at[node0, line_idx] = (
+                    1  # Outgoing from bus0 (or zone0)
+                )
+                incidence_matrix.at[node1, line_idx] = -1  # Incoming to bus1 (or zone1)
+
+    # Return the incidence matrix as a Data
     return incidence_matrix
-
-
-def create_nodal_incidence_matrix(lines, buses):
-    nodes = buses.index.values
-    node_index = {node: idx for idx, node in enumerate(nodes)}
-
-    incidence_matrix = np.zeros((len(nodes), len(nodes)))
-
-    for _, line in lines.iterrows():
-        i, j = node_index[line["bus0"]], node_index[line["bus1"]]
-        incidence_matrix[i, j] = line["s_nom"]
-        incidence_matrix[j, i] = -line["s_nom"]
-
-    return pd.DataFrame(incidence_matrix, index=nodes, columns=nodes)
 
 
 def normalize_availability(powerplants_df, availability_df):
@@ -588,3 +600,77 @@ def rename_study_case(path: str, old_key: str, new_key: str):
     # Write the modified data back to the file
     with open(path, "w") as file:
         yaml.safe_dump(data, file, sort_keys=False)
+
+
+def check_for_tensors(data):
+    """
+    Checks if the data contains tensors and converts them to native Python types.
+
+    Supports both pandas.Series and list of dictionaries.
+
+    Args:
+        data (pandas.Series or list of dicts): The data to be checked.
+
+    Returns:
+        The data with tensors converted to native Python types.
+    """
+    try:
+        import torch as th
+
+        if isinstance(data, pd.Series):
+            # Vectorized check for tensors
+            tensor_mask = data.apply(lambda x: isinstance(x, th.Tensor))
+            if tensor_mask.any():
+                # Convert tensors to their scalar values
+                data[tensor_mask] = data[tensor_mask].apply(lambda x: x.item())
+
+        elif isinstance(data, list):
+            # Check if it's a list of dictionaries
+            if all(isinstance(item, dict) for item in data):
+                for d in data:
+                    for key, value in d.items():
+                        if isinstance(value, th.Tensor):
+                            d[key] = value.item()
+
+        else:
+            # If data is a single value, check its type directly
+            if isinstance(data, th.Tensor):
+                data = data.item()
+
+    except ImportError:
+        # If torch is not installed, return the data unchanged
+        pass
+
+    return data
+
+
+# Define a context manager to suppress output
+@contextlib.contextmanager
+def suppress_output():
+    # Save the original stdout and stderr file descriptors
+    original_stdout_fd = sys.stdout.fileno()
+    original_stderr_fd = sys.stderr.fileno()
+
+    # Open /dev/null for redirecting output
+    devnull = os.open(os.devnull, os.O_WRONLY)
+
+    # Duplicate the original stdout and stderr file descriptors to restore them later
+    saved_stdout_fd = os.dup(original_stdout_fd)
+    saved_stderr_fd = os.dup(original_stderr_fd)
+
+    try:
+        # Redirect stdout and stderr to /dev/null
+        os.dup2(devnull, original_stdout_fd)
+        os.dup2(devnull, original_stderr_fd)
+
+        yield  # Allow the block of code to execute
+
+    finally:
+        # Restore stdout and stderr from the saved file descriptors
+        os.dup2(saved_stdout_fd, original_stdout_fd)
+        os.dup2(saved_stderr_fd, original_stderr_fd)
+
+        # Close the duplicated file descriptors and /dev/null
+        os.close(saved_stdout_fd)
+        os.close(saved_stderr_fd)
+        os.close(devnull)

@@ -148,12 +148,8 @@ class NaiveDASteelplantStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        bids = []
-        start = product_tuples[0][0]  # start time of the first product
-
+        # calculate the optimal operation of the unit
         unit.calculate_optimal_operation_if_needed()
-
-        # unit.run_modified_optimization()
 
         bids = []
         for product in product_tuples:
@@ -162,14 +158,15 @@ class NaiveDASteelplantStrategy(BaseStrategy):
             and the volume of the product. Dispatch the order to the market.
             """
             start = product[0]
+
             volume = unit.opt_power_requirement.loc[start]
-            price = 3000
+            marginal_price = unit.calculate_marginal_cost(start, volume)
             bids.append(
                 {
                     "start_time": product[0],
                     "end_time": product[1],
                     "only_hours": product[2],
-                    "price": price,
+                    "price": marginal_price,
                     "volume": -volume,
                 }
             )
@@ -185,12 +182,8 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        bids = []
-        start = product_tuples[0][0]  # start time of the first product
-
+        # calculate the optimal operation of the unit according to the objective function
         unit.calculate_optimal_operation_if_needed()
-
-        # introduce marginal cost
 
         bids = []
         for product in product_tuples:
@@ -200,13 +193,13 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
             """
             start = product[0]
             volume = unit.flex_power_requirement.loc[start]
-            price = 3000
+            marginal_price = unit.calculate_marginal_cost(start, volume)
             bids.append(
                 {
                     "start_time": product[0],
                     "end_time": product[1],
                     "only_hours": product[2],
-                    "price": price,
+                    "price": marginal_price,
                     "volume": -volume,
                 }
             )
