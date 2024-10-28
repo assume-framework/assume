@@ -296,3 +296,38 @@ class RLUnitsOperator(UnitsOperator):
                     "data": rl_agent_data,
                 },
             )
+
+    async def formulate_bids(
+        self, market: MarketConfig, products: list[tuple]
+    ) -> Orderbook:
+        """
+        Formulates the bid to the market according to the bidding strategy of the each unit individually.
+
+        Args:
+            market (MarketConfig): The market to formulate bids for.
+            products (list[tuple]): The products to formulate bids for.
+
+        Returns:
+            OrderBook: The orderbook that is submitted as a bid to the market.
+        """
+
+        orderbook: Orderbook = []
+
+        for unit_id, unit in self.units.items():
+            product_bids = unit.calculate_bids(
+                market,
+                product_tuples=products,
+            )
+            for i, order in enumerate(product_bids):
+                order["agent_id"] = (self.context.addr, self.context.aid)
+
+                if market.volume_tick:
+                    order["volume"] = round(order["volume"] / market.volume_tick)
+                if market.price_tick:
+                    order["price"] = round(order["price"] / market.price_tick)
+                if "bid_id" not in order.keys() or order["bid_id"] is None:
+                    order["bid_id"] = f"{unit_id}_{i+1}"
+                order["unit_id"] = unit_id
+                orderbook.append(order)
+
+        return orderbook

@@ -25,9 +25,9 @@ from pyomo.opt import SolverFactory, check_available_solvers
 from assume.common.market_objects import MarketConfig, MarketProduct, Order, Orderbook
 from assume.markets.base_market import MarketRole
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
-SOLVERS = ["glpk", "cbc", "gurobi", "cplex"]
+SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
 
 order_types = ["single_ask", "single_bid", "linked_ask", "exclusive_ask"]
 
@@ -38,7 +38,7 @@ class ComplexDmasClearingRole(MarketRole):
     def __init__(self, marketconfig: MarketConfig, verbose: bool = False):
         super().__init__(marketconfig)
         if not verbose:
-            log.setLevel(logging.WARNING)
+            logger.setLevel(logging.WARNING)
 
     def clear(
         self, orderbook: Orderbook, market_products: list[MarketProduct]
@@ -92,13 +92,13 @@ class ComplexDmasClearingRole(MarketRole):
                     order_type = "exclusive_ask"
                 else:
                     order_type = None
-                    log.error(f"received invalid order: {order=}")
+                    logger.error(f"received invalid order: {order=}")
             elif not (order["block_id"] is None or order["link"] is None):
                 if order["exclusive_id"] is None:
                     order_type = "linked_ask"
                 else:
                     order_type = None
-                    log.error(f"received invalid order: {order=}")
+                    logger.error(f"received invalid order: {order=}")
             else:
                 if order["volume"] < 0:
                     order_type = "single_bid"
@@ -145,7 +145,7 @@ class ComplexDmasClearingRole(MarketRole):
 
         # optimize
         model.clear()
-        log.info("start building model")
+        logger.info("start building model")
         t1 = time.time()
         # Step 1 initialize binary variables for hourly ask block per agent and id
         model.use_hourly_ask = Var(
@@ -155,6 +155,7 @@ class ComplexDmasClearingRole(MarketRole):
             ),
             within=Reals,
             bounds=(0, 1),
+            initialize=0,
         )
         model_vars["single_ask"] = model.use_hourly_ask
         # Step 3 initialize binary variables for ask order in block per agent
@@ -204,14 +205,14 @@ class ComplexDmasClearingRole(MarketRole):
                         )
                     )
                 else:
-                    log.warning(
+                    logger.warning(
                         f"Agent {agent} send invalid linked orders "
                         f"- block {block} has no parent_id {parent_id}"
                     )
-                    log.warning("Block, Hour, Agent, Price, Volume, Link")
+                    logger.warning("Block, Hour, Agent, Price, Volume, Link")
                     for key, data in orders["linked_ask"].items():
                         if key[2] == agent:
-                            log.warning(
+                            logger.warning(
                                 f"{key[0], key[1], key[2], data[0], data[1], data[2]}"
                             )
             else:
@@ -289,10 +290,10 @@ class ComplexDmasClearingRole(MarketRole):
         model.gen_dem = ConstraintList()
         for t in t_range:
             if not index_orders["single_bid"][t]:
-                log.error(f"no hourly_bids available at hour {t}")
+                logger.error(f"no hourly_bids available at hour {t}")
             elif not (index_orders["single_ask"][t] or index_orders["linked_ask"][t]):
                 # constraints with 0 <= 0 are not valid
-                log.error(f"no hourly_asks available at hour {t}")
+                logger.error(f"no hourly_asks available at hour {t}")
             else:
                 model.gen_dem.add(magic_source[t] == model.source[t] - model.sink[t])
 
@@ -313,21 +314,21 @@ class ComplexDmasClearingRole(MarketRole):
         # and is magically filled if not
 
         model.obj = Objective(expr=generation_cost, sense=minimize)
-        log.info(f"built model in {time.time() - t1:.2f} seconds")
-        log.info("start optimization/market clearing")
+        logger.info(f"built model in {time.time() - t1:.2f} seconds")
+        logger.info("start optimization/market clearing")
         t1 = time.time()
         try:
-            if opt.name == "gurobi":
+            if hasattr(opt, "name") and opt.name == "gurobi":
                 options = {"MIPGap": 0.1, "TimeLimit": 60}
             else:
                 options = {}
             r = opt.solve(model, options=options)
-            log.info(r)
+            logger.info(r)
         except Exception as e:
-            log.exception("error solving optimization problem")
-            log.error(f"Model: {model}")
-            log.error(f"{repr(e)}")
-        log.info(f"cleared market in {time.time() - t1:.2f} seconds")
+            logger.exception("error solving optimization problem")
+            logger.error(f"Model: {model}")
+            logger.error(f"{repr(e)}")
+        logger.info(f"cleared market in {time.time() - t1:.2f} seconds")
 
         ################ convert internal bids to orderbook ################
 
@@ -374,7 +375,7 @@ class ComplexDmasClearingRole(MarketRole):
                 ):
                     volume += (-1) * orders["exclusive_ask"][block, t, name][1]
             volumes.append(volume)
-        log.info(f"Got {sum_magic_source:.2f} kWh from Magic source")
+        logger.info(f"Got {sum_magic_source:.2f} kWh from Magic source")
         # -> determine used ask orders
 
         used_orders = {type_: {} for type_ in model_vars.keys()}

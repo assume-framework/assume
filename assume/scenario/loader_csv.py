@@ -146,13 +146,14 @@ def load_dsm_units(
         - It is crucial that the input CSV file follows the expected structure for the function to process it correctly.
     """
 
-    industrial_dsm_units = load_file(
+    # Load the DSM units file
+    dsm_units = load_file(
         path=path,
         config=config,
         file_name=file_name,
     )
 
-    if industrial_dsm_units is None:
+    if dsm_units is None:
         return None
 
     # Define columns that are common across different technologies within the same plant
@@ -162,20 +163,23 @@ def load_dsm_units(
         "demand",
         "cost_tolerance",
         "unit_type",
+        "node",
+        "flexibility_measure",
     ]
-    bidding_columns = [
-        col for col in industrial_dsm_units.columns if col.startswith("bidding_")
-    ]
+    # Filter the common columns to only include those that exist in the DataFrame
+    common_columns = [col for col in common_columns if col in dsm_units.columns]
+
+    # Get bidding columns dynamically
+    bidding_columns = [col for col in dsm_units.columns if col.startswith("bidding_")]
 
     # Initialize the dictionary to hold the final structured data
     dsm_units_dict = {}
 
-    # Process each group of components by plant name
-    for name, group in industrial_dsm_units.groupby(industrial_dsm_units.index):
+    # Process each group of components by plant name or building name
+    for name, group in dsm_units.groupby(dsm_units.index):
         dsm_unit = {}
 
-        # Aggregate or select appropriate data for common and bidding columns
-        # We take the first non-null entry
+        # Aggregate or select appropriate data for available common and bidding columns
         for col in common_columns + bidding_columns:
             non_null_values = group[col].dropna()
             if not non_null_values.empty:
@@ -184,24 +188,28 @@ def load_dsm_units(
         # Process each technology within the plant
         components = {}
         for tech, tech_data in group.groupby("technology"):
-            # Clean the technology-specific data: drop all-NaN columns and 'technology' column
+            # Clean the technology-specific data: drop all-NaN columns and drop 'technology', common, and bidding columns
             cleaned_data = tech_data.dropna(axis=1, how="all").drop(
-                columns=["technology"]
+                columns=["technology"] + common_columns + bidding_columns,
+                errors="ignore",
             )
-            components[tech] = cleaned_data.to_dict(orient="records")[0]
+            # Ensure that there is at least one record before adding to components
+            if not cleaned_data.empty:
+                components[tech] = cleaned_data.to_dict(orient="records")[0]
 
         dsm_unit["components"] = components
         dsm_units_dict[name] = dsm_unit
 
     # Convert the structured dictionary into a DataFrame
-    industrial_dsm_units = pd.DataFrame.from_dict(dsm_units_dict, orient="index")
+    dsm_units_df = pd.DataFrame.from_dict(dsm_units_dict, orient="index")
 
     # Split the DataFrame based on unit_type
     unit_type_dict = {}
-    for unit_type in industrial_dsm_units["unit_type"].unique():
-        unit_type_dict[unit_type] = industrial_dsm_units[
-            industrial_dsm_units["unit_type"] == unit_type
-        ]
+    if "unit_type" in dsm_units_df.columns:
+        for unit_type in dsm_units_df["unit_type"].unique():
+            unit_type_dict[unit_type] = dsm_units_df[
+                dsm_units_df["unit_type"] == unit_type
+            ]
 
     return unit_type_dict
 
@@ -444,11 +452,16 @@ def load_config_and_create_forecaster(
     storage_units = load_file(path=path, config=config, file_name="storage_units")
     demand_units = load_file(path=path, config=config, file_name="demand_units")
 
-    industrial_dsm_units = load_dsm_units(
-        path=path,
-        config=config,
-        file_name="industrial_dsm_units",
-    )
+    # Initialize an empty dictionary to combine the DSM units
+    dsm_units = {}
+    for unit_type in ["industrial_dsm_units", "residential_dsm_units"]:
+        units = load_dsm_units(
+            path=path,
+            config=config,
+            file_name=unit_type,
+        )
+        if units is not None:
+            dsm_units.update(units)
 
     if powerplant_units is None or demand_units is None:
         raise ValueError("No power plant or no demand units were provided!")
@@ -516,7 +529,7 @@ def load_config_and_create_forecaster(
         "powerplant_units": powerplant_units,
         "storage_units": storage_units,
         "demand_units": demand_units,
-        "industrial_dsm_units": industrial_dsm_units,
+        "dsm_units": dsm_units,
         "forecaster": forecaster,
         # New addition for PPO
         "time_step": time_step,
@@ -561,10 +574,24 @@ async def async_setup_world(
     powerplant_units = scenario_data["powerplant_units"]
     storage_units = scenario_data["storage_units"]
     demand_units = scenario_data["demand_units"]
-    industrial_dsm_units = scenario_data["industrial_dsm_units"]
+    dsm_units = scenario_data["dsm_units"]
     forecaster = scenario_data["forecaster"]
 
     save_frequency_hours = config.get("save_frequency_hours", 48)
+    # Disable save frequency if CSV export is enabled
+    if world.export_csv_path and save_frequency_hours is not None:
+        save_frequency_hours = None
+        logger.info(
+            "save_frequency_hours is disabled due to CSV export being enabled. "
+            "Data will be stored in the CSV files at the end of the simulation."
+        )
+
+        # If PostgreSQL database is in use, warn the user about end-of-simulation saving
+        if world.db is not None and "postgresql" in world.db.name:
+            logger.warning(
+                "Data will be stored in the PostgreSQL database only at the end of the simulation due to CSV export being enabled. "
+                "Disable CSV export to save data at regular intervals (export_csv_path = '')."
+            )
 
     learning_config: LearningConfig = config.get("learning_config", {})
     bidding_strategy_params = config.get("bidding_strategy_params", {})
@@ -656,8 +683,8 @@ async def async_setup_world(
         world_bidding_strategies=world.bidding_strategies,
     )
 
-    if industrial_dsm_units is not None:
-        for unit_type, units_df in industrial_dsm_units.items():
+    if dsm_units is not None:
+        for unit_type, units_df in dsm_units.items():
             dsm_units = read_units(
                 units_df=units_df,
                 unit_type=unit_type,
