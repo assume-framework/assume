@@ -4,6 +4,8 @@
 
 import sys
 
+from mango import addr
+
 from assume import MarketConfig, World
 from assume.common.forecasts import NaiveForecast
 
@@ -64,7 +66,7 @@ if __name__ == "__main__":
                 agent_address = (tcp_host, int(address))
             else:
                 agent_address = address
-            agent_addresses.append((agent_address, "clock_agent"))
+            agent_addresses.append(addr(agent_address, "clock_agent"))
         print("new agent addresses are", agent_addresses)
     try:
         if world.distributed_role:

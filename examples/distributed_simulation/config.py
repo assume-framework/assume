@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 from dateutil import rrule as rr
-from mango import AgentAddress, activate
+from mango import activate, addr
 
 from assume import World
 from assume.common.market_objects import MarketConfig, MarketProduct
@@ -26,13 +26,13 @@ tcp_port = int(os.getenv("TCP_PORT", "9097"))
 if use_mqtt:
     manager_protocol_addr = "manager"
     agent_address = "agent"
-    agent_addresses = [AgentAddress("agent", "clock_agent")]
+    agent_addresses = [addr("agent", "clock_agent")]
 else:
     manager_protocol_addr = (tcp_host, tcp_port)
     agent_address = (tcp_host, 9098)
-    agent_addresses = [AgentAddress((tcp_host, 9098), "clock_agent")]
+    agent_addresses = [addr((tcp_host, 9098), "clock_agent")]
 
-market_operator_addr = AgentAddress(manager_protocol_addr, "market_operator")
+market_operator_addr = addr(manager_protocol_addr, "market_operator")
 broker_addr = os.getenv("MQTT_BROKER", ("0.0.0.0", 1883, 600))
 
 start = datetime(2019, 1, 1)

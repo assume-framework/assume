@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pandas as pd
 from mango import (
-    AgentAddress,
     RoleAgent,
     activate,
+    addr,
     agent_composed_of,
     create_ec_container,
     create_mqtt_container,
@@ -226,15 +226,15 @@ class World:
         self.learning_mode = self.learning_config.get("learning_mode", False)
 
         if not self.db and not self.export_csv_path:
-            self.output_agent_addr = AgentAddress(None, None)
+            self.output_agent_addr = addr(None, None)
         else:
-            self.output_agent_addr = AgentAddress(self.addr, "export_agent_1")
+            self.output_agent_addr = addr(self.addr, "export_agent_1")
 
         if self.distributed_role is False:
             # if distributed_role is False - we are a ChildContainer
             # and only connect to the manager_address, which can set/sync our clock
             self.clock_agent = DistributedClockAgent()
-            self.output_agent_addr = AgentAddress(manager_address, "export_agent_1")
+            self.output_agent_addr = addr(manager_address, "export_agent_1")
 
             # # when the clock_agent is stopped, we should gracefully shutdown our container
             # self.clock_agent.stopped.add_done_callback(stop)
@@ -264,7 +264,7 @@ class World:
 
             self.learning_role = Learning(self.learning_config)
             # separate process does not support buffer and learning
-            self.learning_agent_addr = AgentAddress(self.addr, "learning_agent")
+            self.learning_agent_addr = addr(self.addr, "learning_agent")
             rl_agent = agent_composed_of(
                 self.learning_role,
                 register_in=self.container,
@@ -303,7 +303,7 @@ class World:
         # mango multiprocessing is currently only supported on linux
         # with single
         if False and self.distributed_role is not None:
-            self.addresses.append(AgentAddress(self.addr, "clock_agent"))
+            self.addresses.append(addr(self.addr, "clock_agent"))
 
             def creator(container):
                 agent = agent_composed_of(
@@ -420,7 +420,7 @@ class World:
             units (list[dict]): list of unit dictionaries forwarded to create_unit
         """
         clock_agent_name = f"clock_agent_{id}"
-        self.addresses.append(AgentAddress(self.addr, clock_agent_name))
+        self.addresses.append(addr(self.addr, clock_agent_name))
 
         def creator(container):
             # creating a new role agent and apply the role of a units operator

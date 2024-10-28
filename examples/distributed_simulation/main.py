@@ -5,7 +5,7 @@
 import time
 from multiprocessing import Process, set_start_method
 
-from mango import AgentAddress
+from mango import addr
 
 from assume import World
 
@@ -62,9 +62,9 @@ if __name__ == "__main__":
     n = 1
     for i in range(1, n):
         if use_mqtt:
-            agent_addresses.append(AgentAddress(agent_address + str(i), "clock_agent"))
+            agent_addresses.append(addr(agent_address + str(i), "clock_agent"))
         else:
-            agent_addresses.append(AgentAddress((tcp_host, 9098 + i), "clock_agent"))
+            agent_addresses.append(addr((tcp_host, 9098 + i), "clock_agent"))
     ags = []
     for i in range(n):
         ag = Process(target=agent, args=(i, n))
