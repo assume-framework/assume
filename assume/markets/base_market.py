@@ -77,7 +77,7 @@ class MarketMechanism:
 
         return all([requirement(info) for info in content["information"]])
 
-    def validate_orderbook(self, orderbook: Orderbook, agent_tuple: tuple) -> None:
+    def validate_orderbook(self, orderbook: Orderbook, agent_addr: AgentAddress) -> None:
         """
         Validates a given orderbook.
 
@@ -85,7 +85,7 @@ class MarketMechanism:
 
         Args:
             orderbook (Orderbook): The orderbook to be validated.
-            agent_tuple (tuple): The tuple of the agent.
+            agent_addr (AgentAddress): The address of the agent.
 
         Raises:
             ValueError: If max_price, min_price, or max_volume are unset when required.
@@ -119,7 +119,7 @@ class MarketMechanism:
 
         # Validate each order in the orderbook
         for order in orderbook:
-            order["agent_id"] = agent_tuple
+            order["agent_id"] = agent_addr
 
             # Ensure 'only_hours' field is present
             if not order.get("only_hours"):
@@ -479,16 +479,9 @@ class MarketRole(MarketMechanism, Role):
             if orderbook is None:
                 raise KeyError("Missing 'orderbook' in content.")
 
-            agent_addr = meta.get("sender_addr")
-            if "sender_addr" not in meta.keys():
-                raise KeyError("Missing 'sender_addr' in meta.")
-
-            agent_id = meta.get("sender_id")
-            if agent_id is None:
-                raise KeyError("Missing 'sender_id' in meta.")
-
+            agent_addr = sender_addr(meta)
             # Validate the order book
-            self.validate_orderbook(orderbook, (agent_addr, agent_id))
+            self.validate_orderbook(orderbook, agent_addr)
 
             # Add each validated order to 'all_orders'
             for order in orderbook:
@@ -510,16 +503,16 @@ class MarketRole(MarketMechanism, Role):
             self.context.schedule_instant_message(
                 create_acl(
                     content=rejection_message,
-                    receiver_addr=AgentAddress(agent_addr, agent_id),
+                    receiver_addr=agent_addr,
                     sender_addr=self.context.addr,
                     acl_metadata={
                         "in_reply_to": meta.get("reply_with", 1),
                     },
                 ),
-                receiver_addr=AgentAddress(agent_addr, agent_id),
+                receiver_addr=agent_addr,
             )
             logger.debug(
-                f"Sent rejection message to agent '{agent_id}' at '{agent_addr}': {rejection_message}"
+                f"Sent rejection message to agent '{agent_addr}': {rejection_message}"
             )
 
     def handle_data_request(self, content: DataRequestMessage, meta: MetaDict):
@@ -573,8 +566,7 @@ class MarketRole(MarketMechanism, Role):
         """
         try:
             order = content.get("order")
-            agent_addr = meta["sender_addr"]
-            agent_id = meta["sender_id"]
+            agent_addr = sender_addr(meta)
 
             if order:
 
@@ -594,10 +586,10 @@ class MarketRole(MarketMechanism, Role):
                     "context": "get_unmatched",
                     "available_orders": available_orders,
                 },
-                receiver_addr=AgentAddress(agent_addr, agent_id),
+                receiver_addr=agent_addr,
             )
             logger.debug(
-                f"Sent unmatched orders to agent '{agent_id}' at '{agent_addr}'."
+                f"Sent unmatched orders to agent '{agent_addr}'."
             )
 
         except KeyError as ke:
@@ -639,8 +631,9 @@ class MarketRole(MarketMechanism, Role):
 
         self.open_auctions - set(market_products)
 
-        accepted_orderbook.sort(key=itemgetter("agent_id"))
-        rejected_orderbook.sort(key=itemgetter("agent_id"))
+        accepted_orderbook = sorted(accepted_orderbook, key=lambda x: str(x["agent_id"]))
+        rejected_orderbook = sorted(rejected_orderbook, key=lambda x: str(x["agent_id"]))
+        
 
         accepted_orders = {
             agent: list(bids)

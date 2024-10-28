@@ -246,3 +246,48 @@ async def test_market_unmatched(market_role: MarketRole):
     }
 
     market_role.handle_get_unmatched(content, meta)
+
+
+async def test_market_accepted(market_role: MarketRole):
+    meta = {
+        "sender_addr": "test_address",
+        "sender_id": "test_aid",
+    }
+
+    orderbook = [
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": 10,
+            "price": 20,
+            "agent_id": "gen1",
+            "only_hours": None,
+        },
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": -10,
+            "price": 20,
+            "agent_id": "gen1",
+            "only_hours": None,
+        }
+    ]
+    market_role.open_auctions |= {(start, end, None)}
+    market_role.handle_orderbook(content={"orderbook": orderbook}, meta=meta)
+
+    content = {
+        "order": {
+            "start_time": start,
+            "end_time": start + rd(hours=1),
+            "only_hours": None,
+        }
+    }
+
+    def accept_clear(all_orders, products):
+        return all_orders, [], [{"price": 0, "product_start": products[0][0]}]
+
+    market_role.clear = accept_clear  
+
+    accepted, meta = await market_role.clear_market([(start, end, None)])
+    assert accepted == orderbook
+

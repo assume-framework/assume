@@ -8,6 +8,7 @@ from operator import itemgetter
 
 import pandas as pd
 import pyomo.environ as pyo
+from mango import AgentAddress
 from pyomo.opt import SolverFactory, TerminationCondition, check_available_solvers
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
@@ -340,13 +341,13 @@ class ComplexClearingRole(MarketRole):
         self.solver = solver
         self.solver_options = solver_options
 
-    def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> None:
+    def validate_orderbook(self, orderbook: Orderbook, agent_addr: AgentAddress) -> None:
         """
         Checks whether the bid types are valid and whether the volumes are within the maximum bid volume.
 
         Args:
             orderbook (Orderbook): The orderbook to be validated.
-            agent_tuple (tuple[str, str]): The agent tuple of the market (agent_addr, agent_id).
+            agent_addr (AgentAddress): The agent address of the market (agent_addr, agent_id).
 
         Raises:
             ValueError: If the bid type is invalid.
@@ -365,7 +366,7 @@ class ComplexClearingRole(MarketRole):
                 )
                 order["bid_type"] = "SB"  # Set to default bid_type
 
-        super().validate_orderbook(orderbook, agent_tuple)
+        super().validate_orderbook(orderbook, agent_addr)
 
         for order in orderbook:
             # Validate volumes

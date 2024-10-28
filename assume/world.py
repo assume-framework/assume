@@ -217,10 +217,12 @@ class World:
             **container_kwargs,
         )
         self.learning_mode = self.learning_config.get("learning_mode", False)
+
         if not self.db and not self.export_csv_path:
             self.output_agent_addr = AgentAddress(None, None)
         else:
             self.output_agent_addr = AgentAddress(self.addr, "export_agent_1")
+
         if self.distributed_role is False:
             # if distributed_role is False - we are a ChildContainer
             # and only connect to the manager_address, which can set/sync our clock
@@ -233,7 +235,9 @@ class World:
             self.container.register(self.clock_agent, suggested_aid="clock_agent")
         else:
             self.setup_learning()
-            self.setup_output_agent(simulation_id, save_frequency_hours)
+
+            if self.output_agent_addr:
+                self.setup_output_agent(simulation_id, save_frequency_hours)
             self.clock_manager = DistributedClockManager(
                 receiver_clock_addresses=self.addresses
             )
