@@ -512,7 +512,6 @@ class MarketRole(MarketMechanism, Role):
                     },
                 ),
                 receiver_addr=agent_addr,
-                    "in_reply_to": meta.get("reply_with", 1),
             )
             logger.debug(
                 f"Sent rejection message to agent '{agent_addr}': {rejection_message}"
@@ -684,7 +683,7 @@ class MarketRole(MarketMechanism, Role):
 
         await self.store_market_results(market_meta)
 
-        if len(flows) > 0:
+        if flows and len(flows) > 0:
             await self.store_flows(flows)
 
         return accepted_orderbook, market_meta
@@ -734,7 +733,7 @@ class MarketRole(MarketMechanism, Role):
                 content=message,
             )
 
-    async def store_flows(self, flows):
+    async def store_flows(self, flows: dict[tuple, float]):
         """
         Sends a message to the OutputRole to update data in the database.
 
@@ -742,18 +741,16 @@ class MarketRole(MarketMechanism, Role):
             flows (flows): The electric flows between nodes to be stored.
         """
 
-        db_aid = self.context.data.get("output_agent_id")
         db_addr = self.context.data.get("output_agent_addr")
 
-        if db_aid and db_addr:
+        if db_addr:
             message = {
                 "context": "write_results",
                 "type": "store_flows",
                 "market_id": self.marketconfig.market_id,
                 "data": flows,
             }
-            await self.context.send_acl_message(
-                receiver_id=db_aid,
-                receiver_addr=db_addr,
+            await self.context.send_message(
                 content=message,
+                receiver_addr=db_addr,
             )

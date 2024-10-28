@@ -576,12 +576,12 @@ class WriteOutput(Role):
 
         return rewards_by_unit
 
-    def write_flows(self, data: any):
+    def write_flows(self, data: dict[tuple, float]):
         """
-        Writes the actual dispatch of the units to a CSV and database.
+        Writes the flows of the grid results into the database.
 
         Args:
-            data (any): The records to be put into the table. Formatted like, "datetime, power, market_id, unit_id".
+            data (dict[tuple, float]): The records to be put into the table. Formatted like, "(datetime, line), flow".
         """
         # Daten in ein DataFrame umwandeln
         records = [

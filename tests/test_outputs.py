@@ -169,5 +169,5 @@ def test_output_write_flows():
         "data": {(datetime(2019, 1, 1, 0, 0), "north_south_example"): 0.0},
     }
 
-    output_writer.handle_message(content, meta)
+    output_writer.handle_output_message(content, meta)
     assert len(output_writer.write_dfs["flows"]) == 1, "flows"
