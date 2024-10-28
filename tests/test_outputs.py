@@ -154,3 +154,27 @@ def test_output_unit_dispatch():
     }
     output_writer.handle_message(content, meta)
     assert len(output_writer.write_dfs["unit_dispatch"]) == 1, "unit_dispatch"
+
+
+def test_output_write_flows():
+    engine = create_engine(DB_URI)
+    start = datetime(2020, 1, 1)
+    end = datetime(2020, 1, 2)
+    output_writer = WriteOutput("test_sim", start, end, engine)
+    assert len(output_writer.write_dfs.keys()) == 0
+    meta = {"sender_id": None}
+    content = {
+        "context": "write_results",
+        "type": "store_flows",
+        "data": pd.DataFrame(
+            {
+                "timestamp": pd.Timestamp("2019-01-01 00:00:00"),
+                "line": 'north_south_example',
+                "flow": 0.0,
+                },
+            ),
+        }
+        
+        
+    output_writer.handle_message(content, meta)
+    assert len(output_writer.write_dfs["flows"]) == 1, "flows"
