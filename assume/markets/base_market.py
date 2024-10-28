@@ -692,8 +692,9 @@ class MarketRole(MarketMechanism, Role):
             self.results.append(meta)
 
         await self.store_market_results(market_meta)
-
-        await self.store_flows(flows)
+        
+        if len(flows) > 0:
+            await self.store_flows(flows)
 
         return accepted_orderbook, market_meta
 
