@@ -341,7 +341,9 @@ class ComplexClearingRole(MarketRole):
         self.solver = solver
         self.solver_options = solver_options
 
-    def validate_orderbook(self, orderbook: Orderbook, agent_addr: AgentAddress) -> None:
+    def validate_orderbook(
+        self, orderbook: Orderbook, agent_addr: AgentAddress
+    ) -> None:
         """
         Checks whether the bid types are valid and whether the volumes are within the maximum bid volume.
 

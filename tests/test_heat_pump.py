@@ -192,8 +192,8 @@ def test_min_operating_steps(heat_pump_model, heat_pump_config):
             future_t = t + step
             if future_t in model.time_steps:
                 status = pyo.value(operational_status[future_t])
-                assert (
-                    math.isclose(status, 1, rel_tol=1e-6)
+                assert math.isclose(
+                    status, 1, rel_tol=1e-6
                 ), f"Operational status at time {future_t} should be 1 after startup at {t}, but is {status}."
 
 
