@@ -595,7 +595,7 @@ class WriteOutput(Role):
 
         df["simulation"] = self.simulation_id
 
-        #set timestamp to index
+        # set timestamp to index
         df.set_index("timestamp", inplace=True)
 
         with self.locks["flows"]:

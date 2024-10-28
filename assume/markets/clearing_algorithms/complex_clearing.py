@@ -722,16 +722,14 @@ def extract_results(
                 }
             )
 
-
         flows_filtered = {}
 
         if log_flows:
-        # extract flows
+            # extract flows
 
-         # Check if the model has the 'flows' attribute
-            if hasattr(model, 'flows'):
-     
-                flows = model.flows         
+            # Check if the model has the 'flows' attribute
+            if hasattr(model, "flows"):
+                flows = model.flows
 
                 # filter flows and only use positive flows to half the size of the dict
                 flows_filtered = {

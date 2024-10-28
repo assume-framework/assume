@@ -692,7 +692,7 @@ class MarketRole(MarketMechanism, Role):
             self.results.append(meta)
 
         await self.store_market_results(market_meta)
-        
+
         if len(flows) > 0:
             await self.store_flows(flows)
 
