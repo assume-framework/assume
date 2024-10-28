@@ -9,7 +9,6 @@ from .config import (
     agent_adress,
     index,
     market_operator_addr,
-    market_operator_aid,
     marketdesign,
     worker,
 )
@@ -24,7 +23,6 @@ async def create_worker(
 ):
     for market_config in marketdesign:
         market_config.addr = market_operator_addr
-        market_config.aid = market_operator_aid
         world.markets[f"{market_config.market_id}"] = market_config
 
     nuclear_forecast = NaiveForecast(index, availability=1, fuel_price=3, co2_price=0.1)
