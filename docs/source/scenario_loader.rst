@@ -39,7 +39,7 @@ The AMIRIS loader can be used to run examples configured for usage with the ener
 .. code-block:: python
 
     from assume import World
-    from assume.scenario import load_amiris_async
+    from assume.scenario import load_amiris
 
     # To download some amiris examples run:
     # git clone https://gitlab.com/dlr-ve/esy/amiris/examples.git amiris-examples
@@ -71,7 +71,7 @@ The AMIRIS loader can be used to run examples configured for usage with the ener
 
     # Let the loader add everything to the world
     world.loop.run_until_complete(
-        load_amiris_async(
+        load_amiris(
             world,
             "amiris",
             scenario,
@@ -87,7 +87,7 @@ If you want to adjust the scenario or change bidding strategies, you currently h
 as it currently does not use reinforcement learning or different bidding strategies at all.
 It tries to resemble the behavior of AMIRIS in the best way possible.
 As AMIRIS currently only supports a single market design (with different support mechanisms), the market design can not be adjusted.
-For more information consult the methods documentation :py:meth:`assume.scenario.loader_amiris.load_amiris_async`.
+For more information consult the methods documentation :py:meth:`assume.scenario.loader_amiris.load_amiris`.
 
 .. _oeds:
 
@@ -141,15 +141,13 @@ An example configuration of how this can be used is shown here:
     }
 
     # load the dataset from the database
-    world.loop.run_until_complete(
-        load_oeds_async(world, "oeds_mastr_simulation", "my_studycase", infra_uri, marketdesign, nuts_config)
-    )
+    load_oeds(world, "oeds_mastr_simulation", "my_studycase", infra_uri, marketdesign, nuts_config)
 
     # Run the scenario
     world.run()
 
 This creates operators each per NUTS areas and creates a single EOM market, just as the `DMAS simulation <https://github.com/NOWUM/dmas/>`_ from FH Aachen.
-For more information consult the methods documentation :py:meth:`assume.scenario.loader_oeds.load_oeds_async`.
+For more information consult the methods documentation :py:meth:`assume.scenario.loader_oeds.load_oeds`.
 
 .. _pypsa_loader_doc:
 
@@ -167,7 +165,7 @@ An example can be seen from the pypsa scigrid case:
 
 .. code-block:: python
 
-    from assume.scenario.loader_pypsa import load_pypsa_async
+    from assume.scenario.loader_pypsa import load_pypsa
     from assume import World
     import pypsa
 
@@ -200,15 +198,11 @@ An example can be seen from the pypsa scigrid case:
         "solar": "naive_redispatch",
         "demand": "naive_redispatch",
     }
-    world.loop.run_until_complete(
-        load_pypsa_async(world, scenario, study_case, network, marketdesign, bidding_strategies)
-    )
-    world.loop.run_until_complete(
-        load_pypsa_async(world, "world_pypsa", "scigrid_de", network, marketdesign)
-    )
+    load_pypsa(world, scenario, study_case, network, marketdesign, bidding_strategies)
+    load_pypsa(world, "world_pypsa", "scigrid_de", network, marketdesign)
 
     world.run()
 
 You can also create and use your own existing scenarios in pypsa format to convert these into a market simulation too.
 
-For more information consult the methods documentation :py:meth:`assume.scenario.loader_pypsa.load_pypsa_async`.
+For more information consult the methods documentation :py:meth:`assume.scenario.loader_pypsa.load_pypsa`.

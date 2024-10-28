@@ -20,7 +20,7 @@ from sqlalchemy import inspect, text
 from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 
 from assume.common.market_objects import MetaDict
-from assume.common.utils import separate_orders
+from assume.common.utils import check_for_tensors, separate_orders
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,8 @@ class WriteOutput(Role):
 
         # store needed date
         self.simulation_id = simulation_id
-        self.save_frequency_hours = save_frequency_hours or (end - start).days * 24
+        self.save_frequency_hours = save_frequency_hours
+        logger.debug("saving results every %s hours", self.save_frequency_hours)
 
         # make directory if not already present
         if export_csv_path:
@@ -182,22 +183,24 @@ class WriteOutput(Role):
 
         self.context.subscribe_message(
             self,
-            self.handle_message,
+            self.handle_output_message,
             lambda content, meta: content.get("context") == "write_results",
         )
 
-        recurrency_task = rr.rrule(
-            freq=rr.HOURLY,
-            interval=self.save_frequency_hours,
-            dtstart=self.start,
-            until=self.end,
-            cache=True,
-        )
-        self.context.schedule_recurrent_task(
-            self.store_dfs, recurrency_task, src="no_wait"
-        )
+    def on_ready(self):
+        if self.save_frequency_hours is not None:
+            recurrency_task = rr.rrule(
+                freq=rr.HOURLY,
+                interval=self.save_frequency_hours,
+                dtstart=self.start,
+                until=self.end,
+                cache=True,
+            )
+            self.context.schedule_recurrent_task(
+                self.store_dfs, recurrency_task, src="no_wait"
+            )
 
-    def handle_message(self, content: dict, meta: MetaDict):
+    def handle_output_message(self, content: dict, meta: MetaDict):
         """
         Handles the incoming messages and performs corresponding actions.
 
@@ -275,12 +278,15 @@ class WriteOutput(Role):
                 if len(self.write_dfs[table]) == 0:
                     continue
 
-                df = pd.concat(self.write_dfs[table], axis=0)
+                # concat all dataframes
+                # use join='outer' to keep all columns and fill missing values with NaN
+                df = pd.concat(self.write_dfs[table], axis=0, join="outer")
+
                 df.reset_index()
                 if df.empty:
                     continue
 
-                df = df.apply(self.check_for_tensors)
+                df = df.apply(check_for_tensors)
 
                 if self.export_csv_path:
                     data_path = self.export_csv_path / f"{table}.csv"
@@ -406,25 +412,6 @@ class WriteOutput(Role):
             with self.db.begin() as db:
                 db.execute(text(query))
 
-    def check_for_tensors(self, data: pd.Series):
-        """
-        Checks if the data contains tensors and converts them to floats.
-
-        Args:
-            data (pandas.Series): The data to be checked.
-        """
-        try:
-            import torch as th
-
-            if data.map(lambda x: isinstance(x, th.Tensor)).any():
-                for i, value in enumerate(data):
-                    if isinstance(value, th.Tensor):
-                        data.iat[i] = value.item()
-        except ImportError:
-            pass
-
-        return data
-
     def write_market_orders(self, market_orders: any, market_id: str):
         """
         Writes market orders to the corresponding data frame.
@@ -447,7 +434,7 @@ class WriteOutput(Role):
             )
 
         del df["only_hours"]
-        del df["agent_id"]
+        del df["agent_addr"]
 
         if "bid_type" not in df.columns:
             df["bid_type"] = None

@@ -27,7 +27,7 @@ from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
 
-SOLVERS = ["glpk", "cbc", "gurobi", "cplex"]
+SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
 
 order_types = ["single_ask", "single_bid", "linked_ask", "exclusive_ask"]
 
@@ -82,7 +82,7 @@ class ComplexDmasClearingRole(MarketRole):
         opt = SolverFactory(solvers[0])
 
         bid_ids = {}
-        agent_ids = {}
+        agent_addrs = {}
         unit_ids = {}
 
         for order in orderbook:
@@ -109,7 +109,7 @@ class ComplexDmasClearingRole(MarketRole):
             if order_type is not None:
                 tt = (order["start_time"] - start) / duration
                 # block_id, hour, name
-                name = f'{order["agent_id"]} {order.get("unit_id", "")}'
+                name = f'{order["agent_addr"]} {order.get("unit_id", "")}'
                 if "exclusive" in order_type:
                     idx = (order["exclusive_id"], tt, name)
                 elif "linked" in order_type:
@@ -118,7 +118,7 @@ class ComplexDmasClearingRole(MarketRole):
                     # needs bid_id to distinguish orders in the set
                     name += str(order["bid_id"])
                     idx = (None, tt, name)
-                agent_ids[name] = order["agent_id"]
+                agent_addrs[name] = order["agent_addr"]
                 bid_ids[name] = order["bid_id"]
                 unit_ids[name] = order.get("unit_id", "")
 
@@ -155,6 +155,7 @@ class ComplexDmasClearingRole(MarketRole):
             ),
             within=Reals,
             bounds=(0, 1),
+            initialize=0,
         )
         model_vars["single_ask"] = model.use_hourly_ask
         # Step 3 initialize binary variables for ask order in block per agent
@@ -317,7 +318,7 @@ class ComplexDmasClearingRole(MarketRole):
         logger.info("start optimization/market clearing")
         t1 = time.time()
         try:
-            if opt.name == "gurobi":
+            if hasattr(opt, "name") and opt.name == "gurobi":
                 options = {"MIPGap": 0.1, "TimeLimit": 60}
             else:
                 options = {}
@@ -411,7 +412,7 @@ class ComplexDmasClearingRole(MarketRole):
                                 "block_id": block,
                                 "link": link,
                                 "exclusive_id": None,
-                                "agent_id": agent_ids[name],
+                                "agent_addr": agent_addrs[name],
                                 "bid_id": bid_ids[name],
                                 "unit_id": unit_ids[name],
                             }
@@ -432,7 +433,7 @@ class ComplexDmasClearingRole(MarketRole):
                                 "block_id": None,
                                 "link": None,
                                 "exclusive_id": block,
-                                "agent_id": agent_ids[name],
+                                "agent_addr": agent_addrs[name],
                                 "bid_id": bid_ids[name],
                                 "unit_id": unit_ids[name],
                             }
@@ -456,7 +457,7 @@ class ComplexDmasClearingRole(MarketRole):
                     "block_id": None,
                     "link": None,
                     "exclusive_id": None,
-                    "agent_id": agent_ids[name],
+                    "agent_addr": agent_addrs[name],
                     "bid_id": bid_ids[name],
                     "unit_id": unit_ids[name],
                 }
