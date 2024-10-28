@@ -183,10 +183,11 @@ class WriteOutput(Role):
 
         self.context.subscribe_message(
             self,
-            self.handle_message,
+            self.handle_output_message,
             lambda content, meta: content.get("context") == "write_results",
         )
 
+    def on_ready(self):
         if self.save_frequency_hours is not None:
             recurrency_task = rr.rrule(
                 freq=rr.HOURLY,
@@ -199,7 +200,8 @@ class WriteOutput(Role):
                 self.store_dfs, recurrency_task, src="no_wait"
             )
 
-    def handle_message(self, content: dict, meta: MetaDict):
+
+    def handle_output_message(self, content: dict, meta: MetaDict):
         """
         Handles the incoming messages and performs corresponding actions.
 
@@ -428,7 +430,7 @@ class WriteOutput(Role):
             )
 
         del df["only_hours"]
-        del df["agent_id"]
+        del df["agent_addr"]
 
         if "bid_type" not in df.columns:
             df["bid_type"] = None
