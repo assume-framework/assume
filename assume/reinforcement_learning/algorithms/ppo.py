@@ -219,9 +219,6 @@ class PPO(RLAlgorithm):
                 self.learning_role.critics[u_id].load_state_dict(
                     critic_params["critic"]
                 )
-                # self.learning_role.target_critics[u_id].load_state_dict(
-                #     critic_params["critic_target"]
-                # )
                 self.learning_role.critics[u_id].optimizer.load_state_dict(
                     critic_params["critic_optimizer"]
                 )
@@ -514,6 +511,26 @@ class PPO(RLAlgorithm):
         # We will iterate for multiple epochs to update both the policy (actor) and value (critic) networks
         # The number of epochs controls how many times we update using the same collected data (from the buffer).
 
+
+                # Retrieve experiences from the buffer
+        # The collected experiences (observations, actions, rewards, log_probs) are stored in the buffer.
+        transitions = self.learning_role.buffer.get()
+        states = transitions.observations
+        actions = transitions.actions
+        rewards = transitions.rewards
+        log_probs = transitions.log_probs
+
+        # STARTING FROM HERE, THE IMPLEMENTATION NEEDS TO BE FIXED
+        # Potentially, it could be useful to source some functionality out into methods stored in buffer.py
+
+        # Pass the current states through the critic network to get value estimates.
+        #TODO: Handling von unique obs dim and make ciritc obsevrations better,
+        #TODO: critic should not get own action to estimate value, here confusion with Q(s,a) and V(s), need acitions of other agent though
+        #TODO: hier durch alle critics gehen und values generieren, weil sonst ciritcgeupdated zwischen durhc und neue values 
+        # loop mit allen critics für value und advantage berehcnung als extra function hier in PPO
+        values = critic(states, actions).squeeze(dim=2)
+
+        #TODO: epochen in gradient steps umbennen
         for _ in range(self.epochs):
             self.n_updates += 1
 
@@ -526,29 +543,13 @@ class PPO(RLAlgorithm):
                 # Decentralized
                 actor = self.learning_role.rl_strats[u_id].actor
 
-                # Retrieve experiences from the buffer
-                # The collected experiences (observations, actions, rewards, log_probs) are stored in the buffer.
-                transitions = self.learning_role.buffer.get()
-                states = transitions.observations
-                actions = transitions.actions
-                rewards = transitions.rewards
-                log_probs = transitions.log_probs
 
-                # STARTING FROM HERE, THE IMPLEMENTATION NEEDS TO BE FIXED
-                # Potentially, it could be useful to source some functionality out into methods stored in buffer.py
-
-                # Pass the current states through the critic network to get value estimates.
-                values = critic(states, actions).squeeze(dim=2)
 
                 logger.debug(f"Values: {values}")
 
-                # Store the calculated values in the rollout buffer
-                # These values are used later to calculate the advantage estimates (for policy updates).
-                self.learning_role.buffer.values = values.detach().cpu().numpy()
-
                 # Compute advantages using Generalized Advantage Estimation (GAE)
                 advantages = []
-                last_advantage = 0
+                advantage = 0
                 returns = []
 
                 # Iterate through the collected experiences in reverse order to calculate advantages and returns
@@ -561,24 +562,30 @@ class PPO(RLAlgorithm):
                     else:
                         next_value = values[t + 1]
 
-                    # Temporal difference delta
+                    # Temporal difference delta Equation 12 from PPO paper
                     delta = (
-                        rewards[t] + self.gamma * next_value - values[t]
+                        - values[t] + rewards[t] + self.gamma * next_value 
                     )  # Use self.gamma for discount factor
 
                     logger.debug(f"Delta: {delta}")
 
-                    # GAE advantage
-                    last_advantage = (
-                        delta + self.gamma * self.gae_lambda * last_advantage
+                    # GAE advantage Equation 11 from PPO paper
+                    advantage = (
+                        delta + self.gamma * self.gae_lambda * advantage
                     )  # Use self.gae_lambda for advantage estimation
 
-                    logger.debug(f"Last_advantage: {last_advantage}")
+                    logger.debug(f"Last_advantage: {advantage}")
 
-                    advantages.insert(0, last_advantage)
-                    returns.insert(0, last_advantage + values[t])
+                    advantages.insert(0, advantage)
+                    returns.insert(0, advantage + values[t])
 
                 # Convert advantages and returns to tensors
+                #TODO: normalisieren von advantages wie in spinning up von 
+                #also done in mappo         
+                #advantages_copy[buffer.active_masks[:-1] == 0.0] = np.nan
+                #mean_advantages = np.nanmean(advantages_copy)
+                #std_advantages = np.nanstd(advantages_copy)
+                #advantages = (advantages - mean_advantages) / (std_advantages + 1e-5)
                 advantages = th.tensor(advantages, dtype=th.float32, device=self.device)
                 returns = th.tensor(returns, dtype=th.float32, device=self.device)
 
@@ -587,8 +594,12 @@ class PPO(RLAlgorithm):
                 action_stddev = th.ones_like(
                     action_means
                 )  # Assuming fixed standard deviation for simplicity
+                # TODO: rename to actions function and use same fix std
+                # TODO: move mean and std in extra actor that outputs distributin immediately
                 dist = th.distributions.Normal(action_means, action_stddev)
                 new_log_probs = dist.log_prob(actions).sum(-1)
+                
+                
                 entropy = dist.entropy().sum(-1)
 
                 # Compute the ratio of new policy to old policy
@@ -606,8 +617,8 @@ class PPO(RLAlgorithm):
                 logger.debug(f"surrogate1: {surrogate1}")
                 logger.debug(f"surrogate2: {surrogate2}")
 
-                # Final policy loss (clipped surrogate loss)
-                policy_loss = -th.min(surrogate1, surrogate2).mean()
+                # Final policy loss (clipped surrogate loss) equation 7 from PPO paper
+                policy_loss = th.min(surrogate1, surrogate2).mean()
 
                 logger.debug(f"policy_loss: {policy_loss}")
 
@@ -617,8 +628,9 @@ class PPO(RLAlgorithm):
                 logger.debug(f"value loss: {value_loss}")
 
                 # Total loss: policy loss + value loss - entropy bonus
+                # euqation 9 from PPO paper multiplied with -1 to enable minimizing
                 total_loss = (
-                    policy_loss
+                    - policy_loss
                     + self.vf_coef * value_loss
                     - self.entropy_coef * entropy.mean()
                 )  # Use self.vf_coef and self.entropy_coef
@@ -669,6 +681,7 @@ def get_actions(rl_strategy, next_observation):
 
     # Create a normal distribution for continuous actions (with assumed standard deviation of 
     # TODO: 0.01/0.0 as in marlbenchmark or 1.0 or sheduled decrease?)
+    # TODO: differently fixed std for policy update and action sampling!?
     action_distribution = th.distributions.Normal(next_observation[-1]-action_logits, 0.2)
 
     logger.debug(f"Action distribution: {action_distribution}")
