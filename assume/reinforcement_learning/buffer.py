@@ -411,8 +411,8 @@ class RolloutBuffer:
         # self.values = None
         # self.advantages = None
         # self.returns = None
-        # self.pos = 0
-        # self.full = False
+        self.pos = 0
+        self.full = False 
 
     # def compute_returns_and_advantages(self, last_values, dones):
     #     """

@@ -1,10 +1,9 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
-
 tiny:
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-05 00:00 
+  end_date: 2019-01-05 00:00
   time_step: 1h
   save_frequency_hours: null
   learning_mode: True
@@ -13,35 +12,20 @@ tiny:
     continue_learning: False
     trained_policies_save_path: null
     max_bid_price: 100
-    algorithm: ppo
-    device: cpu
+    algorithm: matd3
+    actor_architecture: mlp
     learning_rate: 0.001
-    buffer_size: 5e5
-    matd3:
-      actor_architecture: mlp
-      training_episodes: 10
-      episodes_collecting_initial_experience: 3
-      train_freq: 48h
-      gradient_steps: -1
-      batch_size: 64
-      gamma: 0.99
-      noise_sigma: 0.1
-      noise_scale: 1
-      noise_dt: 1
-      validation_episodes_interval: 5
-    ppo: 
-      actor_architecture: mlp
-      training_episodes: 10
-      validation_episodes_interval: 5 # after how many episodes the validation starts and the policy is updated
-      train_freq: 48h # how often write_to_learning_role gets called
-      gamma: 0.99  # Discount factor for future rewards
-      epochs: 5 # #4  # Number of epochs for updating the policy
-      clip_ratio: 0.2  # Clipping parameter for policy updates
-      vf_coef: 0.5  # Value function coefficient in the loss function
-      entropy_coef: 0.01  # Entropy coefficient for exploration
-      max_grad_norm: 0.5  # Gradient clipping value
-      gae_lambda: 0.95  # GAE lambda for advantage estimation
-      batch_size: 5  # Batch size for each update, if mini-batch approach is used (currently not implemented)
+    training_episodes: 10
+    episodes_collecting_initial_experience: 3
+    train_freq: 24h
+    gradient_steps: -1
+    batch_size: 64
+    gamma: 0.99
+    device: cpu
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
 
   markets_config:
     EOM:
@@ -72,9 +56,56 @@ base:
     continue_learning: False
     trained_policies_save_path: null
     max_bid_price: 100
+    algorithm: matd3
+    actor_architecture: mlp
+    learning_rate: 0.001
+    training_episodes: 50
+    episodes_collecting_initial_experience: 5
+    train_freq: 24h
+    gradient_steps: -1
+    batch_size: 256
+    gamma: 0.99
+    device: cpu
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+    early_stopping_steps: 10
+    early_stopping_threshold: 0.05
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+
+tiny_ppo:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-05 00:00 
+  time_step: 1h
+  save_frequency_hours: null
+  learning_mode: True
+
+  learning_config:
+    continue_learning: False
+    trained_policies_save_path: null
+    max_bid_price: 100
     algorithm: ppo
     device: cpu
     learning_rate: 0.001
+    buffer_size: 5e5
     matd3:
       actor_architecture: mlp
       training_episodes: 10
@@ -91,7 +122,63 @@ base:
       actor_architecture: mlp
       training_episodes: 10
       validation_episodes_interval: 5 # after how many episodes the validation starts and the policy is updated
+      train_freq: 64h # how often write_to_learning_role gets called
+      gamma: 0.99  # Discount factor for future rewards
+      epochs: 5 # #4  # Number of epochs for updating the policy
+      clip_ratio: 0.2  # Clipping parameter for policy updates
+      vf_coef: 0.5  # Value function coefficient in the loss function
+      entropy_coef: 0.01  # Entropy coefficient for exploration
+      max_grad_norm: 0.5  # Gradient clipping value
+      gae_lambda: 0.95  # GAE lambda for advantage estimation
+      batch_size: 5  # Batch size for each update, if mini-batch approach is used (currently not implemented)
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+
+base_ppo:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-31 00:00
+  time_step: 1h
+  save_frequency_hours: null
+  learning_mode: True
+
+  learning_config:
+    continue_learning: False
+    trained_policies_save_path: null
+    max_bid_price: 100
+    algorithm: ppo
+    device: cpu
+    learning_rate: 0.001
+    validation_episodes_interval: 2 # after how many episodes the validation starts and the policy is updated
+    training_episodes: 10
+    matd3:
+      actor_architecture: mlp
       train_freq: 24h # how often write_to_learning_role gets called
+      episodes_collecting_initial_experience: 3
+      gradient_steps: -1
+      batch_size: 64
+      gamma: 0.99
+      noise_sigma: 0.1
+      noise_scale: 1
+      noise_dt: 1
+    ppo: 
+      actor_architecture: mlp
+      train_freq: 64h # how often write_to_learning_role gets called
       gamma: 0.99  # Discount factor for future rewards
       epochs: 5 # #4  # Number of epochs for updating the policy
       clip_ratio: 0.2  # Clipping parameter for policy updates

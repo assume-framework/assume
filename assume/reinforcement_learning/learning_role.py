@@ -65,10 +65,12 @@ class Learning(Role):
         self.actor_architecture = learning_config.get(self.rl_algorithm_name, {}).get(
             "actor_architecture", "mlp"
         )
-        self.training_episodes = learning_config[self.rl_algorithm_name][
+        self.training_episodes = learning_config[
             "training_episodes"
         ]
-        self.train_freq = learning_config[self.rl_algorithm_name]["train_freq"]
+        self.train_freq = learning_config.get(self.rl_algorithm_name, {}).get(
+            "train_freq"
+        )
         self.batch_size = learning_config.get(self.rl_algorithm_name, {}).get(
             "batch_size", 128
         )
@@ -221,6 +223,10 @@ class Learning(Role):
                 )
 
             self.update_policy()
+
+            # since the PPO is an on-policy algorithm it onyl uses the expercience collected with the current policy
+            # after the policy-update which ultimately changes the policy, theb buffer needs to be cleared 
+            self.buffer.reset()
 
     # TD3
     def turn_off_initial_exploration(self) -> None:

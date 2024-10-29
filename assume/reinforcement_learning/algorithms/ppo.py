@@ -663,24 +663,25 @@ def get_actions(rl_strategy, next_observation):
     perform_evaluation = rl_strategy.perform_evaluation
 
     # Pass observation through the actor network to get action logits (mean of action distribution)
-    action_logits = actor(next_observation.to(device))
+    action_logits = actor(next_observation).detach()
 
     logger.debug(f"Action logits: {action_logits}")
 
+    # Create a normal distribution for continuous actions (with assumed standard deviation of 
+    # TODO: 0.01/0.0 as in marlbenchmark or 1.0 or sheduled decrease?)
+    action_distribution = th.distributions.Normal(next_observation[-1]-action_logits, 0.01)
+
+    logger.debug(f"Action distribution: {action_distribution}")
+
     if learning_mode and not perform_evaluation:
 
-        # Create a normal distribution for continuous actions (with assumed standard deviation of 1.0)
-        action_distribution = th.distributions.Normal(next_observation[-1]-action_logits, 1.0)
-
-        logger.debug(f"Action distribution: {action_distribution}")
-
         # Sample an action from the distribution
-        sampled_action = action_distribution.sample()
+        sampled_action = action_distribution.sample().to(device)
 
 
     else:
         # If not in learning mode or during evaluation, use the mean of the action distribution
-        sampled_action = action_logits
+        sampled_action = action_logits.detach()
 
     logger.debug(f"Sampled action: {sampled_action}")
 
