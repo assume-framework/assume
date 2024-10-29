@@ -97,12 +97,8 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.hydrogen_price = self.forecaster["price_hydrogen"]
         self.electricity_price = self.forecaster["price_EOM"]
         self.iron_ore_price = self.forecaster.get_price("iron_ore")
-        self.natural_gas_co2_factor = self.forecaster.get_price(
-            "natural_gas_co2_factor"
-        )
         self.steel_demand = demand
         self.steel_price = self.forecaster.get_price("steel")
-        self.lime_co2_factor = self.forecaster.get_price("lime_co2_factor")
         self.lime_price = self.forecaster.get_price("lime")
         self.co2_price = self.forecaster.get_price("co2")
 
