@@ -164,7 +164,7 @@ base_ppo:
     algorithm: ppo
     device: cpu
     learning_rate: 0.001
-    validation_episodes_interval: 100 # after how many episodes the validation starts and the policy is updated
+    validation_episodes_interval: 80 # after how many episodes the validation starts and the policy is updated
     training_episodes: 100
     matd3:
       actor_architecture: mlp
