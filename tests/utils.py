@@ -18,7 +18,7 @@ def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
         order: Order = {
             "start_time": start,
             "end_time": end,
-            "agent_id": "dem1",
+            "agent_addr": "dem1",
             "bid_id": "bid1",
             "volume": 0,
             "price": 0,
@@ -33,10 +33,10 @@ def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
         new_order["price"] = np.random.randint(100)
         new_order["volume"] = np.random.randint(-10, 10)
         if new_order["volume"] > 0:
-            agent_id = f"gen_{i}"
+            agent_addr = f"gen_{i}"
         else:
-            agent_id = f"dem_{i}"
-        new_order["agent_id"] = agent_id
+            agent_addr = f"dem_{i}"
+        new_order["agent_addr"] = agent_addr
         new_order["bid_id"] = f"bid_{i}"
         new_order["node"] = node_id
         orders.append(new_order)
@@ -65,14 +65,14 @@ def extend_orderbook(
 
     if bid_type == "BB" or bid_type == "LB":
         if volume < 0:
-            agent_id = f"block_dem{len(orderbook)+1}"
+            agent_addr = f"block_dem{len(orderbook)+1}"
         else:
-            agent_id = f"block_gen{len(orderbook)+1}"
+            agent_addr = f"block_gen{len(orderbook)+1}"
 
         order: Order = {
             "start_time": products[0][0],
             "end_time": products[-1][1],
-            "agent_id": agent_id,
+            "agent_addr": agent_addr,
             "bid_id": f"bid_{len(orderbook)+1}",
             "volume": {product[0]: volume for product in products},
             "price": price,
@@ -93,15 +93,15 @@ def extend_orderbook(
 
     else:
         if volume < 0:
-            agent_id = f"dem{len(orderbook)+1}"
+            agent_addr = f"dem{len(orderbook)+1}"
         else:
-            agent_id = f"gen{len(orderbook)+1}"
+            agent_addr = f"gen{len(orderbook)+1}"
 
         for product in products:
             order: Order = {
                 "start_time": product[0],
                 "end_time": product[1],
-                "agent_id": agent_id,
+                "agent_addr": agent_addr,
                 "bid_id": f"bid_{len(orderbook)+1}",
                 "volume": volume,
                 "accepted_volume": 0,

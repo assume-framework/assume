@@ -76,6 +76,7 @@ Documentation
 * :doc:`market_mechanism`
 * :doc:`scenario_loader`
 * :doc:`unit_operator`
+* :doc:`units`
 * :doc:`learning`
 * :doc:`learning_algorithm`
 * :doc:`buffers`
@@ -94,11 +95,13 @@ Documentation
    market_mechanism
    scenario_loader
    unit_operator
+   units
    learning
    learning_algorithm
    buffers
    support_policies
    distributed_simulation
+   manual_simulation
    command_line_interface
    assume
 

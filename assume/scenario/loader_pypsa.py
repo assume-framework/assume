@@ -13,10 +13,10 @@ from assume import World
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
-async def load_pypsa_async(
+def load_pypsa(
     world: World,
     scenario: str,
     study_case: str,
@@ -42,9 +42,9 @@ async def load_pypsa_async(
     start = index[0]
     end = index[-1]
     sim_id = f"{scenario}_{study_case}"
-    log.info(f"loading scenario {sim_id}")
+    logger.info(f"loading scenario {sim_id}")
 
-    await world.setup(
+    world.setup(
         start=start,
         end=end,
         save_frequency_hours=save_frequency_hours,
@@ -182,7 +182,7 @@ if __name__ == "__main__":
         case "storage_hvdc":
             network = pypsa.examples.storage_hvdc(True)
         case _:
-            log.info(f"invalid studycase: {study_case}")
+            logger.info(f"invalid studycase: {study_case}")
             network = pd.DataFrame()
 
     study_case += market_mechanism
@@ -211,9 +211,7 @@ if __name__ == "__main__":
 
     bidding_strategies = defaultdict(lambda: default_strategies)
 
-    world.loop.run_until_complete(
-        load_pypsa_async(
-            world, scenario, study_case, network, marketdesign, bidding_strategies
-        )
+    load_pypsa(
+        world, scenario, study_case, network, marketdesign, bidding_strategies
     )
     world.run()

@@ -14,9 +14,7 @@ from assume.common.market_objects import (
     MetaDict,
     Orderbook,
 )
-from assume.common.utils import (
-    get_products_index,
-)
+from assume.common.utils import create_rrule, get_products_index
 from assume.strategies import BaseStrategy, LearningStrategy, RLAdvancedOrderStrategy
 from assume.units import BaseUnit
 
@@ -38,7 +36,21 @@ class RLUnitsOperator(UnitsOperator):
             "device": "cpu",
         }
 
-    async def add_unit(
+    def on_ready(self):
+        super().on_ready()
+
+        # todo
+        recurrency_task = create_rrule(
+            start=self.context.data["train_start"],
+            end=self.context.data["train_end"],
+            freq=self.context.data.get("train_freq", "24h"),
+        )
+
+        self.context.schedule_recurrent_task(
+            self.write_to_learning_role, recurrency_task
+        )
+
+    def add_unit(
         self,
         unit: BaseUnit,
     ) -> None:
@@ -65,25 +77,6 @@ class RLUnitsOperator(UnitsOperator):
 
                 self.rl_units.append(unit)
                 break
-
-        db_aid = self.context.data.get("output_agent_id")
-        db_addr = self.context.data.get("output_agent_addr")
-        if db_aid and db_addr:
-            # send unit data to db agent to store it
-            message = {
-                "context": "write_results",
-                "type": "store_units",
-                "data": self.units[unit.id].as_dict(),
-            }
-            await self.context.send_acl_message(
-                receiver_id=db_aid,
-                receiver_addr=db_addr,
-                content=message,
-                acl_metadata={
-                    "sender_addr": self.context.addr,
-                    "sender_id": self.context.aid,
-                },
-            )
 
     def handle_market_feedback(self, content: ClearingMessage, meta: MetaDict) -> None:
         """
@@ -174,13 +167,10 @@ class RLUnitsOperator(UnitsOperator):
 
                 output_agent_list.append(output_dict)
 
-
-        db_aid = self.context.data.get("learning_output_agent_id")
         db_addr = self.context.data.get("learning_output_agent_addr")
 
-        if db_aid and db_addr and output_agent_list:
-            self.context.schedule_instant_acl_message(
-                receiver_id=db_aid,
+        if db_addr and output_agent_list:
+            self.context.schedule_instant_message(
                 receiver_addr=db_addr,
                 content={
                     "context": "write_results",
@@ -283,16 +273,49 @@ class RLUnitsOperator(UnitsOperator):
         else:    
             rl_agent_data = (all_observations, all_actions, all_rewards)
 
-        learning_role_id = self.context.data.get("learning_agent_id")
         learning_role_addr = self.context.data.get("learning_agent_addr")
 
-        if learning_role_id and learning_role_addr:
-            self.context.schedule_instant_acl_message(
-                receiver_id=learning_role_id,
-                receiver_addr=learning_role_addr,
+        if learning_role_addr:
+            self.context.schedule_instant_message(
                 content={
                     "context": "rl_training",
                     "type": "save_buffer_and_update",
                     "data": rl_agent_data,
                 },
+                receiver_addr=learning_role_addr,
             )
+
+    async def formulate_bids(
+        self, market: MarketConfig, products: list[tuple]
+    ) -> Orderbook:
+        """
+        Formulates the bid to the market according to the bidding strategy of the each unit individually.
+
+        Args:
+            market (MarketConfig): The market to formulate bids for.
+            products (list[tuple]): The products to formulate bids for.
+
+        Returns:
+            OrderBook: The orderbook that is submitted as a bid to the market.
+        """
+
+        orderbook: Orderbook = []
+
+        for unit_id, unit in self.units.items():
+            product_bids = unit.calculate_bids(
+                market,
+                product_tuples=products,
+            )
+            for i, order in enumerate(product_bids):
+                order["agent_addr"] = self.context.addr
+
+                if market.volume_tick:
+                    order["volume"] = round(order["volume"] / market.volume_tick)
+                if market.price_tick:
+                    order["price"] = round(order["price"] / market.price_tick)
+                if "bid_id" not in order.keys() or order["bid_id"] is None:
+                    order["bid_id"] = f"{unit_id}_{i+1}"
+                order["unit_id"] = unit_id
+                orderbook.append(order)
+
+        return orderbook
