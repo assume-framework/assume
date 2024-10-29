@@ -51,9 +51,11 @@ try:
     from assume.strategies.learning_advanced_orders import (
         RLAdvancedOrderStrategy,
     )
-    from assume.strategies.learning_strategies import RLStrategy
+    from assume.strategies.learning_strategies import RLStrategy, BatteryRLStrategy, BatteryRLStrategy_Curve
 
     bidding_strategies["pp_learning"] = RLStrategy
+    bidding_strategies["storage_learning"] = BatteryRLStrategy
+    bidding_strategies["storage_learning_curve"] = BatteryRLStrategy_Curve
     bidding_strategies["learning_advanced_orders"] = RLAdvancedOrderStrategy
 
 except ImportError:
