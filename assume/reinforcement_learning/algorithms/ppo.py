@@ -669,7 +669,7 @@ def get_actions(rl_strategy, next_observation):
 
     # Create a normal distribution for continuous actions (with assumed standard deviation of 
     # TODO: 0.01/0.0 as in marlbenchmark or 1.0 or sheduled decrease?)
-    action_distribution = th.distributions.Normal(next_observation[-1]-action_logits, 0.01)
+    action_distribution = th.distributions.Normal(next_observation[-1]-action_logits, 0.2)
 
     logger.debug(f"Action distribution: {action_distribution}")
 
