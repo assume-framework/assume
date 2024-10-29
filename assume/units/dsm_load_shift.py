@@ -8,12 +8,12 @@ from assume.units.dst_components import demand_side_technologies
 
 
 class DSMFlex:
-    def __init__(self, **kwargs):
+    def __init__(self, components, **kwargs):
         super().__init__(**kwargs)
 
-        self.components = {}
+        self.components = components
 
-    def initialize_components(self, components: dict[str, dict]):
+    def initialize_components(self):
         """
         Initializes the DSM components by creating and adding blocks to the model.
 
@@ -30,6 +30,7 @@ class DSMFlex:
         - Instantiates the class by passing the required parameters.
         - Adds the resulting block to the model under the `dsm_blocks` attribute.
         """
+        components = self.components.copy()
         self.model.dsm_blocks = pyo.Block(list(components.keys()))
 
         for technology, component_data in components.items():
@@ -68,12 +69,19 @@ class DSMFlex:
 
         @model.Constraint(model.time_steps)
         def total_power_input_constraint_with_flex(m, t):
-            return (
-                m.total_power_input[t] - m.load_shift[t]
-                == self.model.dsm_blocks["electrolyser"].power_in[t]
-                + self.model.dsm_blocks["eaf"].power_in[t]
-                + self.model.dsm_blocks["dri_plant"].power_in[t]
-            )
+            if self.has_electrolyser:
+                return (
+                    m.total_power_input[t] - m.load_shift[t]
+                    == self.model.dsm_blocks["electrolyser"].power_in[t]
+                    + self.model.dsm_blocks["eaf"].power_in[t]
+                    + self.model.dsm_blocks["dri_plant"].power_in[t]
+                )
+            else:
+                return (
+                    m.total_power_input[t] - m.load_shift[t]
+                    == self.model.dsm_blocks["eaf"].power_in[t]
+                    + self.model.dsm_blocks["dri_plant"].power_in[t]
+                )
 
     def recalculate_with_accepted_offers(self, model):
         self.reference_power = self.forecaster[f"{self.id}_power"]

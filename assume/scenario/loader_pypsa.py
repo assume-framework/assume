@@ -211,7 +211,5 @@ if __name__ == "__main__":
 
     bidding_strategies = defaultdict(lambda: default_strategies)
 
-    load_pypsa(
-        world, scenario, study_case, network, marketdesign, bidding_strategies
-    )
+    load_pypsa(world, scenario, study_case, network, marketdesign, bidding_strategies)
     world.run()
