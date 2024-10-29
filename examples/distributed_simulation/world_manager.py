@@ -8,8 +8,8 @@ from assume.common.forecasts import NaiveForecast
 from .config import (
     db_uri,
     index,
-    manager_addr,
-    market_operator_aid,
+    manager_protocol_addr,
+    market_operator_addr,
     marketdesign,
     worker,
 )
@@ -22,9 +22,9 @@ async def create_worker(
     n_proc: int,
     m_agents: int = 1,
 ):
-    world.add_market_operator(id=market_operator_aid)
+    world.add_market_operator(id=market_operator_addr.aid)
     for market_config in marketdesign:
-        world.add_market(market_operator_aid, market_config)
+        world.add_market(market_operator_addr.aid, market_config)
 
     world.add_unit_operator(f"my_operator{i}")
 
@@ -45,5 +45,7 @@ async def create_worker(
 
 
 if __name__ == "__main__":
-    world = World(database_uri=db_uri, addr=manager_addr, distributed_role=True)
+    world = World(
+        database_uri=db_uri, addr=manager_protocol_addr, distributed_role=True
+    )
     world.loop.run_until_complete(worker(world, marketdesign, create_worker))
