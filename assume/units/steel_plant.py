@@ -195,22 +195,23 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         )
         self.model.steel_demand = pyo.Param(initialize=self.steel_demand)
         self.model.steel_price = pyo.Param(
-            initialize=self.steel_price.mean(), within=pyo.NonNegativeReals
-        )
-        self.model.lime_co2_factor = pyo.Param(
-            initialize=self.lime_co2_factor.mean(), within=pyo.NonNegativeReals
-        )
-        self.model.natural_gas_co2_factor = pyo.Param(
-            initialize=self.natural_gas_co2_factor.mean(), within=pyo.NonNegativeReals
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.steel_price)},
+            within=pyo.NonNegativeReals,
         )
         self.model.co2_price = pyo.Param(
-            initialize=self.co2_price.mean(), within=pyo.NonNegativeReals
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.co2_price)},
         )
         self.model.lime_price = pyo.Param(
-            initialize=self.lime_price.mean(), within=pyo.NonNegativeReals
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.lime_price)},
+            within=pyo.NonNegativeReals,
         )
         self.model.iron_ore_price = pyo.Param(
-            initialize=self.iron_ore_price.mean(), within=pyo.NonNegativeReals
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.iron_ore_price)},
+            within=pyo.NonNegativeReals,
         )
 
     def define_variables(self):
@@ -301,17 +302,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 )
                 == self.model.steel_demand
             )
-
-        """
-        The following commented constraint ensures the steel output meets the steel demand for each time step.
-
-        This constraint directly compares the steel output of the Electric Arc Furnace (EAF) at each individual
-        time step to the steel demand. This is useful when the steel demand needs to be met at each specific time step,
-        rather than over the entire time horizon.
-        """
-        # @self.model.Constraint(self.model.time_steps)
-        # def steel_output_association_constraint(m, t):
-        #     return self.model.dsm_blocks["eaf"].steel_output[t] == self.model.steel_demand
 
         # Constraint for total power input
         @self.model.Constraint(self.model.time_steps)

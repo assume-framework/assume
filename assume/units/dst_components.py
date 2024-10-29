@@ -836,13 +836,13 @@ class DRIPlant:
         min_operating_steps (int, optional): The minimum number of steps the DRI plant must operate continuously. Defaults to 0.
         min_down_steps (int, optional): The minimum number of downtime steps required between operating cycles. Defaults to 0.
         initial_operational_status (int, optional): The initial operational status of the DRI plant (0 for off, 1 for on). Defaults to 1.
+        natural_gas_co2_factor (float, optional): The CO2 emission factor for natural gas (in ton/MWh). Defaults to 0.5.
     """
 
     def __init__(
         self,
         specific_hydrogen_consumption: float,
         specific_natural_gas_consumption: float,
-        natural_gas_co2_factor: float,
         specific_electricity_consumption: float,
         specific_iron_ore_consumption: float,
         max_power: float,
@@ -854,6 +854,7 @@ class DRIPlant:
         min_operating_steps: int = 0,
         min_down_steps: int = 0,
         initial_operational_status: int = 1,
+        natural_gas_co2_factor: float = 0.5,
         **kwargs,
     ):
         super().__init__()
@@ -863,6 +864,7 @@ class DRIPlant:
         self.specific_electricity_consumption = specific_electricity_consumption
         self.specific_iron_ore_consumption = specific_iron_ore_consumption
         self.natural_gas_co2_factor = natural_gas_co2_factor
+
         self.max_power = max_power
         self.min_power = min_power
         self.fuel_type = fuel_type
@@ -893,6 +895,7 @@ class DRIPlant:
                 - `min_operating_steps`: Minimum operating time.
                 - `min_down_steps`: Minimum downtime between operating cycles.
                 - `initial_operational_status`: Initial operational status of the DRI plant.
+                - `natural_gas_co2_factor`: CO2 emission factor for natural gas.
 
             - **Variables**:
                 - `power_in[t]`: Power input to the DRI plant at each time step `t`.
@@ -916,6 +919,7 @@ class DRIPlant:
                 - `min_operating_time_constraint[t]`: Ensures the DRI plant operates for a minimum duration.
                 - `min_downtime_constraint[t]`: Ensures the DRI plant remains off for a minimum duration between operations.
                 - `operating_cost_constraint[t]`: Calculates the operating cost based on fuel and electricity consumption.
+                - `co2_emission_constraint[t]`: Calculates the CO2 emissions based on natural gas consumption.
 
         Args:
             model (pyo.ConcreteModel): A Pyomo ConcreteModel object representing the optimization model.
@@ -953,6 +957,7 @@ class DRIPlant:
         model_block.natural_gas_co2_factor = pyo.Param(
             initialize=self.natural_gas_co2_factor
         )
+
         model_block.max_power = pyo.Param(initialize=self.max_power)
         model_block.min_power = pyo.Param(initialize=self.min_power)
         model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
@@ -1022,7 +1027,7 @@ class DRIPlant:
 
         # CO2 emissions
         @model_block.Constraint(self.time_steps)
-        def co2_emission_constraint_dri(b, t):
+        def co2_emission_constraint(b, t):
             return b.co2_emission[t] == b.natural_gas_in[t] * b.natural_gas_co2_factor
 
         # Operating cost constraint
@@ -1030,8 +1035,8 @@ class DRIPlant:
         def operating_cost_constraint(b, t):
             operating_cost = (
                 b.power_in[t] * model.electricity_price[t]
-                + b.iron_ore_in[t] * model.iron_ore_price
-                + b.co2_emission[t] * model.co2_price
+                + b.iron_ore_in[t] * model.iron_ore_price[t]
+                + b.co2_emission[t] * model.co2_price[t]
             )
             if self.fuel_type == "natural_gas":
                 operating_cost += b.natural_gas_in[t] * model.natural_gas_price[t]
@@ -1078,6 +1083,7 @@ class ElectricArcFurnace:
         specific_electricity_consumption (float): The specific electricity consumption of the electric arc furnace (in MWh per ton of steel produced).
         specific_dri_demand (float): The specific demand for Direct Reduced Iron (DRI) in the electric arc furnace (in tons per ton of steel produced).
         specific_lime_demand (float): The specific demand for lime in the electric arc furnace (in tons per ton of steel produced).
+        lime_co2_factor (float): The CO2 emission factor for lime production (in ton/MWh).
         time_steps (list[int]): A list of time steps over which the EAF operates.
         ramp_up (float, optional): The ramp-up rate of the electric arc furnace. Defaults to `max_power`.
         ramp_down (float, optional): The ramp-down rate of the electric arc furnace. Defaults to `max_power`.
@@ -1131,6 +1137,7 @@ class ElectricArcFurnace:
                 - `specific_electricity_consumption`: Electricity consumption per ton of steel produced.
                 - `specific_dri_demand`: DRI demand per ton of steel produced.
                 - `specific_lime_demand`: Lime demand per ton of steel produced.
+                - `lime_co2_factor`: CO2 emission factor for lime production.
                 - `ramp_up`: Maximum ramp-up rate.
                 - `ramp_down`: Maximum ramp-down rate.
                 - `min_operating_steps`: Minimum operating time.
@@ -1151,12 +1158,12 @@ class ElectricArcFurnace:
             - **Constraints**:
                 - `min_power_constraint[t]`: Ensures that the power input is at least the minimum power input when the EAF is operational.
                 - `max_power_constraint[t]`: Ensures that the power input does not exceed the maximum power input.
-                - `steel_output_dri_relation[t]`: Links steel output to DRI input.
-                - `steel_output_power_relation[t]`: Links steel output to power consumption.
-                - `eaf_lime_demand[t]`: Links lime demand to steel output.
-                - `co2_emission[t]`: Links CO2 emissions to lime demand.
-                - `ramp_up_eaf_constraint[t]`: Limits the ramp-up rate of power input.
-                - `ramp_down_eaf_constraint[t]`: Limits the ramp-down rate of power input.
+                - `steel_output_dri_relation_constraint[t]`: Links steel output to DRI input.
+                - `steel_output_power_relation_constraint[t]`: Links steel output to power consumption.
+                - `lime_demand_constraint[t]`: Links lime demand to steel output.
+                - `co2_emission_constraint[t]`: Links CO2 emissions to lime demand.
+                - `ramp_up_constraint[t]`: Limits the ramp-up rate of power input.
+                - `ramp_down_constraint[t]`: Limits the ramp-down rate of power input.
                 - `min_operating_time_constraint[t]`: Ensures the EAF operates for a minimum duration.
                 - `min_down_time_constraint[t]`: Ensures the EAF remains off for a minimum duration between operations.
                 - `operating_cost_constraint[t]`: Calculates the operating cost based on power input, CO2 emissions, and lime consumption.
@@ -1170,8 +1177,6 @@ class ElectricArcFurnace:
         """
 
         # Define parameters
-        model_block.max_power = pyo.Param(initialize=self.max_power)
-        model_block.min_power = pyo.Param(initialize=self.min_power)
         model_block.specific_electricity_consumption = pyo.Param(
             initialize=self.specific_electricity_consumption
         )
@@ -1180,6 +1185,9 @@ class ElectricArcFurnace:
             initialize=self.specific_lime_demand
         )
         model_block.lime_co2_factor = pyo.Param(initialize=self.lime_co2_factor)
+
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.min_power = pyo.Param(initialize=self.min_power)
         model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
         model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
         model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
@@ -1204,12 +1212,12 @@ class ElectricArcFurnace:
 
         # Steel output based on DRI input
         @model_block.Constraint(self.time_steps)
-        def steel_output_dri_relation(b, t):
+        def steel_output_dri_relation_constraint(b, t):
             return b.steel_output[t] == b.dri_input[t] / b.specific_dri_demand
 
         # Steel output based on power consumption
         @model_block.Constraint(self.time_steps)
-        def steel_output_power_relation(b, t):
+        def steel_output_power_relation_constraint(b, t):
             return (
                 b.power_in[t] == b.steel_output[t] * b.specific_electricity_consumption
             )
@@ -1230,8 +1238,8 @@ class ElectricArcFurnace:
             return (
                 b.operating_cost[t]
                 == b.power_in[t] * model.electricity_price[t]
-                + b.co2_emission[t] * model.co2_price
-                + b.lime_demand[t] * model.lime_price
+                + b.co2_emission[t] * model.co2_price[t]
+                + b.lime_demand[t] * model.lime_price[t]
             )
 
         # Ramp-up constraint and ramp-down constraints

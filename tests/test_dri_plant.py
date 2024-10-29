@@ -26,7 +26,6 @@ def dri_plant_config():
         "specific_natural_gas_consumption": 1,
         "specific_electricity_consumption": 1,
         "specific_iron_ore_consumption": 1,
-        "natural_gas_co2_factor": 0.1,
         "max_power": 50,
         "min_power": 10,  # Changed from 0 to 10 to test min_power constraints
         "fuel_type": "natural_gas",
@@ -35,6 +34,7 @@ def dri_plant_config():
         "min_operating_steps": 2,
         "min_down_steps": 2,
         "initial_operational_status": 1,
+        "natural_gas_co2_factor": 0.5,
     }
 
 
@@ -49,10 +49,8 @@ def dri_plant_model(dri_plant_config, price_profile):
         model.time_steps, initialize=price_profile.to_dict()
     )
     model.natural_gas_price = pyo.Param(model.time_steps, initialize=3)
-    model.iron_ore_price = pyo.Param(initialize=4)
-
-    # Additional parameters
-    model.co2_price = 30
+    model.iron_ore_price = pyo.Param(model.time_steps, initialize=10)
+    model.co2_price = pyo.Param(model.time_steps, initialize=30)
 
     # Initialize the DRIPlant
     dri_plant = DRIPlant(**dri_plant_config, time_steps=model.time_steps)
@@ -222,8 +220,6 @@ def test_operating_cost(dri_plant_model, price_profile):
     Test that the operating cost is calculated correctly based on fuel and electricity consumption.
     """
     model, _ = dri_plant_model
-    natural_gas_co2_factor = dri_plant_config["natural_gas_co2_factor"]
-    co2_price = model.co2_price
     total_calculated_cost = sum(
         pyo.value(model.dri_plant.operating_cost[t]) for t in model.time_steps
     )
@@ -237,15 +233,17 @@ def test_operating_cost(dri_plant_model, price_profile):
         natural_gas_consumption = pyo.value(model.dri_plant.natural_gas_in[t])
         electricity_consumption = pyo.value(model.dri_plant.power_in[t])
         iron_ore_consumption = pyo.value(model.dri_plant.iron_ore_in[t])
+        co2_emission = pyo.value(model.dri_plant.co2_emission[t])
         price_ng = pyo.value(model.natural_gas_price[t])
         price_elec = pyo.value(model.electricity_price[t])
-        price_iron = pyo.value(model.iron_ore_price)
+        price_iron = pyo.value(model.iron_ore_price[t])
+        price_co2 = pyo.value(model.co2_price[t])
 
         expected_cost = (
             natural_gas_consumption * price_ng
             + electricity_consumption * price_elec
             + iron_ore_consumption * price_iron
-            + (natural_gas_consumption * natural_gas_co2_factor) * co2_price
+            + co2_emission * price_co2
         )
         actual_cost = pyo.value(model.dri_plant.operating_cost[t])
         assert (
