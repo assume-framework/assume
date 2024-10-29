@@ -26,6 +26,7 @@ def dri_plant_config():
         "specific_natural_gas_consumption": 1,
         "specific_electricity_consumption": 1,
         "specific_iron_ore_consumption": 1,
+        "natural_gas_co2_factor": 0.1,
         "max_power": 50,
         "min_power": 10,  # Changed from 0 to 10 to test min_power constraints
         "fuel_type": "natural_gas",
@@ -49,6 +50,9 @@ def dri_plant_model(dri_plant_config, price_profile):
     )
     model.natural_gas_price = pyo.Param(model.time_steps, initialize=3)
     model.iron_ore_price = pyo.Param(initialize=4)
+
+    # Additional parameters
+    model.co2_price = 30
 
     # Initialize the DRIPlant
     dri_plant = DRIPlant(**dri_plant_config, time_steps=model.time_steps)
@@ -218,6 +222,8 @@ def test_operating_cost(dri_plant_model, price_profile):
     Test that the operating cost is calculated correctly based on fuel and electricity consumption.
     """
     model, _ = dri_plant_model
+    natural_gas_co2_factor = dri_plant_config["natural_gas_co2_factor"]
+    co2_price = model.co2_price
     total_calculated_cost = sum(
         pyo.value(model.dri_plant.operating_cost[t]) for t in model.time_steps
     )
@@ -239,6 +245,7 @@ def test_operating_cost(dri_plant_model, price_profile):
             natural_gas_consumption * price_ng
             + electricity_consumption * price_elec
             + iron_ore_consumption * price_iron
+            + (natural_gas_consumption * natural_gas_co2_factor) * co2_price
         )
         actual_cost = pyo.value(model.dri_plant.operating_cost[t])
         assert (

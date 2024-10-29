@@ -77,7 +77,9 @@ class MarketMechanism:
 
         return all([requirement(info) for info in content["information"]])
 
-    def validate_orderbook(self, orderbook: Orderbook, agent_addr: AgentAddress) -> None:
+    def validate_orderbook(
+        self, orderbook: Orderbook, agent_addr: AgentAddress
+    ) -> None:
         """
         Validates a given orderbook.
 
@@ -588,9 +590,7 @@ class MarketRole(MarketMechanism, Role):
                 },
                 receiver_addr=agent_addr,
             )
-            logger.debug(
-                f"Sent unmatched orders to agent '{agent_addr}'."
-            )
+            logger.debug(f"Sent unmatched orders to agent '{agent_addr}'.")
 
         except KeyError as ke:
             logger.error(f"Missing key in meta data: {ke}")
@@ -631,9 +631,12 @@ class MarketRole(MarketMechanism, Role):
 
         self.open_auctions - set(market_products)
 
-        accepted_orderbook = sorted(accepted_orderbook, key=lambda x: str(x["agent_addr"]))
-        rejected_orderbook = sorted(rejected_orderbook, key=lambda x: str(x["agent_addr"]))
-        
+        accepted_orderbook = sorted(
+            accepted_orderbook, key=lambda x: str(x["agent_addr"])
+        )
+        rejected_orderbook = sorted(
+            rejected_orderbook, key=lambda x: str(x["agent_addr"])
+        )
 
         accepted_orders = {
             agent: list(bids)

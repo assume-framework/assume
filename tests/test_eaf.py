@@ -27,6 +27,7 @@ def eaf_config():
         "specific_electricity_consumption": 1,
         "specific_dri_demand": 1,
         "specific_lime_demand": 0.05,
+        "lime_co2_factor": 0.1,
         "ramp_up": 50,
         "ramp_down": 50,
         "min_operating_steps": 2,
@@ -47,7 +48,6 @@ def eaf_model(eaf_config, price_profile):
     )
 
     # Additional parameters
-    model.lime_co2_factor = 0.03
     model.co2_price = 30
     model.lime_price = 20
 
@@ -249,7 +249,7 @@ def test_eaf_co2_emission_relation(eaf_model):
     Test that CO2 emissions are calculated correctly based on lime demand.
     """
     model, _ = eaf_model
-    lime_co2_factor = model.lime_co2_factor
+    lime_co2_factor = eaf_config["lime_co2_factor"]
 
     for t in model.time_steps:
         lime_demand = pyo.value(model.eaf.lime_demand[t])

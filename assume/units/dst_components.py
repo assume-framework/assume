@@ -842,6 +842,7 @@ class DRIPlant:
         self,
         specific_hydrogen_consumption: float,
         specific_natural_gas_consumption: float,
+        natural_gas_co2_factor: float,
         specific_electricity_consumption: float,
         specific_iron_ore_consumption: float,
         max_power: float,
@@ -861,6 +862,7 @@ class DRIPlant:
         self.specific_natural_gas_consumption = specific_natural_gas_consumption
         self.specific_electricity_consumption = specific_electricity_consumption
         self.specific_iron_ore_consumption = specific_iron_ore_consumption
+        self.natural_gas_co2_factor = natural_gas_co2_factor
         self.max_power = max_power
         self.min_power = min_power
         self.fuel_type = fuel_type
@@ -948,6 +950,9 @@ class DRIPlant:
         model_block.specific_iron_ore_consumption = pyo.Param(
             initialize=self.specific_iron_ore_consumption
         )
+        model_block.natural_gas_co2_factor = pyo.Param(
+            initialize=self.natural_gas_co2_factor
+        )
         model_block.max_power = pyo.Param(initialize=self.max_power)
         model_block.min_power = pyo.Param(initialize=self.min_power)
         model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
@@ -1018,9 +1023,7 @@ class DRIPlant:
         # CO2 emissions
         @model_block.Constraint(self.time_steps)
         def co2_emission_constraint_dri(b, t):
-            return (
-                b.co2_emission[t] == b.natural_gas_in[t] * model.natural_gas_co2_factor
-            )
+            return b.co2_emission[t] == b.natural_gas_in[t] * b.natural_gas_co2_factor
 
         # Operating cost constraint
         @model_block.Constraint(self.time_steps)
@@ -1090,6 +1093,7 @@ class ElectricArcFurnace:
         specific_electricity_consumption: float,
         specific_dri_demand: float,
         specific_lime_demand: float,
+        lime_co2_factor: float,
         time_steps: list[int],
         ramp_up: float | None = None,
         ramp_down: float | None = None,
@@ -1105,6 +1109,7 @@ class ElectricArcFurnace:
         self.specific_electricity_consumption = specific_electricity_consumption
         self.specific_dri_demand = specific_dri_demand
         self.specific_lime_demand = specific_lime_demand
+        self.lime_co2_factor = lime_co2_factor
         self.time_steps = time_steps
         self.ramp_up = max_power if ramp_up is None else ramp_up
         self.ramp_down = max_power if ramp_down is None else ramp_down
@@ -1174,6 +1179,7 @@ class ElectricArcFurnace:
         model_block.specific_lime_demand = pyo.Param(
             initialize=self.specific_lime_demand
         )
+        model_block.lime_co2_factor = pyo.Param(initialize=self.lime_co2_factor)
         model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
         model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
         model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
@@ -1216,7 +1222,7 @@ class ElectricArcFurnace:
         # CO2 emissions based on lime demand
         @model_block.Constraint(self.time_steps)
         def co2_emission_constraint(b, t):
-            return b.co2_emission[t] == b.lime_demand[t] * model.lime_co2_factor
+            return b.co2_emission[t] == b.lime_demand[t] * b.lime_co2_factor
 
         # Operating cost constraint
         @model_block.Constraint(self.time_steps)

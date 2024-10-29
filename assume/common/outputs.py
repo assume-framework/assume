@@ -200,7 +200,6 @@ class WriteOutput(Role):
                 self.store_dfs, recurrency_task, src="no_wait"
             )
 
-
     def handle_output_message(self, content: dict, meta: MetaDict):
         """
         Handles the incoming messages and performs corresponding actions.
