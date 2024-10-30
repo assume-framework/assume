@@ -164,8 +164,8 @@ base_ppo:
     algorithm: ppo
     device: cpu
     learning_rate: 0.001
-    validation_episodes_interval: 80 # after how many episodes the validation starts and the policy is updated
-    training_episodes: 100
+    validation_episodes_interval: 900 # after how many episodes the validation starts and the policy is updated
+    training_episodes: 1000
     gradient_steps: 1
     matd3:
       actor_architecture: mlp
@@ -180,7 +180,6 @@ base_ppo:
       actor_architecture: dist
       train_freq: 64h # how often write_to_learning_role gets called
       gamma: 0.99  # Discount factor for future rewards
-      epochs: 5 # #4  # Number of epochs for updating the policy
       clip_ratio: 0.2  # Clipping parameter for policy updates
       vf_coef: 0.5  # Value function coefficient in the loss function
       entropy_coef: 0.01  # Entropy coefficient for exploration
