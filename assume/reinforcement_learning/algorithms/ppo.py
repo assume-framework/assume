@@ -59,6 +59,12 @@ class PPO(RLAlgorithm):
         self.gae_lambda = gae_lambda
         self.n_updates = 0  # Number of updates performed
 
+        # write error if different actor_architecture than dist is used
+        if actor_architecture != "dist":
+            raise ValueError(
+                "PPO only supports the 'dist' actor architecture. Please define 'dist' as actor architecture in config."
+            )
+
     # Unchanged method from MATD3
     def save_params(self, directory):
         """
@@ -629,17 +635,11 @@ class PPO(RLAlgorithm):
 
 
                 # Evaluate the new log-probabilities and entropy under the current policy
-                action_means = actor(states)
-                action_stddev = th.ones_like(
-                    action_means
-                )  # Assuming fixed standard deviation for simplicity
-                # TODO: rename to actions function and use same fix std
-                # TODO: move mean and std in extra actor that outputs distributin immediately
-                dist = th.distributions.Normal(action_means, action_stddev)
-                new_log_probs = dist.log_prob(actions).sum(-1)
+                action_logits, action_distribution = actor(states)
+                new_log_probs = action_distribution.log_prob(actions).sum(-1)
                 
                 
-                entropy = dist.entropy().sum(-1)
+                entropy = action_distribution.entropy().sum(-1)
 
                 # Compute the ratio of new policy to old policy
                 ratio = (new_log_probs - log_probs).exp()
@@ -716,14 +716,9 @@ def get_actions(rl_strategy, next_observation):
     perform_evaluation = rl_strategy.perform_evaluation
 
     # Pass observation through the actor network to get action logits (mean of action distribution)
-    action_logits = actor(next_observation).detach()
-
+    action_logits, action_distribution = actor(next_observation)
+    action_logits = action_logits.detach()
     logger.debug(f"Action logits: {action_logits}")
-
-    # Create a normal distribution for continuous actions (with assumed standard deviation of 
-    # TODO: 0.01/0.0 as in marlbenchmark or 1.0 or sheduled decrease?)
-    # TODO: differently fixed std for policy update and action sampling!?
-    action_distribution = th.distributions.Normal(next_observation[-1]-action_logits, 0.2)
 
     logger.debug(f"Action distribution: {action_distribution}")
 
@@ -731,7 +726,6 @@ def get_actions(rl_strategy, next_observation):
 
         # Sample an action from the distribution
         sampled_action = action_distribution.sample().to(device)
-
 
     else:
         # If not in learning mode or during evaluation, use the mean of the action distribution
@@ -750,7 +744,7 @@ def get_actions(rl_strategy, next_observation):
 
     # PREVIOUSLY SET TO (-1, 1)
     # Bound actions to [0, 1] range
-    # TODO: Does it make more sense o to log probaility of the action before or after clamping?
+    # TODO: Does it make more sense to log probaility of the action before or after clamping?
     sampled_action = sampled_action.clamp(0, 1)
 
     logger.debug(f"Clamped sampled action: {sampled_action}")

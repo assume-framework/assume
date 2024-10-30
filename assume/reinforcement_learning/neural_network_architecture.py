@@ -169,6 +169,29 @@ class MLPActor(Actor):
         #x = th.sigmoid(self.FC3(x))
 
         return x
+    
+class DistActor(MLPActor):
+    """
+    The actor based on the  neural network MLP actor that contrcuts a distribution for the action defintion.
+    """
+
+
+    def forward(self, obs):
+        x = F.relu(self.FC1(obs))
+        x = F.relu(self.FC2(x))
+        # Works with MATD3, output of softsign: [-1, 1]
+        x = F.softsign(self.FC3(x))
+        
+        # x = th.tanh(self.FC3(x))
+
+        # Tested for PPO, scales the output to [0, 1] range
+        #x = th.sigmoid(self.FC3(x))
+
+        # Create a normal distribution for continuous actions (with assumed standard deviation of 
+        # TODO: 0.01/0.0 as in marlbenchmark or 1.0 or sheduled decrease?)
+        dist = th.distributions.Normal(x, 0.2)
+                
+        return x, dist
 
 
 class LSTMActor(Actor):

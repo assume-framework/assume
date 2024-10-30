@@ -177,7 +177,7 @@ base_ppo:
       noise_scale: 1
       noise_dt: 1
     ppo: 
-      actor_architecture: mlp
+      actor_architecture: dist
       train_freq: 64h # how often write_to_learning_role gets called
       gamma: 0.99  # Discount factor for future rewards
       epochs: 5 # #4  # Number of epochs for updating the policy
