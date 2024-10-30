@@ -82,16 +82,16 @@ class Learning(Role):
             1,
         )
 
+        self.gradient_steps = (
+            int(self.train_freq[:-1])
+            if learning_config.get("gradient_steps", -1) == -1
+            else learning_config["gradient_steps"]
+        )
+
         # Algorithm-specific parameters
         if self.rl_algorithm_name == "matd3":
             self.buffer: ReplayBuffer = None
             self.target_critics = {}
-
-            self.gradient_steps = (
-                int(self.train_freq[:-1])
-                if learning_config["matd3"].get("gradient_steps", -1) == -1
-                else learning_config["matd3"]["gradient_steps"]
-            )
             self.noise_sigma = learning_config["matd3"]["noise_sigma"]
             self.noise_scale = learning_config["matd3"]["noise_scale"]
 
@@ -281,7 +281,7 @@ class Learning(Role):
                 learning_role=self,
                 learning_rate=self.learning_rate,
                 gamma=self.gamma,  # Discount factor
-                epochs=self.steps_per_epoch,  # Number of epochs for policy updates
+                gradient_steps=self.gradient_steps,  # Number of epochs for policy updates
                 clip_ratio=self.clip_ratio,  # PPO-specific clipping parameter
                 vf_coef=self.value_coeff,  # Coefficient for value function loss
                 entropy_coef=self.entropy_coeff,  # Coefficient for entropy to encourage exploration

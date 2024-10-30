@@ -101,6 +101,46 @@ def polyak_update(params, target_params, tau: float):
             th.add(target_param.data, param.data, alpha=tau, out=target_param.data)
 
 
+def collect_obs_for_central_critic(
+    states: th.Tensor, i: int, obs_dim: int, unique_obs_dim: int, batch_size: int   
+) -> th.Tensor:
+    """
+    This function samels the observations from allagents for the central critic. 
+    In detail it takes all actions and concates all unique_obs of the agents and one time the similar observations. 
+
+    Args:
+        actions (th.Tensor): The actions
+        n_agents (int): Number of agents
+        n_actions (int): Number of actions
+
+    Returns:
+        th.Tensor: The sampled actions
+    """
+    # Sample actions for the central critic
+
+    # this takes the unique observations from all other agents assuming that
+    # the unique observations are at the end of the observation vector
+    temp = th.cat(
+        (
+            states[:, :i, obs_dim - unique_obs_dim :].reshape(
+                batch_size, -1
+            ),
+            states[
+                :, i + 1 :, obs_dim - unique_obs_dim :
+            ].reshape(batch_size, -1),
+        ),
+        axis=1,
+    )
+
+    # the final all_states vector now contains the current agent's observation
+    # and the unique observations from all other agents
+    all_states = th.cat(
+        (states[:, i, :].reshape(batch_size, -1), temp), axis=1
+    ).view(batch_size, -1)
+
+
+    return all_states
+
 # # For non-dynamic PPO buffer size calculation (remove if buffer stays dynamic)
 # def convert_to_timedelta(time_str):
 #     # Wenn bereits ein Timedelta-Objekt, direkt zurückgeben

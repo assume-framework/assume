@@ -12,6 +12,8 @@ from torch.optim import Adam
 from assume.common.base import LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.neural_network_architecture import CriticPPO
+from assume.reinforcement_learning.learning_utils import collect_obs_for_central_critic
+
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +37,7 @@ class PPO(RLAlgorithm):
         learning_role,
         learning_rate: float,
         gamma: float,  # Discount factor for future rewards
-        epochs: int,  # Number of epochs for updating the policy
+        gradient_steps: int,  # Number of steps for updating the policy
         clip_ratio: float,  # Clipping parameter for policy updates
         vf_coef: float,  # Value function coefficient in the loss function
         entropy_coef: float,  # Entropy coefficient for exploration
@@ -49,7 +51,7 @@ class PPO(RLAlgorithm):
             gamma=gamma,
             actor_architecture=actor_architecture,
         )
-        self.epochs = epochs
+        self.gradient_steps = gradient_steps
         self.clip_ratio = clip_ratio
         self.vf_coef = vf_coef
         self.entropy_coef = entropy_coef
@@ -501,6 +503,93 @@ class PPO(RLAlgorithm):
         }
 
         return actors_and_critics
+    
+    def get_values(self, states, actions):
+        """
+        Gets values for a unit based on the observation using PPO.
+
+        Args:
+            rl_strategy (RLStrategy): The strategy containing relevant information.
+            next_observation (torch.Tensor): The observation.
+
+        Returns:
+            torch.Tensor: The value of the observation.
+        """
+        #counter iterating over all agents for dynamic buffer slice
+        i=0
+
+        #get length of all states to pass it on as batch size, since the entire buffer is used for the PPO
+        buffer_length = len(states)
+        all_actions = actions.view(buffer_length, -1)
+        # Initialize an empty tensor to store all values
+        all_values = th.empty(0, buffer_length, 1)
+         
+        for u_id in self.learning_role.rl_strats.keys():
+
+            all_states = collect_obs_for_central_critic(states, i, self.obs_dim, self.unique_obs_dim, buffer_length)
+        
+            critic = self.learning_role.critics[u_id]
+
+            # Pass the current states through the critic network to get value estimates.
+            values = critic(all_states, all_actions)
+
+            if  all_values.numel() == 0:
+                all_values = values
+            else:
+                all_values = th.cat((all_values, values), dim=1)
+
+            i=i+1
+
+        return all_values
+
+    def get_advantages(self, rewards, values):
+
+        # Compute advantages using Generalized Advantage Estimation (GAE)
+        advantages = []
+        advantage = 0
+        returns = []
+
+        # Iterate through the collected experiences in reverse order to calculate advantages and returns
+        for t in reversed(range(len(rewards))):
+            
+            logger.debug(f"Reward: {t}")    
+
+            if t == len(rewards) - 1:
+                next_value = 0
+            else:
+                next_value = values[t + 1]
+
+            # Temporal difference delta Equation 12 from PPO paper
+            delta = (
+                - values[t] + rewards[t] + self.gamma * next_value 
+            )  # Use self.gamma for discount factor
+
+            logger.debug(f"Delta: {delta}")
+
+            # GAE advantage Equation 11 from PPO paper
+            advantage = (
+                delta + self.gamma * self.gae_lambda * advantage
+            )  # Use self.gae_lambda for advantage estimation
+
+            logger.debug(f"Last_advantage: {advantage}")
+
+            advantages.insert(0, advantage)
+            returns.insert(0, advantage + values[t])
+        
+        # Convert advantages and returns to tensors
+        advantages = th.tensor(advantages, dtype=th.float32, device=self.device)
+        returns = th.tensor(returns, dtype=th.float32, device=self.device)
+
+        #Normalize advantages
+        #in accordance with spinning up and mappo version of PPO
+        mean_advantages = th.nanmean(advantages)
+        std_advantages = th.std(advantages)
+        advantages = (advantages - mean_advantages) / (std_advantages + 1e-5)
+
+        #TODO: Should we detach here? I though becaus of normalisation not being included in backward
+        # but unsure if this is correct
+        return advantages, returns
+
 
     def update_policy(self):
         """
@@ -512,26 +601,21 @@ class PPO(RLAlgorithm):
         # The number of epochs controls how many times we update using the same collected data (from the buffer).
 
 
-                # Retrieve experiences from the buffer
+        # Retrieve experiences from the buffer
         # The collected experiences (observations, actions, rewards, log_probs) are stored in the buffer.
         transitions = self.learning_role.buffer.get()
         states = transitions.observations
         actions = transitions.actions
         rewards = transitions.rewards
         log_probs = transitions.log_probs
-
-        # STARTING FROM HERE, THE IMPLEMENTATION NEEDS TO BE FIXED
-        # Potentially, it could be useful to source some functionality out into methods stored in buffer.py
-
+        
         # Pass the current states through the critic network to get value estimates.
-        #TODO: Handling von unique obs dim and make ciritc obsevrations better,
-        #TODO: critic should not get own action to estimate value, here confusion with Q(s,a) and V(s), need acitions of other agent though
-        #TODO: hier durch alle critics gehen und values generieren, weil sonst ciritcgeupdated zwischen durhc und neue values 
-        # loop mit allen critics für value und advantage berehcnung als extra function hier in PPO
-        values = critic(states, actions).squeeze(dim=2)
+        values = self.get_values(states, actions)
 
-        #TODO: epochen in gradient steps umbennen
-        for _ in range(self.epochs):
+        # Compute advantages using Generalized Advantage Estimation (GAE)
+        advantages, returns = self.get_advantages(rewards, values)
+
+        for _ in range(self.gradient_steps):
             self.n_updates += 1
 
             # Iterate through over each agent's strategy
@@ -543,51 +627,6 @@ class PPO(RLAlgorithm):
                 # Decentralized
                 actor = self.learning_role.rl_strats[u_id].actor
 
-
-
-                logger.debug(f"Values: {values}")
-
-                # Compute advantages using Generalized Advantage Estimation (GAE)
-                advantages = []
-                advantage = 0
-                returns = []
-
-                # Iterate through the collected experiences in reverse order to calculate advantages and returns
-                for t in reversed(range(len(rewards))):
-                    
-                    logger.debug(f"Reward: {t}")    
-
-                    if t == len(rewards) - 1:
-                        next_value = 0
-                    else:
-                        next_value = values[t + 1]
-
-                    # Temporal difference delta Equation 12 from PPO paper
-                    delta = (
-                        - values[t] + rewards[t] + self.gamma * next_value 
-                    )  # Use self.gamma for discount factor
-
-                    logger.debug(f"Delta: {delta}")
-
-                    # GAE advantage Equation 11 from PPO paper
-                    advantage = (
-                        delta + self.gamma * self.gae_lambda * advantage
-                    )  # Use self.gae_lambda for advantage estimation
-
-                    logger.debug(f"Last_advantage: {advantage}")
-
-                    advantages.insert(0, advantage)
-                    returns.insert(0, advantage + values[t])
-
-                # Convert advantages and returns to tensors
-                #TODO: normalisieren von advantages wie in spinning up von 
-                #also done in mappo         
-                #advantages_copy[buffer.active_masks[:-1] == 0.0] = np.nan
-                #mean_advantages = np.nanmean(advantages_copy)
-                #std_advantages = np.nanstd(advantages_copy)
-                #advantages = (advantages - mean_advantages) / (std_advantages + 1e-5)
-                advantages = th.tensor(advantages, dtype=th.float32, device=self.device)
-                returns = th.tensor(returns, dtype=th.float32, device=self.device)
 
                 # Evaluate the new log-probabilities and entropy under the current policy
                 action_means = actor(states)
@@ -640,7 +679,7 @@ class PPO(RLAlgorithm):
                 # Zero the gradients and perform backpropagation for both actor and critic
                 actor.optimizer.zero_grad()
                 critic.optimizer.zero_grad()
-                total_loss.backward()
+                total_loss.backward(retain_graph=True)
 
                 # Clip gradients to prevent gradient explosion
                 th.nn.utils.clip_grad_norm_(
@@ -653,6 +692,8 @@ class PPO(RLAlgorithm):
                 # Perform optimization steps
                 actor.optimizer.step()
                 critic.optimizer.step()
+
+    
 
 
 def get_actions(rl_strategy, next_observation):
@@ -716,3 +757,6 @@ def get_actions(rl_strategy, next_observation):
 
 
     return sampled_action, log_prob_action
+
+
+

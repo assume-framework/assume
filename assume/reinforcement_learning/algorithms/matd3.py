@@ -11,7 +11,7 @@ from torch.optim import Adam
 
 from assume.common.base import LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
-from assume.reinforcement_learning.learning_utils import polyak_update
+from assume.reinforcement_learning.learning_utils import polyak_update, collect_obs_for_central_critic
 from assume.reinforcement_learning.neural_network_architecture import CriticTD3
 
 logger = logging.getLogger(__name__)
@@ -433,46 +433,13 @@ class TD3(RLAlgorithm):
 
                 all_actions = actions.view(self.batch_size, -1)
 
-                # this takes the unique observations from all other agents assuming that
-                # the unique observations are at the end of the observation vector
-                temp = th.cat(
-                    (
-                        states[:, :i, self.obs_dim - self.unique_obs_dim :].reshape(
-                            self.batch_size, -1
-                        ),
-                        states[
-                            :, i + 1 :, self.obs_dim - self.unique_obs_dim :
-                        ].reshape(self.batch_size, -1),
-                    ),
-                    axis=1,
+                #collect observations for critic
+                all_states = collect_obs_for_central_critic(
+                    states, i, self.obs_dim, self.unique_obs_dim, self.batch_size
                 )
-
-                # the final all_states vector now contains the current agent's observation
-                # and the unique observations from all other agents
-                all_states = th.cat(
-                    (states[:, i, :].reshape(self.batch_size, -1), temp), axis=1
-                ).view(self.batch_size, -1)
-                # all_states = states[:, i, :].reshape(self.batch_size, -1)
-
-                # this is the same as above but for the next states
-                temp = th.cat(
-                    (
-                        next_states[
-                            :, :i, self.obs_dim - self.unique_obs_dim :
-                        ].reshape(self.batch_size, -1),
-                        next_states[
-                            :, i + 1 :, self.obs_dim - self.unique_obs_dim :
-                        ].reshape(self.batch_size, -1),
-                    ),
-                    axis=1,
+                all_next_states = collect_obs_for_central_critic(
+                    next_states, i, self.obs_dim, self.unique_obs_dim, self.batch_size
                 )
-
-                # the final all_next_states vector now contains the current agent's observation
-                # and the unique observations from all other agents
-                all_next_states = th.cat(
-                    (next_states[:, i, :].reshape(self.batch_size, -1), temp), axis=1
-                ).view(self.batch_size, -1)
-                # all_next_states = next_states[:, i, :].reshape(self.batch_size, -1)
 
                 with th.no_grad():
                     # Compute the next Q-values: min over all critics targets
