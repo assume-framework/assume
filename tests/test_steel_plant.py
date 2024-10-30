@@ -44,6 +44,7 @@ def dsm_components():
             "specific_electricity_consumption": 1,
             "specific_dri_demand": 1,
             "specific_lime_demand": 1,
+            "lime_co2_factor": 0.1,
             "ramp_up": 100,
             "ramp_down": 100,
             "min_operating_time": 0,
