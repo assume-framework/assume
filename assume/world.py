@@ -147,6 +147,7 @@ class World:
         # required for jupyter notebooks
         # as they already have a running loop
         import nest_asyncio
+
         nest_asyncio.apply()
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)

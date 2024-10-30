@@ -14,6 +14,7 @@ from assume.common.market_objects import MarketConfig, MarketProduct
 
 log = logging.getLogger(__name__)
 
+
 def init(world, n=1):
     start = datetime(2019, 1, 1)
     end = datetime(2019, 3, 1)
