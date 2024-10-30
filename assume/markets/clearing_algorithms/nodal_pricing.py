@@ -161,8 +161,10 @@ class NodalMarketRole(MarketRole):
             logger.error(f"Solver exited with {termination_condition}")
             raise Exception("Solver in redispatch market did not converge")
 
+        log_flows = True
+
         # process dispatch data
-        self.process_dispatch_data(network=nodal_network, orderbook_df=orderbook_df)
+        flows = self.process_dispatch_data(network=nodal_network, orderbook_df=orderbook_df, log_flows=log_flows)
 
         # return orderbook_df back to orderbook format as list of dicts
         accepted_orders = orderbook_df.to_dict("records")
@@ -175,12 +177,11 @@ class NodalMarketRole(MarketRole):
             meta.extend(
                 calculate_network_meta(network=nodal_network, product=product, i=i)
             )
-        # write network flows here if applicable
-        flows = []
+    
 
         return accepted_orders, rejected_orders, meta, flows
 
-    def process_dispatch_data(self, network: pypsa.Network, orderbook_df: pd.DataFrame):
+    def process_dispatch_data(self, network: pypsa.Network, orderbook_df: pd.DataFrame, log_flows: bool = False):
         """
         This function processes the dispatch data to calculate the dispatch volumes and prices
         and update the orderbook with the accepted volumes and prices.
@@ -230,3 +231,25 @@ class NodalMarketRole(MarketRole):
                     nodal_marginal_prices[unit_node],
                     0,
                 )
+
+        # get flows from optimized pypsa network
+        if log_flows:
+        # extract flows
+            # write network flows here if applicable
+            flows = []
+
+            # Check if the model has the 'flows' attribute
+            if hasattr(network, "lines_t"):
+                flows = network.lines_t.p0
+
+                flows['datetime'] = orderbook_df['start_time'].unique()
+                #set datetime as index
+                flows = flows.set_index('datetime', drop=True)
+                #pivot the dataframe to have row per line column per datetime
+                flows = flows.stack().reset_index()
+
+                #rename columns
+                flows.columns = ['datetime', 'line', 'flow']
+
+
+        return flows
