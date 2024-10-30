@@ -27,7 +27,7 @@ def test_output_market_orders():
         "sender": "CRM_pos",
         "data": [],
     }
-    output_writer.handle_message(content, meta)
+    output_writer.handle_output_message(content, meta)
     assert len(output_writer.write_dfs["market_orders"]) == 0
 
     orderbook = [
@@ -36,7 +36,7 @@ def test_output_market_orders():
             "end_time": end,
             "volume": 120,
             "price": 120,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         },
         {
@@ -44,7 +44,7 @@ def test_output_market_orders():
             "end_time": end,
             "volume": 80,
             "price": 58,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         },
         {
@@ -52,7 +52,7 @@ def test_output_market_orders():
             "end_time": end,
             "volume": 100,
             "price": 53,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         },
         {
@@ -60,7 +60,7 @@ def test_output_market_orders():
             "end_time": end,
             "volume": -180,
             "price": 70,
-            "agent_id": "dem1",
+            "agent_addr": "dem1",
             "only_hours": None,
         },
     ]
@@ -71,7 +71,7 @@ def test_output_market_orders():
         "sender": "CRM_pos",
         "data": orderbook,
     }
-    output_writer.handle_message(content, meta)
+    output_writer.handle_output_message(content, meta)
     assert len(output_writer.write_dfs["market_orders"]) == 1
 
 
@@ -104,7 +104,7 @@ def test_output_market_results():
             }
         ],
     }
-    output_writer.handle_message(content, meta)
+    output_writer.handle_output_message(content, meta)
     assert len(output_writer.write_dfs["market_meta"]) == 1, "market_meta"
 
 
@@ -116,7 +116,7 @@ def test_output_market_dispatch():
     assert len(output_writer.write_dfs.keys()) == 0
     meta = {"sender_id": None}
     content = {"context": "write_results", "type": "market_dispatch", "data": []}
-    output_writer.handle_message(content, meta)
+    output_writer.handle_output_message(content, meta)
     # empty dfs are discarded
     assert len(output_writer.write_dfs["market_dispatch"]) == 0, "market_dispatch"
 
@@ -125,7 +125,7 @@ def test_output_market_dispatch():
         "type": "market_dispatch",
         "data": [[start, 90, "EOM", "TestUnit"]],
     }
-    output_writer.handle_message(content, meta)
+    output_writer.handle_output_message(content, meta)
     assert len(output_writer.write_dfs["market_dispatch"]) == 1, "market_dispatch"
 
 
@@ -152,5 +152,5 @@ def test_output_unit_dispatch():
             }
         ),
     }
-    output_writer.handle_message(content, meta)
+    output_writer.handle_output_message(content, meta)
     assert len(output_writer.write_dfs["unit_dispatch"]) == 1, "unit_dispatch"

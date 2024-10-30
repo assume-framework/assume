@@ -17,6 +17,7 @@ Upcoming Release
 - Converted DST components from functions to classes for improved modularity and reusability.
 - Added new residential DST components like PV, EV, Heat Pump, and Boiler, with refined docstrings for better usability.
 - Created a `GenericStorage` class for storage components, with classes like EV and Hydrogen Storage inheriting from it.
+- update to mango 2.x which allows for sync creation of world
 
 **New Features:**
 - Converted DST components from functions to classes for improved modularity and reusability.

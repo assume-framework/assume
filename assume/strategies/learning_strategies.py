@@ -484,7 +484,7 @@ class RLStrategy(LearningStrategy):
         """
         directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
 
-        params = th.load(directory, map_location=self.device)
+        params = th.load(directory, map_location=self.device, weights_only=True)
 
         self.actor = self.actor_architecture_class(
             obs_dim=self.obs_dim,

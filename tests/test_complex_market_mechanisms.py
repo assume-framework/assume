@@ -63,11 +63,11 @@ def test_complex_clearing():
     assert math.isclose(meta[0]["demand_volume"], 1000, abs_tol=eps)
     assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
     assert rejected_orders == []
-    assert accepted_orders[0]["agent_id"] == "dem1"
+    assert accepted_orders[0]["agent_addr"] == "dem1"
     assert math.isclose(accepted_orders[0]["accepted_volume"], -1000, abs_tol=eps)
-    assert accepted_orders[1]["agent_id"] == f"gen{h+1}"
+    assert accepted_orders[1]["agent_addr"] == f"gen{h+1}"
     assert math.isclose(accepted_orders[1]["accepted_volume"], 100, abs_tol=eps)
-    assert accepted_orders[2]["agent_id"] == f"gen{2*h+1}"
+    assert accepted_orders[2]["agent_addr"] == f"gen{2*h+1}"
     assert math.isclose(accepted_orders[2]["volume"], 900, abs_tol=eps)
 
 
@@ -137,16 +137,16 @@ def test_market_coupling():
     assert math.isclose(meta[2]["price"], 50, abs_tol=eps)
 
     assert rejected_orders == []
-    assert accepted_orders[0]["agent_id"] == "dem1"
+    assert accepted_orders[0]["agent_addr"] == "dem1"
     assert math.isclose(accepted_orders[0]["accepted_volume"], -1000, abs_tol=eps)
-    assert accepted_orders[1]["agent_id"] == "dem3"
+    assert accepted_orders[1]["agent_addr"] == "dem3"
     assert math.isclose(accepted_orders[1]["accepted_volume"], -200, abs_tol=eps)
 
-    assert accepted_orders[2]["agent_id"] == "gen5"
+    assert accepted_orders[2]["agent_addr"] == "gen5"
     assert math.isclose(accepted_orders[2]["accepted_volume"], 500, abs_tol=eps)
     assert math.isclose(accepted_orders[2]["accepted_price"], 100, abs_tol=eps)
 
-    assert accepted_orders[3]["agent_id"] == "gen7"
+    assert accepted_orders[3]["agent_addr"] == "gen7"
     assert math.isclose(accepted_orders[3]["accepted_volume"], 700, abs_tol=eps)
     assert math.isclose(accepted_orders[3]["accepted_price"], 50, abs_tol=eps)
 
@@ -319,7 +319,7 @@ def test_complex_clearing_BB():
     accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
     # accept only cheapes simple bids
     assert math.isclose(meta[0]["price"], 50, abs_tol=eps)
-    assert rejected_orders[1]["agent_id"] == "block_gen7"
+    assert rejected_orders[1]["agent_addr"] == "block_gen7"
     assert math.isclose(
         rejected_orders[1]["accepted_volume"][products[0][0]], 0, abs_tol=eps
     )
@@ -329,14 +329,14 @@ def test_complex_clearing_BB():
     assert mr.all_orders == []
 
     # change the price of the block order to be in-the-money
-    assert orderbook[3]["agent_id"] == "block_gen7"
+    assert orderbook[3]["agent_addr"] == "block_gen7"
     orderbook[3]["price"] = 45
 
     mr = ComplexClearingRole(market_config)
     accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
     # accept block order and part of cheaper simple order
     assert math.isclose(meta[0]["price"], 50, abs_tol=eps)
-    assert accepted_orders[2]["agent_id"] == "block_gen7"
+    assert accepted_orders[2]["agent_addr"] == "block_gen7"
     assert math.isclose(
         accepted_orders[2]["accepted_volume"][products[0][0]], 100, abs_tol=eps
     )
@@ -352,7 +352,7 @@ def test_complex_clearing_BB():
     assert math.isclose(meta[0]["price"], 41, abs_tol=eps)
     assert math.isclose(meta[1]["price"], 50, abs_tol=eps)
     # block bid should be accepted, because surplus is 91-90=1
-    assert accepted_orders[2]["agent_id"] == "block_gen7"
+    assert accepted_orders[2]["agent_addr"] == "block_gen7"
     assert math.isclose(
         accepted_orders[2]["accepted_volume"][products[0][0]], 100, abs_tol=eps
     )
@@ -371,7 +371,7 @@ def test_complex_clearing_BB():
     assert math.isclose(meta[0]["price"], 39, abs_tol=eps)
     assert math.isclose(meta[1]["price"], 50, abs_tol=eps)
     # block bid should be rejected, because surplus is 89-90=-1
-    assert rejected_orders[1]["agent_id"], "block_gen7"
+    assert rejected_orders[1]["agent_addr"], "block_gen7"
     assert math.isclose(
         rejected_orders[1]["accepted_volume"][products[0][0]], 0, abs_tol=eps
     )
@@ -391,7 +391,7 @@ def test_complex_clearing_BB():
     # the acceptance depends on the solver:
     # if solver is glpk, the bid is rejected, if it's gurobi, its accepted
 
-    # assert rejected_orders[1]["agent_id"] == "block_gen7"
+    # assert rejected_orders[1]["agent_addr"] == "block_gen7"
     # assert math.isclose(
     #     rejected_orders[1]["accepted_volume"][products[0][0]], 0, abs_tol=eps
     # )
@@ -401,7 +401,7 @@ def test_complex_clearing_BB():
     assert mr.all_orders == []
 
     # introducing profile block order by increasing the volume for the hour with a higher mcp
-    assert orderbook[3]["agent_id"] == "block_gen7"
+    assert orderbook[3]["agent_addr"] == "block_gen7"
     orderbook[3]["volume"][products[1][0]] = 900
 
     mr = ComplexClearingRole(market_config)
@@ -409,7 +409,7 @@ def test_complex_clearing_BB():
     assert math.isclose(meta[0]["price"], 40, abs_tol=eps)
     assert math.isclose(meta[1]["price"], 50, abs_tol=eps)
     # block bid should be accepted, because surplus is (40-45)*100+(50-45)*900=4000
-    assert accepted_orders[2]["agent_id"] == "block_gen7"
+    assert accepted_orders[2]["agent_addr"] == "block_gen7"
     assert math.isclose(
         accepted_orders[2]["accepted_volume"][products[0][0]], 100, abs_tol=eps
     )
@@ -473,7 +473,7 @@ def test_complex_clearing_LB():
     assert mr.all_orders == []
 
     # change the price of the block order to be out-of-the-money, but saved by child bid
-    assert orderbook[2]["agent_id"] == "block_gen5"
+    assert orderbook[2]["agent_addr"] == "block_gen5"
     orderbook[2]["price"] = 120
 
     mr = ComplexClearingRole(market_config)
@@ -484,28 +484,28 @@ def test_complex_clearing_LB():
     assert mr.all_orders == []
 
     # change the price of the block order to be out-of-the-money, not saved by child bid
-    assert orderbook[2]["agent_id"] == "block_gen5"
+    assert orderbook[2]["agent_addr"] == "block_gen5"
     orderbook[2]["price"] = 130
 
     mr = ComplexClearingRole(market_config)
     accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
     # accept block order and part of cheaper simple order
     assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
-    assert rejected_orders[0]["agent_id"] == "block_gen5"
-    assert rejected_orders[1]["agent_id"] == "block_gen6"
+    assert rejected_orders[0]["agent_addr"] == "block_gen5"
+    assert rejected_orders[1]["agent_addr"] == "block_gen6"
 
     # change the price of the block order to be in-the-money and child bid out-of-the-money
-    assert orderbook[2]["agent_id"] == "block_gen5"
+    assert orderbook[2]["agent_addr"] == "block_gen5"
     orderbook[2]["price"] = 90
-    assert orderbook[3]["agent_id"] == "block_gen6"
+    assert orderbook[3]["agent_addr"] == "block_gen6"
     orderbook[3]["price"] = 120
 
     mr = ComplexClearingRole(market_config)
     accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
 
     assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
-    assert rejected_orders[0]["agent_id"] == "block_gen6"
-    assert accepted_orders[2]["agent_id"] == "block_gen5"
+    assert rejected_orders[0]["agent_addr"] == "block_gen6"
+    assert accepted_orders[2]["agent_addr"] == "block_gen5"
 
     # add second level of child bids
     orderbook = extend_orderbook(
