@@ -1553,6 +1553,7 @@ class DRIStorage(GenericStorage):
 demand_side_technologies: dict = {
     "electrolyser": Electrolyser,
     "hydrogen_storage": HydrogenStorage,
+    "h2_seasonal_storage": HydrogenStorage,
     "dri_plant": DRIPlant,
     "dri_storage": DRIStorage,
     "eaf": ElectricArcFurnace,
