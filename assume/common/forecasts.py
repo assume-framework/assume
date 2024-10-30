@@ -110,10 +110,10 @@ class CsvForecaster(Forecaster):
         index: pd.Series,
         powerplants_units: dict[str, pd.Series] = {},
         demand_units: dict[str, pd.Series] = {},
-        industrial_dsm_units: dict[str, pd.Series] = {},
+        dsm_units: dict[str, pd.Series] = {},
         buses: dict[str, pd.Series] = {},
-        lines: pd.DataFrame = pd.DataFrame(),
-        demand_df: pd.DataFrame = pd.DataFrame(),
+        lines: dict[str, pd.Series] = {},
+        demand_df: dict[str, pd.Series] = {},
         market_configs: dict[str, pd.Series] = {},
         *args,
         **kwargs,
@@ -122,7 +122,7 @@ class CsvForecaster(Forecaster):
         self.logger = logging.getLogger(__name__)
         self.powerplants_units = powerplants_units
         self.demand_units = demand_units
-        self.industrial_dsm_units = industrial_dsm_units
+        self.dsm_units = dsm_units
         self.buses = buses
         self.lines = lines
         self.demand_df = demand_df
@@ -220,6 +220,22 @@ class CsvForecaster(Forecaster):
                 self.forecasts[f"residual_load_{market_id}"] = (
                     self.calculate_residual_load_forecast(market_id=market_id)
                 )
+
+        # # Check if congestion forecast for each node is calculated
+        # congestion_forecast_df = self.calculate_congestion_forecast()  # Returns a DataFrame with node columns
+
+        # for col in congestion_forecast_df.columns:
+        #     if col not in self.forecasts.columns:
+        #         self.forecasts[col] = congestion_forecast_df[col]
+
+        # Step 4: Calculate node-specific congestion signal if not already calculated
+        node_congestion_signal_df = (
+            self.calculate_node_specific_congestion_forecast()
+        )  # Returns a DataFrame with node columns
+
+        for col in node_congestion_signal_df.columns:
+            if col not in self.forecasts.columns:
+                self.forecasts[col] = node_congestion_signal_df[col]
 
     def get_registered_market_participants(self, market_id):
         """
@@ -379,61 +395,124 @@ class CsvForecaster(Forecaster):
 
         return marginal_cost
 
-        # def calculate_congestion_forecast(self) -> pd.Series:
-        #     """
-        #     Calculates a combined grid congestion forecast as a load-to-capacity ratio for all nodes associated
-        #     with industrial DSM units and their connecting lines.
+    # def calculate_congestion_forecast(self) -> pd.Series:
 
-        #     Returns:
-        #         pd.Series: A time series representing the grid congestion forecast.
-        #     """
-        #     # Check the input data
-        #     print("Industrial DSM Units:", self.industrial_dsm_units)
-        #     print("Demand DataFrame Head:\n", self.demand_df.head())
-        #     print("Lines DataFrame Head:\n", self.lines.head())
-        #     # Initialize an empty series to accumulate congestion severity per time step
-        #     grid_congestion_forecast = pd.Series(index=self.index, data=0.0)
+    #     """
+    #     Calculates grid congestion sensitivity for each node as a load-to-capacity ratio.
 
-        #     # Step 1: Find all unique nodes connected to industrial DSM units
-        #     unique_nodes = set(self.industrial_dsm_units.values())
-        #     if not unique_nodes:
-        #         print("No unique nodes found in industrial DSM units.")
-        #         return grid_congestion_forecast  # Return an empty forecast if no nodes are found
+    #     Returns:
+    #         pd.DataFrame: A DataFrame with columns for each node, where each column represents the
+    #                       congestion sensitivity time series for that node.
+    #     """
+    #     node_congestion_sensitivity = pd.DataFrame(index=self.index)
 
-        #     # Step 2: Loop through each unique node
-        #     for node in unique_nodes:
-        #         # Filter demand for all units connected to this node across time steps
-        #         node_units = [
-        #             unit for unit, unit_node in self.industrial_dsm_units.items() if unit_node == node
-        #         ]
-        #         node_demand = self.demand_df[node_units].sum(axis=1)
-        #         # Debug: Check if node_demand is calculated correctly
-        #         print(f"Node '{node}' Demand:\n{node_demand.head()}")
+    #     # Iterate through each unique node in demand_units to calculate congestion sensitivity
+    #     unique_nodes = self.demand_units["node"].unique()
 
-        #         # Step 3: Identify lines connected to this node
-        #         connected_lines = self.lines[
-        #             (self.lines["bus0"] == node) | (self.lines["bus1"] == node)
-        #         ]
+    #     for node in unique_nodes:
+    #         # Identify demand units connected to this node
+    #         node_units = self.demand_units[self.demand_units["node"] == node].index
 
-        #         # Step 4: For each connected line, calculate and accumulate the congestion severity
-        #         for line_id, line_data in connected_lines.iterrows():
-        #             line_capacity = line_data["s_nom"]
+    #         # Sum demand for all units connected to this node across time steps
+    #         node_demand = self.demand_df[node_units].sum(axis=1)
 
-        #             # Debug: Print line capacity to ensure it's retrieved correctly
-        #             print(f"Line '{line_id}' Capacity: {line_capacity}")
+    #         # Identify all lines connected to this node and calculate total capacity
+    #         connected_lines = self.lines[
+    #             (self.lines["bus0"] == node) | (self.lines["bus1"] == node)
+    #         ]
+    #         total_line_capacity = connected_lines["s_nom"].sum()
 
-        #             # Calculate the load-to-capacity ratio as congestion severity
-        #             congestion_severity = (node_demand / line_capacity).clip(upper=1.0)
+    #         # Calculate congestion sensitivity as load-to-capacity ratio
+    #         congestion_sensitivity = (node_demand / total_line_capacity)
 
-        #             # Debug: Check the calculated congestion severity for this line
-        #             print(f"Congestion Severity for Line '{line_id}' at Node '{node}':\n{congestion_severity.head()}")
+    #         # Store the result in the DataFrame with a column named for the node
+    #         node_congestion_sensitivity[f"{node}_congestion_sensitivity"] = congestion_sensitivity
 
-        #             # Aggregate the congestion severity with existing values (e.g., using max or average)
-        #             grid_congestion_forecast = grid_congestion_forecast.combine(
-        #                 congestion_severity, func="max"
-        #             )
+    #     return node_congestion_sensitivity
 
-        # return grid_congestion_forecast
+    def calculate_node_specific_congestion_forecast(self) -> pd.DataFrame:
+        """
+        Calculates a collective node-specific congestion signal by aggregating the congestion severity of all
+        transmission lines connected to each node, taking into account powerplant load based on availability factors.
+
+        Returns:
+            pd.DataFrame: A DataFrame with columns for each node, where each column represents the collective
+                          congestion signal time series for that node.
+        """
+        # Step 1: Calculate powerplant load using availability factors
+        availability_factor_df = pd.DataFrame(
+            index=self.index, columns=self.powerplants_units.index, data=0.0
+        )
+
+        # Calculate load for each powerplant based on availability factor and max power
+        for pp, max_power in self.powerplants_units["max_power"].items():
+            availability_factor_df[pp] = (
+                self.forecasts[f"availability_{pp}"] * max_power
+            )
+
+        # Step 2: Calculate net load for each node (demand - generation)
+        net_load_by_node = {}
+
+        for node in self.demand_units["node"].unique():
+            # Calculate total demand for this node
+            node_demand_units = self.demand_units[
+                self.demand_units["node"] == node
+            ].index
+            node_demand = self.demand_df[node_demand_units].sum(axis=1)
+
+            # Calculate total generation for this node by summing powerplant loads
+            node_generation_units = self.powerplants_units[
+                self.powerplants_units["node"] == node
+            ].index
+            node_generation = availability_factor_df[node_generation_units].sum(axis=1)
+
+            # Calculate net load (demand - generation)
+            net_load_by_node[node] = node_demand - node_generation
+
+        # Step 3: Calculate line-specific congestion severity
+        line_congestion_severity = pd.DataFrame(index=self.index)
+
+        for line_id, line_data in self.lines.iterrows():
+            node1, node2 = line_data["bus0"], line_data["bus1"]
+            line_capacity = line_data["s_nom"]
+
+            # Calculate net load for the line as the sum of net loads from both connected nodes
+            line_net_load = net_load_by_node[node1] + net_load_by_node[node2]
+            congestion_severity = line_net_load / line_capacity
+
+            # Store the line-specific congestion severity in DataFrame
+            line_congestion_severity[f"{line_id}_congestion_severity"] = (
+                congestion_severity
+            )
+
+        # Step 4: Calculate node-specific congestion signal by aggregating connected lines
+        node_congestion_signal = pd.DataFrame(index=self.index)
+
+        for node in self.demand_units["node"].unique():
+            # Find all lines connected to this node
+            connected_lines = self.lines[
+                (self.lines["bus0"] == node) | (self.lines["bus1"] == node)
+            ].index
+
+            # Collect all relevant line congestion severities
+            relevant_lines = [
+                f"{line_id}_congestion_severity" for line_id in connected_lines
+            ]
+
+            # Ensure only existing columns are used to avoid KeyError
+            relevant_lines = [
+                line
+                for line in relevant_lines
+                if line in line_congestion_severity.columns
+            ]
+
+            # Aggregate congestion severities for this node (use max or mean)
+            if relevant_lines:
+                node_congestion_signal[f"{node}_congestion_severity"] = (
+                    line_congestion_severity[relevant_lines].max(axis=1)
+                )
+
+        return node_congestion_signal
 
     def save_forecasts(self, path):
         """
@@ -596,97 +675,3 @@ class NaiveForecast(Forecaster):
         if isinstance(value, pd.Series):
             value.index = self.index
         return pd.Series(value, self.index)
-
-
-# class CongestionForecaster(CsvForecaster):
-#     """
-#     This class represents a forecaster that generates a congestion forecast based on
-#     demand and line capacity data. It calculates a combined grid congestion severity
-#     forecast across all lines and nodes connected to industrial DSM units.
-#     """
-
-#     def __init__(
-#         self,
-#         index: pd.Series,
-#         powerplants_units: dict[str, pd.Series] = {},
-#         demand_units: dict[str, pd.Series] = {},
-#         industrial_dsm_units: dict[str, pd.Series] = {},
-#         buses: dict[str, pd.Series] = {},
-#         lines: pd.DataFrame = pd.DataFrame(),
-#         demand_df: pd.DataFrame = pd.DataFrame(),
-#         market_configs: dict[str, pd.Series] = {},
-#         *args,
-#         **kwargs,
-#     ):
-#         super().__init__(
-#             index,
-#             powerplants_units=powerplants_units,
-#             demand_units=demand_units,
-#             industrial_dsm_units=industrial_dsm_units,
-#             buses=buses,
-#             lines=lines,
-#             demand_df=demand_df,
-#             market_configs=market_configs,
-#             *args,
-#             **kwargs,
-#         )
-
-#     def __getitem__(self, column: str) -> pd.Series:
-#         """
-#         Returns the congestion forecast for the specified column.
-
-#         Args:
-#             column (str): The column for which the congestion forecast is requested.
-
-#         Returns:
-#             pd.Series: The congestion forecast as a time series.
-#         """
-#         if column == "congestion_forecast":
-#             congestion_forecast = self.calculate_congestion_forecast()
-#             return congestion_forecast
-#         else:
-#             # For other columns, fall back to the parent class's implementation
-#             return super().__getitem__(column)
-
-# def calculate_congestion_forecast(self) -> pd.Series:
-#     """
-#     Calculates a combined grid congestion forecast as a load-to-capacity ratio for all nodes associated
-#     with industrial DSM units and their connecting lines.
-
-#     Returns:
-#         pd.Series: A time series representing the grid congestion forecast.
-#     """
-#     # Initialize an empty series to accumulate congestion severity per time step
-#     grid_congestion_forecast = pd.Series(index=self.index, data=0.0)
-
-#     # Step 1: Find all unique nodes connected to industrial DSM units
-#     unique_nodes = set(self.industrial_dsm_units.values())
-
-#     # Step 2: Loop through each unique node
-#     for node in unique_nodes:
-#         # Filter demand for all units connected to this node across time steps
-#         node_units = [
-#             unit
-#             for unit, unit_node in self.industrial_dsm_units.items()
-#             if unit_node == node
-#         ]
-#         node_demand = self.demand_df[node_units].sum(axis=1)
-
-#         # Step 3: Identify lines connected to this node
-#         connected_lines = self.lines[
-#             (self.lines["bus0"] == node) | (self.lines["bus1"] == node)
-#         ]
-
-#         # Step 4: For each connected line, calculate and accumulate the congestion severity
-#         for line_id, line_data in connected_lines.iterrows():
-#             line_capacity = line_data["s_nom"]
-
-#             # Calculate the load-to-capacity ratio as congestion severity
-#             congestion_severity = (node_demand / line_capacity).clip(upper=1.0)
-
-#             # Aggregate the congestion severity with existing values (e.g., using max or average)
-#             grid_congestion_forecast = grid_congestion_forecast.combine(
-#                 congestion_severity, func="max"
-#             )
-
-#     return grid_congestion_forecast

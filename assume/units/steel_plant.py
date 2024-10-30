@@ -101,14 +101,9 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.lime_price = self.forecaster.get_price("lime")
         self.co2_price = self.forecaster.get_price("co2")
 
-        # # Calculate congestion forecast and set it as a forecast column in the forecaster
-        # congestion_forecast = self.forecaster.calculate_congestion_forecast()
-        # congestion_forecast.name = 'congestion'  # Set the name of the Series
-        # self.forecaster.set_forecast(congestion_forecast)
-
-        # Calculate and set congestion forecast
-        # self.congestion_forecast = self.forecaster.calculate_congestion_forecast()
-        # print("Congestion Forecast:\n", self.congestion_forecast)
+        # Calculate congestion forecast and set it as a forecast column in the forecaster
+        congestion_forecast = self.forecaster["east_congestion_severity"]
+        print(congestion_forecast)
 
         self.objective = objective
         self.flexibility_measure = flexibility_measure

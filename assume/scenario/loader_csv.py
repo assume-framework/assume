@@ -444,6 +444,8 @@ def load_config_and_create_forecaster(
     )
 
     powerplant_units = load_file(path=path, config=config, file_name="powerplant_units")
+    buses = load_file(path=path, config=config, file_name="buses")
+    lines = load_file(path=path, config=config, file_name="lines")
     storage_units = load_file(path=path, config=config, file_name="storage_units")
     demand_units = load_file(path=path, config=config, file_name="demand_units")
 
@@ -501,6 +503,10 @@ def load_config_and_create_forecaster(
         index=index,
         powerplants_units=powerplant_units,
         demand_units=demand_units,
+        dsm_units=dsm_units,
+        buses=buses,
+        lines=lines,
+        demand_df=demand_df,
         market_configs=config["markets_config"],
     )
 
@@ -525,6 +531,8 @@ def load_config_and_create_forecaster(
         "storage_units": storage_units,
         "demand_units": demand_units,
         "dsm_units": dsm_units,
+        "buses": buses,
+        "lines": lines,
         "forecaster": forecaster,
     }
 
