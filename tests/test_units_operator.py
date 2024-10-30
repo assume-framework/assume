@@ -103,7 +103,8 @@ async def rl_units_operator() -> RLUnitsOperator:
     start_ts = datetime2timestamp(start)
     clock.set_time(start_ts)
 
-    units_role.context.data.update({
+    units_role.context.data.update(
+        {
             "train_start": start,
             "train_end": end,
             "train_freq": "24h",

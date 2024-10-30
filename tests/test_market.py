@@ -270,7 +270,7 @@ async def test_market_accepted(market_role: MarketRole):
             "price": 20,
             "agent_addr": "gen1",
             "only_hours": None,
-        }
+        },
     ]
     market_role.open_auctions |= {(start, end, None)}
     market_role.handle_orderbook(content={"orderbook": orderbook}, meta=meta)
@@ -286,8 +286,7 @@ async def test_market_accepted(market_role: MarketRole):
     def accept_clear(all_orders, products):
         return all_orders, [], [{"price": 0, "product_start": products[0][0]}]
 
-    market_role.clear = accept_clear  
+    market_role.clear = accept_clear
 
     accepted, meta = await market_role.clear_market([(start, end, None)])
     assert accepted == orderbook
-
