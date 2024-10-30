@@ -51,7 +51,7 @@ def test_market():
     orderbook = extend_orderbook(products, 900, 50, orderbook)
 
     mr = PayAsClearRole(simple_dayahead_auction_config)
-    accepted, rejected, meta = mr.clear(orderbook, products)
+    accepted, rejected, meta, flows = mr.clear(orderbook, products)
     assert meta[0]["demand_volume"] > 0
     assert meta[0]["price"] > 0
     import pandas as pd
@@ -84,7 +84,7 @@ async def test_simple_market_mechanism():
 
         orderbook = create_orderbook(order, node_ids=[0, 1, 2])
         mr = role(simple_dayahead_auction_config)
-        accepted, rejected, meta = mr.clear(orderbook, products)
+        accepted, rejected, meta, flows = mr.clear(orderbook, products)
         assert meta[0]["supply_volume"] > 0
         assert meta[0]["price"] > 0
         # import pandas as pd
@@ -114,7 +114,7 @@ def test_market_pay_as_clear():
     orderbook = extend_orderbook(products, 200, 50, orderbook)
 
     mr = PayAsClearRole(simple_dayahead_auction_config)
-    accepted, rejected, meta = mr.clear(orderbook, products)
+    accepted, rejected, meta, flows = mr.clear(orderbook, products)
     assert meta[0]["demand_volume"] > 0
     assert meta[0]["price"] > 0
     assert len(accepted) == 4
@@ -144,7 +144,7 @@ def test_market_pay_as_clears_single_demand():
     orderbook = extend_orderbook(products, 200, 50, orderbook)
 
     mr = PayAsClearRole(simple_dayahead_auction_config)
-    accepted, rejected, meta = mr.clear(orderbook, products)
+    accepted, rejected, meta, flows = mr.clear(orderbook, products)
     assert meta[0]["demand_volume"] > 0
     assert meta[0]["price"] > 0
     assert len(accepted) == 3
@@ -175,7 +175,7 @@ def test_market_pay_as_clears_single_demand_more_generation():
     orderbook = extend_orderbook(products, 230, 60, orderbook)
 
     mr = PayAsClearRole(simple_dayahead_auction_config)
-    accepted, rejected, meta = mr.clear(orderbook, products)
+    accepted, rejected, meta, flows = mr.clear(orderbook, products)
     assert meta[0]["demand_volume"] > 0
     assert meta[0]["price"] > 0
     assert len(accepted) == 3

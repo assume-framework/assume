@@ -166,7 +166,10 @@ class PayAsClearRole(MarketRole):
                 )
             )
 
-        return accepted_orders, rejected_orders, meta
+        # write network flows here if applicable
+        flows = []
+
+        return accepted_orders, rejected_orders, meta, flows
 
 
 class PayAsBidRole(MarketRole):
@@ -282,4 +285,8 @@ class PayAsBidRole(MarketRole):
                     product,
                 )
             )
-        return accepted_orders, rejected_orders, meta
+
+        # write network flows here if applicable
+        flows = []
+
+        return accepted_orders, rejected_orders, meta, flows
