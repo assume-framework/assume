@@ -19,7 +19,7 @@ Upcoming Release
 - Added new residential DST components like PV, EV, Heat Pump, and Boiler, with refined docstrings for better usability.
 - Created a `GenericStorage` class for storage components, with classes like EV and Hydrogen Storage inheriting from it.
 - update to mango 2.x which allows for sync creation of world
-  
+
   * to upgrade a prior environment run `pip uninstall -y mango-agents mango-agents-assume && pip install mango-agents`
 
 

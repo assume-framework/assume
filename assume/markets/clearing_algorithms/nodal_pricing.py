@@ -164,7 +164,9 @@ class NodalMarketRole(MarketRole):
         log_flows = True
 
         # process dispatch data
-        flows = self.process_dispatch_data(network=nodal_network, orderbook_df=orderbook_df, log_flows=log_flows)
+        flows = self.process_dispatch_data(
+            network=nodal_network, orderbook_df=orderbook_df, log_flows=log_flows
+        )
 
         # return orderbook_df back to orderbook format as list of dicts
         accepted_orders = orderbook_df.to_dict("records")
@@ -177,11 +179,15 @@ class NodalMarketRole(MarketRole):
             meta.extend(
                 calculate_network_meta(network=nodal_network, product=product, i=i)
             )
-    
 
         return accepted_orders, rejected_orders, meta, flows
 
-    def process_dispatch_data(self, network: pypsa.Network, orderbook_df: pd.DataFrame, log_flows: bool = False):
+    def process_dispatch_data(
+        self,
+        network: pypsa.Network,
+        orderbook_df: pd.DataFrame,
+        log_flows: bool = False,
+    ):
         """
         This function processes the dispatch data to calculate the dispatch volumes and prices
         and update the orderbook with the accepted volumes and prices.
@@ -234,7 +240,7 @@ class NodalMarketRole(MarketRole):
 
         # get flows from optimized pypsa network
         if log_flows:
-        # extract flows
+            # extract flows
             # write network flows here if applicable
             flows = []
 
@@ -242,14 +248,13 @@ class NodalMarketRole(MarketRole):
             if hasattr(network, "lines_t"):
                 flows = network.lines_t.p0
 
-                flows['datetime'] = orderbook_df['start_time'].unique()
-                #set datetime as index
-                flows = flows.set_index('datetime', drop=True)
-                #pivot the dataframe to have row per line column per datetime
+                flows["datetime"] = orderbook_df["start_time"].unique()
+                # set datetime as index
+                flows = flows.set_index("datetime", drop=True)
+                # pivot the dataframe to have row per line column per datetime
                 flows = flows.stack().reset_index()
 
-                #rename columns
-                flows.columns = ['datetime', 'line', 'flow']
-
+                # rename columns
+                flows.columns = ["datetime", "line", "flow"]
 
         return flows

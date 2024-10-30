@@ -576,7 +576,7 @@ class WriteOutput(Role):
 
         return rewards_by_unit
 
-    def write_flows(self, data):
+    def write_flows(self, data: dict[tuple[datetime, str], float]):
         """
         Writes the flows of the grid results into the database.
 
@@ -586,18 +586,22 @@ class WriteOutput(Role):
         # Daten in ein DataFrame umwandeln depending on the data format which differes when different solver are used
         # transformation done here to avoid adapting format during clearing
 
-        #if data is dataframe
+        # if data is dataframe
         if isinstance(data, pd.DataFrame):
             df = data
-        
-        #if data is dict
+
+        # if data is dict
         elif isinstance(data, dict):
             # Convert the dictionary to a DataFrame
-            df = pd.DataFrame.from_dict(data, orient='index', columns=['flow']).reset_index()
+            df = pd.DataFrame.from_dict(
+                data, orient="index", columns=["flow"]
+            ).reset_index()
             # Split the 'index' column into 'timestamp' and 'line'
-            df[['timestamp', 'line']] = pd.DataFrame(df['index'].tolist(), index=df.index)
+            df[["timestamp", "line"]] = pd.DataFrame(
+                df["index"].tolist(), index=df.index
+            )
             # Rename the columns
-            df = df.drop(columns=['index'])
+            df = df.drop(columns=["index"])
 
             # set timestamp to index
             df.set_index("timestamp", inplace=True)

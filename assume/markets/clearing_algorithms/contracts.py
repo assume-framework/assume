@@ -264,8 +264,8 @@ class PayAsBidContractRole(MarketRole):
                     partial(self.execute_contract, contract=order), recurrency_task
                 )
 
-            #write flows if applicable
-            flows=[]
+            # write flows if applicable
+            flows = []
 
         # contract clearing (pay_as_bid) takes place
         return accepted_orders, rejected_orders, meta, flows
