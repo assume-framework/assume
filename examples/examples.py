@@ -94,6 +94,10 @@ available_examples = {
         "scenario": "example_04",
         "study_case": "base_case_steel_plant_2019",
     },
+
+    # redispatch for DSM validation example
+    "redisp_dsm_3_nodes": {"scenario": "example_05e", "study_case": "base"},
+
     "experiment": {
         "scenario": "experiment",
         "study_case": "dst_flexibility_redispatch_case",
@@ -109,7 +113,7 @@ if __name__ == "__main__":
     - timescale: with database and grafana (note: you need docker installed)
     """
     data_format = "local_db"  # "local_db" or "timescale"
-    example = "experiment"
+    example = "redisp_dsm_3_nodes"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
