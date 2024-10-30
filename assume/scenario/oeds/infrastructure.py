@@ -42,8 +42,11 @@ class InfrastructureInterface:
     ):
         self.databases = {}
         for db in structure_databases:
+            schema_name = db
+            if db == "nuts":
+                schema_name = "public"
             self.databases[db] = create_engine(
-                f"{db_server_uri}/{db}",
+                f"{db_server_uri}?options=--search_path={schema_name}",
                 connect_args={"application_name": name},
             )
         self.setup()

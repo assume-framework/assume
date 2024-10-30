@@ -8,6 +8,7 @@ from operator import itemgetter
 
 import pandas as pd
 import pyomo.environ as pyo
+from mango import AgentAddress
 from pyomo.opt import SolverFactory, TerminationCondition, check_available_solvers
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
@@ -340,13 +341,15 @@ class ComplexClearingRole(MarketRole):
         self.solver = solver
         self.solver_options = solver_options
 
-    def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> None:
+    def validate_orderbook(
+        self, orderbook: Orderbook, agent_addr: AgentAddress
+    ) -> None:
         """
         Checks whether the bid types are valid and whether the volumes are within the maximum bid volume.
 
         Args:
             orderbook (Orderbook): The orderbook to be validated.
-            agent_tuple (tuple[str, str]): The agent tuple of the market (agent_addr, agent_id).
+            agent_addr (AgentAddress): The agent address of the market.
 
         Raises:
             ValueError: If the bid type is invalid.
@@ -365,7 +368,7 @@ class ComplexClearingRole(MarketRole):
                 )
                 order["bid_type"] = "SB"  # Set to default bid_type
 
-        super().validate_orderbook(orderbook, agent_tuple)
+        super().validate_orderbook(orderbook, agent_addr)
 
         for order in orderbook:
             # Validate volumes
@@ -517,17 +520,20 @@ class ComplexClearingRole(MarketRole):
             if all(order_surplus >= 0 for order_surplus in orders_surplus):
                 break
 
-        accepted_orders, rejected_orders, meta = extract_results(
+        log_flows = True
+
+        accepted_orders, rejected_orders, meta, flows = extract_results(
             model=instance,
             orders=orderbook,
             rejected_orders=rejected_orders,
             market_products=market_products,
             market_clearing_prices=market_clearing_prices,
+            log_flows=log_flows,
         )
 
         self.all_orders = []
 
-        return accepted_orders, rejected_orders, meta
+        return accepted_orders, rejected_orders, meta, flows
 
 
 def calculate_order_surplus(
@@ -613,6 +619,7 @@ def extract_results(
     rejected_orders: Orderbook,
     market_products: list[MarketProduct],
     market_clearing_prices: dict,
+    log_flows: bool = False,
 ):
     """
     Extracts the results of the market clearing from the solved pyomo model.
@@ -718,4 +725,18 @@ def extract_results(
                 }
             )
 
-    return accepted_orders, rejected_orders, meta
+        flows_filtered = {}
+
+        if log_flows:
+            # extract flows
+
+            # Check if the model has the 'flows' attribute
+            if hasattr(model, "flows"):
+                flows = model.flows
+
+                # filter flows and only use positive flows to half the size of the dict
+                flows_filtered = {
+                    index: flow.value for index, flow in flows.items() if not flow.stale
+                }
+
+    return accepted_orders, rejected_orders, meta, flows_filtered

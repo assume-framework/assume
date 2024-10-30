@@ -82,7 +82,7 @@ class ComplexDmasClearingRole(MarketRole):
         opt = SolverFactory(solvers[0])
 
         bid_ids = {}
-        agent_ids = {}
+        agent_addrs = {}
         unit_ids = {}
 
         for order in orderbook:
@@ -109,7 +109,7 @@ class ComplexDmasClearingRole(MarketRole):
             if order_type is not None:
                 tt = (order["start_time"] - start) / duration
                 # block_id, hour, name
-                name = f'{order["agent_id"]} {order.get("unit_id", "")}'
+                name = f'{order["agent_addr"]} {order.get("unit_id", "")}'
                 if "exclusive" in order_type:
                     idx = (order["exclusive_id"], tt, name)
                 elif "linked" in order_type:
@@ -118,7 +118,7 @@ class ComplexDmasClearingRole(MarketRole):
                     # needs bid_id to distinguish orders in the set
                     name += str(order["bid_id"])
                     idx = (None, tt, name)
-                agent_ids[name] = order["agent_id"]
+                agent_addrs[name] = order["agent_addr"]
                 bid_ids[name] = order["bid_id"]
                 unit_ids[name] = order.get("unit_id", "")
 
@@ -412,7 +412,7 @@ class ComplexDmasClearingRole(MarketRole):
                                 "block_id": block,
                                 "link": link,
                                 "exclusive_id": None,
-                                "agent_id": agent_ids[name],
+                                "agent_addr": agent_addrs[name],
                                 "bid_id": bid_ids[name],
                                 "unit_id": unit_ids[name],
                             }
@@ -433,7 +433,7 @@ class ComplexDmasClearingRole(MarketRole):
                                 "block_id": None,
                                 "link": None,
                                 "exclusive_id": block,
-                                "agent_id": agent_ids[name],
+                                "agent_addr": agent_addrs[name],
                                 "bid_id": bid_ids[name],
                                 "unit_id": unit_ids[name],
                             }
@@ -457,7 +457,7 @@ class ComplexDmasClearingRole(MarketRole):
                     "block_id": None,
                     "link": None,
                     "exclusive_id": None,
-                    "agent_id": agent_ids[name],
+                    "agent_addr": agent_addrs[name],
                     "bid_id": bid_ids[name],
                     "unit_id": unit_ids[name],
                 }
@@ -522,4 +522,8 @@ class ComplexDmasClearingRole(MarketRole):
                     "only_hours": None,
                 }
             )
-        return orderbook, rejected, meta
+
+        # write network flows here if applicable
+        flows = []
+
+        return orderbook, rejected, meta, flows
