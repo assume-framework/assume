@@ -191,7 +191,7 @@ class MarketMechanism:
         Returns:
             (Orderbook, Orderbook, list[dict]): The empty accepted orderbook, the empty rejected orderbook and the empty market metadata.
         """
-        return [], [], []
+        return [], [], [], []
 
 
 class MarketRole(MarketMechanism, Role):
@@ -604,11 +604,9 @@ class MarketRole(MarketMechanism, Role):
             market_products (list[MarketProduct]): The products to be traded.
         """
         try:
-            (
-                accepted_orderbook,
-                rejected_orderbook,
-                market_meta,
-            ) = self.clear(self.all_orders, market_products)
+            (accepted_orderbook, rejected_orderbook, market_meta, flows) = self.clear(
+                self.all_orders, market_products
+            )
         except Exception as e:
             logger.error("clearing failed: %s", e)
             raise e
@@ -685,6 +683,9 @@ class MarketRole(MarketMechanism, Role):
 
         await self.store_market_results(market_meta)
 
+        if flows and len(flows) > 0:
+            await self.store_flows(flows)
+
         return accepted_orderbook, market_meta
 
     async def store_order_book(self, orderbook: Orderbook):
@@ -730,4 +731,26 @@ class MarketRole(MarketMechanism, Role):
             await self.context.send_message(
                 receiver_addr=db_addr,
                 content=message,
+            )
+
+    async def store_flows(self, flows: dict[tuple, float]):
+        """
+        Sends a message to the OutputRole to update data in the database.
+
+        Args:
+            flows (flows): The electric flows between nodes to be stored.
+        """
+
+        db_addr = self.context.data.get("output_agent_addr")
+
+        if db_addr:
+            message = {
+                "context": "write_results",
+                "type": "store_flows",
+                "market_id": self.marketconfig.market_id,
+                "data": flows,
+            }
+            await self.context.send_message(
+                content=message,
+                receiver_addr=db_addr,
             )
