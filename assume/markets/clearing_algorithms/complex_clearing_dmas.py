@@ -522,4 +522,8 @@ class ComplexDmasClearingRole(MarketRole):
                     "only_hours": None,
                 }
             )
-        return orderbook, rejected, meta
+
+        # write network flows here if applicable
+        flows = []
+
+        return orderbook, rejected, meta, flows
