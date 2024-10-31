@@ -109,15 +109,17 @@ class World:
 
         self.export_csv_path = export_csv_path
         # intialize db connection at beginning of simulation
+        self.db_uri = database_uri
         if database_uri:
             if str(database_uri).startswith("sqlite:///"):
                 db_path = Path(str(database_uri).replace("sqlite:///", ""))
                 db_path.parent.mkdir(exist_ok=True)
-            self.db = create_engine(make_url(database_uri))
+            self.db_uri = make_url(database_uri)
+            db = create_engine(self.db_uri)
             connected = False
             while not connected:
                 try:
-                    with self.db.connect():
+                    with db.connect():
                         connected = True
                         logger.info("connected to db")
                 except OperationalError as e:
@@ -126,8 +128,6 @@ class World:
                     if not e.code == "e3q8":
                         logger.error("%s", e)
                     time.sleep(2)
-        else:
-            self.db = None
 
         self.market_operators: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}
@@ -225,8 +225,8 @@ class World:
         )
         self.learning_mode = self.learning_config.get("learning_mode", False)
 
-        if not self.db and not self.export_csv_path:
-            self.output_agent_addr = addr(None, None)
+        if not self.db_uri and not self.export_csv_path:
+            self.output_agent_addr = None
         else:
             self.output_agent_addr = addr(self.addr, "export_agent_1")
 
@@ -242,8 +242,7 @@ class World:
         else:
             self.setup_learning()
 
-            if self.output_agent_addr:
-                self.setup_output_agent(simulation_id, save_frequency_hours)
+            self.setup_output_agent(simulation_id, save_frequency_hours)
             self.clock_manager = DistributedClockManager(
                 receiver_clock_addresses=self.addresses
             )
@@ -285,34 +284,40 @@ class World:
 
         logger.debug(
             "creating output agent db=%s export_csv_path=%s",
-            self.db,
+            self.db_uri,
             self.export_csv_path,
         )
         self.output_role = WriteOutput(
             simulation_id=simulation_id,
             start=self.start,
             end=self.end,
-            db_engine=self.db,
+            db_uri=self.db_uri,
             export_csv_path=self.export_csv_path,
             save_frequency_hours=save_frequency_hours,
             learning_mode=self.learning_mode,
             perform_evaluation=self.perform_evaluation,
             additional_kpis=self.additional_kpis,
         )
+        if not self.output_agent_addr:
+            return
 
         # mango multiprocessing is currently only supported on linux
         # with single
+        # sys.platform == "linux"
+        # currently broken in mango2
         if False and self.distributed_role is not None:
             self.addresses.append(addr(self.addr, "clock_agent"))
+            output_role = self.output_role
+            output_aid = self.output_agent_addr.aid
 
             def creator(container):
                 agent = agent_composed_of(
-                    self.output_role,
+                    output_role,
                     register_in=container,
-                    suggested_aid=self.output_agent_addr.aid,
+                    suggested_aid=output_aid,
                 )
                 agent.suspendable_tasks = False
-                self.container.register(DistributedClockAgent(), "clock_agent")
+                container.register(DistributedClockAgent(), "clock_agent")
 
             self.container.as_agent_process(agent_creator=creator)
         else:
@@ -420,26 +425,32 @@ class World:
             units (list[dict]): list of unit dictionaries forwarded to create_unit
         """
         clock_agent_name = f"clock_agent_{id}"
+        markets = list(self.markets.values())
+        for market in markets:
+            # remove generator from rrule as it is not serializable
+            if market.opening_hours._cache is not None:
+                market.opening_hours._cache = None
+                market.opening_hours._cache_complete = False
+                market.opening_hours._cache_gen = None
         self.addresses.append(addr(self.addr, clock_agent_name))
+        units_operator = UnitsOperator(available_markets=markets)
+
+        for unit in units:
+            units_operator.add_unit(self.create_unit(**unit))
+        data_update_dict = {
+            "output_agent_addr": self.output_agent_addr,
+            "learning_output_agent_addr": self.output_agent_addr,
+        }
 
         def creator(container):
             # creating a new role agent and apply the role of a units operator
-            units_operator = UnitsOperator(
-                available_markets=list(self.markets.values())
-            )
+
             unit_operator_agent = agent_composed_of(
                 units_operator, register_in=container, suggested_aid=str(id)
             )
             unit_operator_agent.suspendable_tasks = False
-            unit_operator_agent._role_context.data.update(
-                {
-                    "output_agent_addr": self.output_agent_addr,
-                    "learning_output_agent_addr": self.output_agent_addr,
-                }
-            )
+            unit_operator_agent._role_context.data.update(data_update_dict)
             container.register(DistributedClockAgent(), suggested_aid=clock_agent_name)
-            for unit in units:
-                units_operator.add_unit(self.create_unit(**unit))
 
         self.container.as_agent_process(agent_creator=creator)
 
@@ -588,7 +599,7 @@ class World:
         market_operator.markets.append(market_config)
         self.markets[f"{market_config.market_id}"] = market_config
 
-    async def _step(self):
+    async def _step(self, container):
         if self.distributed_role:
             # TODO find better way than sleeping
             # we need to wait, until the last step is executed correctly
@@ -602,7 +613,7 @@ class World:
             return None
         delta = next_activity - self.clock.time
         self.clock.set_time(next_activity)
-        await tasks_complete_or_sleeping(self.container)
+        await tasks_complete_or_sleeping(container)
         return delta
 
     async def async_run(self, start_ts: datetime, end_ts: datetime):
@@ -616,10 +627,13 @@ class World:
             start_ts (datetime.datetime): The start timestamp for the simulation run.
             end_ts (datetime.datetime): The end timestamp for the simulation run.
         """
+        logger.info("activating container")
         # agent is implicit added to self.container._agents
-        pbar = tqdm(total=end_ts - start_ts)
+        async with activate(self.container) as c:
+            await tasks_complete_or_sleeping(c)
+            logger.info("all agents up - starting simulation")
+            pbar = tqdm(total=end_ts - start_ts)
 
-        async with activate(self.container):
             # allow registration before first opening
             self.clock.set_time(start_ts - 1)
             if self.distributed_role is not False:
@@ -627,7 +641,7 @@ class World:
             prev_delta = 0
             while self.clock.time < end_ts:
                 await asyncio.sleep(0)
-                delta = await self._step()
+                delta = await self._step(c)
                 if delta or prev_delta:
                     pbar.update(delta)
                     pbar.set_description(
