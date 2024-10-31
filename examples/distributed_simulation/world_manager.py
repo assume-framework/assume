@@ -16,7 +16,6 @@ from .config import (
     manager_protocol_addr,
     market_operator_addr,
     marketdesign,
-    tcp_host,
     use_mqtt,
     worker,
 )
@@ -63,7 +62,8 @@ if __name__ == "__main__":
         agent_addresses = []
         for address in sys.argv[1:]:
             if not use_mqtt:
-                agent_address = (tcp_host, int(address))
+                host, port = address.split(":")
+                agent_address = (host, int(port))
             else:
                 agent_address = address
             agent_addresses.append(addr(agent_address, "clock_agent"))

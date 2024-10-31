@@ -22,7 +22,7 @@ db_uri = os.getenv("DB_URI", "postgresql://assume:assume@localhost:5432/assume")
 use_mqtt = os.getenv("MQTT_BROKER", False)
 
 tcp_host = os.getenv("TCP_HOST", "0.0.0.0")
-tcp_port = int(os.getenv("TCP_PORT", "9097"))
+tcp_port = int(os.getenv("TCP_PORT", "8089"))
 if use_mqtt:
     manager_protocol_addr = "manager"
     agent_address = "agent"
