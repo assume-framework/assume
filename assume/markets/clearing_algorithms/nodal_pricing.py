@@ -75,8 +75,10 @@ class NodalMarketRole(MarketRole):
         self.solver = marketconfig.param_dict.get("solver", "highs")
         if self.solver == "gurobi":
             self.solver_options = {"LogToConsole": 0, "OutputFlag": 0}
-        elif self.solver == "highs":
+        elif self.solver == "appsi_highs":
             self.solver_options = {"output_flag": False, "log_to_console": False}
+        else:
+            self.solver_options = {}
 
         # set the market clearing principle
         # as pay as bid or pay as clear
