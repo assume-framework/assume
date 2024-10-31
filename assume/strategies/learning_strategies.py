@@ -295,16 +295,14 @@ class RLStrategy(LearningStrategy):
         # =============================================================================
         # 1.1 Get the Observations, which are the basis of the action decision
         # =============================================================================
+        # scaling factors for the observations
         scaling_factor_res_load = self.max_demand
-
-        # price forecast
         scaling_factor_price = self.max_bid_price
 
         # total capacity and marginal cost
         scaling_factor_total_capacity = unit.max_power
 
         # marginal cost
-        # Obs[2*foresight+1:2*foresight+2]
         scaling_factor_marginal_cost = self.max_bid_price
 
         # checks if we are at end of simulation horizon, since we need to change the forecast then
@@ -475,76 +473,50 @@ class RLStrategy(LearningStrategy):
 
         unit.outputs["rl_rewards"].append(reward)
 
-    def load_actor_params(self, load_path):
-        """
-        Load actor parameters.
-
-        Args:
-            load_path (str): The path to load parameters from.
-        """
-        directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
-
-        params = th.load(directory, map_location=self.device, weights_only=True)
-
-        self.actor = self.actor_architecture_class(
-            obs_dim=self.obs_dim,
-            act_dim=self.act_dim,
-            float_type=self.float_type,
-            unique_obs_dim=self.unique_obs_dim,
-            num_timeseries_obs_dim=self.num_timeseries_obs_dim,
-        ).to(self.device)
-        self.actor.load_state_dict(params["actor"])
-
-        if self.learning_mode:
-            self.actor_target = self.actor_architecture_class(
-                obs_dim=self.obs_dim,
-                act_dim=self.act_dim,
-                float_type=self.float_type,
-                unique_obs_dim=self.unique_obs_dim,
-                num_timeseries_obs_dim=self.num_timeseries_obs_dim,
-            ).to(self.device)
-            self.actor_target.load_state_dict(params["actor_target"])
-            self.actor_target.eval()
-            self.actor.optimizer.load_state_dict(params["actor_optimizer"])
-
 
 class BatteryRLStrategy(LearningStrategy):
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=51, act_dim=2, unique_obs_dim=2, *args,
-                         **kwargs)  # need to be 50 and 2, all RL units the same
-        self.world = None
+        super().__init__(obs_dim=50, act_dim=2, unique_obs_dim=2, *args, **kwargs)
+
         self.unit_id = kwargs["unit_id"]
+
+        # defines bounds of actions space
+        self.max_bid_price = kwargs.get("max_bid_price", 100)
+        self.max_demand = kwargs.get("max_demand", 10e3)
 
         # tells us whether we are training the agents or just executing per-learnind stategies
         self.learning_mode = kwargs.get("learning_mode", False)
         self.perform_evaluation = kwargs.get("perform_evaluation", False)
 
-        #technical parameters of power plant
-        self.max_power_charge = kwargs.get("max_power_charge", 100)
-        self.max_power_discharge = kwargs.get("max_power_discharge", 90)
-        self.efficiency_charge = kwargs.get("efficiency_charge", 0.95)
-        self.efficiency_discharge = kwargs.get("efficiency_discharge", 0.95)
-        self.min_volume = kwargs.get("min_volume", 1)
-        self.max_volume = kwargs.get("max_volume", 190)
-        self.variable_cost_charge = kwargs.get("variable_cost_charge", 30)
-        self.variable_cost_discharge = kwargs.get("variable_cost_discharge", 30)
-        self.natural_inflow = kwargs.get("natural_inflow", 0)
+        # based on learning config
+        self.algorithm = kwargs.get("algorithm", "matd3")
+        actor_architecture = kwargs.get("actor_architecture", "mlp")
 
-        self.max_bid_price = kwargs.get("max_bid_price", 100)
+        if actor_architecture in actor_architecture_aliases.keys():
+            self.actor_architecture_class = actor_architecture_aliases[
+                actor_architecture
+            ]
+        else:
+            raise ValueError(
+                f"Policy '{actor_architecture}' unknown. Supported architectures are {list(actor_architecture_aliases.keys())}"
+            )
 
-        self.float_type = th.float
-
-        # sets the devide of the actor network
+        # sets the device of the actor network
         device = kwargs.get("device", "cpu")
         self.device = th.device(device if th.cuda.is_available() else "cpu")
         if not self.learning_mode:
             self.device = th.device("cpu")
 
+        # future: add option to choose between float16 and float32
+        # float_type = kwargs.get("float_type", "float32")
+        self.float_type = th.float
+
         # for definition of observation space
         self.foresight = kwargs.get("foresight", 24)
 
-        # define used order types
+        # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
+
         if self.learning_mode or self.perform_evaluation:
             self.collect_initial_experience_mode = kwargs.get(
                 "episodes_collecting_initial_experience", True
@@ -566,11 +538,11 @@ class BatteryRLStrategy(LearningStrategy):
             )
 
     def calculate_bids(
-            self,
-            unit: SupportsMinMaxCharge,
-            market_config: MarketConfig,
-            product_tuples: list[Product],
-            **kwargs,
+        self,
+        unit: SupportsMinMaxCharge,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
     ) -> Orderbook:
         """
         Takes information from a unit that the unit operator manages and
@@ -590,6 +562,7 @@ class BatteryRLStrategy(LearningStrategy):
         """
         start = product_tuples[0][0]
         end_all = product_tuples[-1][1]
+
         next_observation = self.create_observation(
             unit=unit,
             market_id=market_config.market_id,
@@ -597,49 +570,52 @@ class BatteryRLStrategy(LearningStrategy):
             end=end_all,
         )
         # =============================================================================
-        # Storage Unit is either charging, discharging, or off
+        # Get the Actions, based on the observations
         # =============================================================================
         actions, noise = self.get_actions(next_observation)
-
 
         # =============================================================================
         # 3. Transform Actions into bids
         # =============================================================================
-        # actions are in the range [-1,1], we need to transform them into actual bids
-        # we can use our domain knowledge to guide the bid formulation
-        bid_price = actions[0] * self.max_bid_price
+        # the first action is the bid price
+        bid_price = (actions[0] + 1) * self.max_bid_price
+        # the second action is the bid direction
+        bid_direction = "sell" if actions[1] >= 0 else "buy"
 
-        bid_direction = 'sell' if actions[1] >= 0 else 'buy'
+        _, max_discharge = unit.calculate_min_max_discharge(start, end_all)
+        _, max_charge = unit.calculate_min_max_charge(start, end_all)
 
-        min_charge, max_charge = unit.calculate_min_max_charge(start, end_all)
-        min_discharge, max_discharge = unit.calculate_min_max_discharge(start, end_all)
-
-        bid_quantity_demand=max_charge.iloc[0]
-        bid_quantity_supply=max_discharge.iloc[0]
+        bid_quantity_supply = max_discharge.iloc[0]
+        bid_quantity_demand = max_charge.iloc[0]
 
         bids = []
 
-        #TODO: check if we need to add a check for the minimum volume
-        if bid_direction == 'sell':
-            bids.append({
-                "start_time": start,
-                "end_time": end_all,
-                "only_hours": None,
-                "price": bid_price,
-                "volume": bid_quantity_supply,  
-                "node": unit.node,
-            })
-        if bid_direction == 'buy':
-            bids.append({
-                "start_time": start,
-                "end_time": end_all,
-                "only_hours": None,
-                "price": -bid_price,
-                "volume": bid_quantity_demand,  
-                "node": unit.node,
-            })
-        bids = self.remove_empty_bids(bids)
+        if bid_direction == "sell":
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end_all,
+                    "only_hours": None,
+                    "price": bid_price,
+                    # zero bids are ignored by the market clearing and orders are deleted,
+                    # but we need the orderbook for the DRL to function,
+                    # therefore we add a small amount
+                    "volume": bid_quantity_supply + 1e-6,
+                    "node": unit.node,
+                }
+            )
 
+        elif bid_direction == "buy":
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end_all,
+                    "only_hours": None,
+                    "price": bid_price,
+                    "volume": bid_quantity_demand + 1e-6,  # negative value for demand
+                    "node": unit.node,
+                }
+            )
 
         unit.outputs["rl_observations"].append(next_observation)
         unit.outputs["rl_actions"].append(actions)
@@ -685,7 +661,7 @@ class BatteryRLStrategy(LearningStrategy):
                 # 2.1 Get Actions and handle exploration
                 # =============================================================================
                 # only use noise as the action to enforce exploration
-                curr_action = noise 
+                curr_action = noise
 
             else:
                 # if we are not in the initial exploration phase we chose the action with the actor neural net
@@ -702,97 +678,98 @@ class BatteryRLStrategy(LearningStrategy):
             noise = tuple(0 for _ in range(self.act_dim))
 
         curr_action = curr_action.clamp(-1, 1)
+
         return curr_action, noise
 
     def calculate_reward(
-            self,
-            unit: SupportsMinMaxCharge,
-            marketconfig: MarketConfig,
-            orderbook: Orderbook,
+        self,
+        unit: SupportsMinMaxCharge,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
     ):
         """
-    Calculates the reward for the unit.
+        Calculates the reward for the unit after market feedback.
 
-    Args:
-        unit (SupportsMinMax): Unit to calculate reward for.
-        marketconfig (MarketConfig): Market configuration.
-        orderbook (Orderbook): Orderbook.
-    """
+        Args:
+            unit (SupportsMinMaxCharge): Unit for which to calculate the reward.
+            marketconfig (MarketConfig): Configuration of the market.
+            orderbook (Orderbook): Orderbook containing orders and their details.
+        """
 
         # =============================================================================
-        # 4. Calculate Reward
+        # Calculate Reward
         # =============================================================================
-        # function is called after the market is cleared and we get the market feedback,
-        # so we can calculate the profit
+        # This function is called after the market is cleared, allowing for profit calculation
+        # based on market feedback.
+
+        scaling_factor = 0.1 / unit.max_power_discharge
+
         product_type = marketconfig.product_type
+        reward = 0
 
-        order = None
-        profit = 0
-        costs = 0
-        marginal_cost = 0
-        duration = 0
-        start = None
-        end_excl = None
-        # iterate over all orders in the orderbook, to calculate order specific profit
+        # Iterate over all orders in the orderbook to calculate order-specific profit
         for order in orderbook:
-            start = order["start_time"]
-            end = order["end_time"]
-            end_excl = end - unit.index.freq
+            start_time = order["start_time"]
+            next_time = start_time + unit.index.freq
+            end_time = order["end_time"]
+            end_exclusive = end_time - unit.index.freq
+            duration_hours = (end_time - start_time) / timedelta(hours=1)
 
-            # depending on way the unit calculates marginal costs we take costs
+            # Calculate marginal and starting costs
             marginal_cost = unit.calculate_marginal_cost(
-                pd.Timestamp(start), unit.outputs[product_type].loc[start]
+                start_time, unit.outputs[product_type].loc[start_time]
+            )
+            marginal_cost += unit.get_starting_costs(int(duration_hours))
+
+            # ignore very small volumes due to calculations
+            accepted_volume = max(order["accepted_volume"], 1e-3)
+
+            # Calculate profit and cost for the order
+            order_profit = order["accepted_price"] * accepted_volume * duration_hours
+            order_cost = abs(marginal_cost * accepted_volume * duration_hours)
+
+            current_soc = unit.outputs["soc"][start_time]
+            next_soc = unit.outputs["soc"][next_time]
+
+            # Calculate and clip the energy cost for the start time
+            unit.outputs["energy_cost"].at[next_time] = np.clip(
+                (unit.outputs["energy_cost"][start_time] * current_soc - order_profit)
+                / next_soc,
+                0,
+                self.max_bid_price,
             )
 
-            duration = (end - start) / timedelta(hours=1)
+            reward += (order_profit - order_cost) * scaling_factor
 
-            marginal_cost += unit.get_starting_costs(int(duration))
+            # add a small reward for charging when empty and discharging when full
+            action = unit.outputs["actions"][start_time]
+            if current_soc == unit.min_soc:
+                if action[1] < 0:
+                    reward += 0.01
+                # else:
+                #     reward -= 0.01
 
-            # calculate profit as income - running_cost from this event
-            order_profit = order["accepted_price"] * order["accepted_volume"] * duration
-            order_cost = marginal_cost * order["accepted_volume"] * duration
+            if current_soc == unit.max_soc:
+                if action[1] >= 0:
+                    reward += 0.01
+                # else:
+                #     reward -= 0.01
 
-            # collect profit and opportunity cost for all orders
-            profit += order_profit
-            costs += order_cost
-
-        # calculate opportunity cost
-        # as the loss of income we have because we are not running at full power
-        opportunity_cost = (
-                (order["accepted_price"] - marginal_cost)
-                * (unit.max_power_charge - unit.outputs[product_type].loc[start:end_excl]).sum()
-                * duration
-        )
-
-        # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
-        opportunity_cost = max(opportunity_cost, 0)
-
-        profit = profit - costs
-
-        scaling = 0.1 / unit.max_volume
-        regret_scale = 0.2
-        reward = float(profit - regret_scale * opportunity_cost) * scaling
-
-        # store results in unit outputs which are written to database by unit operator
-        unit.outputs["profit"].loc[start:end_excl] += profit
-        unit.outputs["reward"].loc[start:end_excl] = reward
-        unit.outputs["regret"].loc[start:end_excl] = opportunity_cost
-        unit.outputs["total_costs"].loc[start:end_excl] = costs
-        # Cause error if orderbook does not contain 2 bids the same as powerplant
-        unit.outputs["rl_rewards"].append(reward)
-
-        if start == datetime(2019, 4, 1, 0, 0):
-            print("SOC Printing at the end" + str(np.average(unit.outputs["soc"])))
-            pd.Series(unit.outputs["soc"]).to_csv(path_or_buf="./outputs/storage/soc_" + unit.id + ".csv")
+            # Store results in unit outputs
+            unit.outputs["profit"].loc[start_time:end_exclusive] += (
+                order_profit - order_cost
+            )
+            unit.outputs["reward"].loc[start_time:end_exclusive] = reward
+            unit.outputs["total_costs"].loc[start_time:end_exclusive] = order_cost
+            unit.outputs["rl_rewards"].append(reward)
 
     def create_observation(
-            self,
-            unit: SupportsMinMaxCharge,
-            market_id: str,
-            start: datetime,
-            end: datetime,
+        self,
+        unit: SupportsMinMaxCharge,
+        market_id: str,
+        start: datetime,
+        end: datetime,
     ):
-
         end_excl = end - unit.index.freq
 
         # get the forecast length depending on the tme unit considered in the modelled unit
@@ -801,84 +778,69 @@ class BatteryRLStrategy(LearningStrategy):
         # =============================================================================
         # 1.1 Get the Observations, which are the basis of the action decision
         # =============================================================================
-        scaling_factor_res_load = self.max_volume
-
-        # price forecast
-        scaling_factor_price = 100
-
-        # total capacity and marginal cost
-        scaling_factor_total_capacity = unit.max_power_charge
-
-        # marginal cost
-        # Obs[2*foresight+1:2*foresight+2]
-        scaling_factor_marginal_cost = 100
+        # scaling factors for the observations
+        scaling_factor_res_load = self.max_demand
+        scaling_factor_price = self.max_bid_price
 
         # checks if we are at end of simulation horizon, since we need to change the forecast then
         # for residual load and price forecast and scale them
         if (
-                end_excl + forecast_len
-                > unit.forecaster[f"residual_load_{market_id}"].index[-1]
+            end_excl + forecast_len
+            > unit.forecaster[f"residual_load_{market_id}"].index[-1]
         ):
             scaled_res_load_forecast = (
-                    unit.forecaster[f"residual_load_{market_id}"].loc[start:].values
-                    / scaling_factor_res_load
+                unit.forecaster[f"residual_load_{market_id}"].loc[start:].values
+                / scaling_factor_res_load
             )
             scaled_res_load_forecast = np.concatenate(
                 [
                     scaled_res_load_forecast,
                     unit.forecaster[f"residual_load_{market_id}"].iloc[
-                    : self.foresight - len(scaled_res_load_forecast)
+                        : self.foresight - len(scaled_res_load_forecast)
                     ],
                 ]
             )
 
         else:
             scaled_res_load_forecast = (
-                    unit.forecaster[f"residual_load_{market_id}"]
-                    .loc[start: end_excl + forecast_len]
-                    .values
-                    / scaling_factor_res_load
+                unit.forecaster[f"residual_load_{market_id}"]
+                .loc[start : end_excl + forecast_len]
+                .values
+                / scaling_factor_res_load
             )
 
         if end_excl + forecast_len > unit.forecaster[f"price_{market_id}"].index[-1]:
             scaled_price_forecast = (
-                    unit.forecaster[f"price_{market_id}"].loc[start:].values
-                    / scaling_factor_price
+                unit.forecaster[f"price_{market_id}"].loc[start:].values
+                / scaling_factor_price
             )
             scaled_price_forecast = np.concatenate(
                 [
                     scaled_price_forecast,
                     unit.forecaster[f"price_{market_id}"].iloc[
-                    : self.foresight - len(scaled_price_forecast)
+                        : self.foresight - len(scaled_price_forecast)
                     ],
                 ]
             )
 
         else:
             scaled_price_forecast = (
-                    unit.forecaster[f"price_{market_id}"]
-                    .loc[start: end_excl + forecast_len]
-                    .values
-                    / scaling_factor_price
+                unit.forecaster[f"price_{market_id}"]
+                .loc[start : end_excl + forecast_len]
+                .values
+                / scaling_factor_price
             )
 
-        # get last accapted bid volume and the current marginal costs of the unit
-        current_volume = unit.get_output_before(start)
-        current_costs = unit.calculate_marginal_cost(start, current_volume)
-
-        soc = unit.outputs["soc"].loc[start:end_excl]
-        soc_scaled = np.average(soc / scaling_factor_res_load)
-
-        # scale unit outpus
-        scaled_total_capacity = current_volume / scaling_factor_total_capacity
-        scaled_marginal_cost = current_costs / scaling_factor_marginal_cost
+        # get the current soc value
+        soc_scaled = unit.outputs["soc"].at[start] / unit.max_soc
+        energy_cost_scaled = unit.outputs["energy_cost"].at[start] / self.max_bid_price
 
         # concat all obsverations into one array
         observation = np.concatenate(
             [
                 scaled_res_load_forecast,
                 scaled_price_forecast,
-                np.array([scaled_total_capacity, scaled_marginal_cost, soc_scaled]),
+                np.array([soc_scaled, energy_cost_scaled]),
             ]
         )
 
@@ -890,166 +852,3 @@ class BatteryRLStrategy(LearningStrategy):
         )
 
         return observation.detach().clone()
-    
-class BatteryRLStrategy_Curve(BatteryRLStrategy):
-    """
-    Reinforcement Learning strategy for a battery unit, which submits a two stage bidding curve.
-    The agents decides on two prices , on for the maximal discharge and one for the maximal charge capacity. 
-
-    """
-    def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=51, act_dim=2, unique_obs_dim=2, *args,
-                         **kwargs)  # need to be 50 and 2, all RL units the same
-        self.world = None
-        self.unit_id = kwargs["unit_id"]
-
-        # tells us whether we are training the agents or just executing per-learnind stategies
-        self.learning_mode = kwargs.get("learning_mode", False)
-        self.perform_evaluation = kwargs.get("perform_evaluation", False)
-
-        #technical parameters of power plant
-        self.max_power_charge = kwargs.get("max_power_charge", 100)
-        self.max_power_discharge = kwargs.get("max_power_discharge", 90)
-        self.efficiency_charge = kwargs.get("efficiency_charge", 0.95)
-        self.efficiency_discharge = kwargs.get("efficiency_discharge", 0.95)
-        self.min_volume = kwargs.get("min_volume", 1)
-        self.max_volume = kwargs.get("max_volume", 190)
-        self.variable_cost_charge = kwargs.get("variable_cost_charge", 30)
-        self.variable_cost_discharge = kwargs.get("variable_cost_discharge", 30)
-        self.natural_inflow = kwargs.get("natural_inflow", 0)
-
-        self.max_bid_price = kwargs.get("max_bid_price", 100)
-
-        self.float_type = th.float
-
-        # sets the devide of the actor network
-        device = kwargs.get("device", "cpu")
-        self.device = th.device(device if th.cuda.is_available() else "cpu")
-        if not self.learning_mode:
-            self.device = th.device("cpu")
-
-        # for definition of observation space
-        self.foresight = kwargs.get("foresight", 24)
-
-        # define used order types
-        self.order_types = kwargs.get("order_types", ["SB"])
-        if self.learning_mode or self.perform_evaluation:
-            self.collect_initial_experience_mode = kwargs.get(
-                "episodes_collecting_initial_experience", True
-            )
-
-            self.action_noise = NormalActionNoise(
-                mu=0.0,
-                sigma=kwargs.get("noise_sigma", 0.1),
-                action_dimension=self.act_dim,
-                scale=kwargs.get("noise_scale", 1.0),
-                dt=kwargs.get("noise_dt", 1.0),
-            )
-
-        elif Path(kwargs["trained_policies_save_path"]).is_dir():
-            self.load_actor_params(load_path=kwargs["trained_policies_save_path"])
-        else:
-            raise FileNotFoundError(
-                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
-            )
-        
-
-    def calculate_bids(
-            self,
-            unit: SupportsMinMaxCharge,
-            market_config: MarketConfig,
-            product_tuples: list[Product],
-            **kwargs,
-    ) -> Orderbook:
-        """
-        Takes information from a storage unit that the unit operator manages and
-        defines how bids for the market are defined, by submitting a two stage bidding curve.
-
-        Args:
-            unit (SupportsMinMaxCharge): The unit that is dispatched.
-            market_config (MarketConfig): The market configuration.
-            product_tuples (list[Product]): List of product tuples.
-            **kwargs: Additional keyword arguments.
-
-        Returns:
-            Orderbook: Bids containing start_time, end_time, only_hours, price, volume.
-
-        Note:
-            The strategy is analogue to flexABLE
-        """
-        start = product_tuples[0][0]
-        end_all = product_tuples[-1][1]
-        next_observation = self.create_observation(
-            unit=unit,
-            market_id=market_config.market_id,
-            start=start,
-            end=end_all,
-        )
-        # =============================================================================
-        # Storage Unit is either charging, discharging, or off
-        # =============================================================================
-        actions, noise = self.get_actions(next_observation)
-        # =============================================================================
-        # 3. Transform Actions into bids
-        # =============================================================================
-        # actions are in the range [0,1], we need to transform them into actual bids
-        # we can use our domain knowledge to guide the bid formulation
-        bid_prices = actions * self.max_bid_price
-
-        min_charge, max_charge = unit.calculate_min_max_charge(start, end_all)
-        min_discharge, max_discharge = unit.calculate_min_max_discharge(start, end_all)
-
-        bids = []
-
-        for bid in bid_prices:
-            if bid > 0:  ## Demand == we have to pay, positive bid
-                bids.append({
-                    "start_time": start,
-                    "end_time": end_all,
-                    "only_hours": None,
-                    "price": bid,
-                    "volume": max_charge[start],  # Charge == Demand, negative Values
-                    "node": unit.node,
-                })
-            if bid < 0:  ## Supply == we get payed, bid need converted to positive price
-                bids.append({
-                    "start_time": start,
-                    "end_time": end_all,
-                    "only_hours": None,
-                    "price": -bid,
-                    "volume": max_discharge[start],  ## Discharge == Supply, positive Values
-                    "node": unit.node,
-                })
-        bids = self.remove_empty_bids(bids)
-
-        # Try to fix inhomogeneous shapes if don't submit min 2 bids
-        if len(bids) == 0:
-            if max_charge[start] < 0:  # Charging possible, bid with zero to get never accepted
-                for i in range(2):
-                    bids.append({
-                        "start_time": start,
-                        "end_time": end_all,
-                        "only_hours": None,
-                        "price": 0,
-                        "volume": max_charge[start] / 2,
-                        "node": unit.node,
-                    })
-            if max_charge[start] >= 0 and max_discharge[start] > 0:  # Charging impossible, discharge the highest price
-                for i in range(2):
-                    bids.append({
-                        "start_time": start,
-                        "end_time": end_all,
-                        "only_hours": None,
-                        "price": self.max_bid_price,
-                        "volume": max_discharge[start] / 2,
-                        "node": unit.node,
-                    })
-        bids = self.remove_empty_bids(bids)
-        unit.outputs["rl_observations"].append(next_observation)
-        unit.outputs["rl_actions"].append(actions)
-
-        # store results in unit outputs as series to be written to the database by the unit operator
-        unit.outputs["actions"][start] = actions
-        unit.outputs["exploration_noise"][start] = noise
-
-        return bids

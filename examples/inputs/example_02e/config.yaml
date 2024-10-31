@@ -12,12 +12,13 @@ tiny:
   learning_config:
     continue_learning: False
     trained_policies_save_path: null
-    max_bid_price: 100
+    max_bid_price: 50
     algorithm: matd3
     actor_architecture: mlp
     learning_rate: 0.001
-    training_episodes: 10
-    episodes_collecting_initial_experience: 3
+    training_episodes: 5
+    validation_episodes_interval: 2
+    episodes_collecting_initial_experience: 1
     train_freq: 24h
     gradient_steps: -1
     batch_size: 64
@@ -26,7 +27,6 @@ tiny:
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
-    validation_episodes_interval: 5
 
   markets_config:
     EOM:
@@ -59,15 +59,15 @@ base:
     max_bid_price: 100
     algorithm: matd3
     actor_architecture: mlp
-    learning_rate: 0.001
+    learning_rate: 0.0001
     training_episodes: 50
     episodes_collecting_initial_experience: 5
-    train_freq: 24h
+    train_freq: 100h
     gradient_steps: -1
     batch_size: 256
-    gamma: 0.99
+    gamma: 0.999
     device: cpu
-    noise_sigma: 0.1
+    noise_sigma: 0.2
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 5
@@ -90,4 +90,3 @@ base:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
-

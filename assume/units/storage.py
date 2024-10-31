@@ -28,8 +28,9 @@ class Storage(SupportsMinMaxCharge):
         min_power_charge (float): The minimum power input of the storage unit in MW (negative value).
         max_power_discharge (float): The maximum power output of the storage unit in MW.
         min_power_discharge (float): The minimum power output of the storage unit in MW.
-        max_volume (float): The maximum state of charge of the storage unit in MWh (equivalent to capacity).
-        min_volume (float): The minimum state of charge of the storage unit in MWh.
+        max_soc (float): The maximum state of charge of the storage unit in MWh (equivalent to capacity).
+        min_soc (float): The minimum state of charge of the storage unit in MWh.
+        initial_soc (float): The initial state of charge of the storage unit in MWh.
         efficiency_charge (float): The efficiency of the storage unit while charging.
         efficiency_discharge (float): The efficiency of the storage unit while discharging.
         additional_cost_charge (Union[float, pd.Series], optional): Additional costs associated with power consumption, in EUR/MWh. Defaults to 0.
@@ -59,11 +60,11 @@ class Storage(SupportsMinMaxCharge):
         bidding_strategies: dict,
         max_power_charge: float | pd.Series,
         max_power_discharge: float | pd.Series,
-        max_volume: float,
+        max_soc: float,
         min_power_charge: float | pd.Series = 0.0,
         min_power_discharge: float | pd.Series = 0.0,
-        min_volume: float = 0.0,
-        initial_soc: float = 0.5,
+        min_soc: float = 0.0,
+        initial_soc: float = 0.0,
         soc_tick: float = 0.01,
         efficiency_charge: float = 1,
         efficiency_discharge: float = 1,
@@ -97,17 +98,19 @@ class Storage(SupportsMinMaxCharge):
             **kwargs,
         )
 
+        self.max_soc = max_soc
+        self.min_soc = min_soc
+        self.initial_soc = initial_soc
+
         self.max_power_charge = -abs(max_power_charge)
         self.min_power_charge = -abs(min_power_charge)
         self.max_power_discharge = abs(max_power_discharge)
         self.min_power_discharge = abs(min_power_discharge)
-        self.initial_soc = initial_soc
+
         self.outputs["soc"] = pd.Series(self.initial_soc, index=self.index, dtype=float)
+        self.outputs["energy_cost"] = pd.Series(0.0, index=self.index, dtype=float)
 
         self.soc_tick = soc_tick
-
-        self.max_volume = max_volume
-        self.min_volume = min_volume
 
         # The efficiency of the storage unit while charging.
         self.efficiency_charge = efficiency_charge if 0 < efficiency_charge < 1 else 1
@@ -198,10 +201,7 @@ class Storage(SupportsMinMaxCharge):
 
                 time_delta = self.index.freq / timedelta(hours=1)
                 delta_soc = (
-                    -self.outputs["energy"][t]
-                    * time_delta
-                    / self.efficiency_discharge
-                    / self.max_volume
+                    -self.outputs["energy"][t] * time_delta / self.efficiency_discharge
                 )
 
             # charging
@@ -213,13 +213,10 @@ class Storage(SupportsMinMaxCharge):
 
                 time_delta = self.index.freq / timedelta(hours=1)
                 delta_soc = (
-                    -self.outputs["energy"][t]
-                    * time_delta
-                    * self.efficiency_charge
-                    / self.max_volume
+                    -self.outputs["energy"][t] * time_delta * self.efficiency_charge
                 )
 
-            self.outputs["soc"][t + self.index.freq] = soc + delta_soc
+            self.outputs["soc"].at[t + self.index.freq] = soc + delta_soc
 
         return self.outputs["energy"].loc[start:end]
 
@@ -266,7 +263,6 @@ class Storage(SupportsMinMaxCharge):
                     -self.outputs["energy"][start]
                     * time_delta
                     / self.efficiency_discharge
-                    / self.max_volume
                 )
 
             # charging
@@ -278,10 +274,7 @@ class Storage(SupportsMinMaxCharge):
 
                 time_delta = self.index.freq / timedelta(hours=1)
                 delta_soc = (
-                    -self.outputs["energy"][start]
-                    * time_delta
-                    * self.efficiency_charge
-                    / self.max_volume
+                    -self.outputs["energy"][start] * time_delta * self.efficiency_charge
                 )
 
             self.outputs["soc"][start + self.index.freq :] = soc + delta_soc
@@ -343,13 +336,9 @@ class Storage(SupportsMinMaxCharge):
         duration = self.index.freq / timedelta(hours=1)
         power = max(
             0,
-            (
-                (soc * self.max_volume - self.min_volume)
-                * self.efficiency_discharge
-                / duration
-            ),
+            ((soc - self.min_soc) * self.efficiency_discharge / duration),
         )
-        return round(power, 3)
+        return power
 
     def calculate_soc_max_charge(
         self,
@@ -367,13 +356,9 @@ class Storage(SupportsMinMaxCharge):
         duration = self.index.freq / timedelta(hours=1)
         power = min(
             0,
-            (
-                (soc * self.max_volume - self.max_volume)
-                / self.efficiency_charge
-                / duration
-            ),
+            ((soc - self.max_soc) / self.efficiency_charge / duration),
         )
-        return round(power, 3)
+        return power
 
     def calculate_min_max_charge(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
@@ -419,7 +404,7 @@ class Storage(SupportsMinMaxCharge):
             min_power_charge >= max_power_charge, 0
         )
 
-        # restrict charging according to max_volume
+        # restrict charging according to max_soc
         max_soc_charge = self.calculate_soc_max_charge(self.outputs["soc"][start])
         max_power_charge = max_power_charge.clip(lower=max_soc_charge)
 
@@ -469,7 +454,7 @@ class Storage(SupportsMinMaxCharge):
             min_power_discharge < max_power_discharge, 0
         )
 
-        # restrict according to min_volume
+        # restrict according to min_soc
         max_soc_discharge = self.calculate_soc_max_discharge(self.outputs["soc"][start])
         max_power_discharge = max_power_discharge.clip(upper=max_soc_discharge)
 

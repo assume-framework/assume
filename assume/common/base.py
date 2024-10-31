@@ -12,6 +12,11 @@ import pandas as pd
 from assume.common.forecasts import Forecaster
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 
+try:
+    import torch as th
+except ImportError:
+    th = None
+
 
 class BaseStrategy:
     pass
@@ -527,7 +532,7 @@ class SupportsMinMaxCharge(BaseUnit):
     # negative
     ramp_down_charge: float
     # ramp_down_charge is negative
-    max_volume: float
+    max_soc: float
     efficiency_charge: float
     efficiency_discharge: float
 
@@ -806,6 +811,38 @@ class LearningStrategy(BaseStrategy):
         # defines the number of provided timeseries, this is necessary for correctly splitting
         # them into suitable format for recurrent neural networks
         self.num_timeseries_obs_dim = num_timeseries_obs_dim
+
+    def load_actor_params(self, load_path):
+        """
+        Load actor parameters.
+
+        Args:
+            load_path (str): The path to load parameters from.
+        """
+        directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
+
+        params = th.load(directory, map_location=self.device, weights_only=True)
+
+        self.actor = self.actor_architecture_class(
+            obs_dim=self.obs_dim,
+            act_dim=self.act_dim,
+            float_type=self.float_type,
+            unique_obs_dim=self.unique_obs_dim,
+            num_timeseries_obs_dim=self.num_timeseries_obs_dim,
+        ).to(self.device)
+        self.actor.load_state_dict(params["actor"])
+
+        if self.learning_mode:
+            self.actor_target = self.actor_architecture_class(
+                obs_dim=self.obs_dim,
+                act_dim=self.act_dim,
+                float_type=self.float_type,
+                unique_obs_dim=self.unique_obs_dim,
+                num_timeseries_obs_dim=self.num_timeseries_obs_dim,
+            ).to(self.device)
+            self.actor_target.load_state_dict(params["actor_target"])
+            self.actor_target.eval()
+            self.actor.optimizer.load_state_dict(params["actor_optimizer"])
 
 
 class LearningConfig(TypedDict):

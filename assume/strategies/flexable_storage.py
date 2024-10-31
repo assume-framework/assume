@@ -156,14 +156,10 @@ class flexableEOMStorage(BaseStrategy):
                     (bid_quantity + current_power)
                     * time_delta
                     / unit.efficiency_discharge
-                    / unit.max_volume
                 )
             elif bid_quantity + current_power < 0:
                 delta_soc = -(
-                    (bid_quantity + current_power)
-                    * time_delta
-                    * unit.efficiency_charge
-                    / unit.max_volume
+                    (bid_quantity + current_power) * time_delta * unit.efficiency_charge
                 )
             else:
                 delta_soc = 0
@@ -263,9 +259,7 @@ class flexablePosCRMStorage(BaseStrategy):
 
         previous_power = unit.get_output_before(start)
 
-        min_power_discharge, max_power_discharge = unit.calculate_min_max_discharge(
-            start, end
-        )
+        _, max_power_discharge = unit.calculate_min_max_discharge(start, end)
         bids = []
         theoretic_SOC = unit.outputs["soc"][start]
         for product in product_tuples:
@@ -303,7 +297,7 @@ class flexablePosCRMStorage(BaseStrategy):
                     abs(specific_revenue) * unit.min_power_discharge / bid_quantity
                 )
 
-            energy_price = capacity_price / (theoretic_SOC * unit.max_volume)
+            energy_price = capacity_price
 
             if market_config.product_type == "capacity_pos":
                 bids.append(
@@ -335,7 +329,6 @@ class flexablePosCRMStorage(BaseStrategy):
                     (bid_quantity + current_power)
                     * time_delta
                     / unit.efficiency_discharge
-                    / unit.max_volume
                 )
                 theoretic_SOC += delta_soc
                 previous_power = bid_quantity + current_power
@@ -395,7 +388,7 @@ class flexableNegCRMStorage(BaseStrategy):
 
         theoretic_SOC = unit.outputs["soc"][start]
 
-        min_power_charge, max_power_charge = unit.calculate_min_max_charge(start, end)
+        _, max_power_charge = unit.calculate_min_max_charge(start, end)
 
         bids = []
         for product in product_tuples:
@@ -442,10 +435,7 @@ class flexableNegCRMStorage(BaseStrategy):
                 # calculate theoretic SOC
                 time_delta = (end - start) / timedelta(hours=1)
                 delta_soc = (
-                    (bid_quantity + current_power)
-                    * time_delta
-                    * unit.efficiency_charge
-                    / unit.max_volume
+                    (bid_quantity + current_power) * time_delta * unit.efficiency_charge
                 )
                 theoretic_SOC += delta_soc
                 previous_power = bid_quantity + current_power
@@ -519,12 +509,12 @@ def get_specific_revenue(unit, marginal_cost, t, foresight, price_forecast):
             power_discharge=max_power_discharge.iloc[i],
         )
         possible_revenue += (market_price - marginal_cost) * theoretic_power_discharge
-        theoretic_SOC -= theoretic_power_discharge / unit.max_volume
+        theoretic_SOC -= theoretic_power_discharge
         previous_power = theoretic_power_discharge
 
     if soc != theoretic_SOC:
-        possible_revenue = possible_revenue / (soc - theoretic_SOC) / unit.max_volume
+        possible_revenue = possible_revenue / (soc - theoretic_SOC)
     else:
-        possible_revenue = possible_revenue / unit.max_volume
+        possible_revenue = possible_revenue / unit.max_soc
 
     return possible_revenue

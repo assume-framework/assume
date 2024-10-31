@@ -141,7 +141,7 @@ class DmasStorageStrategy(BaseStrategy):
         self.model.p_minus = Var(
             time_range, within=Reals, bounds=(0, unit.max_power_discharge)
         )
-        self.model.volume = Var(time_range, within=Reals, bounds=(0, unit.max_volume))
+        self.model.volume = Var(time_range, within=Reals, bounds=(0, unit.max_soc))
 
         self.power = [
             -self.model.p_minus[t] / unit.efficiency_discharge
@@ -151,7 +151,7 @@ class DmasStorageStrategy(BaseStrategy):
 
         self.model.vol_con = ConstraintList()
         soc0 = unit.get_soc_before(start)
-        v0 = unit.max_volume * soc0
+        v0 = unit.max_soc * soc0
 
         for t in time_range:
             if t == 0:
@@ -162,7 +162,7 @@ class DmasStorageStrategy(BaseStrategy):
                 )
 
         # always end with half full SoC
-        self.model.vol_con.add(self.model.volume[hour_count - 1] == unit.max_volume / 2)
+        self.model.vol_con.add(self.model.volume[hour_count - 1] == unit.max_soc / 2)
         return self.power
 
     def optimize(

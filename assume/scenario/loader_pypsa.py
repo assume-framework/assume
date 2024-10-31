@@ -156,7 +156,7 @@ def load_pypsa(
                 "efficiency_charge": storage.efficiency_store,
                 "efficiency_discharge": storage.efficiency_dispatch,
                 "initial_soc": storage.state_of_charge_initial,
-                "max_volume": storage.p_nom,
+                "max_soc": storage.p_nom,
                 "bidding_strategies": bidding_strategies[storage.name],
                 "technology": "hydro",
                 "emission_factor": 0,
