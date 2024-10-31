@@ -20,7 +20,7 @@ The unit operator is responsible for the following tasks:
 - **Handling the opening message from a market by asking for bids from its units**
 - **Passing or processing the bids of the technical units through to the market**
 - **Handling the market feedback and communicate actual dispatch of technical units**
-- **Collects a variety of data and sends it to the output unit which wirtes it in coordinated way to the database**
+- **Collects a variety of data and sends it to the output unit which writes it in coordinated way to the database**
 
 As one can see from all the task the unit oporator covers, that it orchestrates and coordinates the technical units and the markets.
 

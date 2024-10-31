@@ -89,7 +89,7 @@ def test_insufficient_generation():
         },
     ]
     mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert meta[0]["price"] == 60
     assert meta[0]["supply_volume"] == 200
     assert meta[0]["demand_volume"] == 201
@@ -167,7 +167,7 @@ def test_remaining_generation():
         },
     ]
     mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert meta[0]["price"] == 45
     assert meta[0]["supply_volume"] == 200
     assert meta[0]["demand_volume"] == 200
@@ -235,7 +235,7 @@ def test_link_order():
         },
     ]
     mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     # should actually clear to 40, link orders are limited for same hour
     assert meta[0]["price"] == 60
     assert meta[0]["supply_volume"] == 200
@@ -329,7 +329,7 @@ def test_use_link_order():
         },
     ]
     mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert meta[1]["price"] == 0
     assert meta[0]["price"] == 60
     assert meta[0]["supply_volume"] == 100
@@ -437,7 +437,7 @@ def test_use_link_order2():
         },
     ]
     mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert meta[1]["price"] == 50
     assert meta[0]["price"] == 40
     assert meta[0]["supply_volume"] == 100
@@ -526,7 +526,7 @@ def test_market():
         },
     ]
     mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert meta[0]["price"] == 90
     assert meta[0]["supply_volume"] == 210
     assert meta[0]["demand_volume"] == 500
@@ -583,7 +583,7 @@ def test_clearing():
 
     simple_dayahead_auction_config.maximum_bid_price = 1e9
     mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert meta[0]["price"] == 0.2
 
     """
@@ -594,5 +594,5 @@ def test_clearing():
     """
     # simple_dayahead_auction_config.maximum_bid_price = 1e12
     # mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
-    # accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    # accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     # assert meta[0]["price"] == 65

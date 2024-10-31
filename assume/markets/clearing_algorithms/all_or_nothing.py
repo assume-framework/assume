@@ -113,8 +113,12 @@ class PayAsClearAonRole(MarketRole):
                     product,
                 )
             )
+
+        # write network flows here if applicable
+        flows = []
+
         # accepted orders can not be used in future
-        return accepted_orders, rejected_orders, meta
+        return accepted_orders, rejected_orders, meta, flows
 
 
 # does not allow to have partial accepted bids
@@ -195,4 +199,7 @@ class PayAsBidAonRole(MarketRole):
                     product,
                 )
             )
-        return accepted_orders, rejected_orders, meta
+            # write network flows here if applicable
+            flows = []
+
+        return accepted_orders, rejected_orders, meta, flows
