@@ -140,7 +140,7 @@ class NaiveProfileStrategy(BaseStrategy):
         return bids
 
 
-class NaiveDASteelplantStrategy(BaseStrategy):
+class NaiveDADSMStrategy(BaseStrategy):
     def calculate_bids(
         self,
         unit: SupportsMinMax,

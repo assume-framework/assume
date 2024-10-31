@@ -46,7 +46,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
     """
 
     required_technologies = ["dri_plant", "eaf"]
-    optional_technologies = ["electrolyser", "hydrogen_storage", "dri_storage"]
+    optional_technologies = ["electrolyser", "hydrogen_buffer_storage", "dri_storage"]
 
     def __init__(
         self,
@@ -107,7 +107,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.cost_tolerance = cost_tolerance
 
         # Check for the presence of components
-        self.has_h2storage = "hydrogen_storage" in self.components.keys()
+        self.has_h2storage = "hydrogen_buffer_storage" in self.components.keys()
         self.has_dristorage = "dri_storage" in self.components.keys()
         self.has_electrolyser = "electrolyser" in self.components.keys()
 
@@ -240,9 +240,9 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 if self.has_h2storage:
                     return (
                         self.model.dsm_blocks["electrolyser"].hydrogen_out[t]
-                        + self.model.dsm_blocks["hydrogen_storage"].discharge[t]
+                        + self.model.dsm_blocks["hydrogen_buffer_storage"].discharge[t]
                         == self.model.dsm_blocks["dri_plant"].hydrogen_in[t]
-                        + self.model.dsm_blocks["hydrogen_storage"].charge[t]
+                        + self.model.dsm_blocks["hydrogen_buffer_storage"].charge[t]
                     )
                 else:
                     return (

@@ -4,7 +4,6 @@
 
 import logging
 
-import matplotlib.pyplot as plt
 import pandas as pd
 import pyomo.environ as pyo
 from pyomo.opt import (
@@ -95,17 +94,14 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
 
         # Initialize parameters
         self.electricity_price = self.forecaster["price_EOM"]
-        self.hydrogen_demand = demand
+        self.demand = demand
 
         self.objective = objective
         self.flexibility_measure = flexibility_measure
         self.cost_tolerance = cost_tolerance
-        self.demand = demand
 
         # Check for the presence of components
-        self.has_has_h2seasonal_storage = (
-            "h2_seasonal_storage" in self.components.keys()
-        )
+        self.has_h2seasonal_storage = "h2_seasonal_storage" in self.components.keys()
         self.has_electrolyser = "electrolyser" in self.components.keys()
 
         # Define the Pyomo model
@@ -115,6 +111,8 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         self.define_variables()
 
         self.initialize_components()
+        self.initialize_process_sequence()
+
         self.define_constraints()
         self.define_objective_opt()
 
@@ -148,8 +146,7 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.electricity_price)},
         )
-
-        self.model.hydrogen_demand = pyo.Param(initialize=self.hydrogen_demand)
+        self.model.absolute_hydrogen_demand = pyo.Param(initialize=self.demand)
 
     def define_variables(self):
         self.model.total_power_input = pyo.Var(
@@ -165,61 +162,67 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
     def initialize_process_sequence(self):
         """
         Initializes the process sequence and constraints for the hydrogen plant.
-        Here, the components are connected to establish a process for hydrogen production and storage.
+        Distributes hydrogen produced by the electrolyser between hydrogen demand
+        and optional hydrogen storage.
         """
 
         @self.model.Constraint(self.model.time_steps)
-        def electrolyser_to_storage_or_demand(m, t):
+        def hydrogen_production_distribution(m, t):
             """
-            Ensures the hydrogen flow from the Electrolyser to either storage or meets immediate demand.
+            Balances hydrogen produced by the electrolyser to either satisfy the hydrogen demand
+            directly, be stored in hydrogen storage, or both if storage is available.
             """
-            if self.has_electrolyser:
-                if self.has_h2seasonal_storage:
-                    return (
-                        m.dsm_blocks["electrolyser"].hydrogen_out[t]
-                        + m.dsm_blocks["h2_seasonal_storage"].discharge[t]
-                        == m.dsm_blocks["h2_seasonal_storage"].charge[t]
-                        + self.model.hydrogen_demand[t]
-                    )
-                else:
-                    # If no hydrogen storage, all produced hydrogen should meet demand directly.
-                    return (
-                        m.dsm_blocks["electrolyser"].hydrogen_out[t]
-                        == self.model.hydrogen_demand[t]
-                    )
+            electrolyser_output = self.model.dsm_blocks["electrolyser"].hydrogen_out[t]
+
+            if self.has_h2seasonal_storage:
+                # With storage: demand can be fulfilled by electrolyser, storage discharge, or both
+                storage_discharge = self.model.dsm_blocks[
+                    "h2_seasonal_storage"
+                ].discharge[t]
+                storage_charge = self.model.dsm_blocks["h2_seasonal_storage"].charge[t]
+
+                # Hydrogen can be supplied to demand and/or storage, and storage can also discharge to meet demand
+                return (
+                    electrolyser_output + storage_discharge
+                    == self.model.hydrogen_demand[t] + storage_charge
+                )
             else:
-                # If no electrolyser is present, hydrogen demand must be zero.
-                return self.model.hydrogen_demand[t] == 0
-
-        if self.has_storage:
-
-            @self.model.Constraint(self.model.time_steps)
-            def storage_balance_constraint(m, t):
-                """
-                Ensures the state of charge (SOC) for the hydrogen storage matches inputs and outputs.
-                """
-                soc_previous = (
-                    self.model.dsm_blocks["h2_seasonal_storage"].initial_soc
-                    if t == self.model.time_steps.first()
-                    else self.model.dsm_blocks["h2_seasonal_storage"].soc[t - 1]
-                )
-                soc_current = self.model.dsm_blocks["h2_seasonal_storage"].soc[t]
-
-                return soc_current == (
-                    soc_previous
-                    + m.dsm_blocks["h2_seasonal_storage"].charge[t]
-                    * m.dsm_blocks["h2_seasonal_storage"].efficiency_charge
-                    - m.dsm_blocks["h2_seasonal_storage"].discharge[t]
-                    / m.dsm_blocks["h2_seasonal_storage"].efficiency_discharge
-                )
+                # Without storage: demand is met solely by electrolyser output
+                return electrolyser_output == self.model.hydrogen_demand[t]
 
     def define_constraints(self):
-        @self.model.Constraint(self.model.time_steps)
-        def hydrogen_output_constraint(m, t):
-            return (
-                sum(self.model.hydrogen_demand[t] for t in self.model.time_steps)
-                == self.demand
-            )
+        """
+        Defines the constraints for the hydrogen plant model, ensuring that the total hydrogen output
+        over all time steps meets the absolute hydrogen demand. Hydrogen can be sourced from the
+        electrolyser alone or combined with storage discharge if storage is available.
+        """
+
+        @self.model.Constraint()
+        def total_hydrogen_demand_constraint(m):
+            """
+            Ensures that the total hydrogen output over all time steps meets the absolute hydrogen demand.
+            If storage is available, the total demand can be fulfilled by both electrolyser output and storage discharge.
+            If storage is unavailable, the electrolyser output alone must meet the demand.
+            """
+            if self.has_h2seasonal_storage:
+                # With storage: sum of electrolyser output and storage discharge must meet the total hydrogen demand
+                return (
+                    sum(
+                        self.model.dsm_blocks["electrolyser"].hydrogen_out[t]
+                        + self.model.dsm_blocks["h2_seasonal_storage"].discharge[t]
+                        for t in self.model.time_steps
+                    )
+                    == self.model.absolute_hydrogen_demand
+                )
+            else:
+                # Without storage: sum of electrolyser output alone must meet the total hydrogen demand
+                return (
+                    sum(
+                        self.model.dsm_blocks["electrolyser"].hydrogen_out[t]
+                        for t in self.model.time_steps
+                    )
+                    == self.model.absolute_hydrogen_demand
+                )
 
         # Constraint for total power input
         @self.model.Constraint(self.model.time_steps)
@@ -227,8 +230,10 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
             """
             Ensures the total power input is the sum of power inputs of all components.
             """
-            power_input = self.model.dsm_blocks["electrolyser"].power_in[t]
-            return m.total_power_input[t] == power_input
+            return (
+                m.total_power_input[t]
+                == self.model.dsm_blocks["electrolyser"].power_in[t]
+            )
 
         # Constraint for variable cost per time step
         @self.model.Constraint(self.model.time_steps)
@@ -237,9 +242,10 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
             Calculates the variable cost per time step.
             """
 
-            variable_cost = self.model.dsm_blocks["electrolyser"].operating_cost[t]
-
-            return self.model.variable_cost[t] == variable_cost
+            return (
+                self.model.variable_cost[t]
+                == self.model.dsm_blocks["electrolyser"].operating_cost[t]
+            )
 
     def define_objective_opt(self):
         if self.objective == "min_variable_cost":
@@ -274,6 +280,7 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         instance = self.model.create_instance()
         # switch the instance to the optimal mode by deactivating the flexibility constraints and objective
         instance = self.switch_to_opt(instance)
+
         # solve the instance
         results = self.solver.solve(instance, options=self.solver_options)
 
@@ -308,51 +315,6 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         self.variable_cost_series = pd.Series(
             data=instance.variable_cost.get_values()
         ).set_axis(self.index)
-
-        #########
-        # Extract time series data for power, natural gas, and hydrogen
-        power_series = pd.Series(data=instance.total_power_input.get_values())
-        hydrogen_series = pd.Series(
-            data=[
-                instance.dsm_blocks["electrolyser"].hydrogen_out[t].value
-                for t in instance.time_steps
-            ]
-        )
-
-        # Set the index based on the steel plant's index (time)
-        power_series.index = self.index
-        hydrogen_series.index = self.index
-
-        # Print the time series data
-        print("Power Input Time Series:\n", power_series)
-        print("\nHydrogen Time Series:\n", hydrogen_series)
-
-        # Plotting the time series
-        plt.figure(figsize=(12, 8))
-
-        # Power Input Time Series
-        plt.subplot(3, 1, 1)
-        plt.plot(power_series, label="Power Input", color="blue")
-        plt.xlabel("Time")
-        plt.ylabel("Power (MW)")
-        plt.title("Hydrogen Plant Power Input Time Series")
-        plt.legend()
-
-        # Hydrogen Time Series
-        plt.subplot(3, 1, 3)
-        plt.plot(hydrogen_series, label="Hydrogen Output", color="red")
-        plt.xlabel("Time")
-        plt.ylabel("Hydrogen (MW)")
-        plt.title("Hydrogen Plant Hydrogen Time Series")
-        plt.legend()
-
-        plt.tight_layout()
-        plt.show()
-
-        # Store results for possible further analysis
-        self.opt_power_requirement = power_series
-
-        self.hydrogen_series = hydrogen_series
 
     def determine_optimal_operation_with_flex(self):
         """
@@ -392,51 +354,6 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         temp_1 = instance.variable_cost.get_values()
         self.variable_cost_series = pd.Series(data=temp_1)
         self.variable_cost_series.index = self.index
-
-        #########
-        # Extract time series data for power, natural gas, and hydrogen
-        power_series = pd.Series(data=instance.total_power_input.get_values())
-        hydrogen_series = pd.Series(
-            data=[
-                instance.dsm_blocks["electrolyser"].hydrogen_out[t].value
-                for t in instance.time_steps
-            ]
-        )
-
-        # Set the index based on the steel plant's index (time)
-        power_series.index = self.index
-        hydrogen_series.index = self.index
-
-        # Print the time series data
-        print("Power Input Time Series:\n", power_series)
-        print("\nHydrogen Time Series:\n", hydrogen_series)
-
-        # Plotting the time series
-        plt.figure(figsize=(12, 8))
-
-        # Power Input Time Series
-        plt.subplot(3, 1, 1)
-        plt.plot(power_series, label="Power Input", color="blue")
-        plt.xlabel("Time")
-        plt.ylabel("Power (MW)")
-        plt.title("Hydrogen Plant Power Input Time Series")
-        plt.legend()
-
-        # Hydrogen Time Series
-        plt.subplot(3, 1, 3)
-        plt.plot(hydrogen_series, label="Hydrogen Output", color="red")
-        plt.xlabel("Time")
-        plt.ylabel("Hydrogen (MW)")
-        plt.title("Hydrogen Plant Hydrogen Time Series")
-        plt.legend()
-
-        plt.tight_layout()
-        plt.show()
-
-        # Store results for possible further analysis
-        self.flex_power_requirement = power_series
-
-        self.hydrogen_series = hydrogen_series
 
     def switch_to_opt(self, instance):
         """
