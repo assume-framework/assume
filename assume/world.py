@@ -319,7 +319,7 @@ class World:
                 agent.suspendable_tasks = False
                 container.register(DistributedClockAgent(), "clock_agent")
 
-            self.container.as_agent_process(agent_creator=creator)
+            self.container.as_agent_process_lazy(agent_creator=creator)
         else:
             output_agent = agent_composed_of(
                 self.output_role,
@@ -452,7 +452,7 @@ class World:
             unit_operator_agent._role_context.data.update(data_update_dict)
             container.register(DistributedClockAgent(), suggested_aid=clock_agent_name)
 
-        self.container.as_agent_process(agent_creator=creator)
+        self.container.as_agent_process_lazy(agent_creator=creator)
 
     def create_unit(
         self,
