@@ -35,7 +35,6 @@ class Storage(SupportsMinMaxCharge):
         efficiency_discharge (float): The efficiency of the storage unit while discharging.
         additional_cost_charge (Union[float, pd.Series], optional): Additional costs associated with power consumption, in EUR/MWh. Defaults to 0.
         additional_cost_discharge (Union[float, pd.Series], optional): Additional costs associated with power generation, in EUR/MWh. Defaults to 0.
-        emission_factor (float): The emission factor of the storage unit.
         ramp_up_charge (float): The ramp up rate of charging the storage unit in MW/15 minutes (negative value).
         ramp_down_charge (float): The ramp down rate of charging the storage unit in MW/15 minutes (negative value).
         ramp_up_discharge (float): The ramp up rate of discharging the storage unit in MW/15 minutes.
@@ -70,7 +69,6 @@ class Storage(SupportsMinMaxCharge):
         efficiency_discharge: float = 1,
         additional_cost_charge: float | pd.Series = 0.0,
         additional_cost_discharge: float | pd.Series = 0.0,
-        emission_factor: float = 0.0,
         ramp_up_charge: float = None,
         ramp_down_charge: float = None,
         ramp_up_discharge: float = None,
@@ -121,9 +119,6 @@ class Storage(SupportsMinMaxCharge):
         # The variable costs to charge/discharge the storage unit.
         self.additional_cost_charge = additional_cost_charge
         self.additional_cost_discharge = additional_cost_discharge
-
-        # The emission factor of the storage unit.
-        self.emission_factor = emission_factor
 
         # The ramp up/down rate of charging/discharging the storage unit.
         # if ramp_up_charge == 0, the ramp_up_charge is set to enable ramping between full charge and discharge power

@@ -73,7 +73,7 @@ available_examples = {
     "small_learning_2_lstm": {"scenario": "example_02b", "study_case": "base_lstm"},
     # Further DRL example simulation showcasing learning features
     "learning_with_complex_bids": {"scenario": "example_02d", "study_case": "dam"},
-    "small_learning_storage": {"scenario": "example_02e", "study_case": "base"},
+    "small_learning_with_storage": {"scenario": "example_02e", "study_case": "base"},
     #
     # full year examples to show real-world scenarios
     "large_2019_eom": {"scenario": "example_03", "study_case": "base_case_2019"},
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     - timescale: with database and grafana (note: you need docker installed)
     """
     data_format = "timescale"  # "local_db" or "timescale"
-    example = "small_learning_storage"
+    example = "small_learning_with_storage"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
