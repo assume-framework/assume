@@ -16,7 +16,7 @@ from dateutil import rrule as rr
 from mango import Role
 from pandas.api.types import is_bool_dtype, is_numeric_dtype
 from psycopg2.errors import UndefinedColumn
-from sqlalchemy import inspect, text
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 
 from assume.common.market_objects import MetaDict
@@ -39,7 +39,7 @@ class WriteOutput(Role):
         simulation_id (str): The ID of the simulation as a unique classifier.
         start (datetime.datetime): The start datetime of the simulation run.
         end (datetime.datetime): The end datetime of the simulation run.
-        db_engine: The database engine. Defaults to None.
+        db_uri: The uri of the database engine. Defaults to ''.
         export_csv_path (str, optional): The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
         save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to None.
         learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
@@ -52,7 +52,7 @@ class WriteOutput(Role):
         simulation_id: str,
         start: datetime,
         end: datetime,
-        db_engine=None,
+        db_uri="",
         export_csv_path: str = "",
         save_frequency_hours: int = None,
         learning_mode: bool = False,
@@ -74,7 +74,8 @@ class WriteOutput(Role):
         else:
             self.export_csv_path = None
 
-        self.db = db_engine
+        self.db = None
+        self.db_uri = db_uri
 
         self.learning_mode = learning_mode
         self.perform_evaluation = perform_evaluation
@@ -188,6 +189,8 @@ class WriteOutput(Role):
         )
 
     def on_ready(self):
+        if self.db_uri:
+            self.db = create_engine(self.db_uri)
         if self.save_frequency_hours is not None:
             recurrency_task = rr.rrule(
                 freq=rr.HOURLY,

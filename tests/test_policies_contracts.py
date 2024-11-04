@@ -6,7 +6,7 @@ from datetime import datetime
 
 import pandas as pd
 from dateutil import rrule as rr
-from mango import AgentAddress
+from mango import addr
 
 from assume.markets.clearing_algorithms.contracts import (
     available_contracts,
@@ -34,7 +34,7 @@ def test_contract_functions():
         "sender_id": "nuclear1",
         "eligible_lambda": is_co2emissionless,
         "evaluation_frequency": rr.WEEKLY,
-        "agent_addr": AgentAddress("world", "my_operator"),
+        "agent_addr": addr("world", "my_operator"),
         "bid_id": "nuclear1_1",
         "unit_id": "nuclear1",
         "accepted_volume": 1000,

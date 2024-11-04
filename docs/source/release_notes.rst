@@ -22,6 +22,8 @@ Upcoming Release
 
   * to upgrade a prior environment run `pip uninstall -y mango-agents mango-agents-assume && pip install mango-agents`
 
+- improve distributed simulation for TCP and MQTT, so that containers wait for each other in simulations
+
 
 v0.4.1 - latest release (8th October 2024)
 ===========================================

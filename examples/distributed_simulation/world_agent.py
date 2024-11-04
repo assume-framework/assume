@@ -6,10 +6,11 @@ from assume import MarketConfig, World
 from assume.common.forecasts import NaiveForecast
 
 from .config import (
-    agent_adress,
+    agent_address,
     index,
     market_operator_addr,
     marketdesign,
+    use_mqtt,
     worker,
 )
 
@@ -48,9 +49,22 @@ if __name__ == "__main__":
     if len(sys.argv) == 4:
         i = int(sys.argv[1])
         n = int(sys.argv[2])
-        agent_adress = ("0.0.0.0", int(sys.argv[3]))
+        if use_mqtt:
+            agent_address = sys.argv[3]
+        else:
+            host, port = sys.argv[3].split(":")
+            agent_address = (host, int(port))
     else:
         i = 0
         n = 1
-    world = World(addr=agent_adress, distributed_role=False)
-    world.loop.run_until_complete(worker(world, marketdesign, create_worker, i, n))
+    world = World(addr=agent_address, distributed_role=False)
+    try:
+        world.loop.run_until_complete(worker(world, marketdesign, create_worker, i, n))
+    except OSError as e:
+        print(e)
+        print("mqtt might not yet be set up? waiting a few seconds")
+        import time
+
+        time.sleep(6)
+    except Exception as e:
+        print(e)

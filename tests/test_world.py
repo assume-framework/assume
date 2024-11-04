@@ -16,7 +16,7 @@ def test_world():
         world, inputs_path="examples/inputs", scenario=scenario, study_case=study_case
     )
 
-    assert world.db is None
+    assert world.db_uri is None
     assert world.export_csv_path is None
 
     assert isinstance(world.loop, asyncio.BaseEventLoop)
