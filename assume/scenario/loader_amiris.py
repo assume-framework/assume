@@ -278,7 +278,7 @@ def add_agent_to_world(
             )
 
             max_soc = device["EnergyToPowerRatio"] * device["InstalledPowerInMW"]
-            initial_soc = 100 * device["InitialEnergyLevelInMWH"] / max_soc
+            initial_soc = device["InitialEnergyLevelInMWH"]
             # TODO device["SelfDischargeRatePerHour"]
             world.add_unit(
                 f"StorageTrader_{agent['Id']}",
