@@ -48,7 +48,7 @@ base:
         - max_power
       param_dict:
         network_path: .
-        solver: glpk
+        solver: highs
         payment_mechanism: pay_as_bid
         backup_marginal_cost: 10000
 
@@ -81,7 +81,7 @@ nodal_case:
         - max_power
       param_dict:
         network_path: .
-        solver: glpk
+        solver: highs
         payment_mechanism: pay_as_clear
         backup_marginal_cost: 10000
 
@@ -112,5 +112,5 @@ zonal_case:
         - node
       param_dict:
         network_path: .
-        solver: glpk
+        solver: highs
         zones_identifier: zone_id

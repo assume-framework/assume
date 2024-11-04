@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import math
+
 import pandas as pd
 import pyomo.environ as pyo
 import pytest
@@ -9,7 +11,7 @@ import pytest
 from assume.units.dst_components import HeatPump
 
 # Define the solver to use
-use_solver = "glpk"  # Replace with the appropriate solver
+use_solver = "appsi_highs"  # Replace with the appropriate solver
 
 
 # Fixture for creating an electricity price profile, including high prices to test logic
@@ -162,8 +164,10 @@ def test_heat_pump_consumption_behavior(
                 pyo.value(model.heat_pump.operational_status[t]), 0
             )
             if operational_status:
+                # Adjust the assert statement to use math.isclose for comparison
                 assert (
-                    power_in >= heat_pump_config["min_power"]
+                    math.isclose(power_in, heat_pump_config["min_power"], rel_tol=1e-6)
+                    or power_in > heat_pump_config["min_power"]
                 ), f"Heat pump power at time {t} is {power_in}, which is below the minimum power {heat_pump_config['min_power']}."
             else:
                 assert (
@@ -188,8 +192,8 @@ def test_min_operating_steps(heat_pump_model, heat_pump_config):
             future_t = t + step
             if future_t in model.time_steps:
                 status = pyo.value(operational_status[future_t])
-                assert (
-                    status == 1
+                assert math.isclose(
+                    status, 1, rel_tol=1e-6
                 ), f"Operational status at time {future_t} should be 1 after startup at {t}, but is {status}."
 
 

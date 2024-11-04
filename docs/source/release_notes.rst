@@ -8,14 +8,19 @@ Release Notes
 
 Upcoming Release
 =======================
+
 .. warning::
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
-  e.g. pip install git+https://github.com/assume-framework/assume
+  e.g. ``pip install git+https://github.com/assume-framework/assume``
 
 **New Features:**
+
 - Converted DST components from functions to classes for improved modularity and reusability.
 - Added new residential DST components like PV, EV, Heat Pump, and Boiler, with refined docstrings for better usability.
 - Created a `GenericStorage` class for storage components, with classes like EV and Hydrogen Storage inheriting from it.
+- update to mango 2.x which allows for sync creation of world
+
+  * to upgrade a prior environment run `pip uninstall -y mango-agents mango-agents-assume && pip install mango-agents`
 
 
 v0.4.1 - latest release (8th October 2024)
@@ -85,6 +90,7 @@ v0.4.0 - latest release (8th August 2024)
 - Examples have been restructed to easier orientation and understanding: example_01.. cover all feature demonstration examples,
   example_02.. cover all learning examples, example_03.. cover all full year examples
 - Added the option of integrating different actor network architectures to the reinforcement learning algorithm, currently a multilayer perceptron (mlp) and long short-term memory (lstm) are implemented
+- Added storing of network flows for complex clearing
 
 **Bug Fixes:**
 

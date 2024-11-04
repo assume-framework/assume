@@ -576,7 +576,7 @@ def load_config_and_create_forecaster(
     }
 
 
-async def async_setup_world(
+def setup_world(
     world: World,
     scenario_data: dict[str, object],
     study_case: str,
@@ -665,7 +665,7 @@ async def async_setup_world(
 
     world.reset()
 
-    await world.setup(
+    world.setup(
         start=start,
         end=end,
         save_frequency_hours=save_frequency_hours,
@@ -746,7 +746,7 @@ async def async_setup_world(
     if world.distributed_role is True:
         logger.info("Adding unit operators and units - with subprocesses")
         for op, op_units in units.items():
-            await world.add_units_with_operator_subprocess(op, op_units)
+            world.add_units_with_operator_subprocess(op, op_units)
     else:
         logger.info("Adding unit operators and units")
         for company_name in set(units.keys()):
@@ -758,7 +758,7 @@ async def async_setup_world(
         # add the units to corresponding unit operators
         for op, op_units in units.items():
             for unit in op_units:
-                await world.async_add_unit(**unit)
+                world.add_unit(**unit)
 
     if (
         world.learning_mode
@@ -766,28 +766,6 @@ async def async_setup_world(
         and len(world.learning_role.rl_strats) == 0
     ):
         raise ValueError("No RL units/strategies were provided!")
-
-
-def setup_world(
-    world: World,
-    scenario_data: dict[str, object],
-    study_case: str,
-    perform_evaluation: bool = False,
-    terminate_learning: bool = False,
-    episode: int = 0,
-    eval_episode: int = 0,
-) -> None:
-    world.loop.run_until_complete(
-        async_setup_world(
-            world=world,
-            scenario_data=scenario_data,
-            study_case=study_case,
-            perform_evaluation=perform_evaluation,
-            terminate_learning=terminate_learning,
-            episode=episode,
-            eval_episode=eval_episode,
-        )
-    )
 
 
 def load_scenario_folder(
@@ -852,49 +830,6 @@ def load_scenario_folder(
     )
 
 
-async def async_load_custom_units(
-    world: World,
-    inputs_path: str,
-    scenario: str,
-    file_name: str,
-    unit_type: str,
-) -> None:
-    """
-    Load custom units from a given path.
-
-    This function loads custom units of a specified type from a given path within a scenario, adding them to the world environment for simulation.
-
-    Args:
-        world (World): An instance of the World class representing the simulation environment.
-        inputs_path (str): The path to the folder containing input files necessary for the custom units.
-        scenario (str): The name of the scenario from which the custom units are to be loaded.
-        file_name (str): The name of the file containing the custom units.
-        unit_type (str): The type of the custom units to be loaded.
-    """
-    path = f"{inputs_path}/{scenario}"
-
-    custom_units = load_file(
-        path=path,
-        config={},
-        file_name=file_name,
-    )
-
-    if custom_units is None:
-        logger.warning(f"No {file_name} units were provided!")
-
-    operators = custom_units.unit_operator.unique()
-    for operator in operators:
-        if operator not in world.unit_operators:
-            world.add_unit_operator(id=str(operator))
-
-    add_units(
-        units_df=custom_units,
-        unit_type=unit_type,
-        world=world,
-        forecaster=world.forecaster,
-    )
-
-
 def load_custom_units(
     world: World,
     inputs_path: str,
@@ -929,14 +864,27 @@ def load_custom_units(
         - Each unique unit operator in the custom units is added to the world's unit operators.
         - The custom units are added to the world environment based on their type for use in simulations.
     """
-    world.loop.run_until_complete(
-        async_load_custom_units(
-            world=world,
-            inputs_path=inputs_path,
-            scenario=scenario,
-            file_name=file_name,
-            unit_type=unit_type,
-        )
+    path = f"{inputs_path}/{scenario}"
+
+    custom_units = load_file(
+        path=path,
+        config={},
+        file_name=file_name,
+    )
+
+    if custom_units is None:
+        logger.warning(f"No {file_name} units were provided!")
+
+    operators = custom_units.unit_operator.unique()
+    for operator in operators:
+        if operator not in world.unit_operators:
+            world.add_unit_operator(id=str(operator))
+
+    add_units(
+        units_df=custom_units,
+        unit_type=unit_type,
+        world=world,
+        forecaster=world.forecaster,
     )
 
 

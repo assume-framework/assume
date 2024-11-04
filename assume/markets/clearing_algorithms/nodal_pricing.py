@@ -16,6 +16,7 @@ from assume.common.grid_utils import (
     read_pypsa_grid,
 )
 from assume.common.market_objects import MarketConfig, Orderbook
+from assume.common.utils import suppress_output
 from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
@@ -71,18 +72,13 @@ class NodalMarketRole(MarketRole):
             loads=self.grid_data["loads"],
         )
 
-        self.solver = marketconfig.param_dict.get("solver", "glpk")
-        self.env = None
-
+        self.solver = marketconfig.param_dict.get("solver", "highs")
         if self.solver == "gurobi":
-            try:
-                from gurobipy import Env
-
-                self.env = Env()
-                self.env.setParam("LogToConsole", 0)
-            except ImportError:
-                logger.error("gurobi not installed - using GLPK")
-                self.solver = "glpk"
+            self.solver_options = {"LogToConsole": 0, "OutputFlag": 0}
+        elif self.solver == "appsi_highs":
+            self.solver_options = {"output_flag": False, "log_to_console": False}
+        else:
+            self.solver_options = {}
 
         # set the market clearing principle
         # as pay as bid or pay as clear
@@ -157,17 +153,22 @@ class NodalMarketRole(MarketRole):
         # Update marginal costs for generators
         nodal_network.generators_t.marginal_cost.update(costs)
 
-        status, termination_condition = nodal_network.optimize(
-            solver_name=self.solver,
-            env=self.env,
-        )
+        with suppress_output():
+            status, termination_condition = nodal_network.optimize(
+                solver_name=self.solver,
+                solver_options=self.solver_options,
+            )
 
         if status != "ok":
             logger.error(f"Solver exited with {termination_condition}")
             raise Exception("Solver in redispatch market did not converge")
 
+        log_flows = True
+
         # process dispatch data
-        self.process_dispatch_data(network=nodal_network, orderbook_df=orderbook_df)
+        flows = self.process_dispatch_data(
+            network=nodal_network, orderbook_df=orderbook_df, log_flows=log_flows
+        )
 
         # return orderbook_df back to orderbook format as list of dicts
         accepted_orders = orderbook_df.to_dict("records")
@@ -181,9 +182,14 @@ class NodalMarketRole(MarketRole):
                 calculate_network_meta(network=nodal_network, product=product, i=i)
             )
 
-        return accepted_orders, rejected_orders, meta
+        return accepted_orders, rejected_orders, meta, flows
 
-    def process_dispatch_data(self, network: pypsa.Network, orderbook_df: pd.DataFrame):
+    def process_dispatch_data(
+        self,
+        network: pypsa.Network,
+        orderbook_df: pd.DataFrame,
+        log_flows: bool = False,
+    ):
         """
         This function processes the dispatch data to calculate the dispatch volumes and prices
         and update the orderbook with the accepted volumes and prices.
@@ -233,3 +239,24 @@ class NodalMarketRole(MarketRole):
                     nodal_marginal_prices[unit_node],
                     0,
                 )
+
+        # get flows from optimized pypsa network
+        if log_flows:
+            # extract flows
+            # write network flows here if applicable
+            flows = []
+
+            # Check if the model has the 'flows' attribute
+            if hasattr(network, "lines_t"):
+                flows = network.lines_t.p0
+
+                flows["datetime"] = orderbook_df["start_time"].unique()
+                # set datetime as index
+                flows = flows.set_index("datetime", drop=True)
+                # pivot the dataframe to have row per line column per datetime
+                flows = flows.stack().reset_index()
+
+                # rename columns
+                flows.columns = ["datetime", "line", "flow"]
+
+        return flows

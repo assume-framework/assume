@@ -8,15 +8,19 @@ from operator import itemgetter
 
 import pandas as pd
 import pyomo.environ as pyo
+from mango import AgentAddress
 from pyomo.opt import SolverFactory, TerminationCondition, check_available_solvers
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.common.utils import check_for_tensors, create_incidence_matrix
 from assume.markets.base_market import MarketRole
 
+# Set the log level to WARNING
+logging.getLogger("pyomo").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
-SOLVERS = ["gurobi", "glpk"]
+SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
 EPS = 1e-4
 
 
@@ -27,7 +31,8 @@ def market_clearing_opt(
     with_linked_bids: bool,
     incidence_matrix: pd.DataFrame = None,
     lines: pd.DataFrame = None,
-    solver: str = "glpk",
+    solver: str = "appsi_highs",
+    solver_options: dict = {},
 ):
     """
     Sets up and solves the market clearing optimization problem.
@@ -56,7 +61,7 @@ def market_clearing_opt(
 
         If linked bids are considered, the acceptance of a child bid is bounded by the acceptance of its parent bid.
 
-        The market clearing is solved using pyomo with the specified solver (glpk is used by default).
+        The market clearing is solved using pyomo with the specified solver (HIGHS is used by default).
         If the specified solver is not available, the model is solved using available solver.
         If none of the solvers are available, an exception is raised.
 
@@ -226,45 +231,24 @@ def market_clearing_opt(
 
     model.objective = pyo.Objective(expr=obj_expr, sense=pyo.minimize)
 
-    # check available solvers, gurobi is preferred
-    solvers = check_available_solvers(*SOLVERS)
-    if len(solvers) < 1:
-        raise Exception(f"None of {SOLVERS} are available")
-
-    if solver not in solvers:
-        logger.warning(f"Solver {solver} not available, using {solvers[0]}")
-        solver = SolverFactory(solvers[0])
-    else:
-        solver = SolverFactory(solver)
-
-    if solver.name == "gurobi":
-        options = {"cutoff": -1.0, "MIPGap": EPS}
-    elif solver.name == "cplex":
-        options = {
-            "mip.tolerances.lowercutoff": -1.0,
-            "mip.tolerances.absmipgap": EPS,
-        }
-    elif solver.name == "cbc":
-        options = {"sec": 60, "ratio": 0.1}
-    # elif solver.name == "glpk":
-    #     options = {"tmlim": 60, "mipgap": 0.1}
-    else:
-        options = {}
-
+    solver = SolverFactory(solver)
     # Solve the model
     instance = model.create_instance()
-    results = solver.solve(instance, options=options)
+    results = solver.solve(instance, options=solver_options)
 
-    # fix all model.x to the values in the solution
+    # Fix all model.x to the values in the solution
     if mode == "with_min_acceptance_ratio":
-        # add dual suffix to the model (we need this to extract the market clearing prices later)
+        # Add dual suffix to the model (needed to extract duals later)
         instance.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT_EXPORT)
 
         for bid_id in instance.Bids:
+            # Fix the binary variable to its value
             instance.x[bid_id].fix(instance.x[bid_id].value)
+            # Change the domain to Reals (or appropriate continuous domain)
+            instance.x[bid_id].domain = pyo.Reals
 
-        # resolve the model
-        results = solver.solve(instance, options=options)
+        # Resolve the model
+        results = solver.solve(instance, options=solver_options)
 
     return instance, results
 
@@ -305,8 +289,9 @@ class ComplexClearingRole(MarketRole):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
 
-        self.solver = marketconfig.param_dict.get("solver", "glpk")
+        self.define_solver(solver=marketconfig.param_dict.get("solver", "appsi_highs"))
 
+        # Define grid data
         self.nodes = ["node0"]
         self.zones_id = None
         self.incidence_matrix = None
@@ -332,13 +317,39 @@ class ComplexClearingRole(MarketRole):
                 self.incidence_matrix = create_incidence_matrix(self.lines, buses)
                 self.nodes = buses.index.values
 
-    def validate_orderbook(self, orderbook: Orderbook, agent_tuple) -> None:
+    def define_solver(self, solver: str):
+        # Get the solver from the market configuration
+        if solver == "highs":
+            solver = "appsi_highs"
+
+        # Check if the solver is available and define solver options
+        solvers = check_available_solvers(*SOLVERS)
+        if len(solvers) < 1:
+            raise Exception(f"None of {SOLVERS} are available")
+
+        if solver == "gurobi":
+            solver_options = {"cutoff": -1.0, "MIPGap": EPS, "LogToConsole": 0}
+        elif solver == "appsi_highs":
+            solver_options = {"output_flag": False, "log_to_console": False}
+        else:
+            solver_options = {}
+
+        if solver not in solvers:
+            logger.warning(f"Solver {solver} not available, using {solvers[0]}")
+            solver = solvers[0]
+
+        self.solver = solver
+        self.solver_options = solver_options
+
+    def validate_orderbook(
+        self, orderbook: Orderbook, agent_addr: AgentAddress
+    ) -> None:
         """
         Checks whether the bid types are valid and whether the volumes are within the maximum bid volume.
 
         Args:
             orderbook (Orderbook): The orderbook to be validated.
-            agent_tuple (tuple[str, str]): The agent tuple of the market (agent_addr, agent_id).
+            agent_addr (AgentAddress): The agent address of the market.
 
         Raises:
             ValueError: If the bid type is invalid.
@@ -357,7 +368,7 @@ class ComplexClearingRole(MarketRole):
                 )
                 order["bid_type"] = "SB"  # Set to default bid_type
 
-        super().validate_orderbook(orderbook, agent_tuple)
+        super().validate_orderbook(orderbook, agent_addr)
 
         for order in orderbook:
             # Validate volumes
@@ -462,6 +473,7 @@ class ComplexClearingRole(MarketRole):
                 incidence_matrix=self.incidence_matrix,
                 lines=self.lines,
                 solver=self.solver,
+                solver_options=self.solver_options,
             )
 
             if results.solver.termination_condition == TerminationCondition.infeasible:
@@ -508,17 +520,20 @@ class ComplexClearingRole(MarketRole):
             if all(order_surplus >= 0 for order_surplus in orders_surplus):
                 break
 
-        accepted_orders, rejected_orders, meta = extract_results(
+        log_flows = True
+
+        accepted_orders, rejected_orders, meta, flows = extract_results(
             model=instance,
             orders=orderbook,
             rejected_orders=rejected_orders,
             market_products=market_products,
             market_clearing_prices=market_clearing_prices,
+            log_flows=log_flows,
         )
 
         self.all_orders = []
 
-        return accepted_orders, rejected_orders, meta
+        return accepted_orders, rejected_orders, meta, flows
 
 
 def calculate_order_surplus(
@@ -604,6 +619,7 @@ def extract_results(
     rejected_orders: Orderbook,
     market_products: list[MarketProduct],
     market_clearing_prices: dict,
+    log_flows: bool = False,
 ):
     """
     Extracts the results of the market clearing from the solved pyomo model.
@@ -709,4 +725,18 @@ def extract_results(
                 }
             )
 
-    return accepted_orders, rejected_orders, meta
+        flows_filtered = {}
+
+        if log_flows:
+            # extract flows
+
+            # Check if the model has the 'flows' attribute
+            if hasattr(model, "flows"):
+                flows = model.flows
+
+                # filter flows and only use positive flows to half the size of the dict
+                flows_filtered = {
+                    index: flow.value for index, flow in flows.items() if not flow.stale
+                }
+
+    return accepted_orders, rejected_orders, meta, flows_filtered

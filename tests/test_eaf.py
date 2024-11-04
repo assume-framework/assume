@@ -9,7 +9,7 @@ import pytest
 from assume.units.dst_components import ElectricArcFurnace
 
 # Define the solver to use
-use_solver = "glpk"  # Replace with the appropriate solver
+use_solver = "appsi_highs"  # Replace with the appropriate solver
 
 
 # Fixture for creating an electricity price profile, including negative prices
@@ -27,6 +27,7 @@ def eaf_config():
         "specific_electricity_consumption": 1,
         "specific_dri_demand": 1,
         "specific_lime_demand": 0.05,
+        "lime_co2_factor": 0.1,
         "ramp_up": 50,
         "ramp_down": 50,
         "min_operating_steps": 2,
@@ -43,13 +44,11 @@ def eaf_model(eaf_config, price_profile):
 
     # Add the price profile to the model
     model.electricity_price = pyo.Param(
-        model.time_steps, initialize=price_profile.to_dict(), within=pyo.Reals
+        model.time_steps, initialize=price_profile.to_dict()
     )
 
-    # Additional parameters
-    model.lime_co2_factor = 0.03
-    model.co2_price = 30
-    model.lime_price = 20
+    model.co2_price = pyo.Param(model.time_steps, initialize=30)
+    model.lime_price = pyo.Param(model.time_steps, initialize=20)
 
     # Initialize the Electric Arc Furnace
     eaf = ElectricArcFurnace(**eaf_config, time_steps=model.time_steps)
@@ -249,12 +248,11 @@ def test_eaf_co2_emission_relation(eaf_model):
     Test that CO2 emissions are calculated correctly based on lime demand.
     """
     model, _ = eaf_model
-    lime_co2_factor = model.lime_co2_factor
 
     for t in model.time_steps:
         lime_demand = pyo.value(model.eaf.lime_demand[t])
         co2_emission = pyo.value(model.eaf.co2_emission[t])
-        expected_co2 = lime_demand * lime_co2_factor
+        expected_co2 = lime_demand * model.eaf.lime_co2_factor
         assert (
             abs(co2_emission - expected_co2) < 1e-5
         ), f"CO2 emission at time {t} is {co2_emission}, expected {expected_co2} based on lime demand."
@@ -283,8 +281,8 @@ def test_eaf_operating_cost(eaf_model, price_profile):
         lime_demand = pyo.value(model.eaf.lime_demand[t])
         expected_cost = (
             power_in * price_profile[t]
-            + co2_emission * co2_price
-            + lime_demand * lime_price
+            + co2_emission * co2_price[t]
+            + lime_demand * lime_price[t]
         )
         actual_cost = pyo.value(model.eaf.operating_cost[t])
         assert (
