@@ -9,13 +9,14 @@ from unittest.mock import patch
 
 import pandas as pd
 import pytest
-import torch as th
 
 try:
+    import torch as th
+
     from assume.reinforcement_learning.learning_role import LearningConfig
     from assume.strategies.learning_strategies import StorageRLStrategy
 except ImportError:
-    pass
+    th = None
 
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig
