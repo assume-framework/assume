@@ -68,11 +68,12 @@ class Building(DSMFlex, SupportsMinMax):
             index=index,
             node=node,
             location=location,
+            components=components,
             **kwargs,
         )
 
         # check if the provided components are valid and do not contain any unknown components
-        for component in components.keys():
+        for component in self.components.keys():
             if (
                 component not in self.optional_technologies
             ):
@@ -80,7 +81,9 @@ class Building(DSMFlex, SupportsMinMax):
                     f"Component {component} is not a valid component for the building unit."
                 )
 
+        #JUST FOR MY SIMULATIONS/EXPERIMENTS!!
         self.electricity_price = self.create_price_given_solar_forecast()
+        #self.electricity_price = self.create_price_given_grid_load_forecast()
         self.natural_gas_price = self.forecaster["fuel_price_natural gas"]
         self.heat_demand = self.forecaster["heat_demand"]
         self.ev_load_profile = self.forecaster["ev_load_profile"]
@@ -97,26 +100,26 @@ class Building(DSMFlex, SupportsMinMax):
         self.model = pyo.ConcreteModel()
         self.define_sets()
 
-        self.has_heatpump = "heatpump" in components
-        self.has_boiler = "boiler" in components
-        self.has_thermal_storage = "thermal_storage" in components
-        self.has_ev = "electric_vehicle" in components
-        self.has_battery_storage = "generic_storage" in components
-        self.has_pv = "pv_plant" in components
+        self.has_heatpump = "heatpump" in self.components
+        self.has_boiler = "boiler" in self.components
+        self.has_thermal_storage = "thermal_storage" in self.components
+        self.has_ev = "electric_vehicle" in self.components
+        self.has_battery_storage = "generic_storage" in self.components
+        self.has_pv = "pv_plant" in self.components
 
         self.define_parameters()
 
         # Create availability DataFrame for EVs
         # Parse the availability periods
         if self.has_ev:
-            if "availability_periods" in components["electric_vehicle"]:
+            if "availability_periods" in self.components["electric_vehicle"]:
                 try:
                     # Convert the string to a list of tuples
-                    components["electric_vehicle"]["availability_periods"] = ast.literal_eval(
-                        components["electric_vehicle"]["availability_periods"]
+                    self.components["electric_vehicle"]["availability_periods"] = ast.literal_eval(
+                        self.components["electric_vehicle"]["availability_periods"]
                     )
-                    components["electric_vehicle"]["availability_df"] = self.create_availability_df(
-                        components["electric_vehicle"]["availability_periods"]
+                    self.components["electric_vehicle"]["availability_df"] = self.create_availability_df(
+                        self.components["electric_vehicle"]["availability_periods"]
                     )
                 except Exception as e:
                     raise ValueError(
@@ -129,18 +132,18 @@ class Building(DSMFlex, SupportsMinMax):
 
         # Parse the availability of the PV plant
         if self.has_pv:
-            if not strtobool(components["pv_plant"]["uses_power_profile"]):
+            if not strtobool(self.components["pv_plant"]["uses_power_profile"]):
                 pv_availability = self.forecaster["availability_Solar"]
                 pv_availability.index = self.model.time_steps
-                components["pv_plant"]["availability_profile"] = pv_availability
+                self.components["pv_plant"]["availability_profile"] = pv_availability
             else:
                 pv_power = self.forecaster[f"{self.id}_pv_power_profile"]
                 pv_power.index = self.model.time_steps
-                components["pv_plant"]["power_profile"] = pv_power
+                self.components["pv_plant"]["power_profile"] = pv_power
 
 
         self.define_variables()
-        self.initialize_components(components)
+        self.initialize_components()
         self.define_constraints()
         self.define_objective()
         self.initialize_process_sequence()
@@ -156,17 +159,21 @@ class Building(DSMFlex, SupportsMinMax):
     def create_price_given_solar_forecast(self):
         buy_forecast = self.forecaster["price_EOM"].values
         sell_forecast = self.forecaster["price_EOM_sell"].values
+
+        price_delta = (buy_forecast - sell_forecast) * (self.forecaster["availability_Solar"])
+        return round(buy_forecast - price_delta, 2)
+
+    def create_price_given_grid_load_forecast(self):
+        buy_forecast = self.forecaster["price_EOM"].values
+        sell_forecast = self.forecaster["price_EOM_sell"].values
         community_load = self.forecaster["total_community_load"].values.copy()
+        min_val, max_val = min(community_load), max(community_load)
 
-        # I am only interested in negative values where overproduction is happening, based on that I want to change the price
-        community_load[community_load > 0] = 0
-        min_val = min(community_load)
-        # Normalize the data to be between 1 and 0
-        community_load /= min_val
-
-        price_delta = np.array((buy_forecast - sell_forecast) * community_load).round(2)
-        #price_delta = round((buy_forecast - sell_forecast) * (self.forecaster["availability_Solar"]), 2)
-        return buy_forecast - price_delta
+        # Normalization to be between -1 and 1
+        community_load_scaled = ((community_load - min_val) / (max_val - min_val) * 2) - 1
+        spread = (buy_forecast - sell_forecast)
+        price_delta = spread * community_load_scaled / 2
+        return np.round(buy_forecast - max(price_delta) + price_delta, 2)
 
     def create_availability_df(self, availability_periods):
         """
