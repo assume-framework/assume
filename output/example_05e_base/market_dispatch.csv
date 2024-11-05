@@ -1,0 +1,121 @@
+,datetime,power,market_id,unit_id,simulation
+0,2023-01-02 00:00:00,31,EOM,Unit 1,example_05e_base
+1,2023-01-02 01:00:00,31,EOM,Unit 1,example_05e_base
+2,2023-01-02 02:00:00,31,EOM,Unit 1,example_05e_base
+3,2023-01-02 03:00:00,31,EOM,Unit 1,example_05e_base
+4,2023-01-02 04:00:00,31,EOM,Unit 1,example_05e_base
+5,2023-01-02 05:00:00,31,EOM,Unit 1,example_05e_base
+6,2023-01-02 06:00:00,31,EOM,Unit 1,example_05e_base
+7,2023-01-02 07:00:00,31,EOM,Unit 1,example_05e_base
+8,2023-01-02 08:00:00,31,EOM,Unit 1,example_05e_base
+9,2023-01-02 09:00:00,31,EOM,Unit 1,example_05e_base
+10,2023-01-02 10:00:00,31,EOM,Unit 1,example_05e_base
+11,2023-01-02 11:00:00,31,EOM,Unit 1,example_05e_base
+12,2023-01-02 12:00:00,31,EOM,Unit 1,example_05e_base
+13,2023-01-02 13:00:00,31,EOM,Unit 1,example_05e_base
+14,2023-01-02 14:00:00,31,EOM,Unit 1,example_05e_base
+15,2023-01-02 15:00:00,31,EOM,Unit 1,example_05e_base
+16,2023-01-02 16:00:00,31,EOM,Unit 1,example_05e_base
+17,2023-01-02 17:00:00,31,EOM,Unit 1,example_05e_base
+18,2023-01-02 18:00:00,31,EOM,Unit 1,example_05e_base
+19,2023-01-02 19:00:00,31,EOM,Unit 1,example_05e_base
+20,2023-01-02 00:00:00,19,EOM,Unit 2,example_05e_base
+21,2023-01-02 01:00:00,19,EOM,Unit 2,example_05e_base
+22,2023-01-02 02:00:00,19,EOM,Unit 2,example_05e_base
+23,2023-01-02 03:00:00,19,EOM,Unit 2,example_05e_base
+24,2023-01-02 04:00:00,19,EOM,Unit 2,example_05e_base
+25,2023-01-02 05:00:00,19,EOM,Unit 2,example_05e_base
+26,2023-01-02 06:00:00,19,EOM,Unit 2,example_05e_base
+27,2023-01-02 07:00:00,19,EOM,Unit 2,example_05e_base
+28,2023-01-02 08:00:00,19,EOM,Unit 2,example_05e_base
+29,2023-01-02 09:00:00,19,EOM,Unit 2,example_05e_base
+30,2023-01-02 10:00:00,19,EOM,Unit 2,example_05e_base
+31,2023-01-02 11:00:00,19,EOM,Unit 2,example_05e_base
+32,2023-01-02 12:00:00,19,EOM,Unit 2,example_05e_base
+33,2023-01-02 13:00:00,19,EOM,Unit 2,example_05e_base
+34,2023-01-02 14:00:00,19,EOM,Unit 2,example_05e_base
+35,2023-01-02 15:00:00,19,EOM,Unit 2,example_05e_base
+36,2023-01-02 16:00:00,19,EOM,Unit 2,example_05e_base
+37,2023-01-02 17:00:00,19,EOM,Unit 2,example_05e_base
+38,2023-01-02 18:00:00,19,EOM,Unit 2,example_05e_base
+39,2023-01-02 19:00:00,19,EOM,Unit 2,example_05e_base
+40,2023-01-02 00:00:00,10,EOM,Unit 3,example_05e_base
+41,2023-01-02 01:00:00,10,EOM,Unit 3,example_05e_base
+42,2023-01-02 02:00:00,10,EOM,Unit 3,example_05e_base
+43,2023-01-02 03:00:00,10,EOM,Unit 3,example_05e_base
+44,2023-01-02 04:00:00,10,EOM,Unit 3,example_05e_base
+45,2023-01-02 05:00:00,10,EOM,Unit 3,example_05e_base
+46,2023-01-02 06:00:00,10,EOM,Unit 3,example_05e_base
+47,2023-01-02 07:00:00,10,EOM,Unit 3,example_05e_base
+48,2023-01-02 08:00:00,10,EOM,Unit 3,example_05e_base
+49,2023-01-02 09:00:00,10,EOM,Unit 3,example_05e_base
+50,2023-01-02 10:00:00,10,EOM,Unit 3,example_05e_base
+51,2023-01-02 11:00:00,10,EOM,Unit 3,example_05e_base
+52,2023-01-02 12:00:00,10,EOM,Unit 3,example_05e_base
+53,2023-01-02 13:00:00,10,EOM,Unit 3,example_05e_base
+54,2023-01-02 14:00:00,10,EOM,Unit 3,example_05e_base
+55,2023-01-02 15:00:00,10,EOM,Unit 3,example_05e_base
+56,2023-01-02 16:00:00,10,EOM,Unit 3,example_05e_base
+57,2023-01-02 17:00:00,10,EOM,Unit 3,example_05e_base
+58,2023-01-02 18:00:00,10,EOM,Unit 3,example_05e_base
+59,2023-01-02 19:00:00,10,EOM,Unit 3,example_05e_base
+0,2023-01-02 00:00:00,-40,EOM,demand_west,example_05e_base
+1,2023-01-02 01:00:00,-40,EOM,demand_west,example_05e_base
+2,2023-01-02 02:00:00,-40,EOM,demand_west,example_05e_base
+3,2023-01-02 03:00:00,-40,EOM,demand_west,example_05e_base
+4,2023-01-02 04:00:00,-40,EOM,demand_west,example_05e_base
+5,2023-01-02 05:00:00,-40,EOM,demand_west,example_05e_base
+6,2023-01-02 06:00:00,-40,EOM,demand_west,example_05e_base
+7,2023-01-02 07:00:00,-40,EOM,demand_west,example_05e_base
+8,2023-01-02 08:00:00,-40,EOM,demand_west,example_05e_base
+9,2023-01-02 09:00:00,-40,EOM,demand_west,example_05e_base
+10,2023-01-02 10:00:00,-40,EOM,demand_west,example_05e_base
+11,2023-01-02 11:00:00,-40,EOM,demand_west,example_05e_base
+12,2023-01-02 12:00:00,-40,EOM,demand_west,example_05e_base
+13,2023-01-02 13:00:00,-40,EOM,demand_west,example_05e_base
+14,2023-01-02 14:00:00,-40,EOM,demand_west,example_05e_base
+15,2023-01-02 15:00:00,-40,EOM,demand_west,example_05e_base
+16,2023-01-02 16:00:00,-40,EOM,demand_west,example_05e_base
+17,2023-01-02 17:00:00,-40,EOM,demand_west,example_05e_base
+18,2023-01-02 18:00:00,-40,EOM,demand_west,example_05e_base
+19,2023-01-02 19:00:00,-40,EOM,demand_west,example_05e_base
+20,2023-01-02 00:00:00,-10,EOM,demand_north,example_05e_base
+21,2023-01-02 01:00:00,-10,EOM,demand_north,example_05e_base
+22,2023-01-02 02:00:00,-10,EOM,demand_north,example_05e_base
+23,2023-01-02 03:00:00,-10,EOM,demand_north,example_05e_base
+24,2023-01-02 04:00:00,-10,EOM,demand_north,example_05e_base
+25,2023-01-02 05:00:00,-10,EOM,demand_north,example_05e_base
+26,2023-01-02 06:00:00,-10,EOM,demand_north,example_05e_base
+27,2023-01-02 07:00:00,-10,EOM,demand_north,example_05e_base
+28,2023-01-02 08:00:00,-10,EOM,demand_north,example_05e_base
+29,2023-01-02 09:00:00,-10,EOM,demand_north,example_05e_base
+30,2023-01-02 10:00:00,-10,EOM,demand_north,example_05e_base
+31,2023-01-02 11:00:00,-10,EOM,demand_north,example_05e_base
+32,2023-01-02 12:00:00,-10,EOM,demand_north,example_05e_base
+33,2023-01-02 13:00:00,-10,EOM,demand_north,example_05e_base
+34,2023-01-02 14:00:00,-10,EOM,demand_north,example_05e_base
+35,2023-01-02 15:00:00,-10,EOM,demand_north,example_05e_base
+36,2023-01-02 16:00:00,-10,EOM,demand_north,example_05e_base
+37,2023-01-02 17:00:00,-10,EOM,demand_north,example_05e_base
+38,2023-01-02 18:00:00,-10,EOM,demand_north,example_05e_base
+39,2023-01-02 19:00:00,-10,EOM,demand_north,example_05e_base
+40,2023-01-02 00:00:00,-10,EOM,demand_east,example_05e_base
+41,2023-01-02 01:00:00,-10,EOM,demand_east,example_05e_base
+42,2023-01-02 02:00:00,-10,EOM,demand_east,example_05e_base
+43,2023-01-02 03:00:00,-10,EOM,demand_east,example_05e_base
+44,2023-01-02 04:00:00,-10,EOM,demand_east,example_05e_base
+45,2023-01-02 05:00:00,-10,EOM,demand_east,example_05e_base
+46,2023-01-02 06:00:00,-10,EOM,demand_east,example_05e_base
+47,2023-01-02 07:00:00,-10,EOM,demand_east,example_05e_base
+48,2023-01-02 08:00:00,-10,EOM,demand_east,example_05e_base
+49,2023-01-02 09:00:00,-10,EOM,demand_east,example_05e_base
+50,2023-01-02 10:00:00,-10,EOM,demand_east,example_05e_base
+51,2023-01-02 11:00:00,-10,EOM,demand_east,example_05e_base
+52,2023-01-02 12:00:00,-10,EOM,demand_east,example_05e_base
+53,2023-01-02 13:00:00,-10,EOM,demand_east,example_05e_base
+54,2023-01-02 14:00:00,-10,EOM,demand_east,example_05e_base
+55,2023-01-02 15:00:00,-10,EOM,demand_east,example_05e_base
+56,2023-01-02 16:00:00,-10,EOM,demand_east,example_05e_base
+57,2023-01-02 17:00:00,-10,EOM,demand_east,example_05e_base
+58,2023-01-02 18:00:00,-10,EOM,demand_east,example_05e_base
+59,2023-01-02 19:00:00,-10,EOM,demand_east,example_05e_base

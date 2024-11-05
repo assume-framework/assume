@@ -1,0 +1,5 @@
+,technology,unit_operator,node,components,simulation,max_power,min_power
+A360,steel_plant,dsm_operator_1,north,"dri_plant,eaf",example_05e_base,,
+demand_north,inflex_demand,eom_de,north,,example_05e_base,0,-100000
+demand_east,inflex_demand,eom_de,east,,example_05e_base,0,-100000
+demand_west,inflex_demand,eom_de,west,,example_05e_base,0,-100000
