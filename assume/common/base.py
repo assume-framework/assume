@@ -12,6 +12,11 @@ import pandas as pd
 from assume.common.forecasts import Forecaster
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 
+try:
+    import torch as th
+except ImportError:
+    th = None
+
 
 class BaseStrategy:
     pass
@@ -527,7 +532,7 @@ class SupportsMinMaxCharge(BaseUnit):
     # negative
     ramp_down_charge: float
     # ramp_down_charge is negative
-    max_volume: float
+    max_soc: float
     efficiency_charge: float
     efficiency_discharge: float
 
