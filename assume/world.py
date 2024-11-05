@@ -8,11 +8,17 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from sys import platform
 
-import nest_asyncio
 import pandas as pd
-from mango import RoleAgent, create_container
+from mango import (
+    RoleAgent,
+    activate,
+    addr,
+    agent_composed_of,
+    create_ec_container,
+    create_mqtt_container,
+    create_tcp_container,
+)
 from mango.container.core import Container
 from mango.util.clock import ExternalClock
 from mango.util.distributed_clock import DistributedClockAgent, DistributedClockManager
@@ -30,10 +36,10 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.common.base import LearningConfig
-from assume.common.utils import create_rrule, datetime2timestamp, timestamp2datetime
+from assume.common.utils import datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import LearningStrategy, bidding_strategies
-from assume.units import BaseUnit, unit_types
+from assume.units import BaseUnit, demand_side_technologies, unit_types
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
 stdout_handler = logging.StreamHandler(stream=sys.stdout)
@@ -98,20 +104,22 @@ class World:
     ) -> None:
         logging.getLogger("assume").setLevel(log_level)
         self.addr = addr
-        self.container = None
+        self.container: Container = None
         self.distributed_role = distributed_role
 
         self.export_csv_path = export_csv_path
         # intialize db connection at beginning of simulation
+        self.db_uri = database_uri
         if database_uri:
             if str(database_uri).startswith("sqlite:///"):
                 db_path = Path(str(database_uri).replace("sqlite:///", ""))
                 db_path.parent.mkdir(exist_ok=True)
-            self.db = create_engine(make_url(database_uri))
+            self.db_uri = make_url(database_uri)
+            db = create_engine(self.db_uri)
             connected = False
             while not connected:
                 try:
-                    with self.db.connect():
+                    with db.connect():
                         connected = True
                         logger.info("connected to db")
                 except OperationalError as e:
@@ -120,16 +128,14 @@ class World:
                     if not e.code == "e3q8":
                         logger.error("%s", e)
                     time.sleep(2)
-        else:
-            self.db = None
 
         self.market_operators: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}
         self.unit_operators: dict[str, UnitsOperator] = {}
         self.unit_types = unit_types
+        self.dst_components = demand_side_technologies
 
         self.bidding_strategies = bidding_strategies
-
         if "pp_learning" not in bidding_strategies:
             logger.info(
                 "Learning Strategies are not available. Check that you have torch installed."
@@ -138,11 +144,15 @@ class World:
         self.clearing_mechanisms: dict[str, MarketRole] = clearing_mechanisms
         self.additional_kpis: dict[str, OutputDef] = {}
         self.addresses = []
+        # required for jupyter notebooks
+        # as they already have a running loop
+        import nest_asyncio
+
         nest_asyncio.apply()
-        self.loop = asyncio.get_event_loop()
+        self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
-    async def setup(
+    def setup(
         self,
         start: datetime,
         end: datetime,
@@ -187,52 +197,58 @@ class World:
         self.bidding_params = bidding_params
         self.index = index
 
-        # kill old container if exists
-        if isinstance(self.container, Container) and self.container.running:
-            await self.container.shutdown()
-
         # create new container
         container_kwargs = {}
         if self.addr == "world":
-            connection_type = "external_connection"
+            container_func = create_ec_container
+            container_kwargs = {
+                "addr": self.addr,
+            }
         elif isinstance(self.addr, tuple):
-            connection_type = "tcp"
+            container_func = create_tcp_container
+            container_kwargs = {
+                "addr": self.addr,
+            }
         else:
-            connection_type = "mqtt"
-            container_kwargs["mqtt_kwargs"] = {
+            container_func = create_mqtt_container
+            container_kwargs = {
                 "broker_addr": "localhost",
                 "client_id": self.addr,
+                "inbox_topic": self.addr,
             }
-            container_kwargs["mqtt_kwargs"].update(**kwargs)
+            container_kwargs.update(**kwargs)
 
-        self.container = await create_container(
-            connection_type=connection_type,
+        self.container = container_func(
             codec=mango_codec_factory(),
-            addr=self.addr,
             clock=self.clock,
             **container_kwargs,
         )
         self.learning_mode = self.learning_config.get("learning_mode", False)
-        self.output_agent_addr = (self.addr, "export_agent_1")
+
+        if not self.db_uri and not self.export_csv_path:
+            self.output_agent_addr = None
+        else:
+            self.output_agent_addr = addr(self.addr, "export_agent_1")
+
         if self.distributed_role is False:
             # if distributed_role is False - we are a ChildContainer
             # and only connect to the manager_address, which can set/sync our clock
-            self.clock_agent = DistributedClockAgent(self.container)
-            self.output_agent_addr = (manager_address, "export_agent_1")
+            self.clock_agent = DistributedClockAgent()
+            self.output_agent_addr = addr(manager_address, "export_agent_1")
 
-            def stop(fut):
-                self.loop.run_until_complete(self.container.shutdown())
-
-            # when the clock_agent is stopped, we should gracefully shutdown our container
-            self.clock_agent.stopped.add_done_callback(stop)
+            # # when the clock_agent is stopped, we should gracefully shutdown our container
+            # self.clock_agent.stopped.add_done_callback(stop)
+            self.container.register(self.clock_agent, suggested_aid="clock_agent")
         else:
-            await self.setup_learning()
-            await self.setup_output_agent(simulation_id, save_frequency_hours)
-            self.clock_manager = DistributedClockManager(
-                self.container, receiver_clock_addresses=self.addresses
-            )
+            self.setup_learning()
 
-    async def setup_learning(self) -> None:
+            self.setup_output_agent(simulation_id, save_frequency_hours)
+            self.clock_manager = DistributedClockManager(
+                receiver_clock_addresses=self.addresses
+            )
+            self.container.register(self.clock_manager)
+
+    def setup_learning(self) -> None:
         """
         Set up the learning process for the simulation, updating bidding parameters with the learning configuration
         and initializing the reinforcement learning (RL) learning role with the specified parameters. It also sets up
@@ -247,17 +263,15 @@ class World:
 
             self.learning_role = Learning(self.learning_config)
             # separate process does not support buffer and learning
-            self.learning_agent_addr = (self.addr, "learning_agent")
-            rl_agent = RoleAgent(
-                self.container,
-                suggested_aid=self.learning_agent_addr[1],
-                suspendable_tasks=False,
+            self.learning_agent_addr = addr(self.addr, "learning_agent")
+            rl_agent = agent_composed_of(
+                self.learning_role,
+                register_in=self.container,
+                suggested_aid=self.learning_agent_addr.aid,
             )
-            rl_agent.add_role(self.learning_role)
+            rl_agent.suspendable_tasks = False
 
-    async def setup_output_agent(
-        self, simulation_id: str, save_frequency_hours: int
-    ) -> None:
+    def setup_output_agent(self, simulation_id: str, save_frequency_hours: int) -> None:
         """
         Set up the output agent for the simulation, creating an output role responsible for writing simulation output,
         including data storage and export settings. Depending on the platform (currently supported only on Linux),
@@ -270,43 +284,47 @@ class World:
 
         logger.debug(
             "creating output agent db=%s export_csv_path=%s",
-            self.db,
+            self.db_uri,
             self.export_csv_path,
         )
         self.output_role = WriteOutput(
             simulation_id=simulation_id,
             start=self.start,
             end=self.end,
-            db_engine=self.db,
+            db_uri=self.db_uri,
             export_csv_path=self.export_csv_path,
             save_frequency_hours=save_frequency_hours,
             learning_mode=self.learning_mode,
             perform_evaluation=self.perform_evaluation,
             additional_kpis=self.additional_kpis,
         )
+        if not self.output_agent_addr:
+            return
 
         # mango multiprocessing is currently only supported on linux
         # with single
-        if platform == "linux" and self.distributed_role is not None:
-            self.addresses.append((self.addr, "clock_agent"))
+        if sys.platform == "linux" and self.distributed_role is not None:
+            self.addresses.append(addr(self.addr, "clock_agent"))
+            output_role = self.output_role
+            output_aid = self.output_agent_addr.aid
 
             def creator(container):
-                agent = RoleAgent(
-                    container,
-                    suggested_aid=self.output_agent_addr[1],
-                    suspendable_tasks=False,
+                agent = agent_composed_of(
+                    output_role,
+                    register_in=container,
+                    suggested_aid=output_aid,
                 )
-                agent.add_role(self.output_role)
-                DistributedClockAgent(container)
+                agent.suspendable_tasks = False
+                container.register(DistributedClockAgent(), "clock_agent")
 
-            await self.container.as_agent_process(agent_creator=creator)
+            self.container.as_agent_process_lazy(agent_creator=creator)
         else:
-            output_agent = RoleAgent(
-                self.container,
-                suggested_aid=self.output_agent_addr[1],
-                suspendable_tasks=False,
+            output_agent = agent_composed_of(
+                self.output_role,
+                register_in=self.container,
+                suggested_aid=self.output_agent_addr.aid,
             )
-            output_agent.add_role(self.output_role)
+            output_agent.suspendable_tasks = False
 
     def add_unit_operator(self, id: str) -> None:
         """
@@ -324,10 +342,10 @@ class World:
         units_operator = UnitsOperator(available_markets=list(self.markets.values()))
 
         # creating a new role agent and apply the role of a units operator
-        unit_operator_agent = RoleAgent(
-            self.container, suggested_aid=f"{id}", suspendable_tasks=False
-        )
+        unit_operator_agent = RoleAgent()
         unit_operator_agent.add_role(units_operator)
+        self.container.register(unit_operator_agent, suggested_aid=str(id))
+        unit_operator_agent.suspendable_tasks = False
 
         # add the current unitsoperator to the list of operators currently existing
         self.unit_operators[id] = units_operator
@@ -336,8 +354,7 @@ class World:
         if not self.learning_mode:
             unit_operator_agent._role_context.data.update(
                 {
-                    "output_agent_addr": self.output_agent_addr[0],
-                    "output_agent_id": self.output_agent_addr[1],
+                    "output_agent_addr": self.output_agent_addr,
                 }
             )
 
@@ -361,18 +378,19 @@ class World:
 
         units_operator = RLUnitsOperator(available_markets=list(self.markets.values()))
         # creating a new role agent and apply the role of a units operator
-        unit_operator_agent = RoleAgent(
-            self.container, suggested_aid=f"{id}", suspendable_tasks=False
+        unit_operator_agent = agent_composed_of(
+            units_operator,
+            register_in=self.container,
+            suggested_aid=f"{id}",
         )
-        unit_operator_agent.add_role(units_operator)
+        unit_operator_agent.suspendable_tasks = False
 
         # add the current unitsoperator to the list of operators currently existing
         self.unit_operators[id] = units_operator
 
         unit_operator_agent._role_context.data.update(
             {
-                "learning_output_agent_addr": self.output_agent_addr[0],
-                "learning_output_agent_id": self.output_agent_addr[1],
+                "learning_output_agent_addr": self.output_agent_addr,
             }
         )
 
@@ -380,29 +398,21 @@ class World:
         if self.learning_mode:
             unit_operator_agent._role_context.data.update(
                 {
-                    "learning_agent_addr": self.learning_agent_addr[0],
-                    "learning_agent_id": self.learning_agent_addr[1],
+                    "learning_agent_addr": self.learning_agent_addr,
+                    "train_start": self.start,
+                    "train_end": self.end,
+                    "train_freq": self.learning_config.get("train_freq", "24h"),
                 }
-            )
-            recurrency_task = create_rrule(
-                start=self.start,
-                end=self.end,
-                freq=self.learning_config.get("train_freq", "24h"),
-            )
-
-            units_operator.context.schedule_recurrent_task(
-                units_operator.write_to_learning_role, recurrency_task
             )
 
         else:
             unit_operator_agent._role_context.data.update(
                 {
-                    "output_agent_addr": self.output_agent_addr[0],
-                    "output_agent_id": self.output_agent_addr[1],
+                    "output_agent_addr": self.output_agent_addr,
                 }
             )
 
-    async def add_units_with_operator_subprocess(self, id: str, units: list[dict]):
+    def add_units_with_operator_subprocess(self, id: str, units: list[dict]):
         """
         Adds a units operator with given ID in a separate process
         and creates and adds the given list of unit dictionaries to it
@@ -413,30 +423,34 @@ class World:
             units (list[dict]): list of unit dictionaries forwarded to create_unit
         """
         clock_agent_name = f"clock_agent_{id}"
-        self.addresses.append((self.addr, clock_agent_name))
+        markets = list(self.markets.values())
+        for market in markets:
+            # remove generator from rrule as it is not serializable
+            if market.opening_hours._cache is not None:
+                market.opening_hours._cache = None
+                market.opening_hours._cache_complete = False
+                market.opening_hours._cache_gen = None
+        self.addresses.append(addr(self.addr, clock_agent_name))
+        units_operator = UnitsOperator(available_markets=markets)
 
-        async def creator(container):
+        for unit in units:
+            units_operator.add_unit(self.create_unit(**unit))
+        data_update_dict = {
+            "output_agent_addr": self.output_agent_addr,
+            "learning_output_agent_addr": self.output_agent_addr,
+        }
+
+        def creator(container):
             # creating a new role agent and apply the role of a units operator
-            units_operator = UnitsOperator(
-                available_markets=list(self.markets.values())
-            )
-            unit_operator_agent = RoleAgent(
-                container, suggested_aid=f"{id}", suspendable_tasks=False
-            )
-            unit_operator_agent.add_role(units_operator)
-            unit_operator_agent._role_context.data.update(
-                {
-                    "output_agent_addr": self.output_agent_addr[0],
-                    "output_agent_id": self.output_agent_addr[1],
-                    "learning_output_agent_addr": self.output_agent_addr[0],
-                    "learning_output_agent_id": self.output_agent_addr[1],
-                }
-            )
-            DistributedClockAgent(container, clock_agent_name)
-            for unit in units:
-                await units_operator.add_unit(self.create_unit(**unit))
 
-        await self.container.as_agent_process(agent_creator=creator)
+            unit_operator_agent = agent_composed_of(
+                units_operator, register_in=container, suggested_aid=str(id)
+            )
+            unit_operator_agent.suspendable_tasks = False
+            unit_operator_agent._role_context.data.update(data_update_dict)
+            container.register(DistributedClockAgent(), suggested_aid=clock_agent_name)
+
+        self.container.as_agent_process_lazy(agent_creator=creator)
 
     def create_unit(
         self,
@@ -464,36 +478,6 @@ class World:
             forecaster=forecaster,
             **unit_params,
         )
-
-    async def async_add_unit(
-        self,
-        id: str,
-        unit_type: str,
-        unit_operator_id: str,
-        unit_params: dict,
-        forecaster: Forecaster,
-    ) -> None:
-        """
-        Asynchronously adds a unit to the simulation, checking if the unit operator exists, verifying the unit type,
-        and ensuring that the unit operator does not already have a unit with the same id. It then creates bidding
-        strategies for the unit and adds the unit within the associated unit operator.
-
-        Args:
-            id (str): The identifier for the unit.
-            unit_type (str): The type of unit to be added.
-            unit_operator_id (str): The identifier of the unit operator to which the unit will be added.
-            unit_params (dict): Parameters for configuring the unit.
-            forecaster (Forecaster): The forecaster used by the unit.
-        """
-
-        # check if unit operator exists
-        self._validate_unit_addition(id, unit_type, unit_operator_id)
-
-        unit = self.create_unit(
-            id, unit_type, unit_operator_id, unit_params, forecaster
-        )
-
-        await self.unit_operators[unit_operator_id].add_unit(unit)
 
     def _add_bidding_strategies_to_learning_role(self, unit_id, bidding_strategies):
         """
@@ -571,18 +555,15 @@ class World:
 
         if self.market_operators.get(id):
             raise ValueError(f"MarketOperator {id} already exists")
-        market_operator_agent = RoleAgent(
-            self.container, suggested_aid=id, suspendable_tasks=False
-        )
+        market_operator_agent = RoleAgent()
+        self.container.register(market_operator_agent, suggested_aid=id)
+        market_operator_agent.suspendable_tasks = False
         market_operator_agent.markets = []
 
         # after creation of an agent - we set additional context params
         if not self.learning_mode and not self.perform_evaluation:
             market_operator_agent._role_context.data.update(
-                {
-                    "output_agent_addr": self.output_agent_addr[0],
-                    "output_agent_id": self.output_agent_addr[1],
-                }
+                {"output_agent_addr": self.output_agent_addr}
             )
         self.market_operators[id] = market_operator_agent
 
@@ -616,7 +597,7 @@ class World:
         market_operator.markets.append(market_config)
         self.markets[f"{market_config.market_id}"] = market_config
 
-    async def _step(self):
+    async def _step(self, container):
         if self.distributed_role:
             # TODO find better way than sleeping
             # we need to wait, until the last step is executed correctly
@@ -630,7 +611,7 @@ class World:
             return None
         delta = next_activity - self.clock.time
         self.clock.set_time(next_activity)
-        await tasks_complete_or_sleeping(self.container)
+        await tasks_complete_or_sleeping(container)
         return delta
 
     async def async_run(self, start_ts: datetime, end_ts: datetime):
@@ -644,28 +625,31 @@ class World:
             start_ts (datetime.datetime): The start timestamp for the simulation run.
             end_ts (datetime.datetime): The end timestamp for the simulation run.
         """
+        logger.info("activating container")
         # agent is implicit added to self.container._agents
-        pbar = tqdm(total=end_ts - start_ts)
+        async with activate(self.container) as c:
+            await tasks_complete_or_sleeping(c)
+            logger.info("all agents up - starting simulation")
+            pbar = tqdm(total=end_ts - start_ts)
 
-        # allow registration before first opening
-        self.clock.set_time(start_ts - 1)
-        if self.distributed_role is not False:
-            await self.clock_manager.broadcast(self.clock.time)
-        prev_delta = 0
-        while self.clock.time < end_ts:
-            await asyncio.sleep(0)
-            delta = await self._step()
-            if delta or prev_delta:
-                pbar.update(delta)
-                pbar.set_description(
-                    f"{self.output_role.simulation_id} {timestamp2datetime(self.clock.time)}",
-                    refresh=False,
-                )
-            else:
-                self.clock.set_time(end_ts)
-            prev_delta = delta
-        pbar.close()
-        await self.container.shutdown()
+            # allow registration before first opening
+            self.clock.set_time(start_ts - 1)
+            if self.distributed_role is not False:
+                await self.clock_manager.broadcast(self.clock.time)
+            prev_delta = 0
+            while self.clock.time < end_ts:
+                await asyncio.sleep(0)
+                delta = await self._step(c)
+                if delta or prev_delta:
+                    pbar.update(delta)
+                    pbar.set_description(
+                        f"{self.output_role.simulation_id} {timestamp2datetime(self.clock.time)}",
+                        refresh=False,
+                    )
+                else:
+                    self.clock.set_time(end_ts)
+                prev_delta = delta
+            pbar.close()
 
     def run(self):
         """
@@ -724,12 +708,11 @@ class World:
             forecaster (Forecaster): The forecaster associated with the unit.
         """
 
-        return self.loop.run_until_complete(
-            self.async_add_unit(
-                id=id,
-                unit_type=unit_type,
-                unit_operator_id=unit_operator_id,
-                unit_params=unit_params,
-                forecaster=forecaster,
-            )
+        # check if unit operator exists
+        self._validate_unit_addition(id, unit_type, unit_operator_id)
+
+        unit = self.create_unit(
+            id, unit_type, unit_operator_id, unit_params, forecaster
         )
+
+        self.unit_operators[unit_operator_id].add_unit(unit)

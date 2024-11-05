@@ -16,7 +16,7 @@ from dateutil import rrule as rr
 from mango import Role
 from pandas.api.types import is_bool_dtype, is_numeric_dtype
 from psycopg2.errors import UndefinedColumn
-from sqlalchemy import inspect, text
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 
 from assume.common.market_objects import MetaDict
@@ -39,7 +39,7 @@ class WriteOutput(Role):
         simulation_id (str): The ID of the simulation as a unique classifier.
         start (datetime.datetime): The start datetime of the simulation run.
         end (datetime.datetime): The end datetime of the simulation run.
-        db_engine: The database engine. Defaults to None.
+        db_uri: The uri of the database engine. Defaults to ''.
         export_csv_path (str, optional): The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
         save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to None.
         learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
@@ -52,7 +52,7 @@ class WriteOutput(Role):
         simulation_id: str,
         start: datetime,
         end: datetime,
-        db_engine=None,
+        db_uri="",
         export_csv_path: str = "",
         save_frequency_hours: int = None,
         learning_mode: bool = False,
@@ -63,7 +63,7 @@ class WriteOutput(Role):
 
         # store needed date
         self.simulation_id = simulation_id
-        self.save_frequency_hours = save_frequency_hours or (end - start).days * 24
+        self.save_frequency_hours = save_frequency_hours
         logger.debug("saving results every %s hours", self.save_frequency_hours)
 
         # make directory if not already present
@@ -74,7 +74,8 @@ class WriteOutput(Role):
         else:
             self.export_csv_path = None
 
-        self.db = db_engine
+        self.db = None
+        self.db_uri = db_uri
 
         self.learning_mode = learning_mode
         self.perform_evaluation = perform_evaluation
@@ -183,22 +184,26 @@ class WriteOutput(Role):
 
         self.context.subscribe_message(
             self,
-            self.handle_message,
+            self.handle_output_message,
             lambda content, meta: content.get("context") == "write_results",
         )
 
-        recurrency_task = rr.rrule(
-            freq=rr.HOURLY,
-            interval=self.save_frequency_hours,
-            dtstart=self.start,
-            until=self.end,
-            cache=True,
-        )
-        self.context.schedule_recurrent_task(
-            self.store_dfs, recurrency_task, src="no_wait"
-        )
+    def on_ready(self):
+        if self.db_uri:
+            self.db = create_engine(self.db_uri)
+        if self.save_frequency_hours is not None:
+            recurrency_task = rr.rrule(
+                freq=rr.HOURLY,
+                interval=self.save_frequency_hours,
+                dtstart=self.start,
+                until=self.end,
+                cache=True,
+            )
+            self.context.schedule_recurrent_task(
+                self.store_dfs, recurrency_task, src="no_wait"
+            )
 
-    def handle_message(self, content: dict, meta: MetaDict):
+    def handle_output_message(self, content: dict, meta: MetaDict):
         """
         Handles the incoming messages and performs corresponding actions.
 
@@ -227,6 +232,9 @@ class WriteOutput(Role):
 
         elif content.get("type") == "grid_topology":
             self.store_grid(content.get("data"), content.get("market_id"))
+
+        elif content.get("type") == "store_flows":
+            self.write_flows(content.get("data"))
 
     def write_rl_params(self, rl_params: dict):
         """
@@ -273,7 +281,10 @@ class WriteOutput(Role):
                 if len(self.write_dfs[table]) == 0:
                     continue
 
-                df = pd.concat(self.write_dfs[table], axis=0)
+                # concat all dataframes
+                # use join='outer' to keep all columns and fill missing values with NaN
+                df = pd.concat(self.write_dfs[table], axis=0, join="outer")
+
                 df.reset_index()
                 if df.empty:
                     continue
@@ -338,7 +349,9 @@ class WriteOutput(Role):
             grid["generators"]["wkt_srid_4326"] = grid["generators"][grid_col].apply(
                 translate_point_dict.get
             )
-            grid_col = "node" if "node" in grid["loads"].columns else "bus"
+            grid_col = (
+                "node" if "node" in grid["loads"].columns else "bus"
+            )  # TODO: anschauen ob da die loads drauf sind
             grid["loads"]["wkt_srid_4326"] = grid["loads"][grid_col].apply(
                 translate_point_dict.get
             )
@@ -424,7 +437,7 @@ class WriteOutput(Role):
             )
 
         del df["only_hours"]
-        del df["agent_id"]
+        del df["agent_addr"]
 
         if "bid_type" not in df.columns:
             df["bid_type"] = None
@@ -565,3 +578,38 @@ class WriteOutput(Role):
         rewards_by_unit = np.array(rewards_by_unit)
 
         return rewards_by_unit
+
+    def write_flows(self, data: dict[tuple[datetime, str], float]):
+        """
+        Writes the flows of the grid results into the database.
+
+        Args:
+            data: The records to be put into the table. Formatted like, "(datetime, line), flow" if generated by pyomo or df if it comes from pypsa.
+        """
+        # Daten in ein DataFrame umwandeln depending on the data format which differes when different solver are used
+        # transformation done here to avoid adapting format during clearing
+
+        # if data is dataframe
+        if isinstance(data, pd.DataFrame):
+            df = data
+
+        # if data is dict
+        elif isinstance(data, dict):
+            # Convert the dictionary to a DataFrame
+            df = pd.DataFrame.from_dict(
+                data, orient="index", columns=["flow"]
+            ).reset_index()
+            # Split the 'index' column into 'timestamp' and 'line'
+            df[["timestamp", "line"]] = pd.DataFrame(
+                df["index"].tolist(), index=df.index
+            )
+            # Rename the columns
+            df = df.drop(columns=["index"])
+
+            # set timestamp to index
+            df.set_index("timestamp", inplace=True)
+
+        df["simulation"] = self.simulation_id
+
+        with self.locks["flows"]:
+            self.write_dfs["flows"].append(df)

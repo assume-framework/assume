@@ -21,6 +21,9 @@ from assume.strategies.naive_strategies import (
     NaiveSingleBidStrategy,
 )
 from assume.strategies.manual_strategies import SimpleManualTerminalStrategy
+from assume.strategies.dmas_powerplant import DmasPowerplantStrategy
+from assume.strategies.dmas_storage import DmasStorageStrategy
+
 
 bidding_strategies: dict[str, BaseStrategy] = {
     "naive_eom": NaiveSingleBidStrategy,
@@ -40,26 +43,21 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "naive_da_steelplant": NaiveDASteelplantStrategy,
     "naive_steel_redispatch": NaiveRedispatchSteelplantStrategy,
     "manual_strategy": SimpleManualTerminalStrategy,
+    "dmas_powerplant": DmasPowerplantStrategy,
+    "dmas_storage": DmasStorageStrategy,
 }
-
-try:
-    from assume.strategies.dmas_powerplant import DmasPowerplantStrategy
-    from assume.strategies.dmas_storage import DmasStorageStrategy
-
-    bidding_strategies["dmas_powerplant"] = DmasPowerplantStrategy
-    bidding_strategies["dmas_storage"] = DmasStorageStrategy
-
-except ImportError:
-    pass
-
 
 try:
     from assume.strategies.learning_advanced_orders import (
         RLAdvancedOrderStrategy,
     )
-    from assume.strategies.learning_strategies import RLStrategy
+    from assume.strategies.learning_strategies import (
+        RLStrategy,
+        StorageRLStrategy,
+    )
 
     bidding_strategies["pp_learning"] = RLStrategy
+    bidding_strategies["storage_learning"] = StorageRLStrategy
     bidding_strategies["learning_advanced_orders"] = RLAdvancedOrderStrategy
 
 except ImportError:

@@ -71,16 +71,16 @@ def test_complex_clearing_whitepaper_a():
     orderbook = extend_orderbook(products, volume=13, price=100, orderbook=orderbook)
 
     # bid gen1 and block_gen3 are from one unit
-    orderbook[3]["agent_id"] = orderbook[2]["agent_id"]
+    orderbook[3]["agent_addr"] = orderbook[2]["agent_addr"]
     assert len(orderbook) == 5
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert math.isclose(meta[0]["supply_volume"], 10, abs_tol=eps)
     assert math.isclose(meta[0]["price"], 40, abs_tol=eps)
-    assert accepted_orders[0]["agent_id"] == "dem1"
+    assert accepted_orders[0]["agent_addr"] == "dem1"
     assert math.isclose(accepted_orders[0]["accepted_volume"], -10, abs_tol=eps)
-    assert accepted_orders[1]["agent_id"] == "gen3"
+    assert accepted_orders[1]["agent_addr"] == "gen3"
     assert math.isclose(
         accepted_orders[1]["accepted_volume"][products[0][0]], 10, abs_tol=eps
     )
@@ -132,12 +132,12 @@ def test_complex_clearing_whitepaper_d():
     assert len(orderbook) == 4
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert math.isclose(meta[0]["supply_volume"], 10, abs_tol=eps)
     assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
-    assert accepted_orders[0]["agent_id"] == "dem1"
+    assert accepted_orders[0]["agent_addr"] == "dem1"
     assert math.isclose(accepted_orders[0]["accepted_volume"], -10, abs_tol=eps)
-    assert accepted_orders[1]["agent_id"] == "gen4"
+    assert accepted_orders[1]["agent_addr"] == "gen4"
     assert math.isclose(accepted_orders[1]["accepted_volume"], 10, abs_tol=eps)
 
 
@@ -170,7 +170,7 @@ def test_clearing_non_convex_1():
     order: Order = {
         "start_time": products[0][0],
         "end_time": products[0][1],
-        "agent_id": "B1",
+        "agent_addr": "B1",
         "bid_id": "B1",
         "volume": {
             products[0][0]: -4,
@@ -187,7 +187,7 @@ def test_clearing_non_convex_1():
     order: Order = {
         "start_time": products[0][0],
         "end_time": products[0][1],
-        "agent_id": "B2",
+        "agent_addr": "B2",
         "bid_id": "B2",
         "volume": {
             products[0][0]: -3,
@@ -211,7 +211,7 @@ def test_clearing_non_convex_1():
     assert len(orderbook_demand) == 2
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert math.isclose(meta[0]["supply_volume"], 7, abs_tol=eps)
     assert math.isclose(meta[0]["price"], 3, abs_tol=eps)
     assert math.isclose(meta[1]["supply_volume"], 12, abs_tol=eps)
@@ -219,7 +219,7 @@ def test_clearing_non_convex_1():
     assert math.isclose(meta[2]["supply_volume"], 22, abs_tol=eps)
     assert math.isclose(meta[2]["price"], 5, abs_tol=eps)
 
-    assert accepted_orders[0]["agent_id"] == "B1"
+    assert accepted_orders[0]["agent_addr"] == "B1"
     assert math.isclose(
         accepted_orders[0]["accepted_volume"][products[0][0]], -4, abs_tol=eps
     )
@@ -230,7 +230,7 @@ def test_clearing_non_convex_1():
         accepted_orders[0]["accepted_volume"][products[2][0]], -10, abs_tol=eps
     )
 
-    assert accepted_orders[1]["agent_id"] == "B2"
+    assert accepted_orders[1]["agent_addr"] == "B2"
     assert math.isclose(
         accepted_orders[1]["accepted_volume"][products[0][0]], -3, abs_tol=eps
     )
@@ -241,16 +241,16 @@ def test_clearing_non_convex_1():
         accepted_orders[1]["accepted_volume"][products[2][0]], -12, abs_tol=eps
     )
 
-    assert accepted_orders[2]["agent_id"] == "gen6"
+    assert accepted_orders[2]["agent_addr"] == "gen6"
     assert math.isclose(accepted_orders[2]["accepted_volume"], 7, abs_tol=eps)
 
-    assert accepted_orders[3]["agent_id"] == "gen6"
+    assert accepted_orders[3]["agent_addr"] == "gen6"
     assert math.isclose(accepted_orders[3]["accepted_volume"], 12, abs_tol=eps)
 
-    assert accepted_orders[4]["agent_id"] == "gen3"
+    assert accepted_orders[4]["agent_addr"] == "gen3"
     assert math.isclose(accepted_orders[4]["accepted_volume"], 2, abs_tol=eps)
 
-    assert accepted_orders[5]["agent_id"] == "gen6"
+    assert accepted_orders[5]["agent_addr"] == "gen6"
     assert math.isclose(accepted_orders[5]["accepted_volume"], 20, abs_tol=eps)
 
 
@@ -282,7 +282,7 @@ def test_clearing_non_convex_2():
     order: Order = {
         "start_time": products[0][0],
         "end_time": products[0][1],
-        "agent_id": "B1",
+        "agent_addr": "B1",
         "bid_id": "B1",
         "volume": {
             products[0][0]: -4,
@@ -300,7 +300,7 @@ def test_clearing_non_convex_2():
     order: Order = {
         "start_time": products[0][0],
         "end_time": products[0][1],
-        "agent_id": "B2",
+        "agent_addr": "B2",
         "bid_id": "B2",
         "volume": {
             products[0][0]: -3,
@@ -333,7 +333,7 @@ def test_clearing_non_convex_2():
     )
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert math.isclose(meta[0]["supply_volume"], 7, abs_tol=eps)
     assert math.isclose(meta[0]["price"], 5, abs_tol=eps)
     assert math.isclose(meta[1]["supply_volume"], 12, abs_tol=eps)
@@ -341,7 +341,7 @@ def test_clearing_non_convex_2():
     assert math.isclose(meta[2]["supply_volume"], 23, abs_tol=eps)
     assert math.isclose(meta[2]["price"], 5, abs_tol=eps)
 
-    assert accepted_orders[0]["agent_id"] == "B1"
+    assert accepted_orders[0]["agent_addr"] == "B1"
     assert math.isclose(
         accepted_orders[0]["accepted_volume"][products[0][0]], -4, abs_tol=eps
     )
@@ -352,7 +352,7 @@ def test_clearing_non_convex_2():
         accepted_orders[0]["accepted_volume"][products[2][0]], -11, abs_tol=eps
     )
 
-    assert accepted_orders[1]["agent_id"] == "B2"
+    assert accepted_orders[1]["agent_addr"] == "B2"
     assert math.isclose(
         accepted_orders[1]["accepted_volume"][products[0][0]], -3, abs_tol=eps
     )
@@ -363,13 +363,13 @@ def test_clearing_non_convex_2():
         accepted_orders[1]["accepted_volume"][products[2][0]], -12, abs_tol=eps
     )
 
-    assert accepted_orders[2]["agent_id"] == "gen3"
+    assert accepted_orders[2]["agent_addr"] == "gen3"
     assert math.isclose(accepted_orders[2]["accepted_volume"], 7, abs_tol=eps)
-    assert accepted_orders[3]["agent_id"] == "gen6"
+    assert accepted_orders[3]["agent_addr"] == "gen6"
     assert math.isclose(accepted_orders[3]["accepted_volume"], 12, abs_tol=eps)
-    assert accepted_orders[4]["agent_id"] == "gen3"
+    assert accepted_orders[4]["agent_addr"] == "gen3"
     assert math.isclose(accepted_orders[4]["accepted_volume"], 3, abs_tol=eps)
-    assert accepted_orders[5]["agent_id"] == "gen6"
+    assert accepted_orders[5]["agent_addr"] == "gen6"
     assert math.isclose(accepted_orders[5]["accepted_volume"], 20, abs_tol=eps)
 
 
@@ -400,7 +400,7 @@ def test_clearing_non_convex_3():
     order: Order = {
         "start_time": products[0][0],
         "end_time": products[0][1],
-        "agent_id": "B1",
+        "agent_addr": "B1",
         "bid_id": "B1_1",
         "volume": {
             products[0][0]: -2,
@@ -418,7 +418,7 @@ def test_clearing_non_convex_3():
     order: Order = {
         "start_time": products[0][0],
         "end_time": products[0][1],
-        "agent_id": "B2",
+        "agent_addr": "B2",
         "bid_id": "B2_1",
         "volume": {
             products[0][0]: -1.5,
@@ -436,7 +436,7 @@ def test_clearing_non_convex_3():
     order: Order = {
         "start_time": products[0][0],
         "end_time": products[0][1],
-        "agent_id": "B1",
+        "agent_addr": "B1",
         "bid_id": "B1_2",
         "volume": {
             products[0][0]: -2,
@@ -454,7 +454,7 @@ def test_clearing_non_convex_3():
     order: Order = {
         "start_time": products[0][0],
         "end_time": products[0][1],
-        "agent_id": "B2",
+        "agent_addr": "B2",
         "bid_id": "B2_2",
         "volume": {
             products[0][0]: -1.5,
@@ -487,7 +487,7 @@ def test_clearing_non_convex_3():
     )
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
 
     assert math.isclose(meta[0]["supply_volume"], 5.5, abs_tol=eps)
     assert math.isclose(meta[0]["price"], 5, abs_tol=eps)
@@ -529,11 +529,11 @@ def test_clearing_non_convex_3():
         accepted_orders[2]["accepted_volume"][products[2][0]], -5.5, abs_tol=eps
     )
 
-    assert accepted_orders[3]["agent_id"] == "gen5"
+    assert accepted_orders[3]["agent_addr"] == "gen5"
     assert math.isclose(accepted_orders[3]["accepted_volume"], 5.5, abs_tol=eps)
-    assert accepted_orders[4]["agent_id"] == "gen5"
+    assert accepted_orders[4]["agent_addr"] == "gen5"
     assert math.isclose(accepted_orders[4]["accepted_volume"], 9, abs_tol=eps)
-    assert accepted_orders[5]["agent_id"] == "gen8"
+    assert accepted_orders[5]["agent_addr"] == "gen8"
     assert math.isclose(accepted_orders[5]["accepted_volume"], 17, abs_tol=eps)
 
     """
@@ -545,7 +545,7 @@ def test_clearing_non_convex_3():
 if __name__ == "__main__":
     pass
     # from assume.common.utils import plot_orderbook
-    # clearing_result, meta = test_market_mechanism()
+    # clearing_result, meta, flows = test_market_mechanism()
     # only works with per node clearing
     # fig, ax = plot_orderbook(clearing_result, meta)
     # fig.show()

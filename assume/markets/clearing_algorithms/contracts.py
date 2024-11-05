@@ -13,6 +13,7 @@ from operator import itemgetter
 import pandas as pd
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
+from mango import addr, create_acl
 
 from assume.common.market_objects import (
     ClearingMessage,
@@ -124,8 +125,8 @@ class PayAsBidContractRole(MarketRole):
         Returns:
             bool: True if the orders are compatible
         """
-        s_information = self.registered_agents[supply_order["agent_id"]]
-        d_information = self.registered_agents[demand_order["agent_id"]]
+        s_information = self.registered_agents[supply_order["agent_addr"]]
+        d_information = self.registered_agents[demand_order["agent_addr"]]
         return supply_order["eligible_lambda"](d_information) and demand_order[
             "eligible_lambda"
         ](s_information)
@@ -217,9 +218,9 @@ class PayAsBidContractRole(MarketRole):
                     supply_order["accepted_price"] = supply_order["price"]
                     demand_order["accepted_price"] = supply_order["price"]
                     supply_order["contractor_unit_id"] = demand_order["sender_id"]
-                    supply_order["contractor_id"] = demand_order["agent_id"]
+                    supply_order["contractor_id"] = demand_order["agent_addr"]
                     demand_order["contractor_unit_id"] = supply_order["sender_id"]
-                    demand_order["contractor_id"] = supply_order["agent_id"]
+                    demand_order["contractor_id"] = supply_order["agent_addr"]
                 accepted_supply_orders.extend(to_commit)
 
             for order in supply_orders:
@@ -263,8 +264,11 @@ class PayAsBidContractRole(MarketRole):
                     partial(self.execute_contract, contract=order), recurrency_task
                 )
 
+            # write flows if applicable
+            flows = []
+
         # contract clearing (pay_as_bid) takes place
-        return accepted_orders, rejected_orders, meta
+        return accepted_orders, rejected_orders, meta, flows
 
     async def execute_contract(self, contract: Order):
         """
@@ -280,7 +284,7 @@ class PayAsBidContractRole(MarketRole):
         # contract must be executed
         # contract from supply is given
         buyer, seller = contract["contractor_unit_id"], contract["unit_id"]
-        seller_agent = contract["agent_id"]
+        seller_agent = contract["agent_addr"]
         c_function: Callable[str, tuple[Orderbook, Orderbook]] = available_contracts[
             contract["contract"]
         ]
@@ -291,45 +295,47 @@ class PayAsBidContractRole(MarketRole):
 
         reply_with = f'{buyer}_{contract["start_time"]}'
         self.futures[reply_with] = asyncio.Future()
-        self.context.schedule_instant_acl_message(
-            {
-                "context": "data_request",
-                "unit": seller,
-                "metric": "energy",
-                "start_time": begin,
-                "end_time": end,
-            },
-            receiver_addr=seller_agent[0],
-            receiver_id=seller_agent[1],
-            acl_metadata={
-                "sender_addr": self.context.addr,
-                "sender_id": self.context.aid,
-                "reply_with": reply_with,
-            },
+        self.context.schedule_instant_message(
+            create_acl(
+                {
+                    "context": "data_request",
+                    "unit": seller,
+                    "metric": "energy",
+                    "start_time": begin,
+                    "end_time": end,
+                },
+                sender_addr=self.context.addr,
+                receiver_addr=addr(seller_agent[0], seller_agent[1]),
+                acl_metadata={
+                    "reply_with": reply_with,
+                },
+            ),
+            receiver_addr=addr(seller_agent[0], seller_agent[1]),
         )
 
         if contract["contract"] in contract_needs_market:
             reply_with_market = f'market_eom_{contract["start_time"]}'
             self.futures[reply_with_market] = asyncio.Future()
-            self.context.schedule_instant_acl_message(
-                {
-                    "context": "data_request",
-                    # ID3 would be average price of orders cleared in last 3 hours before delivery
-                    # monthly averages are used for EEG
-                    # https://www.netztransparenz.de/de-de/Erneuerbare-Energien-und-Umlagen/EEG/Transparenzanforderungen/Marktpr%C3%A4mie/Marktwert%C3%BCbersicht
-                    "market_id": "EOM",
-                    "metric": "price",
-                    "start_time": begin,
-                    "end_time": end,
-                },
-                # TODO other market might not always be the same agent
+            self.context.schedule_instant_message(
+                create_acl(
+                    {
+                        "context": "data_request",
+                        # ID3 would be average price of orders cleared in last 3 hours before delivery
+                        # monthly averages are used for EEG
+                        # https://www.netztransparenz.de/de-de/Erneuerbare-Energien-und-Umlagen/EEG/Transparenzanforderungen/Marktpr%C3%A4mie/Marktwert%C3%BCbersicht
+                        "market_id": "EOM",
+                        "metric": "price",
+                        "start_time": begin,
+                        "end_time": end,
+                    },
+                    # TODO other market might not always be the same agent
+                    receiver_addr=self.context.addr,
+                    sender_addr=self.context.addr,
+                    acl_metadata={
+                        "reply_with": reply_with_market,
+                    },
+                ),
                 receiver_addr=self.context.addr,
-                receiver_id=self.context.aid,
-                acl_metadata={
-                    "sender_addr": self.context.addr,
-                    "sender_id": self.context.aid,
-                    "reply_with": reply_with_market,
-                },
             )
             market_series = await self.futures[reply_with_market]
         else:
@@ -340,7 +346,7 @@ class PayAsBidContractRole(MarketRole):
 
         in_reply_to = f'{contract["contract"]}_{contract["start_time"]}'
         await self.send_contract_result(contract["contractor_id"], buyer, in_reply_to)
-        await self.send_contract_result(contract["agent_id"], seller, in_reply_to)
+        await self.send_contract_result(contract["agent_addr"], seller, in_reply_to)
 
     async def send_contract_result(
         self, receiver: tuple, orderbook: Orderbook, in_reply_to: str
@@ -394,7 +400,7 @@ def ppa(
     Returns:
         tuple[dict, dict]: the buyer order and the seller order as a tuple
     """
-    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_id"]
+    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_addr"]
     volume = sum(future_generation_series[start:end])
     buyer: Orderbook = [
         {
@@ -407,7 +413,7 @@ def ppa(
             "accepted_volume": volume,
             "accepted_price": contract["price"],
             "only_hours": None,
-            "agent_id": buyer_agent,
+            "agent_addr": buyer_agent,
         }
     ]
     seller: Orderbook = [
@@ -421,7 +427,7 @@ def ppa(
             "accepted_volume": -volume,
             "accepted_price": contract["price"],
             "only_hours": None,
-            "agent_id": seller_agent,
+            "agent_addr": seller_agent,
         }
     ]
     return buyer, seller
@@ -447,7 +453,7 @@ def swingcontract(
     Returns:
         tuple[dict, dict]: the buyer order and the seller order as a tuple
     """
-    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_id"]
+    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_addr"]
 
     minDCQ = 80  # daily constraint quantity
     maxDCQ = 100
@@ -472,7 +478,7 @@ def swingcontract(
             "accepted_volume": demand,
             "accepted_price": price,
             "only_hours": None,
-            "agent_id": buyer_agent,
+            "agent_addr": buyer_agent,
         }
     ]
     seller: Orderbook = [
@@ -486,7 +492,7 @@ def swingcontract(
             "accepted_volume": -demand,
             "accepted_price": price,
             "only_hours": None,
-            "agent_id": seller_agent,
+            "agent_addr": seller_agent,
         }
     ]
     return buyer, seller
@@ -512,7 +518,7 @@ def cfd(
     Returns:
         tuple[dict, dict]: the buyer order and the seller order as a tuple
     """
-    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_id"]
+    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_addr"]
 
     # TODO does not work with multiple markets with differing time scales..
     # this only works for whole trading hours (as x MW*1h == x MWh)
@@ -536,7 +542,7 @@ def cfd(
             "accepted_volume": volume,
             "accepted_price": price,
             "only_hours": None,
-            "agent_id": buyer_agent,
+            "agent_addr": buyer_agent,
         }
     ]
     seller: Orderbook = [
@@ -550,7 +556,7 @@ def cfd(
             "accepted_volume": -volume,
             "accepted_price": price,
             "only_hours": None,
-            "agent_id": seller_agent,
+            "agent_addr": seller_agent,
         }
     ]
     return buyer, seller
@@ -577,7 +583,7 @@ def market_premium(
     Returns:
         tuple[dict, dict]: the buyer order and the seller order as a tuple
     """
-    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_id"]
+    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_addr"]
     # TODO does not work with multiple markets with differing time scales..
     # this only works for whole trading hours (as x MW*1h == x MWh)
     price_series = (market_index[start:end] - contract["price"]) * gen_series[start:end]
@@ -598,7 +604,7 @@ def market_premium(
             "accepted_volume": volume,
             "accepted_price": price,
             "only_hours": None,
-            "agent_id": buyer_agent,
+            "agent_addr": buyer_agent,
         }
     ]
     seller: Orderbook = [
@@ -612,7 +618,7 @@ def market_premium(
             "accepted_volume": -volume,
             "accepted_price": price,
             "only_hours": None,
-            "agent_id": seller_agent,
+            "agent_addr": seller_agent,
         }
     ]
     return buyer, seller
@@ -625,7 +631,7 @@ def feed_in_tariff(
     start: datetime,
     end: datetime,
 ):
-    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_id"]
+    buyer_agent, seller_agent = contract["contractor_id"], contract["agent_addr"]
     # TODO does not work with multiple markets with differing time scales..
     # this only works for whole trading hours (as x MW*1h == x MWh)
     price_series = contract["price"] * client_series[start:end]
@@ -644,7 +650,7 @@ def feed_in_tariff(
             "accepted_volume": volume,
             "accepted_price": price,
             "only_hours": None,
-            "agent_id": buyer_agent,
+            "agent_addr": buyer_agent,
         }
     ]
     seller: Orderbook = [
@@ -658,7 +664,7 @@ def feed_in_tariff(
             "accepted_volume": -volume,
             "accepted_price": price,
             "only_hours": None,
-            "agent_id": seller_agent,
+            "agent_addr": seller_agent,
         }
     ]
     return buyer, seller

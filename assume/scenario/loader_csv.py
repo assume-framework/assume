@@ -144,13 +144,14 @@ def load_dsm_units(
         - It is crucial that the input CSV file follows the expected structure for the function to process it correctly.
     """
 
-    industrial_dsm_units = load_file(
+    # Load the DSM units file
+    dsm_units = load_file(
         path=path,
         config=config,
         file_name=file_name,
     )
 
-    if industrial_dsm_units is None:
+    if dsm_units is None:
         return None
 
     # Define columns that are common across different technologies within the same plant
@@ -160,20 +161,23 @@ def load_dsm_units(
         "demand",
         "cost_tolerance",
         "unit_type",
+        "node",
+        "flexibility_measure",
     ]
-    bidding_columns = [
-        col for col in industrial_dsm_units.columns if col.startswith("bidding_")
-    ]
+    # Filter the common columns to only include those that exist in the DataFrame
+    common_columns = [col for col in common_columns if col in dsm_units.columns]
+
+    # Get bidding columns dynamically
+    bidding_columns = [col for col in dsm_units.columns if col.startswith("bidding_")]
 
     # Initialize the dictionary to hold the final structured data
     dsm_units_dict = {}
 
-    # Process each group of components by plant name
-    for name, group in industrial_dsm_units.groupby(industrial_dsm_units.index):
+    # Process each group of components by plant name or building name
+    for name, group in dsm_units.groupby(dsm_units.index):
         dsm_unit = {}
 
-        # Aggregate or select appropriate data for common and bidding columns
-        # We take the first non-null entry
+        # Aggregate or select appropriate data for available common and bidding columns
         for col in common_columns + bidding_columns:
             non_null_values = group[col].dropna()
             if not non_null_values.empty:
@@ -182,24 +186,28 @@ def load_dsm_units(
         # Process each technology within the plant
         components = {}
         for tech, tech_data in group.groupby("technology"):
-            # Clean the technology-specific data: drop all-NaN columns and 'technology' column
+            # Clean the technology-specific data: drop all-NaN columns and drop 'technology', common, and bidding columns
             cleaned_data = tech_data.dropna(axis=1, how="all").drop(
-                columns=["technology"]
+                columns=["technology"] + common_columns + bidding_columns,
+                errors="ignore",
             )
-            components[tech] = cleaned_data.to_dict(orient="records")[0]
+            # Ensure that there is at least one record before adding to components
+            if not cleaned_data.empty:
+                components[tech] = cleaned_data.to_dict(orient="records")[0]
 
         dsm_unit["components"] = components
         dsm_units_dict[name] = dsm_unit
 
     # Convert the structured dictionary into a DataFrame
-    industrial_dsm_units = pd.DataFrame.from_dict(dsm_units_dict, orient="index")
+    dsm_units_df = pd.DataFrame.from_dict(dsm_units_dict, orient="index")
 
     # Split the DataFrame based on unit_type
     unit_type_dict = {}
-    for unit_type in industrial_dsm_units["unit_type"].unique():
-        unit_type_dict[unit_type] = industrial_dsm_units[
-            industrial_dsm_units["unit_type"] == unit_type
-        ]
+    if "unit_type" in dsm_units_df.columns:
+        for unit_type in dsm_units_df["unit_type"].unique():
+            unit_type_dict[unit_type] = dsm_units_df[
+                dsm_units_df["unit_type"] == unit_type
+            ]
 
     return unit_type_dict
 
@@ -392,7 +400,7 @@ def read_units(
                 id=unit_name,
                 unit_type=unit_type,
                 unit_operator_id=operator_id,
-                unit_params=unit_params,
+                unit_params=unit_params.to_dict(),
                 forecaster=forecaster,
             )
         )
@@ -439,11 +447,16 @@ def load_config_and_create_forecaster(
     storage_units = load_file(path=path, config=config, file_name="storage_units")
     demand_units = load_file(path=path, config=config, file_name="demand_units")
 
-    industrial_dsm_units = load_dsm_units(
-        path=path,
-        config=config,
-        file_name="industrial_dsm_units",
-    )
+    # Initialize an empty dictionary to combine the DSM units
+    dsm_units = {}
+    for unit_type in ["industrial_dsm_units", "residential_dsm_units"]:
+        units = load_dsm_units(
+            path=path,
+            config=config,
+            file_name=unit_type,
+        )
+        if units is not None:
+            dsm_units.update(units)
 
     if powerplant_units is None or demand_units is None:
         raise ValueError("No power plant or no demand units were provided!")
@@ -511,12 +524,12 @@ def load_config_and_create_forecaster(
         "powerplant_units": powerplant_units,
         "storage_units": storage_units,
         "demand_units": demand_units,
-        "industrial_dsm_units": industrial_dsm_units,
+        "dsm_units": dsm_units,
         "forecaster": forecaster,
     }
 
 
-async def async_setup_world(
+def setup_world(
     world: World,
     scenario_data: dict[str, object],
     study_case: str,
@@ -554,10 +567,24 @@ async def async_setup_world(
     powerplant_units = scenario_data["powerplant_units"]
     storage_units = scenario_data["storage_units"]
     demand_units = scenario_data["demand_units"]
-    industrial_dsm_units = scenario_data["industrial_dsm_units"]
+    dsm_units = scenario_data["dsm_units"]
     forecaster = scenario_data["forecaster"]
 
     save_frequency_hours = config.get("save_frequency_hours", 48)
+    # Disable save frequency if CSV export is enabled
+    if world.export_csv_path and save_frequency_hours is not None:
+        save_frequency_hours = None
+        logger.info(
+            "save_frequency_hours is disabled due to CSV export being enabled. "
+            "Data will be stored in the CSV files at the end of the simulation."
+        )
+
+        # If PostgreSQL database is in use, warn the user about end-of-simulation saving
+        if world.db_uri is not None and "postgresql" in world.db_uri:
+            logger.warning(
+                "Data will be stored in the PostgreSQL database only at the end of the simulation due to CSV export being enabled. "
+                "Disable CSV export to save data at regular intervals (export_csv_path = '')."
+            )
 
     learning_config: LearningConfig = config.get("learning_config", {})
     bidding_strategy_params = config.get("bidding_strategy_params", {})
@@ -591,7 +618,7 @@ async def async_setup_world(
 
     world.reset()
 
-    await world.setup(
+    world.setup(
         start=start,
         end=end,
         save_frequency_hours=save_frequency_hours,
@@ -649,8 +676,8 @@ async def async_setup_world(
         world_bidding_strategies=world.bidding_strategies,
     )
 
-    if industrial_dsm_units is not None:
-        for unit_type, units_df in industrial_dsm_units.items():
+    if dsm_units is not None:
+        for unit_type, units_df in dsm_units.items():
             dsm_units = read_units(
                 units_df=units_df,
                 unit_type=unit_type,
@@ -672,7 +699,7 @@ async def async_setup_world(
     if world.distributed_role is True:
         logger.info("Adding unit operators and units - with subprocesses")
         for op, op_units in units.items():
-            await world.add_units_with_operator_subprocess(op, op_units)
+            world.add_units_with_operator_subprocess(op, op_units)
     else:
         logger.info("Adding unit operators and units")
         for company_name in set(units.keys()):
@@ -684,7 +711,7 @@ async def async_setup_world(
         # add the units to corresponding unit operators
         for op, op_units in units.items():
             for unit in op_units:
-                await world.async_add_unit(**unit)
+                world.add_unit(**unit)
 
     if (
         world.learning_mode
@@ -692,28 +719,6 @@ async def async_setup_world(
         and len(world.learning_role.rl_strats) == 0
     ):
         raise ValueError("No RL units/strategies were provided!")
-
-
-def setup_world(
-    world: World,
-    scenario_data: dict[str, object],
-    study_case: str,
-    perform_evaluation: bool = False,
-    terminate_learning: bool = False,
-    episode: int = 0,
-    eval_episode: int = 0,
-) -> None:
-    world.loop.run_until_complete(
-        async_setup_world(
-            world=world,
-            scenario_data=scenario_data,
-            study_case=study_case,
-            perform_evaluation=perform_evaluation,
-            terminate_learning=terminate_learning,
-            episode=episode,
-            eval_episode=eval_episode,
-        )
-    )
 
 
 def load_scenario_folder(
@@ -778,49 +783,6 @@ def load_scenario_folder(
     )
 
 
-async def async_load_custom_units(
-    world: World,
-    inputs_path: str,
-    scenario: str,
-    file_name: str,
-    unit_type: str,
-) -> None:
-    """
-    Load custom units from a given path.
-
-    This function loads custom units of a specified type from a given path within a scenario, adding them to the world environment for simulation.
-
-    Args:
-        world (World): An instance of the World class representing the simulation environment.
-        inputs_path (str): The path to the folder containing input files necessary for the custom units.
-        scenario (str): The name of the scenario from which the custom units are to be loaded.
-        file_name (str): The name of the file containing the custom units.
-        unit_type (str): The type of the custom units to be loaded.
-    """
-    path = f"{inputs_path}/{scenario}"
-
-    custom_units = load_file(
-        path=path,
-        config={},
-        file_name=file_name,
-    )
-
-    if custom_units is None:
-        logger.warning(f"No {file_name} units were provided!")
-
-    operators = custom_units.unit_operator.unique()
-    for operator in operators:
-        if operator not in world.unit_operators:
-            world.add_unit_operator(id=str(operator))
-
-    add_units(
-        units_df=custom_units,
-        unit_type=unit_type,
-        world=world,
-        forecaster=world.forecaster,
-    )
-
-
 def load_custom_units(
     world: World,
     inputs_path: str,
@@ -855,14 +817,27 @@ def load_custom_units(
         - Each unique unit operator in the custom units is added to the world's unit operators.
         - The custom units are added to the world environment based on their type for use in simulations.
     """
-    world.loop.run_until_complete(
-        async_load_custom_units(
-            world=world,
-            inputs_path=inputs_path,
-            scenario=scenario,
-            file_name=file_name,
-            unit_type=unit_type,
-        )
+    path = f"{inputs_path}/{scenario}"
+
+    custom_units = load_file(
+        path=path,
+        config={},
+        file_name=file_name,
+    )
+
+    if custom_units is None:
+        logger.warning(f"No {file_name} units were provided!")
+
+    operators = custom_units.unit_operator.unique()
+    for operator in operators:
+        if operator not in world.unit_operators:
+            world.add_unit_operator(id=str(operator))
+
+    add_units(
+        units_df=custom_units,
+        unit_type=unit_type,
+        world=world,
+        forecaster=world.forecaster,
     )
 
 
@@ -997,7 +972,12 @@ def run_learning(
             world.run()
 
             total_rewards = world.output_role.get_sum_reward()
+
+            if len(total_rewards) == 0:
+                raise AssumeException("No rewards were collected during evaluation run")
+
             avg_reward = np.mean(total_rewards)
+
             # check reward improvement in evaluation run
             # and store best run in eval folder
             terminate = world.learning_role.compare_and_save_policies(
