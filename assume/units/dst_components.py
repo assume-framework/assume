@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import ast
 import logging
 
 import pandas as pd
@@ -1292,13 +1293,13 @@ class ElectricVehicle(GenericStorage):
         self,
         max_capacity: float,
         time_steps: list[int],
-        availability_profile: pd.Series,
         max_power_charge: float,
         min_capacity: float = 0.0,
         max_power_discharge: float = 0,
         efficiency_charge: float = 1.0,
         efficiency_discharge: float = 1.0,
         initial_soc: float = 1.0,
+        availability_periods: list[tuple[str, str]] | None = None,
         ramp_up: float | None = None,
         ramp_down: float | None = None,
         charging_profile: pd.Series | None = None,
@@ -1322,8 +1323,18 @@ class ElectricVehicle(GenericStorage):
         )
 
         # EV-specific attributes
-        self.availability_profile = availability_profile
+        self.availability_periods = availability_periods
         self.charging_profile = charging_profile
+
+        # Validate that only one profile is provided (either availability_profile or power_profile)
+        if availability_periods is not None and charging_profile is not None:
+            raise ValueError(
+                "Provide either `availability_periods` or `charging_profile` for the residential EV, not both."
+            )
+        elif availability_periods is None and charging_profile is None:
+            raise ValueError(
+                "Provide `availability_periods` or `charging_profile` for the residential EV."
+            )
 
     def add_to_model(
         self, model: pyo.ConcreteModel, model_block: pyo.Block
@@ -1362,6 +1373,9 @@ class ElectricVehicle(GenericStorage):
         # Call the parent class (GenericStorage) add_to_model method
         model_block = super().add_to_model(model, model_block)
 
+        # Create a EV's availability profile based on the provided availability periods
+        self.create_availability_profile(model)
+
         # Apply availability profile constraints if provided
         if self.availability_profile is not None:
             if not isinstance(self.availability_profile, pd.Series):
@@ -1395,6 +1409,21 @@ class ElectricVehicle(GenericStorage):
                 return b.charge[t] == self.charging_profile[t]
 
         return model_block
+
+    def create_availability_profile(self, model: pyo.ConcreteModel):
+        try:
+            temp_availability_profile = create_availability_df(
+                ast.literal_eval(
+                    self.availability_periods
+                ),
+                model
+            )
+            temp_availability_profile.index = self.time_steps
+            self.availability_profile = temp_availability_profile
+        except Exception as e:
+            raise ValueError(
+                f"Error processing availability periods for EV: {e}"
+            )
 
 
 class HydrogenStorage(GenericStorage):
@@ -1556,7 +1585,7 @@ demand_side_technologies: dict = {
     "dri_plant": DRIPlant,
     "dri_storage": DRIStorage,
     "eaf": ElectricArcFurnace,
-    "heat_pump": HeatPump,
+    "heatpump": HeatPump,
     "boiler": Boiler,
     "electric_vehicle": ElectricVehicle,
     "generic_storage": GenericStorage,
@@ -1676,3 +1705,22 @@ def add_min_up_down_time_constraints(model_block, time_steps):
                 )
 
     return model_block
+
+
+def create_availability_df(availability_periods, model: pyo.ConcreteModel) -> pd.Series:
+    """
+    Create an availability DataFrame based on the provided availability periods.
+
+    Args:
+        availability_periods (list of tuples): List of (start, end) tuples for availability periods.
+        model (pyo.ConcreteModel): A Pyomo ConcreteModel object representing the optimization model
+
+    Returns:
+        pd.Series: A series with 1 for available time steps and 0 otherwise.
+    """
+    availability_series = pd.Series(0, index=model.index)
+
+    for start, end in availability_periods:
+        availability_series[start:end] = 1
+
+    return availability_series

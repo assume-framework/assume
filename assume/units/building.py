@@ -2,12 +2,10 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import ast
 import logging
 from distutils.util import strtobool
 
 import pandas as pd
-import numpy as np
 import pyomo.environ as pyo
 from pyomo.opt import (
     SolverFactory,
@@ -96,6 +94,7 @@ class Building(DSMFlex, SupportsMinMax):
 
         # Main Model part
         self.model = pyo.ConcreteModel()
+        self.model.index = index
         self.define_sets()
 
         self.has_heatpump = "heatpump" in self.components
@@ -105,47 +104,35 @@ class Building(DSMFlex, SupportsMinMax):
         self.has_battery_storage = "generic_storage" in self.components
         self.has_pv = "pv_plant" in self.components
 
+        if self.has_ev:
+            if "sells_energy_to_market" not in self.components["electric_vehicle"]:
+                raise ValueError(
+                    "Electric vehicle needs to provide info via 'sells_energy_to_market' if it sells energy to the market or not."
+                )
+            else:
+                self.ev_sells_energy_to_market = strtobool(
+                    self.components["electric_vehicle"]["sells_energy_to_market"])
+
+        if self.has_battery_storage:
+            if "sells_energy_to_market" not in self.components["generic_storage"]:
+                raise ValueError(
+                    "Generic Storage needs to provide info via 'sells_energy_to_market' if it sells energy to the market or not."
+                )
+            else:
+                self.battery_sells_energy_to_market = strtobool(
+                    self.components["generic_storage"]["sells_energy_to_market"])
+
         self.define_parameters()
 
-        # Create availability DataFrame for EVs
-        # Parse the availability periods
-        # TODO: Move to dst_components
-        if self.has_ev:
-            if "availability_periods" in self.components["electric_vehicle"]:
-                try:
-                    # Convert the string to a list of tuples
-                    self.components["electric_vehicle"]["availability_periods"] = ast.literal_eval(
-                        self.components["electric_vehicle"]["availability_periods"]
-                    )
-                    self.components["electric_vehicle"]["availability_df"] = self.create_availability_df(
-                        self.components["electric_vehicle"]["availability_periods"]
-                    )
-                except Exception as e:
-                    raise ValueError(
-                        f"Error processing availability periods for EV: {e}"
-                    )
-            else:
-                raise KeyError(
-                    "Missing 'availability_periods' in EV components configuration."
-                )
-
         # Parse the availability of the PV plant
-        # TODO: move to dst_components
         if self.has_pv:
-            if not strtobool(self.components["pv_plant"]["uses_power_profile"]):
-                pv_power = self.forecaster[f"{self.id}_pv_power_profile"]
-                pv_power.index = self.model.time_steps
-                self.components["pv_plant"]["power_profile"] = pv_power
-            else:
-                pv_availability = self.forecaster["availability_Solar"]
-                pv_availability.index = self.model.time_steps
-                self.components["pv_plant"]["availability_profile"] = pv_availability
+            self.prepare_pv_availability_or_power_profile()
 
         self.define_variables()
         self.initialize_components()
         self.define_constraints()
-        self.define_objective()
         self.initialize_process_sequence()
+        self.define_objective()
 
         solvers = check_available_solvers(*SOLVERS)
         if len(solvers) < 1:
@@ -164,22 +151,15 @@ class Building(DSMFlex, SupportsMinMax):
         return round(buy_forecast - price_delta, 2)
 
 
-    def create_availability_df(self, availability_periods):
-        """
-        Create an availability DataFrame based on the provided availability periods.
-
-        Args:
-            availability_periods (list of tuples): List of (start, end) tuples for availability periods.
-
-        Returns:
-            pd.Series: A series with 1 for available time steps and 0 otherwise.
-        """
-        availability_series = pd.Series(0, index=self.index)
-
-        for start, end in availability_periods:
-            availability_series[start:end] = 1
-
-        return availability_series
+    def prepare_pv_availability_or_power_profile(self):
+        if not strtobool(self.components["pv_plant"]["uses_power_profile"]):
+            pv_power = self.forecaster[f"{self.id}_pv_power_profile"]
+            pv_power.index = self.model.time_steps
+            self.components["pv_plant"]["power_profile"] = pv_power
+        else:
+            pv_availability = self.forecaster["availability_Solar"]
+            pv_availability.index = self.model.time_steps
+            self.components["pv_plant"]["availability_profile"] = pv_availability
 
 
     def initialize_process_sequence(self):
@@ -195,6 +175,7 @@ class Building(DSMFlex, SupportsMinMax):
                 return (
                         (self.model.dsm_blocks["heatpump"].heat_out[t] if self.has_heatpump else 0)
                         + (self.model.dsm_blocks["boiler"].heat_out[t] if self.has_boiler else 0)
+                        #TODO: Thermal storage is missing in dst_components
                         + (self.model.dsm_blocks["thermal_storage"].discharge_thermal[t] if self.has_thermal_storage else 0)
                         == self.model.heat_demand[t]
                         + (self.model.dsm_blocks["thermal_storage"].charge_thermal[t] if self.has_thermal_storage else 0)
@@ -263,10 +244,37 @@ class Building(DSMFlex, SupportsMinMax):
                     + (self.model.dsm_blocks["electric_vehicle"].charge[t] if self.has_ev else 0)
                     + (self.model.dsm_blocks["generic_storage"].charge[t] if self.has_battery_storage else 0)
                     - (self.model.dsm_blocks["pv_plant"].power[t] if self.has_pv else 0)
-                    # TODO: My idea with sells_battery_energy_to_market is not working since there is no split up anymore!
                     - (self.model.dsm_blocks["generic_storage"].discharge[t] if self.has_battery_storage else 0)
                     - (self.model.dsm_blocks["electric_vehicle"].discharge[t] if self.has_ev else 0)
             )
+        if self.has_ev and not self.ev_sells_energy_to_market:
+            @self.model.Constraint(self.model.time_steps)
+            def discharge_ev_to_market_constraint(m, t):
+                """
+                Restricts the discharging rate of the electric vehicle for self usage only.
+                """
+                return (
+                        self.model.dsm_blocks["electric_vehicle"].discharge[t]
+                        <= self.model.inflex_demand[t]
+                        + (self.model.dsm_blocks["heatpump"].power_in[t] if self.has_heatpump else 0)
+                        + (self.model.dsm_blocks["boiler"].power_in[t] if self.has_boiler else 0)
+                        - (self.model.dsm_blocks["pv_plant"].power[t] if self.has_pv else 0)
+                )
+
+        if self.has_battery_storage and not self.battery_sells_energy_to_market:
+            @self.model.Constraint(self.model.time_steps)
+            def discharge_battery_to_market_constraint(m, t):
+                """
+                Restricts the discharging rate of the battery storage for self usage only.
+                """
+                return (
+                        self.model.dsm_blocks["electric_vehicle"].discharge[t]
+                        <= self.model.inflex_demand[t]
+                        + (self.model.dsm_blocks["heatpump"].power_in[t] if self.has_heatpump else 0)
+                        + (self.model.dsm_blocks["boiler"].power_in[t] if self.has_boiler else 0)
+                        + (self.model.dsm_blocks["electric_vehicle"].charge[t] if self.has_ev else 0)
+                        - (self.model.dsm_blocks["pv_plant"].power[t] if self.has_pv else 0)
+                )
 
         @self.model.Constraint(self.model.time_steps)
         def variable_expenses_constraint(m, t):
@@ -274,7 +282,6 @@ class Building(DSMFlex, SupportsMinMax):
             Calculates the variable expense per time step.
             """
             return (
-                # TODO: Also Idea not really possible to have two different prices for buying and selling (variable_power negtive or positive)
                     self.model.variable_expenses[t]
                     == self.model.variable_power[t]
                     * self.model.electricity_price[t]
@@ -355,7 +362,7 @@ class Building(DSMFlex, SupportsMinMax):
         if self.has_ev:
             model_block = instance.dsm_blocks["electric_vehicle"]
             ev_soc = pd.Series(
-                data=model_block.ev_battery_soc.get_values(), dtype=float
+                data=model_block.soc.get_values(), dtype=float
             ) / pyo.value(model_block.max_capacity)
             ev_soc.index = self.index
             self.outputs["ev_soc"] = ev_soc
