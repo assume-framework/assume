@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": 2,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -50,7 +50,7 @@
         "content": "# Welcome to our ASSUME demo\n\nThis is the Grafana Dashboard which makes interacting with the simulation data very easy.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "11.2.0",
       "title": "Overview Dashboard",
       "type": "text"
     },
@@ -88,7 +88,7 @@
         "content": "# Market-specific Data\n\nData specific for the market depending on the choice made at te top of the panel\n\n",
         "mode": "markdown"
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "11.2.0",
       "targets": [
         {
           "datasource": {
@@ -143,6 +143,7 @@
             "axisLabel": "",
             "axisPlacement": "left",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 1,
             "gradientMode": "none",
@@ -365,6 +366,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -545,6 +547,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -965,7 +968,7 @@
           }
         ]
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "11.2.0",
       "targets": [
         {
           "datasource": {
@@ -1150,7 +1153,7 @@
         "content": "# Unit Specific Data\n\nFor the chosen market and the chosen unit here the dispatch is displayed.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "11.2.0",
       "targets": [
         {
           "datasource": {
@@ -1204,6 +1207,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -1393,7 +1397,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "5.3.0",
+      "pluginVersion": "5.4.0",
       "targets": [
         {
           "datasource": {
@@ -1449,6 +1453,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -1679,6 +1684,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -1934,6 +1940,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "sum"
@@ -1945,7 +1952,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "11.2.0",
       "targets": [
         {
           "datasource": {
@@ -2001,6 +2008,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2163,6 +2171,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2348,7 +2357,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "5.3.0",
+      "pluginVersion": "5.4.0",
       "targets": [
         {
           "datasource": {
@@ -2404,6 +2413,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2662,6 +2672,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "sum"
@@ -2673,7 +2684,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "11.2.0",
       "targets": [
         {
           "datasource": {
@@ -2730,6 +2741,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2920,6 +2932,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "mean"
@@ -2931,7 +2944,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "11.2.0",
       "targets": [
         {
           "datasource": {
@@ -3010,6 +3023,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "sum"
@@ -3021,7 +3035,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "11.2.0",
       "targets": [
         {
           "datasource": {
@@ -3077,6 +3091,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -3228,6 +3243,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -3413,7 +3429,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "5.3.0",
+      "pluginVersion": "5.4.0",
       "targets": [
         {
           "datasource": {
@@ -3453,6 +3469,7 @@
     },
     {
       "datasource": {
+        "default": true,
         "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
@@ -3468,6 +3485,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -3507,7 +3525,7 @@
               }
             ]
           },
-          "unit": "%"
+          "unit": "mwatth"
         },
         "overrides": []
       },
@@ -3546,7 +3564,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  SOC*100 AS \"State of Charge\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, SOC\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  SOC AS \"State of Charge\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, SOC\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -3588,24 +3606,6 @@
         }
       ],
       "title": "State of Charge",
-      "transformations": [
-        {
-          "id": "calculateField",
-          "options": {
-            "binary": {
-              "left": "State of Charge Storage 1",
-              "operator": "*",
-              "reducer": "sum",
-              "right": "100"
-            },
-            "mode": "binary",
-            "reduce": {
-              "reducer": "sum"
-            },
-            "replaceFields": true
-          }
-        }
-      ],
       "type": "timeseries"
     },
     {
@@ -3626,6 +3626,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -3677,6 +3678,31 @@
               {
                 "id": "unit",
                 "value": "€/MW"
+              }
+            ]
+          },
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "Bid price Discharge Storage 1 - EOM",
+                  "Bid price Charge Storage 1 - EOM"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
               }
             ]
           }
@@ -3840,6 +3866,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -3906,6 +3933,31 @@
               },
               {
                 "id": "unit"
+              }
+            ]
+          },
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "Bid volume charge: Storage 1 - EOM",
+                  "Bid volume discharge: Storage 1 - EOM"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
               }
             ]
           }
@@ -4113,6 +4165,7 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "sum"
@@ -4124,7 +4177,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.0.1",
+      "pluginVersion": "11.2.0",
       "targets": [
         {
           "datasource": {
@@ -4180,6 +4233,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -4313,7 +4367,7 @@
       "type": "timeseries"
     }
   ],
-  "refresh": false,
+  "refresh": "",
   "schemaVersion": 39,
   "tags": [],
   "templating": {
@@ -4321,8 +4375,8 @@
       {
         "current": {
           "selected": false,
-          "text": "example_01a_base",
-          "value": "example_01a_base"
+          "text": "example_02e_base",
+          "value": "example_02e_base"
         },
         "datasource": {
           "type": "postgres",
@@ -4369,8 +4423,8 @@
       {
         "current": {
           "selected": false,
-          "text": "Unit 1",
-          "value": "Unit 1"
+          "text": "pp_1",
+          "value": "pp_1"
         },
         "datasource": {
           "type": "postgres",
@@ -4418,10 +4472,13 @@
       },
       {
         "current": {
-          "isNone": true,
-          "selected": false,
-          "text": "None",
-          "value": ""
+          "selected": true,
+          "text": [
+            "Storage 1"
+          ],
+          "value": [
+            "Storage 1"
+          ]
         },
         "datasource": {
           "type": "postgres",
@@ -4429,7 +4486,6 @@
         },
         "definition": "SELECT index\nFROM storage_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which storage units we want to display ",
-        "error": {},
         "hide": 0,
         "includeAll": false,
         "label": "",
@@ -4446,10 +4502,9 @@
     ]
   },
   "time": {
-    "from": "2019-01-01T00:00:00.000Z",
-    "to": "2019-01-15T23:59:59.000Z"
+    "from": "2019-03-01T00:00:00.000Z",
+    "to": "2019-04-30T23:59:59.000Z"
   },
-  "timeRangeUpdatedDuringEditOrView": false,
   "timepicker": {
     "refresh_intervals": [
       "5s",
@@ -4463,6 +4518,6 @@
   "timezone": "utc",
   "title": "ASSUME: Main overview",
   "uid": "mQ3Lvkr4k",
-  "version": 5,
+  "version": 4,
   "weekStart": ""
 }

@@ -18,9 +18,13 @@ Upcoming Release
 - Converted DST components from functions to classes for improved modularity and reusability.
 - Added new residential DST components like PV, EV, Heat Pump, and Boiler, with refined docstrings for better usability.
 - Created a `GenericStorage` class for storage components, with classes like EV and Hydrogen Storage inheriting from it.
-- update to mango 2.x which allows for sync creation of world
+- Update to mango 2.x which allows for sync creation of world
+- Added a new DRL-based learning strategy for the storage unit. Use the `storage_learning` strategy in the `bidding_EOM` column of the `storage_units.csv`
+  file to use this strategy. refer to the API of `StorageRLStrategy` documentation for more details.
 
   * to upgrade a prior environment run `pip uninstall -y mango-agents mango-agents-assume && pip install mango-agents`
+
+- improve distributed simulation for TCP and MQTT, so that containers wait for each other in simulations
 
 
 v0.4.1 - latest release (8th October 2024)
