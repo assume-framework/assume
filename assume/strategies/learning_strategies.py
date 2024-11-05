@@ -600,7 +600,8 @@ class StorageRLStrategy(AbstractLearningStrategy):
 
     The agent's actions are formulated as two values, representing the bid price and the bid direction.
     These actions are scaled and interpreted to form actionable market bids, with specific conditions
-    dictating the bid type:
+    dictating the bid type. The storage agent can also decide to stay inactive by submitting a zero bid
+    as this can be a valid strategy in some market conditions and also improves the learning process.
 
     - **Bid Price**: The first action value determines the price at which the agent will bid.
     - **Bid Direction**: The second action value defines the type of bid:
