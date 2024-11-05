@@ -400,7 +400,7 @@ def read_units(
                 id=unit_name,
                 unit_type=unit_type,
                 unit_operator_id=operator_id,
-                unit_params=unit_params,
+                unit_params=unit_params.to_dict(),
                 forecaster=forecaster,
             )
         )
@@ -580,7 +580,7 @@ def setup_world(
         )
 
         # If PostgreSQL database is in use, warn the user about end-of-simulation saving
-        if world.db is not None and "postgresql" in world.db.name:
+        if world.db_uri is not None and "postgresql" in world.db_uri:
             logger.warning(
                 "Data will be stored in the PostgreSQL database only at the end of the simulation due to CSV export being enabled. "
                 "Disable CSV export to save data at regular intervals (export_csv_path = '')."
