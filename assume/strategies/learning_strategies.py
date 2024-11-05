@@ -592,9 +592,9 @@ class StorageRLStrategy(AbstractLearningStrategy):
     The observation space for this strategy consists of 50 elements. Key components include:
 
     - **State of Charge**: Represents the current level of energy in the storage unit,
-    influencing the bid direction and capacity.
+      influencing the bid direction and capacity.
     - **Energy Cost**: The cost associated with the energy content in the storage unit,
-    which helps determine bid prices and profitability.
+      which helps determine bid prices and profitability.
     - **Price Forecasts**
     - **Residual Load Forecasts**
 
@@ -615,7 +615,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
 
     - **Profit**: Calculated from the income of successful sell bids minus costs from buy bids.
     - **Fixed Costs**: Charges associated with storage operations, including charging and discharging
-    costs, which are deducted from the reward.
+      costs, which are deducted from the reward.
 
     Attributes
     ----------
@@ -762,7 +762,10 @@ class StorageRLStrategy(AbstractLearningStrategy):
         # =============================================================================
         # the first action is the bid price
         bid_price = actions[0] * self.max_bid_price
+
         # the second action is the bid direction
+        # the interval [-0.1, 0.1] for the 'ignore' action is based on the learning
+        # process observation and should be adjusted in the future to improve performance
         if actions[1] <= -0.1:
             bid_direction = "buy"
         elif actions[1] >= 0.1:
