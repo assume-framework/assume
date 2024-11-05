@@ -222,7 +222,7 @@ class BaseUnit:
         Returns:
             The volume of the unit within the given time range.
         """
-        return self.outputs["energy"][start:end]
+        return self.outputs["energy"].as_df()
 
     def get_output_before(self, dt: datetime, product_type: str = "energy") -> float:
         """
@@ -420,7 +420,7 @@ class SupportsMinMax(BaseUnit):
         if len(arr) < 1:
             # before start of index
             return max_time
-        is_off = not arr.iloc[0]
+        is_off = not arr[0]
         run = 0
         for val in arr:
             if val == is_off:

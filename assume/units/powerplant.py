@@ -11,6 +11,7 @@ import pandas as pd
 from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
+from assume.common.fds import FastDatetimeSeries
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +147,8 @@ class PowerPlant(SupportsMinMax):
             self.forecaster.get_availability(self.id)[start:end] * self.max_power
         )
 
-        for t in self.outputs["energy"][start:end].index:
+
+        for t in self.outputs["energy"].dt_index(start,end):
             current_power = self.outputs["energy"].at[t]
 
             previous_power = self.get_output_before(t)
@@ -191,9 +193,9 @@ class PowerPlant(SupportsMinMax):
                     for key in order["accepted_volume"].keys()
                 ]
             else:
-                self.outputs[product_type].loc[start:end_excl] += order[
+                self.outputs[product_type][start:end_excl] += float(order[
                     "accepted_volume"
-                ]
+                ])
 
         self.calculate_cashflow(product_type, orderbook)
 
@@ -226,7 +228,7 @@ class PowerPlant(SupportsMinMax):
         Returns:
             float: The marginal cost of the unit.
         """
-        fuel_price = self.forecaster.get_price(self.fuel_type)
+        fuel_price = FastDatetimeSeries.from_series(self.forecaster.get_price(self.fuel_type))
         marginal_cost = (
             fuel_price / self.efficiency
             + self.forecaster.get_price("co2") * self.emission_factor / self.efficiency
@@ -339,7 +341,7 @@ class PowerPlant(SupportsMinMax):
             )
         max_power = available_power * self.max_power
         # provide reserve for capacity_pos
-        max_power = (-self.outputs["capacity_pos"].loc[start:end_excl]).add(max_power)
+        max_power = (-self.outputs["capacity_pos"][start:end_excl]) + max_power
         # remove what has already been bid
         max_power = max_power - base_load
         # make sure that max_power is > 0 for all timesteps

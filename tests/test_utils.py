@@ -562,6 +562,17 @@ def test_create_date_range():
     fs.data[0:4]
 
 
+def test_convert_pd():
+    start = datetime(2020, 1, 1, 0)
+    end = datetime(2020, 1, 1, 5)
+    n = 1000
+    fs = FastDatetimeSeries(start, end, freq="1h")
+
+    fs.init_data()
+
+    df = fs.as_df()
+    assert isinstance(df, pd.DataFrame)
+    
 if __name__ == "__main__":
     test_convert_rrule()
     test_available_products()

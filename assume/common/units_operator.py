@@ -206,7 +206,7 @@ class UnitsOperator(Role):
         marketconfig = self.registered_markets[content["market_id"]]
         self.valid_orders[marketconfig.product_type].extend(orderbook)
         self.set_unit_dispatch(orderbook, marketconfig)
-        self.write_actual_dispatch(marketconfig.product_type)
+        #self.write_actual_dispatch(marketconfig.product_type)
 
     def handle_registration_feedback(
         self, content: RegistrationMessage, meta: MetaDict
