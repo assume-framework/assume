@@ -473,22 +473,3 @@ class PayAsBidBuildingRole(PayAsBidRole):
         flows = []
 
         return accepted_orders, rejected_orders, meta, flows
-
-class PayAsClearBuildingRole(PayAsClearRole):
-    def __init__(self, marketconfig: MarketConfig):
-        super().__init__(marketconfig)
-
-    def sort_orders(self, supply_orders: list[Orderbook], demand_orders: list[Orderbook]):
-        # Sort supply orders by price with preference for 'building' units and randomness for tie-breaking
-        supply_orders.sort(key=lambda i: (
-            0 if "building" in i["unit_id"] else 1,  # Prioritize bids with 'building'
-            i["price"],  # Sort by price
-            random.random()
-        ))
-
-        # Sort demand orders by price in descending order with preference for 'building' units and randomness for tie-breaking
-        demand_orders.sort(key=lambda i: (
-            0 if "building" in i["unit_id"] else 1,  # Prioritize bids with 'building'
-            -i["price"],  # Sort by price
-            random.random()
-        ))

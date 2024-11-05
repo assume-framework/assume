@@ -64,18 +64,6 @@ available_examples = {
         "scenario": "example_06",
         "study_case": "base_case_building_2019",
     },
-    "EEGH_2024_base": {
-        "scenario": "experiment_01_EEGH_base",
-        "study_case": "EEGH_2024_base",
-    },
-    "EEGH_2024_single_storage": {
-        "scenario": "experiment_01_EEGH_single_storage",
-        "study_case": "EEGH_2024_single_storage",
-    },
-    "EEGH_2024_multi_storage": {
-        "scenario": "experiment_01_EEGH_multi_storage",
-        "study_case": "EEGH_2024_multi_storage",
-    },
     "large_2019_eom": {"scenario": "example_02", "study_case": "base_case_2019"},
     # example_01f is used in the tutorial notebook #5: Market configuration comparison example
     # example_01g is used in the tutorial notebook #6: Advanced order types example
@@ -116,7 +104,7 @@ if __name__ == "__main__":
     - local_db: without database and grafana
     - timescale: with database and grafana (note: you need docker installed)
     """
-    data_format = "timescale"  # "local_db" or "timescale"
+    data_format = "local_db"  # "local_db" or "timescale"
     example = "small_with_building_mh"
 
     if data_format == "local_db":

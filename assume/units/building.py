@@ -81,9 +81,7 @@ class Building(DSMFlex, SupportsMinMax):
                     f"Component {component} is not a valid component for the building unit."
                 )
 
-        #JUST FOR MY SIMULATIONS/EXPERIMENTS!!
         self.electricity_price = self.create_price_given_solar_forecast()
-        #self.electricity_price = self.create_price_given_grid_load_forecast()
         self.natural_gas_price = self.forecaster["fuel_price_natural gas"]
         self.heat_demand = self.forecaster["heat_demand"]
         self.ev_load_profile = self.forecaster["ev_load_profile"]
@@ -111,6 +109,7 @@ class Building(DSMFlex, SupportsMinMax):
 
         # Create availability DataFrame for EVs
         # Parse the availability periods
+        # TODO: Move to dst_components
         if self.has_ev:
             if "availability_periods" in self.components["electric_vehicle"]:
                 try:
@@ -131,16 +130,16 @@ class Building(DSMFlex, SupportsMinMax):
                 )
 
         # Parse the availability of the PV plant
+        # TODO: move to dst_components
         if self.has_pv:
             if not strtobool(self.components["pv_plant"]["uses_power_profile"]):
-                pv_availability = self.forecaster["availability_Solar"]
-                pv_availability.index = self.model.time_steps
-                self.components["pv_plant"]["availability_profile"] = pv_availability
-            else:
                 pv_power = self.forecaster[f"{self.id}_pv_power_profile"]
                 pv_power.index = self.model.time_steps
                 self.components["pv_plant"]["power_profile"] = pv_power
-
+            else:
+                pv_availability = self.forecaster["availability_Solar"]
+                pv_availability.index = self.model.time_steps
+                self.components["pv_plant"]["availability_profile"] = pv_availability
 
         self.define_variables()
         self.initialize_components()
@@ -156,6 +155,7 @@ class Building(DSMFlex, SupportsMinMax):
         self.opt_power_requirement = None
         self.variable_expenses_series = None
 
+
     def create_price_given_solar_forecast(self):
         buy_forecast = self.forecaster["price_EOM"].values
         sell_forecast = self.forecaster["price_EOM_sell"].values
@@ -163,17 +163,6 @@ class Building(DSMFlex, SupportsMinMax):
         price_delta = (buy_forecast - sell_forecast) * (self.forecaster["availability_Solar"])
         return round(buy_forecast - price_delta, 2)
 
-    def create_price_given_grid_load_forecast(self):
-        buy_forecast = self.forecaster["price_EOM"].values
-        sell_forecast = self.forecaster["price_EOM_sell"].values
-        community_load = self.forecaster["total_community_load"].values.copy()
-        min_val, max_val = min(community_load), max(community_load)
-
-        # Normalization to be between -1 and 1
-        community_load_scaled = ((community_load - min_val) / (max_val - min_val) * 2) - 1
-        spread = (buy_forecast - sell_forecast)
-        price_delta = spread * community_load_scaled / 2
-        return np.round(buy_forecast - max(price_delta) + price_delta, 2)
 
     def create_availability_df(self, availability_periods):
         """
@@ -211,6 +200,7 @@ class Building(DSMFlex, SupportsMinMax):
                         + (self.model.dsm_blocks["thermal_storage"].charge_thermal[t] if self.has_thermal_storage else 0)
                 )
 
+
     def define_sets(self) -> None:
         """
         Defines the sets for the Pyomo model.
@@ -218,6 +208,7 @@ class Building(DSMFlex, SupportsMinMax):
         self.model.time_steps = pyo.Set(
             initialize=[idx for idx, _ in enumerate(self.index)]
         )
+
 
     def define_parameters(self):
         """
@@ -242,6 +233,7 @@ class Building(DSMFlex, SupportsMinMax):
             },
         )
 
+
     def define_variables(self):
         """
         Defines the variables for the Pyomo model.
@@ -252,6 +244,7 @@ class Building(DSMFlex, SupportsMinMax):
         self.model.variable_expenses = pyo.Var(
             self.model.time_steps, within=pyo.Reals
         )
+
 
     def define_constraints(self):
 
@@ -287,6 +280,7 @@ class Building(DSMFlex, SupportsMinMax):
                     * self.model.electricity_price[t]
             )
 
+
     def define_objective(self):
         """
         Defines the objective for the optimization model.
@@ -305,10 +299,12 @@ class Building(DSMFlex, SupportsMinMax):
         else:
             raise ValueError(f"Unknown objective: {self.objective}")
 
+
     def calculate_optimal_operation_if_needed(self):
         if self.opt_power_requirement is None and self.variable_expenses_series is None and \
                 self.objective in ["minimize_expenses"]:
             self.calculate_optimal_operation()
+
 
     def calculate_optimal_operation(self):
         """
@@ -347,6 +343,7 @@ class Building(DSMFlex, SupportsMinMax):
 
         self.write_additional_outputs(instance)
 
+
     def write_additional_outputs(self, instance):
         if self.has_battery_storage:
             model_block = instance.dsm_blocks["generic_storage"]
@@ -362,6 +359,7 @@ class Building(DSMFlex, SupportsMinMax):
             ) / pyo.value(model_block.max_capacity)
             ev_soc.index = self.index
             self.outputs["ev_soc"] = ev_soc
+
 
     def set_dispatch_plan(
         self,
@@ -401,6 +399,7 @@ class Building(DSMFlex, SupportsMinMax):
             orderbook=orderbook,
         )
 
+
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         """
         Calculate the marginal cost of the unit based on the provided time and power.
@@ -420,6 +419,7 @@ class Building(DSMFlex, SupportsMinMax):
                 self.variable_expenses_series[start] / self.opt_power_requirement[start]
             ),2)
         return marginal_cost
+
 
     def as_dict(self) -> dict:
         """

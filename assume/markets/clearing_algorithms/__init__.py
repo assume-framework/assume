@@ -7,7 +7,7 @@ from assume.markets.base_market import MarketRole
 
 from .all_or_nothing import PayAsBidAonRole, PayAsClearAonRole
 from .contracts import PayAsBidContractRole
-from .simple import PayAsBidRole, PayAsClearRole, PayAsBidBuildingRole, PayAsClearBuildingRole
+from .simple import PayAsBidRole, PayAsClearRole, PayAsBidBuildingRole
 from .complex_clearing import ComplexClearingRole
 from .complex_clearing_dmas import ComplexDmasClearingRole
 

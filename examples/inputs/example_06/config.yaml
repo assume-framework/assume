@@ -23,4 +23,4 @@ base_case_building_2019:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: pay_as_bid
+      market_mechanism: pay_as_bid_building
