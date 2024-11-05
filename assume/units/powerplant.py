@@ -107,9 +107,9 @@ class PowerPlant(SupportsMinMax):
 
         self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
         self.min_down_time = min_down_time if min_down_time > 0 else 1
-        self.downtime_hot_start = downtime_hot_start / (self.freq / timedelta(hours=1))
+        self.downtime_hot_start = downtime_hot_start / (self.index.freq / timedelta(hours=1))
         self.downtime_warm_start = downtime_warm_start / (
-            self.freq / timedelta(hours=1)
+            self.index.freq / timedelta(hours=1)
         )
 
         self.init_marginal_cost()
@@ -140,7 +140,7 @@ class PowerPlant(SupportsMinMax):
         Returns:
             pd.Series: The volume of the unit within the given time range.
         """
-        start = max(start, self.index[0])
+        start = max(start, self.index.start)
 
         max_power = (
             self.forecaster.get_availability(self.id)[start:end] * self.max_power
@@ -184,7 +184,7 @@ class PowerPlant(SupportsMinMax):
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
-            end_excl = end - self.freq
+            end_excl = end - self.index.freq
             if isinstance(order["accepted_volume"], dict):
                 self.outputs[product_type].loc[start:end_excl] += [
                     order["accepted_volume"][key]
@@ -320,7 +320,7 @@ class PowerPlant(SupportsMinMax):
         Note:
             The calculation does not include ramping constraints and can be used for arbitrary start times in the future.
         """
-        end_excl = end - self.freq
+        end_excl = end - self.index.freq
 
         base_load = self.outputs["energy"].loc[start:end_excl]
         heat_demand = self.outputs["heat"].loc[start:end_excl]

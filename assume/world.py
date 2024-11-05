@@ -9,7 +9,6 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-import pandas as pd
 from mango import (
     RoleAgent,
     activate,
@@ -157,7 +156,7 @@ class World:
         start: datetime,
         end: datetime,
         simulation_id: str,
-        index: pd.Series,
+        index: list[datetime],
         save_frequency_hours: int = 24,
         bidding_params: dict = {},
         learning_config: LearningConfig = {},

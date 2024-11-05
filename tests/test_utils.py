@@ -11,6 +11,7 @@ import pytest
 from dateutil import rrule as rr
 from dateutil.tz import tzlocal
 
+from assume.common.fds import FastDatetimeSeries
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
     aggregate_step_amount,
@@ -23,8 +24,6 @@ from assume.common.utils import (
     separate_orders,
     timestamp2datetime,
     visualize_orderbook,
-    numpy_dt_indexer,
-    idx_from_date,
 )
 from assume.scenario.loader_csv import make_market_config
 
@@ -448,30 +447,119 @@ def test_datetime2timestamp():
     unix_start = datetime(1970, 1, 1)
     assert 0 == datetime2timestamp(unix_start)
 
-def test_numpy_idx():
-    pd.date_range()
-    data = [
-        {
-            "start": datetime.now(),
-            "end": datetime.now(),
-            "value": 7,
-        }
-    ]
 
 def test_2():
     orderbook = create_orderbook()
-    
+
     df = pd.DataFrame(orderbook)
     from collections import defaultdict
+
     import numpy as np
+
     l = len(orderbook)
     results = defaultdict(lambda: np.zeros(l))
-    for element in orderbook:
-        for k,v in element.items():
-            result
+    for i, element in enumerate(orderbook):
+        results[element["start_time"]][i] = element["volume"]
+        # for k,v in element.items():
+        #     result
     results
 
-    for element in orderbook:
+    index_products = pd.date_range(
+        start=datetime(2020, 1, 1, 0), end=datetime(2020, 1, 1, 5), freq="1h"
+    )
+
+
+def test_create_date_range():
+    import time
+
+    start = datetime(2020, 1, 1, 0)
+    end = datetime(2020, 1, 1, 5)
+    n = 1000
+    fs = FastDatetimeSeries(start, end, freq="1h")
+
+    t = time.time()
+    for i in range(n):
+        fs = FastDatetimeSeries(start, end, freq="1h")
+        fs.init_data()
+    res = time.time() - t
+    print(res)
+
+    t = time.time()
+    for i in range(n):
+        q_pd = pd.date_range(start, end, freq="1h")
+    res_pd = time.time() - t
+    print(res_pd)
+    # this is sometimes faster, sometimes not
+    # as a lot of objects are created
+    assert res < res_pd + 0.1
+
+    new_end = datetime(2020, 1, 1, 3)
+
+    # check that slicing is faster
+    t = time.time()
+    for i in range(n):
+        q_slice = fs[start:new_end]
+    res_slice = time.time() - t
+    print(res_slice)
+
+    series = pd.Series(0, index=q_pd)
+
+    t = time.time()
+    for i in range(n):
+        q_pd_slice = series[start:new_end]
+    res_slice_pd = time.time() - t
+    print(res_slice_pd)
+    # more than factor 10
+    assert res_slice < res_slice_pd / 10
+
+    # check that setting items is faster:
+    t = time.time()
+    for i in range(n):
+        fs[start] = 1
+    res_slice = time.time() - t
+    print(res_slice)
+
+    series = pd.Series(0, index=q_pd)
+
+    t = time.time()
+    for i in range(n):
+        series[start] = 1
+    res_slice_pd = time.time() - t
+    print(res_slice_pd)
+    # more than factor 10
+    assert res_slice < res_slice_pd / 10
+
+    # check that setting slices is faster
+    t = time.time()
+    for i in range(n):
+        fs[start:new_end] = 17
+    res_slice = time.time() - t
+    print(res_slice)
+
+    series = pd.Series(0, index=q_pd)
+
+    t = time.time()
+    for i in range(n):
+        series[start:new_end] = 17
+    res_slice_pd = time.time() - t
+    print(res_slice_pd)
+    # more than factor 10
+    assert res_slice < res_slice_pd / 10
+
+    se = pd.Series(0.0, index=fs.dt_index())
+    se.loc[start]
+
+    series.loc[new_end] = 33
+
+    fs[new_end] = 33
+    new = series[start:new_end][::-1]
+    assert new.iloc[0] == 33
+    new = fs[start:new_end][::-1]
+    assert new[0] == 33
+    fs.data
+    fs.idx_from_date(start)
+    fs.idx_from_date(new_end)
+    fs.data[0:4]
 
 
 if __name__ == "__main__":
@@ -482,5 +570,3 @@ if __name__ == "__main__":
     test_initializer()
     test_sep_block_orders()
     test_aggregate_step_amount()
-
-

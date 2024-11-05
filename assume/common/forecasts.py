@@ -7,6 +7,7 @@ import logging
 import numpy as np
 import pandas as pd
 
+from assume.common.fds import FastDatetimeSeries
 
 class Forecaster:
     """
@@ -28,8 +29,8 @@ class Forecaster:
 
     """
 
-    def __init__(self, index: pd.Series):
-        self.index = index
+    def __init__(self, index: FastDatetimeSeries):
+        self.index = index.dt_index()
 
     def __getitem__(self, column: str) -> pd.Series:
         """

@@ -18,11 +18,8 @@ log = logging.getLogger(__name__)
 def init(world, n=1):
     start = datetime(2019, 1, 1)
     end = datetime(2019, 3, 1)
-    index = pd.date_range(
-        start=start,
-        end=end + timedelta(hours=24),
-        freq="h",
-    )
+    from assume.common.fds import FastDatetimeSeries
+    index = FastDatetimeSeries(start, end, freq="h")
     sim_id = "world_script_simulation"
 
     world.setup(

@@ -9,6 +9,7 @@ from typing import TypedDict
 import numpy as np
 import pandas as pd
 
+from assume.common.fds import FastDatetimeSeries
 from assume.common.forecasts import Forecaster
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 
@@ -55,7 +56,7 @@ class BaseUnit:
         unit_operator: str,
         technology: str,
         bidding_strategies: dict[str, BaseStrategy],
-        index: pd.DatetimeIndex,
+        index: FastDatetimeSeries,
         node: str = "node0",
         forecaster: Forecaster = None,
         location: tuple[float, float] = (0.0, 0.0),
@@ -68,8 +69,11 @@ class BaseUnit:
         self.location = location
         self.bidding_strategies: dict[str, BaseStrategy] = bidding_strategies
         self.index = index
-        self.freq = (index[1] - index[0]).astype(timedelta)
-        self.outputs = defaultdict(lambda: pd.Series(0.0, index=self.index))
+        self.outputs = defaultdict(
+            lambda: FastDatetimeSeries(
+                self.index.start, self.index.end, self.index.freq
+            )
+        )
         # series does not like to convert from tensor to float otherwise
 
         # RL data stored as lists to simplify storing to the buffer
@@ -77,12 +81,11 @@ class BaseUnit:
         self.outputs["rl_actions"] = []
         self.outputs["rl_rewards"] = []
 
+        dt_index = self.index.dt_index()
         # some data is stored as series to allow to store it in the outputs
-        self.outputs["actions"] = pd.Series(0.0, index=self.index, dtype=object)
-        self.outputs["exploration_noise"] = pd.Series(
-            0.0, index=self.index, dtype=object
-        )
-        self.outputs["reward"] = pd.Series(0.0, index=self.index, dtype=object)
+        self.outputs["actions"] = pd.Series(0.0, index=dt_index, dtype=object)
+        self.outputs["exploration_noise"] = pd.Series(0.0, index=dt_index, dtype=object)
+        self.outputs["reward"] = pd.Series(0.0, index=dt_index, dtype=object)
 
         if forecaster:
             self.forecaster = forecaster
@@ -162,7 +165,7 @@ class BaseUnit:
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
-            end_excl = end - self.freq
+            end_excl = end - self.index.freq
             if isinstance(order["accepted_volume"], dict):
                 added_volume = list(order["accepted_volume"].values())
             else:
@@ -190,7 +193,7 @@ class BaseUnit:
         """
 
         if start not in self.index:
-            start = self.index[0]
+            start = self.index.start
 
         product_type_mc = product_type + "_marginal_costs"
         product_data = self.outputs[product_type].loc[start:end]
@@ -234,10 +237,10 @@ class BaseUnit:
         Returns:
             The output before the given datetime.
         """
-        if dt - self.freq < self.index[0]:
+        if dt - self.index.freq < self.index.start:
             return 0
         else:
-            return self.outputs[product_type].at[dt - self.freq]
+            return self.outputs[product_type].at[dt - self.index.freq]
 
     def as_dict(self) -> dict[str, str | int]:
         """
@@ -265,7 +268,7 @@ class BaseUnit:
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
-            end_excl = end - self.freq
+            end_excl = end - self.index.freq
 
             if isinstance(order["accepted_volume"], dict):
                 cashflow = [
@@ -408,10 +411,10 @@ class SupportsMinMax(BaseUnit):
         Returns:
             int: The operation time.
         """
-        before = start - self.freq
+        before = start - self.index.freq
 
         max_time = max(self.min_operating_time, self.min_down_time)
-        begin = start - self.freq * max_time
+        begin = start - self.index.freq * max_time
         end = before
         arr = self.outputs["energy"][begin:end][::-1] > 0
         if len(arr) < 1:
@@ -440,8 +443,8 @@ class SupportsMinMax(BaseUnit):
         """
         op_series = []
 
-        before = start - self.freq
-        arr = self.outputs["energy"][self.index[0] : before][::-1] > 0
+        before = start - self.index.freq
+        arr = self.outputs["energy"][self.index.start : before][::-1] > 0
 
         if len(arr) < 1:
             # before start of index
@@ -579,10 +582,10 @@ class SupportsMinMaxCharge(BaseUnit):
         Returns:
             float: The SoC before the given datetime.
         """
-        if dt - self.freq <= self.index[0]:
+        if dt - self.index.freq <= self.index.start:
             return self.initial_soc
         else:
-            return self.outputs["soc"].at[dt - self.freq]
+            return self.outputs["soc"].at[dt - self.index.freq]
 
     def get_clean_spread(self, prices: pd.DataFrame) -> float:
         """
