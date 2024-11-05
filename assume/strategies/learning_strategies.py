@@ -595,6 +595,8 @@ class StorageRLStrategy(AbstractLearningStrategy):
     influencing the bid direction and capacity.
     - **Energy Cost**: The cost associated with the energy content in the storage unit,
     which helps determine bid prices and profitability.
+    - **Price Forecasts**
+    - **Residual Load Forecasts**
 
     The agent's actions are formulated as two values, representing the bid price and the bid direction.
     These actions are scaled and interpreted to form actionable market bids, with specific conditions
