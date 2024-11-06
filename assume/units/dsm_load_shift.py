@@ -2,12 +2,21 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from collections.abc import Callable
+
 import pyomo.environ as pyo
 
 from assume.units.dst_components import demand_side_technologies
 
 
 class DSMFlex:
+    # Mapping of flexibility measures to their respective functions
+    flexibility_map: dict[str, Callable[[pyo.ConcreteModel], None]] = {
+        "cost_based_load_shift": lambda self, model: self.cost_based_flexibility(model),
+        "congestion_management_flexibility": lambda self,
+        model: self.grid_congestion_management(model),
+    }
+
     def __init__(self, components, **kwargs):
         super().__init__(**kwargs)
 
@@ -50,7 +59,7 @@ class DSMFlex:
                     self.model, self.model.dsm_blocks[technology]
                 )
 
-    def flexibility_cost_tolerance(self, model):
+    def cost_based_flexibility(self, model):
         """
         Modify the optimization model to include constraints for flexibility within cost tolerance.
         """
@@ -82,6 +91,37 @@ class DSMFlex:
                     == self.model.dsm_blocks["eaf"].power_in[t]
                     + self.model.dsm_blocks["dri_plant"].power_in[t]
                 )
+
+    def grid_congestion_management(self, model):
+        """
+        Adjust load shifting based directly on grid congestion signals to enable
+        congestion-responsive flexibility.
+
+        Args:
+            model (pyomo.ConcreteModel): The Pyomo model being optimized.
+        """
+        # Parameter for congestion sensitivity signal
+        model.cost_tolerance = pyo.Param(initialize=(self.cost_tolerance))
+        model.congestion_signal = pyo.Param(
+            model.time_steps,
+            initialize={t: value for t, value in enumerate(self.congestion_signal)},
+        )
+
+        # Variable for load shift
+        model.load_shift = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
+
+        # Define congestion-adjusted load shift as a Pyomo expression
+        model.congestion_adjusted_load_shift = pyo.Expression(
+            model.time_steps, rule=lambda m, t: m.load_shift[t] * m.congestion_signal[t]
+        )
+
+        # Single constraint ensuring total power input meets the congestion-adjusted load shift
+        @model.Constraint(model.time_steps)
+        def total_power_constraint(m, t):
+            """
+            Ensures total power input can meet the congestion-adjusted load shift demand.
+            """
+            return m.total_power_input[t] - m.congestion_adjusted_load_shift[t] >= 0
 
     def recalculate_with_accepted_offers(self, model):
         self.reference_power = self.forecaster[f"{self.id}_power"]

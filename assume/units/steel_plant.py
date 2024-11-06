@@ -40,13 +40,20 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         location (tuple[float, float]): The location of the unit.
         components (dict[str, dict]): The components of the unit such as Electrolyser, DRI Plant, DRI Storage, and Electric Arc Furnace.
         objective (str): The objective of the unit, e.g. minimize variable cost ("min_variable_cost").
-        flexibility_measure (str): The flexibility measure of the unit, e.g. maximum load shift ("max_load_shift").
+        flexibility_measure (str): The flexibility measure of the unit, e.g. maximum load shift ("cost_based_load_shift").
         demand (float): The demand of the unit - the amount of steel to be produced.
         cost_tolerance (float): The cost tolerance of the unit - the maximum cost that can be tolerated when shifting the load.
     """
 
+    # Compatible Technologies
     required_technologies = ["dri_plant", "eaf"]
     optional_technologies = ["electrolyser", "hydrogen_storage", "dri_storage"]
+
+    # Demand Side Management measures
+    flexibility_measures = [
+        "cost_based_load_shift",
+        "congestion_management_flexibility",
+    ]
 
     def __init__(
         self,
@@ -59,7 +66,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         location: tuple[float, float] = (0.0, 0.0),
         components: dict[str, dict] = None,
         objective: str = None,
-        flexibility_measure: str = "max_load_shift",
+        flexibility_measure: str = "",
         demand: float = 0,
         cost_tolerance: float = 10,
         **kwargs,
@@ -103,8 +110,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.co2_price = self.forecaster.get_price("co2")
 
         # Calculate congestion forecast and set it as a forecast column in the forecaster
-        congestion_forecast = self.forecaster["east_congestion_severity"]
-        print(congestion_forecast)
+        self.congestion_signal = self.forecaster["east_congestion_severity"]
 
         self.objective = objective
         self.flexibility_measure = flexibility_measure
@@ -127,8 +133,16 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.define_constraints()
         self.define_objective_opt()
 
-        if self.flexibility_measure == "max_load_shift":
-            self.flexibility_cost_tolerance(self.model)
+        # Apply the flexibility function based on flexibility measure
+        if self.flexibility_measure == "cost_based_load_shift":
+            self.cost_based_flexibility(self.model)
+
+        # # Apply the flexibility function based on flexibility measure
+        # if self.flexibility_measure in DSMFlex.flexibility_map:
+        #     DSMFlex.flexibility_map[self.flexibility_measure](self, self.model)
+        # else:
+        #     raise ValueError(f"Unknown flexibility measure: {self.flexibility_measure}")
+
         self.define_objective_flex()
 
         solvers = check_available_solvers(*SOLVERS)
@@ -367,7 +381,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         Args:
             model (pyomo.ConcreteModel): The Pyomo model.
         """
-        if self.flexibility_measure == "max_load_shift":
+        if self.flexibility_measure == "cost_based_load_shift":
 
             @self.model.Objective(sense=pyo.maximize)
             def obj_rule_flex(m):
@@ -379,6 +393,18 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 )
                 return maximise_load_shift
 
+        elif self.flexibility_measure == "congestion_management_flexibility":
+
+            @self.model.Objective(sense=pyo.maximize)
+            def obj_rule_flex(m):
+                """
+                Maximizes the load shift over all time steps.
+                """
+                maximise_load_shift = sum(
+                    m.congestion_adjusted_load_shift[t] for t in m.time_steps
+                )
+                return maximise_load_shift
+
         else:
             raise ValueError(f"Unknown objective: {self.flexibility_measure}")
 
@@ -386,7 +412,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         if (
             self.opt_power_requirement is not None
             and self.flex_power_requirement is None
-            and self.flexibility_measure == "max_load_shift"
+            and self.flexibility_measure in self.flexibility_measures
         ):
             self.determine_optimal_operation_with_flex()
 
@@ -426,6 +452,8 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.opt_power_requirement = pd.Series(
             data=instance.total_power_input.get_values()
         ).set_axis(self.index)
+        # print(self.opt_power_requirement)
+        # print("Finish iteration 1")
 
         self.total_cost = sum(
             instance.variable_cost[t].value for t in instance.time_steps
@@ -466,9 +494,22 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 "Termination Condition: ", results.solver.termination_condition
             )
 
+        # Calculate and display the sum of variable costs
+        variable_cost_sum = instance.total_cost()
+        print(f"The total variable cost is {variable_cost_sum}")
+
+        # Calculate and display the cost tolerance limit
+        cost_tolerance_limit = instance.total_cost() * (
+            1 + (instance.cost_tolerance / 100)
+        )
+        print(f"The cost upper limit is {cost_tolerance_limit}")
+
         temp = instance.total_power_input.get_values()
         self.flex_power_requirement = pd.Series(data=temp)
         self.flex_power_requirement.index = self.index
+
+        # print("Started iteration 2")
+        # print(self.flex_power_requirement)
 
         # Variable cost series
         temp_1 = instance.variable_cost.get_values()
@@ -485,10 +526,15 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         Returns:
             pyomo.ConcreteModel: The modified instance with flexibility constraints and objective deactivated.
         """
-        # deactivate the flexibility constraints and objective
+        # Deactivate the flexibility objective if it exists
+        # if hasattr(instance, "obj_rule_flex"):
         instance.obj_rule_flex.deactivate()
 
+        # Deactivate flexibility constraints if they exist
+        # if hasattr(instance, "total_cost_upper_limit"):
         instance.total_cost_upper_limit.deactivate()
+
+        # if hasattr(instance, "total_power_input_constraint_with_flex"):
         instance.total_power_input_constraint_with_flex.deactivate()
 
         return instance
