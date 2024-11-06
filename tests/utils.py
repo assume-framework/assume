@@ -124,6 +124,90 @@ def extend_orderbook(
     return orderbook
 
 
+def extend_orderbook(
+    products,
+    volume,
+    price,
+    unit_id,
+    orderbook=None,
+    bid_type="SB",
+    min_acceptance_ratio=None,
+    parent_bid_id=None,
+    node="node0",
+):
+    """
+    Creates constant bids over the time span of all products
+    with specified values for price and volume
+    and appends the orderbook
+    """
+    if not orderbook:
+        orderbook = []
+    if volume == 0:
+        return orderbook
+
+    if bid_type == "BB" or bid_type == "LB":
+        if volume < 0:
+            agent_addr = f"block_dem{len(orderbook)+1}"
+        else:
+            agent_addr = f"block_gen{len(orderbook)+1}"
+
+        order: Order = {
+            "start_time": products[0][0],
+            "end_time": products[-1][1],
+            "agent_addr": agent_addr,
+            "bid_id": f"bid_{len(orderbook) + 1}",
+            "unit_id": f"bid_{unit_id}",
+            "volume": {product[0]: volume for product in products},
+            "price": price,
+            "only_hours": None,
+            "bid_type": bid_type,
+            "parent_bid_id": parent_bid_id,
+        }
+
+        if min_acceptance_ratio is not None:
+            order.update({"min_acceptance_ratio": min_acceptance_ratio})
+        else:
+            order.update({"min_acceptance_ratio": 0})
+
+        if node is not None:
+            order.update({"node": node})
+
+        orderbook.append(order)
+
+    else:
+        if volume < 0:
+            agent_addr = f"dem{len(orderbook)+1}"
+        else:
+            agent_addr = f"gen{len(orderbook)+1}"
+
+        for product in products:
+            order: Order = {
+                "start_time": product[0],
+                "end_time": product[1],
+                "agent_addr": agent_addr,
+                "bid_id": f"bid_{len(orderbook) + 1}",
+                "unit_id": f"bid_{unit_id}",
+                "volume": volume,
+                "accepted_volume": 0,
+                "price": price,
+                "accepted_price": None,
+                "only_hours": None,
+                "bid_type": bid_type,
+                "parent_bid_id": parent_bid_id,
+            }
+
+            if min_acceptance_ratio is not None:
+                order.update({"min_acceptance_ratio": min_acceptance_ratio})
+            else:
+                order.update({"min_acceptance_ratio": 0})
+            if node is not None:
+                order.update({"node": node})
+
+            orderbook.append(order)
+
+    return orderbook
+
+
 def get_test_prices(num: int = 24):
     power_price = 50 * np.ones(num)
     # power_price[18:24] = 0
