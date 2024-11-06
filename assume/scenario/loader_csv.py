@@ -15,6 +15,7 @@ import yaml
 from tqdm import tqdm
 
 from assume.common.base import LearningConfig
+from assume.common.fds import FastDatetimeSeries
 from assume.common.exceptions import AssumeException
 from assume.common.forecasts import CsvForecaster, Forecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
@@ -33,7 +34,7 @@ def load_file(
     path: str,
     config: dict,
     file_name: str,
-    index: pd.DatetimeIndex | None = None,
+    index: FastDatetimeSeries | None = None,
 ) -> pd.DataFrame:
     """
     Loads a csv file from the given path and returns a dataframe.
@@ -93,7 +94,7 @@ def load_file(
 
             df.index.freq = df.index.inferred_freq
 
-            idx = pd.Index(index)
+            idx = pd.Index(index.get_date_list())
             idx.freq = idx.inferred_freq
 
             if len(df.index) < len(index) and df.index.freq == idx.freq:
@@ -110,7 +111,7 @@ def load_file(
                 logger.warning("Upsampling not implemented yet. Returning None.")
                 return None
 
-            df = df.loc[index]
+            df = df.loc[index.get_date_list()]
 
         return df
 
@@ -437,11 +438,12 @@ def load_config_and_create_forecaster(
 
     sim_id = config.get("simulation_id", f"{scenario}_{study_case}")
 
-    start = config["start_date"]
-    end = config["end_date"]
+    start = pd.Timestamp(config["start_date"])
+    end = pd.Timestamp(config["end_date"])
     freq = timedelta(0) + pd.tseries.frequencies.to_offset("1h")
 
-    index = np.arange(start, end + timedelta(days=1), freq.seconds * 1_000_000)
+    index = FastDatetimeSeries(start, end + timedelta(days=1), freq) 
+    #np.arange(start, end + timedelta(days=1), freq.seconds * 1_000_000)
     # get extra parameters for bidding strategies
 
     powerplant_units = load_file(path=path, config=config, file_name="powerplant_units")

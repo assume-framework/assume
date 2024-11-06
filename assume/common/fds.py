@@ -7,11 +7,11 @@ from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
-from pandas._libs.tslibs import to_offset
+
 
 
 def freq_to_timedelta(freq: str) -> timedelta:
-    return timedelta(minutes=to_offset(freq).nanos / 1e9 // 60)
+    return timedelta(minutes=pd.tseries.frequencies.to_offset(freq).nanos / 1e9 // 60)
 
 
 class FastDatetimeSeries:
@@ -103,3 +103,7 @@ class FastDatetimeSeries:
     def __mul__(self, other: float):
         self.init_data()
         return self.data * other
+
+    def __len__(self):
+        self.init_data()
+        return len(self.data)
