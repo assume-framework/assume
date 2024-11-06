@@ -15,8 +15,8 @@ import yaml
 from tqdm import tqdm
 
 from assume.common.base import LearningConfig
-from assume.common.fds import FastDatetimeSeries
 from assume.common.exceptions import AssumeException
+from assume.common.fds import FastDatetimeSeries
 from assume.common.forecasts import CsvForecaster, Forecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
@@ -442,8 +442,8 @@ def load_config_and_create_forecaster(
     end = pd.Timestamp(config["end_date"])
     freq = timedelta(0) + pd.tseries.frequencies.to_offset("1h")
 
-    index = FastDatetimeSeries(start, end + timedelta(days=1), freq) 
-    #np.arange(start, end + timedelta(days=1), freq.seconds * 1_000_000)
+    index = FastDatetimeSeries(start, end + timedelta(days=1), freq)
+    # np.arange(start, end + timedelta(days=1), freq.seconds * 1_000_000)
     # get extra parameters for bidding strategies
 
     powerplant_units = load_file(path=path, config=config, file_name="powerplant_units")

@@ -572,7 +572,8 @@ def test_convert_pd():
 
     df = fs.as_df()
     assert isinstance(df, pd.DataFrame)
-    
+
+
 if __name__ == "__main__":
     test_convert_rrule()
     test_available_products()

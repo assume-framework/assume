@@ -137,7 +137,7 @@ class flexableEOM(BaseStrategy):
                     "start_time": start,
                     "end_time": end,
                     "only_hours": None,
-                    "price": min(bid_price_inflex, -40),
+                    "price": bid_price_inflex,
                     "volume": bid_quantity_inflex,
                     "node": unit.node,
                 }
@@ -566,9 +566,9 @@ def calculate_reward_EOM(
     for order in orderbook:
         start = order["start_time"]
         end = order["end_time"]
-        end_excl = end - unit.freq
+        end_excl = end - unit.index.freq
 
-        order_times = pd.date_range(start, end_excl, freq=unit.freq)
+        order_times = pd.date_range(start, end_excl, freq=unit.index.freq)
 
         for start in order_times:
             marginal_cost = unit.calculate_marginal_cost(

@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+from functools import lru_cache
 
 import numpy as np
 import pandas as pd
-from functools import lru_cache
 
 from assume.common.fds import FastDatetimeSeries
 
@@ -177,7 +177,7 @@ class CsvForecaster(Forecaster):
             else:
                 # Add new columns to the existing DataFrame, overwriting any existing columns with the same names
                 for column in data.columns:
-                    series = data[column][self.fds.start:self.fds.end]
+                    series = data[column][self.fds.start : self.fds.end]
                     self.forecasts[column] = self.fds.copy_empty(series)
         else:
             self.forecasts[prefix + data.name] = data
@@ -299,11 +299,14 @@ class CsvForecaster(Forecaster):
             self.powerplants_units[f"bidding_{market_id}"].notnull()
         ]
 
-    
         marginal_costs = powerplants_units.apply(self.calculate_marginal_cost, axis=1).T
         sorted_columns = marginal_costs.loc[self.fds.start].sort_values().index
-        availabilities = {k.replace("availability_", ""): v.data for k,v in self.forecasts.items() if k.startswith("availability")}
-        
+        availabilities = {
+            k.replace("availability_", ""): v.data
+            for k, v in self.forecasts.items()
+            if k.startswith("availability")
+        }
+
         availabilities = pd.DataFrame.from_dict(availabilities)
         availabilities["time"] = self.fds.get_date_list()
         availabilities = availabilities.set_index("time")
@@ -315,8 +318,8 @@ class CsvForecaster(Forecaster):
             self.demand_units[f"bidding_{market_id}"].notnull()
         ]
         sum_demand = sum([self.forecasts[i].data for i in demand_units.index])
-            
-        #sum_demand = self.forecasts[demand_units.index].sum(axis=1)
+
+        # sum_demand = self.forecasts[demand_units.index].sum(axis=1)
 
         # initialize empty price_forecast
         price_forecast = pd.Series(index=self.index, data=0.0)
@@ -535,5 +538,5 @@ class NaiveForecast(Forecaster):
         else:
             value = 0
         if isinstance(value, pd.Series):
-            value = value[self.fds.start:self.fds.end]
+            value = value[self.fds.start : self.fds.end]
         return self.fds.copy_empty(value)

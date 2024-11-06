@@ -254,10 +254,10 @@ class RLAdvancedOrderStrategy(RLStrategy):
             The scaling factors are defined by the maximum residual load, the maximum bid price
             and the maximum capacity of the unit.
         """
-        end_excl = end - unit.freq
+        end_excl = end - unit.index.freq
 
         # get the forecast length depending on the time unit considered in the modelled unit
-        forecast_len = pd.Timedelta((self.foresight - 1) * unit.freq)
+        forecast_len = pd.Timedelta((self.foresight - 1) * unit.index.freq)
 
         # =============================================================================
         # 1.1 Get the Observations, which are the basis of the action decision
@@ -276,7 +276,7 @@ class RLAdvancedOrderStrategy(RLStrategy):
 
         # checks if we are at end of simulation horizon, since we need to change the forecast then
         # for residual load and price forecast and scale them
-        product_len = (end - start) / unit.freq
+        product_len = (end - start) / unit.index.freq
         if (
             end_excl + forecast_len
             > unit.forecaster[f"residual_load_{market_id}"].index[-1]
@@ -397,9 +397,9 @@ class RLAdvancedOrderStrategy(RLStrategy):
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
-            end_excl = end - unit.freq
+            end_excl = end - unit.index.freq
 
-            order_times = pd.date_range(start, end_excl, freq=unit.freq)
+            order_times = pd.date_range(start, end_excl, freq=unit.index.freq)
 
             # calculate profit as income - running_cost from this event
 

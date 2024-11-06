@@ -346,8 +346,8 @@ def test_execute_dispatch(storage_unit):
     )
 
     # step into the next hour
-    start = start + storage_unit.freq
-    end = end + storage_unit.freq
+    start = start + storage_unit.index.freq
+    end = end + storage_unit.index.freq
     storage_unit.outputs["energy"][start] = -100
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy.iloc[0] == 0
@@ -426,8 +426,8 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     )
 
     # step into the next hour
-    start = start + storage_unit.freq
-    end = end + storage_unit.freq
+    start = start + storage_unit.index.freq
+    end = end + storage_unit.index.freq
     product_tuples = [(start, end, None)]
 
     bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)

@@ -316,7 +316,12 @@ class UnitsOperator(Role):
             dispatch = {"power": current_dispatch}
             # TODO: this needs to be fixed. For now it is consuming too much time and is deactivated
             # unit.calculate_generation_cost(start, now, "energy")
-            valid_outputs = ["soc", "cashflow", "marginal_costs", "total_costs", ]
+            valid_outputs = [
+                "soc",
+                "cashflow",
+                "marginal_costs",
+                "total_costs",
+            ]
 
             for key in unit.outputs.keys():
                 for output in valid_outputs:
@@ -342,9 +347,7 @@ class UnitsOperator(Role):
             return
         self.last_sent_dispatch[product_type] = self.context.current_timestamp
 
-        market_dispatch, unit_dispatch = self.get_actual_dispatch(
-            product_type, last
-        )
+        market_dispatch, unit_dispatch = self.get_actual_dispatch(product_type, last)
 
         now = timestamp2datetime(self.context.current_timestamp)
         self.valid_orders[product_type] = list(

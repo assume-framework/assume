@@ -203,7 +203,7 @@ class DmasStorageStrategy(BaseStrategy):
             volume = np.asarray([self.model.volume[t].value for t in time_range])
             opt_results[key] = power
             if key == "normal":
-                end = start + unit.freq * (hour_count - 1)
+                end = start + unit.index.freq * (hour_count - 1)
 
                 # unit.outputs["total"][self.power < 0] = -self.power[self.power < 0]
                 # unit.outputs["demand"][self.power > 0] = self.power[self.power > 0]
@@ -289,7 +289,7 @@ class DmasStorageStrategy(BaseStrategy):
                 lambda o: start + timedelta(hours=o["hour"]), axis=1
             )
             bids["end_time"] = bids.apply(
-                lambda o: start + timedelta(hours=o["hour"]) + unit.freq, axis=1
+                lambda o: start + timedelta(hours=o["hour"]) + unit.index.freq, axis=1
             )
             del bids["hour"]
         return bids.to_dict("records")

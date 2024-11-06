@@ -18,6 +18,7 @@ def init(world, n=1):
     start = datetime(2019, 1, 1)
     end = datetime(2019, 3, 1)
     from assume.common.fds import FastDatetimeSeries
+
     index = FastDatetimeSeries(start, end, freq="h")
     sim_id = "world_script_simulation"
 
@@ -32,10 +33,12 @@ def init(world, n=1):
     marketdesign = [
         MarketConfig(
             market_id="EOM",
-            opening_hours=rr.rrule(rr.HOURLY, interval=1, dtstart=start, until=end, cache=True),
+            opening_hours=rr.rrule(
+                rr.HOURLY, interval=24, dtstart=start, until=end, cache=True
+            ),
             opening_duration=timedelta(hours=1),
             market_mechanism="pay_as_clear",
-            market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+            market_products=[MarketProduct(timedelta(hours=1), 24, timedelta(hours=1))],
             additional_fields=["block_id", "link", "exclusive_id"],
         )
     ]
@@ -79,6 +82,6 @@ def init(world, n=1):
 
 if __name__ == "__main__":
     db_uri = "postgresql://assume:assume@localhost:5432/assume"
-    world = World()
+    world = World(database_uri=db_uri)
     init(world)
     world.run()

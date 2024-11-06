@@ -9,9 +9,9 @@ from functools import lru_cache
 import pandas as pd
 
 from assume.common.base import SupportsMinMax
+from assume.common.fds import FastDatetimeSeries
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
-from assume.common.fds import FastDatetimeSeries
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +108,9 @@ class PowerPlant(SupportsMinMax):
 
         self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
         self.min_down_time = min_down_time if min_down_time > 0 else 1
-        self.downtime_hot_start = downtime_hot_start / (self.index.freq / timedelta(hours=1))
+        self.downtime_hot_start = downtime_hot_start / (
+            self.index.freq / timedelta(hours=1)
+        )
         self.downtime_warm_start = downtime_warm_start / (
             self.index.freq / timedelta(hours=1)
         )
@@ -143,12 +145,14 @@ class PowerPlant(SupportsMinMax):
         """
         start = max(start, self.index.start)
 
-        max_power = FastDatetimeSeries(start, end, self.index.freq,
-            self.forecaster.get_availability(self.id)[start:end] * self.max_power
+        max_power = FastDatetimeSeries(
+            start,
+            end,
+            self.index.freq,
+            self.forecaster.get_availability(self.id)[start:end] * self.max_power,
         )
 
-
-        for t in self.outputs["energy"].get_date_list(start,end):
+        for t in self.outputs["energy"].get_date_list(start, end):
             current_power = self.outputs["energy"].at[t]
 
             previous_power = self.get_output_before(t)
@@ -193,9 +197,9 @@ class PowerPlant(SupportsMinMax):
                     for key in order["accepted_volume"].keys()
                 ]
             else:
-                self.outputs[product_type][start:end_excl] += float(order[
-                    "accepted_volume"
-                ])
+                self.outputs[product_type][start:end_excl] += float(
+                    order["accepted_volume"]
+                )
 
         self.calculate_cashflow(product_type, orderbook)
 
@@ -346,7 +350,9 @@ class PowerPlant(SupportsMinMax):
         max_power = max_power - base_load
         # make sure that max_power is > 0 for all timesteps
 
-        return FastDatetimeSeries(start, end_excl, self.index.freq, min_power), FastDatetimeSeries(start, end_excl, self.index.freq, max_power)
+        return FastDatetimeSeries(
+            start, end_excl, self.index.freq, min_power
+        ), FastDatetimeSeries(start, end_excl, self.index.freq, max_power)
 
     def calculate_marginal_cost(self, start: datetime, power: float):
         """

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import TypedDict
 
 import numpy as np
@@ -276,7 +276,7 @@ class BaseUnit:
                     for i in order["accepted_volume"].keys()
                 ]
                 self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
-                    cashflow * 1  # self.index.freq.n
+                    cashflow * self.index.freq.n
                 )
             else:
                 cashflow = float(
