@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 from assume.common.base import BaseStrategy, SupportsMinMax
+from assume.common.fds import FastDatetimeSeries
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_products_index
 
@@ -558,10 +559,12 @@ def calculate_reward_EOM(
         unit.forecaster.get_availability(unit.id)[products_index] * unit.max_power
     )
 
-    profit = pd.Series(0.0, index=products_index)
-    reward = pd.Series(0.0, index=products_index)
-    opportunity_cost = pd.Series(0.0, index=products_index)
-    costs = pd.Series(0.0, index=products_index)
+    profit = FastDatetimeSeries(
+        start=products_index[0], end=products_index[-1], freq=products_index.freq
+    )
+    reward = profit.copy_empty()
+    opportunity_cost = profit.copy_empty()
+    costs = profit.copy_empty()
 
     for order in orderbook:
         start = order["start_time"]

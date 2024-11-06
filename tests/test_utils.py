@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import calendar
+import time
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
@@ -470,8 +471,6 @@ def test_2():
 
 
 def test_create_date_range():
-    import time
-
     start = datetime(2020, 1, 1, 0)
     end = datetime(2020, 1, 1, 5)
     n = 1000
@@ -565,13 +564,56 @@ def test_create_date_range():
 def test_convert_pd():
     start = datetime(2020, 1, 1, 0)
     end = datetime(2020, 1, 1, 5)
-    n = 1000
     fs = FastDatetimeSeries(start, end, freq="1h")
-
     fs.init_data()
 
     df = fs.as_df()
     assert isinstance(df, pd.DataFrame)
+
+
+def test_set_list():
+    start = datetime(2020, 1, 1, 0)
+    end = datetime(2020, 2, 1, 5)
+    n = 1000
+    fs = FastDatetimeSeries(start, end, freq="1h")
+    fs.init_data()
+
+    dr = pd.date_range(start, end=datetime(2020, 1, 3, 5))
+    dr = pd.Series(dr)
+
+    series = pd.Series(0, index=pd.date_range(start, end, freq="1h"))
+
+    t = time.time()
+    for i in range(n):
+        result_pd = fs[dr]
+    res_fds = time.time() - t
+    f_series = series > 1
+    series[f_series] = 4
+    fs.data[f_series] = 4
+
+    # accessing lists or series elements is also faster
+    # check getting list or series
+    t = time.time()
+    for i in range(n):
+        result = series[dr]
+    res_pd = time.time() - t
+    print(res_fds)
+    print(res_pd)
+    assert res_fds < res_pd
+
+    # check setting list or series
+    t = time.time()
+    for i in range(n):
+        fs[dr] = 3
+    res_fds = time.time() - t
+
+    t = time.time()
+    for i in range(n):
+        series[dr] = 3
+    res_pd = time.time() - t
+    print(res_fds)
+    print(res_pd)
+    assert res_fds < res_pd
 
 
 if __name__ == "__main__":

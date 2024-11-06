@@ -49,7 +49,7 @@ class Forecaster:
         """
         return FastDatetimeSeries(self.fds.start, self.fds.end, self.fds.freq)
 
-    def get_availability(self, unit: str) -> pd.Series:
+    def get_availability(self, unit: str) -> FastDatetimeSeries:
         """
         Returns the availability of a given unit as a pandas Series based on the provided index.
 
@@ -67,7 +67,7 @@ class Forecaster:
 
         return self[f"availability_{unit}"]
 
-    def get_price(self, fuel_type: str) -> pd.Series:
+    def get_price(self, fuel_type: str) -> FastDatetimeSeries:
         """
         Returns the price for a given fuel type as a pandas Series or zeros if the type does
         not exist.
@@ -111,14 +111,14 @@ class CsvForecaster(Forecaster):
 
     def __init__(
         self,
-        index: np.array,
+        fds: np.array,
         powerplants_units: dict[str, pd.Series] = {},
         demand_units: dict[str, pd.Series] = {},
         market_configs: dict[str, pd.Series] = {},
         *args,
         **kwargs,
     ):
-        super().__init__(index, *args, **kwargs)
+        super().__init__(fds, *args, **kwargs)
         self.logger = logging.getLogger(__name__)
         self.powerplants_units = powerplants_units
         self.demand_units = demand_units
@@ -322,7 +322,7 @@ class CsvForecaster(Forecaster):
         # sum_demand = self.forecasts[demand_units.index].sum(axis=1)
 
         # initialize empty price_forecast
-        price_forecast = pd.Series(index=self.index, data=0.0)
+        price_forecast = self.fds.copy_empty()
 
         # start with most expensive type (highest cumulative power)
         for col in sorted_columns[::-1]:
@@ -422,14 +422,14 @@ class RandomForecaster(CsvForecaster):
 
     def __init__(
         self,
-        index: pd.Series,
+        fds: FastDatetimeSeries,
         powerplants_units: dict[str, pd.Series] = {},
         sigma: float = 0.02,
         *args,
         **kwargs,
     ):
         self.sigma = sigma
-        super().__init__(index, powerplants_units, *args, **kwargs)
+        super().__init__(fds, powerplants_units, *args, **kwargs)
 
     def __getitem__(self, column: str) -> pd.Series:
         """
@@ -448,7 +448,7 @@ class RandomForecaster(CsvForecaster):
         """
 
         if column not in self.forecasts.columns:
-            return pd.Series(0.0, self.index)
+            return self.fds.copy_empty()
         noise = np.random.normal(0, self.sigma, len(self.index))
         return self.forecasts[column] * noise
 
@@ -491,7 +491,7 @@ class NaiveForecast(Forecaster):
 
     def __init__(
         self,
-        index: pd.Series,
+        fds: FastDatetimeSeries,
         availability: float | list = 1,
         fuel_price: float | list = 10,
         co2_price: float | list = 10,
@@ -500,7 +500,7 @@ class NaiveForecast(Forecaster):
         *args,
         **kwargs,
     ):
-        super().__init__(index)
+        super().__init__(fds)
         self.fuel_price = fuel_price
         self.availability = availability
         self.co2_price = co2_price

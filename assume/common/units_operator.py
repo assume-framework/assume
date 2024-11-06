@@ -314,8 +314,7 @@ class UnitsOperator(Role):
             current_dispatch = unit.execute_current_dispatch(start, now)
             end = now
             dispatch = {"power": current_dispatch}
-            # TODO: this needs to be fixed. For now it is consuming too much time and is deactivated
-            # unit.calculate_generation_cost(start, now, "energy")
+            unit.calculate_generation_cost(start, now, "energy")
             valid_outputs = [
                 "soc",
                 "cashflow",

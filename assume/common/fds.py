@@ -41,9 +41,13 @@ class FastDatetimeSeries:
             stop = self.get_idx_from_date(item.stop) + 1
             return self.data[start:stop]
         elif isinstance(item, list):
-            return self.data[[self.get_idx_from_date(i) for i in item]]
+            if len(item) == len(self.data):
+                return self.data[item]
+            else:
+                return self.data[[self.get_idx_from_date(i) for i in item]]
         else:
             start = self.get_idx_from_date(item)
+
             if start >= len(self.data):
                 return 0
             else:
@@ -55,6 +59,13 @@ class FastDatetimeSeries:
             start = self.get_idx_from_date(item.start)
             stop = self.get_idx_from_date(item.stop)
             self.data[start:stop] = value
+        elif isinstance(item, list | pd.Series):
+            if len(item) == len(self.data):
+                self.data[item] = value
+            else:
+                for i in item:
+                    start = self.get_idx_from_date(i)
+                    self.data[start] = value
         else:
             start = self.get_idx_from_date(item)
             self.data[start] = value
@@ -68,6 +79,8 @@ class FastDatetimeSeries:
         # takes next start value at most
         start_idx = self.get_idx_from_date(start)
         hour_count = self.get_idx_from_date(end) + 1 - start_idx
+        if hour_count < 0:
+            raise ValueError("start must be before end")
 
         start = self.start + start_idx * self.freq
 
@@ -121,3 +134,11 @@ class FastDatetimeSeries:
 
     def copy_empty(self, value=0.0, name=""):
         return FastDatetimeSeries(self.start, self.end, self.freq, value, name)
+
+    def __contains__(self, other: datetime):
+        if self.start > other:
+            return False
+        if self.end < other:
+            return False
+        # TODO check if self.freq fits
+        return True

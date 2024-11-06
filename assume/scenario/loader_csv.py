@@ -442,7 +442,7 @@ def load_config_and_create_forecaster(
     end = pd.Timestamp(config["end_date"])
     freq = timedelta(0) + pd.tseries.frequencies.to_offset("1h")
 
-    index = FastDatetimeSeries(start, end + timedelta(days=1), freq)
+    fds = FastDatetimeSeries(start, end + timedelta(days=1), freq)
     # np.arange(start, end + timedelta(days=1), freq.seconds * 1_000_000)
     # get extra parameters for bidding strategies
 
@@ -465,16 +465,16 @@ def load_config_and_create_forecaster(
         raise ValueError("No power plant or no demand units were provided!")
 
     forecasts_df = load_file(
-        path=path, config=config, file_name="forecasts_df", index=index
+        path=path, config=config, file_name="forecasts_df", index=fds
     )
-    demand_df = load_file(path=path, config=config, file_name="demand_df", index=index)
+    demand_df = load_file(path=path, config=config, file_name="demand_df", index=fds)
     if demand_df is None:
         raise ValueError("No demand time series was provided!")
     cross_border_flows_df = load_file(
-        path=path, config=config, file_name="cross_border_flows", index=index
+        path=path, config=config, file_name="cross_border_flows", index=fds
     )
     availability = load_file(
-        path=path, config=config, file_name="availability_df", index=index
+        path=path, config=config, file_name="availability_df", index=fds
     )
     # check if availability contains any values larger than 1 and raise a warning
     if availability is not None and availability.max().max() > 1:
@@ -488,20 +488,20 @@ def load_config_and_create_forecaster(
         availability = normalize_availability(powerplant_units, availability)
 
     electricity_prices_df = load_file(
-        path=path, config=config, file_name="electricity_prices", index=index
+        path=path, config=config, file_name="electricity_prices", index=fds
     )
     price_forecast_df = load_file(
-        path=path, config=config, file_name="price_forecasts", index=index
+        path=path, config=config, file_name="price_forecasts", index=fds
     )
     fuel_prices_df = load_file(
-        path=path, config=config, file_name="fuel_prices_df", index=index
+        path=path, config=config, file_name="fuel_prices_df", index=fds
     )
     temperature_df = load_file(
-        path=path, config=config, file_name="temperature", index=index
+        path=path, config=config, file_name="temperature", index=fds
     )
 
     forecaster = CsvForecaster(
-        index=index,
+        fds=fds,
         powerplants_units=powerplant_units,
         demand_units=demand_units,
         market_configs=config["markets_config"],
@@ -523,7 +523,7 @@ def load_config_and_create_forecaster(
         "path": path,
         "start": start,
         "end": end,
-        "index": index,
+        "index": fds,
         "powerplant_units": powerplant_units,
         "storage_units": storage_units,
         "demand_units": demand_units,

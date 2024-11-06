@@ -90,7 +90,7 @@ class BaseUnit:
         if forecaster:
             self.forecaster = forecaster
         else:
-            self.forecaster = defaultdict(lambda: pd.Series(0.0, index=self.index))
+            self.forecaster = defaultdict(lambda: index.copy_empty())
 
     def calculate_bids(
         self,
@@ -132,7 +132,7 @@ class BaseUnit:
 
         return bids
 
-    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
+    def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """
         Calculates the marginal cost for the given power.
 
@@ -196,19 +196,17 @@ class BaseUnit:
             start = self.index.start
 
         product_type_mc = product_type + "_marginal_costs"
-        product_data = self.outputs[product_type].loc[start:end]
-
-        marginal_costs = product_data.index.map(
-            lambda t: self.calculate_marginal_cost(t, product_data.loc[t])
-        )
-        new_values = np.abs(marginal_costs * product_data.values)
-        self.outputs[product_type_mc].loc[start:end] = new_values
+        product_index = self.index.get_date_list(start, end)
+        for t in product_index:
+            value = self.outputs[product_type][t]
+            new_value = value * self.calculate_marginal_cost(t, value)
+            self.outputs[product_type_mc][t] = new_value
 
     def execute_current_dispatch(
         self,
-        start: pd.Timestamp,
-        end: pd.Timestamp,
-    ) -> pd.Series:
+        start: datetime,
+        end: datetime,
+    ) -> np.array:
         """
         Checks if the total dispatch plan is feasible.
 
@@ -326,8 +324,8 @@ class SupportsMinMax(BaseUnit):
     min_down_time: int = 0
 
     def calculate_min_max_power(
-        self, start: pd.Timestamp, end: pd.Timestamp, product_type: str = "energy"
-    ) -> tuple[pd.Series, pd.Series]:
+        self, start: datetime, end: datetime, product_type: str = "energy"
+    ) -> tuple[np.array, np.array]:
         """
         Calculates the min and max power for the given time period.
 
@@ -541,8 +539,8 @@ class SupportsMinMaxCharge(BaseUnit):
     efficiency_discharge: float
 
     def calculate_min_max_charge(
-        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
-    ) -> tuple[pd.Series, pd.Series]:
+        self, start: datetime, end: datetime, product_type="energy"
+    ) -> tuple[np.array, np.array]:
         """
         Calculates the min and max charging power for the given time period.
 
@@ -556,8 +554,8 @@ class SupportsMinMaxCharge(BaseUnit):
         """
 
     def calculate_min_max_discharge(
-        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
-    ) -> tuple[pd.Series, pd.Series]:
+        self, start: datetime, end: datetime, product_type="energy"
+    ) -> tuple[FastDatetimeSeries, FastDatetimeSeries]:
         """
         Calculates the min and max discharging power for the given time period.
 
