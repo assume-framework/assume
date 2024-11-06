@@ -5,7 +5,6 @@
 import logging
 from datetime import datetime, timedelta
 
-import pandas as pd
 from dateutil import rrule as rr
 
 from assume import World
@@ -33,10 +32,10 @@ def init(world, n=1):
     marketdesign = [
         MarketConfig(
             market_id="EOM",
-            opening_hours=rr.rrule(rr.HOURLY, interval=24, dtstart=start, until=end),
+            opening_hours=rr.rrule(rr.HOURLY, interval=1, dtstart=start, until=end, cache=True),
             opening_duration=timedelta(hours=1),
             market_mechanism="pay_as_clear",
-            market_products=[MarketProduct(timedelta(hours=1), 24, timedelta(hours=1))],
+            market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
             additional_fields=["block_id", "link", "exclusive_id"],
         )
     ]
@@ -80,6 +79,6 @@ def init(world, n=1):
 
 if __name__ == "__main__":
     db_uri = "postgresql://assume:assume@localhost:5432/assume"
-    world = World(database_uri=db_uri)
+    world = World()
     init(world)
     world.run()

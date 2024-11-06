@@ -143,7 +143,7 @@ class PowerPlant(SupportsMinMax):
         """
         start = max(start, self.index.start)
 
-        max_power = (
+        max_power = FastDatetimeSeries(start, end, self.index.freq,
             self.forecaster.get_availability(self.id)[start:end] * self.max_power
         )
 
@@ -176,9 +176,9 @@ class PowerPlant(SupportsMinMax):
             marketconfig (MarketConfig): The market configuration.
             orderbook (Orderbook): The orderbook.
         """
-        products_index = get_products_index(orderbook)
+        products_index = list(get_products_index(orderbook))
 
-        max_power = (
+        max_power = self.index.copy_empty(
             self.forecaster.get_availability(self.id)[products_index] * self.max_power
         )
 
@@ -228,14 +228,14 @@ class PowerPlant(SupportsMinMax):
         Returns:
             float: The marginal cost of the unit.
         """
-        fuel_price = FastDatetimeSeries.from_series(self.forecaster.get_price(self.fuel_type))
+        fuel_price = self.forecaster.get_price(self.fuel_type)
         marginal_cost = (
             fuel_price / self.efficiency
             + self.forecaster.get_price("co2") * self.emission_factor / self.efficiency
             + self.additional_cost
         )
 
-        return marginal_cost
+        return fuel_price.copy_empty(marginal_cost)
 
     @lru_cache(maxsize=256)
     def calc_marginal_cost_with_partial_eff(
@@ -346,7 +346,7 @@ class PowerPlant(SupportsMinMax):
         max_power = max_power - base_load
         # make sure that max_power is > 0 for all timesteps
 
-        return min_power, max_power
+        return FastDatetimeSeries(start, end_excl, self.index.freq, min_power), FastDatetimeSeries(start, end_excl, self.index.freq, max_power)
 
     def calculate_marginal_cost(self, start: datetime, power: float):
         """

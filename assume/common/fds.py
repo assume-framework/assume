@@ -39,6 +39,11 @@ class FastDatetimeSeries:
             # to comply with pandas behavior
             stop = self.get_idx_from_date(item.stop) + 1
             return self.data[start:stop]
+        elif isinstance(item, list):
+            return self.data[
+                [self.get_idx_from_date(i)
+                for i in item]
+            ]
         else:
             start = self.get_idx_from_date(item)
             if start >= len(self.data):

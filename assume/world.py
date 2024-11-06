@@ -302,7 +302,7 @@ class World:
 
         # mango multiprocessing is currently only supported on linux
         # with single
-        if sys.platform == "linux" and self.distributed_role is not None:
+        if sys.platform == "linux" or self.distributed_role is not None:
             self.addresses.append(addr(self.addr, "clock_agent"))
             output_role = self.output_role
             output_aid = self.output_agent_addr.aid

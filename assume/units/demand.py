@@ -63,7 +63,8 @@ class Demand(SupportsMinMax):
         self.ramp_down = max(abs(min_power), abs(max_power))
         self.ramp_up = max(abs(min_power), abs(max_power))
         volume = self.forecaster[self.id]
-        self.volume = -abs(volume)  # demand is negative
+        volume.data = -abs(volume.data) # demand is negative
+        self.volume = volume
         if isinstance(price, numbers.Real):
             price = FastDatetimeSeries(self.index.start, self.index.end, self.index.freq, price)
         self.price = price
@@ -101,7 +102,7 @@ class Demand(SupportsMinMax):
             tuple[pandas.Series, pandas.Series]: The bid colume as both the minimum and maximum power output of the unit.
         """
         end_excl = end - self.index.freq
-        bid_volume = self.volume[start:end_excl] - self.outputs[product_type][start:end_excl]
+        bid_volume = self.index.copy_empty(self.volume[start:end_excl] - self.outputs[product_type][start:end_excl])
         return bid_volume, bid_volume
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:

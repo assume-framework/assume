@@ -209,7 +209,7 @@ class CsvForecaster(Forecaster):
                     self.calculate_market_price_forecast(market_id=market_id)
                 )
 
-            if f"residual_load_{market_id}" not in self.forecasts.columns:
+            if f"residual_load_{market_id}" not in self.forecasts.keys():
                 self.forecasts[f"residual_load_{market_id}"] = (
                     self.calculate_residual_load_forecast(market_id=market_id)
                 )
@@ -264,7 +264,7 @@ class CsvForecaster(Forecaster):
         demand_units = self.demand_units[
             self.demand_units[f"bidding_{market_id}"].notnull()
         ]
-        sum_demand = self.forecasts[demand_units.index].sum(axis=1)
+        sum_demand = sum([self.forecasts[i].data for i in demand_units.index])
 
         res_demand_df = sum_demand - vre_feed_in_df.sum(axis=1)
 
@@ -299,13 +299,14 @@ class CsvForecaster(Forecaster):
             self.powerplants_units[f"bidding_{market_id}"].notnull()
         ]
 
+    
         marginal_costs = powerplants_units.apply(self.calculate_marginal_cost, axis=1).T
         sorted_columns = marginal_costs.loc[self.fds.start].sort_values().index
-        col_availabilities = self.forecasts.columns[
-            self.forecasts.columns.str.startswith("availability")
-        ]
-        availabilities = self.forecasts[col_availabilities]
-        availabilities.columns = col_availabilities.str.replace("availability_", "")
+        availabilities = {k.replace("availability_", ""): v.data for k,v in self.forecasts.items() if k.startswith("availability")}
+        
+        availabilities = pd.DataFrame.from_dict(availabilities)
+        availabilities["time"] = self.fds.get_date_list()
+        availabilities = availabilities.set_index("time")
 
         power = self.powerplants_units.max_power * availabilities
         cumsum_power = power[sorted_columns].cumsum(axis=1)
@@ -313,7 +314,9 @@ class CsvForecaster(Forecaster):
         demand_units = self.demand_units[
             self.demand_units[f"bidding_{market_id}"].notnull()
         ]
-        sum_demand = self.forecasts[demand_units.index].sum(axis=1)
+        sum_demand = sum([self.forecasts[i].data for i in demand_units.index])
+            
+        #sum_demand = self.forecasts[demand_units.index].sum(axis=1)
 
         # initialize empty price_forecast
         price_forecast = pd.Series(index=self.index, data=0.0)
@@ -370,7 +373,7 @@ class CsvForecaster(Forecaster):
 
         marginal_cost = fuel_cost + emissions_cost + additional_cost
 
-        return marginal_cost
+        return pd.Series(marginal_cost, index=self.fds.get_date_list())
 
     def save_forecasts(self, path):
         """
@@ -532,5 +535,5 @@ class NaiveForecast(Forecaster):
         else:
             value = 0
         if isinstance(value, pd.Series):
-            value.index = self.index
-        return pd.Series(value, self.index)
+            value = value[self.fds.start:self.fds.end]
+        return self.fds.copy_empty(value)
