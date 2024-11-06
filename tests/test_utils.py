@@ -546,7 +546,7 @@ def test_create_date_range():
     # more than factor 10
     assert res_slice < res_slice_pd / 10
 
-    se = pd.Series(0.0, index=fs.dt_index())
+    se = pd.Series(0.0, index=fs.get_date_list())
     se.loc[start]
 
     series.loc[new_end] = 33
@@ -557,8 +557,8 @@ def test_create_date_range():
     new = fs[start:new_end][::-1]
     assert new[0] == 33
     fs.data
-    fs.idx_from_date(start)
-    fs.idx_from_date(new_end)
+    fs.get_idx_from_date(start)
+    fs.get_idx_from_date(new_end)
     fs.data[0:4]
 
 

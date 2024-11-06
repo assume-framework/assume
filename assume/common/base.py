@@ -81,7 +81,7 @@ class BaseUnit:
         self.outputs["rl_actions"] = []
         self.outputs["rl_rewards"] = []
 
-        dt_index = self.index.dt_index()
+        dt_index = self.index.get_date_list()
         # some data is stored as series to allow to store it in the outputs
         self.outputs["actions"] = pd.Series(0.0, index=dt_index, dtype=object)
         self.outputs["exploration_noise"] = pd.Series(0.0, index=dt_index, dtype=object)
@@ -222,7 +222,7 @@ class BaseUnit:
         Returns:
             The volume of the unit within the given time range.
         """
-        return self.outputs["energy"].as_df()
+        return self.outputs["energy"][start, end]
 
     def get_output_before(self, dt: datetime, product_type: str = "energy") -> float:
         """

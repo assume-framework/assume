@@ -30,7 +30,7 @@ class Forecaster:
     """
 
     def __init__(self, index: FastDatetimeSeries):
-        self.index = index.dt_index()
+        self.index = index.get_date_list()
 
     def __getitem__(self, column: str) -> pd.Series:
         """

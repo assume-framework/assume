@@ -148,7 +148,7 @@ class PowerPlant(SupportsMinMax):
         )
 
 
-        for t in self.outputs["energy"].dt_index(start,end):
+        for t in self.outputs["energy"].get_date_list(start,end):
             current_power = self.outputs["energy"].at[t]
 
             previous_power = self.get_output_before(t)
