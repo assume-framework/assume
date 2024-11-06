@@ -15,19 +15,21 @@ def freq_to_timedelta(freq: str) -> timedelta:
 
 
 class FastDatetimeSeries:
-    def __init__(self, start, end, freq, value=0.0, name=""):
+    def __init__(self, start, end, freq, value=None, name=""):
         self.start = start
         self.end = end
         self.freq = freq_to_timedelta(freq)
         self.data = None
         self.loc = self  # allow adjusting loc as well
         self.at = self
-        self.value = value
+        if value is not None:
+            self.init_data(value)
+        # the name is not actually used other than for the compatibility of pandas import/export
         self.name = name
 
-    def init_data(self):
+    def init_data(self, value=None):
         if self.data is None:
-            self.data = self.get_numpy_date_range(self.start, self.end, self.freq, self.value)
+            self.data = self.get_numpy_date_range(self.start, self.end, self.freq, value)
 
     def __getitem__(self, item: slice):
         self.init_data()
@@ -77,10 +79,12 @@ class FastDatetimeSeries:
         #    raise ValueError("date %s is before start %s", date, self.start)
         return math.ceil(idx)
 
-    def get_numpy_date_range(self, start, end, freq, value=0):
+    def get_numpy_date_range(self, start, end, freq, value=None):
         """
         Get the index of a date range.
         """
+        if value is None:
+            value = 0.0
         hour_count = self.get_idx_from_date(end) +1
         return np.full(hour_count, value)
 
@@ -107,3 +111,6 @@ class FastDatetimeSeries:
     def __len__(self):
         self.init_data()
         return len(self.data)
+
+    def copy_empty(self, value=0.0, name=""):
+        return FastDatetimeSeries(self.start, self.end, self.freq, value, name)

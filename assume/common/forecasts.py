@@ -6,8 +6,10 @@ import logging
 
 import numpy as np
 import pandas as pd
+from functools import lru_cache
 
 from assume.common.fds import FastDatetimeSeries
+
 
 class Forecaster:
     """
@@ -29,8 +31,9 @@ class Forecaster:
 
     """
 
-    def __init__(self, index: FastDatetimeSeries):
-        self.index = index.get_date_list()
+    def __init__(self, fds: FastDatetimeSeries):
+        self.fds = fds
+        self.index = fds.get_date_list()
 
     def __getitem__(self, column: str) -> pd.Series:
         """
@@ -44,7 +47,7 @@ class Forecaster:
 
         This method returns the forecast for a given column as a pandas Series based on the provided index.
         """
-        return pd.Series(0.0, self.index)
+        return FastDatetimeSeries(self.fds.start, self.fds.end, self.fds.freq)
 
     def get_availability(self, unit: str) -> pd.Series:
         """
@@ -120,7 +123,7 @@ class CsvForecaster(Forecaster):
         self.powerplants_units = powerplants_units
         self.demand_units = demand_units
         self.market_configs = market_configs
-        self.forecasts = pd.DataFrame(index=index.get_date_list())
+        self.forecasts: dict[str, FastDatetimeSeries] = {}
 
     def __getitem__(self, column: str) -> pd.Series:
         """
@@ -136,10 +139,10 @@ class CsvForecaster(Forecaster):
 
         """
 
-        if column not in self.forecasts.columns:
+        if column not in self.forecasts.keys():
             if "availability" in column:
-                return pd.Series(1, self.index)
-            return pd.Series(0.0, self.index)
+                return self.fds.copy_empty(value=1)
+            return self.fds.copy_empty()
 
         return self.forecasts[column]
 
@@ -166,16 +169,16 @@ class CsvForecaster(Forecaster):
                 # set prefix for columns to set
                 columns = [prefix + column for column in data.columns]
                 data.columns = columns
+
             if len(data.index) == 1:
                 # if we have a single value which should be set for the whole series
                 for column in data.columns:
-                    self.forecasts[column] = data[column].item()
+                    self.forecasts[column] = self.fds.copy_empty(data[column].item())
             else:
                 # Add new columns to the existing DataFrame, overwriting any existing columns with the same names
-                new_columns = set(data.columns) - set(self.forecasts.columns)
-                self.forecasts = pd.concat(
-                    [self.forecasts, data[list(new_columns)]], axis=1
-                )
+                for column in data.columns:
+                    series = data[column][self.fds.start:self.fds.end]
+                    self.forecasts[column] = self.fds.copy_empty(series)
         else:
             self.forecasts[prefix + data.name] = data
 
@@ -187,15 +190,12 @@ class CsvForecaster(Forecaster):
         these don't already exist.
         """
 
-        cols = []
         for pp in self.powerplants_units.index:
             col = f"availability_{pp}"
-            if col not in self.forecasts.columns:
-                s = pd.Series(1, index=self.forecasts.index)
+            if col not in self.forecasts.keys():
+                s = self.fds.copy_empty(1)
                 s.name = col
-                cols.append(s)
-        cols.append(self.forecasts)
-        self.forecasts = pd.concat(cols, axis=1).copy()
+                self.forecasts[col] = s
 
         for market_id, config in self.market_configs.items():
             if config["product_type"] != "energy":
@@ -204,7 +204,7 @@ class CsvForecaster(Forecaster):
                 )
                 continue
 
-            if f"price_{market_id}" not in self.forecasts.columns:
+            if f"price_{market_id}" not in self.forecasts.keys():
                 self.forecasts[f"price_{market_id}"] = (
                     self.calculate_market_price_forecast(market_id=market_id)
                 )
@@ -300,7 +300,7 @@ class CsvForecaster(Forecaster):
         ]
 
         marginal_costs = powerplants_units.apply(self.calculate_marginal_cost, axis=1).T
-        sorted_columns = marginal_costs.loc[self.index[0]].sort_values().index
+        sorted_columns = marginal_costs.loc[self.fds.start].sort_values().index
         col_availabilities = self.forecasts.columns[
             self.forecasts.columns.str.startswith("availability")
         ]
@@ -354,10 +354,10 @@ class CsvForecaster(Forecaster):
         """
 
         fp_column = f"fuel_price_{pp_series.fuel_type}"
-        if fp_column in self.forecasts.columns:
+        if fp_column in self.forecasts.keys():
             fuel_price = self.forecasts[fp_column]
         else:
-            fuel_price = pd.Series(0.0, index=self.index)
+            fuel_price = self.fds.copy_empty()
 
         emission_factor = pp_series["emission_factor"]
         co2_price = self.forecasts["fuel_price_co2"]
@@ -501,6 +501,7 @@ class NaiveForecast(Forecaster):
         self.demand = demand
         self.price_forecast = price_forecast
 
+    @lru_cache
     def __getitem__(self, column: str) -> pd.Series:
         """
         Retrieves forecasted values.
