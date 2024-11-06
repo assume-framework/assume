@@ -87,7 +87,7 @@ class FastDatetimeSeries:
         return [start + i * self.freq for i in range(hour_count)]
 
     def get_idx_from_date(self, date: datetime):
-        if not date:
+        if date is None:
             return None
         idx = (date - self.start) / self.freq
         # todo check if modulo is 0 - else this is not a valid multiple of freq

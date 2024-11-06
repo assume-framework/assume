@@ -145,14 +145,11 @@ class PowerPlant(SupportsMinMax):
         """
         start = max(start, self.index.start)
 
-        max_power = FastDatetimeSeries(
-            start,
-            end,
-            self.index.freq,
-            self.forecaster.get_availability(self.id)[start:end] * self.max_power,
+        max_power = (
+            self.forecaster.get_availability(self.id)[start:end] * self.max_power
         )
 
-        for t in self.outputs["energy"].get_date_list(start, end):
+        for idx, t in enumerate(self.outputs["energy"].get_date_list(start, end)):
             current_power = self.outputs["energy"].at[t]
 
             previous_power = self.get_output_before(t)
@@ -161,7 +158,7 @@ class PowerPlant(SupportsMinMax):
             current_power = self.calculate_ramp(op_time, previous_power, current_power)
 
             if current_power > 0:
-                current_power = min(current_power, max_power[t])
+                current_power = min(current_power, max_power[idx])
                 current_power = max(current_power, self.min_power)
 
             self.outputs["energy"].at[t] = current_power
@@ -180,10 +177,10 @@ class PowerPlant(SupportsMinMax):
             marketconfig (MarketConfig): The market configuration.
             orderbook (Orderbook): The orderbook.
         """
-        products_index = list(get_products_index(orderbook))
-
-        max_power = self.index.copy_empty(
-            self.forecaster.get_availability(self.id)[products_index] * self.max_power
+        products_index = get_products_index(orderbook)
+        max_power = (
+            self.forecaster.get_availability(self.id)[list(products_index)]
+            * self.max_power
         )
 
         product_type = marketconfig.product_type
@@ -203,7 +200,7 @@ class PowerPlant(SupportsMinMax):
 
         self.calculate_cashflow(product_type, orderbook)
 
-        for start in products_index:
+        for idx, start in enumerate(products_index):
             current_power = self.outputs[product_type].at[start]
 
             previous_power = self.get_output_before(start)
@@ -212,7 +209,7 @@ class PowerPlant(SupportsMinMax):
             current_power = self.calculate_ramp(op_time, previous_power, current_power)
 
             if current_power > 0:
-                current_power = min(current_power, max_power[start])
+                current_power = min(current_power, max_power[idx])
                 current_power = max(current_power, self.min_power)
 
             self.outputs[product_type].at[start] = current_power
