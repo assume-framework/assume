@@ -27,7 +27,8 @@ def storage_unit() -> Storage:
         bidding_strategies={"EOM": NaiveSingleBidStrategy()},
         max_power_charge=100,
         max_power_discharge=100,
-        max_volume=1000,
+        max_soc=1000,
+        initial_soc=500,
         efficiency_charge=0.9,
         efficiency_discharge=0.95,
         index=pd.date_range("2022-01-01", periods=4, freq="h"),
@@ -37,7 +38,6 @@ def storage_unit() -> Storage:
         ramp_up_discharge=60,
         additional_cost_charge=3,
         additional_cost_discharge=4,
-        additional_cost=1,
     )
 
 
@@ -60,7 +60,8 @@ def storage_day() -> PowerPlant:
         bidding_strategies={"EOM": NaiveSingleBidStrategy()},
         max_power_charge=100,
         max_power_discharge=100,
-        max_volume=1000,
+        max_soc=1000,
+        initial_soc=500,
         efficiency_charge=0.9,
         efficiency_discharge=0.95,
         index=index,
@@ -70,7 +71,6 @@ def storage_day() -> PowerPlant:
         ramp_up_discharge=60,
         additional_cost_charge=3,
         additional_cost_discharge=4,
-        additional_cost=1,
         forecaster=ff,
     )
 
