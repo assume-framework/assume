@@ -503,6 +503,8 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             1 + (instance.cost_tolerance / 100)
         )
         print(f"The cost upper limit is {cost_tolerance_limit}")
+        
+        print(f"Maximum load shift {objective_value}")
 
         temp = instance.total_power_input.get_values()
         self.flex_power_requirement = pd.Series(data=temp)
