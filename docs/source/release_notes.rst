@@ -13,19 +13,43 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+
+v0.4.2 - Latest Release (5th November 2024)
+===========================================
+
 **New Features:**
 
-- Converted DST components from functions to classes for improved modularity and reusability.
-- Added new residential DST components like PV, EV, Heat Pump, and Boiler, with refined docstrings for better usability.
-- Created a `GenericStorage` class for storage components, with classes like EV and Hydrogen Storage inheriting from it.
-- update to mango 2.x which allows for sync creation of world
+- **Residential Components**: Added new residential DST components including PV, EV, Heat Pump, and Boiler, now with enhanced docstrings for better usability.
+- **Modular DST Components**: DST components have been converted from functions to classes, improving modularity and reusability.
+- **Generic Storage Class**: Introduced a `GenericStorage` class for storage components. Specific classes, such as EV and Hydrogen Storage, now inherit from it.
+- **Storage Learning Strategy**: Added a new DRL-based learning strategy for storage units. To use it, set `storage_learning` in the `bidding_EOM` column of `storage_units.csv`. Refer to the `StorageRLStrategy` documentation for more details.
+- **Mango 2.x Update**: Upgraded to mango 2.x, enabling synchronous world creation. To upgrade an existing environment, run:
+  ```
+  pip uninstall -y mango-agents mango-agents-assume && pip install assume-framework --upgrade
+  ```
+- **Distributed Simulation Enhancements**: Improved distributed simulation for TCP and MQTT, allowing containers to wait for each other during simulations.
+- **Integrated Optimization with Pyomo and HIGHS Solver**: The Pyomo library and HIGHS solver are now installed by default, removing the need to install `assume-framework[optimization]` separately. The HIGHS solver is used as the default, replacing the older GLPK solver for improved optimization performance and efficiency.
 
-  * to upgrade a prior environment run `pip uninstall -y mango-agents mango-agents-assume && pip install mango-agents`
+**Improvements:**
 
-- improve distributed simulation for TCP and MQTT, so that containers wait for each other in simulations
+- **Documentation**: Refined tutorial notebooks and added bug fixes.
+- **Saving Frequency Logic**: Refactored the saving frequency in the `WriteOutput` class for improved efficiency.
+
+**Bug Fixes:**
+
+- **Solver Compatibility**: Addressed undefined `solver_options` when using solvers other than Gurobi or HIGHS.
+- **Cashflow Calculation**: Corrected cashflow calculations for single-digit orders.
+- **Simulation Execution**: Enabled simulations to synchronize and wait for each other.
+- **Edge Case Handling**: Fixed edge cases in `pay_as_clear` and `pay_as_bid`.
+
+**New Contributor:**
+
+- @HafnerMichael made their first contribution with improvements to cashflow calculations and development of residential DST components.
+
+**Full Changelog**: [v0.4.1...v0.4.2](https://github.com/assume-framework/assume/compare/v0.4.1...v0.4.2)
 
 
-v0.4.1 - latest release (8th October 2024)
+v0.4.1 (8th October 2024)
 ===========================================
 
 **New Features:**
@@ -46,7 +70,7 @@ v0.4.1 - latest release (8th October 2024)
 - make complex clearing compatible to RL (#430)
 - pin PyPSA to remove DeprecationWarnings for now (#431)
 
-v0.4.0 - latest release (8th August 2024)
+v0.4.0 (8th August 2024)
 =========================================
 
 **New Features:**

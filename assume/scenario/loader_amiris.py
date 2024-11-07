@@ -277,8 +277,8 @@ def add_agent_to_world(
                 price_forecast=forecast_price,
             )
 
-            max_volume = device["EnergyToPowerRatio"] * device["InstalledPowerInMW"]
-            initial_soc = 100 * device["InitialEnergyLevelInMWH"] / max_volume
+            max_soc = device["EnergyToPowerRatio"] * device["InstalledPowerInMW"]
+            initial_soc = device["InitialEnergyLevelInMWH"]
             # TODO device["SelfDischargeRatePerHour"]
             world.add_unit(
                 f"StorageTrader_{agent['Id']}",
@@ -290,7 +290,7 @@ def add_agent_to_world(
                     "efficiency_charge": device["ChargingEfficiency"],
                     "efficiency_discharge": device["DischargingEfficiency"],
                     "initial_soc": initial_soc,
-                    "max_volume": max_volume,
+                    "max_soc": max_soc,
                     "bidding_strategies": storage_strategies,
                     "technology": "hydro",  # PSPP? Pump-Storage Power Plant
                     "emission_factor": 0,

@@ -972,7 +972,12 @@ def run_learning(
             world.run()
 
             total_rewards = world.output_role.get_sum_reward()
+
+            if len(total_rewards) == 0:
+                raise AssumeException("No rewards were collected during evaluation run")
+
             avg_reward = np.mean(total_rewards)
+
             # check reward improvement in evaluation run
             # and store best run in eval folder
             terminate = world.learning_role.compare_and_save_policies(
