@@ -253,12 +253,12 @@ class RLStrategy(AbstractLearningStrategy):
         bid_prices = actions * self.max_bid_price
 
         # 3.1 formulate the bids for Pmin
-        # Pmin, the minium run capacity is the inflexible part of the bid, which should always be accepted
+        # Pmin, the minimum run capacity is the inflexible part of the bid, which should always be accepted
         bid_quantity_inflex = min_power
         bid_price_inflex = min(bid_prices)
 
         # 3.1 formulate the bids for Pmax - Pmin
-        # Pmin, the minium run capacity is the inflexible part of the bid, which should always be accepted
+        # Pmin, the minimum run capacity is the inflexible part of the bid, which should always be accepted
         bid_quantity_flex = max_power - bid_quantity_inflex
         bid_price_flex = max(bid_prices)
 
@@ -318,7 +318,7 @@ class RLStrategy(AbstractLearningStrategy):
             # if we are in learning mode the first x episodes we want to explore the entire action space
             # to get a good initial experience, in the area around the costs of the agent
             if self.collect_initial_experience_mode:
-                # define current action as soley noise
+                # define current action as solely noise
                 noise = (
                     th.normal(
                         mean=0.0, std=0.2, size=(1, self.act_dim), dtype=self.float_type
@@ -567,7 +567,7 @@ class RLStrategy(AbstractLearningStrategy):
 
         # ---------------------------
         # 4.1 Calculate Reward
-        # The straight forward implemntation would be reward = profit, yet we would like to give the agent more guidance
+        # The straight forward implementation would be reward = profit, yet we would like to give the agent more guidance
         # in the learning process, so we add a regret term to the reward, which is the opportunity cost
         # define the reward and scale it
 
@@ -659,7 +659,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
         self.max_bid_price = kwargs.get("max_bid_price", 100)
         self.max_demand = kwargs.get("max_demand", 10e3)
 
-        # tells us whether we are training the agents or just executing per-learnind stategies
+        # tells us whether we are training the agents or just executing per-learnind strategies
         self.learning_mode = kwargs.get("learning_mode", False)
         self.perform_evaluation = kwargs.get("perform_evaluation", False)
 
@@ -853,7 +853,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
             # if we are in learning mode the first x episodes we want to explore the entire action space
             # to get a good initial experience, in the area around the costs of the agent
             if self.collect_initial_experience_mode:
-                # define current action as soley noise
+                # define current action as solely noise
                 noise = (
                     th.normal(
                         mean=0.0, std=0.4, size=(1, self.act_dim), dtype=self.float_type

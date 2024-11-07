@@ -108,7 +108,7 @@ class World:
         self.distributed_role = distributed_role
 
         self.export_csv_path = export_csv_path
-        # intialize db connection at beginning of simulation
+        # initialize db connection at beginning of simulation
         self.db_uri = database_uri
         if database_uri:
             if str(database_uri).startswith("sqlite:///"):

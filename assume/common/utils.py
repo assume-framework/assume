@@ -587,7 +587,7 @@ def rename_study_case(path: str, old_key: str, new_key: str):
 
     Args:
         path (str): The path to the config file.
-        old_key (str): The orginal name of the key without adjustments. E.g. study_case from available_examples: "base".
+        old_key (str): The original name of the key without adjustments. E.g. study_case from available_examples: "base".
         new_key (str): The name of the key with adjustments. E.g. added run number: "base_run_1".
     """
     # Read the YAML file

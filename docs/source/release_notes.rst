@@ -101,7 +101,7 @@ v0.4.0 (8th August 2024)
 
 - Significant speed up of the framework and especially of the learning process
 - Separated scenario loader function to improve speed and reduce unrequired operations
-- Refactored unit operator by adding a seperate unit operator for learning units
+- Refactored unit operator by adding a separate unit operator for learning units
 - Enhanced learning output and path handling
 - Updated dashboard for better storage view
 - Improved clearing with shuffling of bids, to avoid bias in clearing of units early in order book
