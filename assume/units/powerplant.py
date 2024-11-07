@@ -361,20 +361,19 @@ class PowerPlant(SupportsMinMax):
         Returns:
             float: The marginal cost of the unit.
         """
-        return 130.92
-        # # if marginal costs already exists, return it
-        # if self.marginal_cost is not None:
-        #     return (
-        #         self.marginal_cost[start]
-        #         if len(self.marginal_cost) > 1
-        #         else self.marginal_cost
-        #     )
-        # # if not, calculate it
-        # else:
-        #     return self.calc_marginal_cost_with_partial_eff(
-        #         power_output=power,
-        #         timestep=start,
-        #     )
+        # if marginal costs already exists, return it
+        if self.marginal_cost is not None:
+            return (
+                self.marginal_cost[start]
+                if len(self.marginal_cost) > 1
+                else self.marginal_cost
+            )
+        # if not, calculate it
+        else:
+            return self.calc_marginal_cost_with_partial_eff(
+                power_output=power,
+                timestep=start,
+            )
 
     def as_dict(self) -> dict:
         """

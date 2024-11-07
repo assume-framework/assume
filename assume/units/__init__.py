@@ -17,12 +17,3 @@ unit_types: dict[str, BaseUnit] = {
     "steel_plant": SteelPlant,
     "building": Building,
 }
-
-try:
-    from assume.units.steel_plant import SteelPlant
-    from assume.units.dst_components import demand_side_technologies
-
-    unit_types["steel_plant"] = SteelPlant
-
-except ImportError:
-    demand_side_technologies = {}
