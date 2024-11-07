@@ -113,7 +113,7 @@ v0.4.0 (8th August 2024)
   matched to the corresponding market zone.
 - If any values in the availability_df.csv file are larger than 1, the framework will now warn the user
   and run a method to normalize the values to [0, 1].
-- Examples have been restructed to easier orientation and understanding: example_01.. cover all feature demonstration examples,
+- Examples have been restructured to easier orientation and understanding: example_01.. cover all feature demonstration examples,
   example_02.. cover all learning examples, example_03.. cover all full year examples
 - Added the option of integrating different actor network architectures to the reinforcement learning algorithm, currently a multilayer perceptron (mlp) and long short-term memory (lstm) are implemented
 - Added storing of network flows for complex clearing
