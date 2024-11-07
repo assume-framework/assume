@@ -293,7 +293,7 @@ class CsvForecaster(Forecaster):
         # calculate infeed of renewables and residual demand_df
         # check if max_power is a series or a float
 
-        # select only those power plant units, which have a bidding strategy for the specifi market_id
+        # select only those power plant units, which have a bidding strategy for the specific market_id
         powerplants_units = self.powerplants_units[
             self.powerplants_units[f"bidding_{market_id}"].notnull()
         ]

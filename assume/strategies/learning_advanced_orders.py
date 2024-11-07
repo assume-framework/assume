@@ -317,7 +317,7 @@ class RLAdvancedOrderStrategy(RLStrategy):
 
         current_costs = unit.calculate_marginal_cost(start, current_volume)
 
-        # scale unit outpus
+        # scale unit outputs
         scaled_max_power = current_volume / scaling_factor_total_capacity
         scaled_marginal_cost = current_costs / scaling_factor_marginal_cost
 
@@ -342,7 +342,7 @@ class RLAdvancedOrderStrategy(RLStrategy):
             ]
         )
 
-        # transfer arry to GPU for NN processing
+        # transfer array to GPU for NN processing
         observation = (
             th.tensor(observation, dtype=self.float_type)
             .to(self.device, non_blocking=True)

@@ -6,7 +6,7 @@ Unit Operator
 ==============
 
 Assume is created using flexible and usable abstractions, while still providing flexibility to cover most use cases of market modeling. This is also true for the unit operator class.
-In general the task of this calss can range from simple passing the bids of the technical units through to complex portfolio optimisation of all units assigned to one operator. This text aims
+In general the task of this calls can range from simple passing the bids of the technical units through to complex portfolio optimisation of all units assigned to one operator. This text aims
 to explain its current functionalities and the possibilities the unit
 
 

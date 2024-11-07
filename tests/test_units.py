@@ -145,9 +145,8 @@ def test_minmaxcharge_unconstrained():
         "Test", "TestOperator", "TestTechnology", {}, None, "empty"
     )
 
-    # 1. wenn ramp nicht definiert ist, sollte es auch keine constraints erzeugen
-    # 2. alle maximal/minimal und ramp werte werden positive angegeben
-    #
+    # 1. wenn ramp is undefined, it should not create constraints
+    # 2. all maximum/minimum and ramp values should be given as positive values
 
     mmc.max_power_charge = -1000  # MW
     mmc.max_power_discharge = 1000  # MW

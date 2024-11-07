@@ -258,7 +258,7 @@ class World:
         self.bidding_params.update(self.learning_config)
 
         if self.learning_mode or self.perform_evaluation:
-            # if so, we initate the rl learning role with parameters
+            # if so, we initiate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
 
             self.learning_role = Learning(self.learning_config)

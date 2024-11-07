@@ -85,7 +85,7 @@ with the minimum acceptance ratio :math:`U_{b}` defined for each bid b.
 The linked bid constraint, ensuring that the acceptance of child bids c is below the acceptance of their parent bids p
 is given by: :math:`\mathbf{a}_{c, p} \: u_c \leq u_{p} \quad \forall \: c, p \in \mathcal{B}`,
 
-with the incidence matrix :math:`\mathbf{a}_{c, p}` defining the linkes between bids as 1, if c is linked as child to p, 0 else.
+with the incidence matrix :math:`\mathbf{a}_{c, p}` defining the links between bids as 1, if c is linked as child to p, 0 else.
 
 Because with this algorithm, paradoxically accepted bids (PABs) can occur, the objective is solved in an iterative manner:
 

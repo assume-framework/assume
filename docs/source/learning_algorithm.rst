@@ -7,7 +7,7 @@ Reinforcement Learning Algorithms
 ##################################
 
 In the chapter :doc:`learning` we got an general overview about how RL is implements for a multi-agent setting in Assume. In the case one wants to apply these RL algorithms
-to a new problem, one does not necessarly need to understand how the RL algorithms are are working in detail. The only thing needed is the adaptation of the bidding strategies,
+to a new problem, one does not necessarily need to understand how the RL algorithms are are working in detail. The only thing needed is the adaptation of the bidding strategies,
 which is covered in the tutorial. Yet, for the interested reader we will give a short overview about the RL algorithms used in Assume. We start with the learning role which is the core of the leanring implementation.
 
 
