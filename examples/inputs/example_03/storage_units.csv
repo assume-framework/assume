@@ -1,4 +1,4 @@
-name,technology,bidding_EOM,bidding_CRM_pos,bidding_CRM_neg,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_volume,max_volume,additional_cost_charge,additional_cost_discharge,natural_inflow,unit_operator
+name,technology,bidding_EOM,bidding_CRM_pos,bidding_CRM_neg,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_soc,max_soc,additional_cost_charge,additional_cost_discharge,natural_inflow,unit_operator
 Tanzmühle - Rabenleite,PSPP,flexable_eom_storage,flexable_pos_crm_storage,flexable_neg_crm_storage,25,35,0.81,0.88,1,404,0.28,0.28,0,GDF SUEZ ENERGIE DEUTSCHLAND
 Schwarzenbachwerk,PSPP,flexable_eom_storage,flexable_pos_crm_storage,flexable_neg_crm_storage,20,46,0.73,0.82,1,198,0.28,0.28,1.2,ENBW ENERGIE BADEN-WURTTEMBERG
 Leitzach II,PSPP,flexable_eom_storage,flexable_pos_crm_storage,flexable_neg_crm_storage,38,49,0.86,0.9,1,550,0.28,0.28,0.7,STADTWERKE MUENCHEN GMBH
