@@ -16,10 +16,10 @@ from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.scenario.oeds.infrastructure import InfrastructureInterface
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
-async def load_oeds_async(
+def load_oeds(
     world: World,
     scenario: str,
     study_case: str,
@@ -50,13 +50,13 @@ async def load_oeds_async(
         freq="h",
     )
     sim_id = f"{scenario}_{study_case}"
-    log.info(f"loading scenario {sim_id}")
+    logger.info(f"loading scenario {sim_id}")
     infra_interface = InfrastructureInterface("test", infra_uri)
 
     if not nuts_config:
         nuts_config = list(infra_interface.plz_nuts["nuts3"].unique())
 
-    await world.setup(
+    world.setup(
         start=start,
         end=end,
         save_frequency_hours=48,
@@ -83,10 +83,10 @@ async def load_oeds_async(
 
     # for each area - add demand and generation
     for area in nuts_config:
-        log.info(f"loading config {area} for {year}")
+        logger.info(f"loading config {area} for {year}")
         config_path = Path.home() / ".assume" / f"{area}_{year}"
         if not config_path.is_dir():
-            log.info("query database time series")
+            logger.info("query database time series")
             demand = infra_interface.get_demand_series_in_area(area, year)
             demand = demand.resample("h").mean()
             # demand in MW
@@ -100,12 +100,12 @@ async def load_oeds_async(
                 demand.to_csv(config_path / "demand.csv")
                 solar.to_csv(config_path / "solar.csv")
                 if isinstance(wind, float):
-                    log.info(wind, area, year)
+                    logger.info(wind, area, year)
                 wind.to_csv(config_path / "wind.csv")
             except Exception:
                 shutil.rmtree(config_path, ignore_errors=True)
         else:
-            log.info("use existing local time series")
+            logger.info("use existing local time series")
             demand = pd.read_csv(config_path / "demand.csv", index_col=0).squeeze()
             solar = pd.read_csv(config_path / "solar.csv", index_col=0).squeeze()
             wind = pd.read_csv(config_path / "wind.csv", index_col=0).squeeze()
@@ -213,10 +213,11 @@ if __name__ == "__main__":
     # FH Aachen internal server
     infra_uri = os.getenv(
         "INFRASTRUCTURE_URI",
-        "postgresql://readonly:readonly@timescale.nowum.fh-aachen.de:5432",
+        "postgresql://readonly:readonly@timescale.nowum.fh-aachen.de:5432/opendata",
     )
 
-    nuts_config = ["DE1", "DEA", "DEB", "DEC", "DED", "DEE", "DEF"]
+    nuts_config = os.getenv("NUTS_CONFIG").split(",")
+    nuts_config = nuts_config or ["DE1", "DEA", "DEB", "DEC", "DED", "DEE", "DEF"]
     year = 2019
     start = datetime(year, 1, 1)
     end = datetime(year + 1, 1, 1) - timedelta(hours=1)
@@ -247,18 +248,16 @@ if __name__ == "__main__":
         "solar": default_naive_strategy,
         "demand": default_naive_strategy,
     }
-    world.loop.run_until_complete(
-        load_oeds_async(
-            world,
-            scenario,
-            study_case,
-            start,
-            end,
-            infra_uri,
-            marketdesign,
-            bidding_strategies,
-            nuts_config,
-        )
+    load_oeds(
+        world,
+        scenario,
+        study_case,
+        start,
+        end,
+        infra_uri,
+        marketdesign,
+        bidding_strategies,
+        nuts_config,
     )
 
     world.run()

@@ -11,7 +11,7 @@ from assume.markets.base_market import MarketRole
 
 from .simple import calculate_meta
 
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def cumsum(orderbook: Orderbook):
@@ -63,7 +63,7 @@ class PayAsClearAonRole(MarketRole):
             product_orders = list(product_orders)
             if product not in market_products:
                 rejected_orders.extend(product_orders)
-                # log.debug(f'found unwanted bids for {product} should be {market_products}')
+                # logger.debug(f'found unwanted bids for {product} should be {market_products}')
                 continue
 
             # groupby does only group consecutive groups
@@ -113,8 +113,12 @@ class PayAsClearAonRole(MarketRole):
                     product,
                 )
             )
+
+        # write network flows here if applicable
+        flows = []
+
         # accepted orders can not be used in future
-        return accepted_orders, rejected_orders, meta
+        return accepted_orders, rejected_orders, meta, flows
 
 
 # does not allow to have partial accepted bids
@@ -146,7 +150,7 @@ class PayAsBidAonRole(MarketRole):
             product_orders = list(product_orders)
             if product not in market_products:
                 rejected_orders.extend(product_orders)
-                # log.debug(f'found unwanted bids for {product} should be {market_products}')
+                # logger.debug(f'found unwanted bids for {product} should be {market_products}')
                 continue
 
             product_orders.sort(key=lambda x: abs(x["volume"]))
@@ -195,4 +199,7 @@ class PayAsBidAonRole(MarketRole):
                     product,
                 )
             )
-        return accepted_orders, rejected_orders, meta
+            # write network flows here if applicable
+            flows = []
+
+        return accepted_orders, rejected_orders, meta, flows

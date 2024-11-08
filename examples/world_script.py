@@ -14,10 +14,8 @@ from assume.common.market_objects import MarketConfig, MarketProduct
 
 log = logging.getLogger(__name__)
 
-db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
-
-async def init(world, n=1):
+def init(world, n=1):
     start = datetime(2019, 1, 1)
     end = datetime(2019, 3, 1)
     index = pd.date_range(
@@ -27,7 +25,7 @@ async def init(world, n=1):
     )
     sim_id = "world_script_simulation"
 
-    await world.setup(
+    world.setup(
         start=start,
         end=end,
         save_frequency_hours=48,
@@ -84,6 +82,7 @@ async def init(world, n=1):
 
 
 if __name__ == "__main__":
+    db_uri = "postgresql://assume:assume@localhost:5432/assume"
     world = World(database_uri=db_uri)
-    world.loop.run_until_complete(init(world))
+    init(world)
     world.run()

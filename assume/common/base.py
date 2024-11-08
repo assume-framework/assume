@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import TypedDict
 
 import numpy as np
@@ -11,6 +11,11 @@ import pandas as pd
 
 from assume.common.forecasts import Forecaster
 from assume.common.market_objects import MarketConfig, Orderbook, Product
+
+try:
+    import torch as th
+except ImportError:
+    th = None
 
 
 class BaseStrategy:
@@ -273,9 +278,9 @@ class BaseUnit:
                 cashflow = float(
                     order.get("accepted_price", 0) * order.get("accepted_volume", 0)
                 )
-                hours = (end - start) / timedelta(hours=1)
+                elapsed_intervals = (end - start) / pd.Timedelta(self.index.freq)
                 self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
-                    cashflow * hours
+                    cashflow * elapsed_intervals
                 )
 
     def get_starting_costs(self, op_time: int) -> float:
@@ -527,7 +532,7 @@ class SupportsMinMaxCharge(BaseUnit):
     # negative
     ramp_down_charge: float
     # ramp_down_charge is negative
-    max_volume: float
+    max_soc: float
     efficiency_charge: float
     efficiency_discharge: float
 
@@ -616,7 +621,6 @@ class SupportsMinMaxCharge(BaseUnit):
         # previously charging -800 MW wants to go to 200 MW - but must first check if charging is even possible
         # - 800 MW to 0 with charge ramp down and then 200 MW with discharge ramp up
         # if storage was charging before we need to check if we can ramp back to zero
-        # assert power_discharge >= 0
         if (
             previous_power < 0
             and self.calculate_ramp_charge(previous_power, 0, current_power) < 0
@@ -663,7 +667,6 @@ class SupportsMinMaxCharge(BaseUnit):
             float: The charging power adjusted to the ramping constraints.
         """
 
-        # assert power_charge <= 0
         if (
             previous_power > 0
             and self.calculate_ramp_discharge(previous_power, 0, current_power) > 0

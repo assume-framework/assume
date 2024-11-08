@@ -56,7 +56,7 @@ def test_insufficient_generation():
             "end_time": end,
             "volume": 100,
             "price": 30,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "bid_id": "bid1",
             "only_hours": None,
             "exclusive_id": None,
@@ -68,7 +68,7 @@ def test_insufficient_generation():
             "end_time": end,
             "volume": 100,
             "price": 60,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "bid_id": "bid2",
             "only_hours": None,
             "exclusive_id": None,
@@ -80,7 +80,7 @@ def test_insufficient_generation():
             "end_time": end,
             "volume": -201,
             "price": 700,
-            "agent_id": "dem1",
+            "agent_addr": "dem1",
             "bid_id": "bid4",
             "only_hours": None,
             "exclusive_id": None,
@@ -89,7 +89,7 @@ def test_insufficient_generation():
         },
     ]
     mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert meta[0]["price"] == 60
     assert meta[0]["supply_volume"] == 200
     assert meta[0]["demand_volume"] == 201
@@ -110,7 +110,7 @@ def test_remaining_generation():
             "end_time": end,
             "volume": 100,
             "price": 30,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "bid_id": "bid1",
             "only_hours": None,
             "exclusive_id": None,
@@ -122,7 +122,7 @@ def test_remaining_generation():
             "end_time": end,
             "volume": 100,
             "price": 60,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "bid_id": "bid2",
             "only_hours": None,
             "exclusive_id": None,
@@ -134,7 +134,7 @@ def test_remaining_generation():
             "end_time": end,
             "volume": 50,
             "price": 40,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "bid_id": "bid3",
             "only_hours": None,
             "exclusive_id": None,
@@ -146,7 +146,7 @@ def test_remaining_generation():
             "end_time": end,
             "volume": 50,
             "price": 45,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "bid_id": "bid4",
             "only_hours": None,
             "exclusive_id": None,
@@ -158,7 +158,7 @@ def test_remaining_generation():
             "end_time": end,
             "volume": -200,
             "price": 700,
-            "agent_id": "dem1",
+            "agent_addr": "dem1",
             "bid_id": "bid4",
             "only_hours": None,
             "exclusive_id": None,
@@ -167,7 +167,7 @@ def test_remaining_generation():
         },
     ]
     mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert meta[0]["price"] == 45
     assert meta[0]["supply_volume"] == 200
     assert meta[0]["demand_volume"] == 200
@@ -190,7 +190,7 @@ def test_link_order():
             "end_time": end,
             "volume": 100,
             "price": 60,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "bid_id": "bid1",
             "only_hours": None,
             "exclusive_id": None,
@@ -202,7 +202,7 @@ def test_link_order():
             "end_time": end,
             "volume": 100,
             "price": 0,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "bid_id": "bid1",
             "only_hours": None,
             "exclusive_id": None,
@@ -214,7 +214,7 @@ def test_link_order():
             "end_time": end,
             "volume": 200,
             "price": 40,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "bid_id": "bid3",
             "only_hours": None,
             "exclusive_id": None,
@@ -226,7 +226,7 @@ def test_link_order():
             "end_time": end,
             "volume": -200,
             "price": 700,
-            "agent_id": "dem1",
+            "agent_addr": "dem1",
             "bid_id": "bid4",
             "only_hours": None,
             "exclusive_id": None,
@@ -235,7 +235,7 @@ def test_link_order():
         },
     ]
     mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     # should actually clear to 40, link orders are limited for same hour
     assert meta[0]["price"] == 60
     assert meta[0]["supply_volume"] == 200
@@ -260,7 +260,7 @@ def test_use_link_order():
             "end_time": end1,
             "volume": 100,
             "price": 60,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "bid_id": "bid1",
             "only_hours": None,
             "exclusive_id": None,
@@ -272,7 +272,7 @@ def test_use_link_order():
             "end_time": end2,
             "volume": 100,
             "price": 0,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "bid_id": "bid2",
             "only_hours": None,
             "exclusive_id": None,
@@ -284,7 +284,7 @@ def test_use_link_order():
             "end_time": end1,
             "volume": 100,
             "price": 40,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "bid_id": "bid3",
             "only_hours": None,
             "exclusive_id": None,
@@ -296,7 +296,7 @@ def test_use_link_order():
             "end_time": end2,
             "volume": 100,
             "price": 100,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "bid_id": "bid3",
             "only_hours": None,
             "exclusive_id": None,
@@ -308,7 +308,7 @@ def test_use_link_order():
             "end_time": end1,
             "volume": -100,
             "price": 700,
-            "agent_id": "dem1",
+            "agent_addr": "dem1",
             "bid_id": "bid4",
             "only_hours": None,
             "exclusive_id": None,
@@ -320,7 +320,7 @@ def test_use_link_order():
             "end_time": end2,
             "volume": -100,
             "price": 700,
-            "agent_id": "dem1",
+            "agent_addr": "dem1",
             "bid_id": "bid4",
             "only_hours": None,
             "exclusive_id": None,
@@ -329,7 +329,7 @@ def test_use_link_order():
         },
     ]
     mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert meta[1]["price"] == 0
     assert meta[0]["price"] == 60
     assert meta[0]["supply_volume"] == 100
@@ -356,7 +356,7 @@ def test_use_link_order2():
             "end_time": end1,
             "volume": 100,
             "price": 40,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "bid_id": "bid1",
             "only_hours": None,
             "exclusive_id": None,
@@ -368,7 +368,7 @@ def test_use_link_order2():
             "end_time": end2,
             "volume": 50,
             "price": 80,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "bid_id": "bid2",
             "only_hours": None,
             "exclusive_id": None,
@@ -380,7 +380,7 @@ def test_use_link_order2():
             "end_time": end1,
             "volume": 100,
             "price": 80,
-            "agent_id": "gen2",
+            "agent_addr": "gen2",
             "bid_id": "bid1",
             "only_hours": None,
             "exclusive_id": None,
@@ -392,7 +392,7 @@ def test_use_link_order2():
             "end_time": end2,
             "volume": 100,
             "price": 50,
-            "agent_id": "gen2",
+            "agent_addr": "gen2",
             "bid_id": "bid2",
             "only_hours": None,
             "exclusive_id": None,
@@ -404,7 +404,7 @@ def test_use_link_order2():
             "end_time": end2,
             "volume": 10,
             "price": 60,
-            "agent_id": "gen3",
+            "agent_addr": "gen3",
             "bid_id": "bid1",
             "only_hours": None,
             "exclusive_id": None,
@@ -416,7 +416,7 @@ def test_use_link_order2():
             "end_time": end1,
             "volume": -100,
             "price": 700,
-            "agent_id": "dem1",
+            "agent_addr": "dem1",
             "bid_id": "bid4",
             "only_hours": None,
             "exclusive_id": None,
@@ -428,7 +428,7 @@ def test_use_link_order2():
             "end_time": end2,
             "volume": -100,
             "price": 700,
-            "agent_id": "dem1",
+            "agent_addr": "dem1",
             "bid_id": "bid4",
             "only_hours": None,
             "exclusive_id": None,
@@ -437,7 +437,7 @@ def test_use_link_order2():
         },
     ]
     mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert meta[1]["price"] == 50
     assert meta[0]["price"] == 40
     assert meta[0]["supply_volume"] == 100
@@ -469,7 +469,7 @@ def test_market():
             "end_time": end,
             "volume": 180.0,
             "price": 58,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "bid_id": "bid1",
             "only_hours": None,
             "exclusive_id": None,
@@ -481,7 +481,7 @@ def test_market():
             "end_time": end,
             "volume": 10,
             "price": 90,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "bid_id": "bid2",
             "only_hours": None,
             "exclusive_id": None,
@@ -493,7 +493,7 @@ def test_market():
             "end_time": end,
             "volume": 10,
             "price": 19,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "bid_id": "bid5",
             "only_hours": None,
             "exclusive_id": None,
@@ -505,7 +505,7 @@ def test_market():
             "end_time": end,
             "volume": 10,
             "price": 53,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "bid_id": "bid3",
             "only_hours": None,
             "exclusive_id": None,
@@ -517,7 +517,7 @@ def test_market():
             "end_time": end,
             "volume": -500,
             "price": 700,
-            "agent_id": "dem1",
+            "agent_addr": "dem1",
             "bid_id": "bid4",
             "only_hours": None,
             "exclusive_id": None,
@@ -526,7 +526,7 @@ def test_market():
         },
     ]
     mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert meta[0]["price"] == 90
     assert meta[0]["supply_volume"] == 210
     assert meta[0]["demand_volume"] == 500
@@ -547,7 +547,7 @@ def test_clearing():
             "block_id": None,
             "link": None,
             "exclusive_id": None,
-            "agent_id": ("world", "renewablesDE1"),
+            "agent_addr": ("world", "renewablesDE1"),
             "bid_id": "renewablesDE1_wind_1",
             "unit_id": "renewablesDE1_wind",
         },
@@ -561,7 +561,7 @@ def test_clearing():
             "block_id": None,
             "link": None,
             "exclusive_id": None,
-            "agent_id": ("world", "conventionalDE1"),
+            "agent_addr": ("world", "conventionalDE1"),
             "bid_id": "conventionalDE1_gas_34_1",
             "unit_id": "conventionalDE1_gas_34",
         },
@@ -575,7 +575,7 @@ def test_clearing():
             "block_id": None,
             "link": None,
             "exclusive_id": None,
-            "agent_id": ("world", "demandDE1"),
+            "agent_addr": ("world", "demandDE1"),
             "bid_id": "demandDE11_1",
             "unit_id": "demandDE11",
         },
@@ -583,12 +583,16 @@ def test_clearing():
 
     simple_dayahead_auction_config.maximum_bid_price = 1e9
     mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert meta[0]["price"] == 0.2
 
-    # maximum_bid_price should not be too high.. Some floating point issue in pyomo..?
-    # I don't konw why this happens
-    simple_dayahead_auction_config.maximum_bid_price = 1e12
-    mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
-    assert meta[0]["price"] == 65
+    """
+    the following shows a flaw in the usage of GLPK.
+    it does not occur for highs or CBC
+    maximum_bid_price should not be too high.. Some floating point issue in pyomo..?
+    I don't know why this happens with GLPK
+    """
+    # simple_dayahead_auction_config.maximum_bid_price = 1e12
+    # mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
+    # accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
+    # assert meta[0]["price"] == 65

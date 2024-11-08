@@ -10,7 +10,7 @@ import dateutil.rrule as rr
 import pandas as pd
 import yaml
 from dateutil.relativedelta import relativedelta as rd
-from yamlinclude import YamlIncludeConstructor
+from yaml_include import Constructor
 
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
@@ -138,7 +138,7 @@ def add_agent_to_world(
 ):
     """
     Adds an agent from a amiris agent definition to the ASSUME world.
-    It should be called in load_amiris_async, which loads agents in the correct order.
+    It should be called in load_amiris, which loads agents in the correct order.
 
     Args:
         agent (dict): AMIRIS agent dict
@@ -277,8 +277,8 @@ def add_agent_to_world(
                 price_forecast=forecast_price,
             )
 
-            max_volume = device["EnergyToPowerRatio"] * device["InstalledPowerInMW"]
-            initial_soc = 100 * device["InitialEnergyLevelInMWH"] / max_volume
+            max_soc = device["EnergyToPowerRatio"] * device["InstalledPowerInMW"]
+            initial_soc = device["InitialEnergyLevelInMWH"]
             # TODO device["SelfDischargeRatePerHour"]
             world.add_unit(
                 f"StorageTrader_{agent['Id']}",
@@ -290,7 +290,7 @@ def add_agent_to_world(
                     "efficiency_charge": device["ChargingEfficiency"],
                     "efficiency_discharge": device["DischargingEfficiency"],
                     "initial_soc": initial_soc,
-                    "max_volume": max_volume,
+                    "max_soc": max_soc,
                     "bidding_strategies": storage_strategies,
                     "technology": "hydro",  # PSPP? Pump-Storage Power Plant
                     "emission_factor": 0,
@@ -442,16 +442,14 @@ def add_agent_to_world(
 
 
 def read_amiris_yaml(base_path):
-    YamlIncludeConstructor.add_to_loader_class(
-        loader_class=yaml.FullLoader, base_dir=base_path
-    )
+    yaml.add_constructor("!include", Constructor(base_dir=base_path))
 
     with open(base_path + "/scenario.yaml", "rb") as f:
         amiris_scenario = yaml.load(f, Loader=yaml.FullLoader)
     return amiris_scenario
 
 
-async def load_amiris_async(
+def load_amiris(
     world: World,
     scenario: str,
     study_case: str,
@@ -485,7 +483,7 @@ async def load_amiris_async(
     prices = {}
     index = pd.date_range(start=start, end=end, freq="1h", inclusive="left")
     world.bidding_strategies["support"] = SupportStrategy
-    await world.setup(
+    world.setup(
         start=start,
         end=end,
         save_frequency_hours=save_interval,
@@ -549,13 +547,11 @@ if __name__ == "__main__":
 
     db_uri = "postgresql://assume:assume@localhost:5432/assume"
     world = World(database_uri=db_uri)
-    world.loop.run_until_complete(
-        load_amiris_async(
-            world,
-            "amiris",
-            scenario.lower(),
-            base_path,
-        )
+    load_amiris(
+        world,
+        "amiris",
+        scenario.lower(),
+        base_path,
     )
     logger.info(f"did load {scenario} - now simulating")
     world.run()

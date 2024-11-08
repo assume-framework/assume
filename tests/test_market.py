@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
-from mango import RoleAgent, create_container
+from mango import RoleAgent, activate, create_tcp_container, sender_addr
 from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 
@@ -31,17 +31,18 @@ async def market_role() -> MarketRole:
         market_products=[MarketProduct(rd(hours=1), 1, rd(hours=1))],
     )
     clock = ExternalClock(0)
-    container = await create_container(addr=("0.0.0.0", 9098), clock=clock)
-    market_agent = RoleAgent(container)
+    container = create_tcp_container(addr=("0.0.0.0", 9098), clock=clock)
+    market_agent = RoleAgent()
     market_role = MarketRole(marketconfig=marketconfig)
     market_agent.add_role(market_role)
+    container.register(market_agent)
 
-    yield market_role
+    async with activate(container):
+        yield market_role
 
-    end_ts = datetime2timestamp(end)
-    clock.set_time(end_ts)
-    await tasks_complete_or_sleeping(container)
-    await container.shutdown()
+        end_ts = datetime2timestamp(end)
+        clock.set_time(end_ts)
+        await tasks_complete_or_sleeping(container)
 
 
 async def test_market_init(market_role: MarketRole):
@@ -56,7 +57,7 @@ async def test_market_init(market_role: MarketRole):
             "end_time": end,
             "volume": 120,
             "price": 120,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         }
     ]
@@ -78,7 +79,7 @@ async def test_market_tick(market_role: MarketRole):
             "end_time": end,
             "volume": 120.123,
             "price": 1201,  # used to present 120.1 with precision 0.1
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         }
     ]
@@ -93,7 +94,7 @@ async def test_market_tick(market_role: MarketRole):
             "end_time": end,
             "volume": 120.123,
             "price": 120.123,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         }
     ]
@@ -119,13 +120,13 @@ async def test_market_max(market_role: MarketRole):
             "end_time": end,
             "volume": 9091,
             "price": 120,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         }
     ]
     market_role.handle_orderbook(content={"orderbook": orderbook}, meta=meta)
-    # volume is too high
-    assert len(market_role.all_orders) == 0
+    # assert if the volume was reduced to the maximum
+    assert market_role.all_orders[0]["volume"] == 9090
 
     orderbook = [
         {
@@ -133,13 +134,13 @@ async def test_market_max(market_role: MarketRole):
             "end_time": end,
             "volume": 9090,
             "price": 1001,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         }
     ]
     market_role.handle_orderbook(content={"orderbook": orderbook}, meta=meta)
-    # price is too high
-    assert len(market_role.all_orders) == 0
+    # assert if the price was reduced to the maximum
+    assert market_role.all_orders[1]["price"] == 1000
 
     orderbook = [
         {
@@ -147,13 +148,13 @@ async def test_market_max(market_role: MarketRole):
             "end_time": end,
             "volume": 9090,
             "price": -550,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         }
     ]
     market_role.handle_orderbook(content={"orderbook": orderbook}, meta=meta)
-    # price is too low
-    assert len(market_role.all_orders) == 0
+    # assert if the price was increased to the minimum
+    assert market_role.all_orders[2]["price"] == -500
 
     orderbook = [
         {
@@ -161,14 +162,14 @@ async def test_market_max(market_role: MarketRole):
             "end_time": end,
             "volume": 9090,
             "price": 1000,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         }
     ]
     market_role.handle_orderbook(content={"orderbook": orderbook}, meta=meta)
-    assert len(market_role.all_orders) == 1
-    assert market_role.all_orders[0]["price"] == 1000
-    assert market_role.all_orders[0]["volume"] == 9090
+    assert len(market_role.all_orders) == 4
+    assert market_role.all_orders[3]["price"] == 1000
+    assert market_role.all_orders[3]["volume"] == 9090
 
 
 async def test_market_for_BB(market_role: MarketRole):
@@ -192,7 +193,7 @@ async def test_market_for_BB(market_role: MarketRole):
             "end_time": end,
             "volume": {time: 50 for time in time_range},
             "price": {time: 1000 for time in time_range},
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
             "bid_type": "BB",
         }
@@ -214,7 +215,7 @@ async def test_market_registration(market_role: MarketRole):
         meta=meta,
     )
     assert len(market_role.registered_agents.keys()) == 1
-    assert market_role.registered_agents[tuple(meta.values())] == info
+    assert market_role.registered_agents[sender_addr(meta)] == info
 
 
 async def test_market_unmatched(market_role: MarketRole):
@@ -229,7 +230,7 @@ async def test_market_unmatched(market_role: MarketRole):
             "end_time": end,
             "volume": 10,
             "price": 20,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "only_hours": None,
         }
     ]
@@ -245,3 +246,48 @@ async def test_market_unmatched(market_role: MarketRole):
     }
 
     market_role.handle_get_unmatched(content, meta)
+
+
+async def test_market_accepted(market_role: MarketRole):
+    meta = {
+        "sender_addr": "test_address",
+        "sender_id": "test_aid",
+    }
+
+    orderbook = [
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": 10,
+            "price": 20,
+            "agent_addr": "gen1",
+            "only_hours": None,
+        },
+        {
+            "start_time": start,
+            "end_time": end,
+            "volume": -10,
+            "price": 20,
+            "agent_addr": "gen1",
+            "only_hours": None,
+        },
+    ]
+    market_role.open_auctions |= {(start, end, None)}
+    market_role.handle_orderbook(content={"orderbook": orderbook}, meta=meta)
+
+    content = {
+        "order": {
+            "start_time": start,
+            "end_time": start + rd(hours=1),
+            "only_hours": None,
+        }
+    }
+
+    def accept_clear(all_orders, products):
+        return all_orders, [], [{"price": 0, "product_start": products[0][0]}], None
+
+    market_role.clear = accept_clear
+    # todo add exception handler
+
+    accepted, meta = await market_role.clear_market([(start, end, None)])
+    assert accepted == orderbook

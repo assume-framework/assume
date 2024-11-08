@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
-from mango import RoleAgent, create_container
+from mango import RoleAgent, activate, addr, create_tcp_container
 from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 
@@ -41,33 +41,33 @@ async def units_operator() -> UnitsOperator:
         market_products=[MarketProduct(rd(hours=1), 1, rd(hours=1))],
     )
     clock = ExternalClock(0)
-    container = await create_container(addr=("0.0.0.0", 9098), clock=clock)
-    units_agent = RoleAgent(container, "test_operator")
+    container = create_tcp_container(addr=("0.0.0.0", 9098), clock=clock)
+    units_agent = RoleAgent()
     units_role = UnitsOperator(available_markets=[marketconfig])
     units_agent.add_role(units_role)
+    agent_id = container.register(units_agent)
 
     index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 
     params_dict = {
         "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
         "technology": "energy",
-        "unit_operator": "test_operator",
+        "unit_operator": agent_id,
         "max_power": 1000,
         "min_power": 0,
         "forecaster": NaiveForecast(index, demand=1000),
     }
     unit = Demand("testdemand", index=index, **params_dict)
-    await units_role.add_unit(unit)
+    units_role.add_unit(unit)
 
     start_ts = datetime2timestamp(start)
     clock.set_time(start_ts)
 
-    yield units_role
-
-    end_ts = datetime2timestamp(end)
-    clock.set_time(end_ts)
-    await tasks_complete_or_sleeping(container)
-    await container.shutdown()
+    async with activate(container):
+        yield units_role
+        end_ts = datetime2timestamp(end)
+        clock.set_time(end_ts)
+        await tasks_complete_or_sleeping(container)
 
 
 @pytest.fixture
@@ -81,33 +81,41 @@ async def rl_units_operator() -> RLUnitsOperator:
         market_products=[MarketProduct(rd(hours=1), 1, rd(hours=1))],
     )
     clock = ExternalClock(0)
-    container = await create_container(addr=("0.0.0.0", 9098), clock=clock)
-    units_agent = RoleAgent(container, "test_operator")
+    container = create_tcp_container(addr=("0.0.0.0", 9098), clock=clock)
+    units_agent = RoleAgent()
     units_role = RLUnitsOperator(available_markets=[marketconfig])
     units_agent.add_role(units_role)
+    agent_id = container.register(units_agent)
 
     index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 
     params_dict = {
         "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
         "technology": "energy",
-        "unit_operator": "test_operator",
+        "unit_operator": agent_id,
         "max_power": 1000,
         "min_power": 0,
         "forecaster": NaiveForecast(index, demand=1000),
     }
     unit = Demand("testdemand", index=index, **params_dict)
-    await units_role.add_unit(unit)
+    units_role.add_unit(unit)
 
     start_ts = datetime2timestamp(start)
     clock.set_time(start_ts)
 
-    yield units_role
+    units_role.context.data.update(
+        {
+            "train_start": start,
+            "train_end": end,
+            "train_freq": "24h",
+        }
+    )
 
-    end_ts = datetime2timestamp(end)
-    clock.set_time(end_ts)
-    await tasks_complete_or_sleeping(container)
-    await container.shutdown()
+    async with activate(container):
+        yield units_role
+        end_ts = datetime2timestamp(end)
+        clock.set_time(end_ts)
+        await tasks_complete_or_sleeping(container)
 
 
 async def test_set_unit_dispatch(units_operator: UnitsOperator):
@@ -119,7 +127,7 @@ async def test_set_unit_dispatch(units_operator: UnitsOperator):
             "accepted_volume": 500,
             "price": 1000,
             "accepted_price": 1000,
-            "agent_id": "gen1",
+            "agent_addr": "gen1",
             "unit_id": "testdemand",
             "only_hours": None,
         }
@@ -176,17 +184,15 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
         "forecaster": NaiveForecast(index, powerplant=1000),
     }
     unit = PowerPlant("testplant", index=index, **params_dict)
-    await rl_units_operator.add_unit(unit)
+    rl_units_operator.add_unit(unit)
 
     rl_units_operator.learning_mode = True
     rl_units_operator.learning_data = {"test": 1}
 
     rl_units_operator.context.data.update(
         {
-            "learning_output_agent_addr": "world",
-            "learning_output_agent_id": "export_agent_1",
-            "learning_agent_addr": "world_0",
-            "learning_agent_id": "learning_agent",
+            "learning_output_agent_addr": addr("world", "export_agent_1"),
+            "learning_agent_addr": addr("world_0", "learning_agent"),
         }
     )
 
@@ -195,13 +201,13 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
     products = get_available_products(marketconfig.market_products, start)
     orderbook = await rl_units_operator.formulate_bids(marketconfig, products)
 
-    open_tasks = len(rl_units_operator.context._scheduler._scheduled_tasks)
+    open_tasks = len(rl_units_operator.context.scheduler._scheduled_tasks)
 
     rl_units_operator.write_learning_to_output(
         orderbook, market_id=marketconfig.market_id
     )
 
-    assert len(rl_units_operator.context._scheduler._scheduled_tasks) == open_tasks + 1
+    assert len(rl_units_operator.context.scheduler._scheduled_tasks) == open_tasks + 1
 
     rl_units_operator.units["testplant"].bidding_strategies[
         "EOM"
@@ -217,19 +223,19 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
     products = get_available_products(marketconfig.market_products, start)
     orderbook = await rl_units_operator.formulate_bids(marketconfig, products)
 
-    open_tasks = len(rl_units_operator.context._scheduler._scheduled_tasks)
+    open_tasks = len(rl_units_operator.context.scheduler._scheduled_tasks)
 
     rl_units_operator.write_learning_to_output(
         orderbook, market_id=marketconfig.market_id
     )
 
-    assert len(rl_units_operator.context._scheduler._scheduled_tasks) == open_tasks + 1
+    assert len(rl_units_operator.context.scheduler._scheduled_tasks) == open_tasks + 1
 
 
 async def test_get_actual_dispatch(units_operator: UnitsOperator):
     # GIVEN the first hour happened
     # the UnitOperator does not
-    clock = units_operator.context._agent_context._container.clock
+    clock = units_operator.context.context.clock
 
     last = clock.time
     clock.set_time(clock.time + 3600)

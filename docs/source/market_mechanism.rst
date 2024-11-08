@@ -98,3 +98,14 @@ Because with this algorithm, paradoxically accepted bids (PABs) can occur, the o
 
 
 If you want a hands-on use-case of the complex clearing check out the prepared tutorial in Colab: https://colab.research.google.com/github/assume-framework/assume
+
+
+If you want a hands-on use-case of the complex clearing check out the prepared tutorial in Colab: https://colab.research.google.com/github/assume-framework/assume
+
+Redispatch Modeling
+-------------------
+
+.. toctree::
+   :maxdepth: 1
+
+   redispatch_modeling

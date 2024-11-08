@@ -6,15 +6,7 @@ from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
-from pyomo.environ import (
-    ConcreteModel,
-    ConstraintList,
-    Objective,
-    Reals,
-    Var,
-    maximize,
-    quicksum,
-)
+import pyomo.environ as pyo
 from pyomo.opt import SolverFactory, check_available_solvers
 
 from assume.common.base import BaseStrategy, SupportsMinMaxCharge
@@ -89,12 +81,14 @@ PRICE_FUNCS = {
 }
 
 
-def get_solver_factory(solvers_str=["glpk", "cbc", "gurobi", "cplex"]) -> SolverFactory:
+def get_solver_factory(
+    solvers_str=["appsi_highs", "gurobi", "glpk", "cbc", "cplex"],
+) -> SolverFactory:
     """
     Returns the first available solver from the list of solvers
 
     Args:
-        solvers_str (list, optional): default solvers. Defaults to ["glpk", "cbc", "gurobi", "cplex"].
+        solvers_str (list, optional): list of default solvers
 
     Raises:
         Exception: if no solvers available
@@ -114,7 +108,7 @@ class DmasStorageStrategy(BaseStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.model = ConcreteModel("storage")
+        self.model = pyo.ConcreteModel("storage")
         self.opt = get_solver_factory()
 
     def build_model(self, unit: SupportsMinMaxCharge, start: datetime, hour_count: int):
@@ -133,13 +127,15 @@ class DmasStorageStrategy(BaseStrategy):
         self.model.clear()
         time_range = range(hour_count)
 
-        self.model.p_plus = Var(
-            time_range, within=Reals, bounds=(0, -unit.max_power_charge)
+        self.model.p_plus = pyo.Var(
+            time_range, within=pyo.Reals, bounds=(0, -unit.max_power_charge)
         )
-        self.model.p_minus = Var(
-            time_range, within=Reals, bounds=(0, unit.max_power_discharge)
+        self.model.p_minus = pyo.Var(
+            time_range, within=pyo.Reals, bounds=(0, unit.max_power_discharge)
         )
-        self.model.volume = Var(time_range, within=Reals, bounds=(0, unit.max_volume))
+        self.model.volume = pyo.Var(
+            time_range, within=pyo.NonNegativeReals, bounds=(0, unit.max_soc)
+        )
 
         self.power = [
             -self.model.p_minus[t] / unit.efficiency_discharge
@@ -147,9 +143,8 @@ class DmasStorageStrategy(BaseStrategy):
             for t in time_range
         ]
 
-        self.model.vol_con = ConstraintList()
-        soc0 = unit.get_soc_before(start)
-        v0 = unit.max_volume * soc0
+        self.model.vol_con = pyo.ConstraintList()
+        v0 = unit.get_soc_before(start)
 
         for t in time_range:
             if t == 0:
@@ -160,7 +155,7 @@ class DmasStorageStrategy(BaseStrategy):
                 )
 
         # always end with half full SoC
-        self.model.vol_con.add(self.model.volume[hour_count - 1] == unit.max_volume / 2)
+        self.model.vol_con.add(self.model.volume[hour_count - 1] == unit.max_soc / 2)
         return self.power
 
     def optimize(
@@ -192,8 +187,8 @@ class DmasStorageStrategy(BaseStrategy):
             prices = func(base_price.values)
             self.power = self.build_model(unit, start, hour_count)
             profit = [-self.power[t] * prices[t] for t in time_range]
-            self.model.obj = Objective(
-                expr=quicksum(profit[t] for t in time_range), sense=maximize
+            self.model.obj = pyo.Objective(
+                expr=pyo.quicksum(profit[t] for t in time_range), sense=pyo.maximize
             )
             self.opt.solve(self.model)
 

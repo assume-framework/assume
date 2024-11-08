@@ -8,12 +8,69 @@ Release Notes
 
 Upcoming Release
 =======================
+
 .. warning::
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
-  e.g. pip install git+https://github.com/assume-framework/assume
+  e.g. ``pip install git+https://github.com/assume-framework/assume``
 
 
-v0.4.0 - latest release (8th August 2024)
+v0.4.2 - Latest Release (5th November 2024)
+===========================================
+
+**New Features:**
+
+- **Residential Components**: Added new residential DST components including PV, EV, Heat Pump, and Boiler, now with enhanced docstrings for better usability.
+- **Modular DST Components**: DST components have been converted from functions to classes, improving modularity and reusability.
+- **Generic Storage Class**: Introduced a `GenericStorage` class for storage components. Specific classes, such as EV and Hydrogen Storage, now inherit from it.
+- **Storage Learning Strategy**: Added a new DRL-based learning strategy for storage units. To use it, set `storage_learning` in the `bidding_EOM` column of `storage_units.csv`. Refer to the `StorageRLStrategy` documentation for more details.
+- **Mango 2.x Update**: Upgraded to mango 2.x, enabling synchronous world creation. To upgrade an existing environment, run:
+  ```
+  pip uninstall -y mango-agents mango-agents-assume && pip install assume-framework --upgrade
+  ```
+- **Distributed Simulation Enhancements**: Improved distributed simulation for TCP and MQTT, allowing containers to wait for each other during simulations.
+- **Integrated Optimization with Pyomo and HIGHS Solver**: The Pyomo library and HIGHS solver are now installed by default, removing the need to install `assume-framework[optimization]` separately. The HIGHS solver is used as the default, replacing the older GLPK solver for improved optimization performance and efficiency.
+
+**Improvements:**
+
+- **Documentation**: Refined tutorial notebooks and added bug fixes.
+- **Saving Frequency Logic**: Refactored the saving frequency in the `WriteOutput` class for improved efficiency.
+
+**Bug Fixes:**
+
+- **Solver Compatibility**: Addressed undefined `solver_options` when using solvers other than Gurobi or HIGHS.
+- **Cashflow Calculation**: Corrected cashflow calculations for single-digit orders.
+- **Simulation Execution**: Enabled simulations to synchronize and wait for each other.
+- **Edge Case Handling**: Fixed edge cases in `pay_as_clear` and `pay_as_bid`.
+
+**New Contributor:**
+
+- @HafnerMichael made their first contribution with improvements to cashflow calculations and development of residential DST components.
+
+**Full Changelog**: [v0.4.1...v0.4.2](https://github.com/assume-framework/assume/compare/v0.4.1...v0.4.2)
+
+
+v0.4.1 (8th October 2024)
+===========================================
+
+**New Features:**
+
+- improve LSTM learning strategy (#382)
+- add python 3.12 compatibility (#334)
+- manual strategy for interactive market simulation (#403)
+
+**Improvements:**
+
+- add the ability to define the solver for the optimization-based market clearing inside the param_dict of the config file (#432)
+- shallow clone in Jupyter notebooks so that cloning is faster (#433)
+- fixes in storage operation bidding (#417)
+- update GitHub Actions versions (#402)
+
+**Bug Fixes:**
+- add compatibility with pyyaml-include (#421)
+- make complex clearing compatible to RL (#430)
+- pin PyPSA to remove DeprecationWarnings for now (#431)
+
+v0.4.0 (8th August 2024)
 =========================================
 
 **New Features:**
@@ -59,6 +116,7 @@ v0.4.0 - latest release (8th August 2024)
 - Examples have been restructed to easier orientation and understanding: example_01.. cover all feature demonstration examples,
   example_02.. cover all learning examples, example_03.. cover all full year examples
 - Added the option of integrating different actor network architectures to the reinforcement learning algorithm, currently a multilayer perceptron (mlp) and long short-term memory (lstm) are implemented
+- Added storing of network flows for complex clearing
 
 **Bug Fixes:**
 
@@ -72,6 +130,7 @@ v0.4.0 - latest release (8th August 2024)
 - Resolved various issues with learning and policy saving
 - Fixed missing market dispatch values in day-ahead markets
 - Added a check for availability_df.csv file to check for any values larger than 1
+- Fixed compatibility issues between new pyomo and RL due to tensor handling
 
 **Other Changes:**
 

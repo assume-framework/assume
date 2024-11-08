@@ -21,7 +21,7 @@ COPY README.md pyproject.toml /src
 COPY assume /src/assume
 COPY assume_cli /src/assume_cli
 COPY examples /src/examples
-ENV PATH /home/admin/.local/bin:$PATH
+ENV PATH=/home/admin/.local/bin:$PATH
 RUN chown -R admin /src /home/admin
 USER admin
 RUN pip install -e .
