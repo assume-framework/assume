@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-from distutils.util import strtobool
+from assume.common.utils import strtobool
 
 import pandas as pd
 import pyomo.environ as pyo
