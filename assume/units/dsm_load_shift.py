@@ -68,26 +68,32 @@ class DSMFlex:
         model.total_cost = pyo.Param(initialize=0.0, mutable=True)
 
         # Variables
-        model.load_shift = pyo.Var(model.time_steps, within=pyo.Reals)
+        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
+        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
+        model.shift_indicator = pyo.Var(model.time_steps, within=pyo.Binary)
 
-        @model.Constraint(model.time_steps)
-        def total_cost_upper_limit(m, t):
-            return sum(
-                model.variable_cost[t] for t in model.time_steps
-            ) <= model.total_cost * (1 + (model.cost_tolerance / 100))
+        @model.Constraint()
+        def total_cost_upper_limit(m):
+            return pyo.quicksum(
+                m.variable_cost[t] for t in m.time_steps
+            ) <= m.total_cost * (1 + (m.cost_tolerance / 100))
 
         @model.Constraint(model.time_steps)
         def total_power_input_constraint_with_flex(m, t):
             if self.has_electrolyser:
                 return (
-                    m.total_power_input[t] - m.load_shift[t]
+                    m.total_power_input[t]
+                    + m.load_shift_pos[t] * model.shift_indicator[t]
+                    - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
                     == self.model.dsm_blocks["electrolyser"].power_in[t]
                     + self.model.dsm_blocks["eaf"].power_in[t]
                     + self.model.dsm_blocks["dri_plant"].power_in[t]
                 )
             else:
                 return (
-                    m.total_power_input[t] - m.load_shift[t]
+                    m.total_power_input[t]
+                    + m.load_shift_pos[t] * model.shift_indicator[t]
+                    - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
                     == self.model.dsm_blocks["eaf"].power_in[t]
                     + self.model.dsm_blocks["dri_plant"].power_in[t]
                 )

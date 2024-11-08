@@ -388,9 +388,17 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 """
                 Maximizes the load shift over all time steps.
                 """
-                maximise_load_shift = sum(
-                    m.load_shift[t] for t in self.model.time_steps
+                # maximise_load_shift = pyo.quicksum(
+                #     m.load_shift_pos[t] * m.shift_indicator[t] for t in self.model.time_steps
+                # ) + pyo.quicksum(
+                #     m.load_shift_neg[t] * (1 - m.shift_indicator[t]) for t in self.model.time_steps
+                # )
+
+                maximise_load_shift = pyo.quicksum(
+                    m.load_shift_neg[t] * (1 - m.shift_indicator[t])
+                    for t in self.model.time_steps
                 )
+
                 return maximise_load_shift
 
         elif self.flexibility_measure == "congestion_management_flexibility":
@@ -503,7 +511,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             1 + (instance.cost_tolerance / 100)
         )
         print(f"The cost upper limit is {cost_tolerance_limit}")
-        
+
         print(f"Maximum load shift {objective_value}")
 
         temp = instance.total_power_input.get_values()
