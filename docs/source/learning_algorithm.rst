@@ -44,12 +44,13 @@ The following table shows the options that can be adjusted and gives a short exp
   gamma                                   The discount factor, with which future expected rewards are considered in the decision-making.
   device                                  The device to use.
   noise_sigma                             The standard deviation of the distribution used to draw the noise, which is added to the actions and forces exploration.
-  noise_dt                                Determines how quickly the noise weakens over time (UONoise) and used for noise scheduling (NormalActionNoise).
+  noise_dt                                Determines how quickly the noise weakens over time / used for noise scheduling.
   noise_scale                             The scale of the noise, which is multiplied by the noise drawn from the distribution.
   early_stopping_steps                    The number of steps considered for early stopping. If the moving average reward does not improve over this number of steps, the learning is stopped.
   early_stopping_threshold                The value by which the average reward needs to improve to avoid early stopping.
  ======================================== ==========================================================================================================
 
+Options for (linear) scheduling of learning rate and action noise are available, but not yet settable in the config file.
 
 The Algorithms
 ==============

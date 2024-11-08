@@ -130,7 +130,7 @@ def get_schedule_fn(value_schedule: Schedule | float) -> Schedule:
 def linear_schedule(start: float, end: float = 0, end_fraction: float = 1) -> Schedule:
     """
     Create a function that interpolates linearly between start and end
-    between ``progress_remaining`` = 1 and ``progress_remaining`` = ``end_fraction``.
+    between ``progress_remaining`` = 1 and ``progress_remaining`` = 1 - ``end_fraction``.
 
     Adapted from SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L100
 

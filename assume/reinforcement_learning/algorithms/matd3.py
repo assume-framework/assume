@@ -408,6 +408,7 @@ class TD3(RLAlgorithm):
                 actor = self.learning_role.rl_strats[u_id].actor
                 actor_target = self.learning_role.rl_strats[u_id].actor_target
 
+                # Update learning rate
                 self.update_learning_rate([critic.optimizer, actor.optimizer])
 
                 if i % 100 == 0:
@@ -530,7 +531,7 @@ class TD3(RLAlgorithm):
                     )
                 i += 1
 
-        # TODO: possible place to scale noise; only every policy update - same as learning rate
+        # Update noise decay
         updated_noise_decay = self.learning_role.noise_schedule(
             self.learning_role.get_progress_remaining()
         )

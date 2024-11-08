@@ -83,20 +83,19 @@ class Learning(Role):
         th.backends.cudnn.allow_tf32 = True
 
         self.learning_rate = learning_config.get("learning_rate", 1e-4)
-        # TODO: documentation (+ include in configs?)
-        # for now: disable linear schedule by commenting out the next linee
-        self.learning_rate = linear_schedule(
-            self.learning_rate
-        )  # TODO: discuss defaults for end value and fraction
+        # option for linear schedule
+        schedule_lr = True
+        if schedule_lr:
+            self.learning_rate = linear_schedule(self.learning_rate)
+
         self.lr_schedule = get_schedule_fn(self.learning_rate)
 
-        # provide linear schedule for action noise scale decay
         noise_dt = learning_config.get("noise_dt", 1)
-        # TODO: documentation (+ include in configs?)
-        # for now: disable linear schedule by commenting out the next line
-        noise_dt = linear_schedule(
-            noise_dt
-        )  # TODO: discuss defaults for end value and fraction
+        # option for linear schedule
+        schedule_noise = True
+        if schedule_noise:
+            noise_dt = linear_schedule(noise_dt)
+
         self.noise_schedule = get_schedule_fn(noise_dt)
 
         # if we do not have initital experience collected we will get an error as no samples are avaiable on the
@@ -358,6 +357,9 @@ class Learning(Role):
                     if avg_change < self.early_stopping_threshold:
                         logger.info(
                             f"Stopping training as no improvement above {self.early_stopping_threshold} in last {self.early_stopping_steps} evaluations for {metric}"
+                        )
+                        logger.info(
+                            "If learning rate or action noise were scheduled to decay, further learning improvement can be possible. End value of schedule may not have been reached."
                         )
 
                         self.rl_algorithm.save_params(
