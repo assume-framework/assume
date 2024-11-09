@@ -98,9 +98,6 @@ class WriteOutput(Role):
         self.write_dfs: dict = defaultdict(list)
         self.locks = defaultdict(lambda: Lock())
 
-        if self.db is not None:
-            self.delete_db_scenario(self.simulation_id)
-
         self.kpi_defs: dict[str, OutputDef] = {
             "avg_price": {
                 "value": "avg(price)",
@@ -191,6 +188,8 @@ class WriteOutput(Role):
     def on_ready(self):
         if self.db_uri:
             self.db = create_engine(self.db_uri)
+        if self.db is not None:
+            self.delete_db_scenario(self.simulation_id)
         if self.save_frequency_hours is not None:
             recurrency_task = rr.rrule(
                 freq=rr.HOURLY,
