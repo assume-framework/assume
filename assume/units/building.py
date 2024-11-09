@@ -4,6 +4,7 @@
 
 import ast
 import logging
+from datetime import timedelta
 from distutils.util import strtobool
 
 import pandas as pd
@@ -19,6 +20,7 @@ from pyomo.opt import (
 from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
+from assume.strategies import NaiveDABuildingStrategy
 from assume.units.dsm_load_shift import DSMFlex
 
 SOLVERS = ["gurobi", "glpk", "cbc", "cplex"]
@@ -132,7 +134,7 @@ class Building(DSMFlex, SupportsMinMax):
 
         # Parse the availability of the PV plant
         if self.has_pv:
-            if not strtobool(self.components["pv_plant"]["uses_power_profile"]):
+            if not strtobool(self.components["pv_plant"].get("uses_power_profile", "no")):
                 pv_availability = self.forecaster["availability_Solar"]
                 pv_availability.index = self.model.time_steps
                 self.components["pv_plant"]["availability_profile"] = pv_availability
@@ -141,12 +143,32 @@ class Building(DSMFlex, SupportsMinMax):
                 pv_power.index = self.model.time_steps
                 self.components["pv_plant"]["power_profile"] = pv_power
 
-
         self.define_variables()
-        self.initialize_components()
-        self.define_constraints()
-        self.define_objective()
-        self.initialize_process_sequence()
+
+        #############################
+        # Section for storage units #
+        #############################
+        if not isinstance(self.bidding_strategies.get("EOM", ""), NaiveDABuildingStrategy):
+            self.electricity_price.index = self.index
+            self.max_power_discharge = self.components.get("generic_storage", {}).get("max_power_discharge", 0)
+            self.max_power_charge = -self.components.get("generic_storage", {}).get("max_power_charge", 0)
+            self.max_capacity = self.components.get("generic_storage", {}).get("max_capacity", 0)
+            self.min_capacity = self.components.get("generic_storage", {}).get("min_capacity", 0)
+            self.efficiency_charge = self.components.get("generic_storage", {}).get("efficiency_charge", 1)
+            self.efficiency_discharge = self.components.get("generic_storage", {}).get("efficiency_discharge", 1)
+            self.initial_soc = self.components.get("generic_storage", {}).get("initial_soc", 1)
+            self.outputs["soc"] = pd.Series(self.initial_soc, index=self.index, dtype=float)
+            self.outputs["energy_cost"] = pd.Series(0.0, index=self.index, dtype=float)
+            self.pv_production = pd.Series(0.0, index=self.index, dtype=float)
+            self.battery_charge = pd.Series(0.0, index=self.index, dtype=float)
+            self.pv_max_power = self.components.get("pv_plant", {}).get("max_power", 0)
+        # End section for storage units #
+        else:
+            self.initialize_components()
+            self.define_constraints()
+            self.define_objective()
+            self.initialize_process_sequence()
+
 
         solvers = check_available_solvers(*SOLVERS)
         if len(solvers) < 1:
@@ -348,6 +370,8 @@ class Building(DSMFlex, SupportsMinMax):
         self.write_additional_outputs(instance)
 
     def write_additional_outputs(self, instance):
+        if not isinstance(self.bidding_strategies.get("EOM", ""), NaiveDABuildingStrategy):
+            return
         if self.has_battery_storage:
             model_block = instance.dsm_blocks["generic_storage"]
             soc = pd.Series(
@@ -362,6 +386,68 @@ class Building(DSMFlex, SupportsMinMax):
             ) / pyo.value(model_block.max_capacity)
             ev_soc.index = self.index
             self.outputs["ev_soc"] = ev_soc
+
+
+    def execute_current_dispatch(self, start: pd.Timestamp, end: pd.Timestamp):
+        """
+        Executes the current dispatch of the unit based on the provided timestamps.
+
+        The dispatch is only executed, if it is in the constraints given by the unit.
+        Returns the volume of the unit within the given time range.
+
+        Args:
+            start (pandas.Timestamp): The start time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch.
+
+        Returns:
+            pd.Series: The volume of the unit within the given time range.
+        """
+        if isinstance(self.bidding_strategies.get("EOM", ""), NaiveDABuildingStrategy):
+            return super().execute_current_dispatch(start, end)
+
+        end_excl = end - self.index.freq
+        for t in self.outputs["energy"][start : end_excl].index:
+            inflex_demand = self.inflex_demand[t]
+            pv_power = self.pv_production[t]
+            battery_power = self.battery_charge[t]
+            delta_soc = 0
+            soc = self.outputs["soc"][t]
+            #TODO: Why is that needed??
+            if battery_power > self.max_power_discharge:
+                battery_power = self.max_power_discharge
+            elif battery_power < self.max_power_charge:
+                battery_power = self.max_power_charge
+
+            # discharging
+            if battery_power > 0:
+                max_soc_discharge = self.calculate_soc_max_discharge(soc)
+
+                if battery_power > max_soc_discharge:
+                    battery_power = max_soc_discharge
+
+                time_delta = self.index.freq / timedelta(hours=1)
+                delta_soc = (
+                    -battery_power * time_delta / self.efficiency_discharge
+                )
+
+            # charging
+            elif battery_power < 0:
+                max_soc_charge = self.calculate_soc_max_charge(soc)
+
+                if battery_power < max_soc_charge:
+                    battery_power = max_soc_charge
+
+                time_delta = self.index.freq / timedelta(hours=1)
+                delta_soc = (
+                    -battery_power * time_delta * self.efficiency_charge
+                )
+            # Update the energy with the new values from battery_power
+            self.outputs["energy"][t] = battery_power + pv_power - inflex_demand
+
+            self.outputs["soc"].at[t + self.index.freq] = soc + delta_soc
+
+        return self.outputs["energy"].loc[start:end]
+
 
     def set_dispatch_plan(
         self,
@@ -387,15 +473,54 @@ class Building(DSMFlex, SupportsMinMax):
                     for key in order["accepted_volume"].keys()
                 ]
             else:
-                self.outputs["energy"].loc[start:end_excl] += order["accepted_volume"]
+                self.outputs["energy"].loc[start] += order["accepted_volume"]
         self.calculate_cashflow("energy", orderbook)
 
-        for start in products_index:
-            # TODO: For what is this needed??
-            current_power = self.outputs["energy"][start]
-            self.outputs["energy"][start] = current_power
+        if not isinstance(self.bidding_strategies.get("EOM", ""), NaiveDABuildingStrategy):
+            for start in products_index:
+                delta_soc = 0
+                soc = self.outputs["soc"][start]
+                inflex_demand = self.inflex_demand[start]
+                pv_power = self.pv_production[start]
+                battery_power = self.battery_charge[start]
 
-        self.bidding_strategies[marketconfig.market_id].calculate_reward(
+                # discharging
+                if battery_power > 0:
+                    max_soc_discharge = self.calculate_soc_max_discharge(soc)
+
+                    if battery_power > max_soc_discharge:
+                        battery_power = max_soc_discharge
+
+                    time_delta = self.index.freq / timedelta(hours=1)
+                    delta_soc = (
+                            -battery_power
+                            * time_delta
+                            / self.efficiency_discharge
+                    )
+
+                # charging
+                elif battery_power < 0:
+                    max_soc_charge = self.calculate_soc_max_charge(soc)
+
+                    if battery_power < max_soc_charge:
+                        battery_power = max_soc_charge
+
+                    time_delta = self.index.freq / timedelta(hours=1)
+                    delta_soc = (
+                            -battery_power * time_delta * self.efficiency_charge
+                    )
+
+                self.outputs["soc"][start + self.index.freq:] = soc + delta_soc
+                # Update the energy with the new values from battery_power
+                self.outputs["energy"][start] = battery_power + pv_power - inflex_demand
+            else:
+                for start in products_index:
+                    # TODO: For what is this needed??
+                    current_power = self.outputs["energy"][start]
+                    self.outputs["energy"][start] = current_power
+
+
+            self.bidding_strategies[marketconfig.market_id].calculate_reward(
             unit=self,
             marketconfig=marketconfig,
             orderbook=orderbook,
@@ -421,6 +546,107 @@ class Building(DSMFlex, SupportsMinMax):
             ),2)
         return marginal_cost
 
+    def calculate_max_discharge(self, start: pd.Timestamp, end: pd.Timestamp) -> pd.Series:
+        """
+        Calculates the maximum discharging power for the given time period.
+
+        Args:
+            start:
+            end:
+
+        Returns:
+
+        """
+        end_excl = end - self.index.freq
+        if not self.has_battery_storage:
+            return pd.Series(0, index=self.index[(self.index >= start) & (self.index <= end_excl)], dtype=float)
+
+        max_power_discharge = pd.Series(self.max_power_discharge,
+                                        index=self.index[(self.index >= start) & (self.index <= end_excl)],
+                                        dtype=float
+                                        )
+        # restrict according to min_soc
+        max_soc_discharge = self.calculate_soc_max_discharge(self.outputs["soc"][start])
+        max_power_discharge = max_power_discharge.clip(upper=max_soc_discharge)
+        return max_power_discharge
+
+    def calculate_max_charge(self, start: pd.Timestamp, end: pd.Timestamp) -> pd.Series:
+        """
+        Calculates the maximum discharging power for the given time period.
+
+        Args:
+            start:
+            end:
+
+        Returns:
+
+        """
+        end_excl = end - self.index.freq
+        if not self.has_battery_storage:
+            return pd.Series(0, index=self.index[(self.index >= start) & (self.index <= end_excl)], dtype=float)
+
+        max_power_charge = pd.Series(self.max_power_charge,
+                                     index=self.index[(self.index >= start) & (self.index <= end_excl)],
+                                     dtype=float
+                                     )
+        # restrict charging according to max_soc
+        max_soc_charge = self.calculate_soc_max_charge(self.outputs["soc"][start])
+        max_power_charge = max_power_charge.clip(lower=max_soc_charge)
+        return max_power_charge
+
+
+    def calculate_pv_power(self, start: pd.Timestamp, end: pd.Timestamp) -> pd.Series:
+        end_excl = end - self.index.freq
+        if not self.has_pv:
+            return pd.Series(0, index=self.index[(self.index >= start) & (self.index <= end_excl)], dtype=float)
+
+        availability = self.forecaster["availability_Solar"][start:end_excl]
+        current_power = availability * self.pv_max_power
+
+        self.pv_production[start:end_excl] = current_power
+
+        return current_power
+
+
+    def calculate_soc_max_charge(
+        self,
+        soc,
+    ) -> float:
+        """
+        Calculates the maximum charge power depending on the current state of charge.
+
+        Args:
+            soc (float): The current state of charge.
+
+        Returns:
+            float: The maximum charge power.
+        """
+        duration = self.index.freq / timedelta(hours=1)
+        power = min(
+            0,
+            ((soc - self.max_capacity) / self.efficiency_charge / duration),
+        )
+        return power
+
+
+    def calculate_soc_max_discharge(self, soc) -> float:
+        """
+        Calculates the maximum discharge power depending on the current state of charge.
+
+        Args:
+            soc (float): The current state of charge.
+
+        Returns:
+            float: The maximum discharge power.
+        """
+        duration = self.index.freq / timedelta(hours=1)
+        power = max(
+            0,
+            ((soc - self.min_capacity) * self.efficiency_discharge / duration),
+        )
+        return power
+
+
     def as_dict(self) -> dict:
         """
         Returns the attributes of the unit as a dictionary, including specific attributes.
@@ -428,7 +654,7 @@ class Building(DSMFlex, SupportsMinMax):
         Returns:
             dict: The attributes of the unit as a dictionary.
         """
-        components_list = [component for component in self.model.dsm_blocks.keys()]
+        components_list = [component for component in self.components.keys()]
         components_string = ",".join(components_list)
 
         unit_dict = super().as_dict()

@@ -1,4 +1,4 @@
-name,unit_type,technology,node,bidding_EOM,fuel_type,bidding_redispatch,unit_operator,objective,flexibility_measure,cost_tolerance,charging_profile,uses_power_profile,availability_periods,demand,rated_power,max_power,min_power,ramp_up,ramp_down,min_operating_time,min_down_time,efficiency,cop,max_capacity,min_capacity,initial_soc,storage_loss_rate,efficiency_charge,efficiency_discharge,max_charging_rate,max_discharging_rate,sells_energy_to_market
+name,unit_type,technology,node,bidding_EOM,fuel_type,bidding_redispatch,unit_operator,objective,flexibility_measure,cost_tolerance,charging_profile,uses_power_profile,availability_periods,demand,rated_power,max_power,min_power,ramp_up,ramp_down,min_operating_time,min_down_time,efficiency,cop,max_capacity,min_capacity,initial_soc,storage_loss_rate,efficiency_charge,efficiency_discharge,max_power_charge,max_power_discharge,sells_energy_to_market
 EGHKH_building,building,pv_plant,north,naive_da_building,,,dsm_operator_1,minimize_expenses,,,,No,,,,0,0,,,,,,,,,,,,,,,
 EGHR_building,building,pv_plant,north,naive_da_building,,,dsm_operator_2,minimize_expenses,,,,Yes,,,,5,0,,,,,,,,,,,,,,,
 EGHKM_building,building,pv_plant,north,naive_da_building,,,dsm_operator_3,minimize_expenses,,,,Yes,,,,5,0,,,,,,,,,,,,,,,
@@ -10,4 +10,4 @@ EGHL_building,building,pv_plant,north,naive_da_building,,,dsm_operator_8,minimiz
 EGHD1_building,building,pv_plant,north,naive_da_building,,,dsm_operator_9,minimize_expenses,,,,No,,,,0,0,,,,,,,,,,,,,,,
 EGHD2_building,building,pv_plant,north,naive_da_building,,,dsm_operator_10,minimize_expenses,,,,No,,,,0,0,,,,,,,,,,,,,,,
 EGHD3_building,building,pv_plant,north,naive_da_building,,,dsm_operator_11,minimize_expenses,,,,No,,,,0,0,,,,,,,,,,,,,,,
-EGHSt1_building,building,generic_storage,north,naive_da_building,,,dsm_operator_12,minimize_expenses,,,,,,,,,,0.005,0.005,,,,,0.0135,0.0015,0.0015,,0.9731,0.9731,0.005,0.005,Yes
+EGHSt1_building,building,generic_storage,north,household_storage_learning,,,dsm_operator_6,minimize_expenses,,,,,,,,,,0.005,0.005,,,,,0.09,0.0015,0.0015,,0.9731,0.9731,0.005,0.005,Yes
