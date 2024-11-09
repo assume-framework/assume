@@ -118,11 +118,10 @@ def cli(args=None):
 
     argcomplete.autocomplete(parser)
     args = parser.parse_args(args)
-    name = args.scenario
     if args.db_uri:
         db_uri = make_url(args.db_uri)
     else:
-        db_uri = f"sqlite:///./examples/local_db/{name}.db"
+        db_uri = ""
 
     # add these two weird hacks for now
     warnings.filterwarnings("ignore", "coroutine.*?was never awaited.*")

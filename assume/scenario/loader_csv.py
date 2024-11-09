@@ -440,7 +440,7 @@ def read_units(
                 id=unit_name,
                 unit_type=unit_type,
                 unit_operator_id=operator_id,
-                unit_params=unit_params,
+                unit_params=unit_params.to_dict(),
                 forecaster=forecaster,
             )
         )
@@ -627,7 +627,7 @@ def setup_world(
         )
 
         # If PostgreSQL database is in use, warn the user about end-of-simulation saving
-        if world.db is not None and "postgresql" in world.db.name:
+        if world.db_uri is not None and "postgresql" in world.db_uri:
             logger.warning(
                 "Data will be stored in the PostgreSQL database only at the end of the simulation due to CSV export being enabled. "
                 "Disable CSV export to save data at regular intervals (export_csv_path = '')."
@@ -1019,7 +1019,12 @@ def run_learning(
             world.run()
 
             total_rewards = world.output_role.get_sum_reward()
+
+            if len(total_rewards) == 0:
+                raise AssumeException("No rewards were collected during evaluation run")
+
             avg_reward = np.mean(total_rewards)
+
             # check reward improvement in evaluation run
             # and store best run in eval folder
             terminate = world.learning_role.compare_and_save_policies(

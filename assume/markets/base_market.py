@@ -275,7 +275,6 @@ class MarketRole(MarketMechanism, Role):
         else:
             logger.debug("market %s - does not reopen", self.marketconfig.market_id)
 
-
     def validate_registration(
         self, content: RegistrationMessage, meta: MetaDict
     ) -> bool:

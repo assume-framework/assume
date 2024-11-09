@@ -216,7 +216,8 @@ if __name__ == "__main__":
         "postgresql://readonly:readonly@timescale.nowum.fh-aachen.de:5432/opendata",
     )
 
-    nuts_config = ["DE1", "DEA", "DEB", "DEC", "DED", "DEE", "DEF"]
+    nuts_config = os.getenv("NUTS_CONFIG").split(",")
+    nuts_config = nuts_config or ["DE1", "DEA", "DEB", "DEC", "DED", "DEE", "DEF"]
     year = 2019
     start = datetime(year, 1, 1)
     end = datetime(year + 1, 1, 1) - timedelta(hours=1)

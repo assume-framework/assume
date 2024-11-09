@@ -1,0 +1,2 @@
+name,technology,bidding_EOM,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_soc,max_soc,initial_soc,additional_cost_charge,additional_cost_discharge,natural_inflow,unit_operator
+Storage 1,PSPP,storage_learning,300,300,0.9,0.9,1.0,5000,1.0,0.28,0.28,0.0,Operator 1
