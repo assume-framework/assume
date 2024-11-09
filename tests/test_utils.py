@@ -457,8 +457,8 @@ def test_2():
 
     import numpy as np
 
-    l = len(orderbook)
-    results = defaultdict(lambda: np.zeros(l))
+    o_len = len(orderbook)
+    results = defaultdict(lambda: np.zeros(o_len))
     for i, element in enumerate(orderbook):
         results[element["start_time"]][i] = element["volume"]
         # for k,v in element.items():
