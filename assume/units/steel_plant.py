@@ -149,7 +149,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         if len(solvers) < 1:
             raise Exception(f"None of {SOLVERS} are available")
 
-        self.solver = SolverFactory(solvers[0])
+        self.solver = SolverFactory(solvers[1])
         self.solver_options = {
             "output_flag": False,
             "log_to_console": False,
@@ -333,7 +333,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             )
             if self.has_electrolyser:
                 power_input += self.model.dsm_blocks["electrolyser"].power_in[t]
-            return m.total_power_input[t] == power_input
+            return self.model.total_power_input[t] == power_input
 
         # Constraint for variable cost per time step
         @self.model.Constraint(self.model.time_steps)
@@ -471,6 +471,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.variable_cost_series = pd.Series(
             data=instance.variable_cost.get_values()
         ).set_axis(self.index)
+        print(self.variable_cost_series)
 
     def determine_optimal_operation_with_flex(self):
         """
@@ -511,20 +512,30 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             1 + (instance.cost_tolerance / 100)
         )
         print(f"The cost upper limit is {cost_tolerance_limit}")
+        self.total_cost = sum(
+            instance.variable_cost[t].value for t in instance.time_steps
+        )
+        print(
+            f"The cost upper limit is {self.total_cost} = The cost upper limit is {cost_tolerance_limit}"
+        )
 
         print(f"Maximum load shift {objective_value}")
 
-        temp = instance.total_power_input.get_values()
-        self.flex_power_requirement = pd.Series(data=temp)
-        self.flex_power_requirement.index = self.index
+        # temp = instance.total_power_input.get_values()
+        # self.flex_power_requirement = pd.Series(data=temp)
+        # self.flex_power_requirement.index = self.index
+        self.flex_power_requirement = pd.Series(
+            data=instance.total_power_input.get_values()
+        ).set_axis(self.index)
 
         # print("Started iteration 2")
         # print(self.flex_power_requirement)
 
         # Variable cost series
-        temp_1 = instance.variable_cost.get_values()
-        self.variable_cost_series = pd.Series(data=temp_1)
-        self.variable_cost_series.index = self.index
+        self.variable_cost_series = pd.Series(
+            data=instance.variable_cost.get_values()
+        ).set_axis(self.index)
+        print(self.variable_cost_series)
 
     def switch_to_opt(self, instance):
         """
