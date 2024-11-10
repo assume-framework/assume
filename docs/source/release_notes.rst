@@ -13,8 +13,18 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+v0.4.3 - (11th November 2024)
+===========================================
 
-v0.4.2 - Latest Release (5th November 2024)
+**Improvements:**
+  - **Documentation**: added codespell hook to pre-commit which checks for spelling errors in documentation and code
+
+**Bugfixes:**
+  - **Simulation**: Delete simulation results for same simulation prior to run (as before v0.4.2)
+
+**Full Changelog**: [v0.4.2...v0.4.3](https://github.com/assume-framework/assume/compare/v0.4.2...v0.4.3)
+
+v0.4.2 - (5th November 2024)
 ===========================================
 
 **New Features:**
