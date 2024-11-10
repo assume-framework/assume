@@ -65,17 +65,17 @@ if __name__ == "__main__":
             agent_addresses.append(addr(agent_address + str(i), "clock_agent"))
         else:
             agent_addresses.append(addr((tcp_host, 9098 + i), "clock_agent"))
-    ags = []
+    agents = []
     for i in range(n):
         ag = Process(target=agent, args=(i, n))
-        ags.append(ag)
+        agents.append(ag)
 
     man.start()
-    for ag in ags:
+    for ag in agents:
         ag.start()
 
     # first we are waiting for the manager to finish
     man.join()
     # then we are joining all the finished Agent Containers
-    for ag in ags:
+    for ag in agents:
         ag.join()

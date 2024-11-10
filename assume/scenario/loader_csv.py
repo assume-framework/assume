@@ -548,7 +548,7 @@ def setup_world(
         scenario_data (dict): A dictionary containing the configuration and loaded files for the scenario and study case.
         study_case (str): The specific study case within the scenario to be loaded.
         perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
-        terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode itteration or because we triggered an early stopping.
+        terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode iteration or because we triggered an early stopping.
         episode (int, optional): The episode number for learning. Defaults to 0.
         eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
 
@@ -695,7 +695,7 @@ def setup_world(
         units[op].extend(op_units)
 
     # if distributed_role is true - there is a manager available
-    # and we cann add each units_operator as a separate process
+    # and we can add each units_operator as a separate process
     if world.distributed_role is True:
         logger.info("Adding unit operators and units - with subprocesses")
         for op, op_units in units.items():
@@ -742,7 +742,7 @@ def load_scenario_folder(
         scenario (str): The name of the scenario to be loaded.
         study_case (str): The specific study case within the scenario to be loaded.
         perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
-        terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode itteration or because we triggered an early stopping.
+        terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode iteration or because we triggered an early stopping.
         episode (int, optional): The episode number for learning. Defaults to 0.
         eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
 
@@ -880,7 +880,7 @@ def run_learning(
     world.learning_role.initialize_policy(actors_and_critics=actors_and_critics)
     world.output_role.del_similar_runs()
 
-    # check if we already stored policies for this simualtion
+    # check if we already stored policies for this simulation
     save_path = world.learning_config["trained_policies_save_path"]
 
     if Path(save_path).is_dir():
@@ -939,7 +939,7 @@ def run_learning(
             )
 
         # -----------------------------------------
-        # Give the newly initliazed learning role the needed information across episodes
+        # Give the newly initialized learning role the needed information across episodes
         world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
         world.run()

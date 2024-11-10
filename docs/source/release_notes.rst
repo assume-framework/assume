@@ -101,7 +101,7 @@ v0.4.0 (8th August 2024)
 
 - Significant speed up of the framework and especially of the learning process
 - Separated scenario loader function to improve speed and reduce unrequired operations
-- Refactored unit operator by adding a seperate unit operator for learning units
+- Refactored unit operator by adding a separate unit operator for learning units
 - Enhanced learning output and path handling
 - Updated dashboard for better storage view
 - Improved clearing with shuffling of bids, to avoid bias in clearing of units early in order book
@@ -113,7 +113,7 @@ v0.4.0 (8th August 2024)
   matched to the corresponding market zone.
 - If any values in the availability_df.csv file are larger than 1, the framework will now warn the user
   and run a method to normalize the values to [0, 1].
-- Examples have been restructed to easier orientation and understanding: example_01.. cover all feature demonstration examples,
+- Examples have been restructured to easier orientation and understanding: example_01.. cover all feature demonstration examples,
   example_02.. cover all learning examples, example_03.. cover all full year examples
 - Added the option of integrating different actor network architectures to the reinforcement learning algorithm, currently a multilayer perceptron (mlp) and long short-term memory (lstm) are implemented
 - Added storing of network flows for complex clearing
