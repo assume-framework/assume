@@ -1209,7 +1209,7 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
                 bid_direction = "hold_charge"
 
             # the third action is the charge/discharge volume
-            charging_volume = (actions[2] * unit.calculate_max_charge(start, end).iloc[0]).item()
+            charging_volume = (actions[2] * abs(unit.calculate_max_charge(start, end).iloc[0])).item()
             discharging_volume = (actions[2] * unit.calculate_max_discharge(start, end).iloc[0]).item()
 
             bids = []
@@ -1345,7 +1345,7 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
         Rewards are based on profit and include fixed costs for charging and discharging.
         """
 
-        scaling_factor = 0.1 / unit.max_power_discharge
+        scaling_factor = 0.1 / unit.max_power_discharge if unit.has_battery_storage else 1
 
         product_type = marketconfig.product_type
         reward = 0
@@ -1359,9 +1359,7 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
             duration_hours = (end_time - start_time) / timedelta(hours=1)
 
             # ignore very small volumes due to calculations
-            accepted_volume = (
-                order["accepted_volume"] if abs(order["accepted_volume"]) > 1 else 0
-            )
+            accepted_volume = order["accepted_volume"]
 
             # Calculate profit and cost for the order
             order_profit = order["accepted_price"] * accepted_volume * duration_hours
@@ -1479,12 +1477,12 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
             )
 
         # get the current soc value
-        soc_scaled = unit.outputs["soc"].at[start] / unit.max_capacity
+        soc_scaled = (unit.outputs["soc"].at[start] / unit.max_capacity) if unit.has_battery_storage and unit.max_capacity != 0 else 0
         energy_cost_scaled = unit.outputs["energy_cost"].at[start] / self.max_bid_price
         max_inflex_demand = max(unit.inflex_demand)
         scale_factor_inflex_demand = max_inflex_demand if max_inflex_demand != 0 else 1
         inflex_demand_scaled = unit.inflex_demand[start] / scale_factor_inflex_demand
-        pv_availability = (unit.pv_production[start] / unit.pv_max_power) if unit.has_pv else 0
+        pv_availability = (unit.pv_production[start] / unit.pv_max_power) if unit.has_pv and unit.pv_max_power != 0 else 0
 
         # concat all observations into one array
         observation = np.concatenate(

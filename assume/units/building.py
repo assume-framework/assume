@@ -134,6 +134,7 @@ class Building(DSMFlex, SupportsMinMax):
 
         # Parse the availability of the PV plant
         if self.has_pv:
+            self.pv_uses_power_profile = False
             if not strtobool(self.components["pv_plant"].get("uses_power_profile", "no")):
                 pv_availability = self.forecaster["availability_Solar"]
                 pv_availability.index = self.model.time_steps
@@ -150,8 +151,8 @@ class Building(DSMFlex, SupportsMinMax):
         #############################
         if not isinstance(self.bidding_strategies.get("EOM", ""), NaiveDABuildingStrategy):
             self.electricity_price.index = self.index
-            self.max_power_discharge = self.components.get("generic_storage", {}).get("max_power_discharge", 0)
-            self.max_power_charge = -self.components.get("generic_storage", {}).get("max_power_charge", 0)
+            self.max_power_discharge = abs(self.components.get("generic_storage", {}).get("max_power_discharge", 0))
+            self.max_power_charge = -abs(self.components.get("generic_storage", {}).get("max_power_charge", 0))
             self.max_capacity = self.components.get("generic_storage", {}).get("max_capacity", 0)
             self.min_capacity = self.components.get("generic_storage", {}).get("min_capacity", 0)
             self.efficiency_charge = self.components.get("generic_storage", {}).get("efficiency_charge", 1)
@@ -597,14 +598,21 @@ class Building(DSMFlex, SupportsMinMax):
 
     def calculate_pv_power(self, start: pd.Timestamp, end: pd.Timestamp) -> pd.Series:
         end_excl = end - self.index.freq
-        if not self.has_pv:
-            return pd.Series(0, index=self.index[(self.index >= start) & (self.index <= end_excl)], dtype=float)
+        index = self.index[(self.index >= start) & (self.index <= end_excl)]
+        current_power = pd.Series(0, index=index, dtype=float)
 
-        availability = self.forecaster["availability_Solar"][start:end_excl]
-        current_power = availability * self.pv_max_power
+        if self.has_pv and self.pv_uses_power_profile:
+            power = self.components["pv_plant"].get("power_profile", 0)
+            if isinstance(power, pd.Series):
+                power.index = self.index
+                current_power = power[start:end_excl]
+        elif self.has_pv:
+            av_solar = self.components["pv_plant"].get("availability_profile", 0)
+            if isinstance(av_solar, pd.Series):
+                av_solar.index = self.index
+                current_power = av_solar[start:end_excl] * self.pv_max_power
 
         self.pv_production[start:end_excl] = current_power
-
         return current_power
 
 
