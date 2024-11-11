@@ -106,28 +106,69 @@ class DSMFlex:
         Args:
             model (pyomo.ConcreteModel): The Pyomo model being optimized.
         """
-        # Parameter for congestion sensitivity signal
+
+        def get_congestion_indicator(congestion_signal, threshold):
+            """
+            Converts congestion signals to binary values based on a threshold.
+
+            Args:
+                congestion_signal (pd.Series): Series of congestion signal values.
+                threshold (float): Threshold above which congestion is considered high.
+
+            Returns:
+                dict: Dictionary of 0/1 values indicating low/high congestion per time step.
+            """
+            # Convert to integer-indexed dictionary of binary values using the threshold
+            return {
+                i: int(congestion_signal[i] > threshold)
+                for i in range(len(congestion_signal))
+            }
+
+        # Generate the congestion_indicator based on the threshold
+        congestion_indicator_dict = get_congestion_indicator(
+            self.congestion_signal, self.congestion_threshold
+        )
+
+        # Define the cost tolerance parameter
         model.cost_tolerance = pyo.Param(initialize=(self.cost_tolerance))
-        model.congestion_signal = pyo.Param(
-            model.time_steps,
-            initialize={t: value for t, value in enumerate(self.congestion_signal)},
+        model.total_cost = pyo.Param(initialize=0.0, mutable=True)
+        # Define congestion_indicator as a fixed parameter with matching indices
+        model.congestion_indicator = pyo.Param(
+            model.time_steps, initialize=congestion_indicator_dict
         )
 
-        # Variable for load shift
-        model.load_shift = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
+        # Variables
+        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
+        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
+        model.shift_indicator = pyo.Var(model.time_steps, within=pyo.Binary)
 
-        # Define congestion-adjusted load shift as a Pyomo expression
-        model.congestion_adjusted_load_shift = pyo.Expression(
-            model.time_steps, rule=lambda m, t: m.load_shift[t] * m.congestion_signal[t]
-        )
+        # Constraint to manage total cost upper limit with cost tolerance
+        @model.Constraint()
+        def total_cost_upper_limit(m):
+            return pyo.quicksum(
+                m.variable_cost[t] for t in m.time_steps
+            ) <= m.total_cost * (1 + (m.cost_tolerance / 100))
 
-        # Single constraint ensuring total power input meets the congestion-adjusted load shift
+        # Power input constraint with flexibility based on congestion
         @model.Constraint(model.time_steps)
-        def total_power_constraint(m, t):
-            """
-            Ensures total power input can meet the congestion-adjusted load shift demand.
-            """
-            return m.total_power_input[t] - m.congestion_adjusted_load_shift[t] >= 0
+        def total_power_input_constraint_with_flex(m, t):
+            if self.has_electrolyser:
+                return (
+                    m.total_power_input[t]
+                    + m.load_shift_pos[t] * model.shift_indicator[t]
+                    - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
+                    == self.model.dsm_blocks["electrolyser"].power_in[t]
+                    + self.model.dsm_blocks["eaf"].power_in[t]
+                    + self.model.dsm_blocks["dri_plant"].power_in[t]
+                )
+            else:
+                return (
+                    m.total_power_input[t]
+                    + m.load_shift_pos[t] * model.shift_indicator[t]
+                    - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
+                    == self.model.dsm_blocks["eaf"].power_in[t]
+                    + self.model.dsm_blocks["dri_plant"].power_in[t]
+                )
 
     def recalculate_with_accepted_offers(self, model):
         self.reference_power = self.forecaster[f"{self.id}_power"]

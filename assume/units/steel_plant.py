@@ -69,6 +69,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         flexibility_measure: str = "",
         demand: float = 0,
         cost_tolerance: float = 10,
+        congestion_threshold: float = 0,
         **kwargs,
     ):
         super().__init__(
@@ -115,6 +116,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.objective = objective
         self.flexibility_measure = flexibility_measure
         self.cost_tolerance = cost_tolerance
+        self.congestion_threshold = congestion_threshold
 
         # Check for the presence of components
         self.has_h2storage = "hydrogen_storage" in self.components.keys()
@@ -404,9 +406,13 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 """
                 Maximizes the load shift over all time steps.
                 """
-                maximise_load_shift = sum(
-                    m.congestion_adjusted_load_shift[t] for t in m.time_steps
+                maximise_load_shift = pyo.quicksum(
+                    m.load_shift_neg[t]
+                    * (1 - m.shift_indicator[t])
+                    * m.congestion_indicator[t]
+                    for t in m.time_steps
                 )
+
                 return maximise_load_shift
 
         else:
@@ -465,6 +471,9 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.variable_cost_series = pd.Series(
             data=instance.variable_cost.get_values()
         ).set_axis(self.index)
+
+        # for t in instance.time_steps:
+        #     print(f"Congestion indicator at time {t}: {pyo.value(instance.congestion_indicator[t])}")
 
     def determine_optimal_operation_with_flex(self):
         """
@@ -533,8 +542,8 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         instance.obj_rule_flex.deactivate()
 
         # Deactivate flexibility constraints if they exist
-        # if hasattr(instance, "total_cost_upper_limit"):
-        instance.total_cost_upper_limit.deactivate()
+        if hasattr(instance, "total_cost_upper_limit"):
+            instance.total_cost_upper_limit.deactivate()
 
         # if hasattr(instance, "total_power_input_constraint_with_flex"):
         instance.total_power_input_constraint_with_flex.deactivate()
