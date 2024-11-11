@@ -70,7 +70,7 @@ def test_minmax():
         mm.calculate_ramp(op_time=1, previous_power=800, power=500, current_power=0)
         == 600
     )
-    # check min_operating_time contraint
+    # check min_operating_time constraint
     mm.min_operating_time = 2
     mm.outputs["energy"][mm.index[0]] = 0
     mm.outputs["energy"][mm.index[1]] = 200
@@ -88,7 +88,7 @@ def test_minmax():
         == 400
     )
 
-    # check min_down_time contraint
+    # check min_down_time constraint
     mm.min_down_time = 2
     mm.outputs["energy"][mm.index[2]] = 0
     op_time = mm.get_operation_time(mm.index[3])
@@ -145,9 +145,8 @@ def test_minmaxcharge_unconstrained():
         "Test", "TestOperator", "TestTechnology", {}, None, "empty"
     )
 
-    # 1. wenn ramp nicht definiert ist, sollte es auch keine constraints erzeugen
-    # 2. alle maximal/minimal und ramp werte werden positiv angegeben
-    #
+    # 1. wenn ramp is undefined, it should not create constraints
+    # 2. all maximum/minimum and ramp values should be given as positive values
 
     mmc.max_power_charge = -1000  # MW
     mmc.max_power_discharge = 1000  # MW

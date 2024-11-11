@@ -440,9 +440,9 @@ class InfrastructureInterface:
         # If the response Dataframe is not empty set technical parameter
         if df.empty:
             return df
-        # all WEA with nan set hight to mean value
+        # all WEA with nan set height to mean value
         df["height"] = df["height"].fillna(df["height"].mean())
-        # all WEA with nan set hight to mean diameter
+        # all WEA with nan set height to mean diameter
         df["diameter"] = df["diameter"].fillna(df["diameter"].mean())
         # all WEA with na are on shore and not allocated to a sea cluster
         df["nordicSea"] = df["nordicSea"].astype(float).fillna(0)
