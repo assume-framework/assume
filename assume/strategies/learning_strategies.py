@@ -1087,6 +1087,7 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
 
         # defines bounds of actions space
         self.max_bid_price = kwargs.get("max_bid_price", 100)
+        self.min_bid_price = kwargs.get("min_bid_price", 0)
         self.max_demand = kwargs.get("max_demand", 10e3)
 
         # tells us whether we are training the agents or just executing per-learnind stategies
@@ -1196,7 +1197,9 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
             # 3. Transform Actions into bids
             # =============================================================================
             # the first action is the bid price
-            bid_price = (actions[0] * self.max_bid_price).item()
+            delta = (self.max_bid_price - self.min_bid_price)/2
+            mid_price = self.max_bid_price - delta
+            bid_price = (mid_price + (actions[0] * delta)).item()
 
             # the second action is the bid direction
             # the interval [-0.1, 0.1] for the 'ignore' action is based on the learning

@@ -63,6 +63,7 @@ def learning_config() -> LearningConfig:
         "training_episodes": 3,
         "unit_id": "test_storage",
         "max_bid_price": 100,
+        "min_bid_price": 20,
         "max_demand": 1000,
     }
 
@@ -126,9 +127,11 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, household_unit, index,
             bid = bids[0]
 
             # Assert the bid price is correctly scaled
+            delta = (learning_config["max_bid_price"] - learning_config["min_bid_price"]) / 2
+            mid_price = learning_config["min_bid_price"] + delta
             expected_bid_price = (
-                sell_action[0] * learning_config["max_bid_price"]
-            )  # 20.0
+                mid_price + sell_action[0] * delta
+            )  # 68
             assert (
                 bid["price"] == expected_bid_price
             ), f"Expected bid price {expected_bid_price}, got {bid['price']}"
@@ -191,7 +194,7 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, household_unit, index, 
     strategy = household_unit.bidding_strategies["EOM"]
 
     # Define the 'charge' action: [0.2, -0.5, -1.0] -> price=30, direction='charge', volume=-1
-    buy_action = [0.3, -0.5, -1.0]
+    buy_action = [-0.3, -0.5, -1.0]
 
     # Mock the get_actions method to return the buy action
     with patch.object(
@@ -211,9 +214,11 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, household_unit, index, 
             bid = bids[0]
 
             # Assert the bid price is correctly scaled
+            delta = (learning_config["max_bid_price"] - learning_config["min_bid_price"]) / 2
+            mid_price = learning_config["min_bid_price"] + delta
             expected_bid_price = (
-                buy_action[0] * learning_config["max_bid_price"]
-            )  # 30.0
+                    mid_price + buy_action[0] * delta
+            )  # 48
             assert math.isclose(
                 bid["price"], expected_bid_price, abs_tol=1e3
             ), f"Expected bid price {expected_bid_price}, got {bid['price']}"
@@ -296,9 +301,12 @@ def test_storage_rl_strategy_hold_charge_bid(mock_market_config, household_unit,
             bid = bids[0]
 
             # Assert the bid price is correctly scaled
+            delta = (learning_config["max_bid_price"] - learning_config["min_bid_price"]) / 2
+            mid_price = learning_config["min_bid_price"] + delta
             expected_bid_price = (
-                hold_action[0] * learning_config["max_bid_price"]
-            )  # 30.0
+                    mid_price + hold_action[0] * delta
+            )  # 72
+
             assert math.isclose(
                 bid["price"], expected_bid_price, abs_tol=1e3
             ), f"Expected bid price {expected_bid_price}, got {bid['price']}"

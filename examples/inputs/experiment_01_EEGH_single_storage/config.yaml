@@ -30,6 +30,7 @@ EEGH_2024_single_storage:
     continue_learning: False
     trained_policies_save_path: null
     max_bid_price: 130.92
+    min_bid_price: 62.88
     algorithm: matd3
     actor_architecture: mlp
     learning_rate: 0.0001
