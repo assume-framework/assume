@@ -134,14 +134,10 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.define_objective_opt()
 
         # Apply the flexibility function based on flexibility measure
-        if self.flexibility_measure == "cost_based_load_shift":
-            self.cost_based_flexibility(self.model)
-
-        # # Apply the flexibility function based on flexibility measure
-        # if self.flexibility_measure in DSMFlex.flexibility_map:
-        #     DSMFlex.flexibility_map[self.flexibility_measure](self, self.model)
-        # else:
-        #     raise ValueError(f"Unknown flexibility measure: {self.flexibility_measure}")
+        if self.flexibility_measure in DSMFlex.flexibility_map:
+            DSMFlex.flexibility_map[self.flexibility_measure](self, self.model)
+        else:
+            raise ValueError(f"Unknown flexibility measure: {self.flexibility_measure}")
 
         self.define_objective_flex()
 
@@ -460,8 +456,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.opt_power_requirement = pd.Series(
             data=instance.total_power_input.get_values()
         ).set_axis(self.index)
-        # print(self.opt_power_requirement)
-        # print("Finish iteration 1")
 
         self.total_cost = sum(
             instance.variable_cost[t].value for t in instance.time_steps
@@ -471,7 +465,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.variable_cost_series = pd.Series(
             data=instance.variable_cost.get_values()
         ).set_axis(self.index)
-        print(self.variable_cost_series)
 
     def determine_optimal_operation_with_flex(self):
         """
@@ -503,39 +496,27 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 "Termination Condition: ", results.solver.termination_condition
             )
 
-        # Calculate and display the sum of variable costs
-        variable_cost_sum = instance.total_cost()
-        print(f"The total variable cost is {variable_cost_sum}")
+        # Compute adjusted total power input with load shift applied
+        adjusted_total_power_input = []
+        for t in instance.time_steps:
+            # Calculate the load-shifted value of total_power_input
+            adjusted_power = (
+                instance.total_power_input[t].value
+                + instance.load_shift_pos[t].value * instance.shift_indicator[t].value
+                - instance.load_shift_neg[t].value
+                * (1 - instance.shift_indicator[t].value)
+            )
+            adjusted_total_power_input.append(adjusted_power)
 
-        # Calculate and display the cost tolerance limit
-        cost_tolerance_limit = instance.total_cost() * (
-            1 + (instance.cost_tolerance / 100)
-        )
-        print(f"The cost upper limit is {cost_tolerance_limit}")
-        self.total_cost = sum(
-            instance.variable_cost[t].value for t in instance.time_steps
-        )
-        print(
-            f"The cost upper limit is {self.total_cost} = The cost upper limit is {cost_tolerance_limit}"
-        )
-
-        print(f"Maximum load shift {objective_value}")
-
-        # temp = instance.total_power_input.get_values()
-        # self.flex_power_requirement = pd.Series(data=temp)
-        # self.flex_power_requirement.index = self.index
+        # Assign this list to flex_power_requirement as a pandas Series
         self.flex_power_requirement = pd.Series(
-            data=instance.total_power_input.get_values()
-        ).set_axis(self.index)
-
-        # print("Started iteration 2")
-        # print(self.flex_power_requirement)
+            data=adjusted_total_power_input, index=self.index
+        )
 
         # Variable cost series
         self.variable_cost_series = pd.Series(
             data=instance.variable_cost.get_values()
         ).set_axis(self.index)
-        print(self.variable_cost_series)
 
     def switch_to_opt(self, instance):
         """
