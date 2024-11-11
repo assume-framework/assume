@@ -13,7 +13,7 @@ from operator import itemgetter
 import pandas as pd
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
-from mango import AgentAddress, create_acl
+from mango import addr, create_acl
 
 from assume.common.market_objects import (
     ClearingMessage,
@@ -264,8 +264,11 @@ class PayAsBidContractRole(MarketRole):
                     partial(self.execute_contract, contract=order), recurrency_task
                 )
 
+            # write flows if applicable
+            flows = []
+
         # contract clearing (pay_as_bid) takes place
-        return accepted_orders, rejected_orders, meta
+        return accepted_orders, rejected_orders, meta, flows
 
     async def execute_contract(self, contract: Order):
         """
@@ -302,12 +305,12 @@ class PayAsBidContractRole(MarketRole):
                     "end_time": end,
                 },
                 sender_addr=self.context.addr,
-                receiver_addr=AgentAddress(seller_agent[0], seller_agent[1]),
+                receiver_addr=addr(seller_agent[0], seller_agent[1]),
                 acl_metadata={
                     "reply_with": reply_with,
                 },
             ),
-            receiver_addr=AgentAddress(seller_agent[0], seller_agent[1]),
+            receiver_addr=addr(seller_agent[0], seller_agent[1]),
         )
 
         if contract["contract"] in contract_needs_market:
@@ -438,7 +441,7 @@ def swingcontract(
     end: datetime,
 ):
     """
-    The swing contract is used to provide a band in which one price is payed, while the second (higher) price is paid, when the band is left.
+    The swing contract is used to provide a band in which one price is paid, while the second (higher) price is paid, when the band is left.
 
     Args:
         contract (dict): the contract which is executed

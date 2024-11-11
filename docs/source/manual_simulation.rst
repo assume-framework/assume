@@ -31,7 +31,7 @@ And run the manager in a separate window:
     python -m distributed_simulation.world_manager
 
 This asks for the bids in the world_agent terminal while the manager waits for all agents to submit the bids.
-This can be extended to include better multi user support, which would make this useable in a game environment.
+This can be extended to include better multi user support, which would make this usable in a game environment.
 
 Future Work
 -----------

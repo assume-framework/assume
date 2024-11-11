@@ -10,7 +10,7 @@ RUN mkdir /src
 WORKDIR /src
 COPY README.md pyproject.toml .
 #RUN python -m pip install --upgrade pip
-# thats needed to use create the requirements.txt only
+# that's needed to use create the requirements.txt only
 RUN pip install pip-tools
 RUN mkdir assume assume_cli
 RUN touch assume/__init__.py
@@ -21,7 +21,7 @@ COPY README.md pyproject.toml /src
 COPY assume /src/assume
 COPY assume_cli /src/assume_cli
 COPY examples /src/examples
-ENV PATH /home/admin/.local/bin:$PATH
+ENV PATH=/home/admin/.local/bin:$PATH
 RUN chown -R admin /src /home/admin
 USER admin
 RUN pip install -e .

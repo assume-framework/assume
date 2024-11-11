@@ -10,9 +10,9 @@ from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
 from mango import (
     Agent,
-    AgentAddress,
     RoleAgent,
     activate,
+    addr,
     create_acl,
     create_ec_container,
 )
@@ -41,13 +41,13 @@ class DataRequester(Agent):
         await self.send_message(
             create_acl(
                 content,
-                receiver_addr=AgentAddress(receiver_addr, receiver_id),
+                receiver_addr=addr(receiver_addr, receiver_id),
                 sender_addr=self.addr,
                 acl_metadata={
                     "reply_with": reply_with,
                 },
             ),
-            receiver_addr=AgentAddress(receiver_addr, receiver_id),
+            receiver_addr=addr(receiver_addr, receiver_id),
         )
 
         return await self.await_message

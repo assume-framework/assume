@@ -75,7 +75,7 @@ def test_complex_clearing_whitepaper_a():
     assert len(orderbook) == 5
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert math.isclose(meta[0]["supply_volume"], 10, abs_tol=eps)
     assert math.isclose(meta[0]["price"], 40, abs_tol=eps)
     assert accepted_orders[0]["agent_addr"] == "dem1"
@@ -132,7 +132,7 @@ def test_complex_clearing_whitepaper_d():
     assert len(orderbook) == 4
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert math.isclose(meta[0]["supply_volume"], 10, abs_tol=eps)
     assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
     assert accepted_orders[0]["agent_addr"] == "dem1"
@@ -211,7 +211,7 @@ def test_clearing_non_convex_1():
     assert len(orderbook_demand) == 2
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert math.isclose(meta[0]["supply_volume"], 7, abs_tol=eps)
     assert math.isclose(meta[0]["price"], 3, abs_tol=eps)
     assert math.isclose(meta[1]["supply_volume"], 12, abs_tol=eps)
@@ -333,7 +333,7 @@ def test_clearing_non_convex_2():
     )
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     assert math.isclose(meta[0]["supply_volume"], 7, abs_tol=eps)
     assert math.isclose(meta[0]["price"], 5, abs_tol=eps)
     assert math.isclose(meta[1]["supply_volume"], 12, abs_tol=eps)
@@ -487,7 +487,7 @@ def test_clearing_non_convex_3():
     )
 
     mr = ComplexClearingRole(market_config)
-    accepted_orders, rejected_orders, meta = mr.clear(orderbook, products)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
 
     assert math.isclose(meta[0]["supply_volume"], 5.5, abs_tol=eps)
     assert math.isclose(meta[0]["price"], 5, abs_tol=eps)
@@ -545,7 +545,7 @@ def test_clearing_non_convex_3():
 if __name__ == "__main__":
     pass
     # from assume.common.utils import plot_orderbook
-    # clearing_result, meta = test_market_mechanism()
+    # clearing_result, meta, flows = test_market_mechanism()
     # only works with per node clearing
     # fig, ax = plot_orderbook(clearing_result, meta)
     # fig.show()

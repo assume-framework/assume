@@ -22,7 +22,7 @@ def storage_unit() -> Storage:
         bidding_strategies={"EOM": NaiveSingleBidStrategy()},
         max_power_charge=-100,
         max_power_discharge=100,
-        max_volume=1000,
+        max_soc=1000,
         efficiency_charge=0.9,
         efficiency_discharge=0.95,
         index=pd.date_range("2022-01-01", periods=4, freq="h"),
@@ -33,7 +33,7 @@ def storage_unit() -> Storage:
         additional_cost_charge=3,
         additional_cost_discharge=4,
         additional_cost=1,
-        initial_soc=0.5,
+        initial_soc=500,
     )
 
 
@@ -49,7 +49,7 @@ def test_init_function(storage_unit):
     assert storage_unit.ramp_down_discharge == 50
     assert storage_unit.ramp_up_charge == -60
     assert storage_unit.ramp_up_discharge == 60
-    assert storage_unit.initial_soc == 0.5
+    assert storage_unit.initial_soc == 500
 
 
 def test_reset_function(storage_unit):
@@ -65,7 +65,7 @@ def test_reset_function(storage_unit):
         pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     )
     assert storage_unit.outputs["soc"].equals(
-        pd.Series(0.5, index=pd.date_range("2022-01-01", periods=4, freq="h"))
+        pd.Series(500.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     )
 
 
@@ -132,7 +132,7 @@ def test_soc_constraint(storage_unit):
     storage_unit.outputs["capacity_neg"][start] = -50
     storage_unit.outputs["capacity_pos"][start] = 30
 
-    storage_unit.outputs["soc"][start] = 0.05
+    storage_unit.outputs["soc"][start] = 0.05 * storage_unit.max_soc
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
     )
@@ -141,7 +141,7 @@ def test_soc_constraint(storage_unit):
         max_power_discharge.iloc[0], (50 * storage_unit.efficiency_discharge)
     )
 
-    storage_unit.outputs["soc"][start] = 0.95
+    storage_unit.outputs["soc"][start] = 0.95 * storage_unit.max_soc
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end
     )
@@ -230,13 +230,9 @@ def test_storage_ramping(storage_unit):
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end, product_type="energy"
     )
-    cost_charge = storage_unit.calculate_marginal_cost(start, max_power_charge[start])
 
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end, product_type="energy"
-    )
-    cost_discharge = storage_unit.calculate_marginal_cost(
-        start, max_power_discharge[start]
     )
 
     assert min_power_charge[start] == 0
@@ -246,10 +242,10 @@ def test_storage_ramping(storage_unit):
     assert max_power_discharge[start] == 100
 
     max_ramp_discharge = storage_unit.calculate_ramp_discharge(
-        0.5, 0, max_power_discharge[start]
+        500, 0, max_power_discharge[start]
     )
     max_ramp_charge = storage_unit.calculate_ramp_charge(
-        0.5, 0, max_power_charge[start]
+        500, 0, max_power_charge[start]
     )
 
     assert max_ramp_discharge == 60
@@ -269,16 +265,16 @@ def test_storage_ramping(storage_unit):
     end = product_tuple[1]
 
     max_ramp_discharge = storage_unit.calculate_ramp_discharge(
-        0.5, 60, max_power_discharge[start]
+        500, 60, max_power_discharge[start]
     )
     max_ramp_charge = storage_unit.calculate_ramp_charge(
-        0.5, 60, max_power_charge[start]
+        500, 60, max_power_charge[start]
     )
 
     assert max_ramp_discharge == 100
     assert max_ramp_charge == -60
 
-    # chargin scenario
+    # charging scenario
     storage_unit.outputs["energy"][start] = -60
 
     # next hour
@@ -292,10 +288,10 @@ def test_storage_ramping(storage_unit):
     end = product_tuple[1]
 
     max_ramp_discharge = storage_unit.calculate_ramp_discharge(
-        0.5, -60, max_power_discharge[start]
+        500, -60, max_power_discharge[start]
     )
     max_ramp_charge = storage_unit.calculate_ramp_charge(
-        0.5, -60, max_power_charge[start]
+        500, -60, max_power_charge[start]
     )
 
     assert max_ramp_discharge == 60
@@ -312,40 +308,42 @@ def test_execute_dispatch(storage_unit):
     end = product_tuple[1]
 
     storage_unit.outputs["energy"][start] = 100
-    storage_unit.outputs["soc"][start] = 0.5
+    storage_unit.outputs["soc"][start] = 0.5 * storage_unit.max_soc
 
     # dispatch full discharge
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy.iloc[0] == 100
     assert math.isclose(
         storage_unit.outputs["soc"][end],
-        0.5 - 100 / storage_unit.efficiency_discharge / storage_unit.max_volume,
+        500 - 100 / storage_unit.efficiency_discharge,
     )
 
     # dispatch full charging
     storage_unit.outputs["energy"][start] = -100
-    storage_unit.outputs["soc"][start] = 0.5
+    storage_unit.outputs["soc"][start] = 0.5 * storage_unit.max_soc
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy.iloc[0] == -100
     assert math.isclose(
         storage_unit.outputs["soc"][end],
-        0.5 + 100 * storage_unit.efficiency_charge / storage_unit.max_volume,
+        500 + 100 * storage_unit.efficiency_charge,
     )
     # adjust dispatch to soc limit for discharge
     storage_unit.outputs["energy"][start] = 100
-    storage_unit.outputs["soc"][start] = 0.05
+    storage_unit.outputs["soc"][start] = 0.05 * storage_unit.max_soc
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert math.isclose(
         dispatched_energy.iloc[0], 50 * storage_unit.efficiency_discharge, abs_tol=0.1
     )
     # adjust dispatch to soc limit for charging
     storage_unit.outputs["energy"][start] = -100
-    storage_unit.outputs["soc"][start] = 0.95
+    storage_unit.outputs["soc"][start] = 0.95 * storage_unit.max_soc
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert math.isclose(
         dispatched_energy.iloc[0], -50 / storage_unit.efficiency_charge, abs_tol=0.1
     )
-    assert math.isclose(storage_unit.outputs["soc"][end], 1, abs_tol=0.001)
+    assert math.isclose(
+        storage_unit.outputs["soc"][end], storage_unit.max_soc, abs_tol=0.001
+    )
 
     # step into the next hour
     start = start + storage_unit.index.freq
@@ -353,7 +351,9 @@ def test_execute_dispatch(storage_unit):
     storage_unit.outputs["energy"][start] = -100
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy.iloc[0] == 0
-    assert math.isclose(storage_unit.outputs["soc"][end], 1, abs_tol=0.001)
+    assert math.isclose(
+        storage_unit.outputs["soc"][end], storage_unit.max_soc, abs_tol=0.001
+    )
 
 
 def test_set_dispatch_plan(mock_market_config, storage_unit):
@@ -371,7 +371,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     product_tuples = [(start, end, None)]
 
     storage_unit.outputs["energy"][start] = 100
-    storage_unit.outputs["soc"][start] = 0.5
+    storage_unit.outputs["soc"][start] = 0.5 * storage_unit.max_soc
 
     bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
     assert len(bids) == 0
@@ -383,11 +383,11 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     assert storage_unit.outputs["energy"][start] == 100
     assert math.isclose(
         storage_unit.outputs["soc"][end],
-        0.5 - 100 / storage_unit.efficiency_discharge / storage_unit.max_volume,
+        500 - 100 / storage_unit.efficiency_discharge,
     )
     # dispatch full charging
     storage_unit.outputs["energy"][start] = -100
-    storage_unit.outputs["soc"][start] = 0.5
+    storage_unit.outputs["soc"][start] = 0.5 * storage_unit.max_soc
 
     storage_unit.set_dispatch_plan(mc, bids)
     storage_unit.execute_current_dispatch(start, end)
@@ -395,11 +395,11 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     assert storage_unit.outputs["energy"][start] == -100
     assert math.isclose(
         storage_unit.outputs["soc"][end],
-        0.5 + 100 * storage_unit.efficiency_charge / storage_unit.max_volume,
+        500 + 100 * storage_unit.efficiency_charge,
     )
     # adjust dispatch to soc limit for discharge
     storage_unit.outputs["energy"][start] = 100
-    storage_unit.outputs["soc"][start] = 0.05
+    storage_unit.outputs["soc"][start] = 0.05 * storage_unit.max_soc
 
     storage_unit.set_dispatch_plan(mc, bids)
     storage_unit.execute_current_dispatch(start, end)
@@ -411,7 +411,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     )
     # adjust dispatch to soc limit for charging
     storage_unit.outputs["energy"][start] = -100
-    storage_unit.outputs["soc"][start] = 0.95
+    storage_unit.outputs["soc"][start] = 0.95 * storage_unit.max_soc
 
     storage_unit.set_dispatch_plan(mc, bids)
     storage_unit.execute_current_dispatch(start, end)
@@ -421,7 +421,9 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
         -50 / storage_unit.efficiency_charge,
         abs_tol=0.1,
     )
-    assert math.isclose(storage_unit.outputs["soc"][end], 1, abs_tol=0.001)
+    assert math.isclose(
+        storage_unit.outputs["soc"][end], storage_unit.max_soc, abs_tol=0.001
+    )
 
     # step into the next hour
     start = start + storage_unit.index.freq

@@ -104,7 +104,9 @@ services:
     environment:
       DB_URI: "postgresql://assume:assume@assume_db:5432/assume"
       MQTT_BROKER: mqtt-broker
-    entrypoint: python3 ./examples/distributed_simulation/world_manager.py
+    volumes:
+      - ./examples/distributed_simulation/config.py:/src/examples/distributed_simulation/config.py
+    entrypoint: python3 -m examples.distributed_simulation.world_manager agent agent2
 
   simulation_client01:
     container_name: simulation_client01
@@ -117,4 +119,21 @@ services:
     depends_on:
       - assume_db
       - mqtt-broker
-    entrypoint: python3 ./examples/distributed_simulation/world_agent.py
+    volumes:
+      - ./examples/distributed_simulation/config.py:/src/examples/distributed_simulation/config.py
+    entrypoint: python3 -m examples.distributed_simulation.world_agent 0 2 agent
+
+  simulation_client02:
+    container_name: simulation_client02
+    image: ghcr.io/assume-framework/assume:latest
+    profiles: ["mqtt"]
+    build: .
+    environment:
+      DB_URI: "postgresql://assume:assume@assume_db:5432/assume"
+      MQTT_BROKER: mqtt-broker
+    depends_on:
+      - assume_db
+      - mqtt-broker
+    volumes:
+      - ./examples/distributed_simulation/config.py:/src/examples/distributed_simulation/config.py
+    entrypoint: python3 -m examples.distributed_simulation.world_agent 1 2 agent2

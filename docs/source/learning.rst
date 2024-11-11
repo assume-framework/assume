@@ -165,7 +165,7 @@ based on global information. The following graph shows the information flow.
     :width: 500px
 
 
-The learning role orchestrates this learning process. It initializes the training process, handels the algorithms and manages the experiences gained in a buffer.
+The learning role orchestrates this learning process. It initializes the training process, handles the algorithms and manages the experiences gained in a buffer.
 You can read more about the different algorithms and the learning role in :doc:`learning_algorithm`.
 
 The Learning Results in ASSUME

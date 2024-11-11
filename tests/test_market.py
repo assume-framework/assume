@@ -284,9 +284,10 @@ async def test_market_accepted(market_role: MarketRole):
     }
 
     def accept_clear(all_orders, products):
-        return all_orders, [], [{"price": 0, "product_start": products[0][0]}]
+        return all_orders, [], [{"price": 0, "product_start": products[0][0]}], None
 
     market_role.clear = accept_clear
+    # todo add exception handler
 
     accepted, meta = await market_role.clear_market([(start, end, None)])
     assert accepted == orderbook

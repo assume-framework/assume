@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
-from mango import AgentAddress, RoleAgent, activate, create_tcp_container
+from mango import RoleAgent, activate, addr, create_tcp_container
 from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 
@@ -191,8 +191,8 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
 
     rl_units_operator.context.data.update(
         {
-            "learning_output_agent_addr": AgentAddress("world", "export_agent_1"),
-            "learning_agent_addr": AgentAddress("world_0", "learning_agent"),
+            "learning_output_agent_addr": addr("world", "export_agent_1"),
+            "learning_agent_addr": addr("world_0", "learning_agent"),
         }
     )
 
