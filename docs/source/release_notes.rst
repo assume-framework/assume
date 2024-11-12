@@ -10,13 +10,11 @@ Upcoming Release
 =======================
 
 **New Features:**
-  - **Building Demand Side Unit**: Added a new building demand side unit to the framework, enabling users to model
-  the demand side management of a building. This feature allows for more detailed and accurate simulations
-  of building energy consumption patterns and market interactions. The building demand side
-  unit can be configured with different components, such as generic storage, heat pump, boiler, thermal storage, electric vehicle, and photovoltaic system,
-  to reflect the specific characteristics of building energy systems. The building demand side unit can be optimized to minimize
-  costs or to maximize the available flexibility, depending on the user's requirements. A tutorial and detailed
-  documentation on how to use this feature are coming soon.
+  - **Building Demand Side Unit**: Added a new building demand side unit to the framework, enabling users to model the demand side management of a building. This feature allows
+    for more detailed and accurate simulations of building energy consumption patterns and market interactions. The building demand side unit can be configured with
+    different components, such as generic storage, heat pump, boiler, thermal storage, electric vehicle, and photovoltaic system, to reflect the specific characteristics of
+    building energy systems. The building demand side unit can be optimized to minimize costs or to maximize the available flexibility, depending on the user's requirements.
+    A tutorial and detailed documentation on how to use this feature are coming soon.
 
 .. warning::
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
