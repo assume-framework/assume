@@ -247,7 +247,7 @@ class Boiler:
             pyo.Block: A Pyomo block representing the boiler with variables and constraints.
         """
 
-        # dependig on the fuel type, check if the model has the price profile for the fuel
+        # depending on the fuel type, check if the model has the price profile for the fuel
         if self.fuel_type == "electricity":
             if not hasattr(model, "electricity_price"):
                 raise ValueError(
@@ -930,7 +930,7 @@ class DRIPlant:
             pyo.Block: A Pyomo block representing the DRI plant with variables and constraints.
         """
 
-        # dependig on the fuel type, check if the model has the price profile for the fuel
+        # depending on the fuel type, check if the model has the price profile for the fuel
         if self.fuel_type in ["natural_gas", "both"]:
             if not hasattr(model, "natural_gas_price"):
                 raise ValueError(

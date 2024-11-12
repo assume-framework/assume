@@ -441,7 +441,7 @@ def swingcontract(
     end: datetime,
 ):
     """
-    The swing contract is used to provide a band in which one price is payed, while the second (higher) price is paid, when the band is left.
+    The swing contract is used to provide a band in which one price is paid, while the second (higher) price is paid, when the band is left.
 
     Args:
         contract (dict): the contract which is executed

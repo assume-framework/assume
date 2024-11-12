@@ -108,7 +108,7 @@ class World:
         self.distributed_role = distributed_role
 
         self.export_csv_path = export_csv_path
-        # intialize db connection at beginning of simulation
+        # initialize db connection at beginning of simulation
         self.db_uri = database_uri
         if database_uri:
             if str(database_uri).startswith("sqlite:///"):
@@ -258,7 +258,7 @@ class World:
         self.bidding_params.update(self.learning_config)
 
         if self.learning_mode or self.perform_evaluation:
-            # if so, we initate the rl learning role with parameters
+            # if so, we initiate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
 
             self.learning_role = Learning(self.learning_config)

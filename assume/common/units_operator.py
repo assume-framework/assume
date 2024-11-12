@@ -228,7 +228,7 @@ class UnitsOperator(Role):
                     break
             if not found:
                 logger.error(
-                    "Market %s sent registation but is unknown", content["market_id"]
+                    "Market %s sent registration but is unknown", content["market_id"]
                 )
         else:
             logger.error("Market %s did not accept registration", meta["sender_id"])
@@ -386,7 +386,7 @@ class UnitsOperator(Role):
             meta (MetaDict): The meta data of the market.
 
         Note:
-            This function will accomodate the portfolio optimization in the future.
+            This function will accommodate the portfolio optimization in the future.
         """
 
         products = opening["products"]

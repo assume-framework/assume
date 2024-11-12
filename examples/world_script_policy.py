@@ -66,7 +66,7 @@ def init(world: World):
         #         "eligible_lambda",
         #         "evaluation_frequency",  # monthly
         #     ],
-        #     # it needs to be the same product_type to interfer with output
+        #     # it needs to be the same product_type to interfere with output
         #     product_type="energy",
         #     supports_get_unmatched=True,
         # ),
