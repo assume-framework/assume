@@ -417,12 +417,12 @@ class SupportsMinMax(BaseUnit):
             # before start of index
             return max_time
         is_off = not arr.iloc[0]
-        runn = 0
+        run = 0
         for val in arr:
             if val == is_off:
                 break
-            runn += 1
-        return (-1) ** is_off * runn
+            run += 1
+        return (-1) ** is_off * run
 
     def get_average_operation_times(self, start: datetime) -> tuple[float, float]:
         """
@@ -448,15 +448,15 @@ class SupportsMinMax(BaseUnit):
 
         op_series = []
         status = arr.iloc[0]
-        runn = 0
+        run = 0
         for val in arr:
             if val == status:
-                runn += 1
+                run += 1
             else:
-                op_series.append(-((-1) ** status) * runn)
-                runn = 1
+                op_series.append(-((-1) ** status) * run)
+                run = 1
                 status = val
-        op_series.append(-((-1) ** status) * runn)
+        op_series.append(-((-1) ** status) * run)
 
         op_times = [operation for operation in op_series if operation > 0]
         if op_times == []:

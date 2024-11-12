@@ -382,7 +382,7 @@ class NaiveRedispatchStrategy(BaseStrategy):
     """
     A naive strategy that simply submits all information about the unit and
     currently dispatched power for the following hours to the redispatch market.
-    Information incldes the marginal cost, the ramp up and down values, and the dispatch.
+    Information includes the marginal cost, the ramp up and down values, and the dispatch.
 
     """
 

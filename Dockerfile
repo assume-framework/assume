@@ -10,7 +10,7 @@ RUN mkdir /src
 WORKDIR /src
 COPY README.md pyproject.toml .
 #RUN python -m pip install --upgrade pip
-# thats needed to use create the requirements.txt only
+# that's needed to use create the requirements.txt only
 RUN pip install pip-tools
 RUN mkdir assume assume_cli
 RUN touch assume/__init__.py

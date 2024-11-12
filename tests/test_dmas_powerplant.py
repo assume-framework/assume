@@ -148,7 +148,7 @@ def test_dmas_day(power_plant_day):
 def test_dmas_prevent_start(power_plant_day):
     """
     This test makes sure, that the powerplants still bids positive marginal cost, with block bids.
-    Even if the price is not well inbetween the day.
+    Even if the price is not well between the day.
     The market should still see this as the best option instead of turning off the powerplant
     """
     strategy = DmasPowerplantStrategy()

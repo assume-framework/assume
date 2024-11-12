@@ -121,7 +121,7 @@ The actor policy of each agent is updated using the deterministic policy gradien
     ∇_a Q_i,θ_j(S_k, a_1,k, ..., a_N,k, π(o_i,k))|a_i,k=π(o_i,k) * ∇_θ π(o_i,k)
 
 The actor is updated similarly using only one critic network Q_{θ1}. These changes to the original DDPG algorithm allow increased stability and convergence of the TD3 algorithm. This is especially relevant when approaching a multi-agent RL setup, as discussed in the foregoing section.
-Please note that the actor and critics are updated by sampling expereience from the buffer where all intercations of the agents are stroed, namley the observations, actions and rewards. There are more complex buffers possible, like those that use importance sampling, but the default buffer is a simple replay buffer. You can find a documentation of the latter in :doc:`buffers`
+Please note that the actor and critics are updated by sampling experience from the buffer where all interactions of the agents are stored, namley the observations, actions and rewards. There are more complex buffers possible, like those that use importance sampling, but the default buffer is a simple replay buffer. You can find a documentation of the latter in :doc:`buffers`
 
 
 The Learning Implementation in ASSUME
@@ -165,7 +165,7 @@ based on global information. The following graph shows the information flow.
     :width: 500px
 
 
-The learning role orchestrates this learning process. It initializes the training process, handels the algorithms and manages the experiences gained in a buffer.
+The learning role orchestrates this learning process. It initializes the training process, handles the algorithms and manages the experiences gained in a buffer.
 You can read more about the different algorithms and the learning role in :doc:`learning_algorithm`.
 
 The Learning Results in ASSUME
@@ -173,7 +173,7 @@ The Learning Results in ASSUME
 
 Similarly, to the other results, the learning progress is tracked in the database, either with postgresql or timescale. The latter, enables the usage of the
 predefined dashboards to track the leanring process in the "Assume:Training Process" dashboard. The following pictures show the learning process of a simple reinforcement learning setting.
-A more detailed description is given in the dashboard itsel.
+A more detailed description is given in the dashboard itself.
 
 .. image:: img/Grafana_Learning_1.jpeg
     :align: center

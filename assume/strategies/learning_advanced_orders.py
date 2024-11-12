@@ -47,7 +47,7 @@ class RLAdvancedOrderStrategy(RLStrategy):
         If SB and linked orders (LB) are allowed, the strategy will use SB for the inflexible power and LB for the flexible power.
         If SB and block orders (BB) are allowed, the strategy will use BB for the inflexible power and SB for the flexible power.
         If all three order types (SB, BB, LB) are allowed, the strategy will use BB for the inflexible power
-        and LB for the flexible power, exept the inflexible power is 0,
+        and LB for the flexible power, except the inflexible power is 0,
         then it will use SB for the flexible power (as for VREs).
     """
 
@@ -133,7 +133,7 @@ class RLAdvancedOrderStrategy(RLStrategy):
             bid_quantity_inflex = min_power[start]
 
             # 3.1 formulate the bids for Pmax - Pmin
-            # Pmin, the minium run capacity is the inflexible part of the bid, which should always be accepted
+            # Pmin, the minimum run capacity is the inflexible part of the bid, which should always be accepted
 
             if op_time <= -unit.min_down_time or op_time > 0:
                 bid_quantity_flex = max_power[start] - bid_quantity_inflex
@@ -317,7 +317,7 @@ class RLAdvancedOrderStrategy(RLStrategy):
 
         current_costs = unit.calculate_marginal_cost(start, current_volume)
 
-        # scale unit outpus
+        # scale unit outputs
         scaled_max_power = current_volume / scaling_factor_total_capacity
         scaled_marginal_cost = current_costs / scaling_factor_marginal_cost
 
@@ -342,7 +342,7 @@ class RLAdvancedOrderStrategy(RLStrategy):
             ]
         )
 
-        # transfer arry to GPU for NN processing
+        # transfer array to GPU for NN processing
         observation = (
             th.tensor(observation, dtype=self.float_type)
             .to(self.device, non_blocking=True)
@@ -445,7 +445,7 @@ class RLAdvancedOrderStrategy(RLStrategy):
 
         # ---------------------------
         # 4.1 Calculate Reward
-        # The straight forward implemntation would be reward = profit, yet we would like to give the agent more guidance
+        # The straight forward implementation would be reward = profit, yet we would like to give the agent more guidance
         # in the learning process, so we add a regret term to the reward, which is the opportunity cost
         # define the reward and scale it
 

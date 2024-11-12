@@ -172,7 +172,7 @@ def test_aggregate_step_amount_multi_hour():
             "market_id": "CRM_pos",
         },
     ]
-    # and we calculate the amount inbetween this bid
+    # and we calculate the amount between this bid
     step_func = aggregate_step_amount(
         orderbook, datetime(2019, 1, 3, 12), datetime(2019, 1, 3, 13)
     )

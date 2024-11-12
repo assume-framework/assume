@@ -458,7 +458,7 @@ def load_amiris(
     """
     Loads an Amiris scenario.
     Markups and markdowns are handled by linearly interpolating the agents volume.
-    This mimicks the behavior of the way it is done in AMIRIS.
+    This mimics the behavior of the way it is done in AMIRIS.
 
     Args:
         world (World): the ASSUME world
