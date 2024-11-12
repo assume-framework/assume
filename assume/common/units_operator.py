@@ -318,7 +318,13 @@ class UnitsOperator(Role):
 
             # TODO: this needs to be fixed. For now it is consuming too much time and is deactivated
             # unit.calculate_generation_cost(start, now, "energy")
-            valid_outputs = ["soc", "cashflow", "marginal_costs", "total_costs"]
+            valid_outputs = [
+                "soc",
+                "ev_soc",
+                "cashflow",
+                "marginal_costs",
+                "total_costs",
+            ]
 
             for key in unit.outputs.keys():
                 for output in valid_outputs:

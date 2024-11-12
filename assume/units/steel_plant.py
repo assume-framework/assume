@@ -14,8 +14,6 @@ from pyomo.opt import (
 )
 
 from assume.common.base import SupportsMinMax
-from assume.common.market_objects import MarketConfig, Orderbook
-from assume.common.utils import get_products_index
 from assume.units.dsm_load_shift import DSMFlex
 
 SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
@@ -52,13 +50,13 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self,
         id: str,
         unit_operator: str,
+        index: pd.DatetimeIndex,
         bidding_strategies: dict,
+        components: dict[str, dict],
         technology: str = "steel_plant",
+        objective: str = "min_variable_cost",
         node: str = "node0",
-        index: pd.DatetimeIndex = None,
         location: tuple[float, float] = (0.0, 0.0),
-        components: dict[str, dict] = None,
-        objective: str = None,
         flexibility_measure: str = "max_load_shift",
         demand: float = 0,
         cost_tolerance: float = 10,
@@ -359,9 +357,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
     def define_objective_flex(self):
         """
         Defines the flexibility objective for the optimization model.
-
-        Args:
-            model (pyomo.ConcreteModel): The Pyomo model.
         """
         if self.flexibility_measure == "max_load_shift":
 
@@ -370,7 +365,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 """
                 Maximizes the load shift over all time steps.
                 """
-                maximise_load_shift = sum(
+                maximise_load_shift = pyo.quicksum(
                     m.load_shift[t] for t in self.model.time_steps
                 )
                 return maximise_load_shift
@@ -509,47 +504,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         instance.total_cost = self.total_cost
 
         return instance
-
-    def set_dispatch_plan(
-        self,
-        marketconfig: MarketConfig,
-        orderbook: Orderbook,
-    ) -> None:
-        """
-        Adds the dispatch plan from the current market result to the total dispatch plan and calculates the cashflow.
-
-        Args:
-            marketconfig (MarketConfig): The market configuration.
-            orderbook (Orderbook): The orderbook.
-        """
-        products_index = get_products_index(orderbook)
-
-        product_type = marketconfig.product_type
-        for order in orderbook:
-            start = order["start_time"]
-            end = order["end_time"]
-            end_excl = end - self.index.freq
-            if isinstance(order["accepted_volume"], dict):
-                self.outputs[product_type].loc[start:end_excl] += [
-                    order["accepted_volume"][key]
-                    for key in order["accepted_volume"].keys()
-                ]
-            else:
-                self.outputs[product_type].loc[start:end_excl] += order[
-                    "accepted_volume"
-                ]
-
-        self.calculate_cashflow(product_type, orderbook)
-
-        for start in products_index:
-            current_power = self.outputs[product_type][start]
-            self.outputs[product_type][start] = current_power
-
-        self.bidding_strategies[marketconfig.market_id].calculate_reward(
-            unit=self,
-            marketconfig=marketconfig,
-            orderbook=orderbook,
-        )
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         """

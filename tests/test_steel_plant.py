@@ -7,7 +7,7 @@ import pytest
 
 from assume.common.forecasts import NaiveForecast
 from assume.strategies.naive_strategies import (
-    NaiveDASteelplantStrategy,
+    NaiveDSMStrategy,
     NaiveRedispatchSteelplantStrategy,
 )
 from assume.units.steel_plant import SteelPlant
@@ -64,7 +64,7 @@ def steel_plant(dsm_components) -> SteelPlant:
     )
 
     bidding_strategies = {
-        "EOM": NaiveDASteelplantStrategy(),
+        "EOM": NaiveDSMStrategy(),
         "RD": NaiveRedispatchSteelplantStrategy(),
     }
     return SteelPlant(

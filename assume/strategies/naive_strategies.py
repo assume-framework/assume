@@ -115,7 +115,7 @@ class NaiveProfileStrategy(BaseStrategy):
         end_all = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
         op_time = unit.get_operation_time(start)
-        min_power, max_power = unit.calculate_min_max_power(start, end_all)
+        _, max_power = unit.calculate_min_max_power(start, end_all)
 
         current_power = unit.outputs["energy"].at[start]
         marginal_cost = unit.calculate_marginal_cost(start, previous_power)
@@ -140,7 +140,12 @@ class NaiveProfileStrategy(BaseStrategy):
         return bids
 
 
-class NaiveDASteelplantStrategy(BaseStrategy):
+class NaiveDSMStrategy(BaseStrategy):
+    """
+    A naive bidding strategy for Demand Side Management (DSM) units. It bids the marginal cost of the unit on the market
+    as bid price and the optimal power requirement as bid volume.
+    """
+
     def calculate_bids(
         self,
         unit: SupportsMinMax,
@@ -148,6 +153,19 @@ class NaiveDASteelplantStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
+        """
+        Takes information from a unit that the unit operator manages and
+        defines how it is dispatched to the market.
+
+        Args:
+            unit (SupportsMinMax): The unit to be dispatched.
+            market_config (MarketConfig): The market configuration.
+            product_tuples (list[Product]): The list of all products the unit can offer.
+
+        Returns:
+            Orderbook: The bids consisting of the start time, end time, only hours, price and volume.
+        """
+
         # calculate the optimal operation of the unit
         unit.calculate_optimal_operation_if_needed()
 
@@ -158,9 +176,9 @@ class NaiveDASteelplantStrategy(BaseStrategy):
             and the volume of the product. Dispatch the order to the market.
             """
             start = product[0]
-
             volume = unit.opt_power_requirement.loc[start]
             marginal_price = unit.calculate_marginal_cost(start, volume)
+
             bids.append(
                 {
                     "start_time": product[0],

@@ -4,6 +4,7 @@
 
 import pyomo.environ as pyo
 
+from assume.common.market_objects import MarketConfig, Orderbook
 from assume.units.dst_components import demand_side_technologies
 
 
@@ -119,3 +120,39 @@ class DSMFlex:
                 return m.total_power_input[t] <= m.capacity_upper_bound[t]
             else:
                 return pyo.Constraint.Skip
+
+    def set_dispatch_plan(
+        self,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ) -> None:
+        """
+        Adds the dispatch plan from the current market result to the total dispatch plan and calculates the cashflow.
+
+        Args:
+            marketconfig (MarketConfig): The market configuration.
+            orderbook (Orderbook): The orderbook.
+        """
+
+        product_type = marketconfig.product_type
+        for order in orderbook:
+            start = order["start_time"]
+            end = order["end_time"]
+            end_excl = end - self.index.freq
+            if isinstance(order["accepted_volume"], dict):
+                self.outputs[product_type].loc[start:end_excl] += [
+                    order["accepted_volume"][key]
+                    for key in order["accepted_volume"].keys()
+                ]
+            else:
+                self.outputs[product_type].loc[start:end_excl] += order[
+                    "accepted_volume"
+                ]
+
+        self.calculate_cashflow(product_type, orderbook)
+
+        self.bidding_strategies[marketconfig.market_id].calculate_reward(
+            unit=self,
+            marketconfig=marketconfig,
+            orderbook=orderbook,
+        )
