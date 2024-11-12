@@ -70,6 +70,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         demand: float = 0,
         cost_tolerance: float = 10,
         congestion_threshold: float = 0,
+        peak_threshold: float = 0,
         **kwargs,
     ):
         super().__init__(
@@ -117,6 +118,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.flexibility_measure = flexibility_measure
         self.cost_tolerance = cost_tolerance
         self.congestion_threshold = congestion_threshold
+        self.peak_threshold = peak_threshold
 
         # Check for the presence of components
         self.has_h2storage = "hydrogen_storage" in self.components.keys()
@@ -411,6 +413,19 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                     * (1 - m.shift_indicator[t])
                     * m.congestion_indicator[t]
                     for t in m.time_steps
+                )
+
+                return maximise_load_shift
+
+        elif self.flexibility_measure == "peak_load_shifting":
+
+            @self.model.Objective(sense=pyo.maximize)
+            def obj_rule_flex(m):
+                """
+                Maximizes the load shift over all time steps.
+                """
+                maximise_load_shift = pyo.quicksum(
+                    m.load_shift_neg[t] * m.peak_indicator[t] for t in m.time_steps
                 )
 
                 return maximise_load_shift
