@@ -125,6 +125,9 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.has_dristorage = "dri_storage" in self.components.keys()
         self.has_electrolyser = "electrolyser" in self.components.keys()
 
+        self.opt_power_requirement = None
+        self.flex_power_requirement = None
+
         # Main Model part
         self.model = pyo.ConcreteModel()
         self.define_sets()
@@ -155,9 +158,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             "log_to_console": False,
             "LogToConsole": 0,
         }
-
-        self.opt_power_requirement = None
-        self.flex_power_requirement = None
 
         self.variable_cost_series = None
 
@@ -416,7 +416,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 )
 
                 return maximise_load_shift
-
+            
         elif self.flexibility_measure == "peak_load_shifting":
 
             @self.model.Objective(sense=pyo.maximize)
@@ -424,9 +424,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 """
                 Maximizes the load shift over all time steps.
                 """
-                maximise_load_shift = pyo.quicksum(
-                    m.load_shift_neg[t] * m.peak_indicator[t] for t in m.time_steps
-                )
+                maximise_load_shift = pyo.quicksum(m.load_shift_neg[t] * m.peak_indicator[t] for t in m.time_steps)
 
                 return maximise_load_shift
 

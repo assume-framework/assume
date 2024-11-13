@@ -5,6 +5,7 @@
 from collections.abc import Callable
 
 import pyomo.environ as pyo
+import numpy as np
 
 from assume.units.dst_components import demand_side_technologies
 
@@ -13,11 +14,8 @@ class DSMFlex:
     # Mapping of flexibility measures to their respective functions
     flexibility_map: dict[str, Callable[[pyo.ConcreteModel], None]] = {
         "cost_based_load_shift": lambda self, model: self.cost_based_flexibility(model),
-        "congestion_management_flexibility": lambda self,
-        model: self.grid_congestion_management(model),
-        "peak_load_shifting": lambda self, model: self.peak_load_shifting_flexibility(
-            model
-        ),
+        "congestion_management_flexibility": lambda self, model: self.grid_congestion_management(model),
+        "peak_load_shifting": lambda self, model: self.peak_load_shifting_flexibility(model),
     }
 
     def __init__(self, components, **kwargs):
@@ -172,7 +170,7 @@ class DSMFlex:
                     == self.model.dsm_blocks["eaf"].power_in[t]
                     + self.model.dsm_blocks["dri_plant"].power_in[t]
                 )
-
+            
     def peak_load_shifting_flexibility(self, model):
         """
         Implements constraints for peak load shifting flexibility by identifying peak periods
@@ -182,14 +180,8 @@ class DSMFlex:
             model (pyomo.ConcreteModel): The Pyomo model being optimized.
         """
 
-        # Define an expression to represent the maximum load across all time steps
-        model.max_load = pyo.Expression(
-            expr=max(model.total_power_input[t] for t in model.time_steps)
-        )
-
-        # Define the peak threshold based on `max_load` and `self.peak_threshold`
-        # E.g., if `self.peak_threshold` is 10, we consider peak as 90% of max load
-        peak_threshold_value = model.max_load * (1 - self.peak_threshold / 100)
+        max_load = max(self.opt_power_requirement)
+        peak_threshold_value = max_load * (1 - self.peak_threshold / 100)  # E.g., 10% threshold
 
         # Parameters
         model.cost_tolerance = pyo.Param(initialize=self.cost_tolerance)
@@ -199,15 +191,8 @@ class DSMFlex:
         model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
         model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
 
-        peak_periods = {
-            t
-            for t in model.time_steps
-            if self.opt_power_requirement[t] > peak_threshold_value
-        }
-        model.peak_indicator = pyo.Param(
-            model.time_steps,
-            initialize={t: int(t in peak_periods) for t in model.time_steps},
-        )
+        peak_periods = {t for t in model.time_steps if self.opt_power_requirement[t] > peak_threshold_value}
+        model.peak_indicator = pyo.Param(model.time_steps, initialize={t: int(t in peak_periods) for t in model.time_steps})
 
         @model.Constraint()
         def total_cost_upper_limit(m):
@@ -221,15 +206,14 @@ class DSMFlex:
             if m.peak_indicator[t] == 1:
                 # In peak periods: Reduce load with load_shift_neg
                 return (
-                    m.total_power_input[t] - m.load_shift_neg[t]
-                    == self.opt_power_requirement[t]
+                    m.total_power_input[t] - m.load_shift_neg[t] == self.opt_power_requirement[t]
                 )
             else:
                 # In off-peak periods: Increase load with load_shift_pos
                 return (
-                    m.total_power_input[t] + m.load_shift_pos[t]
-                    == self.opt_power_requirement[t]
+                    m.total_power_input[t] + m.load_shift_pos[t] == self.opt_power_requirement[t]
                 )
+        
 
     def recalculate_with_accepted_offers(self, model):
         self.reference_power = self.forecaster[f"{self.id}_power"]
