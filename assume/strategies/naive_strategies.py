@@ -152,8 +152,7 @@ class NaiveDASteelplantStrategy(BaseStrategy):
         **kwargs,
     ) -> Orderbook:
         # calculate the optimal operation of the unit
-        unit.calculate_optimal_operation_if_needed()
-        unit.calculate_optimal_operation_if_needed()
+        unit.determine_optimal_operation_with_flex()
         self.plot_power_requirements(unit)
 
         bids = []
@@ -225,7 +224,7 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
         **kwargs,
     ) -> Orderbook:
         # calculate the optimal operation of the unit according to the objective function
-        unit.calculate_optimal_operation_if_needed()
+        unit.determine_optimal_operation_with_flex()
 
         bids = []
         for product in product_tuples:

@@ -128,6 +128,18 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.opt_power_requirement = None
         self.flex_power_requirement = None
 
+        # Define a solver
+        solvers = check_available_solvers(*SOLVERS)
+        if len(solvers) < 1:
+            raise Exception(f"None of {SOLVERS} are available")
+
+        self.solver = SolverFactory(solvers[1])
+        self.solver_options = {
+            "output_flag": False,
+            "log_to_console": False,
+            "LogToConsole": 0,
+        }
+
         # Main Model part
         self.model = pyo.ConcreteModel()
         self.define_sets()
@@ -140,6 +152,8 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.define_constraints()
         self.define_objective_opt()
 
+        self.determine_optimal_operation_without_flex(switch_flex_off=False)
+
         # Apply the flexibility function based on flexibility measure
         if self.flexibility_measure in DSMFlex.flexibility_map:
             DSMFlex.flexibility_map[self.flexibility_measure](self, self.model)
@@ -147,17 +161,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             raise ValueError(f"Unknown flexibility measure: {self.flexibility_measure}")
 
         self.define_objective_flex()
-
-        solvers = check_available_solvers(*SOLVERS)
-        if len(solvers) < 1:
-            raise Exception(f"None of {SOLVERS} are available")
-
-        self.solver = SolverFactory(solvers[1])
-        self.solver_options = {
-            "output_flag": False,
-            "log_to_console": False,
-            "LogToConsole": 0,
-        }
 
         self.variable_cost_series = None
 
@@ -416,7 +419,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 )
 
                 return maximise_load_shift
-            
+
         elif self.flexibility_measure == "peak_load_shifting":
 
             @self.model.Objective(sense=pyo.maximize)
@@ -424,32 +427,24 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 """
                 Maximizes the load shift over all time steps.
                 """
-                maximise_load_shift = pyo.quicksum(m.load_shift_neg[t] * m.peak_indicator[t] for t in m.time_steps)
+                maximise_load_shift = pyo.quicksum(
+                    m.load_shift_neg[t] * m.peak_indicator[t] for t in m.time_steps
+                )
 
                 return maximise_load_shift
 
         else:
             raise ValueError(f"Unknown objective: {self.flexibility_measure}")
 
-    def calculate_optimal_operation_if_needed(self):
-        if (
-            self.opt_power_requirement is not None
-            and self.flex_power_requirement is None
-            and self.flexibility_measure in self.flexibility_measures
-        ):
-            self.determine_optimal_operation_with_flex()
-
-        if self.opt_power_requirement is None and self.objective == "min_variable_cost":
-            self.determine_optimal_operation_without_flex()
-
-    def determine_optimal_operation_without_flex(self):
+    def determine_optimal_operation_without_flex(self, switch_flex_off=True):
         """
         Determines the optimal operation of the steel plant without considering flexibility.
         """
         # create an instance of the model
         instance = self.model.create_instance()
         # switch the instance to the optimal mode by deactivating the flexibility constraints and objective
-        instance = self.switch_to_opt(instance)
+        if switch_flex_off:
+            instance = self.switch_to_opt(instance)
         # solve the instance
         results = self.solver.solve(instance, options=self.solver_options)
 
@@ -557,6 +552,9 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         # Deactivate flexibility constraints if they exist
         if hasattr(instance, "total_cost_upper_limit"):
             instance.total_cost_upper_limit.deactivate()
+
+        if hasattr(instance, "peak_load_shift_constraint"):
+            instance.peak_load_shift_constraint.deactivate()
 
         # if hasattr(instance, "total_power_input_constraint_with_flex"):
         instance.total_power_input_constraint_with_flex.deactivate()
