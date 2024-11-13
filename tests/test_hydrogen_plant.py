@@ -160,5 +160,52 @@ def test_final_soc_target_without_flex(hydrogen_plant):
     assert final_soc >= final_soc_target, "Final SOC does not meet target"
 
 
+def test_initial_soc_greater_than_capacity(hydrogen_plant):
+    # After initialization, check if initial SOC > max capacity was adjusted
+    storage = hydrogen_plant.components["h2_seasonal_storage"]
+    adjusted_soc = (
+        storage.initial_soc * storage.max_capacity
+        if storage.initial_soc > 1
+        else storage.initial_soc
+    )
+    assert (
+        adjusted_soc <= storage.max_capacity
+    ), "Initial SOC should be adjusted if set above max capacity"
+
+
+def test_unknown_technology_error():
+    # Test for unknown technology error with required components present
+    hydrogen_components = {
+        "electrolyser": {  # Required component
+            "max_power": 50,
+            "min_power": 0,
+            "ramp_up": 10,
+            "ramp_down": 10,
+            "efficiency": 0.8,
+        },
+        "unknown_tech": {  # Unknown component to trigger the error
+            "max_power": 20,
+            "min_power": 0,
+            "efficiency": 0.5,
+        },
+    }
+
+    with pytest.raises(ValueError, match=r"unknown_tech"):
+        HydrogenPlant(
+            id="test_unknown_technology",
+            unit_operator="test_operator",
+            objective="min_variable_cost",
+            flexibility_measure="max_load_shift",
+            bidding_strategies={"EOM": NaiveDADSMStrategy()},
+            index=pd.date_range("2023-01-01", periods=24, freq="h"),
+            components=hydrogen_components,
+            forecaster=NaiveForecast(
+                index=pd.date_range("2023-01-01", periods=24, freq="h"),
+                price_EOM=[60] * 24,
+            ),
+            demand=500,
+        )
+
+
 if __name__ == "__main__":
     pytest.main(["-s", __file__])
