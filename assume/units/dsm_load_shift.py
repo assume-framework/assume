@@ -91,5 +91,3 @@ class DSMFlex:
                         == self.model.dsm_blocks["eaf"].power_in[t]
                         + self.model.dsm_blocks["dri_plant"].power_in[t]
                     )
-            else:
-                raise ValueError(f"Unknown technology: {self.technology}")
