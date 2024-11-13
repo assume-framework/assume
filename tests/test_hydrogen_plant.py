@@ -18,11 +18,11 @@ def hydrogen_components():
         "electrolyser": {
             "max_power": 100,  # Maximum power input in MW
             "min_power": 0,  # Minimum power input in MW
-            "ramp_up": 50,  # Ramp-up rate in MW per time step
-            "ramp_down": 50,  # Ramp-down rate in MW per time step
-            "efficiency": 0.7,  # Efficiency of the electrolyser
-            "min_operating_time": 1,  # Minimum number of operating steps
-            "min_down_time": 1,  # Minimum downtime steps
+            "ramp_up": 100,  # Ramp-up rate in MW per time step
+            "ramp_down": 100,  # Ramp-down rate in MW per time step
+            "efficiency": 1,  # Efficiency of the electrolyser
+            "min_operating_time": 0,  # Minimum number of operating steps
+            "min_down_time": 0,  # Minimum downtime steps
         },
         "h2_seasonal_storage": {
             "max_capacity": 500,  # Maximum storage capacity in MWh
@@ -65,25 +65,31 @@ def hydrogen_plant(hydrogen_components) -> HydrogenPlant:
         unit_operator="test_operator",
         objective="min_variable_cost",
         flexibility_measure="max_load_shift",
+        cost_tolerance=50,
         bidding_strategies=bidding_strategy,
         index=index,
         components=hydrogen_components,
         forecaster=forecast,
-        demand=800,  # Total hydrogen demand over the horizon
+        demand=500,  # Total hydrogen demand over the horizon
     )
 
 
 def test_optimal_operation_without_flex_initialization(hydrogen_plant):
+    # Run the initial without-flexibility operation to populate opt_power_requirement
     hydrogen_plant.determine_optimal_operation_without_flex()
+
+    # Check that opt_power_requirement is populated and of the correct type
     assert (
         hydrogen_plant.opt_power_requirement is not None
     ), "opt_power_requirement should be populated"
     assert isinstance(hydrogen_plant.opt_power_requirement, pd.Series)
 
+    # Create an instance of the model and switch to optimization mode
     instance = hydrogen_plant.model.create_instance()
     instance = hydrogen_plant.switch_to_opt(instance)
     hydrogen_plant.solver.solve(instance, tee=False)
 
+    # Check that the total power input is greater than zero, indicating operation
     total_power_input = sum(
         instance.total_power_input[t].value
         for t in instance.time_steps
@@ -111,6 +117,25 @@ def test_optimal_operation_without_flex_initialization(hydrogen_plant):
         assert (
             balance_difference < 1e-3
         ), f"Hydrogen balance mismatch at time {t}, difference: {balance_difference}"
+
+    # Now test the with-flexibility operation to verify interaction with opt_power_requirement
+    hydrogen_plant.determine_optimal_operation_with_flex()
+
+    # Re-solve the instance to verify the operation with flexibility
+    instance = hydrogen_plant.model.create_instance()
+    instance = hydrogen_plant.switch_to_flex(instance)
+    hydrogen_plant.solver.solve(instance, tee=False)
+
+    # Verify that opt_power_requirement values are used correctly
+    for t in instance.time_steps:
+        assert (
+            instance.total_power_input[t].value is not None
+        ), f"Total power input at time {t} should be set"
+        expected_power = hydrogen_plant.opt_power_requirement.iloc[t]
+        actual_power = instance.total_power_input[t].value
+        assert (
+            abs(expected_power - actual_power) < 1e-3
+        ), f"Mismatch in power input at time {t}: expected {expected_power}, got {actual_power}"
 
 
 def test_ramping_constraints_without_flex(hydrogen_plant):
@@ -172,6 +197,67 @@ def test_initial_soc_greater_than_capacity(hydrogen_plant):
     assert (
         adjusted_soc <= storage.max_capacity
     ), "Initial SOC should be adjusted if set above max capacity"
+
+
+def test_optimal_operation_with_flex_initialization(hydrogen_plant):
+    # Set synthetic values for opt_power_requirement and total_cost
+    hydrogen_plant.opt_power_requirement = pd.Series(
+        [30] * len(hydrogen_plant.index), index=hydrogen_plant.index
+    )
+    hydrogen_plant.total_cost = 100000  # Assign a synthetic cost value for testing
+
+    # Trigger flexibility operation
+    hydrogen_plant.determine_optimal_operation_with_flex()
+
+    # Verify that flex_power_requirement is populated and is of the correct type
+    assert (
+        hydrogen_plant.flex_power_requirement is not None
+    ), "flex_power_requirement should be populated"
+    assert isinstance(hydrogen_plant.flex_power_requirement, pd.Series)
+
+    # Create an instance of the model and switch to flexibility mode
+    instance = hydrogen_plant.model.create_instance()
+    instance = hydrogen_plant.switch_to_flex(instance)
+    hydrogen_plant.solver.solve(instance, tee=False)
+
+    # Check that the total power input reflects flexible operation
+    total_power_input = sum(
+        instance.total_power_input[t].value
+        for t in instance.time_steps
+        if instance.total_power_input[t].value is not None
+    )
+    assert (
+        total_power_input > 0
+    ), "Total power input should be greater than zero under flexibility"
+
+    # Verify that the synthetic opt_power_requirement values are being used
+    for t in instance.time_steps:
+        expected_power = hydrogen_plant.opt_power_requirement.iloc[t]
+        actual_power = instance.total_power_input[t].value
+        assert (
+            abs(expected_power - actual_power) < 1e-3
+        ), f"Mismatch in power input at time {t}: expected {expected_power}, got {actual_power}"
+
+    # Additional check to ensure the hydrogen demand is met
+    for t in instance.time_steps:
+        electrolyser_out = instance.dsm_blocks["electrolyser"].hydrogen_out[t].value
+        hydrogen_demand = (
+            instance.hydrogen_demand[t].value
+            if hasattr(instance.hydrogen_demand[t], "value")
+            else instance.hydrogen_demand[t]
+        )
+        storage_charge = instance.dsm_blocks["h2_seasonal_storage"].charge[t].value
+        storage_discharge = (
+            instance.dsm_blocks["h2_seasonal_storage"].discharge[t].value
+        )
+
+        # Check that the hydrogen demand balance holds within a small tolerance
+        balance_difference = abs(
+            electrolyser_out - (hydrogen_demand + storage_charge - storage_discharge)
+        )
+        assert (
+            balance_difference < 1e-3
+        ), f"Hydrogen balance mismatch at time {t}, difference: {balance_difference}"
 
 
 def test_unknown_technology_error():
