@@ -169,7 +169,7 @@ class PayAsBidAonRole(MarketRole):
                         supply_orders[i]["accepted_volume"] = supply_orders[i]["volume"]
                         demand_orders[i]["accepted_volume"] = demand_orders[i]["volume"]
 
-                        # pay as bid - so the generator gets payed more than he needed to operate
+                        # pay as bid - so the generator gets paid more than he needed to operate
                         supply_orders[i]["accepted_price"] = demand_orders[i]["price"]
                         demand_orders[i]["accepted_price"] = demand_orders[i]["price"]
 

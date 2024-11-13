@@ -94,7 +94,7 @@ To ease your way into ASSUME we provided some examples and tutorials. The former
 
 ### The Tutorials
 
-The tutorials work completly detached from your own machine on google colab. They provide code snippets and task that show you, how you can work with the software package one your own. We have two tutorials prepared, one for introducing a new unit and one for getting reinforcement learning ready on ASSUME.
+The tutorials work completely detached from your own machine on google colab. They provide code snippets and task that show you, how you can work with the software package one your own. We have two tutorials prepared, one for introducing a new unit and one for getting reinforcement learning ready on ASSUME.
 
 How to configure a new unit in ASSUME?
 [![Open Learning Tutorial in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/assume-framework/assume/blob/main/examples/notebooks/03_custom_unit_example.ipynb)
