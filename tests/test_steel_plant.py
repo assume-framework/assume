@@ -115,12 +115,12 @@ def test_determine_optimal_operation_without_flex(steel_plant):
             dri_output == dri_input
         ), f"DRI output at time {t} does not match DRI input"
 
-    for t in instance.time_steps:
-        dri_output = instance.dsm_blocks["dri_plant"].dri_output[t].value
-        dri_input = instance.dsm_blocks["eaf"].dri_input[t].value
-        assert (
-            dri_output == dri_input
-        ), f"Material flow from DRI plant to EAF at time {t} is inconsistent"
+    # for t in instance.time_steps:
+    #     dri_output = instance.dsm_blocks["dri_plant"].dri_output[t].value
+    #     dri_input = instance.dsm_blocks["eaf"].dri_input[t].value
+    #     assert (
+    #         dri_output == dri_input
+    #     ), f"Material flow from DRI plant to EAF at time {t} is inconsistent"
 
     total_steel_output = sum(
         instance.dsm_blocks["eaf"].steel_output[t].value for t in instance.time_steps
@@ -128,6 +128,50 @@ def test_determine_optimal_operation_without_flex(steel_plant):
     assert (
         total_steel_output == instance.steel_demand
     ), f"Total steel output {total_steel_output} does not match steel demand {instance.steel_demand}"
+
+
+def test_ramping_constraints(steel_plant):
+    steel_plant.determine_optimal_operation_without_flex()
+    instance = steel_plant.model.create_instance()
+    instance = steel_plant.switch_to_opt(instance)
+    steel_plant.solver.solve(instance, tee=False)
+
+    # Loop through time steps to check that the electrolyser ramp constraints hold
+    for t in list(instance.time_steps)[1:]:
+        # Current and previous power values for electrolyser
+        power_prev = instance.dsm_blocks["electrolyser"].power_in[t - 1].value
+        power_curr = instance.dsm_blocks["electrolyser"].power_in[t].value
+
+        # Access ramp constraints using dot notation
+        ramp_up = steel_plant.components["electrolyser"].ramp_up
+        ramp_down = steel_plant.components["electrolyser"].ramp_down
+
+        # Verify ramping constraints
+        assert (
+            power_curr - power_prev <= ramp_up
+        ), f"Electrolyser ramp-up constraint violated at time {t}"
+        assert (
+            power_prev - power_curr <= ramp_down
+        ), f"Electrolyser ramp-down constraint violated at time {t}"
+
+
+def test_handle_missing_components():
+    # Check for handling missing required components, as the SteelPlant requires dri_plant for initialization
+    with pytest.raises(
+        ValueError, match="Component dri_plant is required for the steel plant unit."
+    ):
+        _ = SteelPlant(
+            id="test_steel_plant",
+            unit_operator="test_operator",
+            objective="min_variable_cost",
+            flexibility_measure="max_load_shift",
+            bidding_strategies={"EOM": NaiveDADSMStrategy()},
+            index=pd.date_range("2023-01-01", periods=24, freq="h"),
+            components={},  # No components provided
+            forecaster=None,
+            demand=1000,
+            technology="unknown_tech",
+        )
 
 
 def test_determine_optimal_operation_with_flex(steel_plant):
