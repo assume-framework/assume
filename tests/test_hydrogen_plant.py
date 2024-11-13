@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pandas as pd
+import pyomo.environ as pyo
 import pytest
 
 from assume.common.forecasts import NaiveForecast
@@ -205,6 +206,94 @@ def test_unknown_technology_error():
             ),
             demand=500,
         )
+
+
+@pytest.fixture
+def hydrogen_components_no_storage():
+    # Define component configuration for hydrogen plant with only an electrolyser (no storage)
+    return {
+        "electrolyser": {
+            "max_power": 100,
+            "min_power": 0,
+            "ramp_up": 50,
+            "ramp_down": 50,
+            "efficiency": 0.7,
+            "min_operating_time": 1,
+            "min_down_time": 1,
+        }
+    }
+
+
+@pytest.fixture
+def hydrogen_plant_no_storage(hydrogen_components_no_storage) -> HydrogenPlant:
+    # Define the time index and forecast data
+    index = pd.date_range("2023-01-01", periods=24, freq="h")
+    forecast = NaiveForecast(
+        index,
+        price_EOM=[60] * 24,  # Forecast electricity prices
+    )
+
+    # Define a bidding strategy for the hydrogen plant
+    bidding_strategy = {
+        "EOM": NaiveDADSMStrategy(),
+    }
+
+    # Initialize the HydrogenPlant with only an electrolyser component (no storage)
+    return HydrogenPlant(
+        id="test_hydrogen_plant_no_storage",
+        unit_operator="test_operator",
+        objective="min_variable_cost",
+        flexibility_measure="max_load_shift",
+        bidding_strategies=bidding_strategy,
+        index=index,
+        components=hydrogen_components_no_storage,
+        forecaster=forecast,
+        demand=800,  # Total hydrogen demand over the horizon
+    )
+
+
+def test_electrolyser_only_operation(hydrogen_plant_no_storage):
+    # Test that hydrogen demand is met solely by electrolyser output when there's no storage
+    hydrogen_plant_no_storage.determine_optimal_operation_without_flex()
+    instance = hydrogen_plant_no_storage.model.create_instance()
+    instance = hydrogen_plant_no_storage.switch_to_opt(instance)
+    hydrogen_plant_no_storage.solver.solve(instance, tee=False)
+
+    for t in instance.time_steps:
+        electrolyser_out = instance.dsm_blocks["electrolyser"].hydrogen_out[t].value
+        hydrogen_demand = (
+            instance.hydrogen_demand[t].value
+            if hasattr(instance.hydrogen_demand[t], "value")
+            else instance.hydrogen_demand[t]
+        )
+
+        # Verify that electrolyser output meets hydrogen demand without storage
+        assert (
+            electrolyser_out == hydrogen_demand
+        ), f"Hydrogen demand not met solely by electrolyser at time {t}"
+
+
+def test_electrolyser_meets_total_hydrogen_demand(hydrogen_plant_no_storage):
+    # Test that the sum of electrolyser output alone meets total hydrogen demand when there is no storage
+    hydrogen_plant_no_storage.determine_optimal_operation_without_flex()
+    instance = hydrogen_plant_no_storage.model.create_instance()
+    instance = hydrogen_plant_no_storage.switch_to_opt(instance)
+    hydrogen_plant_no_storage.solver.solve(instance, tee=False)
+
+    # Calculate the total electrolyser output across all time steps
+    total_electrolyser_output = sum(
+        instance.dsm_blocks["electrolyser"].hydrogen_out[t].value
+        for t in instance.time_steps
+    )
+
+    # Access absolute hydrogen demand from the model
+    absolute_hydrogen_demand = pyo.value(instance.absolute_hydrogen_demand)
+
+    # Assert that the total electrolyser output matches the absolute hydrogen demand
+    assert total_electrolyser_output == absolute_hydrogen_demand, (
+        f"Total electrolyser output {total_electrolyser_output} does not match "
+        f"absolute hydrogen demand {absolute_hydrogen_demand}"
+    )
 
 
 if __name__ == "__main__":
