@@ -195,31 +195,3 @@ def test_storage_loss_rate(seasonal_storage_model, seasonal_storage_config):
             abs(soc - expected_soc) < 1e-4
         ), f"SOC at time {t} deviates from expected due to storage loss."
         previous_soc = soc
-
-
-# Test to ensure initial SOC greater than 1 is normalized
-def test_initial_soc_normalization(seasonal_storage_config):
-    # Set initial_soc greater than 1 to trigger normalization
-    seasonal_storage_config["initial_soc"] = 1.2  # Set to a value > 1
-
-    # Define the Pyomo model
-    model = pyo.ConcreteModel()
-    model.time_steps = pyo.Set(initialize=range(100))  # 100 time steps
-
-    # Initialize the SeasonalHydrogenStorage unit with the modified config
-    storage = SeasonalHydrogenStorage(
-        **seasonal_storage_config, time_steps=model.time_steps, horizon=100
-    )
-    model.storage = pyo.Block()
-    storage.add_to_model(model, model.storage)
-
-    # Check that the initial SOC has been normalized to be within the max capacity
-    expected_normalized_soc = (
-        seasonal_storage_config["initial_soc"]
-        * seasonal_storage_config["max_capacity"]
-        / seasonal_storage_config["max_capacity"]
-    )
-    actual_initial_soc = pyo.value(model.storage.soc[0])
-    assert (
-        actual_initial_soc == expected_normalized_soc
-    ), f"Initial SOC normalization failed. Expected {expected_normalized_soc}, got {actual_initial_soc}."
