@@ -14,6 +14,7 @@ from pyomo.opt import (
 )
 
 from assume.common.base import SupportsMinMax
+from assume.common.utils import str_to_bool
 from assume.units.dsm_load_shift import DSMFlex
 
 SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
@@ -134,28 +135,22 @@ class Building(DSMFlex, SupportsMinMax):
 
         # Configuration for electric vehicles selling energy to the market
         if self.has_ev:
-            self.ev_sells_energy_to_market = self.components["electric_vehicle"].get(
-                "sells_energy_to_market", "true"
-            ).lower() in {"y", "yes", "t", "true", "on", "1"}
-
+            self.ev_sells_energy_to_market = str_to_bool(
+                self.components["electric_vehicle"].get(
+                    "sells_energy_to_market", "true"
+                )
+            )
         # Configuration for battery storage selling energy to the market
         if self.has_battery_storage:
-            self.battery_sells_energy_to_market = self.components[
-                "generic_storage"
-            ].get("sells_energy_to_market", "true").lower() in {
-                "y",
-                "yes",
-                "t",
-                "true",
-                "on",
-                "1",
-            }
+            self.battery_sells_energy_to_market = str_to_bool(
+                self.components["generic_storage"].get("sells_energy_to_market", "true")
+            )
 
         # Configure PV plant power profile based on availability
         if self.has_pv:
-            uses_power_profile = self.components["pv_plant"].get(
-                "uses_power_profile", "false"
-            ).lower() in {"y", "yes", "t", "true", "on", "1"}
+            uses_power_profile = str_to_bool(
+                self.components["pv_plant"].get("uses_power_profile", "false")
+            )
             profile_key = (
                 f"{self.id}_pv_power_profile"
                 if not uses_power_profile
