@@ -514,13 +514,15 @@ def load_config_and_create_forecaster(
     forecaster.set_forecast(temperature_df)
     forecaster.calc_forecast_if_needed()
 
+    forecaster.convert_forecasts_to_fast_series()
+
     return {
         "config": config,
         "sim_id": sim_id,
         "path": path,
         "start": start,
         "end": end,
-        "index": index,
+        "index": forecaster.index,
         "powerplant_units": powerplant_units,
         "storage_units": storage_units,
         "demand_units": demand_units,

@@ -9,6 +9,7 @@ from functools import lru_cache
 import pandas as pd
 
 from assume.common.base import SupportsMinMaxCharge
+from assume.common.fast_pandas import FastDatetimeSeries
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
 
@@ -105,8 +106,10 @@ class Storage(SupportsMinMaxCharge):
         self.max_power_discharge = abs(max_power_discharge)
         self.min_power_discharge = abs(min_power_discharge)
 
-        self.outputs["soc"] = pd.Series(self.initial_soc, index=self.index, dtype=float)
-        self.outputs["energy_cost"] = pd.Series(0.0, index=self.index, dtype=float)
+        self.outputs["soc"] = FastDatetimeSeries(
+            value=self.initial_soc, index=self.index
+        )
+        self.outputs["energy_cost"] = FastDatetimeSeries(0.0, index=self.index)
 
         self.soc_tick = soc_tick
 
@@ -401,7 +404,7 @@ class Storage(SupportsMinMaxCharge):
 
         # restrict charging according to max_soc
         max_soc_charge = self.calculate_soc_max_charge(self.outputs["soc"][start])
-        max_power_charge = max_power_charge.clip(lower=max_soc_charge)
+        max_power_charge = max_power_charge.clip(min=max_soc_charge)
 
         return min_power_charge, max_power_charge
 
@@ -433,7 +436,7 @@ class Storage(SupportsMinMaxCharge):
             else self.min_power_discharge
         )
         min_power_discharge -= base_load + capacity_neg
-        min_power_discharge = min_power_discharge.clip(lower=0)
+        min_power_discharge = min_power_discharge.clip(min=0)
 
         max_power_discharge = (
             self.max_power_discharge[start:end_excl]

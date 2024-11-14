@@ -44,7 +44,7 @@ class NaiveSingleBidStrategy(BaseStrategy):
         )  # minimum and maximum power output of the unit between the start time of the first product and the end time of the last product
 
         bids = []
-        for product in product_tuples:
+        for idx, product in enumerate(product_tuples):
             # for each product, calculate the marginal cost of the unit at the start time of the product
             # and the volume of the product. Dispatch the order to the market.
             start = product[0]
@@ -55,7 +55,7 @@ class NaiveSingleBidStrategy(BaseStrategy):
                 start, previous_power
             )  # calculation of the marginal costs
             volume = unit.calculate_ramp(
-                op_time, previous_power, max_power[start], current_power
+                op_time, previous_power, max_power[idx], current_power
             )
             bids.append(
                 {

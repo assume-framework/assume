@@ -7,6 +7,8 @@ import logging
 import numpy as np
 import pandas as pd
 
+from assume.common.fast_pandas import FastDatetimeIndex, FastDatetimeSeries
+
 
 class Forecaster:
     """
@@ -43,7 +45,7 @@ class Forecaster:
 
         This method returns the forecast for a given column as a pandas Series based on the provided index.
         """
-        return pd.Series(0.0, self.index)
+        return FastDatetimeSeries(index=self.index, value=0.0)
 
     def get_availability(self, unit: str) -> pd.Series:
         """
@@ -81,6 +83,51 @@ class Forecaster:
         """
 
         return self[f"fuel_price_{fuel_type}"]
+
+    def _to_fast_series(self, value, name: str) -> FastDatetimeSeries:
+        """
+        Converts a value to a FastDatetimeSeries based on self.index.
+
+        Args:
+            value (float | list | pd.Series): The value to convert.
+            name (str): Name of the series.
+
+        Returns:
+            FastDatetimeSeries: The converted FastDatetimeSeries.
+        """
+        if isinstance(value, pd.Series):
+            value = value.values  # Use the values as an array for consistency
+        return FastDatetimeSeries(
+            self.index.start, self.index.end, self.index.freq, value, name=name
+        )
+
+    def convert_forecasts_to_fast_series(self):
+        """
+        Converts all forecasts in self.forecasts (DataFrame) into FastDatetimeSeries and saves them
+        in a dictionary. It also converts the self.index to a FastDatetimeIndex.
+        """
+        # Convert index to FastDatetimeIndex
+        inferred_freq = pd.infer_freq(self.index)
+        if inferred_freq is None:
+            raise ValueError("Frequency could not be inferred from the index.")
+
+        self.index = FastDatetimeIndex(
+            start=self.index[0], end=self.index[-1], freq=inferred_freq
+        )
+
+        # Initialize an empty dictionary to store FastDatetimeSeries
+        fast_forecasts = {}
+
+        # Convert each column in the forecasts DataFrame to a FastDatetimeSeries
+        for column_name in self.forecasts.columns:
+            # Convert each column in self.forecasts to FastDatetimeSeries
+            forecast_series = self.forecasts[column_name]
+            fast_forecasts[column_name] = FastDatetimeSeries.from_series(
+                forecast_series
+            )
+
+        # Replace the DataFrame with the dictionary of FastDatetimeSeries
+        self.forecasts = fast_forecasts
 
 
 class CsvForecaster(Forecaster):
@@ -135,10 +182,10 @@ class CsvForecaster(Forecaster):
 
         """
 
-        if column not in self.forecasts.columns:
+        if column not in self.forecasts.keys():
             if "availability" in column:
-                return pd.Series(1, self.index)
-            return pd.Series(0.0, self.index)
+                return FastDatetimeSeries(index=self.index, value=1.0)
+            return FastDatetimeSeries(index=self.index, value=0.0)
 
         return self.forecasts[column]
 
@@ -421,8 +468,10 @@ class RandomForecaster(CsvForecaster):
         *args,
         **kwargs,
     ):
-        self.sigma = sigma
         super().__init__(index, powerplants_units, *args, **kwargs)
+
+        self.index = FastDatetimeIndex(start=index[0], end=index[-1], freq=index.freq)
+        self.sigma = sigma
 
     def __getitem__(self, column: str) -> pd.Series:
         """
@@ -441,9 +490,10 @@ class RandomForecaster(CsvForecaster):
         """
 
         if column not in self.forecasts.columns:
-            return pd.Series(0.0, self.index)
+            return FastDatetimeSeries(index=self.index, value=0.0)
         noise = np.random.normal(0, self.sigma, len(self.index))
-        return self.forecasts[column] * noise
+        forecast_data = self.forecasts[column].values * noise
+        return FastDatetimeSeries(index=self.index, value=forecast_data)
 
 
 class NaiveForecast(Forecaster):
@@ -494,11 +544,14 @@ class NaiveForecast(Forecaster):
         **kwargs,
     ):
         super().__init__(index)
-        self.fuel_price = fuel_price
-        self.availability = availability
-        self.co2_price = co2_price
-        self.demand = demand
-        self.price_forecast = price_forecast
+        self.index = FastDatetimeIndex(start=index[0], end=index[-1], freq=index.freq)
+
+        # Convert attributes to FastDatetimeSeries if they are not already Series
+        self.fuel_price = self._to_fast_series(fuel_price, "fuel_price")
+        self.availability = self._to_fast_series(availability, "availability")
+        self.co2_price = self._to_fast_series(co2_price, "co2_price")
+        self.demand = self._to_fast_series(demand, "demand")
+        self.price_forecast = self._to_fast_series(price_forecast, "price_forecast")
 
     def __getitem__(self, column: str) -> pd.Series:
         """
@@ -529,6 +582,5 @@ class NaiveForecast(Forecaster):
             value = self.price_forecast
         else:
             value = 0
-        if isinstance(value, pd.Series):
-            value.index = self.index
-        return pd.Series(value, self.index)
+
+        return FastDatetimeSeries(index=self.index, value=value)

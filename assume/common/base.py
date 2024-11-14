@@ -9,6 +9,7 @@ from typing import TypedDict
 import numpy as np
 import pandas as pd
 
+from assume.common.fast_pandas import FastDatetimeSeries
 from assume.common.forecasts import Forecaster
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 
@@ -68,7 +69,9 @@ class BaseUnit:
         self.location = location
         self.bidding_strategies: dict[str, BaseStrategy] = bidding_strategies
         self.index = index
-        self.outputs = defaultdict(lambda: pd.Series(0.0, index=self.index))
+        self.outputs = defaultdict(
+            lambda: FastDatetimeSeries(value=0.0, index=self.index)
+        )
         # series does not like to convert from tensor to float otherwise
 
         # RL data stored as lists to simplify storing to the buffer
@@ -77,16 +80,19 @@ class BaseUnit:
         self.outputs["rl_rewards"] = []
 
         # some data is stored as series to allow to store it in the outputs
-        self.outputs["actions"] = pd.Series(0.0, index=self.index, dtype=object)
-        self.outputs["exploration_noise"] = pd.Series(
-            0.0, index=self.index, dtype=object
+        self.outputs["actions"] = FastDatetimeSeries(value=0.0, index=self.index)
+        self.outputs["exploration_noise"] = FastDatetimeSeries(
+            value=0.0,
+            index=self.index,
         )
-        self.outputs["reward"] = pd.Series(0.0, index=self.index, dtype=object)
+        self.outputs["reward"] = FastDatetimeSeries(value=0.0, index=self.index)
 
         if forecaster:
             self.forecaster = forecaster
         else:
-            self.forecaster = defaultdict(lambda: pd.Series(0.0, index=self.index))
+            self.forecaster = defaultdict(
+                lambda: FastDatetimeSeries(value=0.0, index=self.index)
+            )
 
     def calculate_bids(
         self,
@@ -355,7 +361,6 @@ class SupportsMinMax(BaseUnit):
         Returns:
             float: The corrected possible power to offer according to ramping restrictions.
         """
-
         # was off before, but should be on now and min_down_time is not reached
         if power > 0 and op_time < 0 and op_time > -self.min_down_time:
             power = 0
@@ -416,7 +421,7 @@ class SupportsMinMax(BaseUnit):
         if len(arr) < 1:
             # before start of index
             return max_time
-        is_off = not arr.iloc[0]
+        is_off = not arr[0]
         run = 0
         for val in arr:
             if val == is_off:
@@ -447,7 +452,7 @@ class SupportsMinMax(BaseUnit):
             return max(self.min_operating_time, 1), min(-self.min_down_time, -1)
 
         op_series = []
-        status = arr.iloc[0]
+        status = arr[0]
         run = 0
         for val in arr:
             if val == status:

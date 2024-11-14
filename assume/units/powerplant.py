@@ -148,7 +148,7 @@ class PowerPlant(SupportsMinMax):
             self.forecaster.get_availability(self.id)[start:end] * self.max_power
         )
 
-        for t in self.outputs["energy"][start:end].index:
+        for idx, t in enumerate(self.index[start:end]):
             current_power = self.outputs["energy"][t]
 
             previous_power = self.get_output_before(t)
@@ -157,7 +157,7 @@ class PowerPlant(SupportsMinMax):
             current_power = self.calculate_ramp(op_time, previous_power, current_power)
 
             if current_power > 0:
-                current_power = min(current_power, max_power[t])
+                current_power = min(current_power, max_power[idx])
                 current_power = max(current_power, self.min_power)
 
             self.outputs["energy"][t] = current_power
@@ -199,7 +199,7 @@ class PowerPlant(SupportsMinMax):
 
         self.calculate_cashflow(product_type, orderbook)
 
-        for start in products_index:
+        for idx, start in enumerate(products_index):
             current_power = self.outputs[product_type][start]
 
             previous_power = self.get_output_before(start)
@@ -208,7 +208,7 @@ class PowerPlant(SupportsMinMax):
             current_power = self.calculate_ramp(op_time, previous_power, current_power)
 
             if current_power > 0:
-                current_power = min(current_power, max_power[start])
+                current_power = min(current_power, max_power[idx])
                 current_power = max(current_power, self.min_power)
 
             self.outputs[product_type][start] = current_power
@@ -229,9 +229,10 @@ class PowerPlant(SupportsMinMax):
             float: The marginal cost of the unit.
         """
         fuel_price = self.forecaster.get_price(self.fuel_type)
+        co2_price = self.forecaster.get_price("co2")
         marginal_cost = (
             fuel_price / self.efficiency
-            + self.forecaster.get_price("co2") * self.emission_factor / self.efficiency
+            + co2_price * self.emission_factor / self.efficiency
             + self.additional_cost
         )
 
@@ -331,7 +332,7 @@ class PowerPlant(SupportsMinMax):
         # needed minimum + capacity_neg - what is already sold is actual minimum
         min_power = self.min_power + capacity_neg - base_load
         # min_power should be at least the heat demand at that time
-        min_power = min_power.clip(lower=heat_demand)
+        min_power = min_power.clip(min=heat_demand)
 
         available_power = self.forecaster.get_availability(self.id)[start:end_excl]
         # check if available power is larger than max_power and raise an error if so
@@ -345,7 +346,7 @@ class PowerPlant(SupportsMinMax):
         # remove what has already been bid
         max_power = max_power - base_load
         # make sure that max_power is > 0 for all timesteps
-        max_power = max_power.clip(lower=0)
+        max_power = max_power.clip(min=0)
 
         return min_power, max_power
 

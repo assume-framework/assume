@@ -313,8 +313,7 @@ class UnitsOperator(Role):
         for unit_id, unit in self.units.items():
             current_dispatch = unit.execute_current_dispatch(start, now)
             end = now
-            current_dispatch.name = "power"
-            data = pd.DataFrame(current_dispatch)
+            data = {"power": current_dispatch}
 
             # TODO: this needs to be fixed. For now it is consuming too much time and is deactivated
             # unit.calculate_generation_cost(start, now, "energy")
@@ -324,7 +323,7 @@ class UnitsOperator(Role):
                 for output in valid_outputs:
                     if output in key:
                         data[key] = unit.outputs[key][start:end]
-
+            data["time"] = unit.index.get_date_list(start, end)
             data["unit"] = unit_id
             unit_dispatch_dfs.append(data)
 
@@ -344,9 +343,7 @@ class UnitsOperator(Role):
             return
         self.last_sent_dispatch[product_type] = self.context.current_timestamp
 
-        market_dispatch, unit_dispatch_dfs = self.get_actual_dispatch(
-            product_type, last
-        )
+        market_dispatch, unit_dispatch = self.get_actual_dispatch(product_type, last)
 
         now = timestamp2datetime(self.context.current_timestamp)
         self.valid_orders[product_type] = list(
@@ -366,8 +363,7 @@ class UnitsOperator(Role):
                     "data": market_dispatch,
                 },
             )
-            if unit_dispatch_dfs:
-                unit_dispatch = pd.concat(unit_dispatch_dfs)
+            if unit_dispatch:
                 self.context.schedule_instant_message(
                     receiver_addr=db_addr,
                     content={

@@ -7,6 +7,7 @@ import numbers
 import pandas as pd
 
 from assume.common.base import SupportsMinMax
+from assume.common.fast_pandas import FastDatetimeSeries
 
 
 class Demand(SupportsMinMax):
@@ -62,9 +63,9 @@ class Demand(SupportsMinMax):
         self.ramp_down = max(abs(min_power), abs(max_power))
         self.ramp_up = max(abs(min_power), abs(max_power))
         volume = self.forecaster[self.id]
-        self.volume = -abs(volume)  # demand is negative
+        self.volume = -volume  # demand is negative
         if isinstance(price, numbers.Real):
-            price = pd.Series(price, index=self.index)
+            price = FastDatetimeSeries(index=index, value=price)
         self.price = price
 
     def execute_current_dispatch(

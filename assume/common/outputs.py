@@ -483,13 +483,15 @@ class WriteOutput(Role):
             df["simulation"] = self.simulation_id
             self.write_dfs["market_dispatch"].append(df)
 
-    def write_unit_dispatch(self, data: any):
+    def write_unit_dispatch(self, unit_dispatch: dict):
         """
         Writes the actual dispatch of the units to a CSV and database.
 
         Args:
             data (any): The records to be put into the table. Formatted like, "datetime, power, market_id, unit_id".
         """
+        data = pd.concat([pd.DataFrame.from_dict(d) for d in unit_dispatch])
+        data = data.set_index("time")
         data["simulation"] = self.simulation_id
         self.write_dfs["unit_dispatch"].append(data)
 
