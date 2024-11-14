@@ -1427,7 +1427,7 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
         # 1.1 Get the Observations, which are the basis of the action decision
         # =============================================================================
         # scaling factors for the observations
-        scaling_factor_res_load = self.max_demand
+        scaling_factor_res_load = max(abs(unit.forecaster[f"total_community_load"]))
         scaling_factor_price = self.max_bid_price
 
         # checks if we are at end of simulation horizon, since we need to change the forecast then
