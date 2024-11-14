@@ -570,7 +570,7 @@ def calculate_reward_EOM(
 
         order_times = pd.date_range(start, end_excl, freq=unit.index.freq)
 
-        for start in order_times:
+        for idx, start in enumerate(order_times):
             marginal_cost = unit.calculate_marginal_cost(
                 start, unit.outputs[product_type].loc[start]
             )
@@ -590,7 +590,7 @@ def calculate_reward_EOM(
             # calculate opportunity cost
             # as the loss of income we have because we are not running at full power
             order_opportunity_cost = price_difference * (
-                max_power[start] - unit.outputs[product_type].loc[start]
+                max_power[idx] - unit.outputs[product_type].loc[start]
             )
             # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
             # don't consider opportunity_cost more than once! Always the same for one timestep and one market
