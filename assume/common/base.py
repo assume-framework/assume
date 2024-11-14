@@ -198,12 +198,17 @@ class BaseUnit:
             start = self.index[0]
 
         product_type_mc = product_type + "_marginal_costs"
-        product_data = self.outputs[product_type].loc[start:end]
+        # Adjusted code for accessing product data and mapping over the index
+        product_data = self.outputs[product_type][
+            start:end
+        ]  # Slicing directly without `.loc`
 
-        marginal_costs = product_data.index.map(
-            lambda t: self.calculate_marginal_cost(t, product_data.loc[t])
-        )
-        new_values = np.abs(marginal_costs * product_data.values)
+        marginal_costs = [
+            self.calculate_marginal_cost(t, product_data[idx])
+            for idx, t in enumerate(self.index[start:end])
+        ]
+
+        new_values = np.abs(marginal_costs * product_data)
         self.outputs[product_type_mc].loc[start:end] = new_values
 
     def execute_current_dispatch(

@@ -110,7 +110,7 @@ class RLAdvancedOrderStrategy(RLStrategy):
         bid_quantity_block = {}
         op_time = unit.get_operation_time(start)
 
-        for product in product_tuples:
+        for idx, product in enumerate(product_tuples):
             start = product[0]
             end = product[1]
 
@@ -121,22 +121,22 @@ class RLAdvancedOrderStrategy(RLStrategy):
 
             # get technical bounds for the unit output from the unit
             # adjust for ramp speed
-            max_power[start] = unit.calculate_ramp(
-                op_time, previous_power, max_power[start], current_power
+            max_power[idx] = unit.calculate_ramp(
+                op_time, previous_power, max_power[idx], current_power
             )
             # adjust for ramp speed
-            min_power[start] = unit.calculate_ramp(
-                op_time, previous_power, min_power[start], current_power
+            min_power[idx] = unit.calculate_ramp(
+                op_time, previous_power, min_power[idx], current_power
             )
 
             # 3.1 formulate the bids for Pmin
-            bid_quantity_inflex = min_power[start]
+            bid_quantity_inflex = min_power[idx]
 
             # 3.1 formulate the bids for Pmax - Pmin
             # Pmin, the minimum run capacity is the inflexible part of the bid, which should always be accepted
 
             if op_time <= -unit.min_down_time or op_time > 0:
-                bid_quantity_flex = max_power[start] - bid_quantity_inflex
+                bid_quantity_flex = max_power[idx] - bid_quantity_inflex
 
             if "BB" in self.order_types:
                 bid_quantity_block[start] = bid_quantity_inflex
@@ -284,15 +284,15 @@ class RLAdvancedOrderStrategy(RLStrategy):
             scaled_res_load_forecast = (
                 unit.forecaster[f"residual_load_{market_id}"][
                     -int(product_len + self.foresight - 1) :
-                ].values
+                ]
                 / scaling_factor_res_load
             )
 
         else:
             scaled_res_load_forecast = (
-                unit.forecaster[f"residual_load_{market_id}"]
-                .loc[start : end_excl + forecast_len]
-                .values
+                unit.forecaster[f"residual_load_{market_id}"].loc[
+                    start : end_excl + forecast_len
+                ]
                 / scaling_factor_res_load
             )
 
@@ -300,15 +300,15 @@ class RLAdvancedOrderStrategy(RLStrategy):
             scaled_price_forecast = (
                 unit.forecaster[f"price_{market_id}"][
                     -int(product_len + self.foresight - 1) :
-                ].values
+                ]
                 / scaling_factor_price
             )
 
         else:
             scaled_price_forecast = (
-                unit.forecaster[f"price_{market_id}"]
-                .loc[start : end_excl + forecast_len]
-                .values
+                unit.forecaster[f"price_{market_id}"].loc[
+                    start : end_excl + forecast_len
+                ]
                 / scaling_factor_price
             )
 

@@ -66,7 +66,7 @@ class flexableEOM(BaseStrategy):
         op_time = unit.get_operation_time(start)
         avg_op_time, avg_down_time = unit.get_average_operation_times(start)
 
-        for product in product_tuples:
+        for idx, product in enumerate(product_tuples):
             bid_quantity_inflex, bid_price_inflex = 0, 0
             bid_quantity_flex, bid_price_flex = 0, 0
 
@@ -81,21 +81,21 @@ class flexableEOM(BaseStrategy):
             current_power = unit.outputs["energy"].at[start]
 
             # adjust max_power for ramp speed
-            max_power[start] = unit.calculate_ramp(
-                op_time, previous_power, max_power[start], current_power
+            max_power[idx] = unit.calculate_ramp(
+                op_time, previous_power, max_power[idx], current_power
             )
             # adjust min_power for ramp speed
-            min_power[start] = unit.calculate_ramp(
-                op_time, previous_power, min_power[start], current_power
+            min_power[idx] = unit.calculate_ramp(
+                op_time, previous_power, min_power[idx], current_power
             )
 
-            bid_quantity_inflex = min_power[start]
+            bid_quantity_inflex = min_power[idx]
 
             marginal_cost_inflex = unit.calculate_marginal_cost(
                 start, current_power + bid_quantity_inflex
             )
             marginal_cost_flex = unit.calculate_marginal_cost(
-                start, current_power + max_power[start]
+                start, current_power + max_power[idx]
             )
 
             # =============================================================================
@@ -129,7 +129,7 @@ class flexableEOM(BaseStrategy):
 
             # Flex-bid price formulation
             if op_time <= -unit.min_down_time or op_time > 0:
-                bid_quantity_flex = max_power[start] - bid_quantity_inflex
+                bid_quantity_flex = max_power[idx] - bid_quantity_inflex
                 bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
 
             bids.append(
@@ -233,7 +233,7 @@ class flexablePosCRM(BaseStrategy):
         )  # get max_power for the product type
 
         bids = []
-        for product in product_tuples:
+        for idx, product in enumerate(product_tuples):
             start = product[0]
             op_time = unit.get_operation_time(start)
 
@@ -241,7 +241,7 @@ class flexablePosCRM(BaseStrategy):
             current_power = unit.outputs["energy"].at[start]
             # max_power + current_power < previous_power + unit.ramp_up
             bid_quantity = unit.calculate_ramp(
-                op_time, previous_power, max_power[start], current_power
+                op_time, previous_power, max_power[idx], current_power
             )
 
             if bid_quantity == 0:
@@ -334,19 +334,19 @@ class flexableNegCRM(BaseStrategy):
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
-        min_power, max_power = unit.calculate_min_max_power(start, end)
+        min_power, _ = unit.calculate_min_max_power(start, end)
 
         bids = []
-        for product in product_tuples:
+        for idx, product in enumerate(product_tuples):
             start = product[0]
             op_time = unit.get_operation_time(start)
             current_power = unit.outputs["energy"].at[start]
 
             # min_power + current_power > previous_power - unit.ramp_down
-            min_power[start] = unit.calculate_ramp(
-                op_time, previous_power, min_power[start], current_power
+            min_power[idx] = unit.calculate_ramp(
+                op_time, previous_power, min_power[idx], current_power
             )
-            bid_quantity = previous_power - min_power[start]
+            bid_quantity = previous_power - min_power[idx]
             if bid_quantity <= 0:
                 continue
 

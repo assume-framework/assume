@@ -6,6 +6,7 @@ import logging
 from datetime import timedelta
 from functools import lru_cache
 
+import numpy as np
 import pandas as pd
 
 from assume.common.base import SupportsMinMaxCharge
@@ -109,7 +110,7 @@ class Storage(SupportsMinMaxCharge):
         self.outputs["soc"] = FastDatetimeSeries(
             value=self.initial_soc, index=self.index
         )
-        self.outputs["energy_cost"] = FastDatetimeSeries(0.0, index=self.index)
+        self.outputs["energy_cost"] = FastDatetimeSeries(value=0.0, index=self.index)
 
         self.soc_tick = soc_tick
 
@@ -386,7 +387,7 @@ class Storage(SupportsMinMaxCharge):
             else self.min_power_charge
         )
         min_power_charge -= base_load + capacity_pos
-        min_power_charge = min_power_charge.clip(upper=0)
+        min_power_charge = min_power_charge.clip(max=0)
 
         max_power_charge = (
             self.max_power_charge[start:end_excl]
@@ -394,12 +395,11 @@ class Storage(SupportsMinMaxCharge):
             else self.max_power_charge
         )
         max_power_charge -= base_load + capacity_neg
-        max_power_charge = max_power_charge.where(
-            max_power_charge <= min_power_charge, 0
+        max_power_charge = np.where(
+            max_power_charge <= min_power_charge, max_power_charge, 0
         )
-
-        min_power_charge = min_power_charge.where(
-            min_power_charge >= max_power_charge, 0
+        min_power_charge = np.where(
+            min_power_charge >= max_power_charge, min_power_charge, 0
         )
 
         # restrict charging according to max_soc
@@ -444,17 +444,20 @@ class Storage(SupportsMinMaxCharge):
             else self.max_power_discharge
         )
         max_power_discharge -= base_load + capacity_pos
-        max_power_discharge = max_power_discharge.where(
-            max_power_discharge >= min_power_discharge, 0
+
+        # Adjust max_power_discharge using np.where
+        max_power_discharge = np.where(
+            max_power_discharge >= min_power_discharge, max_power_discharge, 0
         )
 
-        min_power_discharge = min_power_discharge.where(
-            min_power_discharge < max_power_discharge, 0
+        # Adjust min_power_discharge using np.where
+        min_power_discharge = np.where(
+            min_power_discharge < max_power_discharge, min_power_discharge, 0
         )
 
         # restrict according to min_soc
         max_soc_discharge = self.calculate_soc_max_discharge(self.outputs["soc"][start])
-        max_power_discharge = max_power_discharge.clip(upper=max_soc_discharge)
+        max_power_discharge = max_power_discharge.clip(max=max_soc_discharge)
 
         return min_power_discharge, max_power_discharge
 

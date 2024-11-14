@@ -4,18 +4,26 @@
 
 from datetime import datetime
 
-import pandas as pd
-
 from assume.common.base import SupportsMinMax, SupportsMinMaxCharge
+from assume.common.fast_pandas import FastDatetimeIndex
 
 
 def test_minmax():
-    mm = SupportsMinMax("Test", "TestOperator", "TestTechnology", {}, None, "empty")
+    index = FastDatetimeIndex(start="2022-01-01 00:00", periods=24, freq="h")
+
+    mm = SupportsMinMax(
+        id="Test",
+        unit_operator="TestOperator",
+        technology="TestTechnology",
+        bidding_strategies={},
+        index=index,
+        node="empty",
+    )
+
     mm.ramp_down = 200
     mm.ramp_up = 400
     mm.max_power = 1000
     mm.min_power = 200
-    mm.index = pd.date_range("2022-01-01", periods=24, freq="h")
 
     # stay turned off
     assert mm.calculate_ramp(op_time=1, previous_power=0, power=0, current_power=0) == 0
@@ -105,8 +113,15 @@ def test_minmax():
 
 
 def test_minmaxcharge():
+    index = FastDatetimeIndex(start="2022-01-01 00:00", periods=24, freq="h")
+
     mmc = SupportsMinMaxCharge(
-        "Test", "TestOperator", "TestTechnology", {}, None, "empty"
+        id="Test",
+        unit_operator="TestOperator",
+        technology="TestTechnology",
+        bidding_strategies={},
+        index=index,
+        node="empty",
     )
 
     mmc.ramp_down_charge = -100
@@ -141,8 +156,15 @@ def test_minmaxcharge():
 
 
 def test_minmaxcharge_unconstrained():
+    index = FastDatetimeIndex(start="2022-01-01 00:00", periods=24, freq="h")
+
     mmc = SupportsMinMaxCharge(
-        "Test", "TestOperator", "TestTechnology", {}, None, "empty"
+        id="Test",
+        unit_operator="TestOperator",
+        technology="TestTechnology",
+        bidding_strategies={},
+        index=index,
+        node="empty",
     )
 
     # 1. wenn ramp is undefined, it should not create constraints
@@ -169,12 +191,19 @@ def test_minmaxcharge_unconstrained():
 
 
 def test_minmax_operationtime():
-    mm = SupportsMinMax("Test", "TestOperator", "TestTechnology", {}, None, "empty")
-    mm.index = pd.date_range(
-        start=datetime(2023, 7, 1),
-        end=datetime(2023, 7, 2),
-        freq="1h",
+    index = FastDatetimeIndex(
+        start=datetime(2023, 7, 1), end=datetime(2023, 7, 2), freq="1h"
     )
+
+    mm = SupportsMinMax(
+        id="Test",
+        unit_operator="TestOperator",
+        technology="TestTechnology",
+        bidding_strategies={},
+        index=index,
+        node="empty",
+    )
+
     mm.outputs["energy"] += 500
     mm.min_down_time = 4
     mm.min_operating_time = 4

@@ -18,17 +18,23 @@ class FastDatetimeIndex:
     tolerance for alignment.
     """
 
-    def __init__(self, start: datetime, end: datetime, freq: str):
+    def __init__(
+        self,
+        start: datetime,
+        end: datetime = None,
+        freq: str = "1h",
+        periods: int = None,
+    ):
         """
         Initialize the FastDatetimeIndex.
 
         Parameters:
             start (datetime): Start datetime.
-            end (datetime): End datetime.
-            freq (str): Frequency string (e.g., '1T' for 1 minute).
+            end (datetime, optional): End datetime.
+            freq (str or timedelta, optional): Frequency of the index. Defaults to "1h".
+            periods (int, optional): Number of periods to generate. Defaults to None.
         """
-        self._start = start
-        self._end = end
+        self._start = start if isinstance(start, datetime) else pd.to_datetime(start)
 
         # Ensure freq is a timedelta
         if isinstance(freq, str):
@@ -41,11 +47,20 @@ class FastDatetimeIndex:
         else:
             raise TypeError("Frequency must be a string or timedelta")
 
+        if end is None and periods is None:
+            raise ValueError("Either 'end' or 'periods' must be specified")
+
+        # Calculate the end date based on the number of periods
+        if periods is not None:
+            self._end = self._start + (periods - 1) * self._freq
+        else:
+            self._end = end if isinstance(end, datetime) else pd.to_datetime(end)
+
         self._freq_seconds = self._freq.total_seconds()  # Precompute total seconds
         self._tolerance_seconds = 1  # Tolerance of 1 second
 
         # Precompute the total number of periods
-        self._count = self.get_idx_from_date(end) + 1
+        self._count = self.get_idx_from_date(self._end) + 1
         # Generate and store the full date range as a list of datetime objects
         self._date_list = self.get_date_list()
 
@@ -367,11 +382,24 @@ class FastDatetimeSeries:
         """
 
         if isinstance(item, slice):
-            start_idx = self.index.get_idx_from_date(item.start) if item.start else 0
+            # Handle slicing, including negative indices
+            start_idx = (
+                self.index.get_idx_from_date(item.start)
+                if isinstance(item.start, datetime)
+                else (
+                    len(self.data) + item.start
+                    if item.start is not None and item.start < 0
+                    else item.start or 0
+                )
+            )
             stop_idx = (
                 self.index.get_idx_from_date(item.stop) + 1
-                if item.stop
-                else len(self.data)
+                if isinstance(item.stop, datetime)
+                else (
+                    len(self.data) + item.stop
+                    if item.stop is not None and item.stop < 0
+                    else len(self.data)
+                )
             )
             self.data[start_idx:stop_idx] = value
 
@@ -380,7 +408,6 @@ class FastDatetimeSeries:
         ):
             # Extract dates from the item
             dates = item.index if isinstance(item, pd.Series) else item
-            # Convert to NumPy array of datetime objects
             dates = pd.to_datetime(dates).to_pydatetime()
             # Vectorized calculation of delta seconds
             delta_seconds = np.array(
@@ -388,7 +415,6 @@ class FastDatetimeSeries:
             )
             indices = delta_seconds / self.index.freq_seconds
             remainders = delta_seconds % self.index.freq_seconds
-            # Check if all remainders are within tolerance
             if not np.all(remainders <= self.index.tolerance_seconds):
                 raise ValueError(
                     "One or more dates are not aligned with frequency within tolerance."

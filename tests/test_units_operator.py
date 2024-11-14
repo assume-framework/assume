@@ -12,6 +12,7 @@ from mango import RoleAgent, activate, addr, create_tcp_container
 from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 
+from assume.common.fast_pandas import FastDatetimeIndex
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
@@ -47,7 +48,7 @@ async def units_operator() -> UnitsOperator:
     units_agent.add_role(units_role)
     agent_id = container.register(units_agent)
 
-    index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
+    index = FastDatetimeIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 
     params_dict = {
         "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
@@ -87,7 +88,7 @@ async def rl_units_operator() -> RLUnitsOperator:
     units_agent.add_role(units_role)
     agent_id = container.register(units_agent)
 
-    index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
+    index = FastDatetimeIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 
     params_dict = {
         "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
@@ -168,7 +169,7 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
     marketconfig = rl_units_operator.available_markets[0]
     start = datetime(2020, 1, 1)
     end = datetime(2020, 1, 2)
-    index = pd.date_range(start=start, end=end + pd.Timedelta(hours=24), freq="1h")
+    index = FastDatetimeIndex(start=start, end=end + pd.Timedelta(hours=24), freq="1h")
 
     params_dict = {
         "bidding_strategies": {
@@ -244,6 +245,7 @@ async def test_get_actual_dispatch(units_operator: UnitsOperator):
     # THEN resulting unit dispatch dataframe contains one row
     # which is for the current time - as we must know our current dispatch
     assert unit_dfs[0].index[0].timestamp() == clock.time
+    assert unit_dfs[0]["time"][1].timestamp() == clock.time
     assert len(unit_dfs[0]) == 1
     assert len(market_dispatch) == 0
 
