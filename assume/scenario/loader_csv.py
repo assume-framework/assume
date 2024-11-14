@@ -572,7 +572,7 @@ def setup_world(
     dsm_units = scenario_data["dsm_units"]
     forecaster = scenario_data["forecaster"]
 
-    save_frequency_hours = config.get("save_frequency_hours", 48)
+    save_frequency_hours = config.get("save_frequency_hours", None)
     # Disable save frequency if CSV export is enabled
     if world.export_csv_path and save_frequency_hours is not None:
         save_frequency_hours = None
