@@ -122,7 +122,6 @@ class flexableEOMStorage(BaseStrategy):
 
             # calculate average price
             average_price = calculate_price_average(
-                unit=unit,
                 current_time=start,
                 foresight=self.foresight,
                 price_forecast=price_forecast,
@@ -263,7 +262,7 @@ class flexablePosCRMStorage(BaseStrategy):
         bids = []
         theoretic_SOC = unit.outputs["soc"][start]
 
-        for product in product_tuples:
+        for idx, product in enumerate(product_tuples):
             start = product[0]
             current_power = unit.outputs["energy"].at[start]
 
@@ -271,7 +270,7 @@ class flexablePosCRMStorage(BaseStrategy):
             bid_quantity = unit.calculate_ramp_discharge(
                 theoretic_SOC,
                 previous_power,
-                max_power_discharge[start],
+                max_power_discharge[idx],
                 current_power,
             )
 
@@ -392,14 +391,14 @@ class flexableNegCRMStorage(BaseStrategy):
         _, max_power_charge = unit.calculate_min_max_charge(start, end)
 
         bids = []
-        for product in product_tuples:
+        for idx, product in enumerate(product_tuples):
             start = product[0]
             current_power = unit.outputs["energy"].at[start]
             bid_quantity = abs(
                 unit.calculate_ramp_charge(
                     theoretic_SOC,
                     previous_power,
-                    max_power_charge[start],
+                    max_power_charge[idx],
                     current_power,
                 )
             )
@@ -451,12 +450,11 @@ class flexableNegCRMStorage(BaseStrategy):
         return bids
 
 
-def calculate_price_average(unit, current_time, foresight, price_forecast):
+def calculate_price_average(current_time, foresight, price_forecast):
     """
     Calculates the average price for a given foresight and returns the average price.
 
     Args:
-        unit (SupportsMinMaxCharge): The unit that is dispatched.
         current_time (pandas.Timestamp): The current time.
         foresight (pandas.Timedelta): The foresight.
         price_forecast (pandas.Series): The price forecast.
@@ -488,15 +486,15 @@ def get_specific_revenue(unit, marginal_cost, t, foresight, price_forecast):
     """
 
     if t + foresight > price_forecast.index[-1]:
-        price_forecast = price_forecast.loc[t:]
         _, max_power_discharge = unit.calculate_min_max_discharge(
             start=t, end=price_forecast.index[-1] + unit.index.freq
         )
+        price_forecast = price_forecast.loc[t:]
     else:
-        price_forecast = price_forecast.loc[t : t + foresight]
         _, max_power_discharge = unit.calculate_min_max_discharge(
             start=t, end=t + foresight + unit.index.freq
         )
+        price_forecast = price_forecast.loc[t : t + foresight]
 
     possible_revenue = 0
     soc = unit.outputs["soc"][t]
@@ -507,7 +505,7 @@ def get_specific_revenue(unit, marginal_cost, t, foresight, price_forecast):
         theoretic_power_discharge = unit.calculate_ramp_discharge(
             theoretic_SOC,
             previous_power=previous_power,
-            power_discharge=max_power_discharge.iloc[i],
+            power_discharge=max_power_discharge[i],
         )
         possible_revenue += (market_price - marginal_cost) * theoretic_power_discharge
         theoretic_SOC -= theoretic_power_discharge

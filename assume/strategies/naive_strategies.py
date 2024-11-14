@@ -120,7 +120,7 @@ class NaiveProfileStrategy(BaseStrategy):
         current_power = unit.outputs["energy"].at[start]
         marginal_cost = unit.calculate_marginal_cost(start, previous_power)
         volume = unit.calculate_ramp(
-            op_time, previous_power, max_power[start], current_power
+            op_time, previous_power, max_power[0], current_power
         )
 
         profile = {product[0]: volume for product in product_tuples}
@@ -246,12 +246,12 @@ class NaivePosReserveStrategy(BaseStrategy):
         )
 
         bids = []
-        for product in product_tuples:
+        for idx, product in enumerate(product_tuples):
             start = product[0]
             op_time = unit.get_operation_time(start)
             current_power = unit.outputs["energy"].at[start]
             volume = unit.calculate_ramp(
-                op_time, previous_power, max_power[start], current_power
+                op_time, previous_power, max_power[idx], current_power
             )
             price = 0
             bids.append(

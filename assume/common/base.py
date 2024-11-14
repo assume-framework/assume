@@ -412,27 +412,35 @@ class SupportsMinMax(BaseUnit):
         Returns the time the unit is operating (positive) or shut down (negative).
 
         Args:
-            start (datetime.datetime): The start time.
+            start (datetime): The start time.
 
         Returns:
-            int: The operation time.
+            int: The operation time as a positive integer if operating, or negative if shut down.
         """
-        before = start - self.index.freq
+        # Set the time window based on max of min operating/down time
+        max_time = max(self.min_operating_time, self.min_down_time, 1)
+        begin = max(start - self.index.freq * max_time, self.index[0])
+        end = start - self.index.freq
 
-        max_time = max(self.min_operating_time, self.min_down_time)
-        begin = start - self.index.freq * max_time
-        end = before
-        arr = self.outputs["energy"][begin:end][::-1] > 0
-        if len(arr) < 1:
+        if start <= self.index[0]:
             # before start of index
             return max_time
+
+        # Check energy output in the defined time window, reversed for most recent state
+        arr = (self.outputs["energy"][begin:end] > 0)[::-1]
+
+        # Determine initial state (off if the first period shows zero energy output)
         is_off = not arr[0]
         run = 0
+
+        # Count consecutive periods with the same status, break on change
         for val in arr:
-            if val == is_off:
+            if val != (not is_off):  # Stop if the state changes
                 break
             run += 1
-        return (-1) ** is_off * run
+
+        # Return positive time if operating, negative if shut down
+        return -run if is_off else run
 
     def get_average_operation_times(self, start: datetime) -> tuple[float, float]:
         """

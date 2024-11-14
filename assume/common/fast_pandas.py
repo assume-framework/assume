@@ -328,13 +328,26 @@ class FastDatetimeSeries:
         """
 
         if isinstance(item, slice):
-            start_idx = self.index.get_idx_from_date(item.start) if item.start else 0
-            stop_idx = (
-                self.index.get_idx_from_date(item.stop) + 1
-                if item.stop
-                else len(self.data)
+            # Get the starting index
+            start_idx = (
+                max(0, self.index.get_idx_from_date(item.start))
+                if item.start and item.start >= self.index.start
+                else 0
             )
-            return self.data[start_idx:stop_idx]
+
+            # Adjust stop_idx to include the single point when start and stop are the same
+            if item.start == item.stop:
+                stop_idx = start_idx + 1
+            else:
+                stop_idx = (
+                    min(len(self.data), self.index.get_idx_from_date(item.stop) + 1)
+                    if item.stop and item.stop <= self.index.end
+                    else len(self.data)
+                )
+
+            # Return a new FastDatetimeSeries for the sliced data
+            sliced_data = self.data[start_idx:stop_idx]
+            return sliced_data
 
         elif isinstance(
             item, list | pd.Index | pd.DatetimeIndex | np.ndarray | pd.Series

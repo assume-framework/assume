@@ -177,7 +177,7 @@ class Storage(SupportsMinMaxCharge):
         """
         time_delta = self.index.freq / timedelta(hours=1)
 
-        for t in self.outputs["energy"][start : end - self.index.freq].index:
+        for t in self.index[start : end - self.index.freq]:
             delta_soc = 0
             soc = self.outputs["soc"][t]
             if self.outputs["energy"][t] > self.max_power_discharge:
