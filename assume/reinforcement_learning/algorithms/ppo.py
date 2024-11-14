@@ -609,20 +609,32 @@ class PPO(RLAlgorithm):
 
         # Retrieve experiences from the buffer
         # The collected experiences (observations, actions, rewards, log_probs) are stored in the buffer.
-        transitions = self.learning_role.buffer.get()
-        states = transitions.observations
-        actions = transitions.actions
-        rewards = transitions.rewards
-        log_probs = transitions.log_probs
+        full_transitions = self.learning_role.buffer.get()
+        full_values = self.get_values(full_transitions.observations, full_transitions.actions)
+        full_advantages, full_returns = self.get_advantages(full_transitions.rewards, full_values)
+        
+        #states = transitions.observations
+        #actions = transitions.actions
+        #rewards = transitions.rewards
+        #log_probs = transitions.log_probs
         
         # Pass the current states through the critic network to get value estimates.
-        values = self.get_values(states, actions)
+        #values = self.get_values(states, actions)
 
         # Compute advantages using Generalized Advantage Estimation (GAE)
-        advantages, returns = self.get_advantages(rewards, values)
+        #advantages, returns = self.get_advantages(rewards, values)
 
         for _ in range(self.gradient_steps):
             self.n_updates += 1
+
+            batch_size = 32 #todo: get batch_size directly from config
+            transitions, batch_inds = self.learning_role.buffer.sample(batch_size)
+            states = transitions.observations
+            actions = transitions.actions
+            log_probs = transitions.log_probs
+            advantages = full_advantages[batch_inds]
+            returns = full_returns[batch_inds]
+            values = self.get_values(states, actions)  # always use updated values --> check later if best
 
             # Iterate through over each agent's strategy
             # Each agent has its own actor. Critic (value network) is centralized.
@@ -635,7 +647,7 @@ class PPO(RLAlgorithm):
 
 
                 # Evaluate the new log-probabilities and entropy under the current policy
-                action_logits, action_distribution = actor(states)
+                action_distribution = actor(states)[1]
                 new_log_probs = action_distribution.log_prob(actions).sum(-1)
                 
                 
