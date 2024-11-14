@@ -399,7 +399,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
 
                 maximise_load_shift = pyo.quicksum(
                     m.load_shift_neg[t] * (1 - m.shift_indicator[t])
-                    for t in self.model.time_steps
+                    for t in m.time_steps
                 )
 
                 return maximise_load_shift
@@ -428,7 +428,10 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 Maximizes the load shift over all time steps.
                 """
                 maximise_load_shift = pyo.quicksum(
-                    m.load_shift_neg[t] * m.peak_indicator[t] for t in m.time_steps
+                    m.load_shift_neg[t]
+                    * (1 - m.shift_indicator[t])
+                    * m.peak_indicator[t]
+                    for t in m.time_steps
                 )
 
                 return maximise_load_shift
@@ -519,9 +522,8 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             # Calculate the load-shifted value of total_power_input
             adjusted_power = (
                 instance.total_power_input[t].value
-                + instance.load_shift_pos[t].value * instance.shift_indicator[t].value
+                + instance.load_shift_pos[t].value
                 - instance.load_shift_neg[t].value
-                * (1 - instance.shift_indicator[t].value)
             )
             adjusted_total_power_input.append(adjusted_power)
 

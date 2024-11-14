@@ -5,7 +5,6 @@
 from collections.abc import Callable
 
 import pyomo.environ as pyo
-import numpy as np
 
 from assume.units.dst_components import demand_side_technologies
 
@@ -14,8 +13,11 @@ class DSMFlex:
     # Mapping of flexibility measures to their respective functions
     flexibility_map: dict[str, Callable[[pyo.ConcreteModel], None]] = {
         "cost_based_load_shift": lambda self, model: self.cost_based_flexibility(model),
-        "congestion_management_flexibility": lambda self, model: self.grid_congestion_management(model),
-        "peak_load_shifting": lambda self, model: self.peak_load_shifting_flexibility(model),
+        "congestion_management_flexibility": lambda self,
+        model: self.grid_congestion_management(model),
+        "peak_load_shifting": lambda self, model: self.peak_load_shifting_flexibility(
+            model
+        ),
     }
 
     def __init__(self, components, **kwargs):
@@ -170,7 +172,7 @@ class DSMFlex:
                     == self.model.dsm_blocks["eaf"].power_in[t]
                     + self.model.dsm_blocks["dri_plant"].power_in[t]
                 )
-            
+
     def peak_load_shifting_flexibility(self, model):
         """
         Implements constraints for peak load shifting flexibility by identifying peak periods
@@ -181,7 +183,12 @@ class DSMFlex:
         """
 
         max_load = max(self.opt_power_requirement)
-        peak_threshold_value = max_load * (1 - self.peak_threshold / 100)  # E.g., 10% threshold
+
+        peak_threshold_value = max_load * (
+            self.peak_threshold / 100
+        )  # E.g., 10% threshold
+        # Add peak_threshold_value as a Param on the model so it can be accessed elsewhere
+        model.peak_threshold_value = pyo.Param(initialize=peak_threshold_value)
 
         # Parameters
         model.cost_tolerance = pyo.Param(initialize=self.cost_tolerance)
@@ -190,9 +197,17 @@ class DSMFlex:
         # Variables for load shifting
         model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
         model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
+        model.shift_indicator = pyo.Var(model.time_steps, within=pyo.Binary)
 
-        peak_periods = {t for t in model.time_steps if self.opt_power_requirement[t] > peak_threshold_value}
-        model.peak_indicator = pyo.Param(model.time_steps, initialize={t: int(t in peak_periods) for t in model.time_steps})
+        peak_periods = {
+            t
+            for t in model.time_steps
+            if self.opt_power_requirement[t] > peak_threshold_value
+        }
+        model.peak_indicator = pyo.Param(
+            model.time_steps,
+            initialize={t: int(t in peak_periods) for t in model.time_steps},
+        )
 
         @model.Constraint()
         def total_cost_upper_limit(m):
@@ -200,54 +215,42 @@ class DSMFlex:
                 m.variable_cost[t] for t in m.time_steps
             ) <= m.total_cost * (1 + (m.cost_tolerance / 100))
 
-        # During peak periods, allow load to be reduced (load_shift_neg), and during off-peak periods, allow load to be increased (load_shift_pos)
+        # Power input constraint with flexibility based on congestion
         @model.Constraint(model.time_steps)
-        def peak_load_shift_constraint(m, t):
-            if m.peak_indicator[t] == 1:
-                # In peak periods: Reduce load with load_shift_neg
+        def total_power_input_constraint_with_peak_shift(m, t):
+            if self.has_electrolyser:
                 return (
-                    m.total_power_input[t] - m.load_shift_neg[t] == self.opt_power_requirement[t]
+                    m.total_power_input[t]
+                    + m.load_shift_pos[t] * m.shift_indicator[t]
+                    - m.load_shift_neg[t] * (1 - m.shift_indicator[t])
+                    == m.dsm_blocks["electrolyser"].power_in[t]
+                    + m.dsm_blocks["eaf"].power_in[t]
+                    + m.dsm_blocks["dri_plant"].power_in[t]
                 )
             else:
-                # In off-peak periods: Increase load with load_shift_pos
                 return (
-                    m.total_power_input[t] + m.load_shift_pos[t] == self.opt_power_requirement[t]
+                    m.total_power_input[t]
+                    + m.load_shift_pos[t] * m.shift_indicator[t]
+                    - m.load_shift_neg[t] * (1 - m.shift_indicator[t])
+                    == m.dsm_blocks["eaf"].power_in[t]
+                    + m.dsm_blocks["dri_plant"].power_in[t]
                 )
-        
-
-    def recalculate_with_accepted_offers(self, model):
-        self.reference_power = self.forecaster[f"{self.id}_power"]
-        self.accepted_pos_capacity = self.forecaster[
-            f"{self.id}_power_steelneg"
-        ]  # _accepted_pos_res
-
-        # Parameters
-        model.reference_power = pyo.Param(
-            model.time_steps,
-            initialize={t: value for t, value in enumerate(self.reference_power)},
-        )
-
-        model.accepted_pos_capacity = pyo.Param(
-            model.time_steps,
-            initialize={t: value for t, value in enumerate(self.accepted_pos_capacity)},
-        )
-
-        # Variables
-        model.capacity_upper_bound = pyo.Var(
-            model.time_steps, within=pyo.NonNegativeReals
-        )
-
-        # Constraints
-        @model.Constraint(model.time_steps)
-        def capacity_upper_bound_constraint(m, t):
-            return (
-                m.capacity_upper_bound[t]
-                == m.reference_power[t] - m.accepted_pos_capacity[t]
-            )
 
         @model.Constraint(model.time_steps)
-        def total_power_upper_limit(m, t):
-            if m.accepted_pos_capacity[t] > 0:
-                return m.total_power_input[t] <= m.capacity_upper_bound[t]
+        def peak_threshold_constraint(m, t):
+            """
+            Ensures that the power input during peak periods does not exceed the peak threshold value.
+            """
+            if self.has_electrolyser:
+                return (
+                    m.dsm_blocks["electrolyser"].power_in[t]
+                    + m.dsm_blocks["eaf"].power_in[t]
+                    + m.dsm_blocks["dri_plant"].power_in[t]
+                    <= peak_threshold_value
+                )
             else:
-                return pyo.Constraint.Skip
+                return (
+                    m.dsm_blocks["eaf"].power_in[t]
+                    + m.dsm_blocks["dri_plant"].power_in[t]
+                    <= peak_threshold_value
+                )
