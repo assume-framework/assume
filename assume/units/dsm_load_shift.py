@@ -184,11 +184,11 @@ class DSMFlex:
 
         max_load = max(self.opt_power_requirement)
 
-        peak_threshold_value = max_load * (
-            self.peak_threshold / 100
+        peak_load_cap_value = max_load * (
+            self.peak_load_cap / 100
         )  # E.g., 10% threshold
         # Add peak_threshold_value as a Param on the model so it can be accessed elsewhere
-        model.peak_threshold_value = pyo.Param(initialize=peak_threshold_value)
+        model.peak_load_cap_value = pyo.Param(initialize=peak_load_cap_value)
 
         # Parameters
         model.cost_tolerance = pyo.Param(initialize=self.cost_tolerance)
@@ -202,7 +202,7 @@ class DSMFlex:
         peak_periods = {
             t
             for t in model.time_steps
-            if self.opt_power_requirement[t] > peak_threshold_value
+            if self.opt_power_requirement[t] > peak_load_cap_value
         }
         model.peak_indicator = pyo.Param(
             model.time_steps,
@@ -246,11 +246,11 @@ class DSMFlex:
                     m.dsm_blocks["electrolyser"].power_in[t]
                     + m.dsm_blocks["eaf"].power_in[t]
                     + m.dsm_blocks["dri_plant"].power_in[t]
-                    <= peak_threshold_value
+                    <= peak_load_cap_value
                 )
             else:
                 return (
                     m.dsm_blocks["eaf"].power_in[t]
                     + m.dsm_blocks["dri_plant"].power_in[t]
-                    <= peak_threshold_value
+                    <= peak_load_cap_value
                 )

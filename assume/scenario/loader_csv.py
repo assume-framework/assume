@@ -164,7 +164,7 @@ def load_dsm_units(
         "node",
         "flexibility_measure",
         "congestion_threshold",
-        "peak_threshold",
+        "peak_load_cap",
     ]
     # Filter the common columns to only include those that exist in the DataFrame
     common_columns = [col for col in common_columns if col in dsm_units.columns]

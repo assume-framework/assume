@@ -70,7 +70,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         demand: float = 0,
         cost_tolerance: float = 10,
         congestion_threshold: float = 0,
-        peak_threshold: float = 0,
+        peak_load_cap: float = 0,
         **kwargs,
     ):
         super().__init__(
@@ -118,7 +118,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.flexibility_measure = flexibility_measure
         self.cost_tolerance = cost_tolerance
         self.congestion_threshold = congestion_threshold
-        self.peak_threshold = peak_threshold
+        self.peak_load_cap = peak_load_cap
 
         # Check for the presence of components
         self.has_h2storage = "hydrogen_storage" in self.components.keys()
