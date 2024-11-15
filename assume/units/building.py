@@ -117,7 +117,7 @@ class Building(DSMFlex, SupportsMinMax):
         # Initialize forecasting data for various energy prices and demands
         self.electricity_price = self.forecaster["price_EOM"]
         self.natural_gas_price = self.forecaster["fuel_price_natural gas"]
-        self.heat_demand = self.forecaster["heat_demand"]
+        self.heat_demand = self.forecaster[f"{self.id}_heat_demand"]
         self.ev_load_profile = self.forecaster["ev_load_profile"]
         self.battery_load_profile = self.forecaster["battery_load_profile"]
         self.inflex_demand = self.forecaster[f"{self.id}_load_profile"]
@@ -132,6 +132,10 @@ class Building(DSMFlex, SupportsMinMax):
         self.has_ev = "electric_vehicle" in self.components
         self.has_battery_storage = "generic_storage" in self.components
         self.has_pv = "pv_plant" in self.components
+
+        # Initialize the Pyomo optimization model
+        self.model = pyo.ConcreteModel()
+        self.define_sets()
 
         # Configuration for electric vehicles selling energy to the market
         if self.has_ev:
@@ -156,13 +160,12 @@ class Building(DSMFlex, SupportsMinMax):
                 if not uses_power_profile
                 else "availability_solar"
             )
+            pv_profile = self.forecaster[profile_key]
+            pv_profile.index = self.model.time_steps
             self.components["pv_plant"][
                 "power_profile" if not uses_power_profile else "availability_profile"
-            ] = self.forecaster[profile_key]
+            ] = pv_profile
 
-        # Initialize the Pyomo optimization model
-        self.model = pyo.ConcreteModel()
-        self.define_sets()
         self.define_parameters()
         self.define_variables()
 
