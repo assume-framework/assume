@@ -1143,7 +1143,7 @@ class TensorFastSeries(FastSeries):
                 f"Unsupported index type: {type(item)}. Must be int, slice, or datetime."
             )
 
-    def copy(self, deep: bool = False) -> "TensorFastSeries":
+    def copy(self, deep: bool = False):
         """
         Create a copy of the TensorFastSeries.
 
@@ -1166,7 +1166,7 @@ class TensorFastSeries(FastSeries):
             name=self._name,
         )._set_data(copied_data)
 
-    def _set_data(self, data: list[th.Tensor]) -> "TensorFastSeries":
+    def _set_data(self, data):
         """
         Helper method to set data during initialization.
 
