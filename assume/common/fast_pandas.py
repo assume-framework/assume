@@ -53,58 +53,30 @@ class FastIndex:
         self._tolerance_seconds = 1
         self._date_list = None  # Lazy-loaded
 
-    @lru_cache(maxsize=100)
-    def get_date_list(
-        self, start: datetime | None = None, end: datetime | None = None
-    ) -> list[datetime]:
-        """
-        Generate a list of datetime objects within the specified range.
+    @property
+    def start(self) -> datetime:
+        """Get the start datetime of the index."""
+        return self._start
 
-        Parameters:
-            start (datetime | None, optional): Start datetime for the subset. Defaults to the beginning of the index.
-            end (datetime | None, optional): End datetime for the subset. Defaults to the end of the index.
+    @property
+    def end(self) -> datetime:
+        """Get the end datetime of the index."""
+        return self._end
 
-        Returns:
-            list[datetime]: A list of datetime objects representing the specified range.
-        """
-        if self._date_list is None:
-            total_dates = np.arange(self._count) * self._freq_seconds
-            self._date_list = [self._start + timedelta(seconds=s) for s in total_dates]
+    @property
+    def freq(self) -> timedelta:
+        """Get the frequency of the index as a timedelta."""
+        return self._freq
 
-        start_idx = self.get_idx_from_date(start or self.start)
-        end_idx = self.get_idx_from_date(end or self.end) + 1
-        return self._date_list[start_idx:end_idx]
+    @property
+    def freq_seconds(self) -> float:
+        """Get the frequency of the index in total seconds."""
+        return self._freq_seconds
 
-    @lru_cache(maxsize=1000)
-    def get_idx_from_date(self, date: datetime) -> int:
-        """
-        Convert a datetime to its corresponding index in the range.
-
-        Parameters:
-            date (datetime): The datetime to convert.
-
-        Returns:
-            int: The index of the datetime in the index range.
-
-        Raises:
-            KeyError: If the input `date` is None.
-            ValueError: If the `date` is not aligned with the frequency within tolerance.
-        """
-        if date is None:
-            raise KeyError("Date cannot be None. Please provide a valid datetime.")
-
-        delta_seconds = (date - self.start).total_seconds()
-        remainder = delta_seconds % self.freq_seconds
-
-        if remainder > self.tolerance_seconds and remainder < (
-            self.freq_seconds - self.tolerance_seconds
-        ):
-            raise ValueError(
-                f"Date {date} is not aligned with frequency {self.freq_seconds} seconds. "
-                f"Allowed tolerance: {self.tolerance_seconds} seconds."
-            )
-
-        return round(delta_seconds / self.freq_seconds)
+    @property
+    def tolerance_seconds(self) -> int:
+        """Get the tolerance in seconds for date alignment."""
+        return self._tolerance_seconds
 
     def __getitem__(self, item: int | slice):
         """
@@ -133,12 +105,12 @@ class FastIndex:
 
         elif isinstance(item, slice):
             start_idx = (
-                self.get_idx_from_date(item.start)
+                self._get_idx_from_date(item.start)
                 if isinstance(item.start, datetime)
                 else item.start or 0
             )
             stop_idx = (
-                self.get_idx_from_date(item.stop) + 1
+                self._get_idx_from_date(item.stop) + 1
                 if isinstance(item.stop, datetime)
                 else item.stop or len(self._date_list)
             )
@@ -173,10 +145,88 @@ class FastIndex:
         if self.start > date or self.end < date:
             return False
         try:
-            self.get_idx_from_date(date)
+            self._get_idx_from_date(date)
             return True
         except ValueError:
             return False
+
+    def __len__(self) -> int:
+        """Return the number of datetime points in the index."""
+        return self._count
+
+    def __repr__(self) -> str:
+        """Return a string representation of the FastIndex, including metadata and a date preview."""
+        preview_length = 3  # Show first and last 3 dates
+        dates_preview = (
+            self.get_date_list()[:preview_length]
+            + self.get_date_list()[-preview_length:]
+        )
+        preview_str = ", ".join(
+            date.strftime("%Y-%m-%d %H:%M:%S") for date in dates_preview
+        )
+
+        metadata = (
+            f"FastIndex(start={self.start}, end={self.end}, "
+            f"freq='{self.freq}', dtype=datetime64[ns])"
+        )
+        return f"{metadata}\nDates Preview: [{preview_str}]{'...' if len(self) > 2 * preview_length else ''}"
+
+    def __str__(self) -> str:
+        """Return an informal string representation of the FastIndex."""
+        return self.__repr__()
+
+    @lru_cache(maxsize=100)
+    def get_date_list(
+        self, start: datetime | None = None, end: datetime | None = None
+    ) -> list[datetime]:
+        """
+        Generate a list of datetime objects within the specified range.
+
+        Parameters:
+            start (datetime | None, optional): Start datetime for the subset. Defaults to the beginning of the index.
+            end (datetime | None, optional): End datetime for the subset. Defaults to the end of the index.
+
+        Returns:
+            list[datetime]: A list of datetime objects representing the specified range.
+        """
+        if self._date_list is None:
+            total_dates = np.arange(self._count) * self._freq_seconds
+            self._date_list = [self._start + timedelta(seconds=s) for s in total_dates]
+
+        start_idx = self._get_idx_from_date(start or self.start)
+        end_idx = self._get_idx_from_date(end or self.end) + 1
+        return self._date_list[start_idx:end_idx]
+
+    @lru_cache(maxsize=1000)
+    def _get_idx_from_date(self, date: datetime) -> int:
+        """
+        Convert a datetime to its corresponding index in the range.
+
+        Parameters:
+            date (datetime): The datetime to convert.
+
+        Returns:
+            int: The index of the datetime in the index range.
+
+        Raises:
+            KeyError: If the input `date` is None.
+            ValueError: If the `date` is not aligned with the frequency within tolerance.
+        """
+        if date is None:
+            raise KeyError("Date cannot be None. Please provide a valid datetime.")
+
+        delta_seconds = (date - self.start).total_seconds()
+        remainder = delta_seconds % self.freq_seconds
+
+        if remainder > self.tolerance_seconds and remainder < (
+            self.freq_seconds - self.tolerance_seconds
+        ):
+            raise ValueError(
+                f"Date {date} is not aligned with frequency {self.freq_seconds} seconds. "
+                f"Allowed tolerance: {self.tolerance_seconds} seconds."
+            )
+
+        return round(delta_seconds / self.freq_seconds)
 
     @staticmethod
     def _convert_to_datetime(value: datetime | str) -> datetime:
@@ -209,56 +259,6 @@ class FastIndex:
                 raise ValueError(f"Invalid frequency string: {freq}. Error: {e}")
         raise TypeError("Frequency must be a string or timedelta")
 
-    def __len__(self) -> int:
-        """Return the number of datetime points in the index."""
-        return self._count
-
-    def __repr__(self) -> str:
-        """Return a string representation of the FastIndex, including metadata and a date preview."""
-        preview_length = 3  # Show first and last 3 dates
-        dates_preview = (
-            self.get_date_list()[:preview_length]
-            + self.get_date_list()[-preview_length:]
-        )
-        preview_str = ", ".join(
-            date.strftime("%Y-%m-%d %H:%M:%S") for date in dates_preview
-        )
-
-        metadata = (
-            f"FastIndex(start={self.start}, end={self.end}, "
-            f"freq='{self.freq}', dtype=datetime64[ns])"
-        )
-        return f"{metadata}\nDates Preview: [{preview_str}]{'...' if len(self) > 2 * preview_length else ''}"
-
-    def __str__(self) -> str:
-        """Return an informal string representation of the FastIndex."""
-        return self.__repr__()
-
-    @property
-    def start(self) -> datetime:
-        """Get the start datetime of the index."""
-        return self._start
-
-    @property
-    def end(self) -> datetime:
-        """Get the end datetime of the index."""
-        return self._end
-
-    @property
-    def freq(self) -> timedelta:
-        """Get the frequency of the index as a timedelta."""
-        return self._freq
-
-    @property
-    def freq_seconds(self) -> float:
-        """Get the frequency of the index in total seconds."""
-        return self._freq_seconds
-
-    @property
-    def tolerance_seconds(self) -> int:
-        """Get the tolerance in seconds for date alignment."""
-        return self._tolerance_seconds
-
 
 class FastSeries:
     """
@@ -267,24 +267,35 @@ class FastSeries:
     This class leverages NumPy arrays for data storage to enhance performance
     during market simulations. It supports lazy initialization, vectorized
     operations, and partial compatibility with pandas Series for ease of use.
+
+    Attributes:
+        index (FastIndex): The datetime-based index for the series.
+        data (np.ndarray): The underlying NumPy array storing series values.
+        name (str): The name of the series.
     """
 
-    def __init__(self, index: FastIndex, value=0.0, name: str = ""):
+    def __init__(
+        self, index: FastIndex, value: float | np.ndarray = 0.0, name: str = ""
+    ):
         """
         Initialize the FastSeries.
 
         Parameters:
             index (FastIndex): The datetime index.
-            value (scalar or array-like, optional): Initial value(s) for the data.
-            name (str, optional): Name of the series.
+            value (float | np.ndarray, optional): Initial value(s) for the data. Defaults to 0.0.
+            name (str, optional): Name of the series. Defaults to an empty string.
         """
         self._index = index
-        self._data = None  # Private attribute for data
+        self._name = name
         self.loc = self  # Allow adjusting loc as well
         self.at = self
-        self._name = name
 
-        self.init_data(value)
+        count = len(self.index)  # Use index length directly
+        self._data = (
+            np.full(count, value, dtype=np.float64)
+            if isinstance(value, int | float)
+            else np.array(value, dtype=np.float64)
+        )
 
     @property
     def index(self) -> FastIndex:
@@ -312,11 +323,6 @@ class FastSeries:
         return self._index.freq_seconds
 
     @property
-    def tolerance_seconds(self) -> int:
-        """Get the tolerance in seconds for date alignment."""
-        return self._index.tolerance_seconds
-
-    @property
     def name(self) -> str:
         """Get the name of the series."""
         return self._name
@@ -324,7 +330,7 @@ class FastSeries:
     @property
     def data(self) -> np.ndarray:
         """
-        Access the underlying data array with lazy initialization.
+        Access the underlying data array.
 
         Returns:
             np.ndarray: The data array.
@@ -339,115 +345,133 @@ class FastSeries:
         Parameters:
             value (np.ndarray): The new data array.
         """
+        if value.shape[0] != len(self.index):
+            raise ValueError("Data length must match index length.")
         self._data = value
 
-    def init_data(self, value=None):
+    @property
+    def dtype(self) -> np.dtype:
         """
-        Initialize the data array if it's not already initialized.
+        Get the data type of the series.
 
-        Parameters:
-            value (scalar or array-like, optional): Initial value(s) for the data.
+        Returns:
+            np.dtype: The data type of the underlying NumPy array.
         """
-        if self._data is None:
-            self._data = self.get_numpy_date_range(
-                self.index.start, self.index.end, self.index.freq, value
-            )
+        return self.data.dtype
 
     def __getitem__(self, item):
         """
         Retrieve item(s) from the series.
 
         Parameters:
-            item (datetime, slice, list, pd.Index, pd.Series, np.ndarray, str): The key(s) to retrieve.
+            item (datetime | slice | list | pd.Index | pd.DatetimeIndex | np.ndarray | pd.Series | str):
+                The key(s) to retrieve.
 
         Returns:
-            float or np.ndarray: The retrieved value(s).
+            float | np.ndarray: The retrieved value(s).
 
         Raises:
             TypeError: If the index type is unsupported.
-            ValueError: If dates are not aligned within tolerance.
+            ValueError: If dates are not aligned within tolerance or invalid.
         """
-
         if isinstance(item, slice):
-            # Get the starting index
+            # Handle slice input
             start_idx = (
-                max(0, self.index.get_idx_from_date(item.start))
-                if item.start and item.start >= self.index.start
+                self.index._get_idx_from_date(item.start)
+                if item.start is not None and item.start >= self.index.start
                 else 0
             )
+            stop_idx = (
+                self.index._get_idx_from_date(item.stop) + 1
+                if item.stop is not None and item.stop <= self.index.end
+                else len(self.data)
+            )
 
-            # Adjust stop_idx to include the single point when start and stop are the same
-            if item.start == item.stop:
-                stop_idx = start_idx + 1
-            else:
-                stop_idx = (
-                    min(len(self.data), self.index.get_idx_from_date(item.stop) + 1)
-                    if item.stop and item.stop <= self.index.end
-                    else len(self.data)
+            # Ensure the slice indices are valid
+            if start_idx > stop_idx:
+                raise ValueError(
+                    "Invalid slice: start index is greater than stop index."
                 )
 
-            # Return a new FastSeries for the sliced data
-            sliced_data = self.data[start_idx:stop_idx]
-            return sliced_data
+            # Slice the data and return
+            return self.data[start_idx:stop_idx]
 
         elif isinstance(
-            item, list | pd.Index | pd.DatetimeIndex | np.ndarray | pd.Series
+            item, (list | pd.Index | pd.DatetimeIndex | np.ndarray | pd.Series)
         ):
-            # Extract dates from the item
-            dates = item.index if isinstance(item, pd.Series) else item
-            # Convert to NumPy array of datetime objects
-            dates = pd.to_datetime(dates).to_pydatetime()
-            # Vectorized calculation of delta seconds
+            # Handle list or array-like input
+            dates = (
+                item.index if isinstance(item, pd.Series) else item
+            )  # Extract index if Series
+            dates = self._convert_to_datetime_array(dates)  # Ensure datetime array
+
+            # Vectorized index retrieval
             delta_seconds = np.array(
-                [(d - self.index.start).total_seconds() for d in dates]
+                [(date - self.index.start).total_seconds() for date in dates]
             )
-            indices = delta_seconds / self.index.freq_seconds
+            indices = (delta_seconds / self.index.freq_seconds).round().astype(int)
             remainders = delta_seconds % self.index.freq_seconds
-            # Check if all remainders are within tolerance
+
+            # Check alignment within tolerance
             if not np.all(remainders <= self.index.tolerance_seconds):
                 raise ValueError(
-                    "One or more dates are not aligned with frequency within tolerance."
+                    "One or more dates are not aligned with the index frequency."
                 )
-            indices = indices.astype(int)
+
+            # Retrieve data
             return self.data[indices]
 
         elif isinstance(item, str):
-            # Attempt to parse string to datetime
-            date = pd.to_datetime(item).to_pydatetime()
-            return self.data[self.index.get_idx_from_date(date)]
+            # Handle string input
+            try:
+                date = pd.to_datetime(item).to_pydatetime()
+                return self.data[self.index._get_idx_from_date(date)]
+            except Exception as e:
+                raise ValueError(
+                    f"Invalid string input for datetime parsing: {item}. {e}"
+                )
 
         elif isinstance(item, datetime):
-            return self.data[self.index.get_idx_from_date(item)]
+            # Handle single datetime input
+            return self.data[self.index._get_idx_from_date(item)]
 
         else:
-            raise TypeError(f"Unsupported index type: {type(item)}")
+            # Unsupported type
+            raise TypeError(
+                f"Unsupported index type: {type(item)}. Must be datetime, slice, list, "
+                "pandas Index, NumPy array, pandas Series, or string."
+            )
 
-    def __setitem__(self, item, value):
+    def __setitem__(
+        self,
+        item: datetime | slice | list | pd.Index | pd.Series | np.ndarray | str,
+        value: float | np.ndarray,
+    ):
         """
         Assign value(s) to item(s) in the series.
 
         Parameters:
-            item (datetime, slice, list, pd.Index, pd.Series, np.ndarray, str): The key(s) to set.
-            value (float or array-like): The value(s) to assign.
+            item (datetime | slice | list | pd.Index | pd.Series | np.ndarray | str):
+                The key(s) to set.
+            value (float | np.ndarray): The value(s) to assign.
 
         Raises:
             TypeError: If the index type is unsupported.
             ValueError: If lengths of indices and values do not match or dates are not aligned within tolerance.
         """
-
         if isinstance(item, slice):
-            # Handle slicing, including negative indices
+            # Handle slicing
             start_idx = (
-                self.index.get_idx_from_date(item.start)
+                self.index._get_idx_from_date(item.start)
                 if isinstance(item.start, datetime)
                 else (
                     len(self.data) + item.start
                     if item.start is not None and item.start < 0
-                    else item.start or 0
+                    else 0
                 )
             )
             stop_idx = (
-                self.index.get_idx_from_date(item.stop) + 1
+                self.index._get_idx_from_date(item.stop) + 1
                 if isinstance(item.stop, datetime)
                 else (
                     len(self.data) + item.stop
@@ -455,217 +479,87 @@ class FastSeries:
                     else len(self.data)
                 )
             )
-            self.data[start_idx:stop_idx] = value
+
+            # Assign values to the slice
+            if np.isscalar(value) or len(self.data[start_idx:stop_idx]) == len(value):
+                self.data[start_idx:stop_idx] = value
+            else:
+                raise ValueError(
+                    f"Length of values ({len(value)}) does not match slice length ({stop_idx - start_idx})."
+                )
 
         elif isinstance(
-            item, list | pd.Index | pd.DatetimeIndex | np.ndarray | pd.Series
+            item, (list | pd.Index | pd.DatetimeIndex | np.ndarray | pd.Series)
         ):
-            # Extract dates from the item
-            dates = item.index if isinstance(item, pd.Series) else item
-            dates = pd.to_datetime(dates).to_pydatetime()
-            # Vectorized calculation of delta seconds
+            # Handle list or array-like input
+            dates = self._convert_to_datetime_array(
+                item
+            )  # Standardize to datetime array
             delta_seconds = np.array(
                 [(d - self.index.start).total_seconds() for d in dates]
             )
-            indices = delta_seconds / self.index.freq_seconds
+            indices = (delta_seconds / self.index.freq_seconds).round().astype(int)
             remainders = delta_seconds % self.index.freq_seconds
+
+            # Validate alignment within tolerance
             if not np.all(remainders <= self.index.tolerance_seconds):
                 raise ValueError(
                     "One or more dates are not aligned with frequency within tolerance."
                 )
-            indices = indices.astype(int)
 
-            if isinstance(item, pd.Series):
-                values = item.values
-                if len(indices) != len(values):
+            # Assign values
+            if np.isscalar(value):
+                self.data[indices] = value
+            else:
+                value = np.asarray(value)
+                if len(indices) != len(value):
                     raise ValueError(
-                        f"Length of values ({len(values)}) does not match number of indices ({len(indices)})."
+                        f"Length of values ({len(value)}) does not match number of indices ({len(indices)})."
                     )
-                self.data[indices] = values
-            else:
-                if np.isscalar(value):
-                    self.data[indices] = value
-                else:
-                    value = np.asarray(value)
-                    if value.shape[0] != len(indices):
-                        raise ValueError(
-                            f"Length of value array ({value.shape[0]}) does not match number of indices ({len(indices)})."
-                        )
-                    self.data[indices] = value
-        else:
-            # Assume item is a single datetime or string
-            if isinstance(item, datetime):
-                idx = self.index.get_idx_from_date(item)
-            else:
-                date = pd.to_datetime(item).to_pydatetime()
-                idx = self.index.get_idx_from_date(date)
+                self.data[indices] = value
+
+        elif isinstance(item, datetime | str):
+            # Handle single datetime or string
+            date = (
+                pd.to_datetime(item).to_pydatetime() if isinstance(item, str) else item
+            )
+            idx = self.index._get_idx_from_date(date)
             self.data[idx] = value
 
-    def get_numpy_date_range(
-        self, start: datetime, end: datetime, freq: timedelta, value=None
-    ) -> np.ndarray:
-        """
-        Create a NumPy array filled with a specific value for the date range.
-
-        Parameters:
-            start (datetime): Start datetime.
-            end (datetime): End datetime.
-            freq (timedelta): Frequency.
-            value (scalar, optional): Value to fill the array with.
-
-        Returns:
-            np.ndarray: NumPy array with the specified values.
-        """
-        if value is None:
-            value = 0.0
-        count = self.index.get_idx_from_date(end) + 1
-        return np.full(count, value, dtype=np.float64)
-
-    def as_df(
-        self, name: str = None, start: datetime = None, end: datetime = None
-    ) -> pd.DataFrame:
-        """
-        Convert the FastSeries to a pandas DataFrame.
-
-        Parameters:
-            name (str, optional): Name of the DataFrame column.
-            start (datetime, optional): Start datetime for the DataFrame.
-            end (datetime, optional): End datetime for the DataFrame.
-
-        Returns:
-            pd.DataFrame: DataFrame representation of the series.
-        """
-        data_slice = self[start:end]
-        index = pd.to_datetime(self.index.get_date_list(start, end))
-        return pd.DataFrame(
-            data_slice, index=index, columns=[name if name else self.name]
-        )
-
-    @staticmethod
-    def from_series(series: pd.Series) -> "FastSeries":
-        """
-        Create a FastSeries from a pandas Series.
-
-        Parameters:
-            series (pd.Series): The pandas Series to convert.
-
-        Returns:
-            FastSeries: The converted FastSeries object.
-
-        Raises:
-            ValueError: If the series has fewer than two index entries to infer frequency or frequency cannot be inferred.
-        """
-        if series.empty:
-            raise ValueError("Cannot create FastSeries from an empty pandas Series.")
-
-        # Infer the frequency from the index
-        freq = pd.infer_freq(series.index)
-        if freq is None:
-            raise ValueError("Cannot infer frequency from the series index.")
-
-        # Ensure freq is in a format that includes a number
-        if freq.isalpha():  # If freq is something like "D" or "M" without a number
-            freq = f"1{freq}"  # Prepend '1' to make it a valid timedelta string
-
-        index = FastIndex(
-            start=series.index[0].to_pydatetime(),
-            end=series.index[-1].to_pydatetime(),
-            freq=freq,
-        )
-        return FastSeries(
-            index=index,
-            value=series.values,
-            name=series.name,
-        )
-
-    # Arithmetic Operations in FastSeries
-    def __add__(self, other):
-        """
-        Add a scalar, array, or another FastSeries to this series.
-
-        Parameters:
-            other (float, np.ndarray, or FastSeries): The value(s) to add.
-
-        Returns:
-            FastSeries: The result of the addition.
-        """
-        result = self.copy()
-        if isinstance(other, int | float | np.ndarray):
-            result.data = self.data + other
-        elif isinstance(other, FastSeries):  # Handle another FastSeries
-            if self.index_aligned_with(other):
-                result.data = self.data + other.data
-            else:
-                raise ValueError("Series indices do not match for addition")
         else:
-            raise TypeError(f"Unsupported type for addition: {type(other)}")
-        return result
+            raise TypeError(
+                f"Unsupported index type: {type(item)}. Must be datetime, slice, list, "
+                "pandas Index, NumPy array, pandas Series, or string."
+            )
 
-    def __sub__(self, other):
-        """
-        Subtract a scalar, array, or another FastSeries from this series.
+    def __add__(self, other: int | float | np.ndarray):
+        return self._arithmetic_operation(other, "add")
 
-        Parameters:
-            other (float, np.ndarray, or FastSeries): The value(s) to subtract.
+    def __sub__(self, other: int | float | np.ndarray):
+        return self._arithmetic_operation(other, "sub")
 
-        Returns:
-            FastSeries: The result of the subtraction.
-        """
-        result = self.copy()
-        if isinstance(other, int | float | np.ndarray):
-            result.data = self.data - other
-        elif isinstance(other, FastSeries):
-            if self.index_aligned_with(other):
-                result.data = self.data - other.data
-            else:
-                raise ValueError("Series indices do not match for subtraction")
-        else:
-            raise TypeError(f"Unsupported type for subtraction: {type(other)}")
-        return result
+    def __mul__(self, other: int | float | np.ndarray):
+        return self._arithmetic_operation(other, "mul")
 
-    def __truediv__(self, other):
-        """
-        Divide this series by a scalar, array, or another FastSeries.
+    def __truediv__(self, other: int | float | np.ndarray):
+        return self._arithmetic_operation(other, "truediv")
 
-        Parameters:
-            other (float, np.ndarray, or FastSeries): The value(s) to divide by.
+    # Support for in-place operations
+    def __iadd__(self, other: int | float | np.ndarray):
+        self.data = self.__add__(other).data
+        return self
 
-        Returns:
-            FastSeries: The result of the division.
-        """
-        result = self.copy()
-        if isinstance(other, int | float | np.ndarray):
-            result.data = self.data / other
-        elif isinstance(other, FastSeries):
-            if self.index_aligned_with(other):
-                result.data = self.data / other.data
-            else:
-                raise ValueError("Series indices do not match for division")
-        else:
-            raise TypeError(f"Unsupported type for division: {type(other)}")
-        return result
+    def __isub__(self, other: int | float | np.ndarray):
+        self.data = self.__sub__(other).data
+        return self
 
-    def __mul__(self, other):
-        """
-        Multiply this series by a scalar, array, or another FastSeries.
+    def __imul__(self, other: int | float | np.ndarray):
+        self.data = self.__mul__(other).data
+        return self
 
-        Parameters:
-            other (float, np.ndarray, or FastSeries): The value(s) to multiply by.
-
-        Returns:
-            FastSeries: The result of the multiplication.
-        """
-        result = self.copy()
-        if isinstance(other, int | float | np.ndarray):
-            result.data = self.data * other
-        elif isinstance(other, FastSeries):
-            if self.index_aligned_with(other):
-                result.data = self.data * other.data
-            else:
-                raise ValueError("Series indices do not match for multiplication")
-        else:
-            raise TypeError(f"Unsupported type for multiplication: {type(other)}")
-        return result
+    def __itruediv__(self, other: int | float | np.ndarray):
+        self.data = self.__truediv__(other).data
+        return self
 
     def __neg__(self):
         """
@@ -678,125 +572,145 @@ class FastSeries:
         result.data = -self.data
         return result
 
-    # Helper method to check index alignment
-    def index_aligned_with(self, other):
-        """
-        Check if this series is aligned with another FastSeries.
-
-        Parameters:
-            other (FastSeries): The other series to check alignment with.
-
-        Returns:
-            bool: True if the indices match, False otherwise.
-        """
-        return (
-            self.start == other.start
-            and self.end == other.end
-            and self.freq == other.freq
-            and len(self.data) == len(other.data)
-        )
-
     # Reverse Arithmetic Operations
-    def __radd__(self, other):
+    def __radd__(self, other: int | float | np.ndarray):
         return self.__add__(other)
 
-    def __rsub__(self, other):
+    def __rsub__(self, other: int | float | np.ndarray):
         result = self.copy()
         result.data = other - self.data
         return result
 
-    def __rmul__(self, other):
+    def __rmul__(self, other: int | float | np.ndarray):
         return self.__mul__(other)
 
-    # In-place Arithmetic Operations
-    def __iadd__(self, other):
-        self.data += other
-        return self
-
-    def __isub__(self, other):
-        self.data -= other
-        return self
-
-    def __imul__(self, other):
-        self.data *= other
-        return self
-
-    def __itruediv__(self, other):
-        self.data /= other
-        return self
+    def __rtruediv__(self, other: int | float | np.ndarray):
+        result = self.copy()
+        result.data = other / self.data
+        return result
 
     # Comparison Operations
-    def __gt__(self, other):
+    def __gt__(self, other: int | float | np.ndarray) -> np.ndarray:
         """
         Greater than comparison.
 
         Parameters:
-            other (float or np.ndarray): The value(s) to compare against.
+            other (int | float | np.ndarray): The value(s) to compare against.
 
         Returns:
             np.ndarray: Boolean array where True indicates the series value is greater.
         """
         return self.data > other
 
-    def __lt__(self, other):
+    def __lt__(self, other: int | float | np.ndarray) -> np.ndarray:
         """
         Less than comparison.
 
         Parameters:
-            other (float or np.ndarray): The value(s) to compare against.
+            other (int | float | np.ndarray): The value(s) to compare against.
 
         Returns:
             np.ndarray: Boolean array where True indicates the series value is less.
         """
         return self.data < other
 
-    def __ge__(self, other):
+    def __ge__(self, other: int | float | np.ndarray) -> np.ndarray:
         """
         Greater than or equal to comparison.
 
         Parameters:
-            other (float or np.ndarray): The value(s) to compare against.
+            other (int | float | np.ndarray): The value(s) to compare against.
 
         Returns:
             np.ndarray: Boolean array where True indicates the series value is greater or equal.
         """
         return self.data >= other
 
-    def __le__(self, other):
+    def __le__(self, other: int | float | np.ndarray) -> np.ndarray:
         """
         Less than or equal to comparison.
 
         Parameters:
-            other (float or np.ndarray): The value(s) to compare against.
+            other (int | float | np.ndarray): The value(s) to compare against.
 
         Returns:
             np.ndarray: Boolean array where True indicates the series value is less or equal.
         """
         return self.data <= other
 
-    def __eq__(self, other):
+    def __eq__(self, other: int | float | np.ndarray) -> np.ndarray:
         """
         Equality comparison.
 
         Parameters:
-            other (float or np.ndarray): The value(s) to compare against.
+            other (int | float | np.ndarray): The value(s) to compare against.
 
         Returns:
             np.ndarray: Boolean array where True indicates the series value is equal.
         """
         return self.data == other
 
-    def __ne__(self, other):
+    def __ne__(self, other: int | float | np.ndarray) -> np.ndarray:
         """
         Not equal comparison.
 
         Parameters:
-            other (float or np.ndarray): The value(s) to compare against.
+            other (int | float | np.ndarray): The value(s) to compare against.
 
         Returns:
             np.ndarray: Boolean array where True indicates the series value is not equal.
         """
         return self.data != other
+
+    def __len__(self) -> int:
+        """
+        Get the number of data points in the series.
+
+        Returns:
+            int: The length of the series.
+        """
+        return len(self.data)
+
+    def __repr__(self, preview_length: int = 3) -> str:
+        """
+        Official string representation of the FastSeries, showing metadata and a sample of data.
+
+        Parameters:
+            preview_length (int, optional): Number of entries to show from the start and end. Defaults to 3.
+
+        Returns:
+            str: String representation of the FastSeries.
+        """
+        if len(self) == 0:
+            return f"FastSeries(name='{self.name}', start={self.start}, end={self.end}, freq='{self.freq}', dtype={self.dtype})\n\nData Preview:\n[Empty Series]"
+
+        data_preview = np.concatenate(
+            (self.data[:preview_length], self.data[-preview_length:])
+        )
+        dates_preview = (
+            self.index.get_date_list()[:preview_length]
+            + self.index.get_date_list()[-preview_length:]
+        )
+
+        preview_str = "\n".join(
+            f"{date}: {value}" for date, value in zip(dates_preview, data_preview)
+        )
+
+        metadata = (
+            f"FastSeries(name='{self.name}', start={self.start}, end={self.end}, "
+            f"freq='{self.freq}', dtype={self.dtype})"
+        )
+
+        return f"{metadata}\n\nData Preview:\n{preview_str}\n{'...' if len(self) > 2 * preview_length else ''}"
+
+    def __str__(self) -> str:
+        """
+        Informal string representation of the FastSeries, identical to __repr__.
+
+        Returns:
+            str: String representation of the FastSeries.
+        """
+        return self.__repr__()
 
     # Aggregation Methods
     def mean(self) -> float:
@@ -835,91 +749,171 @@ class FastSeries:
         """
         return self.data.max()
 
-    # Copy Methods
-    def copy(self, deep: bool = False) -> "FastSeries":
+    def std(self) -> float:
+        """
+        Calculate the standard deviation of the series.
+
+        Returns:
+            float: The standard deviation.
+        """
+        return self.data.std()
+
+    def median(self) -> float:
+        """
+        Calculate the median of the series.
+
+        Returns:
+            float: The median value.
+        """
+        return np.median(self.data)
+
+    def copy(self, deep: bool = False):
         """
         Create a copy of the FastSeries.
 
         Parameters:
-            deep (bool, optional): If True, perform a deep copy. Defaults to False.
+            deep (bool, optional): If True, perform a deep copy of the data array. Defaults to False.
 
         Returns:
-            FastSeries: The copied FastSeries.
+            FastSeries: A new FastSeries instance with copied data and metadata.
         """
-        if deep:
-            copied_data = self._data.copy()
-        else:
-            copied_data = self._data.view()
+        copied_data = self._data.copy() if deep else self._data.view()
         return FastSeries(
             index=self.index,
             value=copied_data,
             name=self.name,
         )
 
-    def __len__(self) -> int:
+    def as_df(
+        self, name: str = None, start: datetime = None, end: datetime = None
+    ) -> pd.DataFrame:
         """
-        Get the length of the series.
-
-        Returns:
-            int: Number of data points.
-        """
-        return self.index._count
-
-    def __repr__(self):
-        """
-        Official string representation of the FastSeries, showing key metadata and sample data.
-        """
-        # Show a small preview of the data (similar to pandas Series)
-        preview_length = 10  # number of elements to preview
-        data_preview = self.data[:preview_length]
-        dates_preview = self.index.get_date_list()[:preview_length]
-
-        # Format preview display
-        preview_str = "\n".join(
-            f"{date}: {value}" for date, value in zip(dates_preview, data_preview)
-        )
-
-        # Metadata summary
-        metadata = (
-            f"FastSeries(name='{self.name}', start={self.start}, end={self.end}, "
-            f"freq='{self.freq}', dtype={self.dtype})"
-        )
-
-        # Return full string
-        return f"{metadata}\n\nData Preview:\n{preview_str}\n..."
-
-    def __str__(self):
-        """
-        Informal string representation of the FastSeries, similar to __repr__.
-        """
-        return self.__repr__()
-
-    @property
-    def dtype(self):
-        """
-        Get the data type of the series.
-
-        Returns:
-            dtype: The data type of the underlying NumPy array.
-        """
-        return self.data.dtype if self._data is not None else None
-
-    @staticmethod
-    def make_series(index_series, value=0.0, name: str = ""):
-        """
-        Create a FastSeries using another FastSeries as the index,
-        initializing all data points with the specified value.
+        Convert the FastSeries to a pandas DataFrame.
 
         Parameters:
-            index_series (FastSeries): The FastSeries to use as the index.
-            value (scalar or array-like, optional): The value(s) to initialize the data with. Defaults to 0.0.
-            name (str, optional): The name of the new series. Defaults to an empty string.
+            name (str | None): Name of the DataFrame column. Defaults to None.
+            start (datetime | None): Start datetime for the DataFrame. Defaults to None.
+            end (datetime | None): End datetime for the DataFrame. Defaults to None.
 
         Returns:
-            FastSeries: A new FastSeries with the same index as `index_series` and data initialized to `value`.
+            pd.DataFrame: DataFrame representation of the series.
         """
-        return FastSeries(
-            index=index_series.index,
-            value=value,
-            name=name if name else index_series.name,
+        data_slice = self[start:end]
+        index = pd.to_datetime(self.index.get_date_list(start, end))
+        return pd.DataFrame(
+            data_slice, index=index, columns=[name if name else self.name]
         )
+
+    @staticmethod
+    def from_series(series: pd.Series):
+        """
+        Create a FastSeries from a pandas Series.
+
+        Parameters:
+            series (pd.Series): The pandas Series to convert.
+
+        Returns:
+            FastSeries: The converted FastSeries object.
+
+        Raises:
+            ValueError: If the series has fewer than two index entries to infer frequency or frequency cannot be inferred.
+        """
+        if series.empty:
+            raise ValueError("Cannot create FastSeries from an empty pandas Series.")
+
+        freq = pd.infer_freq(series.index)
+        if freq is None:
+            raise ValueError("Cannot infer frequency from the series index.")
+
+        if freq.isalpha():  # Ensure numeric format for frequency
+            freq = f"1{freq}"
+
+        index = FastIndex(
+            start=series.index[0].to_pydatetime(),
+            end=series.index[-1].to_pydatetime(),
+            freq=freq,
+        )
+        return FastSeries(
+            index=index,
+            value=series.values,
+            name=series.name or "",
+        )
+
+    # Helper method to check index alignment
+    def _index_aligned_with(self, other: "FastSeries") -> bool:
+        """
+        Check if this series is aligned with another FastSeries.
+
+        Parameters:
+            other (FastSeries): The other series to check alignment with.
+
+        Returns:
+            bool: True if the indices match, False otherwise.
+        """
+        aligned = (
+            self.start == other.start
+            and self.end == other.end
+            and self.freq == other.freq
+            and len(self.data) == len(other.data)
+        )
+        if not aligned:
+            print(  # Replace with logging if needed
+                f"Indices are not aligned:\n"
+                f"Self: start={self.start}, end={self.end}, freq={self.freq}, len={len(self.data)}\n"
+                f"Other: start={other.start}, end={other.end}, freq={other.freq}, len={len(other.data)}"
+            )
+        return aligned
+
+    def _convert_to_datetime_array(
+        self, item: list | pd.Index | pd.Series | np.ndarray
+    ) -> np.ndarray:
+        """
+        Convert input to a NumPy array of datetime objects.
+
+        Parameters:
+            item (list | pd.Index | pd.Series | np.ndarray):
+                A collection of datetimes (e.g., list, pandas Index, Series, or NumPy array).
+
+        Returns:
+            np.ndarray: Array of datetime objects.
+
+        Raises:
+            ValueError: If the input cannot be converted to datetime.
+        """
+        try:
+            if isinstance(item, pd.Series):
+                item = item.index
+            return pd.to_datetime(item).to_pydatetime()
+        except Exception as e:
+            raise ValueError(
+                f"Cannot convert {type(item)} to a NumPy array of datetime objects. Ensure the input is "
+                f"a list, pandas Index, Series, or NumPy array of datetimes. Original error: {e}"
+            )
+
+    # Helper for arithmetic operations
+    def _arithmetic_operation(self, other: int | float | np.ndarray, op: str):
+        """
+        Perform an arithmetic operation on the series.
+
+        Parameters:
+            other (int | float | np.ndarray | FastSeries): The value(s) to operate on.
+            op (str): The operation to perform ('add', 'sub', 'mul', 'truediv').
+
+        Returns:
+            FastSeries: A new FastSeries with the result of the operation.
+
+        Raises:
+            ValueError: If the indices do not align for FastSeries.
+            TypeError: If the `other` type is unsupported.
+        """
+        result = self.copy()
+        if isinstance(other, int | float | np.ndarray):
+            result.data = getattr(self.data, f"__{op}__")(other)
+        elif isinstance(other, FastSeries):
+            if self._index_aligned_with(other):
+                result.data = getattr(self.data, f"__{op}__")(other.data)
+            else:
+                raise ValueError(f"Cannot perform {op}: Series indices do not match")
+        else:
+            raise TypeError(f"Unsupported type for {op}: {type(other)}")
+        return result
