@@ -1173,6 +1173,7 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
         Observations are used to calculate bid actions, which are then scaled and processed
         into bids for submission in the market.
         """
+        bids = []
         for product in product_tuples:
             start = product[0]
             end = product[1]
@@ -1214,8 +1215,6 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
             # the third action is the charge/discharge volume
             charging_volume = (actions[2] * abs(unit.calculate_max_charge(start, end).iloc[0])).item()
             discharging_volume = (actions[2] * unit.calculate_max_discharge(start, end).iloc[0]).item()
-
-            bids = []
 
             if bid_direction == "charge":
                 unit.battery_charge[start:end] = charging_volume
