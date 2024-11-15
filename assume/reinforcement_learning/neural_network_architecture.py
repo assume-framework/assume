@@ -189,7 +189,7 @@ class DistActor(MLPActor):
 
         # Create a normal distribution for continuous actions (with assumed standard deviation of 
         # TODO: 0.01/0.0 as in marlbenchmark or 1.0 or sheduled decrease?)
-        dist = th.distributions.Normal(x, 0.2)
+        dist = th.distributions.Normal(x, 0.2) # --> eventuell als hyperparameter und eventuell sigmoid (0,1)
                 
         return x, dist
 

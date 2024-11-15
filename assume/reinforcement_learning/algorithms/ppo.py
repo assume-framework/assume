@@ -757,7 +757,7 @@ def get_actions(rl_strategy, next_observation):
     # PREVIOUSLY SET TO (-1, 1)
     # Bound actions to [0, 1] range
     # TODO: Does it make more sense to log probaility of the action before or after clamping?
-    sampled_action = sampled_action.clamp(0, 1)
+    sampled_action = sampled_action.clamp(-1, 1) #--> why clamped and why often zero in action dim 1
 
     logger.debug(f"Clamped sampled action: {sampled_action}")
 

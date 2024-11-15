@@ -163,10 +163,10 @@ base_ppo:
     max_bid_price: 100
     algorithm: ppo
     device: cpu
-    learning_rate: 0.001
-    validation_episodes_interval: 900 # after how many episodes the validation starts and the policy is updated
-    training_episodes: 1000
-    gradient_steps: 1
+    learning_rate: 0.0003
+    validation_episodes_interval: 10 # after how many episodes the validation starts and the policy is updated
+    training_episodes: 150
+    gradient_steps: 10
     matd3:
       actor_architecture: mlp
       train_freq: 24h # how often write_to_learning_role gets called
@@ -178,14 +178,14 @@ base_ppo:
       noise_dt: 1
     ppo: 
       actor_architecture: dist
-      train_freq: 64h # how often write_to_learning_role gets called
-      gamma: 0.99  # Discount factor for future rewards
-      clip_ratio: 0.2  # Clipping parameter for policy updates
-      vf_coef: 0.5  # Value function coefficient in the loss function
-      entropy_coef: 0.01  # Entropy coefficient for exploration
-      max_grad_norm: 0.5  # Gradient clipping value
-      gae_lambda: 0.95  # GAE lambda for advantage estimation
-      batch_size: 5  # Batch size for each update, if mini-batch approach is used (currently not implemented)
+      train_freq: 33h # how often write_to_learning_role gets called
+      gamma: 0.995  # Discount factor for future rewards
+      clip_ratio: 0.01  # Clipping parameter for policy updates
+      vf_coef: 0.75  # Value function coefficient in the loss function
+      entropy_coef: 0.05  # Entropy coefficient for exploration
+      max_grad_norm: 0.3  # Gradient clipping value
+      gae_lambda: 0.98  # GAE lambda for advantage estimation
+      #batch_size: 5  # Batch size for each update, if mini-batch approach is used (currently not implemented)
 
   markets_config:
     EOM:
