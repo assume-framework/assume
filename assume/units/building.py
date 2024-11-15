@@ -143,6 +143,7 @@ class Building(DSMFlex, SupportsMinMax):
                 pv_power = self.forecaster[f"{self.id}_pv_power_profile"]
                 pv_power.index = self.model.time_steps
                 self.components["pv_plant"]["power_profile"] = pv_power
+                self.pv_uses_power_profile = True
 
         self.define_variables()
 
@@ -157,7 +158,7 @@ class Building(DSMFlex, SupportsMinMax):
             self.min_capacity = self.components.get("generic_storage", {}).get("min_capacity", 0)
             self.efficiency_charge = self.components.get("generic_storage", {}).get("efficiency_charge", 1)
             self.efficiency_discharge = self.components.get("generic_storage", {}).get("efficiency_discharge", 1)
-            self.initial_soc = self.components.get("generic_storage", {}).get("initial_soc", 1)
+            self.initial_soc = self.components.get("generic_storage", {}).get("initial_soc", 1e-6)
             self.outputs["soc"] = pd.Series(self.initial_soc, index=self.index, dtype=float)
             self.outputs["energy_cost"] = pd.Series(0.0, index=self.index, dtype=float)
             self.pv_production = pd.Series(0.0, index=self.index, dtype=float)
