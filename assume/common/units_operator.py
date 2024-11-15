@@ -248,7 +248,9 @@ class UnitsOperator(Role):
 
         data = []
         try:
-            data = self.units[unit].outputs[metric_type][start:end]
+            data = (
+                self.units[unit].outputs[metric_type].as_pd_series(start=start, end=end)
+            )
         except Exception:
             logger.exception("error handling data request")
         self.context.schedule_instant_message(

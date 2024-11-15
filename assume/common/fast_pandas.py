@@ -359,12 +359,24 @@ class FastSeries:
         """
         return self.data.dtype
 
-    def __getitem__(self, item):
+    @property
+    def iloc(self):
         """
-        Retrieve item(s) from the series.
+        Integer-based indexing property.
+
+        Returns:
+            FastSeriesILocIndexer: Indexer for integer-based access.
+        """
+        return FastSeriesILocIndexer(self)
+
+    def __getitem__(
+        self, item: datetime | slice | list | pd.Index | pd.Series | np.ndarray | str
+    ):
+        """
+        Retrieve item(s) from the series using datetime or label-based indexing.
 
         Parameters:
-            item (datetime | slice | list | pd.Index | pd.DatetimeIndex | np.ndarray | pd.Series | str):
+            item (datetime | slice | list | pd.Index | pd.Series | np.ndarray | str):
                 The key(s) to retrieve.
 
         Returns:
@@ -372,71 +384,49 @@ class FastSeries:
 
         Raises:
             TypeError: If the index type is unsupported.
-            ValueError: If dates are not aligned within tolerance or invalid.
+            ValueError: If dates are not aligned within tolerance.
         """
         if isinstance(item, slice):
-            # Handle slice input
+            # Handle slicing with datetime start/stop
             start_idx = (
                 self.index._get_idx_from_date(item.start)
-                if item.start is not None and item.start >= self.index.start
+                if item.start is not None
                 else 0
             )
             stop_idx = (
                 self.index._get_idx_from_date(item.stop) + 1
-                if item.stop is not None and item.stop <= self.index.end
+                if item.stop is not None
                 else len(self.data)
             )
-
-            # Ensure the slice indices are valid
-            if start_idx > stop_idx:
-                raise ValueError(
-                    "Invalid slice: start index is greater than stop index."
-                )
-
-            # Slice the data and return
             return self.data[start_idx:stop_idx]
 
         elif isinstance(
             item, (list | pd.Index | pd.DatetimeIndex | np.ndarray | pd.Series)
         ):
-            # Handle list or array-like input
-            dates = (
-                item.index if isinstance(item, pd.Series) else item
-            )  # Extract index if Series
-            dates = self._convert_to_datetime_array(dates)  # Ensure datetime array
-
-            # Vectorized index retrieval
+            # Handle list-like datetime-based inputs
+            dates = self._convert_to_datetime_array(item)
             delta_seconds = np.array(
-                [(date - self.index.start).total_seconds() for date in dates]
+                [(d - self.index.start).total_seconds() for d in dates]
             )
             indices = (delta_seconds / self.index.freq_seconds).round().astype(int)
             remainders = delta_seconds % self.index.freq_seconds
 
-            # Check alignment within tolerance
             if not np.all(remainders <= self.index.tolerance_seconds):
                 raise ValueError(
                     "One or more dates are not aligned with the index frequency."
                 )
-
-            # Retrieve data
             return self.data[indices]
 
         elif isinstance(item, str):
             # Handle string input
-            try:
-                date = pd.to_datetime(item).to_pydatetime()
-                return self.data[self.index._get_idx_from_date(date)]
-            except Exception as e:
-                raise ValueError(
-                    f"Invalid string input for datetime parsing: {item}. {e}"
-                )
+            date = pd.to_datetime(item).to_pydatetime()
+            return self.data[self.index._get_idx_from_date(date)]
 
         elif isinstance(item, datetime):
-            # Handle single datetime input
+            # Handle datetime input
             return self.data[self.index._get_idx_from_date(item)]
 
         else:
-            # Unsupported type
             raise TypeError(
                 f"Unsupported index type: {type(item)}. Must be datetime, slice, list, "
                 "pandas Index, NumPy array, pandas Series, or string."
@@ -804,6 +794,27 @@ class FastSeries:
             data_slice, index=index, columns=[name if name else self.name]
         )
 
+    def as_pd_series(
+        self, name: str = None, start: datetime = None, end: datetime = None
+    ) -> pd.Series:
+        """
+        Convert the FastSeries to a pandas Series.
+
+        Parameters:
+            name (str | None): Name of the Series. Defaults to None.
+            start (datetime | None): Start datetime for the Series. Defaults to None.
+            end (datetime | None): End datetime for the Series. Defaults to None.
+
+        Returns:
+            pd.Series: pandas Series representation of the FastSeries.
+        """
+        # Slice the data within the specified range
+        data_slice = self[start:end]
+        # Generate the corresponding index
+        index = pd.to_datetime(self.index.get_date_list(start, end))
+        # Create and return the pandas Series
+        return pd.Series(data_slice, index=index, name=name if name else self.name)
+
     @staticmethod
     def from_series(series: pd.Series):
         """
@@ -917,3 +928,97 @@ class FastSeries:
         else:
             raise TypeError(f"Unsupported type for {op}: {type(other)}")
         return result
+
+
+class FastSeriesILocIndexer:
+    def __init__(self, series: FastSeries):
+        self._series = series
+
+    def __getitem__(self, item: int | slice) -> float | np.ndarray:
+        """
+        Retrieve item(s) using integer-based indexing.
+
+        Parameters:
+            item (int | slice): The integer index or slice.
+
+        Returns:
+            float | np.ndarray: The retrieved value(s).
+
+        Raises:
+            IndexError: If the index is out of bounds.
+            TypeError: If the index type is unsupported.
+        """
+        if isinstance(item, int):
+            if item < 0 or item >= len(self._series):
+                raise IndexError(
+                    f"Index {item} is out of bounds for series of length {len(self._series)}"
+                )
+            return self._series._data[item]
+
+        elif isinstance(item, slice):
+            start = item.start or 0
+            stop = item.stop or len(self._series)
+            step = item.step or 1
+
+            if start < 0:
+                start += len(self._series)
+            if stop < 0:
+                stop += len(self._series)
+
+            start = max(0, start)
+            stop = min(len(self._series), stop)
+
+            return self._series._data[start:stop:step]
+
+        else:
+            raise TypeError(
+                f"Unsupported index type for iloc: {type(item)}. Must be int or slice."
+            )
+
+    def __setitem__(self, item: int | slice, value: float | np.ndarray):
+        """
+        Assign value(s) using integer-based indexing.
+
+        Parameters:
+            item (int | slice): The integer index or slice.
+            value (float | np.ndarray): The value(s) to assign.
+
+        Raises:
+            IndexError: If the index is out of bounds.
+            TypeError: If the index type is unsupported.
+            ValueError: If the length of the value does not match the slice length.
+        """
+        if isinstance(item, int):
+            if item < 0 or item >= len(self._series):
+                raise IndexError(
+                    f"Index {item} is out of bounds for series of length {len(self._series)}"
+                )
+            self._series._data[item] = value
+
+        elif isinstance(item, slice):
+            start = item.start or 0
+            stop = item.stop or len(self._series)
+            step = item.step or 1
+
+            if start < 0:
+                start += len(self._series)
+            if stop < 0:
+                stop += len(self._series)
+
+            start = max(0, start)
+            stop = min(len(self._series), stop)
+
+            # Assign the values
+            if np.isscalar(value) or len(self._series._data[start:stop:step]) == len(
+                value
+            ):
+                self._series._data[start:stop:step] = value
+            else:
+                raise ValueError(
+                    f"Length of value ({len(value)}) does not match the length of the slice "
+                    f"({len(self._series._data[start:stop:step])})."
+                )
+        else:
+            raise TypeError(
+                f"Unsupported index type for iloc: {type(item)}. Must be int or slice."
+            )
