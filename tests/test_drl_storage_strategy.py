@@ -92,7 +92,9 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
 
     # Mock the get_actions method to return the sell action
     with patch.object(
-        StorageRLStrategy, "get_actions", return_value=(th.tensor(sell_action), None)
+        StorageRLStrategy,
+        "get_actions",
+        return_value=(th.tensor(sell_action), th.tensor(0.0)),
     ):
         # Mock the calculate_marginal_cost method to return a fixed marginal cost
         with patch.object(Storage, "calculate_marginal_cost", return_value=10.0):
@@ -153,18 +155,18 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
 
             # Assert the calculated reward
             assert (
-                reward.iloc[0] == expected_reward
-            ), f"Expected reward {expected_reward}, got {reward.iloc[0]}"
+                reward[0] == expected_reward
+            ), f"Expected reward {expected_reward}, got {reward[0]}"
 
             # Assert the calculated profit
             assert (
-                profit.iloc[0] == expected_profit - expected_costs
-            ), f"Expected profit {expected_profit}, got {profit.iloc[0]}"
+                profit[0] == expected_profit - expected_costs
+            ), f"Expected profit {expected_profit}, got {profit[0]}"
 
             # Assert the calculated costs
             assert (
-                costs.iloc[0] == expected_costs
-            ), f"Expected costs {expected_costs}, got {costs.iloc[0]}"
+                costs[0] == expected_costs
+            ), f"Expected costs {expected_costs}, got {costs[0]}"
 
 
 @pytest.mark.require_learning
@@ -199,7 +201,9 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
 
     # Mock the get_actions method to return the buy action
     with patch.object(
-        StorageRLStrategy, "get_actions", return_value=(th.tensor(buy_action), None)
+        StorageRLStrategy,
+        "get_actions",
+        return_value=(th.tensor(buy_action), th.tensor(0.0)),
     ):
         # Mock the calculate_marginal_cost method to return a fixed marginal cost
         with patch.object(Storage, "calculate_marginal_cost", return_value=15.0):
@@ -257,18 +261,18 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
 
             # Assert the calculated reward
             assert (
-                reward.iloc[0] == expected_reward
-            ), f"Expected reward {expected_reward}, got {reward.iloc[0]}"
+                reward[0] == expected_reward
+            ), f"Expected reward {expected_reward}, got {reward[0]}"
 
             # Assert the calculated profit
             assert (
-                profit.iloc[0] == expected_profit - expected_costs
-            ), f"Expected profit {expected_profit}, got {profit.iloc[0]}"
+                profit[0] == expected_profit - expected_costs
+            ), f"Expected profit {expected_profit}, got {profit[0]}"
 
             # Assert the calculated costs
             assert (
-                costs.iloc[0] == expected_costs
-            ), f"Expected costs {expected_costs}, got {costs.iloc[0]}"
+                costs[0] == expected_costs
+            ), f"Expected costs {expected_costs}, got {costs[0]}"
 
 
 @pytest.mark.require_learning
@@ -303,7 +307,9 @@ def test_storage_rl_strategy_ignore_bid(mock_market_config, storage_unit):
 
     # Mock the get_actions method to return the ignore action
     with patch.object(
-        StorageRLStrategy, "get_actions", return_value=(th.tensor(ignore_action), None)
+        StorageRLStrategy,
+        "get_actions",
+        return_value=(th.tensor(ignore_action), th.tensor(0.0)),
     ):
         # Mock the calculate_marginal_cost method to return a fixed marginal cost
         with patch.object(Storage, "calculate_marginal_cost", return_value=0.0):
@@ -355,15 +361,15 @@ def test_storage_rl_strategy_ignore_bid(mock_market_config, storage_unit):
 
             # Assert the calculated reward
             assert (
-                reward.iloc[0] == expected_reward
-            ), f"Expected reward {expected_reward}, got {reward.iloc[0]}"
+                reward[0] == expected_reward
+            ), f"Expected reward {expected_reward}, got {reward[0]}"
 
             # Assert the calculated profit
             assert (
-                profit.iloc[0] == expected_profit
-            ), f"Expected profit {expected_profit}, got {profit.iloc[0]}"
+                profit[0] == expected_profit
+            ), f"Expected profit {expected_profit}, got {profit[0]}"
 
             # Assert the calculated costs
             assert (
-                costs.iloc[0] == expected_costs
-            ), f"Expected costs {expected_costs}, got {costs.iloc[0]}"
+                costs[0] == expected_costs
+            ), f"Expected costs {expected_costs}, got {costs[0]}"

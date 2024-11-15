@@ -9,14 +9,9 @@ from typing import TypedDict
 import numpy as np
 import pandas as pd
 
-from assume.common.fast_pandas import FastSeries
+from assume.common.fast_pandas import FastSeries, TensorFastSeries
 from assume.common.forecasts import Forecaster
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-
-try:
-    import torch as th
-except ImportError:
-    th = None
 
 
 class BaseStrategy:
@@ -78,8 +73,8 @@ class BaseUnit:
         self.outputs["rl_rewards"] = []
 
         # some data is stored as series to allow to store it in the outputs
-        self.outputs["actions"] = FastSeries(value=0.0, index=self.index)
-        self.outputs["exploration_noise"] = FastSeries(
+        self.outputs["actions"] = TensorFastSeries(value=0.0, index=self.index)
+        self.outputs["exploration_noise"] = TensorFastSeries(
             value=0.0,
             index=self.index,
         )
