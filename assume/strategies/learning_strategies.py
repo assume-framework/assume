@@ -413,7 +413,7 @@ class RLStrategy(AbstractLearningStrategy):
             > unit.forecaster[f"residual_load_{market_id}"].index[-1]
         ):
             scaled_res_load_forecast = (
-                unit.forecaster[f"residual_load_{market_id}"].loc[start:].values
+                unit.forecaster[f"residual_load_{market_id}"].loc[start:]
                 / scaling_factor_res_load
             )
             scaled_res_load_forecast = np.concatenate(
@@ -427,16 +427,15 @@ class RLStrategy(AbstractLearningStrategy):
 
         else:
             scaled_res_load_forecast = (
-                unit.forecaster[f"residual_load_{market_id}"]
-                .loc[start : end_excl + forecast_len]
-                .values
+                unit.forecaster[f"residual_load_{market_id}"].loc[
+                    start : end_excl + forecast_len
+                ]
                 / scaling_factor_res_load
             )
 
         if end_excl + forecast_len > unit.forecaster[f"price_{market_id}"].index[-1]:
             scaled_price_forecast = (
-                unit.forecaster[f"price_{market_id}"].loc[start:].values
-                / scaling_factor_price
+                unit.forecaster[f"price_{market_id}"].loc[start:] / scaling_factor_price
             )
             scaled_price_forecast = np.concatenate(
                 [
@@ -449,9 +448,9 @@ class RLStrategy(AbstractLearningStrategy):
 
         else:
             scaled_price_forecast = (
-                unit.forecaster[f"price_{market_id}"]
-                .loc[start : end_excl + forecast_len]
-                .values
+                unit.forecaster[f"price_{market_id}"].loc[
+                    start : end_excl + forecast_len
+                ]
                 / scaling_factor_price
             )
 
@@ -776,8 +775,8 @@ class StorageRLStrategy(AbstractLearningStrategy):
         _, max_discharge = unit.calculate_min_max_discharge(start, end_all)
         _, max_charge = unit.calculate_min_max_charge(start, end_all)
 
-        bid_quantity_supply = max_discharge.iloc[0]
-        bid_quantity_demand = max_charge.iloc[0]
+        bid_quantity_supply = max_discharge[0]
+        bid_quantity_demand = max_charge[0]
 
         bids = []
 
@@ -1009,7 +1008,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
             > unit.forecaster[f"residual_load_{market_id}"].index[-1]
         ):
             scaled_res_load_forecast = (
-                unit.forecaster[f"residual_load_{market_id}"].loc[start:].values
+                unit.forecaster[f"residual_load_{market_id}"].loc[start:]
                 / scaling_factor_res_load
             )
             scaled_res_load_forecast = np.concatenate(
@@ -1023,16 +1022,15 @@ class StorageRLStrategy(AbstractLearningStrategy):
 
         else:
             scaled_res_load_forecast = (
-                unit.forecaster[f"residual_load_{market_id}"]
-                .loc[start : end_excl + forecast_len]
-                .values
+                unit.forecaster[f"residual_load_{market_id}"].loc[
+                    start : end_excl + forecast_len
+                ]
                 / scaling_factor_res_load
             )
 
         if end_excl + forecast_len > unit.forecaster[f"price_{market_id}"].index[-1]:
             scaled_price_forecast = (
-                unit.forecaster[f"price_{market_id}"].loc[start:].values
-                / scaling_factor_price
+                unit.forecaster[f"price_{market_id}"].loc[start:] / scaling_factor_price
             )
             scaled_price_forecast = np.concatenate(
                 [
@@ -1045,9 +1043,9 @@ class StorageRLStrategy(AbstractLearningStrategy):
 
         else:
             scaled_price_forecast = (
-                unit.forecaster[f"price_{market_id}"]
-                .loc[start : end_excl + forecast_len]
-                .values
+                unit.forecaster[f"price_{market_id}"].loc[
+                    start : end_excl + forecast_len
+                ]
                 / scaling_factor_price
             )
 

@@ -44,7 +44,7 @@ def storage_unit() -> Storage:
         efficiency_discharge=0.9,
         additional_cost_charge=5,
         additional_cost_discharge=5,
-        index=index,
+        index=ff.index,
         forecaster=ff,
     )
 
