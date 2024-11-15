@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from datetime import datetime, timedelta
+from functools import lru_cache
 
 import numpy as np
 import pandas as pd
@@ -12,9 +13,9 @@ class FastIndex:
     """
     A fast, memory-efficient datetime index similar to pandas DatetimeIndex.
 
-    This class manages a range of datetime objects with a specified frequency.
-    It provides methods for indexing, slicing, and checking membership with
-    tolerance for alignment.
+    This class manages a range of datetime objects with a specified frequency,
+    providing efficient indexing, slicing (both integer and datetime-based),
+    and membership checking with alignment tolerance.
     """
 
     def __init__(
@@ -28,40 +29,210 @@ class FastIndex:
         Initialize the FastIndex.
 
         Parameters:
-            start (datetime or str): Start datetime or string representation.
-            end (datetime or str, optional): End datetime or string representation. Defaults to None.
-            freq (timedelta or str, optional): Frequency of the index. Defaults to timedelta(hours=1).
-            periods (int, optional): Number of periods to generate. Defaults to None.
+            start (datetime | str): The start datetime or its string representation.
+            end (datetime | str, optional): The end datetime or its string representation. Defaults to None.
+            freq (timedelta | str, optional): The frequency of the index. Can be a timedelta or pandas-style string.
+                                               Defaults to timedelta(hours=1).
+            periods (int, optional): Number of periods in the index. Either `end` or `periods` must be provided.
         """
-        self._start = start if isinstance(start, datetime) else pd.to_datetime(start)
-
-        # Ensure freq is a timedelta
-        if isinstance(freq, str):
-            # Ensure that frequency string includes a numeric value if necessary
-            if freq.isalpha():  # If freq is something like "H" or "D" without a number
-                freq = f"1{freq}"  # Prepend '1' to make it a valid timedelta string
-            self._freq = pd.to_timedelta(freq)
-        elif isinstance(freq, timedelta):
-            self._freq = freq
-        else:
-            raise TypeError("Frequency must be a string or timedelta")
-
+        self._start = self._convert_to_datetime(start)
         if end is None and periods is None:
             raise ValueError("Either 'end' or 'periods' must be specified")
 
-        # Calculate the end date based on the number of periods
+        self._freq = self._parse_frequency(freq)
+        self._freq_seconds = self._freq.total_seconds()
+
         if periods is not None:
             self._end = self._start + (periods - 1) * self._freq
+            self._count = periods
         else:
-            self._end = end if isinstance(end, datetime) else pd.to_datetime(end)
+            self._end = self._convert_to_datetime(end)
+            total_seconds = (self._end - self._start).total_seconds()
+            self._count = int(np.floor(total_seconds / self._freq_seconds)) + 1
 
-        self._freq_seconds = self._freq.total_seconds()  # Precompute total seconds
-        self._tolerance_seconds = 1  # Tolerance of 1 second
+        self._tolerance_seconds = 1
+        self._date_list = None  # Lazy-loaded
 
-        # Precompute the total number of periods
-        self._count = self.get_idx_from_date(self._end) + 1
-        # Generate and store the full date range as a list of datetime objects
-        self._date_list = self.get_date_list()
+    @lru_cache(maxsize=100)
+    def get_date_list(
+        self, start: datetime | None = None, end: datetime | None = None
+    ) -> list[datetime]:
+        """
+        Generate a list of datetime objects within the specified range.
+
+        Parameters:
+            start (datetime | None, optional): Start datetime for the subset. Defaults to the beginning of the index.
+            end (datetime | None, optional): End datetime for the subset. Defaults to the end of the index.
+
+        Returns:
+            list[datetime]: A list of datetime objects representing the specified range.
+        """
+        if self._date_list is None:
+            total_dates = np.arange(self._count) * self._freq_seconds
+            self._date_list = [self._start + timedelta(seconds=s) for s in total_dates]
+
+        start_idx = self.get_idx_from_date(start or self.start)
+        end_idx = self.get_idx_from_date(end or self.end) + 1
+        return self._date_list[start_idx:end_idx]
+
+    @lru_cache(maxsize=1000)
+    def get_idx_from_date(self, date: datetime) -> int:
+        """
+        Convert a datetime to its corresponding index in the range.
+
+        Parameters:
+            date (datetime): The datetime to convert.
+
+        Returns:
+            int: The index of the datetime in the index range.
+
+        Raises:
+            KeyError: If the input `date` is None.
+            ValueError: If the `date` is not aligned with the frequency within tolerance.
+        """
+        if date is None:
+            raise KeyError("Date cannot be None. Please provide a valid datetime.")
+
+        delta_seconds = (date - self.start).total_seconds()
+        remainder = delta_seconds % self.freq_seconds
+
+        if remainder > self.tolerance_seconds and remainder < (
+            self.freq_seconds - self.tolerance_seconds
+        ):
+            raise ValueError(
+                f"Date {date} is not aligned with frequency {self.freq_seconds} seconds. "
+                f"Allowed tolerance: {self.tolerance_seconds} seconds."
+            )
+
+        return round(delta_seconds / self.freq_seconds)
+
+    def __getitem__(self, item: int | slice):
+        """
+        Retrieve datetime(s) based on the specified index or slice.
+
+        Parameters:
+            item (int | slice): Index or slice to retrieve. Slices can use integers or datetime values.
+
+        Returns:
+            datetime | FastIndex: A single datetime object or a new FastIndex for the sliced range.
+
+        Raises:
+            IndexError: If an integer index is out of range.
+            TypeError: If `item` is not an integer or slice.
+            ValueError: If slicing results in an empty range.
+        """
+        if self._date_list is None:
+            self.get_date_list()
+
+        if isinstance(item, int):
+            if item < 0:
+                item += len(self._date_list)
+            if item < 0 or item >= len(self._date_list):
+                raise IndexError("Index out of range")
+            return self._date_list[item]
+
+        elif isinstance(item, slice):
+            start_idx = (
+                self.get_idx_from_date(item.start)
+                if isinstance(item.start, datetime)
+                else item.start or 0
+            )
+            stop_idx = (
+                self.get_idx_from_date(item.stop) + 1
+                if isinstance(item.stop, datetime)
+                else item.stop or len(self._date_list)
+            )
+            step = item.step or 1
+
+            if isinstance(start_idx, int) and start_idx < 0:
+                start_idx += len(self._date_list)
+            if isinstance(stop_idx, int) and stop_idx < 0:
+                stop_idx += len(self._date_list)
+
+            sliced_dates = self._date_list[start_idx:stop_idx:step]
+            if not sliced_dates:
+                raise ValueError("Slice resulted in an empty range")
+
+            return FastIndex(
+                start=sliced_dates[0], end=sliced_dates[-1], freq=self._freq
+            )
+
+        else:
+            raise TypeError("Index must be an integer or a slice")
+
+    def __contains__(self, date: datetime) -> bool:
+        """
+        Check if a datetime is within the index range and aligned with the frequency.
+
+        Parameters:
+            date (datetime): The datetime to check.
+
+        Returns:
+            bool: True if the datetime is in the index range and aligned; False otherwise.
+        """
+        if self.start > date or self.end < date:
+            return False
+        try:
+            self.get_idx_from_date(date)
+            return True
+        except ValueError:
+            return False
+
+    @staticmethod
+    def _convert_to_datetime(value: datetime | str) -> datetime:
+        """Convert input to datetime if it's not already."""
+        return value if isinstance(value, datetime) else pd.to_datetime(value)
+
+    @staticmethod
+    def _parse_frequency(freq: timedelta | str) -> timedelta:
+        """
+        Parse a frequency input into a timedelta.
+
+        Parameters:
+            freq (timedelta | str): Frequency in timedelta or pandas-style string format.
+
+        Returns:
+            timedelta: The parsed frequency.
+
+        Raises:
+            TypeError: If the input type is not supported.
+            ValueError: If the string format is invalid.
+        """
+        if isinstance(freq, timedelta):
+            return freq
+        if isinstance(freq, str):
+            try:
+                if freq.isalpha():
+                    freq = f"1{freq}"
+                return pd.to_timedelta(freq)
+            except ValueError as e:
+                raise ValueError(f"Invalid frequency string: {freq}. Error: {e}")
+        raise TypeError("Frequency must be a string or timedelta")
+
+    def __len__(self) -> int:
+        """Return the number of datetime points in the index."""
+        return self._count
+
+    def __repr__(self) -> str:
+        """Return a string representation of the FastIndex, including metadata and a date preview."""
+        preview_length = 3  # Show first and last 3 dates
+        dates_preview = (
+            self.get_date_list()[:preview_length]
+            + self.get_date_list()[-preview_length:]
+        )
+        preview_str = ", ".join(
+            date.strftime("%Y-%m-%d %H:%M:%S") for date in dates_preview
+        )
+
+        metadata = (
+            f"FastIndex(start={self.start}, end={self.end}, "
+            f"freq='{self.freq}', dtype=datetime64[ns])"
+        )
+        return f"{metadata}\nDates Preview: [{preview_str}]{'...' if len(self) > 2 * preview_length else ''}"
+
+    def __str__(self) -> str:
+        """Return an informal string representation of the FastIndex."""
+        return self.__repr__()
 
     @property
     def start(self) -> datetime:
@@ -87,130 +258,6 @@ class FastIndex:
     def tolerance_seconds(self) -> int:
         """Get the tolerance in seconds for date alignment."""
         return self._tolerance_seconds
-
-    def get_date_list(self, start: datetime = None, end: datetime = None) -> list:
-        """
-        Generate a list of datetime objects within the specified range.
-
-        Parameters:
-            start (datetime, optional): Start datetime.
-            end (datetime, optional): End datetime.
-
-        Returns:
-            list of datetime: The list of datetime indices.
-        """
-        start = max(start, self.start) if start else self.start
-        end = min(end, self.end) if end else self.end
-        start_idx = self.get_idx_from_date(start)
-        end_idx = self.get_idx_from_date(end) + 1
-        date_range = [
-            self.start + timedelta(seconds=i * self.freq_seconds)
-            for i in range(start_idx, end_idx)
-        ]
-        return date_range
-
-    def get_idx_from_date(self, date: datetime) -> int:
-        """
-        Convert a datetime to its corresponding index.
-
-        Parameters:
-            date (datetime): The datetime to convert.
-
-        Returns:
-            int: The corresponding index.
-
-        Raises:
-            KeyError: If the date is None.
-            ValueError: If the date is not aligned with the frequency within tolerance.
-        """
-        if date is None:
-            raise KeyError("Date cannot be None")
-        delta_seconds = (date - self.start).total_seconds()
-        idx = delta_seconds / self.freq_seconds
-        remainder = delta_seconds % self.freq_seconds
-        if remainder > self.tolerance_seconds:
-            raise ValueError(
-                f"Date {date} is not aligned with frequency {self.freq} within tolerance of {self.tolerance_seconds} second(s)."
-            )
-        return int(idx)
-
-    def __getitem__(self, item):
-        """
-        Retrieve datetime(s) based on the specified index or slice.
-
-        Parameters:
-            item (int, slice, datetime): The index or slice to retrieve.
-
-        Returns:
-            datetime or FastIndex: A single datetime object or a new FastIndex.
-        """
-        if isinstance(item, int):
-            # Return a specific datetime at the position `item`
-            return self._date_list[item]
-        elif isinstance(item, slice):
-            # Handle slice of date range
-            start_date = item.start if item.start else self._date_list[0]
-            end_date = item.stop if item.stop else self._date_list[-1]
-            sliced_dates = self.get_date_list(start=start_date, end=end_date)
-            # Return a new FastIndex for the sliced range
-            return FastIndex(
-                start=sliced_dates[0], end=sliced_dates[-1], freq=self.freq
-            )
-        else:
-            raise TypeError("Index must be an integer or slice")
-
-    def __contains__(self, date: datetime) -> bool:
-        """
-        Check if a datetime is within the index and aligned with the frequency within tolerance.
-
-        Parameters:
-            date (datetime): The datetime to check.
-
-        Returns:
-            bool: True if contained and aligned within tolerance, False otherwise.
-        """
-        if self.start > date or self.end < date:
-            return False
-        try:
-            self.get_idx_from_date(date)
-            return True
-        except ValueError:
-            return False
-
-    def __len__(self) -> int:
-        """
-        Get the number of datetime points in the index.
-
-        Returns:
-            int: Number of datetime points.
-        """
-        return self._count
-
-    def __repr__(self):
-        """
-        Official string representation of the FastIndex, showing key metadata and sample dates.
-        """
-        # Show a small preview of the dates (similar to pandas DatetimeIndex)
-        preview_length = 10  # number of elements to preview
-        dates_preview = self.get_date_list()[:preview_length]
-
-        # Format preview display
-        preview_str = ", ".join(
-            date.strftime("%Y-%m-%d %H:%M:%S") for date in dates_preview
-        )
-        metadata = (
-            f"FastIndex(start={self.start}, end={self.end}, "
-            f"freq='{self.freq}', dtype=datetime64[ns])"
-        )
-
-        # Return full string
-        return f"{metadata}\nDates Preview: [{preview_str}]{'...' if len(self) > preview_length else ''}"
-
-    def __str__(self):
-        """
-        Informal string representation of the FastIndex, similar to __repr__.
-        """
-        return self.__repr__()
 
 
 class FastSeries:
