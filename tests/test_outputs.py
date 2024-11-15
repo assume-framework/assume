@@ -5,6 +5,7 @@
 import os
 from datetime import datetime
 
+import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine
 
@@ -139,19 +140,19 @@ def test_output_unit_dispatch():
     content = {
         "context": "write_results",
         "type": "unit_dispatch",
-        "data": pd.DataFrame(
+        "data": [
             {
-                "power": {
-                    pd.Timestamp("2019-01-01 00:00:00"): 0.0,
-                    pd.Timestamp("2019-01-01 01:00:00"): 0.0,
-                },
-                "unit": {
-                    pd.Timestamp("2019-01-01 00:00:00"): "demand_EOM",
-                    pd.Timestamp("2019-01-01 01:00:00"): "demand_EOM",
-                },
+                "power": np.array([0.0, 1000.0]),
+                "energy_cashflow": np.array([0.0, 45050.0]),
+                "time": [
+                    pd.Timestamp("2019-01-01 00:00:00"),
+                    pd.Timestamp("2019-01-01 01:00:00"),
+                ],
+                "unit": "Unit 2",
             }
-        ),
+        ],
     }
+
     output_writer.handle_output_message(content, meta)
     assert len(output_writer.write_dfs["unit_dispatch"]) == 1, "unit_dispatch"
 
