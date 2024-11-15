@@ -202,6 +202,18 @@ class FastIndex:
         end_idx = self._get_idx_from_date(end or self.end) + 1
         return self._date_list[start_idx:end_idx]
 
+    def as_datetimeindex(self) -> pd.DatetimeIndex:
+        """
+        Convert the FastIndex to a pandas DatetimeIndex.
+
+        Returns:
+            pd.DatetimeIndex: A pandas DatetimeIndex representing the FastIndex.
+        """
+        # Retrieve the datetime range using get_date_list
+        datetimes = self.get_date_list()
+        # Convert to pandas DatetimeIndex
+        return pd.DatetimeIndex(pd.to_datetime(datetimes), name="FastIndex")
+
     @lru_cache(maxsize=1000)
     def _get_idx_from_date(self, date: datetime) -> int:
         """
@@ -854,6 +866,15 @@ class FastSeries:
             value=series.values,
             name=series.name or "",
         )
+
+    def __iter__(self):
+        """
+        Make FastSeries iterable by iterating over the stored data.
+
+        Yields:
+            The elements of the series data (e.g., float, tensor).
+        """
+        return iter(self._data)
 
     # Helper method to check index alignment
     def _index_aligned_with(self, other: "FastSeries") -> bool:

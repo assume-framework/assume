@@ -227,8 +227,8 @@ class RLStrategy(AbstractLearningStrategy):
         end = product_tuples[0][1]
         # get technical bounds for the unit output from the unit
         min_power, max_power = unit.calculate_min_max_power(start, end)
-        min_power = min_power[start]
-        max_power = max_power[start]
+        min_power = min_power[0]
+        max_power = max_power[0]
 
         # =============================================================================
         # 1. Get the Observations, which are the basis of the action decision

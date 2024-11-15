@@ -73,7 +73,7 @@ def steel_plant(dsm_components) -> SteelPlant:
         objective="min_variable_cost",
         flexibility_measure="max_load_shift",
         bidding_strategies=bidding_strategies,
-        index=index,
+        index=forecast.index,
         components=dsm_components,
         forecaster=forecast,
         demand=1000,
