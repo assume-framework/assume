@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from copy import deepcopy
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -20,18 +19,18 @@ class FastIndex:
 
     def __init__(
         self,
-        start: datetime,
-        end: datetime = None,
-        freq: str = "1h",
+        start: datetime | str,
+        end: datetime | str = None,
+        freq: timedelta | str = timedelta(hours=1),
         periods: int = None,
     ):
         """
         Initialize the FastIndex.
 
         Parameters:
-            start (datetime): Start datetime.
-            end (datetime, optional): End datetime.
-            freq (str or timedelta, optional): Frequency of the index. Defaults to "1h".
+            start (datetime or str): Start datetime or string representation.
+            end (datetime or str, optional): End datetime or string representation. Defaults to None.
+            freq (timedelta or str, optional): Frequency of the index. Defaults to timedelta(hours=1).
             periods (int, optional): Number of periods to generate. Defaults to None.
         """
         self._start = start if isinstance(start, datetime) else pd.to_datetime(start)
@@ -199,8 +198,6 @@ class FastIndex:
         preview_str = ", ".join(
             date.strftime("%Y-%m-%d %H:%M:%S") for date in dates_preview
         )
-
-        # Metadata summary
         metadata = (
             f"FastIndex(start={self.start}, end={self.end}, "
             f"freq='{self.freq}', dtype=datetime64[ns])"
@@ -225,7 +222,7 @@ class FastSeries:
     operations, and partial compatibility with pandas Series for ease of use.
     """
 
-    def __init__(self, index: FastIndex, value=None, name: str = ""):
+    def __init__(self, index: FastIndex, value=0.0, name: str = ""):
         """
         Initialize the FastSeries.
 
@@ -240,8 +237,7 @@ class FastSeries:
         self.at = self
         self._name = name
 
-        if value is not None:
-            self.init_data(value)
+        self.init_data(value)
 
     @property
     def index(self) -> FastIndex:
@@ -286,8 +282,6 @@ class FastSeries:
         Returns:
             np.ndarray: The data array.
         """
-        if self._data is None:
-            self.init_data()
         return self._data
 
     @data.setter
@@ -806,39 +800,13 @@ class FastSeries:
             FastSeries: The copied FastSeries.
         """
         if deep:
-            copied_data = deepcopy(self._data) if self._data is not None else None
+            copied_data = self._data.copy()
         else:
-            copied_data = self._data.copy() if self._data is not None else None
+            copied_data = self._data.view()
         return FastSeries(
             index=self.index,
             value=copied_data,
             name=self.name,
-        )
-
-    def deepcopy(self) -> "FastSeries":
-        """
-        Create a deep copy of the FastSeries.
-
-        Returns:
-            FastSeries: The deep-copied FastSeries.
-        """
-        return self.copy(deep=True)
-
-    def copy_empty(self, value: float = 0.0, name: str = "") -> "FastSeries":
-        """
-        Create a new FastSeries with the same time index but with data initialized to a specified value.
-
-        Parameters:
-            value (float, optional): The value to initialize the data array with. Defaults to 0.0.
-            name (str, optional): The name of the new series. Defaults to an empty string.
-
-        Returns:
-            FastSeries: A new instance with initialized data.
-        """
-        return FastSeries(
-            index=self.index,
-            value=value,
-            name=name if name else self.name,
         )
 
     def __len__(self) -> int:
@@ -854,9 +822,6 @@ class FastSeries:
         """
         Official string representation of the FastSeries, showing key metadata and sample data.
         """
-        # Initialize data if it's not already done
-        self.init_data()
-
         # Show a small preview of the data (similar to pandas Series)
         preview_length = 10  # number of elements to preview
         data_preview = self.data[:preview_length]
