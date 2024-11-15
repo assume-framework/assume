@@ -5,11 +5,11 @@
 from datetime import datetime
 
 from assume.common.base import SupportsMinMax, SupportsMinMaxCharge
-from assume.common.fast_pandas import FastDatetimeIndex
+from assume.common.fast_pandas import FastIndex
 
 
 def test_minmax():
-    index = FastDatetimeIndex(start="2022-01-01 00:00", periods=24, freq="h")
+    index = FastIndex(start="2022-01-01 00:00", periods=24, freq="h")
 
     mm = SupportsMinMax(
         id="Test",
@@ -113,7 +113,7 @@ def test_minmax():
 
 
 def test_minmaxcharge():
-    index = FastDatetimeIndex(start="2022-01-01 00:00", periods=24, freq="h")
+    index = FastIndex(start="2022-01-01 00:00", periods=24, freq="h")
 
     mmc = SupportsMinMaxCharge(
         id="Test",
@@ -156,7 +156,7 @@ def test_minmaxcharge():
 
 
 def test_minmaxcharge_unconstrained():
-    index = FastDatetimeIndex(start="2022-01-01 00:00", periods=24, freq="h")
+    index = FastIndex(start="2022-01-01 00:00", periods=24, freq="h")
 
     mmc = SupportsMinMaxCharge(
         id="Test",
@@ -191,9 +191,7 @@ def test_minmaxcharge_unconstrained():
 
 
 def test_minmax_operationtime():
-    index = FastDatetimeIndex(
-        start=datetime(2023, 7, 1), end=datetime(2023, 7, 2), freq="1h"
-    )
+    index = FastIndex(start=datetime(2023, 7, 1), end=datetime(2023, 7, 2), freq="1h")
 
     mm = SupportsMinMax(
         id="Test",

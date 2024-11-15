@@ -12,7 +12,7 @@ from mango import RoleAgent, activate, addr, create_tcp_container
 from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 
-from assume.common.fast_pandas import FastDatetimeIndex
+from assume.common.fast_pandas import FastIndex
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
@@ -48,7 +48,7 @@ async def units_operator() -> UnitsOperator:
     units_agent.add_role(units_role)
     agent_id = container.register(units_agent)
 
-    index = FastDatetimeIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
+    index = FastIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 
     params_dict = {
         "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
@@ -88,7 +88,7 @@ async def rl_units_operator() -> RLUnitsOperator:
     units_agent.add_role(units_role)
     agent_id = container.register(units_agent)
 
-    index = FastDatetimeIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
+    index = FastIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 
     params_dict = {
         "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
@@ -169,7 +169,7 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
     marketconfig = rl_units_operator.available_markets[0]
     start = datetime(2020, 1, 1)
     end = datetime(2020, 1, 2)
-    index = FastDatetimeIndex(start=start, end=end + pd.Timedelta(hours=24), freq="1h")
+    index = FastIndex(start=start, end=end + pd.Timedelta(hours=24), freq="1h")
 
     params_dict = {
         "bidding_strategies": {

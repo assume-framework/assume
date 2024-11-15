@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 from assume.common.base import SupportsMinMaxCharge
-from assume.common.fast_pandas import FastDatetimeSeries
+from assume.common.fast_pandas import FastSeries
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
 
@@ -107,10 +107,8 @@ class Storage(SupportsMinMaxCharge):
         self.max_power_discharge = abs(max_power_discharge)
         self.min_power_discharge = abs(min_power_discharge)
 
-        self.outputs["soc"] = FastDatetimeSeries(
-            value=self.initial_soc, index=self.index
-        )
-        self.outputs["energy_cost"] = FastDatetimeSeries(value=0.0, index=self.index)
+        self.outputs["soc"] = FastSeries(value=self.initial_soc, index=self.index)
+        self.outputs["energy_cost"] = FastSeries(value=0.0, index=self.index)
 
         self.soc_tick = soc_tick
 

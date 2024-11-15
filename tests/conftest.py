@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from assume.common.base import SupportsMinMax
-from assume.common.fast_pandas import FastDatetimeIndex, FastDatetimeSeries
+from assume.common.fast_pandas import FastIndex, FastSeries
 
 
 class MockMarketConfig:
@@ -28,8 +28,8 @@ class MockMinMaxUnit(SupportsMinMax):
     def calculate_min_max_power(
         self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
     ) -> tuple[pd.Series, pd.Series]:
-        min = FastDatetimeSeries(value=100, index=self.index).loc[start:end]
-        max = FastDatetimeSeries(value=400, index=self.index).loc[start:end]
+        min = FastSeries(value=100, index=self.index).loc[start:end]
+        max = FastSeries(value=400, index=self.index).loc[start:end]
         return min, max
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
@@ -43,7 +43,5 @@ def mock_market_config():
 
 @pytest.fixture
 def mock_supports_minmax():
-    index = FastDatetimeIndex(
-        start=datetime(2023, 7, 1), end=datetime(2023, 7, 2), freq="1h"
-    )
+    index = FastIndex(start=datetime(2023, 7, 1), end=datetime(2023, 7, 2), freq="1h")
     return MockMinMaxUnit(index)

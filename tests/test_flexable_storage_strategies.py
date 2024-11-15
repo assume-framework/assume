@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from assume.common.fast_pandas import FastDatetimeIndex
+from assume.common.fast_pandas import FastIndex
 from assume.common.forecasts import NaiveForecast
 from assume.strategies import (
     flexableEOMStorage,
@@ -22,7 +22,7 @@ from assume.units import Storage
 @pytest.fixture
 def storage() -> Storage:
     # Create a PowerPlant instance with some example parameters
-    index = FastDatetimeIndex(start=datetime(2023, 7, 1), periods=48, freq="1h")
+    index = FastIndex(start=datetime(2023, 7, 1), periods=48, freq="1h")
     return Storage(
         id="Test_Storage",
         unit_operator="TestOperator",

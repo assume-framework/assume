@@ -105,12 +105,12 @@ class RLAdvancedOrderStrategy(RLStrategy):
         bid_price_inflex = min(bid_price_1, bid_price_2)
         bid_price_flex = max(bid_price_1, bid_price_2)
 
+        op_time = unit.get_operation_time(start)
+
         # calculate the quantities and transform the bids into orderbook format
         bids = []
         bid_quantity_block = {}
-        op_time = unit.get_operation_time(start)
-
-        for idx, product in enumerate(product_tuples):
+        for product, max_pwr, min_pwr in zip(product_tuples, max_power, min_power):
             start = product[0]
             end = product[1]
 
@@ -121,22 +121,22 @@ class RLAdvancedOrderStrategy(RLStrategy):
 
             # get technical bounds for the unit output from the unit
             # adjust for ramp speed
-            max_power[idx] = unit.calculate_ramp(
-                op_time, previous_power, max_power[idx], current_power
+            max_pwr = unit.calculate_ramp(
+                op_time, previous_power, max_pwr, current_power
             )
             # adjust for ramp speed
-            min_power[idx] = unit.calculate_ramp(
-                op_time, previous_power, min_power[idx], current_power
+            min_pwr = unit.calculate_ramp(
+                op_time, previous_power, min_pwr, current_power
             )
 
             # 3.1 formulate the bids for Pmin
-            bid_quantity_inflex = min_power[idx]
+            bid_quantity_inflex = min_pwr
 
             # 3.1 formulate the bids for Pmax - Pmin
             # Pmin, the minimum run capacity is the inflexible part of the bid, which should always be accepted
 
             if op_time <= -unit.min_down_time or op_time > 0:
-                bid_quantity_flex = max_power[idx] - bid_quantity_inflex
+                bid_quantity_flex = max_pwr - bid_quantity_inflex
 
             if "BB" in self.order_types:
                 bid_quantity_block[start] = bid_quantity_inflex

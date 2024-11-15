@@ -148,16 +148,15 @@ class PowerPlant(SupportsMinMax):
             self.forecaster.get_availability(self.id)[start:end] * self.max_power
         )
 
-        for idx, t in enumerate(self.index[start:end]):
+        for t, max_pwr in zip(self.index[start:end], max_power):
             current_power = self.outputs["energy"][t]
-
             previous_power = self.get_output_before(t)
             op_time = self.get_operation_time(t)
 
             current_power = self.calculate_ramp(op_time, previous_power, current_power)
 
             if current_power > 0:
-                current_power = min(current_power, max_power[idx])
+                current_power = min(current_power, max_pwr)
                 current_power = max(current_power, self.min_power)
 
             self.outputs["energy"][t] = current_power
@@ -199,7 +198,7 @@ class PowerPlant(SupportsMinMax):
 
         self.calculate_cashflow(product_type, orderbook)
 
-        for idx, start in enumerate(products_index):
+        for start, max_pwr in zip(products_index, max_power):
             current_power = self.outputs[product_type][start]
 
             previous_power = self.get_output_before(start)
@@ -208,7 +207,7 @@ class PowerPlant(SupportsMinMax):
             current_power = self.calculate_ramp(op_time, previous_power, current_power)
 
             if current_power > 0:
-                current_power = min(current_power, max_power[idx])
+                current_power = min(current_power, max_pwr)
                 current_power = max(current_power, self.min_power)
 
             self.outputs[product_type][start] = current_power

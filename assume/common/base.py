@@ -9,7 +9,7 @@ from typing import TypedDict
 import numpy as np
 import pandas as pd
 
-from assume.common.fast_pandas import FastDatetimeSeries
+from assume.common.fast_pandas import FastSeries
 from assume.common.forecasts import Forecaster
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 
@@ -69,9 +69,7 @@ class BaseUnit:
         self.location = location
         self.bidding_strategies: dict[str, BaseStrategy] = bidding_strategies
         self.index = index
-        self.outputs = defaultdict(
-            lambda: FastDatetimeSeries(value=0.0, index=self.index)
-        )
+        self.outputs = defaultdict(lambda: FastSeries(value=0.0, index=self.index))
         # series does not like to convert from tensor to float otherwise
 
         # RL data stored as lists to simplify storing to the buffer
@@ -80,18 +78,18 @@ class BaseUnit:
         self.outputs["rl_rewards"] = []
 
         # some data is stored as series to allow to store it in the outputs
-        self.outputs["actions"] = FastDatetimeSeries(value=0.0, index=self.index)
-        self.outputs["exploration_noise"] = FastDatetimeSeries(
+        self.outputs["actions"] = FastSeries(value=0.0, index=self.index)
+        self.outputs["exploration_noise"] = FastSeries(
             value=0.0,
             index=self.index,
         )
-        self.outputs["reward"] = FastDatetimeSeries(value=0.0, index=self.index)
+        self.outputs["reward"] = FastSeries(value=0.0, index=self.index)
 
         if forecaster:
             self.forecaster = forecaster
         else:
             self.forecaster = defaultdict(
-                lambda: FastDatetimeSeries(value=0.0, index=self.index)
+                lambda: FastSeries(value=0.0, index=self.index)
             )
 
     def calculate_bids(

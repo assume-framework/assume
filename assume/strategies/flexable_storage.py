@@ -80,44 +80,33 @@ class flexableEOMStorage(BaseStrategy):
         # Calculate bids
         # =============================================================================
         bids = []
-        for idx, product in enumerate(product_tuples):
-            start = product[0]
-            end = product[1]
+
+        for product, max_dis, min_dis, max_chg, min_chg in zip(
+            product_tuples,
+            max_power_discharge,
+            min_power_discharge,
+            max_power_charge,
+            min_power_charge,
+        ):
+            start, end = product[0], product[1]
 
             current_power = unit.outputs["energy"].at[start]
             current_power_discharge = max(current_power, 0)
             current_power_charge = min(current_power, 0)
 
-            # calculate ramping constraints
-            max_power_discharge[idx] = unit.calculate_ramp_discharge(
-                theoretic_SOC,
-                previous_power,
-                max_power_discharge[idx],
-                current_power_discharge,
-                min_power_discharge[idx],
+            # Calculate ramping constraints using helper function
+            max_dis = unit.calculate_ramp_discharge(
+                theoretic_SOC, previous_power, max_dis, current_power_discharge, min_dis
             )
-            min_power_discharge[idx] = unit.calculate_ramp_discharge(
-                theoretic_SOC,
-                previous_power,
-                min_power_discharge[idx],
-                current_power_discharge,
-                min_power_discharge[idx],
+            min_dis = unit.calculate_ramp_discharge(
+                theoretic_SOC, previous_power, min_dis, current_power_discharge, min_dis
             )
-            max_power_charge[idx] = unit.calculate_ramp_charge(
-                theoretic_SOC,
-                previous_power,
-                max_power_charge[idx],
-                current_power_charge,
-                min_power_charge[idx],
+            max_chg = unit.calculate_ramp_charge(
+                theoretic_SOC, previous_power, max_chg, current_power_charge, min_chg
             )
-            min_power_charge[idx] = unit.calculate_ramp_charge(
-                theoretic_SOC,
-                previous_power,
-                min_power_charge[idx],
-                current_power_charge,
-                min_power_charge[idx],
+            min_chg = unit.calculate_ramp_charge(
+                theoretic_SOC, previous_power, min_chg, current_power_charge, min_chg
             )
-
             price_forecast = unit.forecaster[f"price_{market_config.market_id}"]
 
             # calculate average price
@@ -130,12 +119,12 @@ class flexableEOMStorage(BaseStrategy):
             # if price is higher than average price, discharge
             # if price is lower than average price, charge
             # if price forecast favors discharge, but max discharge is zero, set a bid for charging
-            if price_forecast[start] >= average_price and max_power_discharge[idx]:
+            if price_forecast[start] >= average_price and max_dis:
                 price = average_price / unit.efficiency_discharge
-                bid_quantity = max_power_discharge[idx]
+                bid_quantity = max_dis
             else:
                 price = average_price * unit.efficiency_charge
-                bid_quantity = max_power_charge[idx]
+                bid_quantity = max_chg
 
             bids.append(
                 {
@@ -262,7 +251,7 @@ class flexablePosCRMStorage(BaseStrategy):
         bids = []
         theoretic_SOC = unit.outputs["soc"][start]
 
-        for idx, product in enumerate(product_tuples):
+        for product, max_dis in zip(product_tuples, max_power_discharge):
             start = product[0]
             current_power = unit.outputs["energy"].at[start]
 
@@ -270,7 +259,7 @@ class flexablePosCRMStorage(BaseStrategy):
             bid_quantity = unit.calculate_ramp_discharge(
                 theoretic_SOC,
                 previous_power,
-                max_power_discharge[idx],
+                max_dis,
                 current_power,
             )
 
@@ -391,14 +380,14 @@ class flexableNegCRMStorage(BaseStrategy):
         _, max_power_charge = unit.calculate_min_max_charge(start, end)
 
         bids = []
-        for idx, product in enumerate(product_tuples):
+        for product, max_chg in zip(product_tuples, max_power_charge):
             start = product[0]
             current_power = unit.outputs["energy"].at[start]
             bid_quantity = abs(
                 unit.calculate_ramp_charge(
                     theoretic_SOC,
                     previous_power,
-                    max_power_charge[idx],
+                    max_chg,
                     current_power,
                 )
             )
@@ -501,11 +490,12 @@ def get_specific_revenue(unit, marginal_cost, t, foresight, price_forecast):
     theoretic_SOC = soc
 
     previous_power = unit.get_output_before(t)
-    for i, market_price in enumerate(price_forecast):
+
+    for market_price, max_dis in zip(price_forecast, max_power_discharge):
         theoretic_power_discharge = unit.calculate_ramp_discharge(
             theoretic_SOC,
             previous_power=previous_power,
-            power_discharge=max_power_discharge[i],
+            power_discharge=max_dis,
         )
         possible_revenue += (market_price - marginal_cost) * theoretic_power_discharge
         theoretic_SOC -= theoretic_power_discharge

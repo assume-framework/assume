@@ -62,11 +62,11 @@ class flexableEOM(BaseStrategy):
         previous_power = unit.get_output_before(start)
         min_power, max_power = unit.calculate_min_max_power(start, end)
 
-        bids = []
         op_time = unit.get_operation_time(start)
         avg_op_time, avg_down_time = unit.get_average_operation_times(start)
 
-        for idx, product in enumerate(product_tuples):
+        bids = []
+        for product, max_pwr, min_pwr in zip(product_tuples, max_power, min_power):
             bid_quantity_inflex, bid_price_inflex = 0, 0
             bid_quantity_flex, bid_price_flex = 0, 0
 
@@ -81,21 +81,21 @@ class flexableEOM(BaseStrategy):
             current_power = unit.outputs["energy"].at[start]
 
             # adjust max_power for ramp speed
-            max_power[idx] = unit.calculate_ramp(
-                op_time, previous_power, max_power[idx], current_power
+            max_pwr = unit.calculate_ramp(
+                op_time, previous_power, max_pwr, current_power
             )
             # adjust min_power for ramp speed
-            min_power[idx] = unit.calculate_ramp(
-                op_time, previous_power, min_power[idx], current_power
+            min_pwr = unit.calculate_ramp(
+                op_time, previous_power, min_pwr, current_power
             )
 
-            bid_quantity_inflex = min_power[idx]
+            bid_quantity_inflex = min_pwr
 
             marginal_cost_inflex = unit.calculate_marginal_cost(
                 start, current_power + bid_quantity_inflex
             )
             marginal_cost_flex = unit.calculate_marginal_cost(
-                start, current_power + max_power[idx]
+                start, current_power + max_pwr
             )
 
             # =============================================================================
@@ -129,7 +129,7 @@ class flexableEOM(BaseStrategy):
 
             # Flex-bid price formulation
             if op_time <= -unit.min_down_time or op_time > 0:
-                bid_quantity_flex = max_power[idx] - bid_quantity_inflex
+                bid_quantity_flex = max_pwr - bid_quantity_inflex
                 bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
 
             bids.append(
@@ -228,12 +228,12 @@ class flexablePosCRM(BaseStrategy):
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
-        min_power, max_power = unit.calculate_min_max_power(
+        _, max_power = unit.calculate_min_max_power(
             start, end, market_config.product_type
         )  # get max_power for the product type
 
         bids = []
-        for idx, product in enumerate(product_tuples):
+        for product, max_pwr in zip(product_tuples, max_power):
             start = product[0]
             op_time = unit.get_operation_time(start)
 
@@ -241,7 +241,7 @@ class flexablePosCRM(BaseStrategy):
             current_power = unit.outputs["energy"].at[start]
             # max_power + current_power < previous_power + unit.ramp_up
             bid_quantity = unit.calculate_ramp(
-                op_time, previous_power, max_power[idx], current_power
+                op_time, previous_power, max_pwr, current_power
             )
 
             if bid_quantity == 0:
@@ -337,16 +337,16 @@ class flexableNegCRM(BaseStrategy):
         min_power, _ = unit.calculate_min_max_power(start, end)
 
         bids = []
-        for idx, product in enumerate(product_tuples):
+        for product, min_pwr in zip(product_tuples, min_power):
             start = product[0]
             op_time = unit.get_operation_time(start)
             current_power = unit.outputs["energy"].at[start]
 
             # min_power + current_power > previous_power - unit.ramp_down
-            min_power[idx] = unit.calculate_ramp(
-                op_time, previous_power, min_power[idx], current_power
+            min_pwr = unit.calculate_ramp(
+                op_time, previous_power, min_pwr, current_power
             )
-            bid_quantity = previous_power - min_power[idx]
+            bid_quantity = previous_power - min_pwr
             if bid_quantity <= 0:
                 continue
 
@@ -570,7 +570,7 @@ def calculate_reward_EOM(
 
         order_times = pd.date_range(start, end_excl, freq=unit.index.freq)
 
-        for idx, start in enumerate(order_times):
+        for start, max_pwr in zip(order_times, max_power):
             marginal_cost = unit.calculate_marginal_cost(
                 start, unit.outputs[product_type].loc[start]
             )
@@ -590,7 +590,7 @@ def calculate_reward_EOM(
             # calculate opportunity cost
             # as the loss of income we have because we are not running at full power
             order_opportunity_cost = price_difference * (
-                max_power[idx] - unit.outputs[product_type].loc[start]
+                max_pwr - unit.outputs[product_type].loc[start]
             )
             # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
             # don't consider opportunity_cost more than once! Always the same for one timestep and one market

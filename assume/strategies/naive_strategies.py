@@ -44,7 +44,7 @@ class NaiveSingleBidStrategy(BaseStrategy):
         )  # minimum and maximum power output of the unit between the start time of the first product and the end time of the last product
 
         bids = []
-        for idx, product in enumerate(product_tuples):
+        for product, max_pwr, min_pwr in zip(product_tuples, max_power, min_power):
             # for each product, calculate the marginal cost of the unit at the start time of the product
             # and the volume of the product. Dispatch the order to the market.
             start = product[0]
@@ -55,11 +55,11 @@ class NaiveSingleBidStrategy(BaseStrategy):
                 start, previous_power
             )  # calculation of the marginal costs
             volume = unit.calculate_ramp(
-                op_time, previous_power, max_power[idx], current_power
+                op_time, previous_power, max_pwr, current_power
             )
             bids.append(
                 {
-                    "start_time": product[0],
+                    "start_time": start,
                     "end_time": product[1],
                     "only_hours": product[2],
                     "price": marginal_cost,
@@ -70,9 +70,7 @@ class NaiveSingleBidStrategy(BaseStrategy):
 
             if "node" in market_config.additional_fields:
                 bids[-1]["max_power"] = unit.max_power if volume > 0 else unit.min_power
-                bids[-1]["min_power"] = (
-                    min_power[start] if volume > 0 else unit.max_power
-                )
+                bids[-1]["min_power"] = min_pwr if volume > 0 else unit.max_power
 
             previous_power = volume + current_power
             if previous_power > 0:
@@ -119,6 +117,8 @@ class NaiveProfileStrategy(BaseStrategy):
 
         current_power = unit.outputs["energy"].at[start]
         marginal_cost = unit.calculate_marginal_cost(start, previous_power)
+
+        # calculate the ramp up volume using the initial maximum power
         volume = unit.calculate_ramp(
             op_time, previous_power, max_power[0], current_power
         )
@@ -163,7 +163,7 @@ class NaiveDASteelplantStrategy(BaseStrategy):
             marginal_price = unit.calculate_marginal_cost(start, volume)
             bids.append(
                 {
-                    "start_time": product[0],
+                    "start_time": start,
                     "end_time": product[1],
                     "only_hours": product[2],
                     "price": marginal_price,
@@ -196,7 +196,7 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
             marginal_price = unit.calculate_marginal_cost(start, volume)
             bids.append(
                 {
-                    "start_time": product[0],
+                    "start_time": start,
                     "end_time": product[1],
                     "only_hours": product[2],
                     "price": marginal_price,
@@ -246,12 +246,12 @@ class NaivePosReserveStrategy(BaseStrategy):
         )
 
         bids = []
-        for idx, product in enumerate(product_tuples):
+        for product, max_pwr in zip(product_tuples, max_power):
             start = product[0]
             op_time = unit.get_operation_time(start)
             current_power = unit.outputs["energy"].at[start]
             volume = unit.calculate_ramp(
-                op_time, previous_power, max_power[idx], current_power
+                op_time, previous_power, max_pwr, current_power
             )
             price = 0
             bids.append(
@@ -310,18 +310,18 @@ class NaiveNegReserveStrategy(BaseStrategy):
         )
 
         bids = []
-        for idx, product in enumerate(product_tuples):
+        for product, min_pwr in zip(product_tuples, min_power):
             start = product[0]
             op_time = unit.get_operation_time(start)
             previous_power = unit.get_output_before(start)
             current_power = unit.outputs["energy"].at[start]
             volume = unit.calculate_ramp(
-                op_time, previous_power, min_power[idx], current_power
+                op_time, previous_power, min_pwr, current_power
             )
             price = 0
             bids.append(
                 {
-                    "start_time": product[0],
+                    "start_time": start,
                     "end_time": product[1],
                     "only_hours": product[2],
                     "price": price,

@@ -8,7 +8,7 @@ from datetime import timedelta
 import pandas as pd
 import pytest
 
-from assume.common.fast_pandas import FastDatetimeIndex
+from assume.common.fast_pandas import FastIndex
 from assume.strategies.flexable_storage import flexableEOMStorage
 from assume.strategies.naive_strategies import NaiveSingleBidStrategy
 from assume.units import Storage
@@ -16,7 +16,7 @@ from assume.units import Storage
 
 @pytest.fixture
 def storage_unit() -> Storage:
-    index = FastDatetimeIndex(start="2022-01-01", periods=4, freq="1h")
+    index = FastIndex(start="2022-01-01", periods=4, freq="1h")
     return Storage(
         id="Test_Storage",
         unit_operator="TestOperator",

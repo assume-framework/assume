@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 
-class FastDatetimeIndex:
+class FastIndex:
     """
     A fast, memory-efficient datetime index similar to pandas DatetimeIndex.
 
@@ -26,7 +26,7 @@ class FastDatetimeIndex:
         periods: int = None,
     ):
         """
-        Initialize the FastDatetimeIndex.
+        Initialize the FastIndex.
 
         Parameters:
             start (datetime): Start datetime.
@@ -143,7 +143,7 @@ class FastDatetimeIndex:
             item (int, slice, datetime): The index or slice to retrieve.
 
         Returns:
-            datetime or FastDatetimeIndex: A single datetime object or a new FastDatetimeIndex.
+            datetime or FastIndex: A single datetime object or a new FastIndex.
         """
         if isinstance(item, int):
             # Return a specific datetime at the position `item`
@@ -153,8 +153,8 @@ class FastDatetimeIndex:
             start_date = item.start if item.start else self._date_list[0]
             end_date = item.stop if item.stop else self._date_list[-1]
             sliced_dates = self.get_date_list(start=start_date, end=end_date)
-            # Return a new FastDatetimeIndex for the sliced range
-            return FastDatetimeIndex(
+            # Return a new FastIndex for the sliced range
+            return FastIndex(
                 start=sliced_dates[0], end=sliced_dates[-1], freq=self.freq
             )
         else:
@@ -189,7 +189,7 @@ class FastDatetimeIndex:
 
     def __repr__(self):
         """
-        Official string representation of the FastDatetimeIndex, showing key metadata and sample dates.
+        Official string representation of the FastIndex, showing key metadata and sample dates.
         """
         # Show a small preview of the dates (similar to pandas DatetimeIndex)
         preview_length = 10  # number of elements to preview
@@ -202,7 +202,7 @@ class FastDatetimeIndex:
 
         # Metadata summary
         metadata = (
-            f"FastDatetimeIndex(start={self.start}, end={self.end}, "
+            f"FastIndex(start={self.start}, end={self.end}, "
             f"freq='{self.freq}', dtype=datetime64[ns])"
         )
 
@@ -211,26 +211,26 @@ class FastDatetimeIndex:
 
     def __str__(self):
         """
-        Informal string representation of the FastDatetimeIndex, similar to __repr__.
+        Informal string representation of the FastIndex, similar to __repr__.
         """
         return self.__repr__()
 
 
-class FastDatetimeSeries:
+class FastSeries:
     """
-    A fast, memory-efficient replacement for pandas Series with a FastDatetimeIndex.
+    A fast, memory-efficient replacement for pandas Series with a FastIndex.
 
     This class leverages NumPy arrays for data storage to enhance performance
     during market simulations. It supports lazy initialization, vectorized
     operations, and partial compatibility with pandas Series for ease of use.
     """
 
-    def __init__(self, index: FastDatetimeIndex, value=None, name: str = ""):
+    def __init__(self, index: FastIndex, value=None, name: str = ""):
         """
-        Initialize the FastDatetimeSeries.
+        Initialize the FastSeries.
 
         Parameters:
-            index (FastDatetimeIndex): The datetime index.
+            index (FastIndex): The datetime index.
             value (scalar or array-like, optional): Initial value(s) for the data.
             name (str, optional): Name of the series.
         """
@@ -244,8 +244,8 @@ class FastDatetimeSeries:
             self.init_data(value)
 
     @property
-    def index(self) -> FastDatetimeIndex:
-        """Get the FastDatetimeIndex of the series."""
+    def index(self) -> FastIndex:
+        """Get the FastIndex of the series."""
         return self._index
 
     @property
@@ -345,7 +345,7 @@ class FastDatetimeSeries:
                     else len(self.data)
                 )
 
-            # Return a new FastDatetimeSeries for the sliced data
+            # Return a new FastSeries for the sliced data
             sliced_data = self.data[start_idx:stop_idx]
             return sliced_data
 
@@ -484,7 +484,7 @@ class FastDatetimeSeries:
         self, name: str = None, start: datetime = None, end: datetime = None
     ) -> pd.DataFrame:
         """
-        Convert the FastDatetimeSeries to a pandas DataFrame.
+        Convert the FastSeries to a pandas DataFrame.
 
         Parameters:
             name (str, optional): Name of the DataFrame column.
@@ -501,23 +501,21 @@ class FastDatetimeSeries:
         )
 
     @staticmethod
-    def from_series(series: pd.Series) -> "FastDatetimeSeries":
+    def from_series(series: pd.Series) -> "FastSeries":
         """
-        Create a FastDatetimeSeries from a pandas Series.
+        Create a FastSeries from a pandas Series.
 
         Parameters:
             series (pd.Series): The pandas Series to convert.
 
         Returns:
-            FastDatetimeSeries: The converted FastDatetimeSeries object.
+            FastSeries: The converted FastSeries object.
 
         Raises:
             ValueError: If the series has fewer than two index entries to infer frequency or frequency cannot be inferred.
         """
         if series.empty:
-            raise ValueError(
-                "Cannot create FastDatetimeSeries from an empty pandas Series."
-            )
+            raise ValueError("Cannot create FastSeries from an empty pandas Series.")
 
         # Infer the frequency from the index
         freq = pd.infer_freq(series.index)
@@ -528,32 +526,32 @@ class FastDatetimeSeries:
         if freq.isalpha():  # If freq is something like "D" or "M" without a number
             freq = f"1{freq}"  # Prepend '1' to make it a valid timedelta string
 
-        index = FastDatetimeIndex(
+        index = FastIndex(
             start=series.index[0].to_pydatetime(),
             end=series.index[-1].to_pydatetime(),
             freq=freq,
         )
-        return FastDatetimeSeries(
+        return FastSeries(
             index=index,
             value=series.values,
             name=series.name,
         )
 
-    # Arithmetic Operations in FastDatetimeSeries
+    # Arithmetic Operations in FastSeries
     def __add__(self, other):
         """
-        Add a scalar, array, or another FastDatetimeSeries to this series.
+        Add a scalar, array, or another FastSeries to this series.
 
         Parameters:
-            other (float, np.ndarray, or FastDatetimeSeries): The value(s) to add.
+            other (float, np.ndarray, or FastSeries): The value(s) to add.
 
         Returns:
-            FastDatetimeSeries: The result of the addition.
+            FastSeries: The result of the addition.
         """
         result = self.copy()
         if isinstance(other, int | float | np.ndarray):
             result.data = self.data + other
-        elif isinstance(other, FastDatetimeSeries):  # Handle another FastDatetimeSeries
+        elif isinstance(other, FastSeries):  # Handle another FastSeries
             if self.index_aligned_with(other):
                 result.data = self.data + other.data
             else:
@@ -564,18 +562,18 @@ class FastDatetimeSeries:
 
     def __sub__(self, other):
         """
-        Subtract a scalar, array, or another FastDatetimeSeries from this series.
+        Subtract a scalar, array, or another FastSeries from this series.
 
         Parameters:
-            other (float, np.ndarray, or FastDatetimeSeries): The value(s) to subtract.
+            other (float, np.ndarray, or FastSeries): The value(s) to subtract.
 
         Returns:
-            FastDatetimeSeries: The result of the subtraction.
+            FastSeries: The result of the subtraction.
         """
         result = self.copy()
         if isinstance(other, int | float | np.ndarray):
             result.data = self.data - other
-        elif isinstance(other, FastDatetimeSeries):
+        elif isinstance(other, FastSeries):
             if self.index_aligned_with(other):
                 result.data = self.data - other.data
             else:
@@ -586,18 +584,18 @@ class FastDatetimeSeries:
 
     def __truediv__(self, other):
         """
-        Divide this series by a scalar, array, or another FastDatetimeSeries.
+        Divide this series by a scalar, array, or another FastSeries.
 
         Parameters:
-            other (float, np.ndarray, or FastDatetimeSeries): The value(s) to divide by.
+            other (float, np.ndarray, or FastSeries): The value(s) to divide by.
 
         Returns:
-            FastDatetimeSeries: The result of the division.
+            FastSeries: The result of the division.
         """
         result = self.copy()
         if isinstance(other, int | float | np.ndarray):
             result.data = self.data / other
-        elif isinstance(other, FastDatetimeSeries):
+        elif isinstance(other, FastSeries):
             if self.index_aligned_with(other):
                 result.data = self.data / other.data
             else:
@@ -608,18 +606,18 @@ class FastDatetimeSeries:
 
     def __mul__(self, other):
         """
-        Multiply this series by a scalar, array, or another FastDatetimeSeries.
+        Multiply this series by a scalar, array, or another FastSeries.
 
         Parameters:
-            other (float, np.ndarray, or FastDatetimeSeries): The value(s) to multiply by.
+            other (float, np.ndarray, or FastSeries): The value(s) to multiply by.
 
         Returns:
-            FastDatetimeSeries: The result of the multiplication.
+            FastSeries: The result of the multiplication.
         """
         result = self.copy()
         if isinstance(other, int | float | np.ndarray):
             result.data = self.data * other
-        elif isinstance(other, FastDatetimeSeries):
+        elif isinstance(other, FastSeries):
             if self.index_aligned_with(other):
                 result.data = self.data * other.data
             else:
@@ -633,7 +631,7 @@ class FastDatetimeSeries:
         Negate all values in the series.
 
         Returns:
-            FastDatetimeSeries: A new FastDatetimeSeries with negated values.
+            FastSeries: A new FastSeries with negated values.
         """
         result = self.copy()
         result.data = -self.data
@@ -642,10 +640,10 @@ class FastDatetimeSeries:
     # Helper method to check index alignment
     def index_aligned_with(self, other):
         """
-        Check if this series is aligned with another FastDatetimeSeries.
+        Check if this series is aligned with another FastSeries.
 
         Parameters:
-            other (FastDatetimeSeries): The other series to check alignment with.
+            other (FastSeries): The other series to check alignment with.
 
         Returns:
             bool: True if the indices match, False otherwise.
@@ -797,47 +795,47 @@ class FastDatetimeSeries:
         return self.data.max()
 
     # Copy Methods
-    def copy(self, deep: bool = False) -> "FastDatetimeSeries":
+    def copy(self, deep: bool = False) -> "FastSeries":
         """
-        Create a copy of the FastDatetimeSeries.
+        Create a copy of the FastSeries.
 
         Parameters:
             deep (bool, optional): If True, perform a deep copy. Defaults to False.
 
         Returns:
-            FastDatetimeSeries: The copied FastDatetimeSeries.
+            FastSeries: The copied FastSeries.
         """
         if deep:
             copied_data = deepcopy(self._data) if self._data is not None else None
         else:
             copied_data = self._data.copy() if self._data is not None else None
-        return FastDatetimeSeries(
+        return FastSeries(
             index=self.index,
             value=copied_data,
             name=self.name,
         )
 
-    def deepcopy(self) -> "FastDatetimeSeries":
+    def deepcopy(self) -> "FastSeries":
         """
-        Create a deep copy of the FastDatetimeSeries.
+        Create a deep copy of the FastSeries.
 
         Returns:
-            FastDatetimeSeries: The deep-copied FastDatetimeSeries.
+            FastSeries: The deep-copied FastSeries.
         """
         return self.copy(deep=True)
 
-    def copy_empty(self, value: float = 0.0, name: str = "") -> "FastDatetimeSeries":
+    def copy_empty(self, value: float = 0.0, name: str = "") -> "FastSeries":
         """
-        Create a new FastDatetimeSeries with the same time index but with data initialized to a specified value.
+        Create a new FastSeries with the same time index but with data initialized to a specified value.
 
         Parameters:
             value (float, optional): The value to initialize the data array with. Defaults to 0.0.
             name (str, optional): The name of the new series. Defaults to an empty string.
 
         Returns:
-            FastDatetimeSeries: A new instance with initialized data.
+            FastSeries: A new instance with initialized data.
         """
-        return FastDatetimeSeries(
+        return FastSeries(
             index=self.index,
             value=value,
             name=name if name else self.name,
@@ -854,7 +852,7 @@ class FastDatetimeSeries:
 
     def __repr__(self):
         """
-        Official string representation of the FastDatetimeSeries, showing key metadata and sample data.
+        Official string representation of the FastSeries, showing key metadata and sample data.
         """
         # Initialize data if it's not already done
         self.init_data()
@@ -871,7 +869,7 @@ class FastDatetimeSeries:
 
         # Metadata summary
         metadata = (
-            f"FastDatetimeSeries(name='{self.name}', start={self.start}, end={self.end}, "
+            f"FastSeries(name='{self.name}', start={self.start}, end={self.end}, "
             f"freq='{self.freq}', dtype={self.dtype})"
         )
 
@@ -880,7 +878,7 @@ class FastDatetimeSeries:
 
     def __str__(self):
         """
-        Informal string representation of the FastDatetimeSeries, similar to __repr__.
+        Informal string representation of the FastSeries, similar to __repr__.
         """
         return self.__repr__()
 
@@ -897,18 +895,18 @@ class FastDatetimeSeries:
     @staticmethod
     def make_series(index_series, value=0.0, name: str = ""):
         """
-        Create a FastDatetimeSeries using another FastDatetimeSeries as the index,
+        Create a FastSeries using another FastSeries as the index,
         initializing all data points with the specified value.
 
         Parameters:
-            index_series (FastDatetimeSeries): The FastDatetimeSeries to use as the index.
+            index_series (FastSeries): The FastSeries to use as the index.
             value (scalar or array-like, optional): The value(s) to initialize the data with. Defaults to 0.0.
             name (str, optional): The name of the new series. Defaults to an empty string.
 
         Returns:
-            FastDatetimeSeries: A new FastDatetimeSeries with the same index as `index_series` and data initialized to `value`.
+            FastSeries: A new FastSeries with the same index as `index_series` and data initialized to `value`.
         """
-        return FastDatetimeSeries(
+        return FastSeries(
             index=index_series.index,
             value=value,
             name=name if name else index_series.name,
