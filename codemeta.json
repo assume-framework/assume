@@ -1,0 +1,44 @@
+{
+  "@context": "https://raw.githubusercontent.com/codemeta/codemeta/master/codemeta.jsonld",
+  "@type": "Code",
+  "author": [
+    {
+      "@id": "https://orcid.org/0000-0001-8345-3889",
+      "@type": "Person",
+      "email": "maurer@fh-aachen.de",
+      "name": "Florian Maurer",
+      "affiliation": "FH Aachen"
+    },
+    {
+      "@id": "https://orcid.org/0000-0003-1897-3671",
+      "@type": "Person",
+      "email": "nick.harder@inatech.uni-freiburg.de",
+      "name": "Nick Harder",
+      "affiliation": "Universität Freiburg"
+    },
+    {
+      "@id": "https://orcid.org/0009-0009-1389-4844",
+      "@type": "Person",
+      "email": "kim.miskiw@kit.edu",
+      "name": "Kim Kira Miskiw",
+      "affiliation": "Karlsruhe Institute of Technology"
+    },
+    {
+      "@id": "https://orcid.org/0000-0002-3347-9922",
+      "@type": "Person",
+      "email": "manish.khanra@isi.fraunhofer.de",
+      "name": "Manish Khanra",
+      "affiliation": "Fraunhofer ISI"
+    }
+  ],
+  "identifier": "https://doi.org/10.5281/zenodo.8088760",
+  "codeRepository": "https://github.com/assume-framework/assume/",
+  "datePublished": "2024-11-15",
+  "dateModified": "2024-11-13",
+  "dateCreated": "2024-11-13",
+  "description": "ASSUME - Agent-based Simulation for Studying and Understanding Market Evolution",
+  "keywords": "agent-based, energy market, simulation, reinforcement learning, bidding",
+  "license": "AGPL-3.0-or-later",
+  "title": "ASSUME",
+  "version": "v0.4.3"
+}
