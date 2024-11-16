@@ -1227,7 +1227,7 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
                         # zero bids are ignored by the market clearing and orders are deleted,
                         # but we need the orderbook for the DRL to function,
                         # therefore we add a small amount
-                        "volume": charging_volume + inflex_demand + pv_generation + 1e-6,
+                        "volume": charging_volume + inflex_demand + pv_generation + 1e-8,
                         "node": unit.node,
                     }
                 )
@@ -1240,7 +1240,7 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
                         "end_time": end,
                         "only_hours": product[2],
                         "price": bid_price,
-                        "volume": discharging_volume + inflex_demand + pv_generation + 1e-6,  # negative value for demand
+                        "volume": discharging_volume + inflex_demand + pv_generation + 1e-8,  # negative value for demand
                         "node": unit.node,
                     }
                 )
@@ -1252,7 +1252,7 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
                         "end_time": end,
                         "only_hours": product[2],
                         "price": bid_price,
-                        "volume": inflex_demand + pv_generation + 1e-6,  # negative value for demand
+                        "volume": inflex_demand + pv_generation + 1e-8,  # negative value for demand
                         "node": unit.node,
                     }
                 )

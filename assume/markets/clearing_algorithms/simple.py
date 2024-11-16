@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+import math
 import random
 from datetime import timedelta
 from itertools import groupby
@@ -445,6 +446,8 @@ class PayAsBidBuildingRole(PayAsBidRole):
                 if demand_order["accepted_volume"]:
                     accepted_demand_orders.append(demand_order)
                 accepted_supply_orders.extend(to_commit)
+                if math.isclose(gen_vol, dem_vol, abs_tol=1e-8):
+                    gen_vol, dem_vol = 0, 0
 
             # if demand is fulfilled, we do have some additional supply orders
             # these will be rejected
