@@ -7,7 +7,7 @@ Biomass,biomass,naive_eom,renewable,0,50,0,1,30,30,6,north,renewables_operator
 KKW ISAR 2,nuclear,naive_eom,uranium,0,100,10,0.33,50,50,10.3,south,UNIPER
 KKW BROKDORF,nuclear,naive_eom,uranium,0,100,10,0.33,50,50,10.3,west,UNIPER
 KKW PHILIPPSBURG 2,nuclear,naive_eom,uranium,0,100,10,0.33,50,50,10.3,east,ENBW ENERGIE BADEN-WURTTEMBERG
-Solar_2,solar,naive_eom,renewable,0,50,0,1,,,0,east,renewables_operator
+Solar_2,solar,naive_eom,renewable,0,50,0,1,,,0,south,renewables_operator
 Wind onshore_2,wind_onshore,naive_eom,renewable,0,40,0,1,,,0,west,renewables_operator
 Wind offshore_2,wind_offshore,naive_eom,renewable,0,10,0,1,,,0,west,renewables_operator
 Biomass_2,biomass,naive_eom,renewable,0,50,0,1,30,30,6,east,renewables_operator

@@ -18,6 +18,9 @@ class DSMFlex:
         "peak_load_shifting": lambda self, model: self.peak_load_shifting_flexibility(
             model
         ),
+        "renewable_utilisation": lambda self, model: self.renewable_utilisation(
+            model,
+        ),
     }
 
     def __init__(self, components, **kwargs):
@@ -253,4 +256,62 @@ class DSMFlex:
                     m.dsm_blocks["eaf"].power_in[t]
                     + m.dsm_blocks["dri_plant"].power_in[t]
                     <= peak_load_cap_value
+                )
+
+    def renewable_utilisation(self, model):
+        """
+        Implements flexibility based on the renewable utilisation signal. The normalized renewable intensity
+        signal indicates the periods with high renewable availability, allowing the steel plant to adjust
+        its load flexibly in response.
+
+        Args:
+            model (pyomo.ConcreteModel): The Pyomo model being optimized.
+        """
+        # Normalize renewable utilization signal between 0 and 1
+        renewable_signal = (
+            self.renewable_utilisation_signal - self.renewable_utilisation_signal.min()
+        ) / (
+            self.renewable_utilisation_signal.max()
+            - self.renewable_utilisation_signal.min()
+        )
+        # Add normalized renewable signal as a model parameter
+        model.renewable_signal = pyo.Param(
+            model.time_steps,
+            initialize={t: renewable_signal[t] for t in model.time_steps},
+        )
+
+        model.cost_tolerance = pyo.Param(initialize=self.cost_tolerance)
+        model.total_cost = pyo.Param(initialize=0.0, mutable=True)
+
+        # Variables for load flexibility based on renewable intensity
+        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
+        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
+        model.shift_indicator = pyo.Var(model.time_steps, within=pyo.Binary)
+
+        # Constraint to manage total cost upper limit with cost tolerance
+        @model.Constraint()
+        def total_cost_upper_limit(m):
+            return pyo.quicksum(
+                m.variable_cost[t] for t in m.time_steps
+            ) <= m.total_cost * (1 + (m.cost_tolerance / 100))
+
+        # Power input constraint integrating flexibility
+        @model.Constraint(model.time_steps)
+        def total_power_input_constraint_flex(m, t):
+            if self.has_electrolyser:
+                return (
+                    m.total_power_input[t]
+                    + m.load_shift_pos[t] * m.shift_indicator[t]
+                    - m.load_shift_neg[t] * (1 - m.shift_indicator[t])
+                    == m.dsm_blocks["electrolyser"].power_in[t]
+                    + m.dsm_blocks["eaf"].power_in[t]
+                    + m.dsm_blocks["dri_plant"].power_in[t]
+                )
+            else:
+                return (
+                    m.total_power_input[t]
+                    + m.load_shift_pos[t] * m.shift_indicator[t]
+                    - m.load_shift_neg[t] * (1 - m.shift_indicator[t])
+                    == m.dsm_blocks["eaf"].power_in[t]
+                    + m.dsm_blocks["dri_plant"].power_in[t]
                 )

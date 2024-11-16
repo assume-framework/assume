@@ -113,6 +113,10 @@ class SteelPlant(DSMFlex, SupportsMinMax):
 
         # Calculate congestion forecast and set it as a forecast column in the forecaster
         self.congestion_signal = self.forecaster["east_congestion_severity"]
+        self.renewable_utilisation_signal = self.forecaster[
+            "south_renewable_utilisation"
+        ]
+        # print(self.renewable_utilisation_signal)
 
         self.objective = objective
         self.flexibility_measure = flexibility_measure
@@ -436,6 +440,21 @@ class SteelPlant(DSMFlex, SupportsMinMax):
 
                 return maximise_load_shift
 
+        elif self.flexibility_measure == "renewable_utilisation":
+
+            @self.model.Objective(sense=pyo.maximize)
+            def obj_rule_flex(m):
+                """
+                Maximizes the load increase over all time steps based on renewable surplus.
+                """
+                maximise_renewable_utilisation = pyo.quicksum(
+                    m.load_shift_pos[t] * m.shift_indicator[t] * m.renewable_signal[t]
+                    # - m.load_shift_neg[t] * (1 - m.renewable_signal[t]) * (1 - m.shift_indicator[t])
+                    for t in m.time_steps
+                )
+
+                return maximise_renewable_utilisation
+
         else:
             raise ValueError(f"Unknown objective: {self.flexibility_measure}")
 
@@ -482,9 +501,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.variable_cost_series = pd.Series(
             data=instance.variable_cost.get_values()
         ).set_axis(self.index)
-
-        # for t in instance.time_steps:
-        #     print(f"Congestion indicator at time {t}: {pyo.value(instance.congestion_indicator[t])}")
 
     def determine_optimal_operation_with_flex(self):
         """

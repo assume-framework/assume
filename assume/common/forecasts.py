@@ -221,21 +221,30 @@ class CsvForecaster(Forecaster):
                     self.calculate_residual_load_forecast(market_id=market_id)
                 )
 
-        # # Check if congestion forecast for each node is calculated
-        # congestion_forecast_df = self.calculate_congestion_forecast()  # Returns a DataFrame with node columns
-
-        # for col in congestion_forecast_df.columns:
-        #     if col not in self.forecasts.columns:
-        #         self.forecasts[col] = congestion_forecast_df[col]
-
-        # Step 4: Calculate node-specific congestion signal if not already calculated
-        node_congestion_signal_df = (
-            self.calculate_node_specific_congestion_forecast()
-        )  # Returns a DataFrame with node columns
+        # Calculate node-specific congestion signal
+        node_congestion_signal_df = self.calculate_node_specific_congestion_forecast()
 
         for col in node_congestion_signal_df.columns:
             if col not in self.forecasts.columns:
                 self.forecasts[col] = node_congestion_signal_df[col]
+
+        utilisation_columns = [
+            f"{node}_renewable_utilisation"
+            for node in self.demand_units["node"].unique()
+        ]
+        utilisation_columns.append("all_nodes_renewable_utilisation")
+
+        # If any of the utilisation columns are missing, calculate and add them
+        if not all(col in self.forecasts.columns for col in utilisation_columns):
+            # Calculate renewable utilisation forecast if any columns are missing
+            renewable_utilisation_forecast = (
+                self.calculate_renewable_utilisation_forecast()
+            )
+
+            # Add each column from the renewable utilisation forecast to self.forecasts
+            for col in renewable_utilisation_forecast.columns:
+                if col not in self.forecasts.columns:
+                    self.forecasts[col] = renewable_utilisation_forecast[col]
 
     def get_registered_market_participants(self, market_id):
         """
@@ -395,41 +404,6 @@ class CsvForecaster(Forecaster):
 
         return marginal_cost
 
-    # def calculate_congestion_forecast(self) -> pd.Series:
-
-    #     """
-    #     Calculates grid congestion sensitivity for each node as a load-to-capacity ratio.
-
-    #     Returns:
-    #         pd.DataFrame: A DataFrame with columns for each node, where each column represents the
-    #                       congestion sensitivity time series for that node.
-    #     """
-    #     node_congestion_sensitivity = pd.DataFrame(index=self.index)
-
-    #     # Iterate through each unique node in demand_units to calculate congestion sensitivity
-    #     unique_nodes = self.demand_units["node"].unique()
-
-    #     for node in unique_nodes:
-    #         # Identify demand units connected to this node
-    #         node_units = self.demand_units[self.demand_units["node"] == node].index
-
-    #         # Sum demand for all units connected to this node across time steps
-    #         node_demand = self.demand_df[node_units].sum(axis=1)
-
-    #         # Identify all lines connected to this node and calculate total capacity
-    #         connected_lines = self.lines[
-    #             (self.lines["bus0"] == node) | (self.lines["bus1"] == node)
-    #         ]
-    #         total_line_capacity = connected_lines["s_nom"].sum()
-
-    #         # Calculate congestion sensitivity as load-to-capacity ratio
-    #         congestion_sensitivity = (node_demand / total_line_capacity)
-
-    #         # Store the result in the DataFrame with a column named for the node
-    #         node_congestion_sensitivity[f"{node}_congestion_sensitivity"] = congestion_sensitivity
-
-    #     return node_congestion_sensitivity
-
     def calculate_node_specific_congestion_forecast(self) -> pd.DataFrame:
         """
         Calculates a collective node-specific congestion signal by aggregating the congestion severity of all
@@ -513,6 +487,47 @@ class CsvForecaster(Forecaster):
                 )
 
         return node_congestion_signal
+
+    def calculate_renewable_utilisation_forecast(self) -> pd.DataFrame:
+        """
+        Calculates the renewable utilisation forecast by summing the available renewable generation
+        for each node and an overall 'all_nodes' summary.
+
+        Returns:
+            pd.DataFrame: A DataFrame with columns for each node, where each column represents the renewable
+                        utilisation signal time series for that node and a column for total utilisation across all nodes.
+        """
+        # Initialize a DataFrame to store renewable utilisation for each node
+        renewable_utilisation = pd.DataFrame(index=self.index)
+
+        # Identify renewable power plants by filtering `powerplants_units` DataFrame
+        renewable_plants = self.powerplants_units[
+            self.powerplants_units["fuel_type"] == "renewable"
+        ]
+
+        # Calculate utilisation based on availability and max power for each renewable plant
+        for node in self.demand_units["node"].unique():
+            node_renewable_sum = pd.Series(0, index=self.index)
+
+            # Filter renewable plants in this specific node
+            node_renewable_plants = renewable_plants[renewable_plants["node"] == node]
+
+            for pp in node_renewable_plants.index:
+                max_power = node_renewable_plants.loc[pp, "max_power"]
+                availability_col = f"availability_{pp}"
+
+                # Calculate renewable power based on availability and max capacity
+                if availability_col in self.forecasts.columns:
+                    node_renewable_sum += self.forecasts[availability_col] * max_power
+
+            # Store the node-specific renewable utilisation
+            renewable_utilisation[f"{node}_renewable_utilisation"] = node_renewable_sum
+
+        # Calculate the total renewable utilisation across all nodes
+        all_nodes_sum = renewable_utilisation.sum(axis=1)
+        renewable_utilisation["all_nodes_renewable_utilisation"] = all_nodes_sum
+
+        return renewable_utilisation
 
     def save_forecasts(self, path):
         """
