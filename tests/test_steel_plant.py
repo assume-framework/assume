@@ -77,6 +77,7 @@ def steel_plant(dsm_components) -> SteelPlant:
         flexibility_measure="cost_based_load_shift",
         bidding_strategies=bidding_strategies,
         index=index,
+        node="south",
         components=dsm_components,
         forecaster=forecast,
         demand=1000,
@@ -174,6 +175,7 @@ def test_handle_missing_components():
             flexibility_measure="cost_based_load_shift",
             bidding_strategies={"EOM": NaiveDASteelplantStrategy()},
             index=pd.date_range("2023-01-01", periods=24, freq="h"),
+            node="south",
             components={},  # No components provided
             forecaster=None,
             demand=1000,
