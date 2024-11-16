@@ -49,12 +49,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
     required_technologies = ["dri_plant", "eaf"]
     optional_technologies = ["electrolyser", "hydrogen_storage", "dri_storage"]
 
-    # Demand Side Management measures
-    flexibility_measures = [
-        "cost_based_load_shift",
-        "congestion_management_flexibility",
-    ]
-
     def __init__(
         self,
         id: str,
@@ -395,11 +389,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 """
                 Maximizes the load shift over all time steps.
                 """
-                # maximise_load_shift = pyo.quicksum(
-                #     m.load_shift_pos[t] * m.shift_indicator[t] for t in self.model.time_steps
-                # ) + pyo.quicksum(
-                #     m.load_shift_neg[t] * (1 - m.shift_indicator[t]) for t in self.model.time_steps
-                # )
 
                 maximise_load_shift = pyo.quicksum(
                     m.load_shift_neg[t] * (1 - m.shift_indicator[t])
@@ -449,7 +438,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 """
                 maximise_renewable_utilisation = pyo.quicksum(
                     m.load_shift_pos[t] * m.shift_indicator[t] * m.renewable_signal[t]
-                    # - m.load_shift_neg[t] * (1 - m.renewable_signal[t]) * (1 - m.shift_indicator[t])
                     for t in m.time_steps
                 )
 

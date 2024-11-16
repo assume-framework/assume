@@ -268,7 +268,7 @@ class DSMFlex:
             model (pyomo.ConcreteModel): The Pyomo model being optimized.
         """
         # Normalize renewable utilization signal between 0 and 1
-        renewable_signal = (
+        renewable_signal_normalised = (
             self.renewable_utilisation_signal - self.renewable_utilisation_signal.min()
         ) / (
             self.renewable_utilisation_signal.max()
@@ -277,7 +277,7 @@ class DSMFlex:
         # Add normalized renewable signal as a model parameter
         model.renewable_signal = pyo.Param(
             model.time_steps,
-            initialize={t: renewable_signal[t] for t in model.time_steps},
+            initialize={t: renewable_signal_normalised[t] for t in model.time_steps},
         )
 
         model.cost_tolerance = pyo.Param(initialize=self.cost_tolerance)
