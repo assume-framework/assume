@@ -151,7 +151,6 @@ class NaiveDASteelplantStrategy(BaseStrategy):
     ) -> Orderbook:
         # calculate the optimal operation of the unit
         unit.determine_optimal_operation_with_flex()
-        self.plot_power_requirements(unit)
 
         bids = []
         for product in product_tuples:
