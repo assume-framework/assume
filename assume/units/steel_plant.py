@@ -131,7 +131,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         if len(solvers) < 1:
             raise Exception(f"None of {SOLVERS} are available")
 
-        self.solver = SolverFactory(solvers[1])
+        self.solver = SolverFactory(solvers[0])
         self.solver_options = {
             "output_flag": False,
             "log_to_console": False,
