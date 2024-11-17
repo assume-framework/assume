@@ -18,7 +18,7 @@ from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
 from assume.units.dsm_load_shift import DSMFlex
 
-SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
+SOLVERS = ["gurobi", "appsi_highs", "glpk", "cbc", "cplex"]
 
 logger = logging.getLogger(__name__)
 
