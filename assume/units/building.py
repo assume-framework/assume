@@ -515,11 +515,11 @@ class Building(DSMFlex, SupportsMinMax):
                 self.outputs["soc"][start + self.index.freq:] = soc + delta_soc
                 # Update the energy with the new values from battery_power
                 self.outputs["energy"][start] = battery_power + pv_power - inflex_demand
-                self.bidding_strategies[marketconfig.market_id].calculate_reward(
-                unit=self,
-                marketconfig=marketconfig,
-                orderbook=orderbook,
-            )
+            self.bidding_strategies[marketconfig.market_id].calculate_reward(
+            unit=self,
+            marketconfig=marketconfig,
+            orderbook=orderbook,
+        )
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         """
