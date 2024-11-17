@@ -88,6 +88,12 @@ def steel_plant(dsm_components) -> SteelPlant:
     )
 
 
+def solve_model_with_solver(instance):
+    """Helper function to solve the Pyomo model using the `appsi_highs` solver."""
+    solver = pyo.SolverFactory("appsi_highs")
+    solver.solve(instance, tee=False)
+
+
 def test_initialize_components(steel_plant):
     assert "electrolyser" in steel_plant.model.dsm_blocks.keys()
     assert "dri_plant" in steel_plant.model.dsm_blocks.keys()
@@ -101,7 +107,7 @@ def test_determine_optimal_operation_without_flex(steel_plant):
 
     instance = steel_plant.model.create_instance()
     instance = steel_plant.switch_to_opt(instance)
-    steel_plant.solver.solve(instance, tee=False)
+    solve_model_with_solver(instance)
 
     total_power_input = sum(
         instance.total_power_input[t].value for t in instance.time_steps
@@ -123,13 +129,6 @@ def test_determine_optimal_operation_without_flex(steel_plant):
             dri_output == dri_input
         ), f"DRI output at time {t} does not match DRI input"
 
-    # for t in instance.time_steps:
-    #     dri_output = instance.dsm_blocks["dri_plant"].dri_output[t].value
-    #     dri_input = instance.dsm_blocks["eaf"].dri_input[t].value
-    #     assert (
-    #         dri_output == dri_input
-    #     ), f"Material flow from DRI plant to EAF at time {t} is inconsistent"
-
     total_steel_output = sum(
         instance.dsm_blocks["eaf"].steel_output[t].value for t in instance.time_steps
     )
@@ -142,7 +141,7 @@ def test_ramping_constraints(steel_plant):
     steel_plant.determine_optimal_operation_without_flex()
     instance = steel_plant.model.create_instance()
     instance = steel_plant.switch_to_opt(instance)
-    steel_plant.solver.solve(instance, tee=False)
+    solve_model_with_solver(instance)
 
     # Loop through time steps to check that the electrolyser ramp constraints hold
     for t in list(instance.time_steps)[1:]:
@@ -198,7 +197,7 @@ def test_determine_optimal_operation_with_flex(steel_plant):
 
     instance = steel_plant.model.create_instance()
     instance = steel_plant.switch_to_flex(instance)
-    steel_plant.solver.solve(instance, tee=False)
+    solve_model_with_solver(instance)
 
     total_power_input = sum(
         instance.total_power_input[t].value for t in instance.time_steps
@@ -275,7 +274,7 @@ def test_handle_missing_electrolyser(steel_plant_without_electrolyser):
     steel_plant_without_electrolyser.determine_optimal_operation_without_flex()
     instance = steel_plant_without_electrolyser.model.create_instance()
     instance = steel_plant_without_electrolyser.switch_to_opt(instance)
-    steel_plant_without_electrolyser.solver.solve(instance, tee=False)
+    solve_model_with_solver(instance)
 
     # Loop through time steps to check that the electrolyser ramp constraints hold
     for t in list(instance.time_steps)[1:]:
@@ -317,7 +316,7 @@ def test_congestion_management_flexibility(steel_plant):
     )
 
     # Solve the instance
-    steel_plant.solver.solve(instance, tee=False)
+    solve_model_with_solver(instance)
 
     # Calculate adjusted total power input
     adjusted_total_power_input = [
@@ -362,7 +361,7 @@ def test_peak_load_shifting(steel_plant):
     )
 
     # Solve the instance
-    steel_plant.solver.solve(instance, tee=False)
+    solve_model_with_solver(instance)
 
     # Calculate adjusted total power input
     adjusted_total_power_input = [
@@ -419,7 +418,7 @@ def test_renewable_utilisation(steel_plant):
     )
 
     # Solve the instance
-    steel_plant.solver.solve(instance, tee=False)
+    solve_model_with_solver(instance)
 
     # Calculate adjusted total power input
     adjusted_total_power_input = [
@@ -444,7 +443,7 @@ def test_total_cost_upper_limit_with_flexibility(steel_plant):
 
     instance = steel_plant.model.create_instance()
     instance = steel_plant.switch_to_flex(instance)
-    steel_plant.solver.solve(instance, tee=False)
+    solve_model_with_solver(instance)
 
     total_cost = sum(instance.variable_cost[t].value for t in instance.time_steps)
     assert total_cost <= steel_plant.total_cost * (
