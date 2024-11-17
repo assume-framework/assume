@@ -1352,19 +1352,23 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
         product_type = marketconfig.product_type
         reward = 0
 
+        first_order_start = orderbook[0]["start_time"]
+        last_order_start = orderbook[0]["start_time"]
         # Iterate over all orders in the orderbook to calculate order-specific profit
         for order in orderbook:
+            first_order_start = min(first_order_start, order["start_time"])
+            last_order_start = max(last_order_start, order["start_time"])
             start_time = order["start_time"]
             next_time = start_time + unit.index.freq
             end_time = order["end_time"]
             end_exclusive = end_time - unit.index.freq
-            duration_hours = (end_time - start_time) / timedelta(hours=1)
+            duration = (end_time - start_time) / pd.Timedelta(unit.index.freq)
 
             # ignore very small volumes due to calculations
             accepted_volume = order["accepted_volume"]
 
             # Calculate profit and cost for the order
-            order_profit = order["accepted_price"] * accepted_volume * duration_hours
+            order_profit = order["accepted_price"] * accepted_volume * duration
 
             current_soc = unit.outputs["soc"][start_time]
             next_soc = unit.outputs["soc"][next_time]
@@ -1383,7 +1387,7 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
             unit.outputs["profit"].loc[start_time:end_exclusive] += order_profit
             unit.outputs["reward"].loc[start_time:end_exclusive] = reward
             unit.outputs["total_costs"].loc[start_time:end_exclusive] = 0
-            unit.outputs["rl_rewards"].append(reward)
+        unit.outputs["rl_rewards"].extend(unit.outputs["reward"].loc[first_order_start:last_order_start])
 
     def create_observation(
             self,
