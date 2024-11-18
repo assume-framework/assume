@@ -128,15 +128,18 @@ class SteelPlant(DSMFlex, SupportsMinMax):
 
         # Define a solver
         solvers = check_available_solvers(*SOLVERS)
+        solver = solvers[0]
         if len(solvers) < 1:
             raise Exception(f"None of {SOLVERS} are available")
 
-        self.solver = SolverFactory(solvers[0])
-        self.solver_options = {
-            "output_flag": False,
-            "log_to_console": False,
-            "LogToConsole": 0,
-        }
+        if solver == "gurobi":
+            self.solver_options = {"LogToConsole": 0, "OutputFlag": 0}
+        elif solver == "appsi_highs":
+            self.solver_options = {"output_flag": False, "log_to_console": False}
+        else:
+            self.solver_options = {}
+        self.solver = SolverFactory(solver)
+        
 
         # Main Model part
         self.model = pyo.ConcreteModel()
