@@ -1178,6 +1178,12 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
             start = product[0]
             end = product[1]
 
+            # =============================================================================
+            # Get the Households' Consumption and Generation
+            # =============================================================================
+            inflex_demand = -unit.inflex_demand.loc[start:end].iloc[0]
+            pv_generation = unit.calculate_pv_power(start, end).iloc[0]
+
             next_observation = self.create_observation(
                 unit=unit,
                 market_id=market_config.market_id,
@@ -1188,12 +1194,6 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
             # Get the Actions, based on the observations
             # =============================================================================
             actions, noise = self.get_actions(next_observation)
-
-            # =============================================================================
-            # Get the Households' Consumption and Generation
-            # =============================================================================
-            inflex_demand = -unit.inflex_demand.loc[start:end].iloc[0]
-            pv_generation = unit.calculate_pv_power(start, end).iloc[0]
             # =============================================================================
             # 3. Transform Actions into bids
             # =============================================================================

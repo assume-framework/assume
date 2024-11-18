@@ -139,11 +139,13 @@ class Building(DSMFlex, SupportsMinMax):
                 pv_availability = self.forecaster["availability_Solar"]
                 pv_availability.index = self.model.time_steps
                 self.components["pv_plant"]["availability_profile"] = pv_availability
+                self.pv_max_power = self.components.get("pv_plant", {}).get("max_power", 0)
             else:
                 pv_power = self.forecaster[f"{self.id}_pv_power_profile"]
                 pv_power.index = self.model.time_steps
                 self.components["pv_plant"]["power_profile"] = pv_power
                 self.pv_uses_power_profile = True
+                self.pv_max_power = max(pv_power)
 
         self.define_variables()
 
@@ -163,7 +165,6 @@ class Building(DSMFlex, SupportsMinMax):
             self.outputs["energy_cost"] = pd.Series(0.0, index=self.index, dtype=float)
             self.pv_production = pd.Series(0.0, index=self.index, dtype=float)
             self.battery_charge = pd.Series(0.0, index=self.index, dtype=float)
-            self.pv_max_power = self.components.get("pv_plant", {}).get("max_power", 0)
         # End section for storage units #
         else:
             self.initialize_components()
