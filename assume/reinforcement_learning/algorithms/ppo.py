@@ -58,6 +58,7 @@ class PPO(RLAlgorithm):
         self.max_grad_norm = max_grad_norm
         self.gae_lambda = gae_lambda
         self.n_updates = 0  # Number of updates performed
+        self.batch_size = learning_role.batch_size 
 
         # write error if different actor_architecture than dist is used
         if actor_architecture != "dist":
@@ -627,8 +628,7 @@ class PPO(RLAlgorithm):
         for _ in range(self.gradient_steps):
             self.n_updates += 1
 
-            batch_size = 32 #todo: get batch_size directly from config
-            transitions, batch_inds = self.learning_role.buffer.sample(batch_size)
+            transitions, batch_inds = self.learning_role.buffer.sample(self.batch_size)
             states = transitions.observations
             actions = transitions.actions
             log_probs = transitions.log_probs
@@ -753,11 +753,6 @@ def get_actions(rl_strategy, next_observation):
     log_prob_action = log_prob_action.detach()
 
     logger.debug(f"Detached log probability of the sampled action: {log_prob_action}")
-
-    # PREVIOUSLY SET TO (-1, 1)
-    # Bound actions to [0, 1] range
-    # TODO: Does it make more sense to log probaility of the action before or after clamping?
-    sampled_action = sampled_action.clamp(-1, 1) #--> why clamped and why often zero in action dim 1
 
     logger.debug(f"Clamped sampled action: {sampled_action}")
 
