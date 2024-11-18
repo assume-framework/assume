@@ -43,7 +43,7 @@ class DSMFlex:
                     time_steps=self.model.time_steps, **component_data
                 )
                 # Add the component to the components dictionary
-                self.components[technology] = component_instance
+                # self.components[technology] = component_instance
 
                 # Add the component's block to the model
                 component_instance.add_to_model(
