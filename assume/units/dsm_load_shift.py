@@ -126,7 +126,7 @@ class DSMFlex:
             """
             # Convert to integer-indexed dictionary of binary values using the threshold
             return {
-                i: int(congestion_signal[i] > threshold)
+                i: int(congestion_signal.iloc[i] > threshold)
                 for i in range(len(congestion_signal))
             }
 
@@ -205,7 +205,7 @@ class DSMFlex:
         peak_periods = {
             t
             for t in model.time_steps
-            if self.opt_power_requirement[t] > peak_load_cap_value
+            if self.opt_power_requirement.iloc[t] > peak_load_cap_value
         }
         model.peak_indicator = pyo.Param(
             model.time_steps,
@@ -277,7 +277,9 @@ class DSMFlex:
         # Add normalized renewable signal as a model parameter
         model.renewable_signal = pyo.Param(
             model.time_steps,
-            initialize={t: renewable_signal_normalised[t] for t in model.time_steps},
+            initialize={
+                t: renewable_signal_normalised.iloc[t] for t in model.time_steps
+            },
         )
 
         model.cost_tolerance = pyo.Param(initialize=self.cost_tolerance)
