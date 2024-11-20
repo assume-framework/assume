@@ -10,6 +10,7 @@ import torch as th
 from mango import Role
 
 from assume.common.base import LearningConfig, LearningStrategy
+from assume.common.utils import datetime2timestamp
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
@@ -17,7 +18,6 @@ from assume.reinforcement_learning.learning_utils import (
     get_schedule_fn,
     linear_schedule,
 )
-from assume.common.utils import datetime2timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ class Learning(Role):
         if use_lr_schedule:
             self.lr_schedule = get_schedule_fn(linear_schedule(self.learning_rate))
         else:
-            #linear schedule as no config item stating it should be sheduled is present
+            # constant schedule as no config item stating it should be scheduled is present
             self.lr_schedule = get_schedule_fn(self.learning_rate)
 
         noise_dt = learning_config.get("noise_dt", 1)
@@ -96,6 +96,7 @@ class Learning(Role):
         if use_noise_schedule:
             self.noise_schedule = get_schedule_fn(linear_schedule(noise_dt))
         else:
+            # constant schedule as no config item stating it should be scheduled is present
             self.noise_schedule = get_schedule_fn(noise_dt)
 
         # if we do not have initial experience collected we will get an error as no samples are available on the
