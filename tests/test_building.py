@@ -584,6 +584,36 @@ def test_building_missing_required_component(
     Building.required_technologies = []
 
 
+def test_building_ev_discharge_constraint(
+    forecast,
+    index,
+    building_components_heatpump,
+    default_objective,
+    default_flexibility_measure,
+):
+    """
+    Test that the discharge_ev_to_market_constraint is correctly defined
+    when the EV is not allowed to sell energy to the market.
+    """
+    # Modify the EV configuration to disallow selling energy to the market
+    building_components_heatpump["electric_vehicle"]["sells_energy_to_market"] = "false"
+
+    building = Building(
+        id="building_ev_test",
+        unit_operator="operator_hp",
+        index=index,
+        bidding_strategies={},
+        components=building_components_heatpump,
+        objective=default_objective,
+        flexibility_measure=default_flexibility_measure,
+        forecaster=forecast,
+    )
+
+    # Verify that the constraint is defined
+    constraints = list(building.model.component_map(pyo.Constraint).keys())
+    assert "discharge_ev_to_market_constraint" in constraints
+
+
 def test_building_bidding_strategy_execution(
     forecast,
     index,
@@ -668,6 +698,35 @@ def test_str_to_bool_invalid_value_in_building():
             forecaster=None,  # Replace with a suitable forecaster if necessary
         )
     assert "Invalid truth value: 'invalid_value'" in str(exc_info.value)
+
+
+def test_building_unknown_flexibility_measure(
+    forecast,
+    index,
+    building_components_heatpump,
+    default_objective,
+):
+    """
+    Test that the Building class raises a ValueError for an unknown flexibility measure.
+    """
+    invalid_flexibility_measure = "invalid_flex_measure"
+
+    with pytest.raises(ValueError) as exc_info:
+        Building(
+            id="building_unknown_flex",
+            unit_operator="operator_hp",
+            index=index,
+            bidding_strategies={},
+            components=building_components_heatpump,
+            objective=default_objective,
+            flexibility_measure=invalid_flexibility_measure,
+            forecaster=forecast,
+        )
+
+    # Assert the correct error message
+    assert f"Unknown flexibility measure: {invalid_flexibility_measure}" in str(
+        exc_info.value
+    )
 
 
 if __name__ == "__main__":
