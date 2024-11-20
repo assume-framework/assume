@@ -613,6 +613,35 @@ def test_building_ev_discharge_constraint(
     constraints = list(building.model.component_map(pyo.Constraint).keys())
     assert "discharge_ev_to_market_constraint" in constraints
 
+def test_building_battery_discharge_constraint_simple(
+    forecast,
+    index,
+    building_components_heatpump,
+    default_objective,
+    default_flexibility_measure,
+):
+    """
+    Test that the discharge_battery_to_market_constraint is defined
+    when the battery is not allowed to sell energy to the market.
+    """
+    # Modify the battery configuration to disallow selling energy to the market
+    building_components_heatpump["generic_storage"]["sells_energy_to_market"] = "false"
+
+    building = Building(
+        id="building_battery_test",
+        unit_operator="operator_hp",
+        index=index,
+        bidding_strategies={},
+        components=building_components_heatpump,
+        objective=default_objective,
+        flexibility_measure=default_flexibility_measure,
+        forecaster=forecast,
+    )
+
+    # Verify that the constraint is defined
+    constraints = list(building.model.component_map(pyo.Constraint).keys())
+    assert "discharge_battery_to_market_constraint" in constraints
+
 
 def test_building_bidding_strategy_execution(
     forecast,
