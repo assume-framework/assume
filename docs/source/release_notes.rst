@@ -13,6 +13,10 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**New Features:**
+- **Learning rate and noise sheduling**: Added the possibility to schedule the learning rate and noise in the learning process. This feature enables streamlining the learning progress. It was designed similar to the stable baselines implementation. This can be done by setting the `learning_rate_schedule` and `noise_schedule` in the learning config. 
+The schedules are linear and can be set by the user. The schedules are not settable in the config file yet, but can be set in the code.
+
 v0.4.3 - (11th November 2024)
 ===========================================
 
