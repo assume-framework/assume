@@ -154,7 +154,7 @@ def add_agent_to_world(
     match agent["Type"]:
         case "SupportPolicy":
             support_data = agent["Attributes"]["SetSupportData"]
-            supports |= {x.pop("Set"): x for x in support_data}
+            supports |= {x.pop("PolicySet"): x for x in support_data}
             world.add_unit_operator(agent["Id"])
 
             for name, support in supports.items():
