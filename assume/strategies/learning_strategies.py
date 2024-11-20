@@ -1081,7 +1081,7 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=52, act_dim=3, unique_obs_dim=2, *args, **kwargs)
+        super().__init__(obs_dim=52, act_dim=2, unique_obs_dim=2, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
 
@@ -1205,18 +1205,15 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
             # the second action is the bid direction
             # the interval [-0.1, 0.1] for the 'ignore' action is based on the learning
             # process observation and should be adjusted in the future to improve performance
-            if actions[1] <= -0.1 and actions[2] <= -0.1:
+            if actions[1] <= -0.1:
                 bid_direction = "charge"
-            elif actions[1] >= 0.1 and actions[2] >= 0.1:
+            elif actions[1] >= 0.1:
                 bid_direction = "discharge"
             else:
                 bid_direction = "hold_charge"
 
-            # the third action is the charge/discharge volume
-            charging_volume = (actions[2] * abs(unit.calculate_max_charge(start, end).iloc[0])).item()
-            discharging_volume = (actions[2] * unit.calculate_max_discharge(start, end).iloc[0]).item()
-
             if bid_direction == "charge":
+                charging_volume = (actions[1] * abs(unit.calculate_max_charge(start, end).iloc[0])).item()
                 unit.battery_charge[start:end] = charging_volume
                 bids.append(
                     {
@@ -1233,6 +1230,7 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
                 )
 
             elif bid_direction == "discharge":
+                discharging_volume = (actions[1] * unit.calculate_max_discharge(start, end).iloc[0]).item()
                 unit.battery_charge[start:end] = discharging_volume
                 bids.append(
                     {

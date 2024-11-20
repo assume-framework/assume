@@ -106,8 +106,8 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, household_unit, index,
     # Instantiate the StorageRLStrategy
     strategy = household_unit.bidding_strategies["EOM"]
 
-    # Define the 'discharge' action: [0.2, 0.5, 1.0] -> price=20, direction='discharge', volume=1
-    sell_action = [0.2, 0.5, 1.0]
+    # Define the 'discharge' action: [0.2, 1.0] -> price=20, direction='discharge' with volume=1
+    sell_action = [0.2, 1.0]
 
     # Mock the get_actions method to return the sell action
     with patch.object(
@@ -193,8 +193,8 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, household_unit, index, 
     # Instantiate the StorageRLStrategy
     strategy = household_unit.bidding_strategies["EOM"]
 
-    # Define the 'charge' action: [0.2, -0.5, -1.0] -> price=30, direction='charge', volume=-1
-    buy_action = [-0.3, -0.5, -1.0]
+    # Define the 'charge' action: [0.2, -1.0] -> price=30, direction='charge' with volume=-1
+    buy_action = [-0.3, -1.0]
 
     # Mock the get_actions method to return the buy action
     with patch.object(
@@ -280,8 +280,8 @@ def test_storage_rl_strategy_hold_charge_bid(mock_market_config, household_unit,
     # Instantiate the StorageRLStrategy
     strategy = household_unit.bidding_strategies["EOM"]
 
-    # Define the 'charge' action: [0.2, 0.0, 0.0] -> price=30, direction='hold_charge', volume=0.0
-    hold_action = [0.3, 0.0, 0.0]
+    # Define the 'charge' action: [0.2, 0.0] -> price=30, direction='hold_charge' with volume=0.0
+    hold_action = [0.3, 0.0]
 
     # Mock the get_actions method to return the hold charge action
     with patch.object(

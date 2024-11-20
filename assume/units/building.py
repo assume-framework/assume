@@ -4,7 +4,6 @@
 
 import ast
 import logging
-from datetime import timedelta
 from distutils.util import strtobool
 
 import pandas as pd
@@ -428,9 +427,8 @@ class Building(DSMFlex, SupportsMinMax):
                 if battery_power > max_soc_discharge:
                     battery_power = max_soc_discharge
 
-                time_delta = self.index.freq / timedelta(hours=1)
                 delta_soc = (
-                    -battery_power * time_delta / self.efficiency_discharge
+                    -battery_power / self.efficiency_discharge
                 )
 
             # charging
@@ -440,9 +438,8 @@ class Building(DSMFlex, SupportsMinMax):
                 if battery_power < max_soc_charge:
                     battery_power = max_soc_charge
 
-                time_delta = self.index.freq / timedelta(hours=1)
                 delta_soc = (
-                    -battery_power * time_delta * self.efficiency_charge
+                    -battery_power * self.efficiency_charge
                 )
             # Update the energy with the new values from battery_power
             self.outputs["energy"][t] = battery_power + pv_power - inflex_demand
@@ -494,10 +491,8 @@ class Building(DSMFlex, SupportsMinMax):
                     if battery_power > max_soc_discharge:
                         battery_power = max_soc_discharge
 
-                    time_delta = self.index.freq / timedelta(hours=1)
                     delta_soc = (
                             -battery_power
-                            * time_delta
                             / self.efficiency_discharge
                     )
 
@@ -508,9 +503,8 @@ class Building(DSMFlex, SupportsMinMax):
                     if battery_power < max_soc_charge:
                         battery_power = max_soc_charge
 
-                    time_delta = self.index.freq / timedelta(hours=1)
                     delta_soc = (
-                            -battery_power * time_delta * self.efficiency_charge
+                            -battery_power * self.efficiency_charge
                     )
 
                 self.outputs["soc"][start + self.index.freq:] = soc + delta_soc
@@ -624,10 +618,9 @@ class Building(DSMFlex, SupportsMinMax):
         Returns:
             float: The maximum charge power.
         """
-        duration = self.index.freq / timedelta(hours=1)
         power = min(
             0,
-            ((soc - self.max_capacity) / self.efficiency_charge / duration),
+            ((soc - self.max_capacity) / self.efficiency_charge),
         )
         return power
 
@@ -642,10 +635,9 @@ class Building(DSMFlex, SupportsMinMax):
         Returns:
             float: The maximum discharge power.
         """
-        duration = self.index.freq / timedelta(hours=1)
         power = max(
             0,
-            ((soc - self.min_capacity) * self.efficiency_discharge / duration),
+            ((soc - self.min_capacity) * self.efficiency_discharge),
         )
         return power
 

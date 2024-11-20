@@ -5,9 +5,9 @@ EGHKM_building,building,pv_plant,north,naive_da_building,,,dsm_operator_3,minimi
 EGHF_building,building,pv_plant,north,naive_da_building,,,dsm_operator_4,minimize_expenses,,,,No,,,,0,0,,,,,,,,,,,,,,,
 EGHFE_building,building,pv_plant,north,naive_da_building,,,dsm_operator_5,minimize_expenses,,,,No,,,,0,0,,,,,,,,,,,,,,,
 EGHFM_building,building,pv_plant,north,naive_da_building,,,dsm_operator_6,minimize_expenses,,,,Yes,,,,5,0,,,,,,,,,,,,,,,
+EGHFM_building,building,generic_storage,north,,,,,minimize_expenses,,,,,,,,,,0.07,0.07,,,,,0.1521,0.01521,0.1,,0.9731,0.9731,0.07,0.07,Yes
 EGHS_building,building,pv_plant,north,naive_da_building,,,dsm_operator_7,minimize_expenses,,,,Yes,,,,5,0,,,,,,,,,,,,,,,
 EGHL_building,building,pv_plant,north,naive_da_building,,,dsm_operator_8,minimize_expenses,,,,No,,,,0,0,,,,,,,,,,,,,,,
 EGHD1_building,building,pv_plant,north,naive_da_building,,,dsm_operator_9,minimize_expenses,,,,No,,,,0,0,,,,,,,,,,,,,,,
 EGHD2_building,building,pv_plant,north,naive_da_building,,,dsm_operator_10,minimize_expenses,,,,No,,,,0,0,,,,,,,,,,,,,,,
 EGHD3_building,building,pv_plant,north,naive_da_building,,,dsm_operator_11,minimize_expenses,,,,No,,,,0,0,,,,,,,,,,,,,,,
-EGHSt1_building,building,generic_storage,north,household_storage_learning,,,dsm_operator_12,minimize_expenses,,,,,,,,,,0.00125,0.00125,,,,,0.021,0.0015,0.0015,,0.9731,0.9731,0.00125,0.00125,Yes
