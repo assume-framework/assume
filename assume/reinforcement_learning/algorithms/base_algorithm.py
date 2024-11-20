@@ -77,15 +77,16 @@ class RLAlgorithm:
         self, optimizers: list[th.optim.Optimizer] | th.optim.Optimizer
     ) -> None:
         """
-        Adapted from SB3:
-        - https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/base_class.py#L286
-        - https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L68
-
-        Update the optimizers learning rate using the current learning rate schedule
-        and the current progress remaining (from 1 to 0).
+        Update the optimizers learning rate using the current learning rate schedule and the current progress remaining (from 1 to 0).
 
         Args:
             optimizers (List[th.optim.Optimizer] | th.optim.Optimizer): An optimizer or a list of optimizers.
+
+        Note:
+            Adapted from SB3:
+            - https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/base_class.py#L286
+            - https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L68
+
         """
         learning_rate = self.learning_role.lr_schedule(
             self.learning_role.get_progress_remaining()

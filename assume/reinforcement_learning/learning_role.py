@@ -215,7 +215,7 @@ class Learning(Role):
 
     def get_progress_remaining(self) -> float:
         """
-        Get the remaining learning progress.
+        Get the remaining learning progress from the simulation run.
 
         """
         total_duration = self.end - self.start

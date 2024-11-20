@@ -110,10 +110,15 @@ def get_schedule_fn(value_schedule: Schedule | float) -> Schedule:
     """
     Transform (if needed) values (e.g. learning rate, action noise scale, ...) to Schedule function.
 
-    Adapted from SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L80
+    Args:
+        value_schedule: Constant value of schedule function
+    
+    Returns: 
+        Schedule function (can return constant value)
 
-    :param value_schedule: Constant value of schedule function
-    :return: Schedule function (can return constant value)
+    Note:
+        Adapted from SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L80
+
     """
     # If the passed schedule is a float
     # create a constant function
@@ -132,14 +137,19 @@ def linear_schedule(start: float, end: float = 0, end_fraction: float = 1) -> Sc
     Create a function that interpolates linearly between start and end
     between ``progress_remaining`` = 1 and ``progress_remaining`` = 1 - ``end_fraction``.
 
-    Adapted from SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L100
+    Args:
+        start: value to start with if ``progress_remaining`` = 1
+        end: value to end with if ``progress_remaining`` = 0
+        end_fraction: fraction of ``progress_remaining``
+            where end is reached e.g 0.1 then end is reached after 10%
+            of the complete training process.
 
-    :params start: value to start with if ``progress_remaining`` = 1
-    :params end: value to end with if ``progress_remaining`` = 0
-    :params end_fraction: fraction of ``progress_remaining``
-        where end is reached e.g 0.1 then end is reached after 10%
-        of the complete training process.
-    :return: Linear schedule function.
+    Returns:
+        Linear schedule function.
+
+    Note:
+        Adapted from SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L100
+
     """
 
     def func(progress_remaining: float) -> float:
@@ -153,13 +163,16 @@ def linear_schedule(start: float, end: float = 0, end_fraction: float = 1) -> Sc
 
 def constant_schedule(val: float) -> Schedule:
     """
-    Create a function that returns a constant
-    It is useful for learning rate schedule (to avoid code duplication)
+    Create a function that returns a constant. It is useful for learning rate schedule (to avoid code duplication)
 
-    From SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L124
+    Args:
+        val: constant value
+    Returns:
+        Constant schedule function.
 
-    :param val: constant value
-    :return: Constant schedule function.
+    Note:
+        From SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L124
+
     """
 
     def func(_):

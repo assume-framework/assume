@@ -50,7 +50,7 @@ The following table shows the options that can be adjusted and gives a short exp
   early_stopping_threshold                The value by which the average reward needs to improve to avoid early stopping.
  ======================================== ==========================================================================================================
 
-Options for (linear) scheduling of learning rate and action noise are available, but not yet settable in the config file.
+Options for (linear) scheduling of learning rate and action noise are available, but not settable in the config file.
 
 The Algorithms
 ==============
