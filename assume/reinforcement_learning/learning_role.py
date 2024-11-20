@@ -17,6 +17,7 @@ from assume.reinforcement_learning.learning_utils import (
     get_schedule_fn,
     linear_schedule,
 )
+from assume.common.utils import datetime2timestamp
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +124,14 @@ class Learning(Role):
         self.rl_eval = defaultdict(list)
         # list of avg_changes
         self.avg_rewards = []
+
+    def set_simulation_horizon_to_learning_role(self, start, end):
+        """
+        Add simulation horizon to learning role for calculation of decay.
+        """
+
+        self.start = datetime2timestamp(start)
+        self.end = datetime2timestamp(end)
 
     def load_inter_episodic_data(self, inter_episodic_data):
         """

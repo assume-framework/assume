@@ -262,7 +262,7 @@ class World:
             from assume.reinforcement_learning.learning_role import Learning
 
             self.learning_role = Learning(self.learning_config)
-            self._add_simulation_horizon_to_learning_role()
+            self.learning_role.set_simulation_horizon_to_learning_role(start=self.start, end=self.end)
             # separate process does not support buffer and learning
             self.learning_agent_addr = addr(self.addr, "learning_agent")
             rl_agent = agent_composed_of(
@@ -480,13 +480,7 @@ class World:
             **unit_params,
         )
 
-    def _add_simulation_horizon_to_learning_role(self):
-        """
-        Add simulation horizon to learning role for calculation of decay.
-        """
 
-        self.learning_role.start = datetime2timestamp(self.start)
-        self.learning_role.end = datetime2timestamp(self.end)
 
     def _add_bidding_strategies_to_learning_role(self, unit_id, bidding_strategies):
         """
