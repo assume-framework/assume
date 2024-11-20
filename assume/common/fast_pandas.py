@@ -7,6 +7,7 @@ from functools import lru_cache
 
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_datetime64_any_dtype
 
 try:
     import torch as th
@@ -163,8 +164,10 @@ class FastIndex:
         """Return a string representation of the FastIndex, including metadata and a date preview."""
         preview_length = 3  # Show first and last 3 dates
         date_list = self.get_date_list()
+
         def format_dates(date_range, date_format="%Y-%m-%d %H:%M:%S"):
             return ", ".join(date.strftime(date_format) for date in date_range)
+
         if len(date_list) <= 2 * preview_length:
             preview_str = format_dates(date_list)
         else:
@@ -499,32 +502,12 @@ class FastSeries:
         elif isinstance(
             item, (list | pd.Index | pd.DatetimeIndex | np.ndarray | pd.Series)
         ):
-            # Handle list or array-like input
-            dates = self._convert_to_datetime_array(
-                item
-            )  # Standardize to datetime array
-            delta_seconds = np.array(
-                [(d - self.index.start).total_seconds() for d in dates]
-            )
-            indices = (delta_seconds / self.index.freq_seconds).round().astype(int)
-            remainders = delta_seconds % self.index.freq_seconds
-
-            # Validate alignment within tolerance
-            if not np.all(remainders <= self.index.tolerance_seconds):
-                raise ValueError(
-                    "One or more dates are not aligned with frequency within tolerance."
-                )
-
-            # Assign values
-            if np.isscalar(value):
-                self.data[indices] = value
+            if len(item) == len(self.data):
+                self.data[item] = value
             else:
-                value = np.asarray(value)
-                if len(indices) != len(value):
-                    raise ValueError(
-                        f"Length of values ({len(value)}) does not match number of indices ({len(indices)})."
-                    )
-                self.data[indices] = value
+                for i in item:
+                    start = self.index._get_idx_from_date(i)
+                    self.data[start] = value
 
         elif isinstance(item, datetime | str):
             # Handle single datetime or string
@@ -925,7 +908,11 @@ class FastSeries:
         """
         try:
             if isinstance(item, pd.Series):
-                item = item.index
+                if is_datetime64_any_dtype(item.index):
+                    item = item.index
+                else:
+                    item = item.values
+
             return pd.to_datetime(item).to_pydatetime()
         except Exception as e:
             raise ValueError(

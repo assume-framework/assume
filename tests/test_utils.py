@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import calendar
+import time
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
@@ -11,6 +12,7 @@ import pytest
 from dateutil import rrule as rr
 from dateutil.tz import tzlocal
 
+from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
     aggregate_step_amount,
@@ -445,6 +447,152 @@ def test_timestamp2datetime():
 def test_datetime2timestamp():
     unix_start = datetime(1970, 1, 1)
     assert 0 == datetime2timestamp(unix_start)
+
+def test_create_date_range():
+    start = datetime(2020, 1, 1, 0)
+    end = datetime(2020, 1, 1, 5)
+    n = 1000
+    index = FastIndex(start, end, freq="1h")
+    fs = FastSeries(index)
+
+    t = time.time()
+    for i in range(n):
+        index = FastIndex(start, end, freq="1h")
+        fs = FastSeries(index)
+    res = time.time() - t
+    print(res)
+
+    t = time.time()
+    for i in range(n):
+        q_pd = pd.date_range(start, end, freq="1h")
+    res_pd = time.time() - t
+    print(res_pd)
+    # this is sometimes faster, sometimes not
+    # as a lot of objects are created
+    assert res < res_pd + 0.1
+
+    new_end = datetime(2020, 1, 1, 3)
+
+    # check that slicing is faster
+    t = time.time()
+    for i in range(n):
+        q_slice = fs[start:new_end]
+    res_slice = time.time() - t
+    print(res_slice)
+
+    series = pd.Series(0, index=q_pd)
+
+    t = time.time()
+    for i in range(n):
+        q_pd_slice = series[start:new_end]
+    res_slice_pd = time.time() - t
+    print(res_slice_pd)
+    # more than factor 10
+    assert res_slice < res_slice_pd / 10
+
+    # check that setting items is faster:
+    t = time.time()
+    for i in range(n):
+        fs[start] = 1
+    res_slice = time.time() - t
+    print(res_slice)
+
+    series = pd.Series(0, index=q_pd)
+
+    t = time.time()
+    for i in range(n):
+        series[start] = 1
+    res_slice_pd = time.time() - t
+    print(res_slice_pd)
+    # more than factor 10
+    assert res_slice < res_slice_pd / 10
+
+    # check that setting slices is faster
+    t = time.time()
+    for i in range(n):
+        fs[start:new_end] = 17
+    res_slice = time.time() - t
+    print(res_slice)
+
+    series = pd.Series(0, index=q_pd)
+
+    t = time.time()
+    for i in range(n):
+        series[start:new_end] = 17
+    res_slice_pd = time.time() - t
+    print(res_slice_pd)
+    # more than factor 10
+    assert res_slice < res_slice_pd / 10
+
+    se = pd.Series(0.0, index=fs.index.get_date_list())
+    se.loc[start]
+
+    series.loc[new_end] = 33
+
+    fs[new_end] = 33
+    new = series[start:new_end][::-1]
+    assert new.iloc[0] == 33
+    new = fs[start:new_end][::-1]
+    assert new[0] == 33
+    fs.data
+    fs.index._get_idx_from_date(start)
+    fs.index._get_idx_from_date(new_end)
+    fs.data[0:4]
+
+
+def test_convert_pd():
+    start = datetime(2020, 1, 1, 0)
+    end = datetime(2020, 1, 1, 5)
+    index = FastIndex(start, end, freq="1h")
+    fs = FastSeries(index)
+
+    df = fs.as_df()
+    assert isinstance(df, pd.DataFrame)
+
+
+def test_set_list():
+    start = datetime(2020, 1, 1, 0)
+    end = datetime(2020, 2, 1, 5)
+    n = 1000
+    index = FastIndex(start, end, freq="1h")
+    fs = FastSeries(index)
+
+    dr = pd.date_range(start, end=datetime(2020, 1, 3, 5))
+    dr = pd.Series(dr)
+
+    series = pd.Series(0, index=pd.date_range(start, end, freq="1h"))
+
+    t = time.time()
+    for i in range(n):
+        result_pd = fs[dr]
+    res_fds = time.time() - t
+    f_series = series > 1
+    series[f_series] = 4
+    fs.data[f_series] = 4
+
+    # accessing lists or series elements is also faster
+    # check getting list or series
+    t = time.time()
+    for i in range(n):
+        result = series[dr]
+    res_pd = time.time() - t
+    print(res_fds)
+    print(res_pd)
+    assert res_fds < res_pd
+
+    # check setting list or series
+    t = time.time()
+    for i in range(n):
+        fs[dr] = 3
+    res_fds = time.time() - t
+
+    t = time.time()
+    for i in range(n):
+        series[dr] = 3
+    res_pd = time.time() - t
+    print(res_fds)
+    print(res_pd)
+    assert res_fds < res_pd
 
 
 if __name__ == "__main__":
