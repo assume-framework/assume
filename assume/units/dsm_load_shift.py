@@ -75,9 +75,7 @@ class DSMFlex:
         model.total_cost = pyo.Param(initialize=0.0, mutable=True)
 
         # Variables
-        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
-        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
-        model.shift_indicator = pyo.Var(model.time_steps, within=pyo.Binary)
+        model.load_shift = pyo.Var(model.time_steps, within=pyo.Reals)
 
         @model.Constraint()
         def total_cost_upper_limit(m):
@@ -90,18 +88,14 @@ class DSMFlex:
             if self.technology == "steel_plant":
                 if self.has_electrolyser:
                     return (
-                        m.total_power_input[t]
-                        + m.load_shift_pos[t] * model.shift_indicator[t]
-                        - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
+                        m.total_power_input[t] - m.load_shift[t]
                         == self.model.dsm_blocks["electrolyser"].power_in[t]
                         + self.model.dsm_blocks["eaf"].power_in[t]
                         + self.model.dsm_blocks["dri_plant"].power_in[t]
                     )
                 else:
                     return (
-                        m.total_power_input[t]
-                        + m.load_shift_pos[t] * model.shift_indicator[t]
-                        - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
+                        m.total_power_input[t] - m.load_shift[t]
                         == self.model.dsm_blocks["eaf"].power_in[t]
                         + self.model.dsm_blocks["dri_plant"].power_in[t]
                     )
@@ -126,12 +120,7 @@ class DSMFlex:
                     total_power_input -= self.model.dsm_blocks["pv_plant"].power[t]
 
                 # Apply flexibility adjustments
-                return (
-                    m.total_power_input[t]
-                    + m.load_shift_pos[t] * model.shift_indicator[t]
-                    - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
-                    == total_power_input
-                )
+                return m.total_power_input[t] - m.load_shift[t] == total_power_input
 
     def set_dispatch_plan(
         self,
