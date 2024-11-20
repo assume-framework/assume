@@ -13,6 +13,9 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**Bugfixes:**
+  - **Tutorials**: General fixes of the tutorials, to align with updated functionalitites of Assume
+
 v0.4.3 - (11th November 2024)
 ===========================================
 
