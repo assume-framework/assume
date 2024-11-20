@@ -124,7 +124,7 @@ class Building(DSMFlex, SupportsMinMax):
                 and component not in self.optional_technologies
             ):
                 raise ValueError(
-                    f"Components {component} is not a valid component for the steel plant unit."
+                    f"Components {component} is not a valid component for the building unit."
                 )
 
         # Initialize forecasting data for various energy prices and demands

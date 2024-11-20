@@ -83,6 +83,17 @@ def pv_plant_config():
     }
 
 
+# Fixtures for Default Objective and Flexibility Measure
+@pytest.fixture
+def default_objective():
+    return "min_variable_cost"
+
+
+@pytest.fixture
+def default_flexibility_measure():
+    return "cost_based_load_shift"
+
+
 # Fixtures for Availability Profiles
 @pytest.fixture
 def ev_availability_profile():
@@ -181,8 +192,15 @@ def available_solver():
 
 
 # Test Cases
+
+
 def test_building_initialization_heatpump(
-    forecast, index, building_components_heatpump, available_solver
+    forecast,
+    index,
+    building_components_heatpump,
+    available_solver,
+    default_objective,
+    default_flexibility_measure,
 ):
     building = Building(
         id="building_heatpump",
@@ -190,7 +208,9 @@ def test_building_initialization_heatpump(
         index=index,
         bidding_strategies={},
         components=building_components_heatpump,
-        forecaster=forecast,  # Passed via **kwargs
+        objective=default_objective,
+        flexibility_measure=default_flexibility_measure,
+        forecaster=forecast,
     )
 
     assert building.id == "building_heatpump"
@@ -205,7 +225,12 @@ def test_building_initialization_heatpump(
 
 
 def test_building_initialization_boiler(
-    forecast, index, building_components_boiler, available_solver
+    forecast,
+    index,
+    building_components_boiler,
+    available_solver,
+    default_objective,
+    default_flexibility_measure,
 ):
     building = Building(
         id="building_boiler",
@@ -213,6 +238,8 @@ def test_building_initialization_boiler(
         index=index,
         bidding_strategies={},
         components=building_components_boiler,
+        objective=default_objective,
+        flexibility_measure=default_flexibility_measure,
         forecaster=forecast,  # Passed via **kwargs
     )
 
@@ -227,7 +254,9 @@ def test_building_initialization_boiler(
     assert building.has_pv is True
 
 
-def test_building_initialization_invalid_component(forecast, index, available_solver):
+def test_building_initialization_invalid_component(
+    forecast, index, available_solver, default_objective, default_flexibility_measure
+):
     invalid_components = {"invalid_component": {"some_param": 123}}
 
     with pytest.raises(ValueError) as exc_info:
@@ -237,11 +266,14 @@ def test_building_initialization_invalid_component(forecast, index, available_so
             index=index,
             bidding_strategies={},
             components=invalid_components,
-            forecaster=forecast,  # Passed via **kwargs
+            objective=default_objective,
+            flexibility_measure=default_flexibility_measure,
+            forecaster=forecast,
         )
 
+    # Match the actual error message
     assert (
-        "Component invalid_component is not a valid component for the building unit."
+        "Components invalid_component is not a valid component for the building unit."
         in str(exc_info.value)
     )
 
@@ -252,19 +284,26 @@ def test_solver_availability():
 
 
 def test_building_optimization_heatpump(
-    forecast, index, building_components_heatpump, available_solver
+    forecast,
+    index,
+    building_components_heatpump,
+    available_solver,
+    default_objective,
+    default_flexibility_measure,
 ):
     building = Building(
         id="building_heatpump",
         unit_operator="operator_hp",
         index=index,
         bidding_strategies={},
+        objective=default_objective,
+        flexibility_measure=default_flexibility_measure,
         components=building_components_heatpump,
         forecaster=forecast,  # Passed via **kwargs
     )
 
     # Perform optimization
-    building.calculate_optimal_operation()
+    building.determine_optimal_operation_without_flex()
 
     # Check if optimal power requirement is calculated
     assert building.opt_power_requirement is not None
@@ -295,19 +334,26 @@ def test_building_optimization_heatpump(
 
 
 def test_building_optimization_boiler(
-    forecast, index, building_components_boiler, available_solver
+    forecast,
+    index,
+    building_components_boiler,
+    available_solver,
+    default_objective,
+    default_flexibility_measure,
 ):
     building = Building(
         id="building_boiler",
         unit_operator="operator_boiler",
         index=index,
         bidding_strategies={},
+        objective=default_objective,
+        flexibility_measure=default_flexibility_measure,
         components=building_components_boiler,
         forecaster=forecast,  # Passed via **kwargs
     )
 
     # Perform optimization
-    building.calculate_optimal_operation()
+    building.determine_optimal_operation_without_flex()
 
     # Check if optimal power requirement is calculated
     assert building.opt_power_requirement is not None
@@ -332,18 +378,25 @@ def test_building_optimization_boiler(
 
 
 def test_building_marginal_cost_calculation_heatpump(
-    forecast, index, building_components_heatpump, available_solver
+    forecast,
+    index,
+    building_components_heatpump,
+    available_solver,
+    default_objective,
+    default_flexibility_measure,
 ):
     building = Building(
         id="building_heatpump",
         unit_operator="operator_hp",
         index=index,
         bidding_strategies={},
+        objective=default_objective,
+        flexibility_measure=default_flexibility_measure,
         components=building_components_heatpump,
         forecaster=forecast,  # Passed via **kwargs
     )
 
-    building.calculate_optimal_operation()
+    building.determine_optimal_operation_without_flex()
 
     # Select a timestamp to test
     test_time = 0  # Using integer index
@@ -361,18 +414,25 @@ def test_building_marginal_cost_calculation_heatpump(
 
 
 def test_building_marginal_cost_calculation_boiler(
-    forecast, index, building_components_boiler, available_solver
+    forecast,
+    index,
+    building_components_boiler,
+    available_solver,
+    default_objective,
+    default_flexibility_measure,
 ):
     building = Building(
         id="building_boiler",
         unit_operator="operator_boiler",
         index=index,
         bidding_strategies={},
+        objective=default_objective,
+        flexibility_measure=default_flexibility_measure,
         components=building_components_boiler,
         forecaster=forecast,  # Passed via **kwargs
     )
 
-    building.calculate_optimal_operation()
+    building.determine_optimal_operation_without_flex()
 
     # Select a timestamp to test
     test_time = 1  # Using integer index
@@ -390,20 +450,26 @@ def test_building_marginal_cost_calculation_boiler(
 
 
 def test_building_objective_function_heatpump(
-    forecast, index, building_components_heatpump, available_solver
+    forecast,
+    index,
+    building_components_heatpump,
+    available_solver,
+    default_objective,
+    default_flexibility_measure,
 ):
     building = Building(
         id="building_heatpump",
         unit_operator="operator_hp",
         index=index,
         bidding_strategies={},
+        objective=default_objective,
+        flexibility_measure=default_flexibility_measure,
         components=building_components_heatpump,
-        objective="min_variable_cost",
         forecaster=forecast,  # Passed via **kwargs
     )
 
     # Access the objective function
-    objective = building.model.obj_rule
+    objective = building.model.obj_rule_opt
 
     assert isinstance(objective, pyo.Objective)
     assert objective.sense == pyo.minimize
@@ -453,11 +519,18 @@ def test_building_no_available_solvers(
 
 
 def test_building_define_constraints_heatpump(
-    forecast, index, building_components_heatpump, available_solver
+    forecast,
+    index,
+    building_components_heatpump,
+    available_solver,
+    default_objective,
+    default_flexibility_measure,
 ):
     building = Building(
         id="building_constraints_hp",
         unit_operator="operator_constraints_hp",
+        objective=default_objective,
+        flexibility_measure=default_flexibility_measure,
         index=index,
         bidding_strategies={},
         components=building_components_heatpump,
@@ -466,7 +539,7 @@ def test_building_define_constraints_heatpump(
 
     # Check if constraints are defined
     constraints = list(building.model.component_map(pyo.Constraint).keys())
-    assert "variable_power_constraint" in constraints
+    assert "total_power_input_constraint" in constraints
     if building.has_heatpump:
         assert "heat_flow_constraint" in constraints
 
@@ -481,3 +554,7 @@ def test_building_get_available_solvers():
     assert isinstance(available_solvers, list)
     for solver in available_solvers:
         assert SolverFactory(solver).available()
+
+
+if __name__ == "__main__":
+    pytest.main(["-s", __file__])
