@@ -114,7 +114,7 @@ class Building(DSMFlex, SupportsMinMax):
         for component in self.required_technologies:
             if component not in components.keys():
                 raise ValueError(
-                    f"Component {component} is required for the steel plant unit."
+                    f"Component {component} is required for the building plant unit."
                 )
 
         # check if the provided components are valid and do not contain any unknown components

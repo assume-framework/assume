@@ -8,6 +8,8 @@ import pytest
 from pyomo.opt import SolverFactory
 
 from assume.common.forecasts import CsvForecaster
+from assume.common.market_objects import MarketConfig
+from assume.strategies.naive_strategies import NaiveDSMStrategy
 from assume.units.building import SOLVERS, Building, check_available_solvers
 
 # Fixtures for Component Configurations
@@ -206,7 +208,7 @@ def test_building_initialization_heatpump(
         id="building_heatpump",
         unit_operator="operator_hp",
         index=index,
-        bidding_strategies={},
+        bidding_strategies={"EOM": NaiveDSMStrategy()},
         components=building_components_heatpump,
         objective=default_objective,
         flexibility_measure=default_flexibility_measure,
@@ -544,6 +546,95 @@ def test_building_define_constraints_heatpump(
         assert "heat_flow_constraint" in constraints
 
 
+def test_building_missing_required_component(
+    forecast,
+    index,
+    building_components_heatpump,
+    default_objective,
+    default_flexibility_measure,
+):
+    """
+    Test that the Building class raises a ValueError if a required component is missing.
+    """
+    # Set the required technologies for the test
+    Building.required_technologies = ["boiler"]
+
+    # Remove a required component from the configuration
+    incomplete_components = building_components_heatpump.copy()
+    incomplete_components.pop("boiler", None)  # Remove "boiler" to trigger the error
+
+    with pytest.raises(ValueError) as exc_info:
+        Building(
+            id="building_test",
+            unit_operator="operator_hp",
+            index=index,
+            bidding_strategies={},
+            components=incomplete_components,
+            objective=default_objective,
+            flexibility_measure=default_flexibility_measure,
+            forecaster=forecast,
+        )
+
+    # Assert the correct error message
+    assert "Component boiler is required for the building plant unit." in str(
+        exc_info.value
+    )
+
+    # Reset required technologies to avoid affecting other tests
+    Building.required_technologies = []
+
+
+def test_building_bidding_strategy_execution(
+    forecast,
+    index,
+    building_components_heatpump,
+    available_solver,
+    default_objective,
+    default_flexibility_measure,
+):
+    """
+    Test that the NaiveDSMStrategy's calculate_bids method is executed correctly,
+    and unit.determine_optimal_operation_without_flex() is called.
+    """
+    # Create the Building instance with a NaiveDSMStrategy
+    building = Building(
+        id="building_heatpump",
+        unit_operator="operator_hp",
+        index=index,
+        bidding_strategies={"EOM": NaiveDSMStrategy()},
+        components=building_components_heatpump,
+        objective=default_objective,
+        flexibility_measure=default_flexibility_measure,
+        forecaster=forecast,
+    )
+
+    # Create dummy market configuration and product tuples
+    market_config = MarketConfig(
+        product_type="electricity",
+        market_id="EOM",
+    )
+    product_tuples = [
+        (index[0], index[1], "hour_1"),
+        (index[1], index[2], "hour_2"),
+        (index[2], index[3], "hour_3"),
+    ]
+
+    # Call the bidding strategy
+    bids = building.bidding_strategies["EOM"].calculate_bids(
+        unit=building,
+        market_config=market_config,
+        product_tuples=product_tuples,
+    )
+
+    # Verify that bids are generated correctly
+    assert len(bids) == len(product_tuples)
+    for bid, product in zip(bids, product_tuples):
+        assert bid["start_time"] == product[0]
+        assert bid["end_time"] == product[1]
+        assert bid["volume"] <= 0  # Demand-side bids have non-positive volume
+        assert bid["price"] >= 0  # Marginal price should be non-negative
+
+
 # ----------------------------
 # Additional Helper Tests (Optional)
 # ----------------------------
@@ -554,6 +645,29 @@ def test_building_get_available_solvers():
     assert isinstance(available_solvers, list)
     for solver in available_solvers:
         assert SolverFactory(solver).available()
+
+
+def test_str_to_bool_invalid_value_in_building():
+    """
+    Test that str_to_bool raises ValueError when an invalid value is passed
+    within the Building context.
+    """
+    invalid_components = {
+        "electric_vehicle": {"sells_energy_to_market": "invalid_value"}
+    }
+
+    with pytest.raises(ValueError) as exc_info:
+        Building(
+            id="building_invalid_str_to_bool",
+            unit_operator="operator_invalid",
+            index=range(10),
+            bidding_strategies={},
+            components=invalid_components,
+            objective="min_variable_cost",
+            flexibility_measure="cost_based_load_shift",
+            forecaster=None,  # Replace with a suitable forecaster if necessary
+        )
+    assert "Invalid truth value: 'invalid_value'" in str(exc_info.value)
 
 
 if __name__ == "__main__":
