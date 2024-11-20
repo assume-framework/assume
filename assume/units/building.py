@@ -509,8 +509,9 @@ class Building(DSMFlex, SupportsMinMax):
                 Maximizes the load shift over all time steps.
                 """
 
-                maximise_load_shift = sum(
-                    m.load_shift[t] for t in self.model.time_steps
+                maximise_load_shift = pyo.quicksum(
+                    m.load_shift_neg[t] * (1 - m.shift_indicator[t])
+                    for t in m.time_steps
                 )
 
                 return maximise_load_shift
@@ -597,7 +598,9 @@ class Building(DSMFlex, SupportsMinMax):
         for t in instance.time_steps:
             # Calculate the load-shifted value of total_power_input
             adjusted_power = (
-                instance.total_power_input[t].value - instance.load_shift[t].value
+                instance.total_power_input[t].value
+                + instance.load_shift_pos[t].value
+                - instance.load_shift_neg[t].value
             )
             adjusted_total_power_input.append(adjusted_power)
 
@@ -660,6 +663,54 @@ class Building(DSMFlex, SupportsMinMax):
         instance.total_cost = self.total_cost
 
         return instance
+
+    # def calculate_optimal_operation(self):
+    #     """
+    #     Solves the optimization model to determine the building's optimal energy operation strategy.
+
+    #     This method creates an instance of the Pyomo model, solves it using the selected solver,
+    #     and processes the results. It handles solver status checks, logs relevant information,
+    #     and extracts the optimal power requirements and variable costs.
+
+    #     Additionally, it invokes `write_additional_outputs` to process and store results from
+    #     specific components like battery storage and electric vehicles.
+    #     """
+    #     # Create an instance of the model
+    #     instance = self.model.create_instance()
+    #     # Solve the instance using the configured solver
+    #     results = self.solver.solve(instance, tee=False)
+
+    #     # Check solver status and termination condition
+    #     if (results.solver.status == SolverStatus.ok) and (
+    #         results.solver.termination_condition == TerminationCondition.optimal
+    #     ):
+    #         logger.debug("The optimization model was solved optimally.")
+
+    #         # Retrieve and log the objective function value
+    #         objective_value = instance.obj_rule()
+    #         logger.debug(f"The value of the objective function is {objective_value}.")
+
+    #     elif results.solver.termination_condition == TerminationCondition.infeasible:
+    #         logger.debug("The optimization model is infeasible.")
+
+    #     else:
+    #         logger.debug(f"Solver Status: {results.solver.status}")
+    #         logger.debug(
+    #             f"Termination Condition: {results.solver.termination_condition}"
+    #         )
+
+    #     # Extract and store the total power requirement as a Pandas Series
+    #     self.opt_power_requirement = pd.Series(
+    #         data=instance.totalvariable_power.get_values()
+    #     ).set_axis(self.index)
+
+    #     # Extract and store the variable cost series as a Pandas Series
+    #     self.variable_cost_series = pd.Series(
+    #         data=instance.variable_cost.get_values()
+    #     ).set_axis(self.index)
+
+    #     # Process additional outputs from specific components
+    #     self.write_additional_outputs(instance)
 
     def write_additional_outputs(self, instance):
         """
