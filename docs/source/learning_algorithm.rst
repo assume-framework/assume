@@ -6,10 +6,10 @@
 Reinforcement Learning Algorithms
 ##################################
 
-In the chapter :doc:`learning` we got a general overview of how RL is implemented for a multi-agent setting in Assume. 
-If you want to apply these RL algorithms to a new problem, you do not necessarily need to understand how the RL algorithms work in detail. 
-All that is needed is to adapt the bidding strategies, which is covered in the tutorial. 
-However, for the interested reader, we will give a brief overview of the RL algorithms used in Assume. 
+In the chapter :doc:`learning` we got a general overview of how RL is implemented for a multi-agent setting in Assume.
+If you want to apply these RL algorithms to a new problem, you do not necessarily need to understand how the RL algorithms work in detail.
+All that is needed is to adapt the bidding strategies, which is covered in the tutorial.
+However, for the interested reader, we will give a brief overview of the RL algorithms used in Assume.
 We start with the learning role, which is the core of the learning implementation.
 
 The Learning Role
@@ -17,7 +17,7 @@ The Learning Role
 
 The learning role orchestrates the learning process. It initializes the training process and manages the experience gained in a buffer.
 It also schedules policy updates, thus bringing critic and actor together during the learning process.
-Specifically, this means that at the beginning of the simulation we schedule recurrent policy updates, where the output of the critic 
+Specifically, this means that at the beginning of the simulation we schedule recurrent policy updates, where the output of the critic
 is used as a loss for the actor, which then updates its weights using backward propagation.
 
 With the learning role, we can also choose which RL algorithm should be used. The algorithm and the buffer have base classes and can be customized if needed.
