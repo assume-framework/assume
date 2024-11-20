@@ -492,3 +492,34 @@ class RolloutBuffer:
         )
 
         return RolloutBufferTransitions(*tuple(map(self.to_torch, data)))
+
+
+    def sample(self, batch_size: int) -> RolloutBufferTransitions:
+        """
+        Samples a random batch of experiences from the rollout buffer.
+        Unlike the replay buffer, this samples only from the current rollout data (up to self.pos)
+        and includes log probabilities needed for PPO updates.
+
+        Args:
+            batch_size (int): The number of experiences to sample.
+
+        Returns:
+            RolloutBufferTransitions: A named tuple containing the sampled observations, actions, rewards,
+                and log probabilities.
+
+        Raises:
+            Exception: If there are less than batch_size entries in the buffer.
+        """
+        if self.pos < batch_size:
+            raise Exception(f"Not enough entries in buffer (need {batch_size}, have {self.pos})")
+        
+        batch_inds = np.random.randint(0, self.pos, size=batch_size)
+        
+        data = (
+            self.observations[batch_inds, :, :],
+            self.actions[batch_inds, :, :],
+            self.rewards[batch_inds],
+            self.log_probs[batch_inds],
+        )
+        
+        return RolloutBufferTransitions(*tuple(map(self.to_torch, data))), batch_inds # also return the indices of the sampled minibatch episodes

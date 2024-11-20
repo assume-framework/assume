@@ -58,6 +58,7 @@ class PPO(RLAlgorithm):
         self.max_grad_norm = max_grad_norm
         self.gae_lambda = gae_lambda
         self.n_updates = 0  # Number of updates performed
+        self.batch_size = learning_role.batch_size 
 
         # write error if different actor_architecture than dist is used
         if actor_architecture != "dist":
@@ -609,20 +610,31 @@ class PPO(RLAlgorithm):
 
         # Retrieve experiences from the buffer
         # The collected experiences (observations, actions, rewards, log_probs) are stored in the buffer.
-        transitions = self.learning_role.buffer.get()
-        states = transitions.observations
-        actions = transitions.actions
-        rewards = transitions.rewards
-        log_probs = transitions.log_probs
+        full_transitions = self.learning_role.buffer.get()
+        full_values = self.get_values(full_transitions.observations, full_transitions.actions)
+        full_advantages, full_returns = self.get_advantages(full_transitions.rewards, full_values)
+        
+        #states = transitions.observations
+        #actions = transitions.actions
+        #rewards = transitions.rewards
+        #log_probs = transitions.log_probs
         
         # Pass the current states through the critic network to get value estimates.
-        values = self.get_values(states, actions)
+        #values = self.get_values(states, actions)
 
         # Compute advantages using Generalized Advantage Estimation (GAE)
-        advantages, returns = self.get_advantages(rewards, values)
+        #advantages, returns = self.get_advantages(rewards, values)
 
         for _ in range(self.gradient_steps):
             self.n_updates += 1
+
+            transitions, batch_inds = self.learning_role.buffer.sample(self.batch_size)
+            states = transitions.observations
+            actions = transitions.actions
+            log_probs = transitions.log_probs
+            advantages = full_advantages[batch_inds]
+            returns = full_returns[batch_inds]
+            values = self.get_values(states, actions)  # always use updated values --> check later if best
 
             # Iterate through over each agent's strategy
             # Each agent has its own actor. Critic (value network) is centralized.
@@ -635,7 +647,7 @@ class PPO(RLAlgorithm):
 
 
                 # Evaluate the new log-probabilities and entropy under the current policy
-                action_logits, action_distribution = actor(states)
+                action_distribution = actor(states)[1]
                 new_log_probs = action_distribution.log_prob(actions).sum(-1)
                 
                 
@@ -741,11 +753,6 @@ def get_actions(rl_strategy, next_observation):
     log_prob_action = log_prob_action.detach()
 
     logger.debug(f"Detached log probability of the sampled action: {log_prob_action}")
-
-    # PREVIOUSLY SET TO (-1, 1)
-    # Bound actions to [0, 1] range
-    # TODO: Does it make more sense to log probaility of the action before or after clamping?
-    sampled_action = sampled_action.clamp(0, 1)
 
     logger.debug(f"Clamped sampled action: {sampled_action}")
 
