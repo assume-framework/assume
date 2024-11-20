@@ -73,12 +73,17 @@ class BaseUnit:
         self.outputs["rl_rewards"] = []
 
         # some data is stored as series to allow to store it in the outputs
-        self.outputs["actions"] = TensorFastSeries(value=0.0, index=self.index)
-        self.outputs["exploration_noise"] = TensorFastSeries(
-            value=0.0,
-            index=self.index,
-        )
-        self.outputs["reward"] = FastSeries(value=0.0, index=self.index)
+        # check if any bidding strategy is using the RL strategy
+        if any(
+            isinstance(strategy, LearningStrategy)
+            for strategy in self.bidding_strategies.values()
+        ):
+            self.outputs["actions"] = TensorFastSeries(value=0.0, index=self.index)
+            self.outputs["exploration_noise"] = TensorFastSeries(
+                value=0.0,
+                index=self.index,
+            )
+            self.outputs["reward"] = FastSeries(value=0.0, index=self.index)
 
         if forecaster:
             self.forecaster = forecaster
