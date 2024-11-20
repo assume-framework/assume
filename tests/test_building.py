@@ -644,6 +644,54 @@ def test_building_battery_discharge_constraint_simple(
     assert "discharge_battery_to_market_constraint" in constraints
 
 
+def test_building_flexibility_infeasible_solution(
+    forecast,
+    index,
+    building_components_heatpump,
+    default_objective,
+    default_flexibility_measure,
+):
+    """
+    Test the determine_optimal_operation_with_flex method with an infeasible solution.
+    """
+    # Initialize the Building instance with flexibility enabled
+    building_components_heatpump["heat_pump"]["flexibility_enabled"] = True
+
+    building = Building(
+        id="building_flex_infeasible_test",
+        unit_operator="operator_hp",
+        index=index,
+        bidding_strategies={},
+        components=building_components_heatpump,
+        objective=default_objective,
+        flexibility_measure=default_flexibility_measure,
+        forecaster=forecast,
+    )
+
+    # Add contradictory constraints to make the model infeasible
+    @building.model.Constraint(building.model.time_steps)
+    def infeasible_constraint_lower(m, t):
+        """Force total_power_input to be at least 10."""
+        return m.total_power_input[t] >= 10
+
+    @building.model.Constraint(building.model.time_steps)
+    def infeasible_constraint_upper(m, t):
+        """Force total_power_input to be at most 5."""
+        return m.total_power_input[t] <= 5
+
+    # Call the determine_optimal_operation_with_flex method
+    try:
+        building.determine_optimal_operation_with_flex()
+    except RuntimeError as e:
+        # Ensure the solver reported infeasibility
+        assert "A feasible solution was not found" in str(e)
+
+    # Explicitly check that outputs were not computed due to infeasibility
+    assert (
+        building.flex_power_requirement is None
+    ), "Flexibility outputs should not be set for infeasible models."
+
+
 def test_building_infeasible_model(
     forecast,
     index,
