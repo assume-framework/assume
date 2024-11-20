@@ -36,6 +36,7 @@ The following table shows the options that can be adjusted and gives a short exp
   algorithm                               Specifies which algorithm to use. Currently, only MATD3 is implemented.
   actor_architecture                      The architecture of the neural networks used in the algorithm for the actors. The architecture is a list of names specifying the "policy" used e.g. multi layer perceptron (mlp).
   learning_rate                           The learning rate, also known as step size, which specifies how much the new policy should be considered in the update.
+  use_lr_schedule                         Whether the learning rate should decay linearly with progressing learning episodes.
   training_episodes                       The number of training episodes, whereby one episode is the entire simulation horizon specified in the general config.
   episodes_collecting_initial_experience  The number of episodes collecting initial experience, whereby this means that random actions are chosen instead of using the actor network
   train_freq                              Defines the frequency in time steps at which the actor and critic are updated.
@@ -46,11 +47,10 @@ The following table shows the options that can be adjusted and gives a short exp
   noise_sigma                             The standard deviation of the distribution used to draw the noise, which is added to the actions and forces exploration.
   noise_dt                                Determines how quickly the noise weakens over time / used for noise scheduling.
   noise_scale                             The scale of the noise, which is multiplied by the noise drawn from the distribution.
+  use_noise_schedule                      Whether the action noise should decay linearly with progressing learning episodes.
   early_stopping_steps                    The number of steps considered for early stopping. If the moving average reward does not improve over this number of steps, the learning is stopped.
   early_stopping_threshold                The value by which the average reward needs to improve to avoid early stopping.
  ======================================== ==========================================================================================================
-
-Options for (linear) scheduling of learning rate and action noise are available, but not settable in the config file.
 
 The Algorithms
 ==============
