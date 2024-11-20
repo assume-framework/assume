@@ -613,6 +613,7 @@ def test_building_ev_discharge_constraint(
     constraints = list(building.model.component_map(pyo.Constraint).keys())
     assert "discharge_ev_to_market_constraint" in constraints
 
+
 def test_building_battery_discharge_constraint_simple(
     forecast,
     index,
@@ -641,6 +642,50 @@ def test_building_battery_discharge_constraint_simple(
     # Verify that the constraint is defined
     constraints = list(building.model.component_map(pyo.Constraint).keys())
     assert "discharge_battery_to_market_constraint" in constraints
+
+
+def test_building_infeasible_model(
+    forecast,
+    index,
+    building_components_heatpump,
+    default_objective,
+    default_flexibility_measure,
+):
+    """
+    Test that the Building class handles infeasible models correctly by logging the appropriate message.
+    """
+    # Create a Building instance
+    building = Building(
+        id="building_infeasible_test",
+        unit_operator="operator_hp",
+        index=index,
+        bidding_strategies={},
+        components=building_components_heatpump,
+        objective=default_objective,
+        flexibility_measure=default_flexibility_measure,
+        forecaster=forecast,
+    )
+
+    # Make the model infeasible by adding two contradictory constraints
+    @building.model.Constraint(building.model.time_steps)
+    def infeasible_constraint_lower(m, t):
+        """
+        Add a lower bound constraint for total_power_input.
+        """
+        return m.total_power_input[t] >= 10
+
+    @building.model.Constraint(building.model.time_steps)
+    def infeasible_constraint_upper(m, t):
+        """
+        Add an upper bound constraint for total_power_input.
+        """
+        return m.total_power_input[t] <= 5
+
+    # Attempt to determine the optimal operation
+    try:
+        building.determine_optimal_operation_without_flex()
+    except RuntimeError as e:
+        assert "A feasible solution was not found" in str(e)
 
 
 def test_building_bidding_strategy_execution(
