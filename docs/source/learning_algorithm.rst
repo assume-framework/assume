@@ -89,7 +89,7 @@ TD3 is summarized in the following picture from the authors of the original pape
 The steps in the algorithm are translated to implementations in ASSUME in the following way.
 The initialization of the actors and critics is done by the :func:`assume.reinforcement_learning.algorithms.matd3.TD3.initialize_policy` function, which is called
 in the learning role. The replay buffer needs to be stable across different episodes, which corresponds to runs of the entire simulation, hence it needs to be detached from the
-entities of the simualtion that are killed after each episode, like the learning role. Therefore, it is initialized independently and given to the learning role
+entities of the simulation that are killed after each episode, like the learning role. Therefore, it is initialized independently and given to the learning role
 at the beginning of each episode. For more information regarding the buffer see :doc:`buffers`.
 
 The core of the algorithm is embodied by the :func:`assume.reinforcement_learning.algorithms.matd3.TD3.update_policy` in the learning algorithms. Here, the critic and the actor are updated according to the algorithm.
