@@ -398,6 +398,21 @@ class TD3(RLAlgorithm):
 
         logger.debug("Updating Policy")
         n_rl_agents = len(self.learning_role.rl_strats.keys())
+
+        # Update noise decay and leanrng rate
+        updated_noise_decay = self.learning_role.noise_schedule(
+            self.learning_role.get_progress_remaining()
+        )
+
+        #loop again over all units to avoid update call for every gradient step, as it will be ambiguous
+        for u_id, unit_strategy in self.learning_role.rl_strats.items():
+            critic = self.learning_role.critics[u_id]
+            actor = self.learning_role.rl_strats[u_id].actor
+            unit_strategy.action_noise.update_noise_decay(updated_noise_decay)
+            # Update learning rate
+            self.update_learning_rate([critic.optimizer, actor.optimizer])
+
+
         for _ in range(self.gradient_steps):
             self.n_updates += 1
             i = 0
@@ -408,9 +423,7 @@ class TD3(RLAlgorithm):
                 actor = self.learning_role.rl_strats[u_id].actor
                 actor_target = self.learning_role.rl_strats[u_id].actor_target
 
-                # Update learning rate
-                self.update_learning_rate([critic.optimizer, actor.optimizer])
-
+                
                 if i % 100 == 0:
                     # only update target networks every 100 steps, to have delayed network update
                     transitions = self.learning_role.buffer.sample(self.batch_size)
@@ -531,9 +544,4 @@ class TD3(RLAlgorithm):
                     )
                 i += 1
 
-        # Update noise decay
-        updated_noise_decay = self.learning_role.noise_schedule(
-            self.learning_role.get_progress_remaining()
-        )
-        for unit_strategy in self.learning_role.rl_strats.values():
-            unit_strategy.action_noise.update_noise_decay(updated_noise_decay)
+        

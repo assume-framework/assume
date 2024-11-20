@@ -87,6 +87,7 @@ class Learning(Role):
         if use_lr_schedule:
             self.lr_schedule = get_schedule_fn(linear_schedule(self.learning_rate))
         else:
+            #linear schedule as no config item stating it should be sheduled is present
             self.lr_schedule = get_schedule_fn(self.learning_rate)
 
         noise_dt = learning_config.get("noise_dt", 1)
