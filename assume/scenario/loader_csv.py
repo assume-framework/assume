@@ -522,7 +522,6 @@ def load_config_and_create_forecaster(
         "path": path,
         "start": start,
         "end": end,
-        "index": forecaster.index,
         "powerplant_units": powerplant_units,
         "storage_units": storage_units,
         "demand_units": demand_units,
@@ -565,7 +564,6 @@ def setup_world(
     config = scenario_data["config"]
     start = scenario_data["start"]
     end = scenario_data["end"]
-    index = scenario_data["index"]
     powerplant_units = scenario_data["powerplant_units"]
     storage_units = scenario_data["storage_units"]
     demand_units = scenario_data["demand_units"]
@@ -627,7 +625,6 @@ def setup_world(
         simulation_id=sim_id,
         learning_config=learning_config,
         bidding_params=bidding_strategy_params,
-        index=index,
         forecaster=forecaster,
     )
 

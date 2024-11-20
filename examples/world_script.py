@@ -30,7 +30,6 @@ def init(world, n=1):
         end=end,
         save_frequency_hours=48,
         simulation_id=sim_id,
-        index=index,
     )
 
     marketdesign = [

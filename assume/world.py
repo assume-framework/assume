@@ -9,7 +9,6 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-import pandas as pd
 from mango import (
     RoleAgent,
     activate,
@@ -157,7 +156,6 @@ class World:
         start: datetime,
         end: datetime,
         simulation_id: str,
-        index: pd.Series,
         save_frequency_hours: int = 24,
         bidding_params: dict = {},
         learning_config: LearningConfig = {},
@@ -195,7 +193,6 @@ class World:
         self.forecaster = forecaster
 
         self.bidding_params = bidding_params
-        self.index = index
 
         # create new container
         container_kwargs = {}
@@ -474,7 +471,6 @@ class World:
         return unit_class(
             id=id,
             unit_operator=unit_operator_id,
-            index=self.index,
             forecaster=forecaster,
             **unit_params,
         )

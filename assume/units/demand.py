@@ -8,6 +8,7 @@ import pandas as pd
 
 from assume.common.base import SupportsMinMax
 from assume.common.fast_pandas import FastSeries
+from assume.common.forecasts import Forecaster
 
 
 class Demand(SupportsMinMax):
@@ -36,9 +37,9 @@ class Demand(SupportsMinMax):
         unit_operator: str,
         technology: str,
         bidding_strategies: dict,
-        index: pd.DatetimeIndex,
         max_power: float,
         min_power: float,
+        forecaster: Forecaster,
         node: str = "node0",
         price: float | pd.Series = 3000.0,
         location: tuple[float, float] = (0.0, 0.0),
@@ -49,7 +50,7 @@ class Demand(SupportsMinMax):
             unit_operator=unit_operator,
             technology=technology,
             bidding_strategies=bidding_strategies,
-            index=index,
+            forecaster=forecaster,
             node=node,
             location=location,
             **kwargs,
@@ -65,7 +66,7 @@ class Demand(SupportsMinMax):
         volume = self.forecaster[self.id]
         self.volume = -volume  # demand is negative
         if isinstance(price, numbers.Real):
-            price = FastSeries(index=index, value=price)
+            price = FastSeries(index=self.index, value=price)
         self.price = price
 
     def execute_current_dispatch(

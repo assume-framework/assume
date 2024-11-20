@@ -9,6 +9,7 @@ from functools import lru_cache
 import pandas as pd
 
 from assume.common.base import SupportsMinMax
+from assume.common.forecasts import Forecaster
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
 
@@ -54,7 +55,7 @@ class PowerPlant(SupportsMinMax):
         unit_operator: str,
         technology: str,
         bidding_strategies: dict,
-        index: pd.DatetimeIndex,
+        forecaster: Forecaster,
         max_power: float,
         min_power: float = 0.0,
         efficiency: float = 1.0,
@@ -82,7 +83,7 @@ class PowerPlant(SupportsMinMax):
             unit_operator=unit_operator,
             technology=technology,
             bidding_strategies=bidding_strategies,
-            index=index,
+            forecaster=forecaster,
             node=node,
             location=location,
             **kwargs,

@@ -11,6 +11,7 @@ import pandas as pd
 
 from assume.common.base import SupportsMinMaxCharge
 from assume.common.fast_pandas import FastSeries
+from assume.common.forecasts import Forecaster
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
 
@@ -59,6 +60,7 @@ class Storage(SupportsMinMaxCharge):
         unit_operator: str,
         technology: str,
         bidding_strategies: dict,
+        forecaster: Forecaster,
         max_power_charge: float | pd.Series,
         max_power_discharge: float | pd.Series,
         max_soc: float,
@@ -82,19 +84,18 @@ class Storage(SupportsMinMaxCharge):
         min_down_time: float = 0,
         downtime_hot_start: int = 8,  # hours
         downtime_warm_start: int = 48,  # hours
-        index: pd.DatetimeIndex = None,
         location: tuple[float, float] = (0, 0),
         node: str = "node0",
         **kwargs,
     ):
         super().__init__(
             id=id,
+            unit_operator=unit_operator,
             technology=technology,
+            bidding_strategies=bidding_strategies,
+            forecaster=forecaster,
             node=node,
             location=location,
-            bidding_strategies=bidding_strategies,
-            index=index,
-            unit_operator=unit_operator,
             **kwargs,
         )
 

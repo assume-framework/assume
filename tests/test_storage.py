@@ -8,7 +8,7 @@ from datetime import timedelta
 import pandas as pd
 import pytest
 
-from assume.common.fast_pandas import FastIndex
+from assume.common.forecasts import NaiveForecast
 from assume.strategies.flexable_storage import flexableEOMStorage
 from assume.strategies.naive_strategies import NaiveSingleBidStrategy
 from assume.units import Storage
@@ -16,18 +16,19 @@ from assume.units import Storage
 
 @pytest.fixture
 def storage_unit() -> Storage:
-    index = FastIndex(start="2022-01-01", periods=4, freq="1h")
+    index = pd.date_range("2022-01-01", periods=4, freq="h")
+    forecaster = NaiveForecast(index, availability=1, price_forecast=50)
     return Storage(
         id="Test_Storage",
         unit_operator="TestOperator",
         technology="TestTechnology",
         bidding_strategies={"EOM": NaiveSingleBidStrategy()},
+        forecaster=forecaster,
         max_power_charge=-100,
         max_power_discharge=100,
         max_soc=1000,
         efficiency_charge=0.9,
         efficiency_discharge=0.95,
-        index=index,
         ramp_down_charge=-50,
         ramp_down_discharge=50,
         ramp_up_charge=-60,

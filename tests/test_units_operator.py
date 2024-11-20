@@ -58,7 +58,7 @@ async def units_operator() -> UnitsOperator:
         "min_power": 0,
         "forecaster": NaiveForecast(index, demand=1000),
     }
-    unit = Demand("testdemand", index=index, **params_dict)
+    unit = Demand("testdemand", **params_dict)
     units_role.add_unit(unit)
 
     start_ts = datetime2timestamp(start)
@@ -98,7 +98,7 @@ async def rl_units_operator() -> RLUnitsOperator:
         "min_power": 0,
         "forecaster": NaiveForecast(index, demand=1000),
     }
-    unit = Demand("testdemand", index=index, **params_dict)
+    unit = Demand("testdemand", **params_dict)
     units_role.add_unit(unit)
 
     start_ts = datetime2timestamp(start)
@@ -184,7 +184,7 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
         "min_power": 0,
         "forecaster": NaiveForecast(index, powerplant=1000),
     }
-    unit = PowerPlant("testplant", index=index, **params_dict)
+    unit = PowerPlant("testplant", **params_dict)
     rl_units_operator.add_unit(unit)
 
     rl_units_operator.learning_mode = True

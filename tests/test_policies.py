@@ -85,7 +85,7 @@ async def test_request_messages():
         "min_power": 0,
         "forecaster": NaiveForecast(index, demand=1000),
     }
-    unit = Demand("testdemand", index=index, **params_dict)
+    unit = Demand("testdemand", **params_dict)
     units_role.add_unit(unit)
 
     market_role = MarketRole(marketconfig)

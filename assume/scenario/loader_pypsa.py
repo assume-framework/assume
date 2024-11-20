@@ -49,7 +49,6 @@ def load_pypsa(
         end=end,
         save_frequency_hours=save_frequency_hours,
         simulation_id=sim_id,
-        index=index,
     )
     # setup eom market
 

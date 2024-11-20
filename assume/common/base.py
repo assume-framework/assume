@@ -51,26 +51,23 @@ class BaseUnit:
         unit_operator: str,
         technology: str,
         bidding_strategies: dict[str, BaseStrategy],
-        index: pd.DatetimeIndex,
+        forecaster: Forecaster,
         node: str = "node0",
-        forecaster: Forecaster = None,
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs,
     ):
         self.id = id
         self.unit_operator = unit_operator
         self.technology = technology
+        self.bidding_strategies: dict[str, BaseStrategy] = bidding_strategies
+        self.forecaster = forecaster
+        self.index = forecaster.index
+
         self.node = node
         self.location = location
-        self.bidding_strategies: dict[str, BaseStrategy] = bidding_strategies
-        self.index = index
+
         self.outputs = defaultdict(lambda: FastSeries(value=0.0, index=self.index))
         # series does not like to convert from tensor to float otherwise
-
-        # RL data stored as lists to simplify storing to the buffer
-        self.outputs["rl_observations"] = []
-        self.outputs["rl_actions"] = []
-        self.outputs["rl_rewards"] = []
 
         # some data is stored as series to allow to store it in the outputs
         # check if any bidding strategy is using the RL strategy
@@ -85,12 +82,10 @@ class BaseUnit:
             )
             self.outputs["reward"] = FastSeries(value=0.0, index=self.index)
 
-        if forecaster:
-            self.forecaster = forecaster
-        else:
-            self.forecaster = defaultdict(
-                lambda: FastSeries(value=0.0, index=self.index)
-            )
+            # RL data stored as lists to simplify storing to the buffer
+            self.outputs["rl_observations"] = []
+            self.outputs["rl_actions"] = []
+            self.outputs["rl_rewards"] = []
 
     def calculate_bids(
         self,

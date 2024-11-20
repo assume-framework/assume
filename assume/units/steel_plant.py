@@ -14,6 +14,7 @@ from pyomo.opt import (
 )
 
 from assume.common.base import SupportsMinMax
+from assume.common.forecasts import Forecaster
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
 from assume.units.dsm_load_shift import DSMFlex
@@ -53,9 +54,9 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         id: str,
         unit_operator: str,
         bidding_strategies: dict,
+        forecaster: Forecaster,
         technology: str = "steel_plant",
         node: str = "node0",
-        index: pd.DatetimeIndex = None,
         location: tuple[float, float] = (0.0, 0.0),
         components: dict[str, dict] = None,
         objective: str = None,
@@ -70,7 +71,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             technology=technology,
             components=components,
             bidding_strategies=bidding_strategies,
-            index=index,
+            forecaster=forecaster,
             node=node,
             location=location,
             **kwargs,
