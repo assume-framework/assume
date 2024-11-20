@@ -162,19 +162,20 @@ class FastIndex:
     def __repr__(self) -> str:
         """Return a string representation of the FastIndex, including metadata and a date preview."""
         preview_length = 3  # Show first and last 3 dates
-        dates_preview = (
-            self.get_date_list()[:preview_length]
-            + self.get_date_list()[-preview_length:]
-        )
-        preview_str = ", ".join(
-            date.strftime("%Y-%m-%d %H:%M:%S") for date in dates_preview
-        )
+        date_list = self.get_date_list()
+        def format_dates(date_range, date_format="%Y-%m-%d %H:%M:%S"):
+            return ", ".join(date.strftime(date_format) for date in date_range)
+        if len(date_list) <= 2 * preview_length:
+            preview_str = format_dates(date_list)
+        else:
+            preview_str = format_dates(date_list[:preview_length]) + ", ..., "
+            preview_str += format_dates(date_list[-preview_length:])
 
         metadata = (
             f"FastIndex(start={self.start}, end={self.end}, "
             f"freq='{self.freq}', dtype=datetime64[ns])"
         )
-        return f"{metadata}\nDates Preview: [{preview_str}]{'...' if len(self) > 2 * preview_length else ''}"
+        return f"{metadata}\nDates Preview: [{preview_str}]"
 
     def __str__(self) -> str:
         """Return an informal string representation of the FastIndex."""

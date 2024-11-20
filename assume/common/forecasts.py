@@ -99,32 +99,6 @@ class Forecaster:
             value = value.values  # Use the values as an array for consistency
         return FastSeries(index=self.index, value=value, name=name)
 
-    def convert_forecasts_to_fast_series(self):
-        """
-        Converts all forecasts in self.forecasts (DataFrame) into FastSeries and saves them
-        in a dictionary. It also converts the self.index to a FastIndex.
-        """
-        # Convert index to FastIndex
-        inferred_freq = pd.infer_freq(self.index)
-        if inferred_freq is None:
-            raise ValueError("Frequency could not be inferred from the index.")
-
-        self.index = FastIndex(
-            start=self.index[0], end=self.index[-1], freq=inferred_freq
-        )
-
-        # Initialize an empty dictionary to store FastSeries
-        fast_forecasts = {}
-
-        # Convert each column in the forecasts DataFrame to a FastSeries
-        for column_name in self.forecasts.columns:
-            # Convert each column in self.forecasts to FastSeries
-            forecast_series = self.forecasts[column_name]
-            fast_forecasts[column_name] = FastSeries.from_series(forecast_series)
-
-        # Replace the DataFrame with the dictionary of FastSeries
-        self.forecasts = fast_forecasts
-
 
 class CsvForecaster(Forecaster):
     """
@@ -432,6 +406,31 @@ class CsvForecaster(Forecaster):
                 f"No forecasts for {self.market_id} provided, so none saved."
             )
 
+    def convert_forecasts_to_fast_series(self):
+        """
+        Converts all forecasts in self.forecasts (DataFrame) into FastSeries and saves them
+        in a dictionary. It also converts the self.index to a FastIndex.
+        """
+        # Convert index to FastIndex
+        inferred_freq = pd.infer_freq(self.index)
+        if inferred_freq is None:
+            raise ValueError("Frequency could not be inferred from the index.")
+
+        self.index = FastIndex(
+            start=self.index[0], end=self.index[-1], freq=inferred_freq
+        )
+
+        # Initialize an empty dictionary to store FastSeries
+        fast_forecasts = {}
+
+        # Convert each column in the forecasts DataFrame to a FastSeries
+        for column_name in self.forecasts.columns:
+            # Convert each column in self.forecasts to FastSeries
+            forecast_series = self.forecasts[column_name]
+            fast_forecasts[column_name] = FastSeries.from_series(forecast_series)
+
+        # Replace the DataFrame with the dictionary of FastSeries
+        self.forecasts = fast_forecasts
 
 class RandomForecaster(CsvForecaster):
     """
