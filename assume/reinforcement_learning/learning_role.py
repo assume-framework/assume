@@ -83,20 +83,18 @@ class Learning(Role):
         th.backends.cudnn.allow_tf32 = True
 
         self.learning_rate = learning_config.get("learning_rate", 1e-4)
-        # option for linear schedule
-        schedule_lr = True
-        if schedule_lr:
-            self.learning_rate = linear_schedule(self.learning_rate)
-
-        self.lr_schedule = get_schedule_fn(self.learning_rate)
+        use_lr_schedule = learning_config.get("use_lr_schedule", False)
+        if use_lr_schedule:
+            self.lr_schedule = get_schedule_fn(linear_schedule(self.learning_rate))
+        else:
+            self.lr_schedule = get_schedule_fn(self.learning_rate)
 
         noise_dt = learning_config.get("noise_dt", 1)
-        # option for linear schedule
-        schedule_noise = True
-        if schedule_noise:
-            noise_dt = linear_schedule(noise_dt)
-
-        self.noise_schedule = get_schedule_fn(noise_dt)
+        use_noise_schedule = learning_config.get("use_noise_schedule", False)
+        if use_noise_schedule:
+            self.noise_schedule = get_schedule_fn(linear_schedule(noise_dt))
+        else:
+            self.noise_schedule = get_schedule_fn(noise_dt)
 
         # if we do not have initial experience collected we will get an error as no samples are available on the
         # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode

@@ -112,8 +112,8 @@ def get_schedule_fn(value_schedule: Schedule | float) -> Schedule:
 
     Args:
         value_schedule: Constant value of schedule function
-    
-    Returns: 
+
+    Returns:
         Schedule function (can return constant value)
 
     Note:
