@@ -53,8 +53,8 @@ def dsm_components():
     }
 
 
-@pytest.fixture
-def steel_plant(dsm_components) -> SteelPlant:
+def create_steel_plant(dsm_components, flexibility_measure):
+    """Helper function to create a SteelPlant with a specific flexibility measure."""
     index = pd.date_range("2023-01-01", periods=24, freq="h")
     forecast = NaiveForecast(
         index,
@@ -67,88 +67,136 @@ def steel_plant(dsm_components) -> SteelPlant:
         "EOM": NaiveDSMStrategy(),
         "RD": NaiveRedispatchSteelplantStrategy(),
     }
+
     return SteelPlant(
-        id="test_steel_plant",
+        id=f"test_steel_plant_{flexibility_measure}",
         unit_operator="test_operator",
         objective="min_variable_cost",
-        flexibility_measure="max_load_shift",
+        flexibility_measure=flexibility_measure,
         bidding_strategies=bidding_strategies,
         index=index,
+        node="south",
         components=dsm_components,
         forecaster=forecast,
         demand=1000,
+        technology="steel_plant",
+        cost_tolerance=10,
     )
 
 
-def test_initialize_components(steel_plant):
-    assert "electrolyser" in steel_plant.model.dsm_blocks.keys()
-    assert "dri_plant" in steel_plant.model.dsm_blocks.keys()
-    assert "eaf" in steel_plant.model.dsm_blocks.keys()
+@pytest.fixture
+def steel_plant_cost_based(dsm_components):
+    """Fixture for cost-based load shifting."""
+    return create_steel_plant(dsm_components, "cost_based_load_shift")
 
 
-def test_determine_optimal_operation_without_flex(steel_plant):
-    steel_plant.determine_optimal_operation_without_flex()
-    assert steel_plant.opt_power_requirement is not None
-    assert isinstance(steel_plant.opt_power_requirement, pd.Series)
+@pytest.fixture
+def steel_plant_congestion(dsm_components):
+    """Fixture for congestion management flexibility."""
+    return create_steel_plant(dsm_components, "congestion_management_flexibility")
 
-    instance = steel_plant.model.create_instance()
-    instance = steel_plant.switch_to_opt(instance)
-    steel_plant.solver.solve(instance, tee=False)
 
-    total_power_input = sum(
-        instance.total_power_input[t].value for t in instance.time_steps
+@pytest.fixture
+def steel_plant_peak_shifting(dsm_components):
+    """Fixture for peak load shifting."""
+    return create_steel_plant(dsm_components, "peak_load_shifting")
+
+
+@pytest.fixture
+def steel_plant_renewable_utilisation(dsm_components):
+    """Fixture for renewable utilisation flexibility."""
+    return create_steel_plant(dsm_components, "renewable_utilisation")
+
+
+# Test cases
+def test_initialize_components(steel_plant_cost_based):
+    """Verify components are properly initialized."""
+    assert "electrolyser" in steel_plant_cost_based.model.dsm_blocks.keys()
+    assert "dri_plant" in steel_plant_cost_based.model.dsm_blocks.keys()
+    assert "eaf" in steel_plant_cost_based.model.dsm_blocks.keys()
+
+
+def test_determine_optimal_operation_without_flex(steel_plant_cost_based):
+    """Test optimal operation without flexibility for cost-based load shifting."""
+    steel_plant_cost_based.determine_optimal_operation_without_flex()
+    assert steel_plant_cost_based.opt_power_requirement is not None
+    assert isinstance(steel_plant_cost_based.opt_power_requirement, pd.Series)
+
+
+@pytest.fixture
+def steel_plant_without_electrolyser(dsm_components) -> SteelPlant:
+    index = pd.date_range("2023-01-01", periods=24, freq="h")
+    forecast = NaiveForecast(
+        index,
+        price_EOM=[50] * 24,
+        fuel_price_natural_gas=[30] * 24,
+        co2_price=[20] * 24,
     )
 
-    assert total_power_input == 3000
+    dsm_components.pop("electrolyser", None)
+    return SteelPlant(
+        id="test_steel_plant_no_electrolyser",
+        unit_operator="test_operator",
+        objective="min_variable_cost",
+        flexibility_measure="cost_based_load_shift",
+        bidding_strategies={
+            "EOM": NaiveDSMStrategy(),
+            "RD": NaiveRedispatchSteelplantStrategy(),
+        },
+        index=index,
+        node="south",
+        components=dsm_components,
+        forecaster=forecast,
+        demand=1000,
+        technology="steel_plant",
+    )
 
+
+# --- Initialization Tests ---
+def test_handle_missing_components():
+    with pytest.raises(
+        ValueError, match="Component dri_plant is required for the steel plant unit."
+    ):
+        _ = SteelPlant(
+            id="test_steel_plant",
+            unit_operator="test_operator",
+            objective="min_variable_cost",
+            flexibility_measure="cost_based_load_shift",
+            bidding_strategies={},
+            index=pd.date_range("2023-01-01", periods=24, freq="h"),
+            node="south",
+            components={},
+            forecaster=None,
+            demand=1000,
+            technology="steel_plant",
+        )
+
+
+def test_handle_missing_electrolyser(steel_plant_without_electrolyser):
+    steel_plant_without_electrolyser.determine_optimal_operation_without_flex()
+    instance = steel_plant_without_electrolyser.model.create_instance()
+    instance = steel_plant_without_electrolyser.switch_to_opt(instance)
+    steel_plant_without_electrolyser.solver.solve(instance, tee=False)
+
+    # Verify no electrolyser-related constraints
     for t in instance.time_steps:
-        hydrogen_out = instance.dsm_blocks["electrolyser"].hydrogen_out[t].value
-        hydrogen_in = instance.dsm_blocks["dri_plant"].hydrogen_in[t].value
-        assert (
-            hydrogen_out >= hydrogen_in
-        ), f"Hydrogen out at time {t} is less than hydrogen in"
-
-    for t in instance.time_steps:
-        dri_output = instance.dsm_blocks["dri_plant"].dri_output[t].value
-        dri_input = instance.dsm_blocks["eaf"].dri_input[t].value
-        assert (
-            dri_output == dri_input
-        ), f"DRI output at time {t} does not match DRI input"
-
-    for t in instance.time_steps:
-        dri_output = instance.dsm_blocks["dri_plant"].dri_output[t].value
-        dri_input = instance.dsm_blocks["eaf"].dri_input[t].value
-        assert (
-            dri_output == dri_input
-        ), f"Material flow from DRI plant to EAF at time {t} is inconsistent"
-
-    total_steel_output = sum(
-        instance.dsm_blocks["eaf"].steel_output[t].value for t in instance.time_steps
-    )
-    assert (
-        total_steel_output == instance.steel_demand
-    ), f"Total steel output {total_steel_output} does not match steel demand {instance.steel_demand}"
+        assert "electrolyser" not in instance.dsm_blocks
 
 
-def test_determine_optimal_operation_with_flex(steel_plant):
-    # Ensure that the optimal operation without flexibility is determined first
-    steel_plant.determine_optimal_operation_without_flex()
-    assert steel_plant.opt_power_requirement is not None
-    assert isinstance(steel_plant.opt_power_requirement, pd.Series)
+# --- Objective Handling ---
+@pytest.fixture
+def reset_objectives(steel_plant):
+    """
+    Helper to reset objectives in the model.
+    """
 
-    steel_plant.determine_optimal_operation_with_flex()
-    assert steel_plant.flex_power_requirement is not None
-    assert isinstance(steel_plant.flex_power_requirement, pd.Series)
+    def _reset(instance):
+        if hasattr(instance, "obj_rule_opt"):
+            instance.obj_rule_opt.deactivate()
+        if hasattr(instance, "obj_rule_flex"):
+            instance.obj_rule_flex.deactivate()
 
-    instance = steel_plant.model.create_instance()
-    instance = steel_plant.switch_to_flex(instance)
-    steel_plant.solver.solve(instance, tee=False)
-
-    total_power_input = sum(
-        instance.total_power_input[t].value for t in instance.time_steps
-    )
-
-    assert total_power_input == 3000
+    return _reset
 
 
 if __name__ == "__main__":

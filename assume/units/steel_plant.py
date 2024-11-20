@@ -14,6 +14,8 @@ from pyomo.opt import (
 )
 
 from assume.common.base import SupportsMinMax
+from assume.common.market_objects import MarketConfig, Orderbook
+from assume.common.utils import get_products_index
 from assume.units.dsm_load_shift import DSMFlex
 
 SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
@@ -100,6 +102,13 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.lime_price = self.forecaster.get_price("lime")
         self.co2_price = self.forecaster.get_price("co2")
 
+        # Calculate congestion forecast and set it as a forecast column in the forecaster
+        self.congestion_signal = self.forecaster["east_congestion_severity"]
+        self.renewable_utilisation_signal = self.forecaster[
+            "south_renewable_utilisation"
+        ]
+        # print(self.renewable_utilisation_signal)
+
         self.objective = objective
         self.flexibility_measure = flexibility_measure
         self.cost_tolerance = cost_tolerance
@@ -108,6 +117,21 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.has_h2storage = "hydrogen_storage" in self.components.keys()
         self.has_dristorage = "dri_storage" in self.components.keys()
         self.has_electrolyser = "electrolyser" in self.components.keys()
+
+        self.opt_power_requirement = None
+        self.flex_power_requirement = None
+
+        # Define a solver
+        solvers = check_available_solvers(*SOLVERS)
+        if len(solvers) < 1:
+            raise Exception(f"None of {SOLVERS} are available")
+
+        self.solver = SolverFactory(solvers[0])
+        self.solver_options = {
+            "output_flag": False,
+            "log_to_console": False,
+            "LogToConsole": 0,
+        }
 
         # Main Model part
         self.model = pyo.ConcreteModel()
@@ -121,23 +145,15 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.define_constraints()
         self.define_objective_opt()
 
-        if self.flexibility_measure == "max_load_shift":
-            self.flexibility_cost_tolerance(self.model)
+        self.determine_optimal_operation_without_flex(switch_flex_off=False)
+
+        # Apply the flexibility function based on flexibility measure
+        if self.flexibility_measure in DSMFlex.flexibility_map:
+            DSMFlex.flexibility_map[self.flexibility_measure](self, self.model)
+        else:
+            raise ValueError(f"Unknown flexibility measure: {self.flexibility_measure}")
+
         self.define_objective_flex()
-
-        solvers = check_available_solvers(*SOLVERS)
-        if len(solvers) < 1:
-            raise Exception(f"None of {SOLVERS} are available")
-
-        self.solver = SolverFactory(solvers[0])
-        self.solver_options = {
-            "output_flag": False,
-            "log_to_console": False,
-            "LogToConsole": 0,
-        }
-
-        self.opt_power_requirement = None
-        self.flex_power_requirement = None
 
         self.variable_cost_series = None
 
@@ -357,8 +373,26 @@ class SteelPlant(DSMFlex, SupportsMinMax):
     def define_objective_flex(self):
         """
         Defines the flexibility objective for the optimization model.
+
+        Args:
+            model (pyomo.ConcreteModel): The Pyomo model.
         """
-        if self.flexibility_measure == "max_load_shift":
+        if self.flexibility_measure == "cost_based_load_shift":
+
+            @self.model.Objective(sense=pyo.maximize)
+            def obj_rule_flex(m):
+                """
+                Maximizes the load shift over all time steps.
+                """
+
+                maximise_load_shift = pyo.quicksum(
+                    m.load_shift_neg[t] * (1 - m.shift_indicator[t])
+                    for t in m.time_steps
+                )
+
+                return maximise_load_shift
+
+        elif self.flexibility_measure == "congestion_management_flexibility":
 
             @self.model.Objective(sense=pyo.maximize)
             def obj_rule_flex(m):
@@ -366,32 +400,56 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 Maximizes the load shift over all time steps.
                 """
                 maximise_load_shift = pyo.quicksum(
-                    m.load_shift[t] for t in self.model.time_steps
+                    m.load_shift_neg[t]
+                    * (1 - m.shift_indicator[t])
+                    * m.congestion_indicator[t]
+                    for t in m.time_steps
                 )
+
                 return maximise_load_shift
+
+        elif self.flexibility_measure == "peak_load_shifting":
+
+            @self.model.Objective(sense=pyo.maximize)
+            def obj_rule_flex(m):
+                """
+                Maximizes the load shift over all time steps.
+                """
+                maximise_load_shift = pyo.quicksum(
+                    m.load_shift_neg[t]
+                    * (1 - m.shift_indicator[t])
+                    * m.peak_indicator[t]
+                    for t in m.time_steps
+                )
+
+                return maximise_load_shift
+
+        elif self.flexibility_measure == "renewable_utilisation":
+
+            @self.model.Objective(sense=pyo.maximize)
+            def obj_rule_flex(m):
+                """
+                Maximizes the load increase over all time steps based on renewable surplus.
+                """
+                maximise_renewable_utilisation = pyo.quicksum(
+                    m.load_shift_pos[t] * m.shift_indicator[t] * m.renewable_signal[t]
+                    for t in m.time_steps
+                )
+
+                return maximise_renewable_utilisation
 
         else:
             raise ValueError(f"Unknown objective: {self.flexibility_measure}")
 
-    def calculate_optimal_operation_if_needed(self):
-        if (
-            self.opt_power_requirement is not None
-            and self.flex_power_requirement is None
-            and self.flexibility_measure == "max_load_shift"
-        ):
-            self.determine_optimal_operation_with_flex()
-
-        if self.opt_power_requirement is None and self.objective == "min_variable_cost":
-            self.determine_optimal_operation_without_flex()
-
-    def determine_optimal_operation_without_flex(self):
+    def determine_optimal_operation_without_flex(self, switch_flex_off=True):
         """
         Determines the optimal operation of the steel plant without considering flexibility.
         """
         # create an instance of the model
         instance = self.model.create_instance()
         # switch the instance to the optimal mode by deactivating the flexibility constraints and objective
-        instance = self.switch_to_opt(instance)
+        if switch_flex_off:
+            instance = self.switch_to_opt(instance)
         # solve the instance
         results = self.solver.solve(instance, options=self.solver_options)
 
@@ -457,14 +515,26 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 "Termination Condition: ", results.solver.termination_condition
             )
 
-        temp = instance.total_power_input.get_values()
-        self.flex_power_requirement = pd.Series(data=temp)
-        self.flex_power_requirement.index = self.index
+        # Compute adjusted total power input with load shift applied
+        adjusted_total_power_input = []
+        for t in instance.time_steps:
+            # Calculate the load-shifted value of total_power_input
+            adjusted_power = (
+                instance.total_power_input[t].value
+                + instance.load_shift_pos[t].value
+                - instance.load_shift_neg[t].value
+            )
+            adjusted_total_power_input.append(adjusted_power)
+
+        # Assign this list to flex_power_requirement as a pandas Series
+        self.flex_power_requirement = pd.Series(
+            data=adjusted_total_power_input, index=self.index
+        )
 
         # Variable cost series
-        temp_1 = instance.variable_cost.get_values()
-        self.variable_cost_series = pd.Series(data=temp_1)
-        self.variable_cost_series.index = self.index
+        self.variable_cost_series = pd.Series(
+            data=instance.variable_cost.get_values()
+        ).set_axis(self.index)
 
     def switch_to_opt(self, instance):
         """
@@ -476,10 +546,18 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         Returns:
             pyomo.ConcreteModel: The modified instance with flexibility constraints and objective deactivated.
         """
-        # deactivate the flexibility constraints and objective
+        # Deactivate the flexibility objective if it exists
+        # if hasattr(instance, "obj_rule_flex"):
         instance.obj_rule_flex.deactivate()
 
-        instance.total_cost_upper_limit.deactivate()
+        # Deactivate flexibility constraints if they exist
+        if hasattr(instance, "total_cost_upper_limit"):
+            instance.total_cost_upper_limit.deactivate()
+
+        if hasattr(instance, "peak_load_shift_constraint"):
+            instance.peak_load_shift_constraint.deactivate()
+
+        # if hasattr(instance, "total_power_input_constraint_with_flex"):
         instance.total_power_input_constraint_with_flex.deactivate()
 
         return instance
@@ -504,6 +582,47 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         instance.total_cost = self.total_cost
 
         return instance
+
+    def set_dispatch_plan(
+        self,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ) -> None:
+        """
+        Adds the dispatch plan from the current market result to the total dispatch plan and calculates the cashflow.
+
+        Args:
+            marketconfig (MarketConfig): The market configuration.
+            orderbook (Orderbook): The orderbook.
+        """
+        products_index = get_products_index(orderbook)
+
+        product_type = marketconfig.product_type
+        for order in orderbook:
+            start = order["start_time"]
+            end = order["end_time"]
+            end_excl = end - self.index.freq
+            if isinstance(order["accepted_volume"], dict):
+                self.outputs[product_type].loc[start:end_excl] += [
+                    order["accepted_volume"][key]
+                    for key in order["accepted_volume"].keys()
+                ]
+            else:
+                self.outputs[product_type].loc[start:end_excl] += order[
+                    "accepted_volume"
+                ]
+
+        self.calculate_cashflow(product_type, orderbook)
+
+        for start in products_index:
+            current_power = self.outputs[product_type][start]
+            self.outputs[product_type][start] = current_power
+
+        self.bidding_strategies[marketconfig.market_id].calculate_reward(
+            unit=self,
+            marketconfig=marketconfig,
+            orderbook=orderbook,
+        )
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         """
