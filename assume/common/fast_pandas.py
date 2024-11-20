@@ -580,6 +580,11 @@ class FastSeries:
         result.data = -self.data
         return result
 
+    def __abs__(self):
+        result = self.copy()
+        result.data = abs(self.data)
+        return result
+
     # Reverse Arithmetic Operations
     def __radd__(self, other: int | float | np.ndarray):
         return self.__add__(other)
