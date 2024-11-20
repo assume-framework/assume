@@ -156,7 +156,9 @@ class UnitsOperator(Role):
         Args:
             market (MarketConfig): The market to register.
         """
-
+        if not market.addr:
+            logger.error("Market %s has no address", market.market_id)
+            return
         await self.context.send_message(
             create_acl(
                 {
@@ -172,7 +174,7 @@ class UnitsOperator(Role):
             ),
             receiver_addr=market.addr,
         )
-        logger.debug(f"{self.id} sent market registration to {market.market_id}")
+        logger.debug("%s sent market registration to %s", self.id, market.market_id)
 
     def handle_opening(self, opening: OpeningMessage, meta: MetaDict) -> None:
         """
@@ -183,7 +185,7 @@ class UnitsOperator(Role):
             meta (MetaDict): The meta data of the market.
         """
         logger.debug(
-            f'{self.id} received opening from: {opening["market_id"]} {opening["start_time"]} until: {opening["end_time"]}.'
+            '%s received opening from: %s %s until: %s.', self.id, opening["market_id"], opening["start_time"], opening["end_time"]
         )
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening, meta))
 
@@ -195,7 +197,7 @@ class UnitsOperator(Role):
             content (ClearingMessage): The content of the clearing message.
             meta (MetaDict): The meta data of the market.
         """
-        logger.debug(f"{self.id} got market result: {content}")
+        logger.debug("%s got market result: %s", self.id, content)
         accepted_orders: Orderbook = content["accepted_orders"]
         rejected_orders: Orderbook = content["rejected_orders"]
         orderbook = accepted_orders + rejected_orders
@@ -391,7 +393,7 @@ class UnitsOperator(Role):
 
         products = opening["products"]
         market = self.registered_markets[opening["market_id"]]
-        logger.debug(f"{self.id} setting bids for {market.market_id} - {products}")
+        logger.debug("%s setting bids for %s - %s", self.id, market.market_id, products)
 
         # the given products just became available on our market
         # and we need to provide bids
@@ -408,6 +410,9 @@ class UnitsOperator(Role):
                 market=market,
                 products=products,
             )
+        if not market.addr:
+            logger.error("Market %s has no address", market.market_id)
+            return
         await self.context.send_message(
             create_acl(
                 content={
