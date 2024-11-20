@@ -253,7 +253,6 @@ async def test_get_actual_dispatch(units_operator: UnitsOperator):
     # WHEN another hour passes
     last = clock.time
     clock.set_time(clock.time + 3600)
-    
 
     # THEN resulting unit dispatch dataframe contains only one row with current dispatch
     market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
@@ -264,7 +263,6 @@ async def test_get_actual_dispatch(units_operator: UnitsOperator):
 
     last = clock.time
     clock.set_time(clock.time + 3600)
-    
 
     market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
     assert datetime2timestamp(unit_dfs[0]["time"][0]) == last

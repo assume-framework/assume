@@ -34,7 +34,7 @@ def power_plant() -> PowerPlant:
         min_power=200,
         efficiency=0.5,
         additional_cost=10,
-        bidding_strategies={},
+        bidding_strategies={"learning": RLAdvancedOrderStrategy},
         fuel_type="lignite",
         emission_factor=0.5,
         forecaster=ff,

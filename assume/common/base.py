@@ -75,7 +75,7 @@ class BaseUnit:
         # some data is stored as series to allow to store it in the outputs
         # check if any bidding strategy is using the RL strategy
         if any(
-            isinstance(strategy, LearningStrategy)
+            issubclass(strategy, LearningStrategy)
             for strategy in self.bidding_strategies.values()
         ):
             self.outputs["actions"] = TensorFastSeries(value=0.0, index=self.index)

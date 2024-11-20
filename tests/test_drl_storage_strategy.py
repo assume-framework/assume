@@ -34,7 +34,7 @@ def storage_unit() -> Storage:
         id="test_storage",
         unit_operator="test_operator",
         technology="storage",
-        bidding_strategies={},
+        bidding_strategies={"learning": StorageRLStrategy},
         max_power_charge=500,  # Negative for charging
         max_power_discharge=500,
         max_soc=1000,
