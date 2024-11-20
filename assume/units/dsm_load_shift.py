@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from collections.abc import Callable
+
 import pyomo.environ as pyo
 
 from assume.common.market_objects import MarketConfig, Orderbook
@@ -9,6 +11,19 @@ from assume.units.dst_components import demand_side_technologies
 
 
 class DSMFlex:
+    # Mapping of flexibility measures to their respective functions
+    flexibility_map: dict[str, Callable[[pyo.ConcreteModel], None]] = {
+        "cost_based_load_shift": lambda self, model: self.cost_based_flexibility(model),
+        "congestion_management_flexibility": lambda self,
+        model: self.grid_congestion_management(model),
+        "peak_load_shifting": lambda self, model: self.peak_load_shifting_flexibility(
+            model
+        ),
+        "renewable_utilisation": lambda self, model: self.renewable_utilisation(
+            model,
+        ),
+    }
+
     def __init__(self, components, **kwargs):
         super().__init__(**kwargs)
 
@@ -51,7 +66,7 @@ class DSMFlex:
                     self.model, self.model.dsm_blocks[technology]
                 )
 
-    def flexibility_cost_tolerance(self, model):
+    def cost_based_flexibility(self, model):
         """
         Modify the optimization model to include constraints for flexibility within cost tolerance.
         """
@@ -60,66 +75,63 @@ class DSMFlex:
         model.total_cost = pyo.Param(initialize=0.0, mutable=True)
 
         # Variables
-        model.load_shift = pyo.Var(model.time_steps, within=pyo.Reals)
+        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
+        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
+        model.shift_indicator = pyo.Var(model.time_steps, within=pyo.Binary)
 
-        @model.Constraint(model.time_steps)
-        def total_cost_upper_limit(m, t):
-            return sum(
-                model.variable_cost[t] for t in model.time_steps
-            ) <= model.total_cost * (1 + (model.cost_tolerance / 100))
+        @model.Constraint()
+        def total_cost_upper_limit(m):
+            return pyo.quicksum(
+                m.variable_cost[t] for t in m.time_steps
+            ) <= m.total_cost * (1 + (m.cost_tolerance / 100))
 
         @model.Constraint(model.time_steps)
         def total_power_input_constraint_with_flex(m, t):
-            if self.has_electrolyser:
+            if self.technology == "steel_plant":
+                if self.has_electrolyser:
+                    return (
+                        m.total_power_input[t]
+                        + m.load_shift_pos[t] * model.shift_indicator[t]
+                        - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
+                        == self.model.dsm_blocks["electrolyser"].power_in[t]
+                        + self.model.dsm_blocks["eaf"].power_in[t]
+                        + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    )
+                else:
+                    return (
+                        m.total_power_input[t]
+                        + m.load_shift_pos[t] * model.shift_indicator[t]
+                        - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
+                        == self.model.dsm_blocks["eaf"].power_in[t]
+                        + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    )
+            elif self.technology == "building":
+                total_power_input = m.inflex_demand[t]
+                # Building components (e.g., heat_pump, boiler, pv_plant, generic_storage)
+                if self.has_heatpump:
+                    total_power_input += self.model.dsm_blocks["heat_pump"].power_in[t]
+                if self.has_boiler:
+                    total_power_input += self.model.dsm_blocks["boiler"].power_in[t]
+                if self.has_ev:
+                    total_power_input += (
+                        self.model.dsm_blocks["electric_vehicle"].charge[t]
+                        - self.model.dsm_blocks["electric_vehicle"].discharge[t]
+                    )
+                if self.has_battery_storage:
+                    total_power_input += (
+                        self.model.dsm_blocks["generic_storage"].charge[t]
+                        - self.model.dsm_blocks["generic_storage"].discharge[t]
+                    )
+                if self.has_pv:
+                    total_power_input -= self.model.dsm_blocks["pv_plant"].power[t]
+
+                # Apply flexibility adjustments
                 return (
-                    m.total_power_input[t] - m.load_shift[t]
-                    == self.model.dsm_blocks["electrolyser"].power_in[t]
-                    + self.model.dsm_blocks["eaf"].power_in[t]
-                    + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    m.total_power_input[t]
+                    + m.load_shift_pos[t] * model.shift_indicator[t]
+                    - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
+                    == total_power_input
                 )
-            else:
-                return (
-                    m.total_power_input[t] - m.load_shift[t]
-                    == self.model.dsm_blocks["eaf"].power_in[t]
-                    + self.model.dsm_blocks["dri_plant"].power_in[t]
-                )
-
-    def recalculate_with_accepted_offers(self, model):
-        self.reference_power = self.forecaster[f"{self.id}_power"]
-        self.accepted_pos_capacity = self.forecaster[
-            f"{self.id}_power_steelneg"
-        ]  # _accepted_pos_res
-
-        # Parameters
-        model.reference_power = pyo.Param(
-            model.time_steps,
-            initialize={t: value for t, value in enumerate(self.reference_power)},
-        )
-
-        model.accepted_pos_capacity = pyo.Param(
-            model.time_steps,
-            initialize={t: value for t, value in enumerate(self.accepted_pos_capacity)},
-        )
-
-        # Variables
-        model.capacity_upper_bound = pyo.Var(
-            model.time_steps, within=pyo.NonNegativeReals
-        )
-
-        # Constraints
-        @model.Constraint(model.time_steps)
-        def capacity_upper_bound_constraint(m, t):
-            return (
-                m.capacity_upper_bound[t]
-                == m.reference_power[t] - m.accepted_pos_capacity[t]
-            )
-
-        @model.Constraint(model.time_steps)
-        def total_power_upper_limit(m, t):
-            if m.accepted_pos_capacity[t] > 0:
-                return m.total_power_input[t] <= m.capacity_upper_bound[t]
-            else:
-                return pyo.Constraint.Skip
 
     def set_dispatch_plan(
         self,

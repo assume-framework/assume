@@ -52,6 +52,8 @@ class Building(DSMFlex, SupportsMinMax):
     """
 
     # List of optional technologies that a building unit can incorporate
+    required_technologies = []
+    # List of optional technologies that a building unit can incorporate
     optional_technologies = [
         "heat_pump",
         "boiler",
@@ -67,12 +69,13 @@ class Building(DSMFlex, SupportsMinMax):
         unit_operator: str,
         index: pd.DatetimeIndex,
         bidding_strategies: dict,
-        components: dict[str, dict],
+        components: dict[str, dict] = None,
         technology: str = "building",
-        objective: str = "min_variable_cost",
+        objective: str = None,
         node: str = "node0",
         location: tuple[float, float] = (0.0, 0.0),
-        flexibility_measure: str = "max_load_shift",
+        flexibility_measure: str = "",
+        cost_tolerance: float = 10,
         **kwargs,
     ):
         """
@@ -107,11 +110,21 @@ class Building(DSMFlex, SupportsMinMax):
             **kwargs,
         )
 
-        # Validate provided components against the list of optional technologies
-        for component in self.components.keys():
-            if component not in self.optional_technologies:
+        # check if the required components are present in the components dictionary
+        for component in self.required_technologies:
+            if component not in components.keys():
                 raise ValueError(
-                    f"Component {component} is not a valid component for the building unit."
+                    f"Component {component} is required for the steel plant unit."
+                )
+
+        # check if the provided components are valid and do not contain any unknown components
+        for component in components.keys():
+            if (
+                component not in self.required_technologies
+                and component not in self.optional_technologies
+            ):
+                raise ValueError(
+                    f"Components {component} is not a valid component for the steel plant unit."
                 )
 
         # Initialize forecasting data for various energy prices and demands
@@ -124,14 +137,37 @@ class Building(DSMFlex, SupportsMinMax):
 
         self.objective = objective
         self.flexibility_measure = flexibility_measure
+        self.cost_tolerance = cost_tolerance
 
         # Flags indicating the presence of specific components
-        self.has_heatpump = "heat_pump" in self.components
-        self.has_boiler = "boiler" in self.components
-        self.has_thermal_storage = "thermal_storage" in self.components
-        self.has_ev = "electric_vehicle" in self.components
-        self.has_battery_storage = "generic_storage" in self.components
-        self.has_pv = "pv_plant" in self.components
+        self.has_heatpump = "heat_pump" in self.components.keys()
+        self.has_boiler = "boiler" in self.components.keys()
+        self.has_thermal_storage = "thermal_storage" in self.components.keys()
+        self.has_ev = "electric_vehicle" in self.components.keys()
+        self.has_battery_storage = "generic_storage" in self.components.keys()
+        self.has_pv = "pv_plant" in self.components.keys()
+
+        self.opt_power_requirement = None
+        self.flex_power_requirement = None
+        self.variable_cost_series = None
+
+        # Select the first available solver from the predefined list
+        solvers = check_available_solvers(*SOLVERS)
+        if len(solvers) < 1:
+            raise Exception(f"None of {SOLVERS} are available")
+        self.solver = SolverFactory(solvers[0])
+        self.solver_options = {
+            "output_flag": False,
+            "log_to_console": False,
+            "LogToConsole": 0,
+        }
+
+        # self.has_heatpump = "heat_pump" in self.components
+        # self.has_boiler = "boiler" in self.components
+        # self.has_thermal_storage = "thermal_storage" in self.components
+        # self.has_ev = "electric_vehicle" in self.components
+        # self.has_battery_storage = "generic_storage" in self.components
+        # self.has_pv = "pv_plant" in self.components
 
         # Initialize the Pyomo optimization model
         self.model = pyo.ConcreteModel()
@@ -173,22 +209,16 @@ class Building(DSMFlex, SupportsMinMax):
         self.initialize_process_sequence()
 
         self.define_constraints()
-        self.define_objective()
+        self.define_objective_opt()
+        self.determine_optimal_operation_without_flex(switch_flex_off=False)
 
-        # Select the first available solver from the predefined list
-        solvers = check_available_solvers(*SOLVERS)
-        if len(solvers) < 1:
-            raise Exception(f"None of {SOLVERS} are available")
+        # Apply the flexibility function based on flexibility measure
+        if self.flexibility_measure in DSMFlex.flexibility_map:
+            DSMFlex.flexibility_map[self.flexibility_measure](self, self.model)
+        else:
+            raise ValueError(f"Unknown flexibility measure: {self.flexibility_measure}")
 
-        self.solver = SolverFactory(solvers[0])
-        self.solver_options = {
-            "output_flag": False,
-            "log_to_console": False,
-            "LogToConsole": 0,
-        }
-
-        self.opt_power_requirement = None
-        self.variable_cost_series = None
+        self.define_objective_flex()
 
     def define_sets(self) -> None:
         """
@@ -230,12 +260,12 @@ class Building(DSMFlex, SupportsMinMax):
         """
         Defines the decision variables for the Pyomo optimization model.
 
-        - `variable_power`: Represents the total power input required at each time step.
+        - `total_power_input`: Represents the total power input required at each time step.
         - `variable_cost`: Represents the variable cost associated with power usage at each time step.
 
         Both variables are defined over the `time_steps` set and are continuous real numbers.
         """
-        self.model.variable_power = pyo.Var(self.model.time_steps, within=pyo.Reals)
+        self.model.total_power_input = pyo.Var(self.model.time_steps, within=pyo.Reals)
         self.model.variable_cost = pyo.Var(self.model.time_steps, within=pyo.Reals)
 
     def initialize_process_sequence(self):
@@ -293,7 +323,7 @@ class Building(DSMFlex, SupportsMinMax):
         """
 
         @self.model.Constraint(self.model.time_steps)
-        def variable_power_constraint(m, t):
+        def total_power_input_constraint(m, t):
             """
             Ensures that the total power input is the sum of all component inputs minus any self-produced
             or stored energy at each time step.
@@ -309,28 +339,32 @@ class Building(DSMFlex, SupportsMinMax):
             Returns:
                 Equality condition balancing total power input.
             """
-            variable_power = self.model.inflex_demand[t]
+            total_power_input = self.model.inflex_demand[t]
 
             # Add power inputs from available components
             if self.has_heatpump:
-                variable_power += self.model.dsm_blocks["heat_pump"].power_in[t]
+                total_power_input += self.model.dsm_blocks["heat_pump"].power_in[t]
             if self.has_boiler:
-                variable_power += self.model.dsm_blocks["boiler"].power_in[t]
+                total_power_input += self.model.dsm_blocks["boiler"].power_in[t]
 
             # Add and subtract EV and storage power if they exist
             if self.has_ev:
-                variable_power += self.model.dsm_blocks["electric_vehicle"].charge[t]
-                variable_power -= self.model.dsm_blocks["electric_vehicle"].discharge[t]
+                total_power_input += self.model.dsm_blocks["electric_vehicle"].charge[t]
+                total_power_input -= self.model.dsm_blocks[
+                    "electric_vehicle"
+                ].discharge[t]
             if self.has_battery_storage:
-                variable_power += self.model.dsm_blocks["generic_storage"].charge[t]
-                variable_power -= self.model.dsm_blocks["generic_storage"].discharge[t]
+                total_power_input += self.model.dsm_blocks["generic_storage"].charge[t]
+                total_power_input -= self.model.dsm_blocks["generic_storage"].discharge[
+                    t
+                ]
 
             # Subtract power from PV plant if it exists
             if self.has_pv:
-                variable_power -= self.model.dsm_blocks["pv_plant"].power[t]
+                total_power_input -= self.model.dsm_blocks["pv_plant"].power[t]
 
-            # Assign the calculated total to the model's variable_power for each time step
-            return self.model.variable_power[t] == variable_power
+            # Assign the calculated total to the model's total_power_input for each time step
+            return self.model.total_power_input[t] == total_power_input
 
         if self.has_ev and not self.ev_sells_energy_to_market:
 
@@ -425,10 +459,10 @@ class Building(DSMFlex, SupportsMinMax):
             """
             return (
                 self.model.variable_cost[t]
-                == self.model.variable_power[t] * self.model.electricity_price[t]
+                == self.model.total_power_input[t] * self.model.electricity_price[t]
             )
 
-    def define_objective(self):
+    def define_objective_opt(self):
         """
         Defines the objective function for the optimization model.
 
@@ -441,7 +475,7 @@ class Building(DSMFlex, SupportsMinMax):
         if self.objective == "min_variable_cost":
 
             @self.model.Objective(sense=pyo.minimize)
-            def obj_rule(m):
+            def obj_rule_opt(m):
                 """
                 Objective function to minimize the total variable cost across all time steps.
 
@@ -460,61 +494,223 @@ class Building(DSMFlex, SupportsMinMax):
         else:
             raise ValueError(f"Unknown objective: {self.objective}")
 
-    def calculate_optimal_operation_if_needed(self):
+    def define_objective_flex(self):
         """
-        Calculates the optimal operation of the building if it hasn't been computed yet and
-        the objective is to minimize variable costs.
-        """
-        if self.opt_power_requirement is None and self.objective == "min_variable_cost":
-            self.calculate_optimal_operation()
+        Defines the flexibility objective for the optimization model.
 
-    def calculate_optimal_operation(self):
+        Args:
+            model (pyomo.ConcreteModel): The Pyomo model.
         """
-        Solves the optimization model to determine the building's optimal energy operation strategy.
+        if self.flexibility_measure == "cost_based_load_shift":
 
-        This method creates an instance of the Pyomo model, solves it using the selected solver,
-        and processes the results. It handles solver status checks, logs relevant information,
-        and extracts the optimal power requirements and variable costs.
+            @self.model.Objective(sense=pyo.maximize)
+            def obj_rule_flex(m):
+                """
+                Maximizes the load shift over all time steps.
+                """
 
-        Additionally, it invokes `write_additional_outputs` to process and store results from
-        specific components like battery storage and electric vehicles.
+                maximise_load_shift = pyo.quicksum(
+                    m.load_shift_neg[t] * (1 - m.shift_indicator[t])
+                    for t in m.time_steps
+                )
+
+                return maximise_load_shift
+
+    def determine_optimal_operation_without_flex(self, switch_flex_off=True):
         """
-        # Create an instance of the model
+        Determines the optimal operation of the steel plant without considering flexibility.
+        """
+        # create an instance of the model
         instance = self.model.create_instance()
-        # Solve the instance using the configured solver
-        results = self.solver.solve(instance, tee=False)
+        # switch the instance to the optimal mode by deactivating the flexibility constraints and objective
+        if switch_flex_off:
+            instance = self.switch_to_opt(instance)
+        # solve the instance
+        results = self.solver.solve(instance, options=self.solver_options)
 
         # Check solver status and termination condition
         if (results.solver.status == SolverStatus.ok) and (
             results.solver.termination_condition == TerminationCondition.optimal
         ):
-            logger.debug("The optimization model was solved optimally.")
+            logger.debug("The model was solved optimally.")
 
-            # Retrieve and log the objective function value
-            objective_value = instance.obj_rule()
+            # Display the Objective Function Value
+            objective_value = instance.obj_rule_opt()
             logger.debug(f"The value of the objective function is {objective_value}.")
 
         elif results.solver.termination_condition == TerminationCondition.infeasible:
-            logger.debug("The optimization model is infeasible.")
+            logger.debug("The model is infeasible.")
 
         else:
-            logger.debug(f"Solver Status: {results.solver.status}")
+            logger.debug("Solver Status: ", results.solver.status)
             logger.debug(
-                f"Termination Condition: {results.solver.termination_condition}"
+                "Termination Condition: ", results.solver.termination_condition
             )
 
-        # Extract and store the total power requirement as a Pandas Series
         self.opt_power_requirement = pd.Series(
-            data=instance.variable_power.get_values()
+            data=instance.total_power_input.get_values()
         ).set_axis(self.index)
 
-        # Extract and store the variable cost series as a Pandas Series
+        self.total_cost = sum(
+            instance.variable_cost[t].value for t in instance.time_steps
+        )
+
+        # Variable cost series
         self.variable_cost_series = pd.Series(
             data=instance.variable_cost.get_values()
         ).set_axis(self.index)
 
         # Process additional outputs from specific components
         self.write_additional_outputs(instance)
+
+    def determine_optimal_operation_with_flex(self):
+        """
+        Determines the optimal operation of the steel plant without considering flexibility.
+        """
+        # create an instance of the model
+        instance = self.model.create_instance()
+        # switch the instance to the flexibility mode by deactivating the optimal constraints and objective
+        instance = self.switch_to_flex(instance)
+        # solve the instance
+        results = self.solver.solve(instance, options=self.solver_options)
+
+        # Check solver status and termination condition
+        if (results.solver.status == SolverStatus.ok) and (
+            results.solver.termination_condition == TerminationCondition.optimal
+        ):
+            logger.debug("The model was solved optimally.")
+
+            # Display the Objective Function Value
+            objective_value = instance.obj_rule_flex()
+            logger.debug(f"The value of the objective function is {objective_value}.")
+
+        elif results.solver.termination_condition == TerminationCondition.infeasible:
+            logger.debug("The model is infeasible.")
+
+        else:
+            logger.debug("Solver Status: ", results.solver.status)
+            logger.debug(
+                "Termination Condition: ", results.solver.termination_condition
+            )
+
+        # Compute adjusted total power input with load shift applied
+        adjusted_total_power_input = []
+        for t in instance.time_steps:
+            # Calculate the load-shifted value of total_power_input
+            adjusted_power = (
+                instance.total_power_input[t].value
+                + instance.load_shift_pos[t].value
+                - instance.load_shift_neg[t].value
+            )
+            adjusted_total_power_input.append(adjusted_power)
+
+        # Assign this list to flex_power_requirement as a pandas Series
+        self.flex_power_requirement = pd.Series(
+            data=adjusted_total_power_input, index=self.index
+        )
+
+        # Variable cost series
+        self.variable_cost_series = pd.Series(
+            data=instance.variable_cost.get_values()
+        ).set_axis(self.index)
+
+        # Process additional outputs from specific components
+        self.write_additional_outputs(instance)
+
+    def switch_to_opt(self, instance):
+        """
+        Switches the instance to solve a cost based optimisation problem by deactivating the flexibility constraints and objective.
+
+        Args:
+            instance (pyomo.ConcreteModel): The instance of the Pyomo model.
+
+        Returns:
+            pyomo.ConcreteModel: The modified instance with flexibility constraints and objective deactivated.
+        """
+        # Deactivate the flexibility objective if it exists
+        # if hasattr(instance, "obj_rule_flex"):
+        instance.obj_rule_flex.deactivate()
+
+        # Deactivate flexibility constraints if they exist
+        if hasattr(instance, "total_cost_upper_limit"):
+            instance.total_cost_upper_limit.deactivate()
+
+        if hasattr(instance, "peak_load_shift_constraint"):
+            instance.peak_load_shift_constraint.deactivate()
+
+        # if hasattr(instance, "total_power_input_constraint_with_flex"):
+        instance.total_power_input_constraint_with_flex.deactivate()
+
+        return instance
+
+    def switch_to_flex(self, instance):
+        """
+        Switches the instance to flexibility mode by deactivating few constraints and objective function.
+
+        Args:
+            instance (pyomo.ConcreteModel): The instance of the Pyomo model.
+
+        Returns:
+            pyomo.ConcreteModel: The modified instance with optimal constraints and objective deactivated.
+        """
+        # deactivate the optimal constraints and objective
+        instance.obj_rule_opt.deactivate()
+        instance.total_power_input_constraint.deactivate()
+
+        # fix values of model.total_power_input
+        for t in instance.time_steps:
+            instance.total_power_input[t].fix(self.opt_power_requirement.iloc[t])
+        instance.total_cost = self.total_cost
+
+        return instance
+
+    # def calculate_optimal_operation(self):
+    #     """
+    #     Solves the optimization model to determine the building's optimal energy operation strategy.
+
+    #     This method creates an instance of the Pyomo model, solves it using the selected solver,
+    #     and processes the results. It handles solver status checks, logs relevant information,
+    #     and extracts the optimal power requirements and variable costs.
+
+    #     Additionally, it invokes `write_additional_outputs` to process and store results from
+    #     specific components like battery storage and electric vehicles.
+    #     """
+    #     # Create an instance of the model
+    #     instance = self.model.create_instance()
+    #     # Solve the instance using the configured solver
+    #     results = self.solver.solve(instance, tee=False)
+
+    #     # Check solver status and termination condition
+    #     if (results.solver.status == SolverStatus.ok) and (
+    #         results.solver.termination_condition == TerminationCondition.optimal
+    #     ):
+    #         logger.debug("The optimization model was solved optimally.")
+
+    #         # Retrieve and log the objective function value
+    #         objective_value = instance.obj_rule()
+    #         logger.debug(f"The value of the objective function is {objective_value}.")
+
+    #     elif results.solver.termination_condition == TerminationCondition.infeasible:
+    #         logger.debug("The optimization model is infeasible.")
+
+    #     else:
+    #         logger.debug(f"Solver Status: {results.solver.status}")
+    #         logger.debug(
+    #             f"Termination Condition: {results.solver.termination_condition}"
+    #         )
+
+    #     # Extract and store the total power requirement as a Pandas Series
+    #     self.opt_power_requirement = pd.Series(
+    #         data=instance.totalvariable_power.get_values()
+    #     ).set_axis(self.index)
+
+    #     # Extract and store the variable cost series as a Pandas Series
+    #     self.variable_cost_series = pd.Series(
+    #         data=instance.variable_cost.get_values()
+    #     ).set_axis(self.index)
+
+    #     # Process additional outputs from specific components
+    #     self.write_additional_outputs(instance)
 
     def write_additional_outputs(self, instance):
         """
