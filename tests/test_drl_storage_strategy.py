@@ -28,13 +28,25 @@ def storage_unit() -> Storage:
     """
     Fixture to create a Storage unit instance with example parameters.
     """
+    # Define the learning configuration for the StorageRLStrategy
+    learning_config: LearningConfig = {
+        "observation_dimension": 50,
+        "action_dimension": 2,
+        "algorithm": "matd3",
+        "learning_mode": True,
+        "training_episodes": 3,
+        "unit_id": "test_storage",
+        "max_bid_price": 100,
+        "max_demand": 1000,
+    }
+
     index = pd.date_range("2023-06-30 22:00:00", periods=48, freq="h")
     ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
     return Storage(
         id="test_storage",
         unit_operator="test_operator",
         technology="storage",
-        bidding_strategies={"learning": StorageRLStrategy},
+        bidding_strategies={"EOM": StorageRLStrategy(**learning_config)},
         max_power_charge=500,  # Negative for charging
         max_power_discharge=500,
         max_soc=1000,
@@ -65,17 +77,6 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
     """
     Test the StorageRLStrategy for a 'sell' bid action.
     """
-    # Define the learning configuration for the StorageRLStrategy
-    learning_config: LearningConfig = {
-        "observation_dimension": 50,
-        "action_dimension": 2,
-        "algorithm": "matd3",
-        "learning_mode": True,
-        "training_episodes": 3,
-        "unit_id": "test_storage",
-        "max_bid_price": 100,
-        "max_demand": 1000,
-    }
 
     # Define the product index and tuples
     product_index = pd.date_range("2023-07-01", periods=1, freq="h")
@@ -84,8 +85,8 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
         (start, start + pd.Timedelta(hours=1), None) for start in product_index
     ]
 
-    # Instantiate the StorageRLStrategy
-    strategy = StorageRLStrategy(**learning_config)
+    # get the strategy
+    strategy = storage_unit.bidding_strategies["EOM"]
 
     # Define the 'sell' action: [0.2, 0.5] -> price=20, direction='sell'
     sell_action = [0.2, 0.5]
@@ -110,9 +111,7 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
             bid = bids[0]
 
             # Assert the bid price is correctly scaled
-            expected_bid_price = (
-                sell_action[0] * learning_config["max_bid_price"]
-            )  # 20.0
+            expected_bid_price = sell_action[0] * strategy.max_bid_price  # 20.0
             assert (
                 bid["price"] == expected_bid_price
             ), f"Expected bid price {expected_bid_price}, got {bid['price']}"
@@ -174,18 +173,6 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
     """
     Test the StorageRLStrategy for a 'buy' bid action.
     """
-    # Define the learning configuration for the StorageRLStrategy
-    learning_config: LearningConfig = {
-        "observation_dimension": 50,
-        "action_dimension": 2,
-        "algorithm": "matd3",
-        "learning_mode": True,
-        "training_episodes": 3,
-        "unit_id": "test_storage",
-        "max_bid_price": 100,
-        "max_demand": 1000,
-    }
-
     # Define the product index and tuples
     product_index = pd.date_range("2023-07-01", periods=1, freq="h")
     mc = mock_market_config
@@ -194,7 +181,7 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
     ]
 
     # Instantiate the StorageRLStrategy
-    strategy = StorageRLStrategy(**learning_config)
+    strategy = storage_unit.bidding_strategies["EOM"]
 
     # Define the 'buy' action: [0.3, -0.5] -> price=30, direction='buy'
     buy_action = [0.3, -0.5]
@@ -219,9 +206,7 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
             bid = bids[0]
 
             # Assert the bid price is correctly scaled
-            expected_bid_price = (
-                buy_action[0] * learning_config["max_bid_price"]
-            )  # 30.0
+            expected_bid_price = buy_action[0] * strategy.max_bid_price  # 30.0
             assert math.isclose(
                 bid["price"], expected_bid_price, abs_tol=1e3
             ), f"Expected bid price {expected_bid_price}, got {bid['price']}"
@@ -280,17 +265,6 @@ def test_storage_rl_strategy_ignore_bid(mock_market_config, storage_unit):
     """
     Test the StorageRLStrategy for an 'ignore' bid action.
     """
-    # Define the learning configuration for the StorageRLStrategy
-    learning_config: LearningConfig = {
-        "observation_dimension": 50,
-        "action_dimension": 2,
-        "algorithm": "matd3",
-        "learning_mode": True,
-        "training_episodes": 3,
-        "unit_id": "test_storage",
-        "max_bid_price": 100,
-        "max_demand": 1000,
-    }
 
     # Define the product index and tuples
     product_index = pd.date_range("2023-07-01", periods=1, freq="h")
@@ -300,7 +274,7 @@ def test_storage_rl_strategy_ignore_bid(mock_market_config, storage_unit):
     ]
 
     # Instantiate the StorageRLStrategy
-    strategy = StorageRLStrategy(**learning_config)
+    strategy = storage_unit.bidding_strategies["EOM"]
 
     # Define the 'ignore' action: [0.0, 0.0] -> price=0, direction='ignore'
     ignore_action = [0.0, 0.0]
@@ -325,9 +299,7 @@ def test_storage_rl_strategy_ignore_bid(mock_market_config, storage_unit):
             bid = bids[0]
 
             # Assert the bid price is correctly scaled
-            expected_bid_price = (
-                ignore_action[0] * learning_config["max_bid_price"]
-            )  # 0.0
+            expected_bid_price = ignore_action[0] * strategy.max_bid_price  # 0.0
             assert (
                 bid["price"] == expected_bid_price
             ), f"Expected bid price {expected_bid_price}, got {bid['price']}"
