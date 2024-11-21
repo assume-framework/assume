@@ -154,7 +154,7 @@ def add_agent_to_world(
     match agent["Type"]:
         case "SupportPolicy":
             support_data = agent["Attributes"]["SetSupportData"]
-            supports |= {x.pop("Set"): x for x in support_data}
+            supports |= {x.pop("PolicySet"): x for x in support_data}
             world.add_unit_operator(agent["Id"])
 
             for name, support in supports.items():
@@ -479,14 +479,12 @@ def load_amiris(
     start += timedelta(minutes=2)
     end += timedelta(minutes=2)
     sim_id = f"{scenario}_{study_case}"
-    save_interval = amiris_scenario["GeneralProperties"]["Output"]["Interval"]
     prices = {}
     index = pd.date_range(start=start, end=end, freq="1h", inclusive="left")
     world.bidding_strategies["support"] = SupportStrategy
     world.setup(
         start=start,
         end=end,
-        save_frequency_hours=save_interval,
         simulation_id=sim_id,
         index=index,
     )
