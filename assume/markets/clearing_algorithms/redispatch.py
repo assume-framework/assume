@@ -184,7 +184,7 @@ class RedispatchMarketRole(MarketRole):
         line_loading = (
             redispatch_network.lines_t.p0.abs() / redispatch_network.lines.s_nom
         )
-
+        """ 
         # if any line is congested, perform redispatch
         if line_loading.max().max() > 1:
             logger.debug("Congestion detected")
@@ -224,7 +224,9 @@ class RedispatchMarketRole(MarketRole):
         flows = []
 
         return accepted_orders, rejected_orders, meta, flows
-
+        """
+        return [], [], [], []
+    
     def process_dispatch_data(self, network: pypsa.Network, orderbook_df: pd.DataFrame):
         """
         This function processes the dispatch data to calculate the redispatch volumes and prices
