@@ -509,9 +509,18 @@ class FastSeries:
             ):
                 self.data = np.array(value)
             else:
-                for i in item:
-                    start = self.index._get_idx_from_date(i)
-                    self.data[start] = value
+                if isinstance(value, pd.Series):
+                    for idx, i in enumerate(item):
+                        start = self.index._get_idx_from_date(i)
+                        self.data[start] = value.iloc[idx]
+                elif isinstance(value, list | np.ndarray):
+                    for idx, i in enumerate(item):
+                        start = self.index._get_idx_from_date(i)
+                        self.data[start] = value[idx]
+                else:
+                    for i in item:
+                        start = self.index._get_idx_from_date(i)
+                        self.data[start] = value
 
         elif isinstance(item, datetime | str):
             # Handle single datetime or string

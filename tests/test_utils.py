@@ -573,7 +573,7 @@ def test_set_list():
     print(res_pd)
     assert res_fds < res_pd
 
-    # check setting list or series
+    # check setting list or series with single value
     t = time.time()
     for i in range(n):
         fs[dr] = 3
@@ -582,6 +582,38 @@ def test_set_list():
     t = time.time()
     for i in range(n):
         series[dr] = 3
+    res_pd = time.time() - t
+    print(res_fds)
+    print(res_pd)
+    assert res_fds < res_pd
+
+    # check setting list or series with a series
+    d_new = pd.Series(dr.index)
+
+    t = time.time()
+    for i in range(n):
+        fs[dr] = d_new
+    res_fds = time.time() - t
+
+    t = time.time()
+    for i in range(n):
+        series[dr] = d_new
+    res_pd = time.time() - t
+    print(res_fds)
+    print(res_pd)
+    assert res_fds < res_pd
+
+    # check setting list or series with a list
+    d_new = list(d_new)
+
+    t = time.time()
+    for i in range(n):
+        fs[dr] = d_new
+    res_fds = time.time() - t
+
+    t = time.time()
+    for i in range(n):
+        series[dr] = d_new
     res_pd = time.time() - t
     print(res_fds)
     print(res_pd)
