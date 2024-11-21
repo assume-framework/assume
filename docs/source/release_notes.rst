@@ -15,6 +15,7 @@ Upcoming Release
 
 **Bugfixes:**
   - **Tutorials**: General fixes of the tutorials, to align with updated functionalitites of Assume
+  - **Tutorial 07**: Aligned Amiris loader with changes in format in Amiris compare (https://gitlab.com/fame-framework/fame-io/-/issues/203 and https://gitlab.com/fame-framework/fame-io/-/issues/208)
 
 v0.4.3 - (11th November 2024)
 ===========================================
