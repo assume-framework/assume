@@ -95,6 +95,10 @@ available_examples = {
     },
     "large_2019_rl": {"scenario": "example_03a", "study_case": "base_case_2019"},
     "large_2021_rl": {"scenario": "example_03b", "study_case": "base_case_2021"},
+    "experiment": {
+        "scenario": "experiment",
+        "study_case": "eom",
+    },
 }
 
 
@@ -105,8 +109,8 @@ if __name__ == "__main__":
     - local_db: without database and grafana
     - timescale: with database and grafana (note: you need docker installed)
     """
-    data_format = "timescale"  # "local_db" or "timescale"
-    example = "small_household"
+    data_format = "local_db"  # "local_db" or "timescale"
+    example = "experiment"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
