@@ -150,7 +150,7 @@ class NaiveDASteelplantStrategy(BaseStrategy):
         **kwargs,
     ) -> Orderbook:
         # calculate the optimal operation of the unit
-        unit.determine_optimal_operation_with_flex()
+        unit.determine_optimal_operation_without_flex()
 
         bids = []
         for product in product_tuples:

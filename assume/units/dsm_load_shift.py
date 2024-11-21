@@ -22,6 +22,7 @@ class DSMFlex:
             model,
         ),
     }
+    big_M = 10000000
 
     def __init__(self, components, **kwargs):
         super().__init__(**kwargs)
@@ -74,8 +75,8 @@ class DSMFlex:
         model.total_cost = pyo.Param(initialize=0.0, mutable=True)
 
         # Variables
-        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
-        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
+        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeIntegers)
+        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeIntegers)
         model.shift_indicator = pyo.Var(model.time_steps, within=pyo.Binary)
 
         @model.Constraint()
@@ -85,21 +86,25 @@ class DSMFlex:
             ) <= m.total_cost * (1 + (m.cost_tolerance / 100))
 
         @model.Constraint(model.time_steps)
+        def flex_constraint_upper(m, t):
+            return m.load_shift_pos[t] <= (1 - m.shift_indicator[t]) * self.big_M
+
+        @model.Constraint(model.time_steps)
+        def flex_constraint_lower(m, t):
+            return m.load_shift_neg[t] <= m.shift_indicator[t] * self.big_M
+
+        @model.Constraint(model.time_steps)
         def total_power_input_constraint_with_flex(m, t):
             if self.has_electrolyser:
                 return (
-                    m.total_power_input[t]
-                    + m.load_shift_pos[t] * model.shift_indicator[t]
-                    - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
                     == self.model.dsm_blocks["electrolyser"].power_in[t]
                     + self.model.dsm_blocks["eaf"].power_in[t]
                     + self.model.dsm_blocks["dri_plant"].power_in[t]
                 )
             else:
                 return (
-                    m.total_power_input[t]
-                    + m.load_shift_pos[t] * model.shift_indicator[t]
-                    - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
                     == self.model.dsm_blocks["eaf"].power_in[t]
                     + self.model.dsm_blocks["dri_plant"].power_in[t]
                 )
@@ -144,8 +149,8 @@ class DSMFlex:
         )
 
         # Variables
-        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
-        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
+        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeIntegers)
+        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeIntegers)
         model.shift_indicator = pyo.Var(model.time_steps, within=pyo.Binary)
 
         # Constraint to manage total cost upper limit with cost tolerance
@@ -155,23 +160,27 @@ class DSMFlex:
                 m.variable_cost[t] for t in m.time_steps
             ) <= m.total_cost * (1 + (m.cost_tolerance / 100))
 
+        @model.Constraint(model.time_steps)
+        def flex_constraint_upper(m, t):
+            return m.load_shift_pos[t] <= (1 - m.shift_indicator[t]) * self.big_M
+
+        @model.Constraint(model.time_steps)
+        def flex_constraint_lower(m, t):
+            return m.load_shift_neg[t] <= m.shift_indicator[t] * self.big_M
+
         # Power input constraint with flexibility based on congestion
         @model.Constraint(model.time_steps)
         def total_power_input_constraint_with_flex(m, t):
             if self.has_electrolyser:
                 return (
-                    m.total_power_input[t]
-                    + m.load_shift_pos[t] * model.shift_indicator[t]
-                    - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
                     == self.model.dsm_blocks["electrolyser"].power_in[t]
                     + self.model.dsm_blocks["eaf"].power_in[t]
                     + self.model.dsm_blocks["dri_plant"].power_in[t]
                 )
             else:
                 return (
-                    m.total_power_input[t]
-                    + m.load_shift_pos[t] * model.shift_indicator[t]
-                    - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
                     == self.model.dsm_blocks["eaf"].power_in[t]
                     + self.model.dsm_blocks["dri_plant"].power_in[t]
                 )
@@ -198,8 +207,8 @@ class DSMFlex:
         model.total_cost = pyo.Param(initialize=0.0, mutable=True)
 
         # Variables for load shifting
-        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
-        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
+        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeIntegers)
+        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeIntegers)
         model.shift_indicator = pyo.Var(model.time_steps, within=pyo.Binary)
 
         peak_periods = {
@@ -218,23 +227,27 @@ class DSMFlex:
                 m.variable_cost[t] for t in m.time_steps
             ) <= m.total_cost * (1 + (m.cost_tolerance / 100))
 
+        @model.Constraint(model.time_steps)
+        def flex_constraint_upper(m, t):
+            return m.load_shift_pos[t] <= (1 - m.shift_indicator[t]) * self.big_M
+
+        @model.Constraint(model.time_steps)
+        def flex_constraint_lower(m, t):
+            return m.load_shift_neg[t] <= m.shift_indicator[t] * self.big_M
+
         # Power input constraint with flexibility based on congestion
         @model.Constraint(model.time_steps)
         def total_power_input_constraint_with_peak_shift(m, t):
             if self.has_electrolyser:
                 return (
-                    m.total_power_input[t]
-                    + m.load_shift_pos[t] * m.shift_indicator[t]
-                    - m.load_shift_neg[t] * (1 - m.shift_indicator[t])
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
                     == m.dsm_blocks["electrolyser"].power_in[t]
                     + m.dsm_blocks["eaf"].power_in[t]
                     + m.dsm_blocks["dri_plant"].power_in[t]
                 )
             else:
                 return (
-                    m.total_power_input[t]
-                    + m.load_shift_pos[t] * m.shift_indicator[t]
-                    - m.load_shift_neg[t] * (1 - m.shift_indicator[t])
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
                     == m.dsm_blocks["eaf"].power_in[t]
                     + m.dsm_blocks["dri_plant"].power_in[t]
                 )
@@ -286,8 +299,8 @@ class DSMFlex:
         model.total_cost = pyo.Param(initialize=0.0, mutable=True)
 
         # Variables for load flexibility based on renewable intensity
-        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
-        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
+        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeIntegers)
+        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeIntegers)
         model.shift_indicator = pyo.Var(model.time_steps, within=pyo.Binary)
 
         # Constraint to manage total cost upper limit with cost tolerance
@@ -297,23 +310,27 @@ class DSMFlex:
                 m.variable_cost[t] for t in m.time_steps
             ) <= m.total_cost * (1 + (m.cost_tolerance / 100))
 
+        @model.Constraint(model.time_steps)
+        def flex_constraint_upper(m, t):
+            return m.load_shift_pos[t] <= (1 - m.shift_indicator[t]) * self.big_M
+
+        @model.Constraint(model.time_steps)
+        def flex_constraint_lower(m, t):
+            return m.load_shift_neg[t] <= m.shift_indicator[t] * self.big_M
+
         # Power input constraint integrating flexibility
         @model.Constraint(model.time_steps)
         def total_power_input_constraint_flex(m, t):
             if self.has_electrolyser:
                 return (
-                    m.total_power_input[t]
-                    + m.load_shift_pos[t] * m.shift_indicator[t]
-                    - m.load_shift_neg[t] * (1 - m.shift_indicator[t])
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
                     == m.dsm_blocks["electrolyser"].power_in[t]
                     + m.dsm_blocks["eaf"].power_in[t]
                     + m.dsm_blocks["dri_plant"].power_in[t]
                 )
             else:
                 return (
-                    m.total_power_input[t]
-                    + m.load_shift_pos[t] * m.shift_indicator[t]
-                    - m.load_shift_neg[t] * (1 - m.shift_indicator[t])
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
                     == m.dsm_blocks["eaf"].power_in[t]
                     + m.dsm_blocks["dri_plant"].power_in[t]
                 )

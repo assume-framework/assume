@@ -18,7 +18,7 @@ from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
 from assume.units.dsm_load_shift import DSMFlex
 
-SOLVERS = ["gurobi", "appsi_highs", "glpk", "cbc", "cplex"]
+SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
 
 logger = logging.getLogger(__name__)
 
@@ -391,8 +391,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 """
 
                 maximise_load_shift = pyo.quicksum(
-                    m.load_shift_neg[t] * (1 - m.shift_indicator[t])
-                    for t in m.time_steps
+                    m.load_shift_pos[t] for t in m.time_steps
                 )
 
                 return maximise_load_shift
@@ -405,9 +404,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 Maximizes the load shift over all time steps.
                 """
                 maximise_load_shift = pyo.quicksum(
-                    m.load_shift_neg[t]
-                    * (1 - m.shift_indicator[t])
-                    * m.congestion_indicator[t]
+                    m.load_shift_neg[t] * m.congestion_indicator[t]
                     for t in m.time_steps
                 )
 
@@ -421,10 +418,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 Maximizes the load shift over all time steps.
                 """
                 maximise_load_shift = pyo.quicksum(
-                    m.load_shift_neg[t]
-                    * (1 - m.shift_indicator[t])
-                    * m.peak_indicator[t]
-                    for t in m.time_steps
+                    m.load_shift_neg[t] * m.peak_indicator[t] for t in m.time_steps
                 )
 
                 return maximise_load_shift
@@ -437,8 +431,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 Maximizes the load increase over all time steps based on renewable surplus.
                 """
                 maximise_renewable_utilisation = pyo.quicksum(
-                    m.load_shift_pos[t] * m.shift_indicator[t] * m.renewable_signal[t]
-                    for t in m.time_steps
+                    m.load_shift_pos[t] * m.renewable_signal[t] for t in m.time_steps
                 )
 
                 return maximise_renewable_utilisation
