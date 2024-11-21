@@ -1,289 +1,289 @@
-start_time,end_time,price,volume,node,bid_id,unit_id,accepted_volume,accepted_price,market_id,bid_type,simulation
-2023-01-02 00:00:00,2023-01-02 01:00:00,10,31,north,Unit 1_1,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 00:00:00,2023-01-02 01:00:00,20,19,east,Unit 2_1,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 00:00:00,2023-01-02 01:00:00,50,10,west,Unit 3_1,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 01:00:00,2023-01-02 02:00:00,10,31,north,Unit 1_2,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 01:00:00,2023-01-02 02:00:00,20,19,east,Unit 2_2,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 01:00:00,2023-01-02 02:00:00,50,10,west,Unit 3_2,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 02:00:00,2023-01-02 03:00:00,10,31,north,Unit 1_3,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 02:00:00,2023-01-02 03:00:00,20,19,east,Unit 2_3,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 02:00:00,2023-01-02 03:00:00,50,10,west,Unit 3_3,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 03:00:00,2023-01-02 04:00:00,10,31,north,Unit 1_4,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 03:00:00,2023-01-02 04:00:00,20,19,east,Unit 2_4,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 03:00:00,2023-01-02 04:00:00,50,10,west,Unit 3_4,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 04:00:00,2023-01-02 05:00:00,10,31,north,Unit 1_5,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 04:00:00,2023-01-02 05:00:00,20,19,east,Unit 2_5,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 04:00:00,2023-01-02 05:00:00,50,10,west,Unit 3_5,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 05:00:00,2023-01-02 06:00:00,10,31,north,Unit 1_6,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 05:00:00,2023-01-02 06:00:00,20,19,east,Unit 2_6,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 05:00:00,2023-01-02 06:00:00,50,10,west,Unit 3_6,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 06:00:00,2023-01-02 07:00:00,10,31,north,Unit 1_7,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 06:00:00,2023-01-02 07:00:00,20,19,east,Unit 2_7,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 06:00:00,2023-01-02 07:00:00,50,10,west,Unit 3_7,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 07:00:00,2023-01-02 08:00:00,10,31,north,Unit 1_8,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 07:00:00,2023-01-02 08:00:00,20,19,east,Unit 2_8,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 07:00:00,2023-01-02 08:00:00,50,10,west,Unit 3_8,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 08:00:00,2023-01-02 09:00:00,10,31,north,Unit 1_9,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 08:00:00,2023-01-02 09:00:00,20,19,east,Unit 2_9,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 08:00:00,2023-01-02 09:00:00,50,10,west,Unit 3_9,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 09:00:00,2023-01-02 10:00:00,10,31,north,Unit 1_10,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 09:00:00,2023-01-02 10:00:00,20,19,east,Unit 2_10,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 09:00:00,2023-01-02 10:00:00,50,10,west,Unit 3_10,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 10:00:00,2023-01-02 11:00:00,10,31,north,Unit 1_11,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 10:00:00,2023-01-02 11:00:00,20,19,east,Unit 2_11,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 10:00:00,2023-01-02 11:00:00,50,10,west,Unit 3_11,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 11:00:00,2023-01-02 12:00:00,10,31,north,Unit 1_12,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 11:00:00,2023-01-02 12:00:00,20,19,east,Unit 2_12,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 11:00:00,2023-01-02 12:00:00,50,10,west,Unit 3_12,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 12:00:00,2023-01-02 13:00:00,10,31,north,Unit 1_13,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 12:00:00,2023-01-02 13:00:00,20,19,east,Unit 2_13,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 12:00:00,2023-01-02 13:00:00,50,10,west,Unit 3_13,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 13:00:00,2023-01-02 14:00:00,10,31,north,Unit 1_14,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 13:00:00,2023-01-02 14:00:00,20,19,east,Unit 2_14,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 13:00:00,2023-01-02 14:00:00,50,10,west,Unit 3_14,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 14:00:00,2023-01-02 15:00:00,10,31,north,Unit 1_15,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 14:00:00,2023-01-02 15:00:00,20,19,east,Unit 2_15,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 14:00:00,2023-01-02 15:00:00,50,10,west,Unit 3_15,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 15:00:00,2023-01-02 16:00:00,10,31,north,Unit 1_16,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 15:00:00,2023-01-02 16:00:00,20,19,east,Unit 2_16,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 15:00:00,2023-01-02 16:00:00,50,10,west,Unit 3_16,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 16:00:00,2023-01-02 17:00:00,10,31,north,Unit 1_17,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 16:00:00,2023-01-02 17:00:00,20,19,east,Unit 2_17,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 16:00:00,2023-01-02 17:00:00,50,10,west,Unit 3_17,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 17:00:00,2023-01-02 18:00:00,10,31,north,Unit 1_18,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 17:00:00,2023-01-02 18:00:00,20,19,east,Unit 2_18,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 17:00:00,2023-01-02 18:00:00,50,10,west,Unit 3_18,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 18:00:00,2023-01-02 19:00:00,10,31,north,Unit 1_19,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 18:00:00,2023-01-02 19:00:00,20,19,east,Unit 2_19,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 18:00:00,2023-01-02 19:00:00,50,10,west,Unit 3_19,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 19:00:00,2023-01-02 20:00:00,10,31,north,Unit 1_20,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 19:00:00,2023-01-02 20:00:00,20,19,east,Unit 2_20,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 19:00:00,2023-01-02 20:00:00,50,10,west,Unit 3_20,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 20:00:00,2023-01-02 21:00:00,10,31,north,Unit 1_21,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 20:00:00,2023-01-02 21:00:00,20,19,east,Unit 2_21,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 20:00:00,2023-01-02 21:00:00,50,10,west,Unit 3_21,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 21:00:00,2023-01-02 22:00:00,10,31,north,Unit 1_22,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 21:00:00,2023-01-02 22:00:00,20,19,east,Unit 2_22,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 21:00:00,2023-01-02 22:00:00,50,10,west,Unit 3_22,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 22:00:00,2023-01-02 23:00:00,10,31,north,Unit 1_23,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 22:00:00,2023-01-02 23:00:00,20,19,east,Unit 2_23,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 22:00:00,2023-01-02 23:00:00,50,10,west,Unit 3_23,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 23:00:00,2023-01-03 00:00:00,10,31,north,Unit 1_24,Unit 1,31,50,EOM,,example_05e_base
-2023-01-02 23:00:00,2023-01-03 00:00:00,20,19,east,Unit 2_24,Unit 2,19,50,EOM,,example_05e_base
-2023-01-02 23:00:00,2023-01-03 00:00:00,50,10,west,Unit 3_24,Unit 3,10,50,EOM,,example_05e_base
-2023-01-02 00:00:00,2023-01-02 01:00:00,3000,-40,west,demand_west_1,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 00:00:00,2023-01-02 01:00:00,3000,-10,north,demand_north_1,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 00:00:00,2023-01-02 01:00:00,3000,-10,east,demand_east_1,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 01:00:00,2023-01-02 02:00:00,3000,-10,north,demand_north_2,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 01:00:00,2023-01-02 02:00:00,3000,-40,west,demand_west_2,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 01:00:00,2023-01-02 02:00:00,3000,-10,east,demand_east_2,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 02:00:00,2023-01-02 03:00:00,3000,-40,west,demand_west_3,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 02:00:00,2023-01-02 03:00:00,3000,-10,east,demand_east_3,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 02:00:00,2023-01-02 03:00:00,3000,-10,north,demand_north_3,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 03:00:00,2023-01-02 04:00:00,3000,-40,west,demand_west_4,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 03:00:00,2023-01-02 04:00:00,3000,-10,east,demand_east_4,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 03:00:00,2023-01-02 04:00:00,3000,-10,north,demand_north_4,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 04:00:00,2023-01-02 05:00:00,3000,-10,east,demand_east_5,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 04:00:00,2023-01-02 05:00:00,3000,-40,west,demand_west_5,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 04:00:00,2023-01-02 05:00:00,3000,-10,north,demand_north_5,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 05:00:00,2023-01-02 06:00:00,3000,-10,north,demand_north_6,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 05:00:00,2023-01-02 06:00:00,3000,-40,west,demand_west_6,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 05:00:00,2023-01-02 06:00:00,3000,-10,east,demand_east_6,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 06:00:00,2023-01-02 07:00:00,3000,-10,north,demand_north_7,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 06:00:00,2023-01-02 07:00:00,3000,-40,west,demand_west_7,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 06:00:00,2023-01-02 07:00:00,3000,-10,east,demand_east_7,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 07:00:00,2023-01-02 08:00:00,3000,-40,west,demand_west_8,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 07:00:00,2023-01-02 08:00:00,3000,-10,east,demand_east_8,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 07:00:00,2023-01-02 08:00:00,3000,-10,north,demand_north_8,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 08:00:00,2023-01-02 09:00:00,3000,-10,north,demand_north_9,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 08:00:00,2023-01-02 09:00:00,3000,-10,east,demand_east_9,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 08:00:00,2023-01-02 09:00:00,3000,-40,west,demand_west_9,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 09:00:00,2023-01-02 10:00:00,3000,-10,east,demand_east_10,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 09:00:00,2023-01-02 10:00:00,3000,-10,north,demand_north_10,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 09:00:00,2023-01-02 10:00:00,3000,-40,west,demand_west_10,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 10:00:00,2023-01-02 11:00:00,3000,-10,north,demand_north_11,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 10:00:00,2023-01-02 11:00:00,3000,-40,west,demand_west_11,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 10:00:00,2023-01-02 11:00:00,3000,-10,east,demand_east_11,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 11:00:00,2023-01-02 12:00:00,3000,-10,east,demand_east_12,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 11:00:00,2023-01-02 12:00:00,3000,-40,west,demand_west_12,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 11:00:00,2023-01-02 12:00:00,3000,-10,north,demand_north_12,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 12:00:00,2023-01-02 13:00:00,3000,-40,west,demand_west_13,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 12:00:00,2023-01-02 13:00:00,3000,-10,north,demand_north_13,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 12:00:00,2023-01-02 13:00:00,3000,-10,east,demand_east_13,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 13:00:00,2023-01-02 14:00:00,3000,-40,west,demand_west_14,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 13:00:00,2023-01-02 14:00:00,3000,-10,north,demand_north_14,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 13:00:00,2023-01-02 14:00:00,3000,-10,east,demand_east_14,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 14:00:00,2023-01-02 15:00:00,3000,-10,north,demand_north_15,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 14:00:00,2023-01-02 15:00:00,3000,-10,east,demand_east_15,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 14:00:00,2023-01-02 15:00:00,3000,-40,west,demand_west_15,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 15:00:00,2023-01-02 16:00:00,3000,-10,north,demand_north_16,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 15:00:00,2023-01-02 16:00:00,3000,-10,east,demand_east_16,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 15:00:00,2023-01-02 16:00:00,3000,-40,west,demand_west_16,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 16:00:00,2023-01-02 17:00:00,3000,-10,east,demand_east_17,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 16:00:00,2023-01-02 17:00:00,3000,-10,north,demand_north_17,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 16:00:00,2023-01-02 17:00:00,3000,-40,west,demand_west_17,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 17:00:00,2023-01-02 18:00:00,3000,-10,east,demand_east_18,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 17:00:00,2023-01-02 18:00:00,3000,-10,north,demand_north_18,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 17:00:00,2023-01-02 18:00:00,3000,-40,west,demand_west_18,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 18:00:00,2023-01-02 19:00:00,3000,-10,east,demand_east_19,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 18:00:00,2023-01-02 19:00:00,3000,-10,north,demand_north_19,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 18:00:00,2023-01-02 19:00:00,3000,-40,west,demand_west_19,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 19:00:00,2023-01-02 20:00:00,3000,-10,east,demand_east_20,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 19:00:00,2023-01-02 20:00:00,3000,-40,west,demand_west_20,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 19:00:00,2023-01-02 20:00:00,3000,-10,north,demand_north_20,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 20:00:00,2023-01-02 21:00:00,3000,-40,west,demand_west_21,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 20:00:00,2023-01-02 21:00:00,3000,-10,north,demand_north_21,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 20:00:00,2023-01-02 21:00:00,3000,-10,east,demand_east_21,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 21:00:00,2023-01-02 22:00:00,3000,-10,east,demand_east_22,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 21:00:00,2023-01-02 22:00:00,3000,-40,west,demand_west_22,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 21:00:00,2023-01-02 22:00:00,3000,-10,north,demand_north_22,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 22:00:00,2023-01-02 23:00:00,3000,-10,north,demand_north_23,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 22:00:00,2023-01-02 23:00:00,3000,-40,west,demand_west_23,demand_west,-40,50,EOM,,example_05e_base
-2023-01-02 22:00:00,2023-01-02 23:00:00,3000,-10,east,demand_east_23,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 23:00:00,2023-01-03 00:00:00,3000,-10,east,demand_east_24,demand_east,-10,50,EOM,,example_05e_base
-2023-01-02 23:00:00,2023-01-03 00:00:00,3000,-10,north,demand_north_24,demand_north,-10,50,EOM,,example_05e_base
-2023-01-02 23:00:00,2023-01-03 00:00:00,3000,-40,west,demand_west_24,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 00:00:00,2023-01-03 01:00:00,10,31,north,Unit 1_1,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 00:00:00,2023-01-03 01:00:00,20,19,east,Unit 2_1,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 00:00:00,2023-01-03 01:00:00,50,10,west,Unit 3_1,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 01:00:00,2023-01-03 02:00:00,10,31,north,Unit 1_2,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 01:00:00,2023-01-03 02:00:00,20,19,east,Unit 2_2,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 01:00:00,2023-01-03 02:00:00,50,10,west,Unit 3_2,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 02:00:00,2023-01-03 03:00:00,10,31,north,Unit 1_3,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 02:00:00,2023-01-03 03:00:00,20,19,east,Unit 2_3,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 02:00:00,2023-01-03 03:00:00,50,10,west,Unit 3_3,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 03:00:00,2023-01-03 04:00:00,10,31,north,Unit 1_4,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 03:00:00,2023-01-03 04:00:00,20,19,east,Unit 2_4,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 03:00:00,2023-01-03 04:00:00,50,10,west,Unit 3_4,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 04:00:00,2023-01-03 05:00:00,10,31,north,Unit 1_5,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 04:00:00,2023-01-03 05:00:00,20,19,east,Unit 2_5,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 04:00:00,2023-01-03 05:00:00,50,10,west,Unit 3_5,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 05:00:00,2023-01-03 06:00:00,10,31,north,Unit 1_6,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 05:00:00,2023-01-03 06:00:00,20,19,east,Unit 2_6,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 05:00:00,2023-01-03 06:00:00,50,10,west,Unit 3_6,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 06:00:00,2023-01-03 07:00:00,10,31,north,Unit 1_7,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 06:00:00,2023-01-03 07:00:00,20,19,east,Unit 2_7,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 06:00:00,2023-01-03 07:00:00,50,10,west,Unit 3_7,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 07:00:00,2023-01-03 08:00:00,10,31,north,Unit 1_8,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 07:00:00,2023-01-03 08:00:00,20,19,east,Unit 2_8,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 07:00:00,2023-01-03 08:00:00,50,10,west,Unit 3_8,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 08:00:00,2023-01-03 09:00:00,10,31,north,Unit 1_9,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 08:00:00,2023-01-03 09:00:00,20,19,east,Unit 2_9,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 08:00:00,2023-01-03 09:00:00,50,10,west,Unit 3_9,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 09:00:00,2023-01-03 10:00:00,10,31,north,Unit 1_10,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 09:00:00,2023-01-03 10:00:00,20,19,east,Unit 2_10,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 09:00:00,2023-01-03 10:00:00,50,10,west,Unit 3_10,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 10:00:00,2023-01-03 11:00:00,10,31,north,Unit 1_11,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 10:00:00,2023-01-03 11:00:00,20,19,east,Unit 2_11,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 10:00:00,2023-01-03 11:00:00,50,10,west,Unit 3_11,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 11:00:00,2023-01-03 12:00:00,10,31,north,Unit 1_12,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 11:00:00,2023-01-03 12:00:00,20,19,east,Unit 2_12,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 11:00:00,2023-01-03 12:00:00,50,10,west,Unit 3_12,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 12:00:00,2023-01-03 13:00:00,10,31,north,Unit 1_13,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 12:00:00,2023-01-03 13:00:00,20,19,east,Unit 2_13,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 12:00:00,2023-01-03 13:00:00,50,10,west,Unit 3_13,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 13:00:00,2023-01-03 14:00:00,10,31,north,Unit 1_14,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 13:00:00,2023-01-03 14:00:00,20,19,east,Unit 2_14,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 13:00:00,2023-01-03 14:00:00,50,10,west,Unit 3_14,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 14:00:00,2023-01-03 15:00:00,10,31,north,Unit 1_15,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 14:00:00,2023-01-03 15:00:00,20,19,east,Unit 2_15,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 14:00:00,2023-01-03 15:00:00,50,10,west,Unit 3_15,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 15:00:00,2023-01-03 16:00:00,10,31,north,Unit 1_16,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 15:00:00,2023-01-03 16:00:00,20,19,east,Unit 2_16,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 15:00:00,2023-01-03 16:00:00,50,10,west,Unit 3_16,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 16:00:00,2023-01-03 17:00:00,10,31,north,Unit 1_17,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 16:00:00,2023-01-03 17:00:00,20,19,east,Unit 2_17,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 16:00:00,2023-01-03 17:00:00,50,10,west,Unit 3_17,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 17:00:00,2023-01-03 18:00:00,10,31,north,Unit 1_18,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 17:00:00,2023-01-03 18:00:00,20,19,east,Unit 2_18,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 17:00:00,2023-01-03 18:00:00,50,10,west,Unit 3_18,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 18:00:00,2023-01-03 19:00:00,10,31,north,Unit 1_19,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 18:00:00,2023-01-03 19:00:00,20,19,east,Unit 2_19,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 18:00:00,2023-01-03 19:00:00,50,10,west,Unit 3_19,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 19:00:00,2023-01-03 20:00:00,10,31,north,Unit 1_20,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 19:00:00,2023-01-03 20:00:00,20,19,east,Unit 2_20,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 19:00:00,2023-01-03 20:00:00,50,10,west,Unit 3_20,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 20:00:00,2023-01-03 21:00:00,10,31,north,Unit 1_21,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 20:00:00,2023-01-03 21:00:00,20,19,east,Unit 2_21,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 20:00:00,2023-01-03 21:00:00,50,10,west,Unit 3_21,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 21:00:00,2023-01-03 22:00:00,10,31,north,Unit 1_22,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 21:00:00,2023-01-03 22:00:00,20,19,east,Unit 2_22,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 21:00:00,2023-01-03 22:00:00,50,10,west,Unit 3_22,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 22:00:00,2023-01-03 23:00:00,10,31,north,Unit 1_23,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 22:00:00,2023-01-03 23:00:00,20,19,east,Unit 2_23,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 22:00:00,2023-01-03 23:00:00,50,10,west,Unit 3_23,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 23:00:00,2023-01-04 00:00:00,10,31,north,Unit 1_24,Unit 1,31,50,EOM,,example_05e_base
-2023-01-03 23:00:00,2023-01-04 00:00:00,20,19,east,Unit 2_24,Unit 2,19,50,EOM,,example_05e_base
-2023-01-03 23:00:00,2023-01-04 00:00:00,50,10,west,Unit 3_24,Unit 3,10,50,EOM,,example_05e_base
-2023-01-03 00:00:00,2023-01-03 01:00:00,3000,-10,north,demand_north_1,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 00:00:00,2023-01-03 01:00:00,3000,-40,west,demand_west_1,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 00:00:00,2023-01-03 01:00:00,3000,-10,east,demand_east_1,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 01:00:00,2023-01-03 02:00:00,3000,-40,west,demand_west_2,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 01:00:00,2023-01-03 02:00:00,3000,-10,east,demand_east_2,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 01:00:00,2023-01-03 02:00:00,3000,-10,north,demand_north_2,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 02:00:00,2023-01-03 03:00:00,3000,-40,west,demand_west_3,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 02:00:00,2023-01-03 03:00:00,3000,-10,north,demand_north_3,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 02:00:00,2023-01-03 03:00:00,3000,-10,east,demand_east_3,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 03:00:00,2023-01-03 04:00:00,3000,-10,east,demand_east_4,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 03:00:00,2023-01-03 04:00:00,3000,-40,west,demand_west_4,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 03:00:00,2023-01-03 04:00:00,3000,-10,north,demand_north_4,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 04:00:00,2023-01-03 05:00:00,3000,-40,west,demand_west_5,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 04:00:00,2023-01-03 05:00:00,3000,-10,north,demand_north_5,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 04:00:00,2023-01-03 05:00:00,3000,-10,east,demand_east_5,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 05:00:00,2023-01-03 06:00:00,3000,-10,north,demand_north_6,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 05:00:00,2023-01-03 06:00:00,3000,-40,west,demand_west_6,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 05:00:00,2023-01-03 06:00:00,3000,-10,east,demand_east_6,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 06:00:00,2023-01-03 07:00:00,3000,-10,east,demand_east_7,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 06:00:00,2023-01-03 07:00:00,3000,-10,north,demand_north_7,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 06:00:00,2023-01-03 07:00:00,3000,-40,west,demand_west_7,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 07:00:00,2023-01-03 08:00:00,3000,-10,east,demand_east_8,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 07:00:00,2023-01-03 08:00:00,3000,-40,west,demand_west_8,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 07:00:00,2023-01-03 08:00:00,3000,-10,north,demand_north_8,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 08:00:00,2023-01-03 09:00:00,3000,-10,north,demand_north_9,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 08:00:00,2023-01-03 09:00:00,3000,-10,east,demand_east_9,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 08:00:00,2023-01-03 09:00:00,3000,-40,west,demand_west_9,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 09:00:00,2023-01-03 10:00:00,3000,-40,west,demand_west_10,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 09:00:00,2023-01-03 10:00:00,3000,-10,north,demand_north_10,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 09:00:00,2023-01-03 10:00:00,3000,-10,east,demand_east_10,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 10:00:00,2023-01-03 11:00:00,3000,-40,west,demand_west_11,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 10:00:00,2023-01-03 11:00:00,3000,-10,north,demand_north_11,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 10:00:00,2023-01-03 11:00:00,3000,-10,east,demand_east_11,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 11:00:00,2023-01-03 12:00:00,3000,-10,east,demand_east_12,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 11:00:00,2023-01-03 12:00:00,3000,-10,north,demand_north_12,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 11:00:00,2023-01-03 12:00:00,3000,-40,west,demand_west_12,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 12:00:00,2023-01-03 13:00:00,3000,-10,north,demand_north_13,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 12:00:00,2023-01-03 13:00:00,3000,-10,east,demand_east_13,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 12:00:00,2023-01-03 13:00:00,3000,-40,west,demand_west_13,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 13:00:00,2023-01-03 14:00:00,3000,-40,west,demand_west_14,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 13:00:00,2023-01-03 14:00:00,3000,-10,east,demand_east_14,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 13:00:00,2023-01-03 14:00:00,3000,-10,north,demand_north_14,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 14:00:00,2023-01-03 15:00:00,3000,-40,west,demand_west_15,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 14:00:00,2023-01-03 15:00:00,3000,-10,north,demand_north_15,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 14:00:00,2023-01-03 15:00:00,3000,-10,east,demand_east_15,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 15:00:00,2023-01-03 16:00:00,3000,-40,west,demand_west_16,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 15:00:00,2023-01-03 16:00:00,3000,-10,east,demand_east_16,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 15:00:00,2023-01-03 16:00:00,3000,-10,north,demand_north_16,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 16:00:00,2023-01-03 17:00:00,3000,-10,north,demand_north_17,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 16:00:00,2023-01-03 17:00:00,3000,-40,west,demand_west_17,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 16:00:00,2023-01-03 17:00:00,3000,-10,east,demand_east_17,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 17:00:00,2023-01-03 18:00:00,3000,-40,west,demand_west_18,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 17:00:00,2023-01-03 18:00:00,3000,-10,east,demand_east_18,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 17:00:00,2023-01-03 18:00:00,3000,-10,north,demand_north_18,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 18:00:00,2023-01-03 19:00:00,3000,-10,north,demand_north_19,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 18:00:00,2023-01-03 19:00:00,3000,-10,east,demand_east_19,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 18:00:00,2023-01-03 19:00:00,3000,-40,west,demand_west_19,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 19:00:00,2023-01-03 20:00:00,3000,-10,north,demand_north_20,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 19:00:00,2023-01-03 20:00:00,3000,-40,west,demand_west_20,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 19:00:00,2023-01-03 20:00:00,3000,-10,east,demand_east_20,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 20:00:00,2023-01-03 21:00:00,3000,-10,east,demand_east_21,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 20:00:00,2023-01-03 21:00:00,3000,-40,west,demand_west_21,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 20:00:00,2023-01-03 21:00:00,3000,-10,north,demand_north_21,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 21:00:00,2023-01-03 22:00:00,3000,-10,north,demand_north_22,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 21:00:00,2023-01-03 22:00:00,3000,-10,east,demand_east_22,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 21:00:00,2023-01-03 22:00:00,3000,-40,west,demand_west_22,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 22:00:00,2023-01-03 23:00:00,3000,-10,east,demand_east_23,demand_east,-10,50,EOM,,example_05e_base
-2023-01-03 22:00:00,2023-01-03 23:00:00,3000,-10,north,demand_north_23,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 22:00:00,2023-01-03 23:00:00,3000,-40,west,demand_west_23,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 23:00:00,2023-01-04 00:00:00,3000,-40,west,demand_west_24,demand_west,-40,50,EOM,,example_05e_base
-2023-01-03 23:00:00,2023-01-04 00:00:00,3000,-10,north,demand_north_24,demand_north,-10,50,EOM,,example_05e_base
-2023-01-03 23:00:00,2023-01-04 00:00:00,3000,-10,east,demand_east_24,demand_east,-10,50,EOM,,example_05e_base
+start_time,end_time,price,volume,node,bid_id,unit_id,accepted_volume,accepted_price,market_id,bid_type,simulation,max_power,min_power
+2023-01-02 00:00:00,2023-01-02 01:00:00,10,31,north,Unit 1_1,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 00:00:00,2023-01-02 01:00:00,20,19,east,Unit 2_1,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 00:00:00,2023-01-02 01:00:00,50,10,west,Unit 3_1,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 01:00:00,2023-01-02 02:00:00,10,31,north,Unit 1_2,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 01:00:00,2023-01-02 02:00:00,20,19,east,Unit 2_2,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 01:00:00,2023-01-02 02:00:00,50,10,west,Unit 3_2,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 02:00:00,2023-01-02 03:00:00,10,31,north,Unit 1_3,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 02:00:00,2023-01-02 03:00:00,20,19,east,Unit 2_3,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 02:00:00,2023-01-02 03:00:00,50,10,west,Unit 3_3,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 03:00:00,2023-01-02 04:00:00,10,31,north,Unit 1_4,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 03:00:00,2023-01-02 04:00:00,20,19,east,Unit 2_4,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 03:00:00,2023-01-02 04:00:00,50,10,west,Unit 3_4,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 04:00:00,2023-01-02 05:00:00,10,31,north,Unit 1_5,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 04:00:00,2023-01-02 05:00:00,20,19,east,Unit 2_5,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 04:00:00,2023-01-02 05:00:00,50,10,west,Unit 3_5,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 05:00:00,2023-01-02 06:00:00,10,31,north,Unit 1_6,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 05:00:00,2023-01-02 06:00:00,20,19,east,Unit 2_6,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 05:00:00,2023-01-02 06:00:00,50,10,west,Unit 3_6,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 06:00:00,2023-01-02 07:00:00,10,31,north,Unit 1_7,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 06:00:00,2023-01-02 07:00:00,20,19,east,Unit 2_7,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 06:00:00,2023-01-02 07:00:00,50,10,west,Unit 3_7,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 07:00:00,2023-01-02 08:00:00,10,31,north,Unit 1_8,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 07:00:00,2023-01-02 08:00:00,20,19,east,Unit 2_8,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 07:00:00,2023-01-02 08:00:00,50,10,west,Unit 3_8,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 08:00:00,2023-01-02 09:00:00,10,31,north,Unit 1_9,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 08:00:00,2023-01-02 09:00:00,20,19,east,Unit 2_9,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 08:00:00,2023-01-02 09:00:00,50,10,west,Unit 3_9,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 09:00:00,2023-01-02 10:00:00,10,31,north,Unit 1_10,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 09:00:00,2023-01-02 10:00:00,20,19,east,Unit 2_10,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 09:00:00,2023-01-02 10:00:00,50,10,west,Unit 3_10,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 10:00:00,2023-01-02 11:00:00,10,31,north,Unit 1_11,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 10:00:00,2023-01-02 11:00:00,20,19,east,Unit 2_11,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 10:00:00,2023-01-02 11:00:00,50,10,west,Unit 3_11,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 11:00:00,2023-01-02 12:00:00,10,31,north,Unit 1_12,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 11:00:00,2023-01-02 12:00:00,20,19,east,Unit 2_12,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 11:00:00,2023-01-02 12:00:00,50,10,west,Unit 3_12,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 12:00:00,2023-01-02 13:00:00,10,31,north,Unit 1_13,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 12:00:00,2023-01-02 13:00:00,20,19,east,Unit 2_13,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 12:00:00,2023-01-02 13:00:00,50,10,west,Unit 3_13,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 13:00:00,2023-01-02 14:00:00,10,31,north,Unit 1_14,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 13:00:00,2023-01-02 14:00:00,20,19,east,Unit 2_14,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 13:00:00,2023-01-02 14:00:00,50,10,west,Unit 3_14,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 14:00:00,2023-01-02 15:00:00,10,31,north,Unit 1_15,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 14:00:00,2023-01-02 15:00:00,20,19,east,Unit 2_15,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 14:00:00,2023-01-02 15:00:00,50,10,west,Unit 3_15,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 15:00:00,2023-01-02 16:00:00,10,31,north,Unit 1_16,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 15:00:00,2023-01-02 16:00:00,20,19,east,Unit 2_16,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 15:00:00,2023-01-02 16:00:00,50,10,west,Unit 3_16,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 16:00:00,2023-01-02 17:00:00,10,31,north,Unit 1_17,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 16:00:00,2023-01-02 17:00:00,20,19,east,Unit 2_17,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 16:00:00,2023-01-02 17:00:00,50,10,west,Unit 3_17,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 17:00:00,2023-01-02 18:00:00,10,31,north,Unit 1_18,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 17:00:00,2023-01-02 18:00:00,20,19,east,Unit 2_18,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 17:00:00,2023-01-02 18:00:00,50,10,west,Unit 3_18,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 18:00:00,2023-01-02 19:00:00,10,31,north,Unit 1_19,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 18:00:00,2023-01-02 19:00:00,20,19,east,Unit 2_19,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 18:00:00,2023-01-02 19:00:00,50,10,west,Unit 3_19,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 19:00:00,2023-01-02 20:00:00,10,31,north,Unit 1_20,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 19:00:00,2023-01-02 20:00:00,20,19,east,Unit 2_20,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 19:00:00,2023-01-02 20:00:00,50,10,west,Unit 3_20,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 20:00:00,2023-01-02 21:00:00,10,31,north,Unit 1_21,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 20:00:00,2023-01-02 21:00:00,20,19,east,Unit 2_21,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 20:00:00,2023-01-02 21:00:00,50,10,west,Unit 3_21,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 21:00:00,2023-01-02 22:00:00,10,31,north,Unit 1_22,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 21:00:00,2023-01-02 22:00:00,20,19,east,Unit 2_22,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 21:00:00,2023-01-02 22:00:00,50,10,west,Unit 3_22,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 22:00:00,2023-01-02 23:00:00,10,31,north,Unit 1_23,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 22:00:00,2023-01-02 23:00:00,20,19,east,Unit 2_23,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 22:00:00,2023-01-02 23:00:00,50,10,west,Unit 3_23,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 23:00:00,2023-01-03 00:00:00,10,31,north,Unit 1_24,Unit 1,31,50,EOM,,example_05e_base,,
+2023-01-02 23:00:00,2023-01-03 00:00:00,20,19,east,Unit 2_24,Unit 2,19,50,EOM,,example_05e_base,,
+2023-01-02 23:00:00,2023-01-03 00:00:00,50,10,west,Unit 3_24,Unit 3,10,50,EOM,,example_05e_base,,
+2023-01-02 00:00:00,2023-01-02 01:00:00,3000,-10,north,demand_north_1,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 00:00:00,2023-01-02 01:00:00,3000,-40,west,demand_west_1,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 00:00:00,2023-01-02 01:00:00,3000,-10,east,demand_east_1,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 01:00:00,2023-01-02 02:00:00,3000,-40,west,demand_west_2,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 01:00:00,2023-01-02 02:00:00,3000,-10,east,demand_east_2,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 01:00:00,2023-01-02 02:00:00,3000,-10,north,demand_north_2,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 02:00:00,2023-01-02 03:00:00,3000,-10,east,demand_east_3,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 02:00:00,2023-01-02 03:00:00,3000,-40,west,demand_west_3,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 02:00:00,2023-01-02 03:00:00,3000,-10,north,demand_north_3,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 03:00:00,2023-01-02 04:00:00,3000,-40,west,demand_west_4,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 03:00:00,2023-01-02 04:00:00,3000,-10,north,demand_north_4,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 03:00:00,2023-01-02 04:00:00,3000,-10,east,demand_east_4,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 04:00:00,2023-01-02 05:00:00,3000,-10,north,demand_north_5,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 04:00:00,2023-01-02 05:00:00,3000,-10,east,demand_east_5,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 04:00:00,2023-01-02 05:00:00,3000,-40,west,demand_west_5,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 05:00:00,2023-01-02 06:00:00,3000,-10,north,demand_north_6,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 05:00:00,2023-01-02 06:00:00,3000,-10,east,demand_east_6,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 05:00:00,2023-01-02 06:00:00,3000,-40,west,demand_west_6,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 06:00:00,2023-01-02 07:00:00,3000,-40,west,demand_west_7,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 06:00:00,2023-01-02 07:00:00,3000,-10,north,demand_north_7,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 06:00:00,2023-01-02 07:00:00,3000,-10,east,demand_east_7,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 07:00:00,2023-01-02 08:00:00,3000,-10,north,demand_north_8,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 07:00:00,2023-01-02 08:00:00,3000,-40,west,demand_west_8,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 07:00:00,2023-01-02 08:00:00,3000,-10,east,demand_east_8,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 08:00:00,2023-01-02 09:00:00,3000,-10,north,demand_north_9,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 08:00:00,2023-01-02 09:00:00,3000,-10,east,demand_east_9,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 08:00:00,2023-01-02 09:00:00,3000,-40,west,demand_west_9,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 09:00:00,2023-01-02 10:00:00,3000,-10,east,demand_east_10,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 09:00:00,2023-01-02 10:00:00,3000,-40,west,demand_west_10,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 09:00:00,2023-01-02 10:00:00,3000,-10,north,demand_north_10,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 10:00:00,2023-01-02 11:00:00,3000,-10,north,demand_north_11,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 10:00:00,2023-01-02 11:00:00,3000,-10,east,demand_east_11,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 10:00:00,2023-01-02 11:00:00,3000,-40,west,demand_west_11,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 11:00:00,2023-01-02 12:00:00,3000,-10,east,demand_east_12,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 11:00:00,2023-01-02 12:00:00,3000,-10,north,demand_north_12,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 11:00:00,2023-01-02 12:00:00,3000,-40,west,demand_west_12,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 12:00:00,2023-01-02 13:00:00,3000,-10,north,demand_north_13,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 12:00:00,2023-01-02 13:00:00,3000,-40,west,demand_west_13,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 12:00:00,2023-01-02 13:00:00,3000,-10,east,demand_east_13,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 13:00:00,2023-01-02 14:00:00,3000,-40,west,demand_west_14,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 13:00:00,2023-01-02 14:00:00,3000,-10,north,demand_north_14,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 13:00:00,2023-01-02 14:00:00,3000,-10,east,demand_east_14,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 14:00:00,2023-01-02 15:00:00,3000,-10,north,demand_north_15,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 14:00:00,2023-01-02 15:00:00,3000,-10,east,demand_east_15,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 14:00:00,2023-01-02 15:00:00,3000,-40,west,demand_west_15,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 15:00:00,2023-01-02 16:00:00,3000,-10,north,demand_north_16,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 15:00:00,2023-01-02 16:00:00,3000,-40,west,demand_west_16,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 15:00:00,2023-01-02 16:00:00,3000,-10,east,demand_east_16,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 16:00:00,2023-01-02 17:00:00,3000,-40,west,demand_west_17,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 16:00:00,2023-01-02 17:00:00,3000,-10,north,demand_north_17,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 16:00:00,2023-01-02 17:00:00,3000,-10,east,demand_east_17,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 17:00:00,2023-01-02 18:00:00,3000,-40,west,demand_west_18,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 17:00:00,2023-01-02 18:00:00,3000,-10,east,demand_east_18,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 17:00:00,2023-01-02 18:00:00,3000,-10,north,demand_north_18,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 18:00:00,2023-01-02 19:00:00,3000,-10,east,demand_east_19,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 18:00:00,2023-01-02 19:00:00,3000,-10,north,demand_north_19,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 18:00:00,2023-01-02 19:00:00,3000,-40,west,demand_west_19,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 19:00:00,2023-01-02 20:00:00,3000,-10,east,demand_east_20,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 19:00:00,2023-01-02 20:00:00,3000,-10,north,demand_north_20,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 19:00:00,2023-01-02 20:00:00,3000,-40,west,demand_west_20,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 20:00:00,2023-01-02 21:00:00,3000,-10,east,demand_east_21,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 20:00:00,2023-01-02 21:00:00,3000,-10,north,demand_north_21,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 20:00:00,2023-01-02 21:00:00,3000,-40,west,demand_west_21,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 21:00:00,2023-01-02 22:00:00,3000,-10,east,demand_east_22,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 21:00:00,2023-01-02 22:00:00,3000,-10,north,demand_north_22,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 21:00:00,2023-01-02 22:00:00,3000,-40,west,demand_west_22,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 22:00:00,2023-01-02 23:00:00,3000,-10,east,demand_east_23,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 22:00:00,2023-01-02 23:00:00,3000,-10,north,demand_north_23,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 22:00:00,2023-01-02 23:00:00,3000,-40,west,demand_west_23,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 23:00:00,2023-01-03 00:00:00,3000,-10,north,demand_north_24,demand_north,-10,50,EOM,,example_05e_base,,
+2023-01-02 23:00:00,2023-01-03 00:00:00,3000,-40,west,demand_west_24,demand_west,-40,50,EOM,,example_05e_base,,
+2023-01-02 23:00:00,2023-01-03 00:00:00,3000,-10,east,demand_east_24,demand_east,-10,50,EOM,,example_05e_base,,
+2023-01-02 00:00:00,2023-01-02 01:00:00,10,31,north,Unit 1_1,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 01:00:00,2023-01-02 02:00:00,10,31,north,Unit 1_2,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 02:00:00,2023-01-02 03:00:00,10,31,north,Unit 1_3,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 03:00:00,2023-01-02 04:00:00,10,31,north,Unit 1_4,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 04:00:00,2023-01-02 05:00:00,10,31,north,Unit 1_5,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 05:00:00,2023-01-02 06:00:00,10,31,north,Unit 1_6,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 06:00:00,2023-01-02 07:00:00,10,31,north,Unit 1_7,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 07:00:00,2023-01-02 08:00:00,10,31,north,Unit 1_8,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 08:00:00,2023-01-02 09:00:00,10,31,north,Unit 1_9,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 09:00:00,2023-01-02 10:00:00,10,31,north,Unit 1_10,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 10:00:00,2023-01-02 11:00:00,10,31,north,Unit 1_11,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 11:00:00,2023-01-02 12:00:00,10,31,north,Unit 1_12,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 12:00:00,2023-01-02 13:00:00,10,31,north,Unit 1_13,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 13:00:00,2023-01-02 14:00:00,10,31,north,Unit 1_14,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 14:00:00,2023-01-02 15:00:00,10,31,north,Unit 1_15,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 15:00:00,2023-01-02 16:00:00,10,31,north,Unit 1_16,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 16:00:00,2023-01-02 17:00:00,10,31,north,Unit 1_17,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 17:00:00,2023-01-02 18:00:00,10,31,north,Unit 1_18,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 18:00:00,2023-01-02 19:00:00,10,31,north,Unit 1_19,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 19:00:00,2023-01-02 20:00:00,10,31,north,Unit 1_20,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 20:00:00,2023-01-02 21:00:00,10,31,north,Unit 1_21,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 21:00:00,2023-01-02 22:00:00,10,31,north,Unit 1_22,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 22:00:00,2023-01-02 23:00:00,10,31,north,Unit 1_23,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 23:00:00,2023-01-03 00:00:00,10,31,north,Unit 1_24,Unit 1,-4.5,10,redispatch,,example_05e_base,31,0
+2023-01-02 00:00:00,2023-01-02 01:00:00,20,19,east,Unit 2_1,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 01:00:00,2023-01-02 02:00:00,20,19,east,Unit 2_2,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 02:00:00,2023-01-02 03:00:00,20,19,east,Unit 2_3,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 03:00:00,2023-01-02 04:00:00,20,19,east,Unit 2_4,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 04:00:00,2023-01-02 05:00:00,20,19,east,Unit 2_5,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 05:00:00,2023-01-02 06:00:00,20,19,east,Unit 2_6,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 06:00:00,2023-01-02 07:00:00,20,19,east,Unit 2_7,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 07:00:00,2023-01-02 08:00:00,20,19,east,Unit 2_8,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 08:00:00,2023-01-02 09:00:00,20,19,east,Unit 2_9,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 09:00:00,2023-01-02 10:00:00,20,19,east,Unit 2_10,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 10:00:00,2023-01-02 11:00:00,20,19,east,Unit 2_11,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 11:00:00,2023-01-02 12:00:00,20,19,east,Unit 2_12,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 12:00:00,2023-01-02 13:00:00,20,19,east,Unit 2_13,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 13:00:00,2023-01-02 14:00:00,20,19,east,Unit 2_14,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 14:00:00,2023-01-02 15:00:00,20,19,east,Unit 2_15,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 15:00:00,2023-01-02 16:00:00,20,19,east,Unit 2_16,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 16:00:00,2023-01-02 17:00:00,20,19,east,Unit 2_17,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 17:00:00,2023-01-02 18:00:00,20,19,east,Unit 2_18,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 18:00:00,2023-01-02 19:00:00,20,19,east,Unit 2_19,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 19:00:00,2023-01-02 20:00:00,20,19,east,Unit 2_20,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 20:00:00,2023-01-02 21:00:00,20,19,east,Unit 2_21,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 21:00:00,2023-01-02 22:00:00,20,19,east,Unit 2_22,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 22:00:00,2023-01-02 23:00:00,20,19,east,Unit 2_23,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 23:00:00,2023-01-03 00:00:00,20,19,east,Unit 2_24,Unit 2,0,0,redispatch,,example_05e_base,19,0
+2023-01-02 00:00:00,2023-01-02 01:00:00,50,10,west,Unit 3_1,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 01:00:00,2023-01-02 02:00:00,50,10,west,Unit 3_2,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 02:00:00,2023-01-02 03:00:00,50,10,west,Unit 3_3,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 03:00:00,2023-01-02 04:00:00,50,10,west,Unit 3_4,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 04:00:00,2023-01-02 05:00:00,50,10,west,Unit 3_5,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 05:00:00,2023-01-02 06:00:00,50,10,west,Unit 3_6,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 06:00:00,2023-01-02 07:00:00,50,10,west,Unit 3_7,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 07:00:00,2023-01-02 08:00:00,50,10,west,Unit 3_8,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 08:00:00,2023-01-02 09:00:00,50,10,west,Unit 3_9,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 09:00:00,2023-01-02 10:00:00,50,10,west,Unit 3_10,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 10:00:00,2023-01-02 11:00:00,50,10,west,Unit 3_11,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 11:00:00,2023-01-02 12:00:00,50,10,west,Unit 3_12,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 12:00:00,2023-01-02 13:00:00,50,10,west,Unit 3_13,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 13:00:00,2023-01-02 14:00:00,50,10,west,Unit 3_14,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 14:00:00,2023-01-02 15:00:00,50,10,west,Unit 3_15,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 15:00:00,2023-01-02 16:00:00,50,10,west,Unit 3_16,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 16:00:00,2023-01-02 17:00:00,50,10,west,Unit 3_17,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 17:00:00,2023-01-02 18:00:00,50,10,west,Unit 3_18,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 18:00:00,2023-01-02 19:00:00,50,10,west,Unit 3_19,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 19:00:00,2023-01-02 20:00:00,50,10,west,Unit 3_20,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 20:00:00,2023-01-02 21:00:00,50,10,west,Unit 3_21,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 21:00:00,2023-01-02 22:00:00,50,10,west,Unit 3_22,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 22:00:00,2023-01-02 23:00:00,50,10,west,Unit 3_23,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 23:00:00,2023-01-03 00:00:00,50,10,west,Unit 3_24,Unit 3,0,0,redispatch,,example_05e_base,10,0
+2023-01-02 00:00:00,2023-01-02 01:00:00,3000,-10,north,demand_north_1,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 01:00:00,2023-01-02 02:00:00,3000,-10,north,demand_north_2,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 02:00:00,2023-01-02 03:00:00,3000,-10,north,demand_north_3,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 03:00:00,2023-01-02 04:00:00,3000,-10,north,demand_north_4,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 04:00:00,2023-01-02 05:00:00,3000,-10,north,demand_north_5,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 05:00:00,2023-01-02 06:00:00,3000,-10,north,demand_north_6,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 06:00:00,2023-01-02 07:00:00,3000,-10,north,demand_north_7,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 07:00:00,2023-01-02 08:00:00,3000,-10,north,demand_north_8,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 08:00:00,2023-01-02 09:00:00,3000,-10,north,demand_north_9,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 09:00:00,2023-01-02 10:00:00,3000,-10,north,demand_north_10,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 10:00:00,2023-01-02 11:00:00,3000,-10,north,demand_north_11,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 11:00:00,2023-01-02 12:00:00,3000,-10,north,demand_north_12,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 12:00:00,2023-01-02 13:00:00,3000,-10,north,demand_north_13,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 13:00:00,2023-01-02 14:00:00,3000,-10,north,demand_north_14,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 14:00:00,2023-01-02 15:00:00,3000,-10,north,demand_north_15,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 15:00:00,2023-01-02 16:00:00,3000,-10,north,demand_north_16,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 16:00:00,2023-01-02 17:00:00,3000,-10,north,demand_north_17,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 17:00:00,2023-01-02 18:00:00,3000,-10,north,demand_north_18,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 18:00:00,2023-01-02 19:00:00,3000,-10,north,demand_north_19,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 19:00:00,2023-01-02 20:00:00,3000,-10,north,demand_north_20,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 20:00:00,2023-01-02 21:00:00,3000,-10,north,demand_north_21,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 21:00:00,2023-01-02 22:00:00,3000,-10,north,demand_north_22,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 22:00:00,2023-01-02 23:00:00,3000,-10,north,demand_north_23,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 23:00:00,2023-01-03 00:00:00,3000,-10,north,demand_north_24,demand_north,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 00:00:00,2023-01-02 01:00:00,3000,-10,east,demand_east_1,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 01:00:00,2023-01-02 02:00:00,3000,-10,east,demand_east_2,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 02:00:00,2023-01-02 03:00:00,3000,-10,east,demand_east_3,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 03:00:00,2023-01-02 04:00:00,3000,-10,east,demand_east_4,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 04:00:00,2023-01-02 05:00:00,3000,-10,east,demand_east_5,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 05:00:00,2023-01-02 06:00:00,3000,-10,east,demand_east_6,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 06:00:00,2023-01-02 07:00:00,3000,-10,east,demand_east_7,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 07:00:00,2023-01-02 08:00:00,3000,-10,east,demand_east_8,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 08:00:00,2023-01-02 09:00:00,3000,-10,east,demand_east_9,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 09:00:00,2023-01-02 10:00:00,3000,-10,east,demand_east_10,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 10:00:00,2023-01-02 11:00:00,3000,-10,east,demand_east_11,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 11:00:00,2023-01-02 12:00:00,3000,-10,east,demand_east_12,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 12:00:00,2023-01-02 13:00:00,3000,-10,east,demand_east_13,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 13:00:00,2023-01-02 14:00:00,3000,-10,east,demand_east_14,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 14:00:00,2023-01-02 15:00:00,3000,-10,east,demand_east_15,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 15:00:00,2023-01-02 16:00:00,3000,-10,east,demand_east_16,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 16:00:00,2023-01-02 17:00:00,3000,-10,east,demand_east_17,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 17:00:00,2023-01-02 18:00:00,3000,-10,east,demand_east_18,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 18:00:00,2023-01-02 19:00:00,3000,-10,east,demand_east_19,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 19:00:00,2023-01-02 20:00:00,3000,-10,east,demand_east_20,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 20:00:00,2023-01-02 21:00:00,3000,-10,east,demand_east_21,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 21:00:00,2023-01-02 22:00:00,3000,-10,east,demand_east_22,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 22:00:00,2023-01-02 23:00:00,3000,-10,east,demand_east_23,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 23:00:00,2023-01-03 00:00:00,3000,-10,east,demand_east_24,demand_east,0,0,redispatch,,example_05e_base,-10,-10
+2023-01-02 00:00:00,2023-01-02 01:00:00,3000,-40,west,demand_west_1,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 01:00:00,2023-01-02 02:00:00,3000,-40,west,demand_west_2,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 02:00:00,2023-01-02 03:00:00,3000,-40,west,demand_west_3,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 03:00:00,2023-01-02 04:00:00,3000,-40,west,demand_west_4,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 04:00:00,2023-01-02 05:00:00,3000,-40,west,demand_west_5,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 05:00:00,2023-01-02 06:00:00,3000,-40,west,demand_west_6,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 06:00:00,2023-01-02 07:00:00,3000,-40,west,demand_west_7,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 07:00:00,2023-01-02 08:00:00,3000,-40,west,demand_west_8,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 08:00:00,2023-01-02 09:00:00,3000,-40,west,demand_west_9,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 09:00:00,2023-01-02 10:00:00,3000,-40,west,demand_west_10,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 10:00:00,2023-01-02 11:00:00,3000,-40,west,demand_west_11,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 11:00:00,2023-01-02 12:00:00,3000,-40,west,demand_west_12,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 12:00:00,2023-01-02 13:00:00,3000,-40,west,demand_west_13,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 13:00:00,2023-01-02 14:00:00,3000,-40,west,demand_west_14,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 14:00:00,2023-01-02 15:00:00,3000,-40,west,demand_west_15,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 15:00:00,2023-01-02 16:00:00,3000,-40,west,demand_west_16,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 16:00:00,2023-01-02 17:00:00,3000,-40,west,demand_west_17,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 17:00:00,2023-01-02 18:00:00,3000,-40,west,demand_west_18,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 18:00:00,2023-01-02 19:00:00,3000,-40,west,demand_west_19,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 19:00:00,2023-01-02 20:00:00,3000,-40,west,demand_west_20,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 20:00:00,2023-01-02 21:00:00,3000,-40,west,demand_west_21,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 21:00:00,2023-01-02 22:00:00,3000,-40,west,demand_west_22,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 22:00:00,2023-01-02 23:00:00,3000,-40,west,demand_west_23,demand_west,0,0,redispatch,,example_05e_base,-40,-40
+2023-01-02 23:00:00,2023-01-03 00:00:00,3000,-40,west,demand_west_24,demand_west,0,0,redispatch,,example_05e_base,-40,-40
