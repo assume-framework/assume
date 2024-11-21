@@ -274,7 +274,7 @@ def test_storage_ramping(storage_unit):
     assert max_ramp_discharge == 100
     assert max_ramp_charge == -60
 
-    # chargin scenario
+    # charging scenario
     storage_unit.outputs["energy"][start] = -60
 
     # next hour

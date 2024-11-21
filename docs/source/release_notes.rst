@@ -13,8 +13,21 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+  **Bugfixes:**
+  - **Tutorial 07**: Aligned Amiris loader with changes in format in Amiris compare (https://gitlab.com/fame-framework/fame-io/-/issues/203 and https://gitlab.com/fame-framework/fame-io/-/issues/208)
 
-v0.4.2 - Latest Release (5th November 2024)
+v0.4.3 - (11th November 2024)
+===========================================
+
+**Improvements:**
+  - **Documentation**: added codespell hook to pre-commit which checks for spelling errors in documentation and code
+
+**Bugfixes:**
+  - **Simulation**: Delete simulation results for same simulation prior to run (as before v0.4.2)
+
+**Full Changelog**: [v0.4.2...v0.4.3](https://github.com/assume-framework/assume/compare/v0.4.2...v0.4.3)
+
+v0.4.2 - (5th November 2024)
 ===========================================
 
 **New Features:**
@@ -101,7 +114,7 @@ v0.4.0 (8th August 2024)
 
 - Significant speed up of the framework and especially of the learning process
 - Separated scenario loader function to improve speed and reduce unrequired operations
-- Refactored unit operator by adding a seperate unit operator for learning units
+- Refactored unit operator by adding a separate unit operator for learning units
 - Enhanced learning output and path handling
 - Updated dashboard for better storage view
 - Improved clearing with shuffling of bids, to avoid bias in clearing of units early in order book
@@ -113,7 +126,7 @@ v0.4.0 (8th August 2024)
   matched to the corresponding market zone.
 - If any values in the availability_df.csv file are larger than 1, the framework will now warn the user
   and run a method to normalize the values to [0, 1].
-- Examples have been restructed to easier orientation and understanding: example_01.. cover all feature demonstration examples,
+- Examples have been restructured to easier orientation and understanding: example_01.. cover all feature demonstration examples,
   example_02.. cover all learning examples, example_03.. cover all full year examples
 - Added the option of integrating different actor network architectures to the reinforcement learning algorithm, currently a multilayer perceptron (mlp) and long short-term memory (lstm) are implemented
 - Added storing of network flows for complex clearing
