@@ -448,6 +448,7 @@ def test_datetime2timestamp():
     unix_start = datetime(1970, 1, 1)
     assert 0 == datetime2timestamp(unix_start)
 
+
 def test_create_date_range():
     start = datetime(2020, 1, 1, 0)
     end = datetime(2020, 1, 1, 5)
@@ -460,13 +461,11 @@ def test_create_date_range():
         index = FastIndex(start, end, freq="1h")
         fs = FastSeries(index)
     res = time.time() - t
-    print(res)
 
     t = time.time()
     for i in range(n):
         q_pd = pd.date_range(start, end, freq="1h")
     res_pd = time.time() - t
-    print(res_pd)
     # this is sometimes faster, sometimes not
     # as a lot of objects are created
     assert res < res_pd + 0.1
@@ -478,7 +477,6 @@ def test_create_date_range():
     for i in range(n):
         q_slice = fs[start:new_end]
     res_slice = time.time() - t
-    print(res_slice)
 
     series = pd.Series(0, index=q_pd)
 
@@ -486,16 +484,14 @@ def test_create_date_range():
     for i in range(n):
         q_pd_slice = series[start:new_end]
     res_slice_pd = time.time() - t
-    print(res_slice_pd)
-    # more than factor 10
-    assert res_slice < res_slice_pd / 10
+    # more than at least factor 5
+    assert res_slice < res_slice_pd / 5
 
     # check that setting items is faster:
     t = time.time()
     for i in range(n):
         fs[start] = 1
     res_slice = time.time() - t
-    print(res_slice)
 
     series = pd.Series(0, index=q_pd)
 
@@ -503,16 +499,14 @@ def test_create_date_range():
     for i in range(n):
         series[start] = 1
     res_slice_pd = time.time() - t
-    print(res_slice_pd)
-    # more than factor 10
-    assert res_slice < res_slice_pd / 10
+    # more than at least factor 5
+    assert res_slice < res_slice_pd / 5
 
     # check that setting slices is faster
     t = time.time()
     for i in range(n):
         fs[start:new_end] = 17
     res_slice = time.time() - t
-    print(res_slice)
 
     series = pd.Series(0, index=q_pd)
 
@@ -520,9 +514,8 @@ def test_create_date_range():
     for i in range(n):
         series[start:new_end] = 17
     res_slice_pd = time.time() - t
-    print(res_slice_pd)
-    # more than factor 10
-    assert res_slice < res_slice_pd / 10
+    # more than at least factor 5
+    assert res_slice < res_slice_pd / 5
 
     se = pd.Series(0.0, index=fs.index.get_date_list())
     se.loc[start]

@@ -432,6 +432,7 @@ class CsvForecaster(Forecaster):
         # Replace the DataFrame with the dictionary of FastSeries
         self.forecasts = fast_forecasts
 
+
 class RandomForecaster(CsvForecaster):
     """
     This class represents a forecaster that generates forecasts using random noise. It inherits

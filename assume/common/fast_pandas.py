@@ -502,8 +502,12 @@ class FastSeries:
         elif isinstance(
             item, (list | pd.Index | pd.DatetimeIndex | np.ndarray | pd.Series)
         ):
-            if len(item) == len(self.data):
-                self.data[item] = value
+            if (
+                len(item) == len(self.data)
+                and item[0] == self.index.start
+                and item[-1] == self.index.end
+            ):
+                self.data = np.array(value)
             else:
                 for i in item:
                     start = self.index._get_idx_from_date(i)
