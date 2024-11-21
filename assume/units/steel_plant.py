@@ -409,7 +409,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
 
             # Display the Objective Function Value
             objective_value = instance.obj_rule_opt()
-            logger.debug(f"The value of the objective function is {objective_value}.")
+            logger.debug("The value of the objective function is %s.", objective_value)
 
         elif results.solver.termination_condition == TerminationCondition.infeasible:
             logger.debug("The model is infeasible.")
@@ -452,7 +452,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
 
             # Display the Objective Function Value
             objective_value = instance.obj_rule_flex()
-            logger.debug(f"The value of the objective function is {objective_value}.")
+            logger.debug("The value of the objective function is %s.", objective_value)
 
         elif results.solver.termination_condition == TerminationCondition.infeasible:
             logger.debug("The model is infeasible.")

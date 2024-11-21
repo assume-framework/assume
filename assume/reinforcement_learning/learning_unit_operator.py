@@ -86,7 +86,7 @@ class RLUnitsOperator(UnitsOperator):
             content (ClearingMessage): The content of the clearing message.
             meta (MetaDict): The meta data of the market.
         """
-        logger.debug(f"{self.id} got market result: {content}")
+        logger.debug("%s got market result: %s", self.id, content)
         accepted_orders: Orderbook = content["accepted_orders"]
         rejected_orders: Orderbook = content["rejected_orders"]
         orderbook = accepted_orders + rejected_orders
