@@ -4,24 +4,26 @@
 
 base:
   end_date: 2019-03-31 00:00
-  learning_config:
-    algorithm: matd3
-    batch_size: 256
-    continue_learning: false
-    device: cpu
-    episodes_collecting_initial_experience: 5
-    gamma: 0.99
-    gradient_steps: -1
-    learning_rate: 0.001
-    max_bid_price: 100
-    noise_dt: 1
-    noise_scale: 1
-    noise_sigma: 0.1
-    train_freq: 24h
-    trained_policies_save_path: null
-    training_episodes: 100
-    validation_episodes_interval: 5
   learning_mode: true
+  learning_config:
+    continue_learning: False
+    trained_policies_save_path: null
+    max_bid_price: 100
+    algorithm: matd3
+    device: cpu
+    learning_rate: 0.0003
+    validation_episodes_interval: 10 # after how many episodes the validation starts and the policy is updated
+    training_episodes: 100
+    gradient_steps: 10
+    matd3:
+      actor_architecture: mlp
+      train_freq: 24h # how often write_to_learning_role gets called
+      episodes_collecting_initial_experience: 3
+      batch_size: 64
+      gamma: 0.99
+      noise_sigma: 0.1
+      noise_scale: 1
+      noise_dt: 1
   markets_config:
     EOM:
       market_mechanism: pay_as_clear
@@ -41,28 +43,28 @@ base:
   save_frequency_hours: null
   start_date: 2019-03-01 00:00
   time_step: 1h
+
 base_lstm:
   end_date: 2019-03-31 00:00
   learning_config:
-    actor_architecture: lstm
-    algorithm: matd3
-    batch_size: 256
-    continue_learning: false
-    device: cpu
-    early_stopping_steps: 10
-    early_stopping_threshold: 0.05
-    episodes_collecting_initial_experience: 5
-    gamma: 0.99
-    gradient_steps: -1
-    learning_rate: 0.001
-    max_bid_price: 100
-    noise_dt: 1
-    noise_scale: 1
-    noise_sigma: 0.1
-    train_freq: 24h
+    continue_learning: False
     trained_policies_save_path: null
-    training_episodes: 50
-    validation_episodes_interval: 5
+    max_bid_price: 100
+    algorithm: matd3
+    device: cpu
+    learning_rate: 0.0003
+    validation_episodes_interval: 10 # after how many episodes the validation starts and the policy is updated
+    training_episodes: 100
+    gradient_steps: 10
+    matd3:
+      actor_architecture: lstm
+      train_freq: 24h # how often write_to_learning_role gets called
+      episodes_collecting_initial_experience: 3
+      batch_size: 64
+      gamma: 0.99
+      noise_sigma: 0.1
+      noise_scale: 1
+      noise_dt: 1
   learning_mode: true
   markets_config:
     EOM:
@@ -93,41 +95,35 @@ tiny_ppo:
   time_step: 1h
   save_frequency_hours: null
   learning_mode: True
-
   learning_config:
     continue_learning: False
     trained_policies_save_path: null
     max_bid_price: 100
     algorithm: ppo
     device: cpu
-    learning_rate: 0.001
-    buffer_size: 5e5
+    learning_rate: 0.0003
+    validation_episodes_interval: 10 # after how many episodes the validation starts and the policy is updated
+    training_episodes: 100
+    gradient_steps: 10
     matd3:
       actor_architecture: mlp
-      training_episodes: 10
+      train_freq: 24h # how often write_to_learning_role gets called
       episodes_collecting_initial_experience: 3
-      train_freq: 48h
-      gradient_steps: -1
       batch_size: 64
       gamma: 0.99
       noise_sigma: 0.1
       noise_scale: 1
       noise_dt: 1
-      validation_episodes_interval: 5
     ppo: 
-      actor_architecture: mlp
-      training_episodes: 10
-      validation_episodes_interval: 5 # after how many episodes the validation starts and the policy is updated
-      train_freq: 64h # how often write_to_learning_role gets called
-      gamma: 0.99  # Discount factor for future rewards
-      epochs: 5 # #4  # Number of epochs for updating the policy
-      clip_ratio: 0.2  # Clipping parameter for policy updates
-      vf_coef: 0.5  # Value function coefficient in the loss function
-      entropy_coef: 0.01  # Entropy coefficient for exploration
-      max_grad_norm: 0.5  # Gradient clipping value
+      actor_architecture: dist
+      train_freq: 33h # how often write_to_learning_role gets called
+      gamma: 0.99 # Discount factor for future rewards
+      clip_ratio: 0.05  # Clipping parameter for policy updates
+      vf_coef: 0.75  # Value function coefficient in the loss function
+      entropy_coef: 0.005  # Entropy coefficient for exploration
+      max_grad_norm: 0.3  # Gradient clipping value
       gae_lambda: 0.95  # GAE lambda for advantage estimation
-      batch_size: 5  # Batch size for each update, if mini-batch approach is used (currently not implemented)
-
+      batch_size: 11  # Batch size for each update, if mini-batch approach is used (currently not implemented)
   markets_config:
     EOM:
       operator: EOM_operator
@@ -152,7 +148,6 @@ base_ppo:
   time_step: 1h
   save_frequency_hours: null
   learning_mode: True
-
   learning_config:
     continue_learning: False
     trained_policies_save_path: null
@@ -206,23 +201,24 @@ base_lstm:
 tiny:
   end_date: 2019-01-05 00:00
   learning_config:
-    actor_architecture: mlp
-    algorithm: matd3
-    batch_size: 64
-    continue_learning: false
-    device: cpu
-    episodes_collecting_initial_experience: 3
-    gamma: 0.99
-    gradient_steps: -1
-    learning_rate: 0.001
-    max_bid_price: 100
-    noise_dt: 1
-    noise_scale: 1
-    noise_sigma: 0.1
-    train_freq: 24h
+    continue_learning: False
     trained_policies_save_path: null
-    training_episodes: 10
-    validation_episodes_interval: 5
+    max_bid_price: 100
+    algorithm: ppo
+    device: cpu
+    learning_rate: 0.0003
+    validation_episodes_interval: 10 # after how many episodes the validation starts and the policy is updated
+    training_episodes: 100
+    gradient_steps: 10
+    matd3:
+      actor_architecture: mlp
+      train_freq: 24h # how often write_to_learning_role gets called
+      episodes_collecting_initial_experience: 3
+      batch_size: 64
+      gamma: 0.99
+      noise_sigma: 0.1
+      noise_scale: 1
+      noise_dt: 1
   learning_mode: true
   markets_config:
     EOM:
