@@ -127,7 +127,7 @@ class BaseUnit:
 
         return bids
 
-    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
+    def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """
         Calculates the marginal cost for the given power.
 
@@ -200,15 +200,14 @@ class BaseUnit:
             self.calculate_marginal_cost(t, product_data[idx])
             for idx, t in enumerate(self.index[start:end])
         ]
-
         new_values = np.abs(marginal_costs * product_data)
         self.outputs[product_type_mc].loc[start:end] = new_values
 
     def execute_current_dispatch(
         self,
-        start: pd.Timestamp,
-        end: pd.Timestamp,
-    ) -> pd.Series:
+        start: datetime,
+        end: datetime,
+    ) -> np.array:
         """
         Checks if the total dispatch plan is feasible.
 
@@ -326,8 +325,8 @@ class SupportsMinMax(BaseUnit):
     min_down_time: int = 0
 
     def calculate_min_max_power(
-        self, start: pd.Timestamp, end: pd.Timestamp, product_type: str = "energy"
-    ) -> tuple[pd.Series, pd.Series]:
+        self, start: datetime, end: datetime, product_type: str = "energy"
+    ) -> tuple[np.array, np.array]:
         """
         Calculates the min and max power for the given time period.
 
@@ -548,8 +547,8 @@ class SupportsMinMaxCharge(BaseUnit):
     efficiency_discharge: float
 
     def calculate_min_max_charge(
-        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
-    ) -> tuple[pd.Series, pd.Series]:
+        self, start: datetime, end: datetime, product_type="energy"
+    ) -> tuple[np.array, np.array]:
         """
         Calculates the min and max charging power for the given time period.
 
@@ -563,8 +562,8 @@ class SupportsMinMaxCharge(BaseUnit):
         """
 
     def calculate_min_max_discharge(
-        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
-    ) -> tuple[pd.Series, pd.Series]:
+        self, start: datetime, end: datetime, product_type="energy"
+    ) -> tuple[FastSeries, FastSeries]:
         """
         Calculates the min and max discharging power for the given time period.
 

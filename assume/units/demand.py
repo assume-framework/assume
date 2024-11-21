@@ -64,7 +64,7 @@ class Demand(SupportsMinMax):
         self.ramp_down = max(abs(min_power), abs(max_power))
         self.ramp_up = max(abs(min_power), abs(max_power))
         volume = self.forecaster[self.id]
-        self.volume = -volume  # demand is negative
+        self.volume = -abs(volume)  # demand is negative
         if isinstance(price, numbers.Real):
             price = FastSeries(index=self.index, value=price)
         self.price = price

@@ -311,25 +311,27 @@ class UnitsOperator(Role):
             groupby=["market_id", "unit_id"],
         )
 
-        unit_dispatch_dfs = []
+        unit_dispatch = []
         for unit_id, unit in self.units.items():
             current_dispatch = unit.execute_current_dispatch(start, now)
             end = now
-            data = {"power": current_dispatch}
-
-            # TODO: this needs to be fixed. For now it is consuming too much time and is deactivated
-            # unit.calculate_generation_cost(start, now, "energy")
-            valid_outputs = ["soc", "cashflow", "marginal_costs", "total_costs"]
+            dispatch = {"power": current_dispatch}
+            unit.calculate_generation_cost(start, now, "energy")
+            valid_outputs = [
+                "soc",
+                "cashflow",
+                "marginal_costs",
+                "total_costs",
+            ]
 
             for key in unit.outputs.keys():
                 for output in valid_outputs:
                     if output in key:
-                        data[key] = unit.outputs[key][start:end]
-            data["time"] = unit.index.get_date_list(start, end)
-            data["unit"] = unit_id
-            unit_dispatch_dfs.append(data)
-
-        return market_dispatch, unit_dispatch_dfs
+                        dispatch[key] = unit.outputs[key][start:end]
+            dispatch["time"] = unit.index.get_date_list(start, end)
+            dispatch["unit"] = unit_id
+            unit_dispatch.append(dispatch)
+        return market_dispatch, unit_dispatch
 
     def write_actual_dispatch(self, product_type: str) -> None:
         """

@@ -5,10 +5,10 @@
 import logging
 from datetime import datetime, timedelta
 
-import pandas as pd
 from dateutil import rrule as rr
 
 from assume import World
+from assume.common.fast_pandas import FastIndex
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 
@@ -18,11 +18,8 @@ log = logging.getLogger(__name__)
 def init(world, n=1):
     start = datetime(2019, 1, 1)
     end = datetime(2019, 3, 1)
-    index = pd.date_range(
-        start=start,
-        end=end + timedelta(hours=24),
-        freq="h",
-    )
+
+    index = FastIndex(start, end, freq="h")
     sim_id = "world_script_simulation"
 
     world.setup(
@@ -35,7 +32,9 @@ def init(world, n=1):
     marketdesign = [
         MarketConfig(
             market_id="EOM",
-            opening_hours=rr.rrule(rr.HOURLY, interval=24, dtstart=start, until=end),
+            opening_hours=rr.rrule(
+                rr.HOURLY, interval=24, dtstart=start, until=end, cache=True
+            ),
             opening_duration=timedelta(hours=1),
             market_mechanism="pay_as_clear",
             market_products=[MarketProduct(timedelta(hours=1), 24, timedelta(hours=1))],
