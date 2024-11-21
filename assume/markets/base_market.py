@@ -457,7 +457,7 @@ class MarketRole(MarketMechanism, Role):
             ),
             receiver_addr=agent_addr,
         )
-        logger.debug(f"Sent registration reply to agent '{agent_addr}': {msg}")
+        logger.debug("Sent registration reply to agent '%s': %s", agent_addr, msg)
 
     def handle_orderbook(self, content: OrderBookMessage, meta: MetaDict):
         """
@@ -590,7 +590,7 @@ class MarketRole(MarketMechanism, Role):
                 },
                 receiver_addr=agent_addr,
             )
-            logger.debug(f"Sent unmatched orders to agent '{agent_addr}'.")
+            logger.debug("Sent unmatched orders to agent '%s'.", agent_addr)
 
         except KeyError as ke:
             logger.error(f"Missing key in meta data: {ke}")
