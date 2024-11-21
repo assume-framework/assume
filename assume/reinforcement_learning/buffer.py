@@ -149,7 +149,7 @@ class ReplayBuffer:
 
     def sample(self, batch_size: int) -> ReplayBufferSamples:
         """
-        Samples a randome batch of experiences from the replay buffer.
+        Samples a random batch of experiences from the replay buffer.
 
         Args:
             batch_size (int): The number of experiences to sample.

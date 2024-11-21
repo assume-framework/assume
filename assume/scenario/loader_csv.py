@@ -402,7 +402,7 @@ def read_units(
                 id=unit_name,
                 unit_type=unit_type,
                 unit_operator_id=operator_id,
-                unit_params=unit_params,
+                unit_params=unit_params.to_dict(),
                 forecaster=forecaster,
             )
         )
@@ -555,7 +555,7 @@ def setup_world(
         scenario_data (dict): A dictionary containing the configuration and loaded files for the scenario and study case.
         study_case (str): The specific study case within the scenario to be loaded.
         perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
-        terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode itteration or because we triggered an early stopping.
+        terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode iteration or because we triggered an early stopping.
         episode (int, optional): The episode number for learning. Defaults to 0.
         eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
 
@@ -587,7 +587,7 @@ def setup_world(
         )
 
         # If PostgreSQL database is in use, warn the user about end-of-simulation saving
-        if world.db is not None and "postgresql" in world.db.name:
+        if world.db_uri is not None and "postgresql" in world.db_uri:
             logger.warning(
                 "Data will be stored in the PostgreSQL database only at the end of the simulation due to CSV export being enabled. "
                 "Disable CSV export to save data at regular intervals (export_csv_path = '')."
@@ -702,7 +702,7 @@ def setup_world(
         units[op].extend(op_units)
 
     # if distributed_role is true - there is a manager available
-    # and we cann add each units_operator as a separate process
+    # and we can add each units_operator as a separate process
     if world.distributed_role is True:
         logger.info("Adding unit operators and units - with subprocesses")
         for op, op_units in units.items():
@@ -749,7 +749,7 @@ def load_scenario_folder(
         scenario (str): The name of the scenario to be loaded.
         study_case (str): The specific study case within the scenario to be loaded.
         perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
-        terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode itteration or because we triggered an early stopping.
+        terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode iteration or because we triggered an early stopping.
         episode (int, optional): The episode number for learning. Defaults to 0.
         eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
 
@@ -874,6 +874,7 @@ def run_learning(
     )  # Leads to the initialization of the Learning role, makes world.learning_role.rl_algorithm_name accessible
     world.output_role.del_similar_runs()
 
+    # check if we already stored policies for this simulation
     save_path = world.learning_config["trained_policies_save_path"]
 
     if Path(save_path).is_dir():
@@ -952,6 +953,8 @@ def run_learning(
                 episode=episode,
             )
 
+        # -----------------------------------------
+        # Give the newly initialized learning role the needed information across episodes
         world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
         world.run()  # triggers calculate_bids()
@@ -985,6 +988,9 @@ def run_learning(
 
             if world.learning_role.rl_algorithm_name == "matd3":
                 total_rewards = world.output_role.get_sum_reward()
+
+                if len(total_rewards) == 0:
+                    raise AssumeException("No rewards were collected during evaluation run")
                 avg_reward = np.mean(total_rewards)
                 terminate = world.learning_role.compare_and_save_policies(
                     {"avg_reward": avg_reward}

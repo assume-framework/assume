@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "assume-framework"
-version = "0.4.1"
+version = "0.4.3"
 description = "ASSUME - Agent-Based Electricity Markets Simulation Toolbox"
 authors = [{ name = "ASSUME Developers", email = "contact@assume-project.de"}]
 license = {text = "AGPL-3.0-or-later"}
@@ -26,12 +26,13 @@ classifiers=[
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 requires-python = ">=3.10"
 dependencies = [
     "argcomplete >=3.1.4",
     "nest-asyncio >=1.5.6",
-    "mango-agents >=2.1.0",
+    "mango-agents >=2.1.1",
     "numpy >=1.26.4",
     "tqdm >=4.64.1",
     "python-dateutil >=2.8.2",
@@ -53,7 +54,8 @@ network = [
 ]
 oeds = [
     "demandlib >=0.1.9",
-    "holidays >=0.37",
+    # see https://github.com/vacanza/holidays/discussions/1800
+    "holidays <1.0",
     "pvlib >=0.10.2",
     "windpowerlib >=0.2.1",
 ]
@@ -144,3 +146,8 @@ show_column_numbers = true
 show_error_codes = true
 pretty = true
 ignore_missing_imports = true
+
+[tool.codespell]
+quiet-level = 3
+skip = "*.csv, *.html, *.json, *.orig, *.svg, ./docs/build"
+ignore-words-list = "DED,esy,flexable,Meger,ore"

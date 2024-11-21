@@ -405,7 +405,7 @@ class TD3(RLAlgorithm):
                 actor_target = self.learning_role.rl_strats[u_id].actor_target
 
                 if i % 100 == 0:
-                    # only update target netwroks every 100 steps, to have delayed network update
+                    # only update target networks every 100 steps, to have delayed network update
                     transitions = self.learning_role.buffer.sample(self.batch_size)
                     states = transitions.observations
                     actions = transitions.actions

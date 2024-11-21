@@ -22,8 +22,6 @@ from assume.units import Storage
 def storage() -> Storage:
     # Create a PowerPlant instance with some example parameters
     index = pd.date_range("2023-07-01", periods=48, freq="h")
-    # constant price of 50
-    ff = NaiveForecast(index, availability=1, price_forecast=50)
     return Storage(
         id="Test_Storage",
         unit_operator="TestOperator",
@@ -31,7 +29,8 @@ def storage() -> Storage:
         bidding_strategies={},
         max_power_charge=-100,
         max_power_discharge=100,
-        max_volume=1000,
+        max_soc=1000,
+        initial_soc=500,
         efficiency_charge=0.9,
         efficiency_discharge=0.95,
         index=index,
@@ -172,7 +171,7 @@ def test_flexable_pos_crm_storage(mock_market_config, storage):
     storage.forecaster = NaiveForecast(index, availability=1, price_forecast=50)
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     assert len(bids) == 1
-    assert math.isclose(bids[0]["price"], specific_revenue / (0.5 * 1000))
+    assert math.isclose(bids[0]["price"], specific_revenue)
     assert bids[0]["volume"] == 60
 
     # assert capacity_pos

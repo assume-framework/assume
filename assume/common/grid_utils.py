@@ -256,7 +256,7 @@ def read_pypsa_grid(
 ):
     """
     Generates the pypsa grid from a grid dictionary.
-    Does not add the generators, as they are added in different ways, depending on wether redispatch is used.
+    Does not add the generators, as they are added in different ways, depending on whether redispatch is used.
 
     Args:
         network (pypsa.Network): the pypsa network to which the components will be added

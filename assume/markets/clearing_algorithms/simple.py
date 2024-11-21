@@ -93,10 +93,11 @@ class PayAsClearRole(MarketRole):
             # generation above it has to be sold for the lower price (or not at all)
             for demand_order in demand_orders:
                 if not supply_orders:
-                    # if no more generation - reject left over demand
-                    rejected_orders.append(demand_order)
+                    # if no more generation - continue
+                    # reject left over demand at the end
                     continue
 
+                # assert dem_vol == gen_vol
                 # now add the next demand order
                 dem_vol += -demand_order["volume"]
                 demand_order["accepted_volume"] = demand_order["volume"]
@@ -112,7 +113,8 @@ class PayAsClearRole(MarketRole):
                         if should_insert:
                             accepted_supply_orders.append(supply_order)
                         gen_vol += added
-                    else:
+                    # if supply is not partially accepted before, reject it
+                    elif not supply_order.get("accepted_volume"):
                         rejected_orders.append(supply_order)
                 # now we know which orders we need
                 # we only need to see how to arrange it.
@@ -138,9 +140,17 @@ class PayAsClearRole(MarketRole):
                 else:
                     demand_order["accepted_volume"] = demand_order["volume"]
 
-                accepted_demand_orders.append(demand_order)
+                if demand_order["accepted_volume"]:
+                    accepted_demand_orders.append(demand_order)
 
+            # if demand is fulfilled, we do have some additional supply orders
+            # these will be rejected
             for order in supply_orders:
+                # if the order was not accepted partially, it is rejected
+                if not order.get("accepted_volume"):
+                    rejected_orders.append(order)
+
+            for order in demand_orders:
                 # if the order was not accepted partially, it is rejected
                 if not order.get("accepted_volume"):
                     rejected_orders.append(order)
@@ -166,7 +176,10 @@ class PayAsClearRole(MarketRole):
                 )
             )
 
-        return accepted_orders, rejected_orders, meta
+        # write network flows here if applicable
+        flows = []
+
+        return accepted_orders, rejected_orders, meta, flows
 
 
 class PayAsBidRole(MarketRole):
@@ -218,8 +231,8 @@ class PayAsBidRole(MarketRole):
             # generation above it has to be sold for the lower price (or not at all)
             for demand_order in demand_orders:
                 if not supply_orders:
-                    # if no more generation - reject left over demand
-                    rejected_orders.append(demand_order)
+                    # if no more generation - continue
+                    # reject left over demand at the end
                     continue
 
                 dem_vol += -demand_order["volume"]
@@ -231,7 +244,8 @@ class PayAsBidRole(MarketRole):
                         supply_order["accepted_volume"] = supply_order["volume"]
                         to_commit.append(supply_order)
                         gen_vol += supply_order["volume"]
-                    else:
+                    # if supply is not partially accepted before, reject it
+                    elif not supply_order.get("accepted_volume"):
                         rejected_orders.append(supply_order)
                 # now we know which orders we need
                 # we only need to see how to arrange it.
@@ -240,11 +254,7 @@ class PayAsBidRole(MarketRole):
 
                 if diff < 0:
                     # gen < dem
-                    # generation is not enough - split demand
-                    split_demand_order = demand_order.copy()
-                    split_demand_order["accepted_volume"] = diff
                     demand_order["accepted_volume"] = demand_order["volume"] - diff
-                    rejected_orders.append(split_demand_order)
                 elif diff > 0:
                     # generation left over - split generation
                     supply_order = to_commit[-1]
@@ -261,7 +271,8 @@ class PayAsBidRole(MarketRole):
                     # diff == 0 perfect match
                     demand_order["accepted_volume"] = demand_order["volume"]
 
-                accepted_demand_orders.append(demand_order)
+                if demand_order["accepted_volume"]:
+                    accepted_demand_orders.append(demand_order)
                 # pay as bid
                 for supply_order in to_commit:
                     supply_order["accepted_price"] = supply_order["price"]
@@ -269,8 +280,17 @@ class PayAsBidRole(MarketRole):
                     demand_order["accepted_price"] = supply_order["price"]
                 accepted_supply_orders.extend(to_commit)
 
+            # if demand is fulfilled, we do have some additional supply orders
+            # these will be rejected
             for order in supply_orders:
-                rejected_orders.append(order)
+                # if the order was not accepted partially, it is rejected
+                if not order.get("accepted_volume"):
+                    rejected_orders.append(order)
+
+            for order in demand_orders:
+                # if the order was not accepted partially, it is rejected
+                if not order.get("accepted_volume"):
+                    rejected_orders.append(order)
 
             accepted_product_orders = accepted_demand_orders + accepted_supply_orders
 
@@ -282,4 +302,8 @@ class PayAsBidRole(MarketRole):
                     product,
                 )
             )
-        return accepted_orders, rejected_orders, meta
+
+        # write network flows here if applicable
+        flows = []
+
+        return accepted_orders, rejected_orders, meta, flows

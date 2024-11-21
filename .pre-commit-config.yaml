@@ -7,11 +7,11 @@ repos:
     rev: v4.0.3
     hooks:
       - id: reuse
-        args: ["annotate", "--license", "AGPL-3.0-or-later", "--recursive", "--copyright", "ASSUME Developers", "--exclude-year", "--skip-unrecognised", "."]
+        args: ["annotate", "--license", "AGPL-3.0-or-later", "--recursive", "--copyright", "ASSUME Developers", "--exclude-year", "--skip-unrecognised", "--skip-existing", "."]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
-    rev: v0.6.2
+    rev: v0.7.2
     hooks:
       # Run the linter.
       - id: ruff
@@ -19,7 +19,14 @@ repos:
       # Run the formatter.
       - id: ruff-format
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v5.0.0
     hooks:
       - id: end-of-file-fixer
       - id: trailing-whitespace
+      - id: check-illegal-windows-names
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.3.0
+    hooks:
+    -   id: codespell
+        types_or: [python, rst, markdown]
+        files: ^(assume|docs|tests)/

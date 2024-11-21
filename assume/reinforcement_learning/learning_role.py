@@ -75,6 +75,9 @@ class Learning(Role):
             "batch_size", 128
         )
         self.gamma = learning_config.get(self.rl_algorithm_name, {}).get("gamma", 0.99)
+        
+        # if we do not have initial experience collected we will get an error as no samples are available on the
+        # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
         self.episodes_collecting_initial_experience = max(
             learning_config.get(self.rl_algorithm_name, {}).get(
                 "episodes_collecting_initial_experience", 5
@@ -380,7 +383,7 @@ class Learning(Role):
                         f"New best policy saved, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
                     )
 
-            # if we do not see any improvment in the last x evaluation runs we stop the training
+            # if we do not see any improvement in the last x evaluation runs we stop the training
             if len(self.rl_eval[metric]) >= self.early_stopping_steps:
                 self.avg_rewards.append(
                     sum(self.rl_eval[metric][-self.early_stopping_steps :])
