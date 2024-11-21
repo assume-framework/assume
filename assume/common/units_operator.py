@@ -185,7 +185,11 @@ class UnitsOperator(Role):
             meta (MetaDict): The meta data of the market.
         """
         logger.debug(
-            '%s received opening from: %s %s until: %s.', self.id, opening["market_id"], opening["start_time"], opening["end_time"]
+            "%s received opening from: %s %s until: %s.",
+            self.id,
+            opening["market_id"],
+            opening["start_time"],
+            opening["end_time"],
         )
         self.context.schedule_instant_task(coroutine=self.submit_bids(opening, meta))
 
