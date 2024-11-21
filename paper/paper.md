@@ -46,7 +46,7 @@ bibliography: paper.bib
 
 # Summary
 
-**ASSUME** is an open-source toolbox for agent-based simulations of European electricity markets, with a primary focus on the German market setup. Developed as an open-source model, its objectives are to ensure usability and customizability for a wide range of users and use cases in the energy system modeling community.
+**ASSUME** is an open-source toolbox for agent-based simulations of various energy markets, with a primary focus on European electricity markets. Developed as an open-source model, its objectives are to ensure usability and customizability for a wide range of users and use cases in the energy system modeling community.
 
 A unique feature of the `ASSUME` toolbox is its integration of **Deep Reinforcement Learning** methods into the behavioral strategies of market agents. The model offers various predefined agent representations for both the demand and generation sides, which can be used as plug-and-play modules, simplifying the usage of reinforcement learning strategies. This setup enables research of new market designs and evolving dynamics in energy markets.
 
@@ -64,12 +64,16 @@ Instead, various moving parts can be configured, such as the market abstraction,
 
 `ASSUME` builds on the open-source agent-based simulation library [mango-agents](https://pypi.org/project/mango-agents/) to model the simulation world and to give users continuous feedback during the simulation runs.
 Interaction with the results of the simulation is possible through the Grafana dashboards, which do have direct access to the simulation database.
-Additionally, writing the output to CSV files is supported for scenarios in which a database is not available.
+Additionally, writing the output to CSV files is supported for scenarios in which a database is not available or needed.
 
 New scenarios can be created by providing CSV files, accessing simulation data from a database or by using the object-oriented API, which makes it possible to integrate new classes, maket mechanisms and bidding strategies as well.
-The core overview of available classes and the interaction with the world is shown in \autoref{fig:architecture}.
 
 ![Basic Architecture of the ASSUME simulation\label{fig:architecture}](../docs/source/img/architecture.svg)
+
+For most of such adjustments, only small changes to the code are necessary.
+This is possible through the decoupled architecture which separates the declaration of simulation behavior from the input data, while allowing to define either externally without changes to the core.
+The overview of available classes and the interaction with the world is shown in \autoref{fig:architecture}.
+Extensive documentation about these features is available at [https://assume.readthedocs.io/en/latest/](https://assume.readthedocs.io/en/latest/).
 
 # Publications
 
