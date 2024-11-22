@@ -346,9 +346,10 @@ class RLStrategy(AbstractLearningStrategy):
                 curr_action += noise
         else:
             # if we are not in learning mode we just use the actor neural net to get the action without adding noise
-
             curr_action = self.actor(next_observation).detach()
-            noise = tuple(0 for _ in range(self.act_dim))
+
+            # noise is an tensor with zeros, because we are not in learning mode
+            noise = th.zeros(self.act_dim, dtype=self.float_type)
 
         curr_action = curr_action.clamp(-1, 1)
 
@@ -876,9 +877,9 @@ class StorageRLStrategy(AbstractLearningStrategy):
                 curr_action += noise
         else:
             # if we are not in learning mode we just use the actor neural net to get the action without adding noise
-
             curr_action = self.actor(next_observation).detach()
-            noise = tuple(0 for _ in range(self.act_dim))
+            # noise is an tensor with zeros, because we are not in learning mode
+            noise = th.zeros(self.act_dim, dtype=self.float_type)
 
         curr_action = curr_action.clamp(-1, 1)
 
