@@ -15,6 +15,8 @@ from assume.common.forecasts import NaiveForecast
 
 class MockMarketConfig:
     market_id = "EOM"
+    maximum_bid_price = 3000.0
+    minimum_bid_price = -500.0
     product_type = "energy"
     additional_fields = []
 

@@ -277,6 +277,13 @@ class flexablePosCRM(BaseStrategy):
                 raise ValueError(
                     f"Product {market_config.product_type} is not supported by this strategy."
                 )
+
+            # clip price by max and min bid price defined by the MarketConfig
+            if price >= 0:
+                price = min(price, market_config.maximum_bid_price)
+            else:
+                price = max(price, market_config.minimum_bid_price)
+
             bids.append(
                 {
                     "start_time": start,
@@ -385,6 +392,13 @@ class flexableNegCRM(BaseStrategy):
                 raise ValueError(
                     f"Product {market_config.product_type} is not supported by this strategy."
                 )
+
+            # clip price by max and min bid price defined by the MarketConfig
+            if price >= 0:
+                price = min(price, market_config.maximum_bid_price)
+            else:
+                price = max(price, market_config.minimum_bid_price)
+
             bids.append(
                 {
                     "start_time": start,
@@ -639,5 +653,5 @@ def calculate_reward_EOM(
     unit.outputs["regret"].loc[products_index] = opportunity_cost
     unit.outputs["total_costs"].loc[products_index] = costs
 
-    if unit.outputs["rl_reward"] is not None:
+    if "rl_reward" in unit.outputs.keys():
         unit.outputs["rl_reward"].append(reward)

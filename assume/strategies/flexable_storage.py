@@ -205,10 +205,11 @@ class flexableEOMStorage(BaseStrategy):
 
             # Extract outputs and costs in one step
             outputs = unit.outputs[product_type].loc[start:end_excl]
-            costs = outputs.apply(
-                lambda x: abs(x * unit.calculate_marginal_cost(start, x))
-                if x != 0
-                else 0
+            costs = np.where(
+                outputs != 0,
+                np.abs(outputs)
+                * np.array([unit.calculate_marginal_cost(start, x) for x in outputs]),
+                0,
             )
 
             unit.outputs["profit"].loc[start:end_excl] = (

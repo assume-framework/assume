@@ -259,21 +259,21 @@ class BaseUnit:
             end_excl = end - self.index.freq
 
             if isinstance(order["accepted_volume"], dict):
-                cashflow = [
-                    float(order["accepted_price"][i] * order["accepted_volume"][i])
-                    for i in order["accepted_volume"].keys()
-                ]
-                self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
-                    cashflow * self.index.freq.n
+                cashflow = np.array(
+                    [
+                        float(order["accepted_price"][i] * order["accepted_volume"][i])
+                        for i in order["accepted_volume"].keys()
+                    ]
                 )
             else:
                 cashflow = float(
                     order.get("accepted_price", 0) * order.get("accepted_volume", 0)
                 )
-                elapsed_intervals = (end - start) / self.index.freq
-                self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
-                    cashflow * elapsed_intervals
-                )
+
+            elapsed_intervals = (end - start) / self.index.freq
+            self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
+                cashflow * elapsed_intervals
+            )
 
     def get_starting_costs(self, op_time: int) -> float:
         """
