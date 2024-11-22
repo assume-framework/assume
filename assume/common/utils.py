@@ -654,16 +654,16 @@ def suppress_output():
 # Function to parse the duration string
 def parse_duration(duration_str):
     if duration_str.endswith("d"):
-        days = int(duration_str[:-1])
+        days = float(duration_str[:-1])
         return timedelta(days=days)
     elif duration_str.endswith("h"):
-        hours = int(duration_str[:-1])
+        hours = float(duration_str[:-1])
         return timedelta(hours=hours)
     elif duration_str.endswith("m"):
-        minutes = int(duration_str[:-1])
+        minutes = float(duration_str[:-1])
         return timedelta(minutes=minutes)
     elif duration_str.endswith("s"):
-        seconds = int(duration_str[:-1])
+        seconds = float(duration_str[:-1])
         return timedelta(seconds=seconds)
     else:
         raise ValueError(f"Unsupported duration format: {duration_str}")

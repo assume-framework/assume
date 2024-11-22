@@ -21,6 +21,7 @@ from assume.common.utils import (
     get_available_products,
     get_products_index,
     initializer,
+    parse_duration,
     plot_orderbook,
     separate_orders,
     timestamp2datetime,
@@ -618,6 +619,20 @@ def test_set_list():
     print(res_fds)
     print(res_pd)
     assert res_fds < res_pd
+
+
+def test_parse_duration():
+    assert parse_duration("24h") == timedelta(days=1)
+    assert parse_duration("1d") == timedelta(days=1)
+    assert parse_duration("12h") == timedelta(hours=12)
+    assert parse_duration("0.25h") == timedelta(minutes=15)
+    assert parse_duration("15m") == timedelta(minutes=15)
+    assert parse_duration("1m") == timedelta(minutes=1)
+    assert parse_duration("10s") == timedelta(seconds=10)
+    with pytest.raises(ValueError):
+        parse_duration("1")
+    with pytest.raises(ValueError):
+        parse_duration("100ms")
 
 
 if __name__ == "__main__":
