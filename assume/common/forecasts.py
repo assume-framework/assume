@@ -113,6 +113,7 @@ class CsvForecaster(Forecaster):
         powerplants_units: pd.DataFrame,
         demand_units: pd.DataFrame,
         market_configs: dict = {},
+        save_path: str = "",
         *args,
         **kwargs,
     ):
@@ -122,6 +123,7 @@ class CsvForecaster(Forecaster):
         self.demand_units = demand_units
         self.market_configs = market_configs
         self.forecasts = pd.DataFrame(index=index)
+        self.save_path = save_path
 
     def __getitem__(self, column: str) -> FastSeries:
         """
@@ -373,7 +375,7 @@ class CsvForecaster(Forecaster):
 
         return marginal_cost
 
-    def save_forecasts(self, path):
+    def save_forecasts(self, path=None):
         """
         Saves the forecasts to a csv file located at the specified path.
 
@@ -384,12 +386,13 @@ class CsvForecaster(Forecaster):
             ValueError: If no forecasts are provided, an error message is logged.
         """
 
-        try:
-            self.forecasts.to_csv(f"{path}/forecasts_df.csv", index=True)
-        except ValueError:
-            self.logger.error(
-                f"No forecasts for {self.market_id} provided, so none saved."
-            )
+        path = path or self.save_path
+
+        merged_forecasts = pd.DataFrame(self.forecasts)
+        merged_forecasts.index = pd.date_range(
+            start=self.index[0], end=self.index[-1], freq=self.index.freq
+        )
+        merged_forecasts.to_csv(f"{path}/forecasts_df.csv", index=True)
 
     def convert_forecasts_to_fast_series(self):
         """
