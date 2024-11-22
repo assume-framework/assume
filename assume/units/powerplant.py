@@ -201,7 +201,7 @@ class PowerPlant(SupportsMinMax):
         self.calculate_cashflow(product_type, orderbook)
 
         for start, max_pwr in zip(products_index, max_power):
-            current_power = self.outputs[product_type][start]
+            current_power = self.outputs[product_type].at[start]
 
             previous_power = self.get_output_before(start)
             op_time = self.get_operation_time(start)
@@ -212,7 +212,7 @@ class PowerPlant(SupportsMinMax):
                 current_power = min(current_power, max_pwr)
                 current_power = max(current_power, self.min_power)
 
-            self.outputs[product_type][start] = current_power
+            self.outputs[product_type].at[start] = current_power
 
         self.bidding_strategies[marketconfig.market_id].calculate_reward(
             unit=self,

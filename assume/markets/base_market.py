@@ -536,7 +536,7 @@ class MarketRole(MarketMechanism, Role):
 
             data = pd.DataFrame(self.results)
             data.index = data["time"]
-            data = data[metric_type][start:end]
+            data = data[metric_type].loc[start:end]
         except Exception:
             logger.exception("Error handling data request")
 

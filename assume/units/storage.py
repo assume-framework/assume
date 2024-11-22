@@ -216,7 +216,7 @@ class Storage(SupportsMinMaxCharge):
                     -self.outputs["energy"].at[t] * time_delta * self.efficiency_charge
                 )
 
-            self.outputs["soc"].loc[t + self.index.freq] = soc + delta_soc
+            self.outputs["soc"].at[t + self.index.freq] = soc + delta_soc
 
         return self.outputs["energy"].loc[start:end]
 
@@ -248,19 +248,19 @@ class Storage(SupportsMinMaxCharge):
 
         for start in products_index:
             delta_soc = 0
-            soc = self.outputs["soc"][start]
-            current_power = self.outputs[product_type][start]
+            soc = self.outputs["soc"].at[start]
+            current_power = self.outputs[product_type].at[start]
 
             # discharging
             if current_power > 0:
                 max_soc_discharge = self.calculate_soc_max_discharge(soc)
 
                 if current_power > max_soc_discharge:
-                    self.outputs[product_type][start] = max_soc_discharge
+                    self.outputs[product_type].at[start] = max_soc_discharge
 
                 time_delta = self.index.freq / timedelta(hours=1)
                 delta_soc = (
-                    -self.outputs["energy"][start]
+                    -self.outputs["energy"].at[start]
                     * time_delta
                     / self.efficiency_discharge
                 )
@@ -270,14 +270,16 @@ class Storage(SupportsMinMaxCharge):
                 max_soc_charge = self.calculate_soc_max_charge(soc)
 
                 if current_power < max_soc_charge:
-                    self.outputs[product_type][start] = max_soc_charge
+                    self.outputs[product_type].at[start] = max_soc_charge
 
                 time_delta = self.index.freq / timedelta(hours=1)
                 delta_soc = (
-                    -self.outputs["energy"][start] * time_delta * self.efficiency_charge
+                    -self.outputs["energy"].at[start]
+                    * time_delta
+                    * self.efficiency_charge
                 )
 
-            self.outputs["soc"][start + self.index.freq :] = soc + delta_soc
+            self.outputs["soc"].loc[start + self.index.freq :] = soc + delta_soc
 
         self.bidding_strategies[marketconfig.market_id].calculate_reward(
             unit=self,

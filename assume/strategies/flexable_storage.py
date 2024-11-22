@@ -66,7 +66,7 @@ class flexableEOMStorage(BaseStrategy):
         previous_power = unit.get_output_before(start)
 
         # save a theoretic SOC to calculate the ramping
-        theoretic_SOC = unit.outputs["soc"][start]
+        theoretic_SOC = unit.outputs["soc"].at[start]
 
         # calculate min and max power for charging and discharging
         min_power_charge, max_power_charge = unit.calculate_min_max_charge(
@@ -246,7 +246,7 @@ class flexablePosCRMStorage(BaseStrategy):
 
         _, max_power_discharge = unit.calculate_min_max_discharge(start, end)
         bids = []
-        theoretic_SOC = unit.outputs["soc"][start]
+        theoretic_SOC = unit.outputs["soc"].at[start]
 
         for product, max_dis in zip(product_tuples, max_power_discharge):
             start = product[0]
@@ -372,7 +372,7 @@ class flexableNegCRMStorage(BaseStrategy):
 
         previous_power = unit.get_output_before(start)
 
-        theoretic_SOC = unit.outputs["soc"][start]
+        theoretic_SOC = unit.outputs["soc"].at[start]
 
         _, max_power_charge = unit.calculate_min_max_charge(start, end)
 

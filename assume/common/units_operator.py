@@ -332,7 +332,7 @@ class UnitsOperator(Role):
             for key in unit.outputs.keys():
                 for output in valid_outputs:
                     if output in key:
-                        dispatch[key] = unit.outputs[key][start:end]
+                        dispatch[key] = unit.outputs[key].loc[start:end]
             dispatch["time"] = unit.index.get_date_list(start, end)
             dispatch["unit"] = unit_id
             unit_dispatch.append(dispatch)

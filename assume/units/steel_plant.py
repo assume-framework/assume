@@ -554,7 +554,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
 
         for start in products_index:
             current_power = self.outputs[product_type][start]
-            self.outputs[product_type][start] = current_power
+            self.outputs[product_type].at[start] = current_power
 
         self.bidding_strategies[marketconfig.market_id].calculate_reward(
             unit=self,

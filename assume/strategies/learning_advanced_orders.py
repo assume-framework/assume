@@ -214,8 +214,8 @@ class RLAdvancedOrderStrategy(RLStrategy):
         unit.outputs["rl_actions"].append(actions)
 
         # store results in unit outputs as series to be written to the database by the unit operator
-        unit.outputs["actions"][start] = actions
-        unit.outputs["exploration_noise"][start] = noise
+        unit.outputs["actions"].at[start] = actions
+        unit.outputs["exploration_noise"].at[start] = noise
 
         bids = self.remove_empty_bids(bids)
 

@@ -120,9 +120,10 @@ class flexableEOM(BaseStrategy):
                     avg_op_time=avg_op_time,
                 )
 
-            if unit.outputs["heat"][start] > 0:
+            if unit.outputs["heat"].at[start] > 0:
                 power_loss_ratio = (
-                    unit.outputs["power_loss"][start] / unit.outputs["heat"][start]
+                    unit.outputs["power_loss"].at[start]
+                    / unit.outputs["heat"].at[start]
                 )
             else:
                 power_loss_ratio = 0.0

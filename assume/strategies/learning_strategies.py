@@ -286,8 +286,8 @@ class RLStrategy(AbstractLearningStrategy):
         unit.outputs["rl_actions"].append(actions)
 
         # store results in unit outputs as series to be written to the database by the unit operator
-        unit.outputs["actions"][start] = actions
-        unit.outputs["exploration_noise"][start] = noise
+        unit.outputs["actions"].at[start] = actions
+        unit.outputs["exploration_noise"].at[start] = noise
 
         return bids
 
@@ -524,7 +524,7 @@ class RLStrategy(AbstractLearningStrategy):
 
             # depending on way the unit calculates marginal costs we take costs
             marginal_cost = unit.calculate_marginal_cost(
-                start, unit.outputs[product_type].loc[start]
+                start, unit.outputs[product_type].at[start]
             )
 
             duration = (end - start) / timedelta(hours=1)
@@ -551,12 +551,12 @@ class RLStrategy(AbstractLearningStrategy):
         # consideration of start-up costs, which are evenly divided between the
         # upward and downward regulation events
         if (
-            unit.outputs[product_type].loc[start] != 0
+            unit.outputs[product_type].at[start] != 0
             and unit.outputs[product_type].loc[start - unit.index.freq] == 0
         ):
             costs += unit.hot_start_cost / 2
         elif (
-            unit.outputs[product_type].loc[start] == 0
+            unit.outputs[product_type].at[start] == 0
             and unit.outputs[product_type].loc[start - unit.index.freq] != 0
         ):
             costs += unit.hot_start_cost / 2
@@ -821,8 +821,8 @@ class StorageRLStrategy(AbstractLearningStrategy):
         unit.outputs["rl_actions"].append(actions)
 
         # store results in unit outputs as series to be written to the database by the unit operator
-        unit.outputs["actions"][start] = actions
-        unit.outputs["exploration_noise"][start] = noise
+        unit.outputs["actions"].at[start] = actions
+        unit.outputs["exploration_noise"].at[start] = noise
 
         return bids
 
@@ -922,7 +922,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
 
             # Calculate marginal and starting costs
             marginal_cost = unit.calculate_marginal_cost(
-                start_time, unit.outputs[product_type].loc[start_time]
+                start_time, unit.outputs[product_type].at[start_time]
             )
             marginal_cost += unit.get_starting_costs(int(duration_hours))
 
@@ -935,12 +935,15 @@ class StorageRLStrategy(AbstractLearningStrategy):
             order_profit = order["accepted_price"] * accepted_volume * duration_hours
             order_cost = abs(marginal_cost * accepted_volume * duration_hours)
 
-            current_soc = unit.outputs["soc"][start_time]
-            next_soc = unit.outputs["soc"][next_time]
+            current_soc = unit.outputs["soc"].at[start_time]
+            next_soc = unit.outputs["soc"].at[next_time]
 
             # Calculate and clip the energy cost for the start time
             unit.outputs["energy_cost"].at[next_time] = np.clip(
-                (unit.outputs["energy_cost"][start_time] * current_soc - order_profit)
+                (
+                    unit.outputs["energy_cost"].at[start_time] * current_soc
+                    - order_profit
+                )
                 / next_soc,
                 0,
                 self.max_bid_price,

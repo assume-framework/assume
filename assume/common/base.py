@@ -181,7 +181,7 @@ class BaseUnit:
 
         product_type_mc = product_type + "_marginal_costs"
         # Adjusted code for accessing product data and mapping over the index
-        product_data = self.outputs[product_type][
+        product_data = self.outputs[product_type].loc[
             start:end
         ]  # Slicing directly without `.loc`
 
@@ -210,7 +210,7 @@ class BaseUnit:
         Returns:
             The volume of the unit within the given time range.
         """
-        return self.outputs["energy"][start:end]
+        return self.outputs["energy"].loc[start:end]
 
     def get_output_before(self, dt: datetime, product_type: str = "energy") -> float:
         """
@@ -394,7 +394,7 @@ class SupportsMinMax(BaseUnit):
             return max_time
 
         # Check energy output in the defined time window, reversed for most recent state
-        arr = (self.outputs["energy"][begin:end] > 0)[::-1]
+        arr = (self.outputs["energy"].loc[begin:end] > 0)[::-1]
 
         # Determine initial state (off if the first period shows zero energy output)
         is_off = not arr[0]
@@ -425,7 +425,7 @@ class SupportsMinMax(BaseUnit):
         op_series = []
 
         before = start - self.index.freq
-        arr = self.outputs["energy"][self.index[0] : before][::-1] > 0
+        arr = self.outputs["energy"].loc[self.index[0] : before][::-1] > 0
 
         if len(arr) < 1:
             # before start of index

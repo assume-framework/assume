@@ -418,7 +418,7 @@ class DmasPowerplantStrategy(BaseStrategy):
                 for key in ["power", "emission", "fuel", "start", "profit"]:
                     self.opt_results[step][key] = np.zeros(self.T)
                 self.opt_results[step]["obj"] = 0
-        return unit.outputs["generation"][start:]
+        return unit.outputs["generation"].loc[start:]
 
     def calculate_bids(
         self,
