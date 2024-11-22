@@ -8,7 +8,6 @@ from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
 
-import pandas as pd
 from mango import Role, create_acl, sender_addr
 from mango.messages.message import Performatives
 
@@ -294,7 +293,7 @@ class UnitsOperator(Role):
 
     def get_actual_dispatch(
         self, product_type: str, last: datetime
-    ) -> tuple[pd.DataFrame, list[pd.DataFrame]]:
+    ) -> tuple[list[tuple[datetime, float, str, str]], list[dict]]:
         """
         Retrieves the actual dispatch and commits it in the unit.
         We calculate the series of the actual market results dataframe with accepted bids.
@@ -305,7 +304,7 @@ class UnitsOperator(Role):
             last (datetime): the last date until which the dispatch was already sent
 
         Returns:
-            tuple[pd.DataFrame, list[pd.DataFrame]]: market_dispatch and unit_dispatch dataframes
+            tuple[list[tuple[datetime, float, str, str]], list[dict]]: market_dispatch and unit_dispatch dataframes
         """
         now = timestamp2datetime(self.context.current_timestamp)
         start = timestamp2datetime(last + 1)

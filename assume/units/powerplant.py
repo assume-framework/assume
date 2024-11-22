@@ -6,9 +6,8 @@ import logging
 from datetime import datetime, timedelta
 from functools import lru_cache
 
-import pandas as pd
-
 from assume.common.base import SupportsMinMax
+from assume.common.fast_pandas import FastSeries
 from assume.common.forecasts import Forecaster
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
@@ -29,7 +28,7 @@ class PowerPlant(SupportsMinMax):
         max_power (float): The maximum power output capacity of the power plant in MW.
         min_power (float, optional): The minimum power output capacity of the power plant in MW. Defaults to 0.0 MW.
         efficiency (float, optional): The efficiency of the power plant in converting fuel to electricity. Defaults to 1.0.
-        additional_cost (Union[float, pd.Series], optional): Additional costs associated with power generation, in EUR/MWh. Defaults to 0.
+        additional_cost (Union[float, FastSeries], optional): Additional costs associated with power generation, in EUR/MWh. Defaults to 0.
         partial_load_eff (bool, optional): Does the efficiency vary at part loads? Defaults to False.
         fuel_type (str, optional): The type of fuel used by the power plant for power generation. Defaults to "others".
         emission_factor (float, optional): The emission factor associated with the power plant's fuel type (CO2 emissions per unit of energy produced). Defaults to 0.0.
@@ -59,7 +58,7 @@ class PowerPlant(SupportsMinMax):
         max_power: float,
         min_power: float = 0.0,
         efficiency: float = 1.0,
-        additional_cost: float | pd.Series = 0.0,
+        additional_cost: float | FastSeries = 0.0,
         partial_load_eff: bool = False,
         fuel_type: str = "others",
         emission_factor: float = 0.0,
@@ -127,8 +126,8 @@ class PowerPlant(SupportsMinMax):
 
     def execute_current_dispatch(
         self,
-        start: pd.Timestamp,
-        end: pd.Timestamp,
+        start: datetime,
+        end: datetime,
     ):
         """
         Executes the current dispatch of the unit based on the provided timestamps.
@@ -141,7 +140,7 @@ class PowerPlant(SupportsMinMax):
             end (pandas.Timestamp): The end time of the dispatch.
 
         Returns:
-            pd.Series: The volume of the unit within the given time range.
+            FastSeries: The volume of the unit within the given time range.
         """
         start = max(start, self.index[0])
 
@@ -242,18 +241,18 @@ class PowerPlant(SupportsMinMax):
     def calc_marginal_cost_with_partial_eff(
         self,
         power_output: float,
-        timestep: pd.Timestamp = None,
-    ) -> float | pd.Series:
+        timestep: datetime = None,
+    ) -> float | FastSeries:
         """
         Calculates the marginal cost of the unit based on power output and timestamp, considering partial efficiency.
         Returns the marginal cost of the unit.
 
         Args:
             power_output (float): The power output of the unit.
-            timestep (pd.Timestamp, optional): The timestamp of the unit. Defaults to None.
+            timestep (datetime, optional): The timestamp of the unit. Defaults to None.
 
         Returns:
-            float | pd.Series: The marginal cost of the unit.
+            float | FastSeries: The marginal cost of the unit.
         """
         fuel_price = self.forecaster.get_price(self.fuel_type).at[timestep]
 
@@ -294,7 +293,7 @@ class PowerPlant(SupportsMinMax):
 
         additional_cost = (
             self.additional_cost.at[timestep]
-            if isinstance(self.additional_cost, pd.Series)
+            if isinstance(self.additional_cost, FastSeries)
             else self.additional_cost
         )
 
@@ -307,8 +306,8 @@ class PowerPlant(SupportsMinMax):
         return marginal_cost
 
     def calculate_min_max_power(
-        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
-    ) -> tuple[pd.Series, pd.Series]:
+        self, start: datetime, end: datetime, product_type="energy"
+    ) -> tuple[FastSeries, FastSeries]:
         """
         Calculates the minimum and maximum power output of the unit and returns it.
 

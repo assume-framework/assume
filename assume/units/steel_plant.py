@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+from datetime import datetime
 
 import pandas as pd
 import pyomo.environ as pyo
@@ -37,7 +38,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         bidding_strategies (dict): The bidding strategies of the unit.
         technology (str): The technology of the unit.
         node (str): The node of the unit.
-        index (pd.DatetimeIndex): The index for the data of the unit.
+        index (FastIndex): The index for the data of the unit.
         location (tuple[float, float]): The location of the unit.
         components (dict[str, dict]): The components of the unit such as Electrolyser, DRI Plant, DRI Storage, and Electric Arc Furnace.
         objective (str): The objective of the unit, e.g. minimize variable cost ("min_variable_cost").
@@ -552,7 +553,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             orderbook=orderbook,
         )
 
-    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
+    def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """
         Calculate the marginal cost of the unit based on the provided time and power.
 

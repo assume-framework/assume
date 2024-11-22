@@ -466,7 +466,9 @@ class RandomForecaster(CsvForecaster):
         *args,
         **kwargs,
     ):
-        super().__init__(index, powerplants_units, demand_units, market_configs, *args, **kwargs)
+        super().__init__(
+            index, powerplants_units, demand_units, market_configs, *args, **kwargs
+        )
 
         self.index = FastIndex(start=index[0], end=index[-1], freq=pd.infer_freq(index))
         self.sigma = sigma

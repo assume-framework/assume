@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import lru_cache
 
 import numpy as np
@@ -160,7 +160,7 @@ class Storage(SupportsMinMaxCharge):
         self.warm_start_cost = warm_start_cost * max_power_discharge
         self.cold_start_cost = cold_start_cost * max_power_discharge
 
-    def execute_current_dispatch(self, start: pd.Timestamp, end: pd.Timestamp):
+    def execute_current_dispatch(self, start: datetime, end: datetime):
         """
         Executes the current dispatch of the unit based on the provided timestamps.
 
@@ -286,7 +286,7 @@ class Storage(SupportsMinMaxCharge):
     @lru_cache(maxsize=256)
     def calculate_marginal_cost(
         self,
-        start: pd.Timestamp,
+        start: datetime,
         power: float,
     ) -> float:
         """
@@ -359,8 +359,8 @@ class Storage(SupportsMinMaxCharge):
         return power
 
     def calculate_min_max_charge(
-        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
-    ) -> tuple[pd.Series]:
+        self, start: datetime, end: datetime, product_type="energy"
+    ) -> tuple[FastSeries, FastSeries]:
         """
         Calculates the min and max charging power for the given time period.
         This is relative to the already sold output on other markets for the same period.
@@ -372,7 +372,7 @@ class Storage(SupportsMinMaxCharge):
             product_type (str): The product type of the storage unit.
 
         Returns:
-            tuple[pd.Series]: The minimum and maximum charge power levels of the storage unit in MW.
+            tuple[FastSeries, FastSeries]: The minimum and maximum charge power levels of the storage unit in MW.
         """
         end_excl = end - self.index.freq
 
@@ -408,8 +408,8 @@ class Storage(SupportsMinMaxCharge):
         return min_power_charge, max_power_charge
 
     def calculate_min_max_discharge(
-        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
-    ) -> tuple[pd.Series]:
+        self, start: datetime, end: datetime, product_type="energy"
+    ) -> tuple[FastSeries, FastSeries]:
         """
         Calculates the min and max discharging power for the given time period.
         This is relative to the already sold output on other markets for the same period.
@@ -421,7 +421,7 @@ class Storage(SupportsMinMaxCharge):
             product_type (str): The product type of the storage unit.
 
         Returns:
-            tuple[pd.Series]: The minimum and maximum discharge power levels of the storage unit in MW.
+            tuple[FastSeries, FastSeries]: The minimum and maximum discharge power levels of the storage unit in MW.
         """
         end_excl = end - self.index.freq
 

@@ -3,8 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import numbers
-
-import pandas as pd
+from datetime import datetime
 
 from assume.common.base import SupportsMinMax
 from assume.common.fast_pandas import FastSeries
@@ -41,7 +40,7 @@ class Demand(SupportsMinMax):
         min_power: float,
         forecaster: Forecaster,
         node: str = "node0",
-        price: float | pd.Series = 3000.0,
+        price: float | FastSeries = 3000.0,
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs,
     ):
@@ -71,8 +70,8 @@ class Demand(SupportsMinMax):
 
     def execute_current_dispatch(
         self,
-        start: pd.Timestamp,
-        end: pd.Timestamp,
+        start: datetime,
+        end: datetime,
     ):
         """
         Execute the current dispatch of the unit.
@@ -83,14 +82,14 @@ class Demand(SupportsMinMax):
             end (pandas.Timestamp): The end time of the dispatch.
 
         Returns:
-            pd.Series: The volume of the unit within the gicen time range.
+            FastSeries: The volume of the unit within the gicen time range.
         """
 
         return self.volume[start:end]
 
     def calculate_min_max_power(
-        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
-    ) -> tuple[pd.Series, pd.Series]:
+        self, start: datetime, end: datetime, product_type="energy"
+    ) -> tuple[FastSeries, FastSeries]:
         """
         Calculates the minimum and maximum power output of the unit and returns the bid volume as both the minimum and maximum power output of the unit.
 
@@ -105,7 +104,7 @@ class Demand(SupportsMinMax):
         bid_volume = (self.volume - self.outputs[product_type]).loc[start:end_excl]
         return bid_volume, bid_volume
 
-    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
+    def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """
         Calculate the marginal cost of the unit returns the marginal cost of the unit based on the provided time and power.
 
