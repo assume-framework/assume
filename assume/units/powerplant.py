@@ -145,11 +145,11 @@ class PowerPlant(SupportsMinMax):
         """
         start = max(start, self.index[0])
 
-        max_power = (
+        max_power_values = (
             self.forecaster.get_availability(self.id).loc[start:end] * self.max_power
         )
 
-        for t, max_pwr in zip(self.index[start:end], max_power):
+        for t, max_power in zip(self.index[start:end], max_power_values):
             current_power = self.outputs["energy"].at[t]
             previous_power = self.get_output_before(t)
             op_time = self.get_operation_time(t)
@@ -157,7 +157,7 @@ class PowerPlant(SupportsMinMax):
             current_power = self.calculate_ramp(op_time, previous_power, current_power)
 
             if current_power > 0:
-                current_power = min(current_power, max_pwr)
+                current_power = min(current_power, max_power)
                 current_power = max(current_power, self.min_power)
 
             self.outputs["energy"].at[t] = current_power
@@ -178,11 +178,6 @@ class PowerPlant(SupportsMinMax):
         """
         products_index = get_products_index(orderbook)
 
-        max_power = (
-            self.forecaster.get_availability(self.id).loc[products_index]
-            * self.max_power
-        )
-
         product_type = marketconfig.product_type
         for order in orderbook:
             start = order["start_time"]
@@ -200,7 +195,12 @@ class PowerPlant(SupportsMinMax):
 
         self.calculate_cashflow(product_type, orderbook)
 
-        for start, max_pwr in zip(products_index, max_power):
+        max_power_values = (
+            self.forecaster.get_availability(self.id).loc[products_index]
+            * self.max_power
+        )
+
+        for start, max_power in zip(products_index, max_power_values):
             current_power = self.outputs[product_type].at[start]
 
             previous_power = self.get_output_before(start)
@@ -209,7 +209,7 @@ class PowerPlant(SupportsMinMax):
             current_power = self.calculate_ramp(op_time, previous_power, current_power)
 
             if current_power > 0:
-                current_power = min(current_power, max_pwr)
+                current_power = min(current_power, max_power)
                 current_power = max(current_power, self.min_power)
 
             self.outputs[product_type].at[start] = current_power

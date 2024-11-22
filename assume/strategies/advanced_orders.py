@@ -63,7 +63,7 @@ class flexableEOMBlock(BaseStrategy):
         end = product_tuples[-1][1]
 
         previous_power = unit.get_output_before(start)
-        min_power, max_power = unit.calculate_min_max_power(start, end)
+        min_power_values, max_power_values = unit.calculate_min_max_power(start, end)
 
         bids = []
         bid_quantity_block = {}
@@ -71,7 +71,9 @@ class flexableEOMBlock(BaseStrategy):
         op_time = unit.get_operation_time(start)
         avg_op_time, avg_down_time = unit.get_average_operation_times(start)
 
-        for product, max_pwr, min_pwr in zip(product_tuples, max_power, min_power):
+        for product, min_power, max_power in zip(
+            product_tuples, min_power_values, max_power_values
+        ):
             start = product[0]
             end = product[1]
 
@@ -86,15 +88,15 @@ class flexableEOMBlock(BaseStrategy):
             # =============================================================================
 
             # adjust max_power for ramp speed
-            max_pwr = unit.calculate_ramp(
-                op_time, previous_power, max_pwr, current_power
+            max_power = unit.calculate_ramp(
+                op_time, previous_power, max_power, current_power
             )
             # adjust min_power for ramp speed
-            min_pwr = unit.calculate_ramp(
-                op_time, previous_power, min_pwr, current_power
+            min_power = unit.calculate_ramp(
+                op_time, previous_power, min_power, current_power
             )
 
-            bid_quantity_inflex = min_pwr
+            bid_quantity_inflex = min_power
 
             # =============================================================================
             # Calculating marginal cost
@@ -104,7 +106,7 @@ class flexableEOMBlock(BaseStrategy):
                 start, current_power + bid_quantity_inflex
             )
             marginal_cost_flex = unit.calculate_marginal_cost(
-                start, current_power + max_pwr
+                start, current_power + max_power
             )
 
             # =============================================================================
@@ -139,7 +141,7 @@ class flexableEOMBlock(BaseStrategy):
 
             # Flex-bid price formulation
             if op_time <= -unit.min_down_time or op_time > 0:
-                bid_quantity_flex = max_pwr - bid_quantity_inflex
+                bid_quantity_flex = max_power - bid_quantity_inflex
                 bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
 
             # add volume and price to block bid
@@ -253,7 +255,7 @@ class flexableEOMLinked(BaseStrategy):
         end = product_tuples[-1][1]
 
         previous_power = unit.get_output_before(start)
-        min_power, max_power = unit.calculate_min_max_power(start, end)
+        min_power_values, max_power_values = unit.calculate_min_max_power(start, end)
 
         bids = []
         bid_quantity_block = {}
@@ -263,7 +265,9 @@ class flexableEOMLinked(BaseStrategy):
 
         block_id = unit.id + "_block"
 
-        for product, max_pwr, min_pwr in zip(product_tuples, max_power, min_power):
+        for product, min_power, max_power in zip(
+            product_tuples, min_power_values, max_power_values
+        ):
             start = product[0]
             end = product[1]
 
@@ -278,15 +282,15 @@ class flexableEOMLinked(BaseStrategy):
             # =============================================================================
 
             # adjust max_power for ramp speed
-            max_pwr = unit.calculate_ramp(
-                op_time, previous_power, max_pwr, current_power
+            max_power = unit.calculate_ramp(
+                op_time, previous_power, max_power, current_power
             )
             # adjust min_power for ramp speed
-            min_pwr = unit.calculate_ramp(
-                op_time, previous_power, min_pwr, current_power
+            min_power = unit.calculate_ramp(
+                op_time, previous_power, min_power, current_power
             )
 
-            bid_quantity_inflex = min_pwr
+            bid_quantity_inflex = min_power
 
             # =============================================================================
             # Calculating marginal cost
@@ -296,7 +300,7 @@ class flexableEOMLinked(BaseStrategy):
                 start, current_power + bid_quantity_inflex
             )
             marginal_cost_flex = unit.calculate_marginal_cost(
-                start, current_power + max_pwr
+                start, current_power + max_power
             )
 
             # =============================================================================
@@ -331,7 +335,7 @@ class flexableEOMLinked(BaseStrategy):
 
             # Flex-bid price formulation
             if op_time <= -unit.min_down_time or op_time > 0:
-                bid_quantity_flex = max_pwr - bid_quantity_inflex
+                bid_quantity_flex = max_power - bid_quantity_inflex
                 bid_price_flex = (1 - power_loss_ratio) * marginal_cost_flex
 
             bid_quantity_block[product[0]] = bid_quantity_inflex

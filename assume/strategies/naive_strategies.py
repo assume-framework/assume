@@ -39,12 +39,14 @@ class NaiveSingleBidStrategy(BaseStrategy):
             start
         )  # power output of the unit before the start time of the first product
         op_time = unit.get_operation_time(start)
-        min_power, max_power = unit.calculate_min_max_power(
+        min_power_values, max_power_values = unit.calculate_min_max_power(
             start, end_all
         )  # minimum and maximum power output of the unit between the start time of the first product and the end time of the last product
 
         bids = []
-        for product, max_pwr, min_pwr in zip(product_tuples, max_power, min_power):
+        for product, min_power, max_power in zip(
+            product_tuples, min_power_values, max_power_values
+        ):
             # for each product, calculate the marginal cost of the unit at the start time of the product
             # and the volume of the product. Dispatch the order to the market.
             start = product[0]
@@ -55,7 +57,7 @@ class NaiveSingleBidStrategy(BaseStrategy):
                 start, previous_power
             )  # calculation of the marginal costs
             volume = unit.calculate_ramp(
-                op_time, previous_power, max_pwr, current_power
+                op_time, previous_power, max_power, current_power
             )
             bids.append(
                 {
@@ -70,7 +72,7 @@ class NaiveSingleBidStrategy(BaseStrategy):
 
             if "node" in market_config.additional_fields:
                 bids[-1]["max_power"] = unit.max_power if volume > 0 else unit.min_power
-                bids[-1]["min_power"] = min_pwr if volume > 0 else unit.max_power
+                bids[-1]["min_power"] = min_power if volume > 0 else unit.max_power
 
             previous_power = volume + current_power
             if previous_power > 0:
@@ -241,17 +243,17 @@ class NaivePosReserveStrategy(BaseStrategy):
         start = product_tuples[0][0]
         end_all = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
-        _, max_power = unit.calculate_min_max_power(
+        _, max_power_values = unit.calculate_min_max_power(
             start, end_all, market_config.product_type
         )
 
         bids = []
-        for product, max_pwr in zip(product_tuples, max_power):
+        for product, max_power in zip(product_tuples, max_power_values):
             start = product[0]
             op_time = unit.get_operation_time(start)
             current_power = unit.outputs["energy"].at[start]
             volume = unit.calculate_ramp(
-                op_time, previous_power, max_pwr, current_power
+                op_time, previous_power, max_power, current_power
             )
             price = 0
             bids.append(
@@ -305,18 +307,18 @@ class NaiveNegReserveStrategy(BaseStrategy):
         start = product_tuples[0][0]
         end_all = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
-        min_power, _ = unit.calculate_min_max_power(
+        min_power_values, _ = unit.calculate_min_max_power(
             start, end_all, market_config.product_type
         )
 
         bids = []
-        for product, min_pwr in zip(product_tuples, min_power):
+        for product, min_power in zip(product_tuples, min_power_values):
             start = product[0]
             op_time = unit.get_operation_time(start)
             previous_power = unit.get_output_before(start)
             current_power = unit.outputs["energy"].at[start]
             volume = unit.calculate_ramp(
-                op_time, previous_power, min_pwr, current_power
+                op_time, previous_power, min_power, current_power
             )
             price = 0
             bids.append(

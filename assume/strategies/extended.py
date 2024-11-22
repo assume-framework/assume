@@ -208,15 +208,14 @@ class MarkupStrategy(BaseStrategy):
             start = product[0]
             end = product[1]
 
-            min_power, max_power = unit.calculate_min_max_power(
-                start, end
-            )  # max_power describes the maximum power output of the unit
+            # max_power describes the maximum power output of the unit
+            _, max_power = unit.calculate_min_max_power(start, end)
             current_power = unit.outputs[
                 "energy"
             ].at[
                 start
             ]  # current power output describes the power output at the start of the product
-            volume = max_power[start]
+            volume = max_power[0]
             price = unit.calculate_marginal_cost(start, current_power + volume)
 
             bids.append(

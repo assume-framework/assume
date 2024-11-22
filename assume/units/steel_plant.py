@@ -553,7 +553,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.calculate_cashflow(product_type, orderbook)
 
         for start in products_index:
-            current_power = self.outputs[product_type][start]
+            current_power = self.outputs[product_type].at[start]
             self.outputs[product_type].at[start] = current_power
 
         self.bidding_strategies[marketconfig.market_id].calculate_reward(
@@ -576,9 +576,10 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         # Initialize marginal cost
         marginal_cost = 0
 
-        if self.opt_power_requirement[start] > 0:
+        if self.opt_power_requirement.at[start] > 0:
             marginal_cost = (
-                self.variable_cost_series[start] / self.opt_power_requirement[start]
+                self.variable_cost_series.at[start]
+                / self.opt_power_requirement.at[start]
             )
 
         return marginal_cost
