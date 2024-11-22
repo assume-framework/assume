@@ -394,6 +394,16 @@ class FastSeries:
         """
         return FastSeriesILocIndexer(self)
 
+    @property
+    def iat(self):
+        """
+        Integer-based single-item access property.
+
+        Returns:
+            FastSeriesIatIndexer: Indexer for integer-based single-element access.
+        """
+        return FastSeriesIatIndexer(self)
+
     def __getitem__(
         self, item: datetime | slice | list | pd.Index | pd.Series | np.ndarray | str
     ):
@@ -1058,6 +1068,49 @@ class FastSeriesILocIndexer:
             raise TypeError(
                 f"Unsupported index type for iloc: {type(item)}. Must be int or slice."
             )
+
+
+class FastSeriesIatIndexer:
+    def __init__(self, series: FastSeries):
+        self._series = series
+
+    def __getitem__(self, item: int) -> float:
+        """
+        Retrieve a single item using integer-based indexing.
+
+        Parameters:
+            item (int): The integer index.
+
+        Returns:
+            float: The retrieved value.
+
+        Raises:
+            IndexError: If the index is out of bounds.
+            TypeError: If the index is not an integer.
+        """
+        if not isinstance(item, int):
+            raise TypeError(
+                f"iat only supports single integer indices, got {type(item)}"
+            )
+        return self._series.iloc[item]
+
+    def __setitem__(self, item: int, value: float):
+        """
+        Assign a value using integer-based indexing.
+
+        Parameters:
+            item (int): The integer index.
+            value (float): The value to assign.
+
+        Raises:
+            IndexError: If the index is out of bounds.
+            TypeError: If the index is not an integer.
+        """
+        if not isinstance(item, int):
+            raise TypeError(
+                f"iat only supports single integer indices, got {type(item)}"
+            )
+        self._series.iloc[item] = value
 
 
 class TensorFastSeries(FastSeries):
