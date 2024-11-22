@@ -5,12 +5,11 @@
 from datetime import datetime
 
 import numpy as np
-import pandas as pd
 import torch as th
 
 from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.common.utils import get_products_index
+from assume.strategies.flexable import calculate_reward_EOM
 from assume.strategies.learning_strategies import RLStrategy
 
 
@@ -257,7 +256,7 @@ class RLAdvancedOrderStrategy(RLStrategy):
         end_excl = end - unit.index.freq
 
         # get the forecast length depending on the time unit considered in the modelled unit
-        forecast_len = pd.Timedelta((self.foresight - 1) * unit.index.freq)
+        forecast_len = (self.foresight - 1) * unit.index.freq
 
         # =============================================================================
         # 1.1 Get the Observations, which are the basis of the action decision
@@ -375,89 +374,4 @@ class RLAdvancedOrderStrategy(RLStrategy):
 
         """
 
-        # =============================================================================
-        # 4. Calculate Reward
-        # =============================================================================
-        # function is called after the market is cleared and we get the market feedback,
-        # so we can calculate the profit
-
-        product_type = marketconfig.product_type
-        products_index = get_products_index(orderbook)
-
-        max_power = (
-            unit.forecaster.get_availability(unit.id)[products_index] * unit.max_power
-        )
-
-        profit = pd.Series(0.0, index=products_index)
-        reward = pd.Series(0.0, index=products_index)
-        opportunity_cost = pd.Series(0.0, index=products_index)
-        costs = pd.Series(0.0, index=products_index)
-
-        # iterate over all orders in the orderbook, to calculate order specific profit
-        for order in orderbook:
-            start = order["start_time"]
-            end = order["end_time"]
-            end_excl = end - unit.index.freq
-
-            order_times = pd.date_range(start, end_excl, freq=unit.index.freq)
-
-            # calculate profit as income - running_cost from this event
-
-            for start in order_times:
-                marginal_cost = unit.calculate_marginal_cost(
-                    start, unit.outputs[product_type].loc[start]
-                )
-                if isinstance(order["accepted_volume"], dict):
-                    accepted_volume = order["accepted_volume"][start]
-                else:
-                    accepted_volume = order["accepted_volume"]
-
-                if isinstance(order["accepted_price"], dict):
-                    accepted_price = order["accepted_price"][start]
-                else:
-                    accepted_price = order["accepted_price"]
-
-                price_difference = accepted_price - marginal_cost
-
-                # calculate opportunity cost
-                # as the loss of income we have because we are not running at full power
-                order_opportunity_cost = price_difference * (
-                    max_power[start] - unit.outputs[product_type].loc[start]
-                )
-                # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
-                # don't consider opportunity_cost more than once! Always the same for one timestep and one market
-                opportunity_cost[start] = max(order_opportunity_cost, 0)
-                profit[start] += accepted_price * accepted_volume
-
-        # consideration of start-up costs, which are evenly divided between the
-        # upward and downward regulation events
-        for start in products_index:
-            op_time = unit.get_operation_time(start)
-
-            marginal_cost = unit.calculate_marginal_cost(
-                start, unit.outputs[product_type].loc[start]
-            )
-            costs[start] += marginal_cost * unit.outputs[product_type].loc[start]
-
-            if unit.outputs[product_type].loc[start] != 0 and op_time < 0:
-                start_up_cost = unit.get_starting_costs(op_time)
-                costs[start] += start_up_cost
-
-        # ---------------------------
-        # 4.1 Calculate Reward
-        # The straight forward implementation would be reward = profit, yet we would like to give the agent more guidance
-        # in the learning process, so we add a regret term to the reward, which is the opportunity cost
-        # define the reward and scale it
-
-        profit += -costs
-        scaling = 1 / (unit.max_power * self.max_bid_price)
-        regret_scale = 0.0
-        reward = (profit - regret_scale * opportunity_cost) * scaling
-
-        # store results in unit outputs which are written to database by unit operator
-        unit.outputs["profit"].loc[products_index] = profit
-        unit.outputs["reward"].loc[products_index] = reward
-        unit.outputs["regret"].loc[products_index] = opportunity_cost
-        unit.outputs["total_costs"].loc[products_index] = costs
-
-        unit.outputs["rl_rewards"].append(reward)
+        calculate_reward_EOM(unit, marketconfig, orderbook)

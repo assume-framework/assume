@@ -333,31 +333,6 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=No
     return [j for sub in list(aggregation.values()) for j in sub]
 
 
-def get_test_demand_orders(power: np.ndarray):
-    """
-    Get test demand orders.
-
-    Args:
-        power (numpy.ndarray): Power array.
-
-    Returns:
-        pandas.DataFrame: DataFrame of demand orders.
-
-    Examples:
-        >>> power = np.array([100, 200, 150])
-        >>> get_test_demand_orders(power)
-    """
-
-    order_book = {}
-    for t in range(len(power)):
-        order_book[t] = dict(
-            type="demand", hour=t, block_id=t, name="DEM", price=3, volume=-power[t]
-        )
-    demand_order = pd.DataFrame.from_dict(order_book, orient="index")
-    demand_order = demand_order.set_index(["block_id", "hour", "name"])
-    return demand_order
-
-
 def separate_orders(orderbook: Orderbook):
     """
     Separate orders with several hours into single hour orders.
@@ -674,3 +649,21 @@ def suppress_output():
         os.close(saved_stdout_fd)
         os.close(saved_stderr_fd)
         os.close(devnull)
+
+
+# Function to parse the duration string
+def parse_duration(duration_str):
+    if duration_str.endswith("d"):
+        days = int(duration_str[:-1])
+        return timedelta(days=days)
+    elif duration_str.endswith("h"):
+        hours = int(duration_str[:-1])
+        return timedelta(hours=hours)
+    elif duration_str.endswith("m"):
+        minutes = int(duration_str[:-1])
+        return timedelta(minutes=minutes)
+    elif duration_str.endswith("s"):
+        seconds = int(duration_str[:-1])
+        return timedelta(seconds=seconds)
+    else:
+        raise ValueError(f"Unsupported duration format: {duration_str}")

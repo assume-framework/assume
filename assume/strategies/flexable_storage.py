@@ -5,10 +5,10 @@
 from datetime import timedelta
 
 import numpy as np
-import pandas as pd
 
 from assume.common.base import BaseStrategy, SupportsMinMaxCharge
 from assume.common.market_objects import MarketConfig, Orderbook, Product
+from assume.common.utils import parse_duration
 
 
 class flexableEOMStorage(BaseStrategy):
@@ -21,7 +21,7 @@ class flexableEOMStorage(BaseStrategy):
     Otherwise, the unit will charge with the price defined as the average price multiplied by the charge efficiency of the unit.
 
     Attributes:
-        foresight (pandas.Timedelta): Foresight for the average price calculation.
+        foresight (datetime.timedelta): Foresight for the average price calculation.
 
     Args:
         *args: Additional arguments.
@@ -31,7 +31,7 @@ class flexableEOMStorage(BaseStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.foresight = pd.Timedelta(kwargs.get("eom_foresight", "12h"))
+        self.foresight = parse_duration(kwargs.get("eom_foresight", "12h"))
 
     def calculate_bids(
         self,
@@ -179,23 +179,20 @@ class flexableEOMStorage(BaseStrategy):
 
         for order in orderbook:
             start = order["start_time"]
-            end = order["end_time"]
-            end_excl = end - unit.index.freq
-            index = pd.date_range(start, end_excl, freq=unit.index.freq)
-            costs = pd.Series(0.0, index=index)
-            for start in index:
-                if unit.outputs[product_type][start] != 0:
-                    costs[start] += abs(
-                        unit.outputs[product_type][start]
-                        * unit.calculate_marginal_cost(
-                            start, unit.outputs[product_type][start]
-                        )
-                    )
+            end_excl = order["end_time"] - unit.index.freq
 
-            unit.outputs["profit"][index] = (
-                unit.outputs[f"{product_type}_cashflow"][index] - costs
+            # Extract outputs and costs in one step
+            outputs = unit.outputs[product_type].loc[start:end_excl]
+            costs = outputs.apply(
+                lambda x: abs(x * unit.calculate_marginal_cost(start, x))
+                if x != 0
+                else 0
             )
-            unit.outputs["total_costs"][index] = costs
+
+            unit.outputs["profit"].loc[start:end_excl] = (
+                unit.outputs[f"{product_type}_cashflow"].loc[start:end_excl] - costs
+            )
+            unit.outputs["total_costs"].loc[start:end_excl] = costs
 
 
 class flexablePosCRMStorage(BaseStrategy):
@@ -206,7 +203,7 @@ class flexablePosCRMStorage(BaseStrategy):
     Otherwise, the strategy bids the capacity_price for the capacity_pos product.
 
     Attributes:
-        foresight (pandas.Timedelta): Foresight for the average price calculation.
+        foresight (datetime.timedelta): Foresight for the average price calculation.
 
     Args:
         *args: Additional arguments.
@@ -217,7 +214,7 @@ class flexablePosCRMStorage(BaseStrategy):
         super().__init__(*args, **kwargs)
 
         # check if kwargs contains crm_foresight argument
-        self.foresight = pd.Timedelta(kwargs.get("crm_foresight", "4h"))
+        self.foresight = parse_duration(kwargs.get("crm_foresight", "4h"))
 
     def calculate_bids(
         self,
@@ -337,7 +334,7 @@ class flexableNegCRMStorage(BaseStrategy):
     A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
 
     Attributes:
-        foresight (pandas.Timedelta): Foresight for the average price calculation.
+        foresight (datetime.timedelta): Foresight for the average price calculation.
 
     Args:
         *args: Additional arguments.
@@ -347,7 +344,7 @@ class flexableNegCRMStorage(BaseStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.foresight = pd.Timedelta(kwargs.get("crm_foresight", "4h"))
+        self.foresight = parse_duration(kwargs.get("crm_foresight", "4h"))
 
     def calculate_bids(
         self,
@@ -444,9 +441,9 @@ def calculate_price_average(current_time, foresight, price_forecast):
     Calculates the average price for a given foresight and returns the average price.
 
     Args:
-        current_time (pandas.Timestamp): The current time.
-        foresight (pandas.Timedelta): The foresight.
-        price_forecast (pandas.Series): The price forecast.
+        current_time (datetime.datetime): The current time.
+        foresight (datetime.timedelta): The foresight.
+        price_forecast (FastSeries): The price forecast.
 
     Returns:
         float: The average price.
@@ -454,7 +451,7 @@ def calculate_price_average(current_time, foresight, price_forecast):
     start = max(current_time - foresight, price_forecast.index[0])
     end = min(current_time + foresight, price_forecast.index[-1])
 
-    average_price = np.mean(price_forecast[start:end])
+    average_price = np.mean(price_forecast.loc[start:end])
 
     return average_price
 
@@ -468,8 +465,8 @@ def get_specific_revenue(unit, marginal_cost, t, foresight, price_forecast):
         unit (SupportsMinMaxCharge): The unit that is dispatched.
         marginal_cost (float): The marginal cost.
         t (datetime.datetime): The start time of the product.
-        foresight (pandas.Timedelta): The foresight.
-        price_forecast (pandas.Series): The price forecast.
+        foresight (datetime.timedelta): The foresight.
+        price_forecast (FastSeries): The price forecast.
 
     Returns:
         float: The specific revenue.

@@ -5,6 +5,7 @@
 import pandas as pd
 import pytest
 
+from assume.common.fast_pandas import FastSeries
 from assume.common.forecasts import NaiveForecast
 from assume.strategies.naive_strategies import (
     NaiveDASteelplantStrategy,
@@ -89,7 +90,7 @@ def test_initialize_components(steel_plant):
 def test_determine_optimal_operation_without_flex(steel_plant):
     steel_plant.determine_optimal_operation_without_flex()
     assert steel_plant.opt_power_requirement is not None
-    assert isinstance(steel_plant.opt_power_requirement, pd.Series)
+    assert isinstance(steel_plant.opt_power_requirement, FastSeries)
 
     instance = steel_plant.model.create_instance()
     instance = steel_plant.switch_to_opt(instance)
@@ -134,11 +135,11 @@ def test_determine_optimal_operation_with_flex(steel_plant):
     # Ensure that the optimal operation without flexibility is determined first
     steel_plant.determine_optimal_operation_without_flex()
     assert steel_plant.opt_power_requirement is not None
-    assert isinstance(steel_plant.opt_power_requirement, pd.Series)
+    assert isinstance(steel_plant.opt_power_requirement, FastSeries)
 
     steel_plant.determine_optimal_operation_with_flex()
     assert steel_plant.flex_power_requirement is not None
-    assert isinstance(steel_plant.flex_power_requirement, pd.Series)
+    assert isinstance(steel_plant.flex_power_requirement, FastSeries)
 
     instance = steel_plant.model.create_instance()
     instance = steel_plant.switch_to_flex(instance)

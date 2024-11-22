@@ -2,8 +2,9 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import numbers
 from datetime import datetime
+
+import numpy as np
 
 from assume.common.base import SupportsMinMax
 from assume.common.fast_pandas import FastSeries
@@ -40,7 +41,7 @@ class Demand(SupportsMinMax):
         min_power: float,
         forecaster: Forecaster,
         node: str = "node0",
-        price: float | FastSeries = 3000.0,
+        price: float = 3000.0,
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs,
     ):
@@ -57,39 +58,39 @@ class Demand(SupportsMinMax):
         """Create a demand unit."""
         self.max_power = max_power
         self.min_power = min_power
+
         if max_power > 0 and min_power <= 0:
             self.max_power = min_power
             self.min_power = -max_power
+
         self.ramp_down = max(abs(min_power), abs(max_power))
         self.ramp_up = max(abs(min_power), abs(max_power))
-        volume = self.forecaster[self.id]
-        self.volume = -abs(volume)  # demand is negative
-        if isinstance(price, numbers.Real):
-            price = FastSeries(index=self.index, value=price)
-        self.price = price
+
+        self.volume = -abs(self.forecaster[self.id])  # demand is negative
+        self.price = FastSeries(index=self.index, value=price)
 
     def execute_current_dispatch(
         self,
         start: datetime,
         end: datetime,
-    ):
+    ) -> np.array:
         """
         Execute the current dispatch of the unit.
         Returns the volume of the unit within the given time range.
 
         Args:
-            start (pandas.Timestamp): The start time of the dispatch.
-            end (pandas.Timestamp): The end time of the dispatch.
+            start (datetime.datetime): The start time of the dispatch.
+            end (datetime.datetime): The end time of the dispatch.
 
         Returns:
-            FastSeries: The volume of the unit within the gicen time range.
+            np.array: The volume of the unit for the given time range.
         """
 
-        return self.volume[start:end]
+        return self.volume.loc[start:end]
 
     def calculate_min_max_power(
         self, start: datetime, end: datetime, product_type="energy"
-    ) -> tuple[FastSeries, FastSeries]:
+    ) -> tuple[np.array, np.array]:
         """
         Calculates the minimum and maximum power output of the unit and returns the bid volume as both the minimum and maximum power output of the unit.
 
@@ -102,6 +103,7 @@ class Demand(SupportsMinMax):
         """
         end_excl = end - self.index.freq
         bid_volume = (self.volume - self.outputs[product_type]).loc[start:end_excl]
+
         return bid_volume, bid_volume
 
     def calculate_marginal_cost(self, start: datetime, power: float) -> float:

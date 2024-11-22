@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 import torch as th
 
 from assume.common.base import LearningStrategy, SupportsMinMax, SupportsMinMaxCharge
@@ -391,7 +390,7 @@ class RLStrategy(AbstractLearningStrategy):
         end_excl = end - unit.index.freq
 
         # get the forecast length depending on the tme unit considered in the modelled unit
-        forecast_len = pd.Timedelta((self.foresight - 1) * unit.index.freq)
+        forecast_len = (self.foresight - 1) * unit.index.freq
 
         # =============================================================================
         # 1.1 Get the Observations, which are the basis of the action decision
@@ -992,7 +991,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
         end_excl = end - unit.index.freq
 
         # get the forecast length depending on the tme unit considered in the modelled unit
-        forecast_len = pd.Timedelta((self.foresight - 1) * unit.index.freq)
+        forecast_len = (self.foresight - 1) * unit.index.freq
 
         # =============================================================================
         # 1.1 Get the Observations, which are the basis of the action decision

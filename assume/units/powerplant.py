@@ -6,8 +6,9 @@ import logging
 from datetime import datetime, timedelta
 from functools import lru_cache
 
+import numpy as np
+
 from assume.common.base import SupportsMinMax
-from assume.common.fast_pandas import FastSeries
 from assume.common.forecasts import Forecaster
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
@@ -28,7 +29,7 @@ class PowerPlant(SupportsMinMax):
         max_power (float): The maximum power output capacity of the power plant in MW.
         min_power (float, optional): The minimum power output capacity of the power plant in MW. Defaults to 0.0 MW.
         efficiency (float, optional): The efficiency of the power plant in converting fuel to electricity. Defaults to 1.0.
-        additional_cost (Union[float, FastSeries], optional): Additional costs associated with power generation, in EUR/MWh. Defaults to 0.
+        additional_cost (float, optional): Additional costs associated with power generation, in EUR/MWh. Defaults to 0.
         partial_load_eff (bool, optional): Does the efficiency vary at part loads? Defaults to False.
         fuel_type (str, optional): The type of fuel used by the power plant for power generation. Defaults to "others".
         emission_factor (float, optional): The emission factor associated with the power plant's fuel type (CO2 emissions per unit of energy produced). Defaults to 0.0.
@@ -58,7 +59,7 @@ class PowerPlant(SupportsMinMax):
         max_power: float,
         min_power: float = 0.0,
         efficiency: float = 1.0,
-        additional_cost: float | FastSeries = 0.0,
+        additional_cost: float = 0.0,
         partial_load_eff: bool = False,
         fuel_type: str = "others",
         emission_factor: float = 0.0,
@@ -128,7 +129,7 @@ class PowerPlant(SupportsMinMax):
         self,
         start: datetime,
         end: datetime,
-    ):
+    ) -> np.array:
         """
         Executes the current dispatch of the unit based on the provided timestamps.
 
@@ -140,16 +141,16 @@ class PowerPlant(SupportsMinMax):
             end (pandas.Timestamp): The end time of the dispatch.
 
         Returns:
-            FastSeries: The volume of the unit within the given time range.
+            np.array: The volume of the unit within the given time range.
         """
         start = max(start, self.index[0])
 
         max_power = (
-            self.forecaster.get_availability(self.id)[start:end] * self.max_power
+            self.forecaster.get_availability(self.id).loc[start:end] * self.max_power
         )
 
         for t, max_pwr in zip(self.index[start:end], max_power):
-            current_power = self.outputs["energy"][t]
+            current_power = self.outputs["energy"].at[t]
             previous_power = self.get_output_before(t)
             op_time = self.get_operation_time(t)
 
@@ -159,7 +160,7 @@ class PowerPlant(SupportsMinMax):
                 current_power = min(current_power, max_pwr)
                 current_power = max(current_power, self.min_power)
 
-            self.outputs["energy"][t] = current_power
+            self.outputs["energy"].at[t] = current_power
 
         return self.outputs["energy"].loc[start:end]
 
@@ -178,7 +179,8 @@ class PowerPlant(SupportsMinMax):
         products_index = get_products_index(orderbook)
 
         max_power = (
-            self.forecaster.get_availability(self.id)[products_index] * self.max_power
+            self.forecaster.get_availability(self.id).loc[products_index]
+            * self.max_power
         )
 
         product_type = marketconfig.product_type
@@ -241,18 +243,18 @@ class PowerPlant(SupportsMinMax):
     def calc_marginal_cost_with_partial_eff(
         self,
         power_output: float,
-        timestep: datetime = None,
-    ) -> float | FastSeries:
+        timestep: datetime,
+    ) -> float:
         """
         Calculates the marginal cost of the unit based on power output and timestamp, considering partial efficiency.
         Returns the marginal cost of the unit.
 
         Args:
             power_output (float): The power output of the unit.
-            timestep (datetime, optional): The timestamp of the unit. Defaults to None.
+            timestep (datetime.datetime): The timestamp of the unit.
 
         Returns:
-            float | FastSeries: The marginal cost of the unit.
+            float: The marginal cost of the unit at the given timestamp.
         """
         fuel_price = self.forecaster.get_price(self.fuel_type).at[timestep]
 
@@ -291,23 +293,17 @@ class PowerPlant(SupportsMinMax):
         efficiency = self.efficiency - eta_loss
         co2_price = self.forecaster.get_price("co2").at[timestep]
 
-        additional_cost = (
-            self.additional_cost.at[timestep]
-            if isinstance(self.additional_cost, FastSeries)
-            else self.additional_cost
-        )
-
         marginal_cost = (
             fuel_price / efficiency
             + co2_price * self.emission_factor / efficiency
-            + additional_cost
+            + self.additional_cost
         )
 
         return marginal_cost
 
     def calculate_min_max_power(
         self, start: datetime, end: datetime, product_type="energy"
-    ) -> tuple[FastSeries, FastSeries]:
+    ) -> tuple[np.array, np.array]:
         """
         Calculates the minimum and maximum power output of the unit and returns it.
 
@@ -324,24 +320,25 @@ class PowerPlant(SupportsMinMax):
         """
         end_excl = end - self.index.freq
 
-        base_load = self.outputs["energy"][start:end_excl]
-        heat_demand = self.outputs["heat"][start:end_excl]
+        base_load = self.outputs["energy"].loc[start:end_excl]
+        heat_demand = self.outputs["heat"].loc[start:end_excl]
+        capacity_neg = self.outputs["capacity_neg"].loc[start:end_excl]
 
-        capacity_neg = self.outputs["capacity_neg"][start:end_excl]
         # needed minimum + capacity_neg - what is already sold is actual minimum
         min_power = self.min_power + capacity_neg - base_load
         # min_power should be at least the heat demand at that time
         min_power = min_power.clip(min=heat_demand)
 
-        available_power = self.forecaster.get_availability(self.id)[start:end_excl]
+        available_power = self.forecaster.get_availability(self.id).loc[start:end_excl]
         # check if available power is larger than max_power and raise an error if so
         if (available_power > self.max_power).any():
             raise ValueError(
                 f"Available power is larger than max_power for unit {self.id} at time {start}."
             )
+
         max_power = available_power * self.max_power
         # provide reserve for capacity_pos
-        max_power = max_power - self.outputs["capacity_pos"][start:end_excl]
+        max_power = max_power - self.outputs["capacity_pos"].loc[start:end_excl]
         # remove what has already been bid
         max_power = max_power - base_load
         # make sure that max_power is > 0 for all timesteps

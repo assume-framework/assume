@@ -84,21 +84,6 @@ class Forecaster:
 
         return self[f"fuel_price_{fuel_type}"]
 
-    def _to_fast_series(self, value, name: str) -> FastSeries:
-        """
-        Converts a value to a FastSeries based on self.index.
-
-        Args:
-            value (float | list | pd.Series): The value to convert.
-            name (str): Name of the series.
-
-        Returns:
-            FastSeries: The converted FastSeries.
-        """
-        if isinstance(value, pd.Series):
-            value = value.values  # Use the values as an array for consistency
-        return FastSeries(index=self.index, value=value, name=name)
-
 
 class CsvForecaster(Forecaster):
     """
@@ -427,7 +412,7 @@ class CsvForecaster(Forecaster):
         for column_name in self.forecasts.columns:
             # Convert each column in self.forecasts to FastSeries
             forecast_series = self.forecasts[column_name]
-            fast_forecasts[column_name] = FastSeries.from_series(forecast_series)
+            fast_forecasts[column_name] = FastSeries.from_pandas_series(forecast_series)
 
         # Replace the DataFrame with the dictionary of FastSeries
         self.forecasts = fast_forecasts
@@ -547,11 +532,17 @@ class NaiveForecast(Forecaster):
         self.index = FastIndex(start=index[0], end=index[-1], freq=pd.infer_freq(index))
 
         # Convert attributes to FastSeries if they are not already Series
-        self.fuel_price = self._to_fast_series(fuel_price, "fuel_price")
-        self.availability = self._to_fast_series(availability, "availability")
-        self.co2_price = self._to_fast_series(co2_price, "co2_price")
-        self.demand = self._to_fast_series(demand, "demand")
-        self.price_forecast = self._to_fast_series(price_forecast, "price_forecast")
+        self.fuel_price = FastSeries(
+            index=self.index, value=fuel_price, name="fuel_price"
+        )
+        self.availability = FastSeries(
+            index=self.index, value=availability, name="availability"
+        )
+        self.co2_price = FastSeries(index=self.index, value=co2_price, name="co2_price")
+        self.demand = FastSeries(index=self.index, value=demand, name="demand")
+        self.price_forecast = FastSeries(
+            index=self.index, value=price_forecast, name="price_forecast"
+        )
 
     def __getitem__(self, column: str) -> FastSeries:
         """

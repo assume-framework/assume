@@ -301,7 +301,7 @@ class UnitsOperator(Role):
 
         Args:
             product_type (str): The product type for which this is done
-            last (datetime): the last date until which the dispatch was already sent
+            last (datetime.datetime): the last date until which the dispatch was already sent
 
         Returns:
             tuple[list[tuple[datetime, float, str, str]], list[dict]]: market_dispatch and unit_dispatch dataframes
@@ -336,6 +336,7 @@ class UnitsOperator(Role):
             dispatch["time"] = unit.index.get_date_list(start, end)
             dispatch["unit"] = unit_id
             unit_dispatch.append(dispatch)
+
         return market_dispatch, unit_dispatch
 
     def write_actual_dispatch(self, product_type: str) -> None:

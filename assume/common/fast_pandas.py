@@ -143,7 +143,7 @@ class FastIndex:
         Check if a datetime is within the index range and aligned with the frequency.
 
         Parameters:
-            date (datetime): The datetime to check.
+            date (datetime.datetime): The datetime to check.
 
         Returns:
             bool: True if the datetime is in the index range and aligned; False otherwise.
@@ -224,7 +224,7 @@ class FastIndex:
         Convert a datetime to its corresponding index in the range.
 
         Parameters:
-            date (datetime): The datetime to convert.
+            date (datetime.datetime): The datetime to convert.
 
         Returns:
             int: The index of the datetime in the index range.
@@ -306,6 +306,10 @@ class FastSeries:
             value (float | np.ndarray, optional): Initial value(s) for the data. Defaults to 0.0.
             name (str, optional): Name of the series. Defaults to an empty string.
         """
+        # check that the index is a FastIndex
+        if not isinstance(index, FastIndex):
+            raise TypeError("In FastSeries, index must be a FastIndex object.")
+
         self._index = index
         self._name = name
         self.loc = self  # Allow adjusting loc as well
@@ -835,7 +839,7 @@ class FastSeries:
         return pd.Series(data_slice, index=index, name=name if name else self.name)
 
     @staticmethod
-    def from_series(series: pd.Series):
+    def from_pandas_series(series: pd.Series):
         """
         Create a FastSeries from a pandas Series.
 

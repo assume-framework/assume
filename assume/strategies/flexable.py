@@ -4,11 +4,11 @@
 
 from datetime import datetime, timedelta
 
-import pandas as pd
+import numpy as np
 
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.common.utils import get_products_index
+from assume.common.utils import get_products_index, parse_duration
 
 
 class flexableEOM(BaseStrategy):
@@ -27,7 +27,7 @@ class flexableEOM(BaseStrategy):
         super().__init__(*args, **kwargs)
 
         # check if kwargs contains eom_foresight argument
-        self.foresight = pd.Timedelta(kwargs.get("eom_foresight", "12h"))
+        self.foresight = parse_duration(kwargs.get("eom_foresight", "12h"))
 
     def calculate_bids(
         self,
@@ -199,7 +199,7 @@ class flexablePosCRM(BaseStrategy):
         super().__init__(*args, **kwargs)
 
         # check if kwargs contains crm_foresight argument
-        self.foresight = pd.Timedelta(kwargs.get("crm_foresight", "4h"))
+        self.foresight = parse_duration(kwargs.get("crm_foresight", "4h"))
 
     def calculate_bids(
         self,
@@ -307,7 +307,7 @@ class flexableNegCRM(BaseStrategy):
         super().__init__(*args, **kwargs)
 
         # check if kwargs contains crm_foresight argument
-        self.foresight = pd.Timedelta(kwargs.get("crm_foresight", "4h"))
+        self.foresight = parse_duration(kwargs.get("crm_foresight", "4h"))
 
     def calculate_bids(
         self,
@@ -518,7 +518,7 @@ def get_specific_revenue(
     and marginal costs for the time defined by the foresight.
 
     Args:
-        price_forecast (pandas.Series): The price forecast.
+        price_forecast (FastSeries): The price forecast.
         marginal_cost (float): The marginal cost of the unit.
         t (datetime.datetime): The start time of the product.
         foresight (datetime.timedelta): The foresight of the unit.
@@ -543,12 +543,21 @@ def calculate_reward_EOM(
     orderbook: Orderbook,
 ):
     """
-    Calculates and writes reward (costs and profit) for EOM market.
+    Calculate and write reward, profit and regret to unit outputs.
 
     Args:
-        unit (SupportsMinMax): A unit that the unit operator manages.
-        marketconfig (MarketConfig): A market configuration.
-        orderbook (Orderbook): An orderbook with accepted and rejected orders for the unit.
+        unit (SupportsMinMax): The unit to calculate reward for.
+        marketconfig (MarketConfig): The market configuration.
+        orderbook (Orderbook): The Orderbook.
+
+    Note:
+        The reward is calculated as the profit minus the opportunity cost,
+        which is the loss of income we have because we are not running at full power.
+        The regret is the opportunity cost.
+        Because the regret_scale is set to 0 the reward equals the profit.
+        The profit is the income we have from the accepted bids.
+        The total costs are the running costs and the start-up costs.
+
     """
     # TODO: Calculate profits over all markets
     product_type = marketconfig.product_type
@@ -558,59 +567,65 @@ def calculate_reward_EOM(
         unit.forecaster.get_availability(unit.id)[products_index] * unit.max_power
     )
 
-    profit = pd.Series(0.0, index=products_index)
-    reward = pd.Series(0.0, index=products_index)
-    opportunity_cost = pd.Series(0.0, index=products_index)
-    costs = pd.Series(0.0, index=products_index)
+    # Initialize intermediate results as numpy arrays for better performance
+    profit = np.zeros(len(products_index))
+    reward = np.zeros(len(products_index))
+    opportunity_cost = np.zeros(len(products_index))
+    costs = np.zeros(len(products_index))
+
+    # Map products_index to their positions for faster updates
+    index_map = {time: i for i, time in enumerate(products_index)}
 
     for order in orderbook:
         start = order["start_time"]
-        end = order["end_time"]
-        end_excl = end - unit.index.freq
+        end_excl = order["end_time"] - unit.index.freq
 
-        order_times = pd.date_range(start, end_excl, freq=unit.index.freq)
+        order_times = unit.index[start:end_excl]
+        accepted_volume = order["accepted_volume"]
+        accepted_price = order["accepted_price"]
 
         for start, max_pwr in zip(order_times, max_power):
+            idx = index_map.get(start)
+
             marginal_cost = unit.calculate_marginal_cost(
-                start, unit.outputs[product_type].loc[start]
+                start, unit.outputs[product_type].at[start]
             )
 
-            if isinstance(order["accepted_volume"], dict):
-                accepted_volume = order["accepted_volume"][start]
+            if isinstance(accepted_volume, dict):
+                accepted_volume = accepted_volume.get(start, 0)
             else:
-                accepted_volume = order["accepted_volume"]
+                accepted_volume = accepted_volume
 
-            if isinstance(order["accepted_price"], dict):
-                accepted_price = order["accepted_price"][start]
+            if isinstance(accepted_price, dict):
+                accepted_price = accepted_price.get(start, 0)
             else:
-                accepted_price = order["accepted_price"]
+                accepted_price = accepted_price
 
             price_difference = accepted_price - marginal_cost
 
             # calculate opportunity cost
             # as the loss of income we have because we are not running at full power
             order_opportunity_cost = price_difference * (
-                max_pwr - unit.outputs[product_type].loc[start]
+                max_pwr - unit.outputs[product_type].at[start]
             )
             # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
             # don't consider opportunity_cost more than once! Always the same for one timestep and one market
-            opportunity_cost[start] = max(order_opportunity_cost, 0)
-            profit[start] += accepted_price * accepted_volume
+            opportunity_cost[idx] = max(order_opportunity_cost, 0)
+            profit[idx] += accepted_price * accepted_volume
 
     # consideration of start-up costs
-    for start in products_index:
+    for i, start in enumerate(products_index):
         op_time = unit.get_operation_time(start)
 
-        marginal_cost = unit.calculate_marginal_cost(
-            start, unit.outputs[product_type].loc[start]
-        )
-        costs[start] += marginal_cost * unit.outputs[product_type].loc[start]
+        output = unit.outputs[product_type].at[start]
+        marginal_cost = unit.calculate_marginal_cost(start, output)
+        costs[i] += marginal_cost * output
 
-        if unit.outputs[product_type].loc[start] != 0 and op_time < 0:
+        if output != 0 and op_time < 0:
             start_up_cost = unit.get_starting_costs(op_time)
-            costs[start] += start_up_cost
+            costs[i] += start_up_cost
 
-    profit += -costs
+    profit -= costs
     scaling = 0.1 / unit.max_power
     regret_scale = 0.0
     reward = (profit - regret_scale * opportunity_cost) * scaling
@@ -620,3 +635,6 @@ def calculate_reward_EOM(
     unit.outputs["reward"].loc[products_index] = reward
     unit.outputs["regret"].loc[products_index] = opportunity_cost
     unit.outputs["total_costs"].loc[products_index] = costs
+
+    if unit.outputs["rl_reward"] is not None:
+        unit.outputs["rl_reward"].append(reward)

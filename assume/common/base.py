@@ -7,7 +7,6 @@ from datetime import datetime
 from typing import TypedDict
 
 import numpy as np
-import pandas as pd
 
 from assume.common.fast_pandas import FastSeries, TensorFastSeries
 from assume.common.forecasts import Forecaster
@@ -22,22 +21,12 @@ class BaseUnit:
     """
     A base class for a unit. This class is used as a foundation for all units.
 
-    Attributes:
-        id (str): The ID of the unit.
-        unit_operator (str): The operator of the unit.
-        technology (str): The technology of the unit.
-        bidding_strategies (dict[str, BaseStrategy]): The bidding strategies of the unit.
-        index (pandas.DatetimeIndex): The index of the unit.
-        node (str, optional): The node of the unit. Defaults to "".
-        forecaster (Forecaster, optional): The forecast of the unit. Defaults to None.
-        **kwargs: Additional keyword arguments.
-
     Args:
         id (str): The ID of the unit.
         unit_operator (str): The operator of the unit.
         technology (str): The technology of the unit.
         bidding_strategies (dict[str, BaseStrategy]): The bidding strategies of the unit.
-        index (pandas.DatetimeIndex): The index of the unit.
+        index (FastIndex): The index of the unit.
         node (str, optional): The node of the unit. Defaults to "".
         forecaster (Forecaster, optional): The forecast of the unit. Defaults to None.
         location (tuple[float, float], optional): The location of the unit. Defaults to (0.0, 0.0).
@@ -129,10 +118,10 @@ class BaseUnit:
 
     def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """
-        Calculates the marginal cost for the given power.
+        Calculates the marginal cost for the given power.`
 
         Args:
-            start (pandas.Timestamp): The start time of the dispatch.
+            start (datetime.datetime): The start time of the dispatch.
             power (float): The power output of the unit.
 
         Returns:
@@ -281,7 +270,7 @@ class BaseUnit:
                 cashflow = float(
                     order.get("accepted_price", 0) * order.get("accepted_volume", 0)
                 )
-                elapsed_intervals = (end - start) / pd.Timedelta(self.index.freq)
+                elapsed_intervals = (end - start) / self.index.freq
                 self.outputs[f"{product_type}_cashflow"].loc[start:end_excl] += (
                     cashflow * elapsed_intervals
                 )
@@ -331,12 +320,12 @@ class SupportsMinMax(BaseUnit):
         Calculates the min and max power for the given time period.
 
         Args:
-            start (pandas.Timestamp): The start time of the dispatch.
-            end (pandas.Timestamp): The end time of the dispatch.
+            start (datetime.datetime): The start time of the dispatch.
+            end (datetime.datetime): The end time of the dispatch.
             product_type (str): The product type of the unit.
 
         Returns:
-            tuple[pandas.Series, pandas.Series]: The min and max power for the given time period.
+            tuple[np.array, np.array]: The min and max power for the given time period.
         """
 
     def calculate_ramp(
@@ -385,26 +374,12 @@ class SupportsMinMax(BaseUnit):
         )
         return power
 
-    def get_clean_spread(self, prices: pd.DataFrame) -> float:
-        """
-        Returns the clean spread for the given prices.
-
-        Args:
-            prices (pandas.DataFrame): The prices.
-
-        Returns:
-            float: The clean spread for the given prices.
-        """
-        emission_cost = self.emission_factor * prices["co"].mean()
-        fuel_cost = prices[self.technology.replace("_combined", "")].mean()
-        return (fuel_cost + emission_cost) / self.efficiency
-
     def get_operation_time(self, start: datetime) -> int:
         """
         Returns the time the unit is operating (positive) or shut down (negative).
 
         Args:
-            start (datetime): The start time.
+            start (datetime.datetime): The start time.
 
         Returns:
             int: The operation time as a positive integer if operating, or negative if shut down.
@@ -553,27 +528,27 @@ class SupportsMinMaxCharge(BaseUnit):
         Calculates the min and max charging power for the given time period.
 
         Args:
-            start (pandas.Timestamp): The start time of the dispatch.
-            end (pandas.Timestamp): The end time of the dispatch.
+            start (datetime.datetime): The start time of the dispatch.
+            end (datetime.datetime): The end time of the dispatch.
             product_type (str, optional): The product type of the unit. Defaults to "energy".
 
         Returns:
-            tuple[pandas.Series, pandas.Series]: The min and max charging power for the given time period.
+            tuple[np.array, np.array]: The min and max charging power for the given time period.
         """
 
     def calculate_min_max_discharge(
         self, start: datetime, end: datetime, product_type="energy"
-    ) -> tuple[FastSeries, FastSeries]:
+    ) -> tuple[np.array, np.array]:
         """
         Calculates the min and max discharging power for the given time period.
 
         Args:
-            start (pandas.Timestamp): The start time of the dispatch.
-            end (pandas.Timestamp): The end time of the dispatch.
+            start (datetime.datetime): The start time of the dispatch.
+            end (datetime.datetime): The end time of the dispatch.
             product_type (str, optional): The product type of the unit. Defaults to "energy".
 
         Returns:
-            tuple[pandas.Series, pandas.Series]: The min and max discharging power for the given time period.
+            tuple[np.array, np.array]: The min and max discharging power for the given time period.
         """
 
     def get_soc_before(self, dt: datetime) -> float:
@@ -592,20 +567,6 @@ class SupportsMinMaxCharge(BaseUnit):
             return self.initial_soc
         else:
             return self.outputs["soc"].at[dt - self.index.freq]
-
-    def get_clean_spread(self, prices: pd.DataFrame) -> float:
-        """
-        Returns the clean spread for the given prices.
-
-        Args:
-            prices (pandas.DataFrame): The prices.
-
-        Returns:
-            float: The clean spread for the given prices.
-        """
-        emission_cost = self.emission_factor * prices["co"].mean()
-        fuel_cost = prices[self.technology.replace("_combined", "")].mean()
-        return (fuel_cost + emission_cost) / self.efficiency_charge
 
     def calculate_ramp_discharge(
         self,

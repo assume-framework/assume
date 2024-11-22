@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 
 import numpy as np
-import pandas as pd
 
 from assume.common.base import SupportsMinMaxCharge
 from assume.common.fast_pandas import FastSeries
@@ -36,8 +35,8 @@ class Storage(SupportsMinMaxCharge):
         initial_soc (float): The initial state of charge of the storage unit in MWh.
         efficiency_charge (float): The efficiency of the storage unit while charging.
         efficiency_discharge (float): The efficiency of the storage unit while discharging.
-        additional_cost_charge (Union[float, pd.Series], optional): Additional costs associated with power consumption, in EUR/MWh. Defaults to 0.
-        additional_cost_discharge (Union[float, pd.Series], optional): Additional costs associated with power generation, in EUR/MWh. Defaults to 0.
+        additional_cost_charge (float, optional): Additional costs associated with power consumption, in EUR/MWh. Defaults to 0.
+        additional_cost_discharge (float, optional): Additional costs associated with power generation, in EUR/MWh. Defaults to 0.
         ramp_up_charge (float): The ramp up rate of charging the storage unit in MW/15 minutes (negative value).
         ramp_down_charge (float): The ramp down rate of charging the storage unit in MW/15 minutes (negative value).
         ramp_up_discharge (float): The ramp up rate of discharging the storage unit in MW/15 minutes.
@@ -61,18 +60,18 @@ class Storage(SupportsMinMaxCharge):
         technology: str,
         bidding_strategies: dict,
         forecaster: Forecaster,
-        max_power_charge: float | pd.Series,
-        max_power_discharge: float | pd.Series,
+        max_power_charge: float,
+        max_power_discharge: float,
         max_soc: float,
-        min_power_charge: float | pd.Series = 0.0,
-        min_power_discharge: float | pd.Series = 0.0,
+        min_power_charge: float = 0.0,
+        min_power_discharge: float = 0.0,
         min_soc: float = 0.0,
         initial_soc: float = 0.0,
         soc_tick: float = 0.01,
         efficiency_charge: float = 1,
         efficiency_discharge: float = 1,
-        additional_cost_charge: float | pd.Series = 0.0,
-        additional_cost_discharge: float | pd.Series = 0.0,
+        additional_cost_charge: float = 0.0,
+        additional_cost_discharge: float = 0.0,
         ramp_up_charge: float = None,
         ramp_down_charge: float = None,
         ramp_up_discharge: float = None,
@@ -160,7 +159,7 @@ class Storage(SupportsMinMaxCharge):
         self.warm_start_cost = warm_start_cost * max_power_discharge
         self.cold_start_cost = cold_start_cost * max_power_discharge
 
-    def execute_current_dispatch(self, start: datetime, end: datetime):
+    def execute_current_dispatch(self, start: datetime, end: datetime) -> np.array:
         """
         Executes the current dispatch of the unit based on the provided timestamps.
 
@@ -168,53 +167,56 @@ class Storage(SupportsMinMaxCharge):
         Returns the volume of the unit within the given time range.
 
         Args:
-            start (pandas.Timestamp): The start time of the dispatch.
-            end (pandas.Timestamp): The end time of the dispatch.
+            start (datetime.datetime): The start time of the dispatch.
+            end (datetime.datetime): The end time of the dispatch.
 
         Returns:
-            pd.Series: The volume of the unit within the given time range.
+            np.array: The volume of the unit within the given time range.
         """
         time_delta = self.index.freq / timedelta(hours=1)
 
         for t in self.index[start : end - self.index.freq]:
             delta_soc = 0
-            soc = self.outputs["soc"][t]
-            if self.outputs["energy"][t] > self.max_power_discharge:
-                self.outputs["energy"][t] = self.max_power_discharge
-            elif self.outputs["energy"][t] < self.max_power_charge:
-                self.outputs["energy"][t] = self.max_power_charge
+            soc = self.outputs["soc"].at[t]
+
+            if self.outputs["energy"].at[t] > self.max_power_discharge:
+                self.outputs["energy"].at[t] = self.max_power_discharge
+            elif self.outputs["energy"].at[t] < self.max_power_charge:
+                self.outputs["energy"].at[t] = self.max_power_charge
             elif (
-                self.outputs["energy"][t] < self.min_power_discharge
-                and self.outputs["energy"][t] > self.min_power_charge
-                and self.outputs["energy"][t] != 0
+                self.outputs["energy"].at[t] < self.min_power_discharge
+                and self.outputs["energy"].at[t] > self.min_power_charge
+                and self.outputs["energy"].at[t] != 0
             ):
-                self.outputs["energy"][t] = 0
+                self.outputs["energy"].at[t] = 0
 
             # discharging
-            if self.outputs["energy"][t] > 0:
+            if self.outputs["energy"].at[t] > 0:
                 max_soc_discharge = self.calculate_soc_max_discharge(soc)
 
-                if self.outputs["energy"][t] > max_soc_discharge:
-                    self.outputs["energy"][t] = max_soc_discharge
+                if self.outputs["energy"].at[t] > max_soc_discharge:
+                    self.outputs["energy"].at[t] = max_soc_discharge
 
                 time_delta = self.index.freq / timedelta(hours=1)
                 delta_soc = (
-                    -self.outputs["energy"][t] * time_delta / self.efficiency_discharge
+                    -self.outputs["energy"].at[t]
+                    * time_delta
+                    / self.efficiency_discharge
                 )
 
             # charging
-            elif self.outputs["energy"][t] < 0:
+            elif self.outputs["energy"].at[t] < 0:
                 max_soc_charge = self.calculate_soc_max_charge(soc)
 
-                if self.outputs["energy"][t] < max_soc_charge:
-                    self.outputs["energy"][t] = max_soc_charge
+                if self.outputs["energy"].at[t] < max_soc_charge:
+                    self.outputs["energy"].at[t] = max_soc_charge
 
                 time_delta = self.index.freq / timedelta(hours=1)
                 delta_soc = (
-                    -self.outputs["energy"][t] * time_delta * self.efficiency_charge
+                    -self.outputs["energy"].at[t] * time_delta * self.efficiency_charge
                 )
 
-            self.outputs["soc"].at[t + self.index.freq] = soc + delta_soc
+            self.outputs["soc"].loc[t + self.index.freq] = soc + delta_soc
 
         return self.outputs["energy"].loc[start:end]
 
@@ -302,19 +304,10 @@ class Storage(SupportsMinMaxCharge):
         """
 
         if power > 0:
-            additional_cost = (
-                self.additional_cost_discharge.at[start]
-                if isinstance(self.additional_cost_discharge, pd.Series)
-                else self.additional_cost_discharge
-            )
+            additional_cost = self.additional_cost_discharge
             efficiency = self.efficiency_discharge
-
         else:
-            additional_cost = (
-                self.additional_cost_charge.at[start]
-                if isinstance(self.additional_cost_charge, pd.Series)
-                else self.additional_cost_charge
-            )
+            additional_cost = self.additional_cost_charge
             efficiency = self.efficiency_charge
 
         marginal_cost = additional_cost / efficiency
@@ -360,40 +353,30 @@ class Storage(SupportsMinMaxCharge):
 
     def calculate_min_max_charge(
         self, start: datetime, end: datetime, product_type="energy"
-    ) -> tuple[FastSeries, FastSeries]:
+    ) -> tuple[np.array, np.array]:
         """
         Calculates the min and max charging power for the given time period.
         This is relative to the already sold output on other markets for the same period.
         It also adheres to reserved positive and negative capacities.
 
         Args:
-            start (pandas.Timestamp): The start of the current dispatch.
-            end (pandas.Timestamp): The end of the current dispatch.
+            start (datetime.datetime): The start of the current dispatch.
+            end (datetime.datetime): The end of the current dispatch.
             product_type (str): The product type of the storage unit.
 
         Returns:
-            tuple[FastSeries, FastSeries]: The minimum and maximum charge power levels of the storage unit in MW.
+            tuple[np.array, np.array]: The minimum and maximum charge power levels of the storage unit in MW.
         """
         end_excl = end - self.index.freq
 
-        base_load = self.outputs["energy"][start:end_excl]
-        capacity_pos = self.outputs["capacity_pos"][start:end_excl]
-        capacity_neg = self.outputs["capacity_neg"][start:end_excl]
+        base_load = self.outputs["energy"].loc[start:end_excl]
+        capacity_pos = self.outputs["capacity_pos"].loc[start:end_excl]
+        capacity_neg = self.outputs["capacity_neg"].loc[start:end_excl]
 
-        min_power_charge = (
-            self.min_power_charge[start:end_excl]
-            if isinstance(self.min_power_charge, pd.Series)
-            else self.min_power_charge
-        )
-        min_power_charge -= base_load + capacity_pos
+        min_power_charge = self.min_power_charge - (base_load + capacity_pos)
         min_power_charge = min_power_charge.clip(max=0)
 
-        max_power_charge = (
-            self.max_power_charge[start:end_excl]
-            if isinstance(self.max_power_charge, pd.Series)
-            else self.max_power_charge
-        )
-        max_power_charge -= base_load + capacity_neg
+        max_power_charge = self.max_power_charge - (base_load + capacity_neg)
         max_power_charge = np.where(
             max_power_charge <= min_power_charge, max_power_charge, 0
         )
@@ -402,47 +385,37 @@ class Storage(SupportsMinMaxCharge):
         )
 
         # restrict charging according to max_soc
-        max_soc_charge = self.calculate_soc_max_charge(self.outputs["soc"][start])
+        max_soc_charge = self.calculate_soc_max_charge(self.outputs["soc"].at[start])
         max_power_charge = max_power_charge.clip(min=max_soc_charge)
 
         return min_power_charge, max_power_charge
 
     def calculate_min_max_discharge(
         self, start: datetime, end: datetime, product_type="energy"
-    ) -> tuple[FastSeries, FastSeries]:
+    ) -> tuple[np.array, np.array]:
         """
         Calculates the min and max discharging power for the given time period.
         This is relative to the already sold output on other markets for the same period.
         It also adheres to reserved positive and negative capacities.
 
         Args:
-            start (pandas.Timestamp): The start of the current dispatch.
-            end (pandas.Timestamp): The end of the current dispatch.
+            start (datetime.datetime): The start of the current dispatch.
+            end (datetime.datetime): The end of the current dispatch.
             product_type (str): The product type of the storage unit.
 
         Returns:
-            tuple[FastSeries, FastSeries]: The minimum and maximum discharge power levels of the storage unit in MW.
+            tuple[np.array, np.array]: The minimum and maximum discharge power levels of the storage unit in MW.
         """
         end_excl = end - self.index.freq
 
-        base_load = self.outputs["energy"][start:end_excl]
-        capacity_pos = self.outputs["capacity_pos"][start:end_excl]
-        capacity_neg = self.outputs["capacity_neg"][start:end_excl]
+        base_load = self.outputs["energy"].loc[start:end_excl]
+        capacity_pos = self.outputs["capacity_pos"].loc[start:end_excl]
+        capacity_neg = self.outputs["capacity_neg"].loc[start:end_excl]
 
-        min_power_discharge = (
-            self.min_power_discharge[start:end_excl]
-            if isinstance(self.min_power_discharge, pd.Series)
-            else self.min_power_discharge
-        )
-        min_power_discharge -= base_load + capacity_neg
+        min_power_discharge = self.min_power_discharge - (base_load + capacity_neg)
         min_power_discharge = min_power_discharge.clip(min=0)
 
-        max_power_discharge = (
-            self.max_power_discharge[start:end_excl]
-            if isinstance(self.max_power_discharge, pd.Series)
-            else self.max_power_discharge
-        )
-        max_power_discharge -= base_load + capacity_pos
+        max_power_discharge = self.max_power_discharge - (base_load + capacity_pos)
 
         # Adjust max_power_discharge using np.where
         max_power_discharge = np.where(
@@ -455,7 +428,9 @@ class Storage(SupportsMinMaxCharge):
         )
 
         # restrict according to min_soc
-        max_soc_discharge = self.calculate_soc_max_discharge(self.outputs["soc"][start])
+        max_soc_discharge = self.calculate_soc_max_discharge(
+            self.outputs["soc"].at[start]
+        )
         max_power_discharge = max_power_discharge.clip(max=max_soc_discharge)
 
         return min_power_discharge, max_power_discharge

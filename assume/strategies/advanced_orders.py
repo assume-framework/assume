@@ -2,10 +2,10 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import pandas as pd
 
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
+from assume.common.utils import parse_duration
 from assume.strategies.flexable import (
     calculate_EOM_price_if_off,
     calculate_EOM_price_if_on,
@@ -29,7 +29,7 @@ class flexableEOMBlock(BaseStrategy):
         super().__init__(*args, **kwargs)
 
         # check if kwargs contains eom_foresight argument
-        self.foresight = pd.Timedelta(kwargs.get("eom_foresight", "12h"))
+        self.foresight = parse_duration(kwargs.get("eom_foresight", "12h"))
 
     def calculate_bids(
         self,
@@ -219,7 +219,7 @@ class flexableEOMLinked(BaseStrategy):
         super().__init__(*args, **kwargs)
 
         # check if kwargs contains eom_foresight argument
-        self.foresight = pd.Timedelta(kwargs.get("eom_foresight", "12h"))
+        self.foresight = parse_duration(kwargs.get("eom_foresight", "12h"))
 
     def calculate_bids(
         self,

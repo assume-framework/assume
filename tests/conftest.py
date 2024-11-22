@@ -4,6 +4,7 @@
 
 from datetime import datetime
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -28,7 +29,7 @@ class MockMinMaxUnit(SupportsMinMax):
 
     def calculate_min_max_power(
         self, start: datetime, end: datetime, product_type="energy"
-    ) -> tuple[FastSeries, FastSeries]:
+    ) -> tuple[np.array, np.array]:
         min = FastSeries(value=100, index=self.index).loc[start:end]
         max = FastSeries(value=400, index=self.index).loc[start:end]
         return min, max
