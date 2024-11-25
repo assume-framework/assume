@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+from datetime import datetime
 
-import pandas as pd
 import pyomo.environ as pyo
 from pyomo.opt import (
     SolverFactory,
@@ -14,6 +14,8 @@ from pyomo.opt import (
 )
 
 from assume.common.base import SupportsMinMax
+from assume.common.fast_pandas import FastSeries
+from assume.common.forecasts import Forecaster
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
 from assume.units.dsm_load_shift import DSMFlex
@@ -36,7 +38,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         bidding_strategies (dict): The bidding strategies of the unit.
         technology (str): The technology of the unit.
         node (str): The node of the unit.
-        index (pd.DatetimeIndex): The index for the data of the unit.
         location (tuple[float, float]): The location of the unit.
         components (dict[str, dict]): The components of the unit such as Electrolyser, DRI Plant, DRI Storage, and Electric Arc Furnace.
         objective (str): The objective of the unit, e.g. minimize variable cost ("min_variable_cost").
@@ -53,9 +54,9 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         id: str,
         unit_operator: str,
         bidding_strategies: dict,
+        forecaster: Forecaster,
         technology: str = "steel_plant",
         node: str = "node0",
-        index: pd.DatetimeIndex = None,
         location: tuple[float, float] = (0.0, 0.0),
         components: dict[str, dict] = None,
         objective: str = None,
@@ -70,7 +71,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             technology=technology,
             components=components,
             bidding_strategies=bidding_strategies,
-            index=index,
+            forecaster=forecaster,
             node=node,
             location=location,
             **kwargs,
@@ -419,18 +420,22 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 "Termination Condition: ", results.solver.termination_condition
             )
 
-        self.opt_power_requirement = pd.Series(
-            data=instance.total_power_input.get_values()
-        ).set_axis(self.index)
+        opt_power_requirement = [
+            pyo.value(instance.total_power_input[t]) for t in instance.time_steps
+        ]
+        self.opt_power_requirement = FastSeries(
+            index=self.index, value=opt_power_requirement
+        )
 
         self.total_cost = sum(
             instance.variable_cost[t].value for t in instance.time_steps
         )
 
         # Variable cost series
-        self.variable_cost_series = pd.Series(
-            data=instance.variable_cost.get_values()
-        ).set_axis(self.index)
+        variable_cost = [
+            pyo.value(instance.variable_cost[t]) for t in instance.time_steps
+        ]
+        self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
 
     def determine_optimal_operation_with_flex(self):
         """
@@ -462,14 +467,20 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 "Termination Condition: ", results.solver.termination_condition
             )
 
-        temp = instance.total_power_input.get_values()
-        self.flex_power_requirement = pd.Series(data=temp)
-        self.flex_power_requirement.index = self.index
+        flex_power_requirement = [
+            pyo.value(instance.total_power_input[t]) for t in instance.time_steps
+        ]
+        self.flex_power_requirement = FastSeries(
+            index=self.index, value=flex_power_requirement
+        )
 
         # Variable cost series
-        temp_1 = instance.variable_cost.get_values()
-        self.variable_cost_series = pd.Series(data=temp_1)
-        self.variable_cost_series.index = self.index
+        flex_variable_cost = [
+            instance.variable_cost[t].value for t in instance.time_steps
+        ]
+        self.flex_variable_cost_series = FastSeries(
+            index=self.index, value=flex_variable_cost
+        )
 
     def switch_to_opt(self, instance):
         """
@@ -542,8 +553,8 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.calculate_cashflow(product_type, orderbook)
 
         for start in products_index:
-            current_power = self.outputs[product_type][start]
-            self.outputs[product_type][start] = current_power
+            current_power = self.outputs[product_type].at[start]
+            self.outputs[product_type].at[start] = current_power
 
         self.bidding_strategies[marketconfig.market_id].calculate_reward(
             unit=self,
@@ -551,12 +562,12 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             orderbook=orderbook,
         )
 
-    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
+    def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """
         Calculate the marginal cost of the unit based on the provided time and power.
 
         Args:
-            start (pandas.Timestamp): The start time of the dispatch.
+            start (datetime.datetime): The start time of the dispatch.
             power (float): The power output of the unit.
 
         Returns:
@@ -565,9 +576,10 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         # Initialize marginal cost
         marginal_cost = 0
 
-        if self.opt_power_requirement[start] > 0:
+        if self.opt_power_requirement.at[start] > 0:
             marginal_cost = (
-                self.variable_cost_series[start] / self.opt_power_requirement[start]
+                self.variable_cost_series.at[start]
+                / self.opt_power_requirement.at[start]
             )
 
         return marginal_cost

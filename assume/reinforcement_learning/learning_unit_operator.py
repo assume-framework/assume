@@ -140,14 +140,14 @@ class RLUnitsOperator(UnitsOperator):
                 else:
                     output_dict.update(
                         {
-                            "profit": unit.outputs["profit"].loc[start],
-                            "reward": unit.outputs["reward"].loc[start],
-                            "regret": unit.outputs["regret"].loc[start],
+                            "profit": unit.outputs["profit"].at[start],
+                            "reward": unit.outputs["reward"].at[start],
+                            "regret": unit.outputs["regret"].at[start],
                         }
                     )
 
-                action_tuple = unit.outputs["actions"].loc[start]
-                noise_tuple = unit.outputs["exploration_noise"].loc[start]
+                action_tuple = unit.outputs["actions"].at[start]
+                noise_tuple = unit.outputs["exploration_noise"].at[start]
                 action_dim = action_tuple.numel()
 
                 for i in range(action_dim):
