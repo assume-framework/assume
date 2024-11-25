@@ -4,7 +4,6 @@
 
 import logging
 import shutil
-import sys
 from collections import defaultdict
 from datetime import datetime
 from multiprocessing import Lock
@@ -21,7 +20,11 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 
 from assume.common.market_objects import MetaDict
-from assume.common.utils import check_for_tensors, separate_orders
+from assume.common.utils import (
+    calculate_content_size,
+    check_for_tensors,
+    separate_orders,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -631,14 +634,3 @@ class WriteOutput(Role):
 
         with self.locks["flows"]:
             self.write_dfs["flows"].append(df)
-
-    def calculate_content_size(self, content):
-        if isinstance(content, dict):  # For dictionaries
-            return sys.getsizeof(content) + sum(
-                sys.getsizeof(value) for value in content.values()
-            )
-        elif isinstance(content, list):  # For lists, including lists of dicts
-            return sys.getsizeof(content) + sum(
-                self.calculate_content_size(item) for item in content
-            )
-        return sys.getsizeof(content)

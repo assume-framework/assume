@@ -667,3 +667,18 @@ def parse_duration(duration_str):
         return timedelta(seconds=seconds)
     else:
         raise ValueError(f"Unsupported duration format: {duration_str}")
+
+
+def calculate_content_size(content: list | dict) -> int:
+    """
+    Calculate the size of a content in bytes.
+    """
+    if isinstance(content, dict):  # For dictionaries
+        return sys.getsizeof(content) + sum(
+            sys.getsizeof(value) for value in content.values()
+        )
+    elif isinstance(content, list):  # For lists, including lists of dicts
+        return sys.getsizeof(content) + sum(
+            calculate_content_size(item) for item in content
+        )
+    return sys.getsizeof(content)
