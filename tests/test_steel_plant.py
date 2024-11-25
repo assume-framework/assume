@@ -6,6 +6,7 @@ import pandas as pd
 import pyomo.environ as pyo
 import pytest
 
+from assume.common.fast_pandas import FastSeries
 from assume.common.forecasts import NaiveForecast
 from assume.strategies.naive_strategies import (
     NaiveDASteelplantStrategy,
@@ -77,7 +78,7 @@ def create_steel_plant(dsm_components, flexibility_measure):
         objective="min_variable_cost",
         flexibility_measure=flexibility_measure,
         bidding_strategies=bidding_strategies,
-        index=index,
+        index=forecast.index,
         node="south",
         components=dsm_components,
         forecaster=forecast,
@@ -127,6 +128,11 @@ def test_determine_optimal_operation_without_flex(steel_plant_cost_based):
     assert steel_plant_cost_based.opt_power_requirement is not None
     assert isinstance(steel_plant_cost_based.opt_power_requirement, pd.Series)
 
+
+def test_determine_optimal_operation_without_flex(steel_plant):
+    steel_plant.determine_optimal_operation_without_flex()
+    assert steel_plant.opt_power_requirement is not None
+    assert isinstance(steel_plant.opt_power_requirement, FastSeries)
 
 def test_congestion_management_flexibility(steel_plant_congestion):
     """

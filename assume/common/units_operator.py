@@ -8,7 +8,6 @@ from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
 
-import pandas as pd
 from mango import Role, create_acl, sender_addr
 from mango.messages.message import Performatives
 
@@ -254,7 +253,9 @@ class UnitsOperator(Role):
 
         data = []
         try:
-            data = self.units[unit].outputs[metric_type][start:end]
+            data = (
+                self.units[unit].outputs[metric_type].as_pd_series(start=start, end=end)
+            )
         except Exception:
             logger.exception("error handling data request")
         self.context.schedule_instant_message(
@@ -292,7 +293,7 @@ class UnitsOperator(Role):
 
     def get_actual_dispatch(
         self, product_type: str, last: datetime
-    ) -> tuple[pd.DataFrame, list[pd.DataFrame]]:
+    ) -> tuple[list[tuple[datetime, float, str, str]], list[dict]]:
         """
         Retrieves the actual dispatch and commits it in the unit.
         We calculate the series of the actual market results dataframe with accepted bids.
@@ -300,10 +301,10 @@ class UnitsOperator(Role):
 
         Args:
             product_type (str): The product type for which this is done
-            last (datetime): the last date until which the dispatch was already sent
+            last (datetime.datetime): the last date until which the dispatch was already sent
 
         Returns:
-            tuple[pd.DataFrame, list[pd.DataFrame]]: market_dispatch and unit_dispatch dataframes
+            tuple[list[tuple[datetime, float, str, str]], list[dict]]: market_dispatch and unit_dispatch dataframes
         """
         now = timestamp2datetime(self.context.current_timestamp)
         start = timestamp2datetime(last + 1)
@@ -315,26 +316,28 @@ class UnitsOperator(Role):
             groupby=["market_id", "unit_id"],
         )
 
-        unit_dispatch_dfs = []
+        unit_dispatch = []
         for unit_id, unit in self.units.items():
             current_dispatch = unit.execute_current_dispatch(start, now)
             end = now
-            current_dispatch.name = "power"
-            data = pd.DataFrame(current_dispatch)
-
-            # TODO: this needs to be fixed. For now it is consuming too much time and is deactivated
-            # unit.calculate_generation_cost(start, now, "energy")
-            valid_outputs = ["soc", "cashflow", "marginal_costs", "total_costs"]
+            dispatch = {"power": current_dispatch}
+            unit.calculate_generation_cost(start, now, "energy")
+            valid_outputs = [
+                "soc",
+                "cashflow",
+                "marginal_costs",
+                "total_costs",
+            ]
 
             for key in unit.outputs.keys():
                 for output in valid_outputs:
                     if output in key:
-                        data[key] = unit.outputs[key][start:end]
+                        dispatch[key] = unit.outputs[key].loc[start:end]
+            dispatch["time"] = unit.index.get_date_list(start, end)
+            dispatch["unit"] = unit_id
+            unit_dispatch.append(dispatch)
 
-            data["unit"] = unit_id
-            unit_dispatch_dfs.append(data)
-
-        return market_dispatch, unit_dispatch_dfs
+        return market_dispatch, unit_dispatch
 
     def write_actual_dispatch(self, product_type: str) -> None:
         """
@@ -350,9 +353,7 @@ class UnitsOperator(Role):
             return
         self.last_sent_dispatch[product_type] = self.context.current_timestamp
 
-        market_dispatch, unit_dispatch_dfs = self.get_actual_dispatch(
-            product_type, last
-        )
+        market_dispatch, unit_dispatch = self.get_actual_dispatch(product_type, last)
 
         now = timestamp2datetime(self.context.current_timestamp)
         self.valid_orders[product_type] = list(
@@ -372,8 +373,7 @@ class UnitsOperator(Role):
                     "data": market_dispatch,
                 },
             )
-            if unit_dispatch_dfs:
-                unit_dispatch = pd.concat(unit_dispatch_dfs)
+            if unit_dispatch:
                 self.context.schedule_instant_message(
                     receiver_addr=db_addr,
                     content={

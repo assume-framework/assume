@@ -536,7 +536,7 @@ class MarketRole(MarketMechanism, Role):
 
             data = pd.DataFrame(self.results)
             data.index = data["time"]
-            data = data[metric_type][start:end]
+            data = data[metric_type].loc[start:end]
         except Exception:
             logger.exception("Error handling data request")
 
@@ -683,7 +683,7 @@ class MarketRole(MarketMechanism, Role):
 
         await self.store_market_results(market_meta)
 
-        if flows and len(flows) > 0:
+        if flows is not None and len(flows) > 0:
             await self.store_flows(flows)
 
         return accepted_orderbook, market_meta
