@@ -46,6 +46,7 @@ class WriteOutput(Role):
         learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
         perform_evaluation (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
         additional_kpis (dict[str, OutputDef], optional): makes it possible to define additional kpis evaluated
+        max_dfs_size_mb (int, optional): The maximum storage size for storing output data before saving it. Defaults to 250 MB.
     """
 
     def __init__(
@@ -59,6 +60,7 @@ class WriteOutput(Role):
         learning_mode: bool = False,
         perform_evaluation: bool = False,
         additional_kpis: dict[str, OutputDef] = {},
+        max_dfs_size_mb: int = 250,
     ):
         super().__init__()
 
@@ -95,8 +97,9 @@ class WriteOutput(Role):
         # construct all timeframe under which hourly values are written to excel and db
         self.start = start
         self.end = end
-        self.current_size_bytes = 0
-        self.max_size_mb = 300
+
+        self.max_dfs_size = max_dfs_size_mb * 1024 * 1024
+        self.current_dfs_size = 0
 
         # initializes dfs for storing and writing asynchronous
         self.write_dfs: dict = defaultdict(list)
@@ -241,9 +244,9 @@ class WriteOutput(Role):
             self.write_flows(content_data)
 
         # # keep track of the memory usage of the data
-        self.current_size_bytes += self.calculate_content_size(content_data)
-        # if the current size is larger than self.max_size_mb, store the data
-        if self.current_size_bytes > self.max_size_mb * 1024 * 1024:
+        self.current_dfs_size += self.calculate_content_size(content_data)
+        # if the current size is larger than self.max_dfs_size, store the data
+        if self.current_dfs_size > self.max_dfs_size:
             logger.debug("storing output data due to size limit")
             self.context.schedule_instant_task(coroutine=self.store_dfs())
 
@@ -323,7 +326,7 @@ class WriteOutput(Role):
 
                 self.write_dfs[table] = []
 
-        self.current_size_bytes = 0
+        self.current_dfs_size = 0
 
     def store_grid(
         self,
