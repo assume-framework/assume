@@ -571,7 +571,7 @@ def setup_world(
     forecaster = scenario_data["forecaster"]
 
     # save every thousand steps by default to free up memory
-    save_frequency_hours = config.get("save_frequency_hours", 1000)
+    save_frequency_hours = config.get("save_frequency_hours", 48)
     # Disable save frequency if CSV export is enabled
     if world.export_csv_path and save_frequency_hours is not None:
         save_frequency_hours = None
