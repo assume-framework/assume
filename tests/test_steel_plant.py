@@ -126,13 +126,8 @@ def test_determine_optimal_operation_without_flex(steel_plant_cost_based):
     """Test optimal operation without flexibility for cost-based load shifting."""
     steel_plant_cost_based.determine_optimal_operation_without_flex()
     assert steel_plant_cost_based.opt_power_requirement is not None
-    assert isinstance(steel_plant_cost_based.opt_power_requirement, pd.Series)
+    assert isinstance(steel_plant_cost_based.opt_power_requirement, FastSeries)
 
-
-def test_determine_optimal_operation_without_flex(steel_plant):
-    steel_plant.determine_optimal_operation_without_flex()
-    assert steel_plant.opt_power_requirement is not None
-    assert isinstance(steel_plant.opt_power_requirement, FastSeries)
 
 def test_congestion_management_flexibility(steel_plant_congestion):
     """
@@ -246,9 +241,9 @@ def test_renewable_utilisation(steel_plant_renewable_utilisation):
             steel_plant_renewable_utilisation.renewable_utilisation_signal - min_signal
         ) / (max_signal - min_signal)
     else:
-        renewable_signal_normalised = pd.Series(
-            1,
+        renewable_signal_normalised = FastSeries(
             index=steel_plant_renewable_utilisation.renewable_utilisation_signal.index,
+            value=1,
         )
 
     # Map normalized renewable signals to a dictionary for Pyomo parameters
@@ -317,6 +312,13 @@ def steel_plant_without_electrolyser(dsm_components) -> SteelPlant:
 
 # --- Initialization Tests ---
 def test_handle_missing_components():
+    index = pd.date_range("2023-01-01", periods=24, freq="h")
+    forecast = NaiveForecast(
+        index,
+        price_EOM=[50] * 24,
+        fuel_price_natural_gas=[30] * 24,
+        co2_price=[20] * 24,
+    )
     with pytest.raises(
         ValueError, match="Component dri_plant is required for the steel plant unit."
     ):
@@ -329,7 +331,7 @@ def test_handle_missing_components():
             index=pd.date_range("2023-01-01", periods=24, freq="h"),
             node="south",
             components={},
-            forecaster=None,
+            forecaster=forecast,
             demand=1000,
             technology="steel_plant",
         )
@@ -348,7 +350,7 @@ def test_handle_missing_electrolyser(steel_plant_without_electrolyser):
 
 # --- Objective Handling ---
 @pytest.fixture
-def reset_objectives(steel_plant):
+def reset_objectives(create_steel):
     """
     Helper to reset objectives in the model.
     """

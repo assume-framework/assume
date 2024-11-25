@@ -530,7 +530,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             adjusted_total_power_input.append(adjusted_power)
 
         # Assign this list to flex_power_requirement as a pandas Series
-         self.flex_power_requirement = FastSeries(
+        self.flex_power_requirement = FastSeries(
             index=self.index, value=adjusted_total_power_input
         )
 
