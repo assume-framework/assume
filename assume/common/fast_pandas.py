@@ -129,7 +129,7 @@ class FastIndex:
 
             sliced_dates = self._date_list[start_idx:stop_idx:step]
             if not sliced_dates:
-                raise ValueError("Slice resulted in an empty range")
+                return []
 
             return FastIndex(
                 start=sliced_dates[0], end=sliced_dates[-1], freq=self._freq
