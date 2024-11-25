@@ -12,13 +12,13 @@ from assume.strategies.flexable_storage import (
     flexablePosCRMStorage,
 )
 from assume.strategies.naive_strategies import (
-    NaiveDASteelplantStrategy,
     NaiveNegReserveStrategy,
     NaivePosReserveStrategy,
     NaiveProfileStrategy,
     NaiveRedispatchSteelplantStrategy,
     NaiveRedispatchStrategy,
     NaiveSingleBidStrategy,
+    NaiveDSMStrategy,
 )
 from assume.strategies.manual_strategies import SimpleManualTerminalStrategy
 from assume.strategies.dmas_powerplant import DmasPowerplantStrategy
@@ -40,7 +40,7 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "flexable_neg_crm_storage": flexableNegCRMStorage,
     "flexable_pos_crm_storage": flexablePosCRMStorage,
     "naive_redispatch": NaiveRedispatchStrategy,
-    "naive_da_steelplant": NaiveDASteelplantStrategy,
+    "naive_dsm": NaiveDSMStrategy,
     "naive_steel_redispatch": NaiveRedispatchSteelplantStrategy,
     "manual_strategy": SimpleManualTerminalStrategy,
     "dmas_powerplant": DmasPowerplantStrategy,

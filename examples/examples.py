@@ -63,6 +63,10 @@ available_examples = {
     },
     # example_01f is used in the tutorial notebook #5: Market configuration comparison example
     # example_01g is used in the tutorial notebook #6: Advanced order types example
+    "small_household": {
+        "scenario": "example_01h",
+        "study_case": "eom",
+    },
     #
     # DRL references case for learning advancement testing
     "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
@@ -101,8 +105,8 @@ if __name__ == "__main__":
     - local_db: without database and grafana
     - timescale: with database and grafana (note: you need docker installed)
     """
-    data_format = "local_db"  # "local_db" or "timescale"
-    example = "small"
+    data_format = "timescale"  # "local_db" or "timescale"
+    example = "small_household"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
