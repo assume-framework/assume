@@ -119,13 +119,8 @@ def test_reset_function(power_plant_1):
 
 
 def test_calculate_operational_window(power_plant_1):
-    product_tuple = (
-        pd.Timestamp("2022-01-01 00:00:00"),
-        pd.Timestamp("2022-01-01 01:00:00"),
-        None,
-    )
-    start = product_tuple[0]
-    end = product_tuple[1]
+    start = datetime(2022, 1, 1, 0)
+    end = datetime(2022, 1, 1, 1)
     min_power, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
     )
@@ -143,13 +138,8 @@ def test_calculate_operational_window(power_plant_1):
 
 
 def test_powerplant_feedback(power_plant_1, mock_market_config):
-    product_tuple = (
-        pd.Timestamp("2022-01-01 00:00:00"),
-        pd.Timestamp("2022-01-01 01:00:00"),
-        None,
-    )
-    start = product_tuple[0]
-    end = product_tuple[1]
+    start = datetime(2022, 1, 1, 0)
+    end = datetime(2022, 1, 1, 1)
     min_power, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
     )
@@ -189,8 +179,8 @@ def test_powerplant_feedback(power_plant_1, mock_market_config):
     assert max_power[0] == 800
 
     # second market request for next interval
-    start = pd.Timestamp("2022-01-01 01:00:00")
-    end = pd.Timestamp("2022-01-01 02:00:00")
+    start = datetime(2022, 1, 1, 1)
+    end = datetime(2022, 1, 1, 2)
     min_power, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
     )
