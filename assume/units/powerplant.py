@@ -10,8 +10,6 @@ import numpy as np
 
 from assume.common.base import SupportsMinMax
 from assume.common.forecasts import Forecaster
-from assume.common.market_objects import MarketConfig, Orderbook
-from assume.common.utils import get_products_index
 
 logger = logging.getLogger(__name__)
 
@@ -163,62 +161,6 @@ class PowerPlant(SupportsMinMax):
             self.outputs["energy"].at[t] = current_power
 
         return self.outputs["energy"].loc[start:end]
-
-    def set_dispatch_plan(
-        self,
-        marketconfig: MarketConfig,
-        orderbook: Orderbook,
-    ) -> None:
-        """
-        Adds the dispatch plan from the current market result to the total dispatch plan and calculates the cashflow.
-
-        Args:
-            marketconfig (MarketConfig): The market configuration.
-            orderbook (Orderbook): The orderbook.
-        """
-        products_index = get_products_index(orderbook)
-
-        product_type = marketconfig.product_type
-        for order in orderbook:
-            start = order["start_time"]
-            end = order["end_time"]
-            end_excl = end - self.index.freq
-            if isinstance(order["accepted_volume"], dict):
-                self.outputs[product_type].loc[start:end_excl] += [
-                    order["accepted_volume"][key]
-                    for key in order["accepted_volume"].keys()
-                ]
-            else:
-                self.outputs[product_type].loc[start:end_excl] += order[
-                    "accepted_volume"
-                ]
-
-        self.calculate_cashflow(product_type, orderbook)
-
-        max_power_values = (
-            self.forecaster.get_availability(self.id).loc[products_index]
-            * self.max_power
-        )
-
-        for start, max_power in zip(products_index, max_power_values):
-            current_power = self.outputs[product_type].at[start]
-
-            previous_power = self.get_output_before(start)
-            op_time = self.get_operation_time(start)
-
-            current_power = self.calculate_ramp(op_time, previous_power, current_power)
-
-            if current_power > 0:
-                current_power = min(current_power, max_power)
-                current_power = max(current_power, self.min_power)
-
-            self.outputs[product_type].at[start] = current_power
-
-        self.bidding_strategies[marketconfig.market_id].calculate_reward(
-            unit=self,
-            marketconfig=marketconfig,
-            orderbook=orderbook,
-        )
 
     def calc_simple_marginal_cost(
         self,
