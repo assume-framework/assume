@@ -247,7 +247,7 @@ class WriteOutput(Role):
             self.write_flows(content_data)
 
         # # keep track of the memory usage of the data
-        self.current_dfs_size += self.calculate_content_size(content_data)
+        self.current_dfs_size += calculate_content_size(content_data)
         # if the current size is larger than self.max_dfs_size, store the data
         if self.current_dfs_size > self.max_dfs_size:
             logger.debug("storing output data due to size limit")

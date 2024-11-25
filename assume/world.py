@@ -198,14 +198,10 @@ class World:
         container_kwargs = {"mp_method": "fork"} if sys.platform == "linux" else {}
         if self.addr == "world":
             container_func = create_ec_container
-            container_kwargs.update({
-                "addr": self.addr,
-            })
+            container_kwargs.update({"addr": self.addr})
         elif isinstance(self.addr, tuple):
             container_func = create_tcp_container
-            container_kwargs.update({
-                "addr": self.addr,
-            })
+            container_kwargs.update({"addr": self.addr})
         else:
             container_func = create_mqtt_container
             container_kwargs = {
