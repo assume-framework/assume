@@ -91,13 +91,11 @@ available_examples = {
     },
     "large_2019_rl": {"scenario": "example_03a", "study_case": "base_case_2019"},
     "large_2021_rl": {"scenario": "example_03b", "study_case": "base_case_2021"},
-    
     # redispatch validation examples
     "redisp_valid_2_nodes": {"scenario": "example_05a", "study_case": "base"},
     "redisp_valid_3_nodes": {"scenario": "example_05b", "study_case": "base"},
     "redisp_valid_Germany_2019": {"scenario": "example_05c", "study_case": "base"},
     "redisp_valid_Germany_2023": {"scenario": "example_05d", "study_case": "base"},
-
 }
 
 
@@ -109,7 +107,7 @@ if __name__ == "__main__":
     - timescale: with database and grafana (note: you need docker installed)
     """
     data_format = "local_db"  # "local_db" or "timescale"
-    example = "small_with_redispatch"
+    example = "redisp_valid_3_nodes"
 
     if data_format == "local_db":
         db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
