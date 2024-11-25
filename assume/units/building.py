@@ -159,7 +159,7 @@ class Building(DSMFlex, SupportsMinMax):
             self.min_capacity = self.components.get("generic_storage", {}).get("min_capacity", 0)
             self.efficiency_charge = self.components.get("generic_storage", {}).get("efficiency_charge", 1)
             self.efficiency_discharge = self.components.get("generic_storage", {}).get("efficiency_discharge", 1)
-            self.initial_soc = self.components.get("generic_storage", {}).get("initial_soc", 1e-6)
+            self.initial_soc = self.components.get("generic_storage", {}).get("initial_soc", 1e-6) * self.max_capacity
             self.outputs["soc"] = pd.Series(self.initial_soc, index=self.index, dtype=float)
             self.outputs["energy_cost"] = pd.Series(0.0, index=self.index, dtype=float)
             self.pv_production = pd.Series(0.0, index=self.index, dtype=float)
@@ -620,7 +620,7 @@ class Building(DSMFlex, SupportsMinMax):
         """
         power = min(
             0,
-            ((soc - self.max_capacity) / self.efficiency_charge),
+            round((soc - self.max_capacity) / self.efficiency_charge, 6),
         )
         return power
 
@@ -637,7 +637,7 @@ class Building(DSMFlex, SupportsMinMax):
         """
         power = max(
             0,
-            ((soc - self.min_capacity) * self.efficiency_discharge),
+            round((soc - self.min_capacity) * self.efficiency_discharge, 6),
         )
         return power
 

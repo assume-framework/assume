@@ -1173,96 +1173,89 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
         Observations are used to calculate bid actions, which are then scaled and processed
         into bids for submission in the market.
         """
-        bids = []
-        for product in product_tuples:
-            start = product[0]
-            end = product[1]
+        start = product_tuples[0][0]
+        end = product_tuples[0][1]
+        only_hours = product_tuples[0][2]
 
-            # =============================================================================
-            # Get the Households' Consumption and Generation
-            # =============================================================================
-            inflex_demand = -unit.inflex_demand.loc[start:end].iloc[0]
-            pv_generation = unit.calculate_pv_power(start, end).iloc[0]
+        # =============================================================================
+        # Get the Households' Consumption and Generation
+        # =============================================================================
+        inflex_demand = -unit.inflex_demand.loc[start:end].iloc[0]
+        pv_generation = unit.calculate_pv_power(start, end).iloc[0]
 
-            next_observation = self.create_observation(
-                unit=unit,
-                market_id=market_config.market_id,
-                start=start,
-                end=end,
-            )
-            # =============================================================================
-            # Get the Actions, based on the observations
-            # =============================================================================
-            actions, noise = self.get_actions(next_observation)
-            # =============================================================================
-            # 3. Transform Actions into bids
-            # =============================================================================
-            # the first action is the bid price
-            delta = (self.max_bid_price - self.min_bid_price)/2
-            mid_price = self.max_bid_price - delta
-            bid_price = (mid_price + (actions[0] * delta)).item()
+        next_observation = self.create_observation(
+            unit=unit,
+            market_id=market_config.market_id,
+            start=start,
+            end=end,
+        )
+        # =============================================================================
+        # Get the Actions, based on the observations
+        # =============================================================================
+        actions, noise = self.get_actions(next_observation)
+        # =============================================================================
+        # 3. Transform Actions into bids
+        # =============================================================================
+        # the first action is the bid price
+        delta = (self.max_bid_price - self.min_bid_price)/2
+        mid_price = self.max_bid_price - delta
+        bid_price = (mid_price + (actions[0] * delta)).item()
 
-            # the second action is the bid direction
-            # the interval [-0.1, 0.1] for the 'ignore' action is based on the learning
-            # process observation and should be adjusted in the future to improve performance
-            if actions[1] <= -0.1:
-                bid_direction = "charge"
-            elif actions[1] >= 0.1:
-                bid_direction = "discharge"
-            else:
-                bid_direction = "hold_charge"
+        # the second action is the bid direction
+        # the interval [-0.1, 0.1] for the 'ignore' action is based on the learning
+        # process observation and should be adjusted in the future to improve performance
+        if actions[1] <= -0.1:
+            bid_direction = "charge"
+        elif actions[1] >= 0.1:
+            bid_direction = "discharge"
+        else:
+            bid_direction = "hold_charge"
 
-            if bid_direction == "charge":
-                charging_volume = (actions[1] * abs(unit.calculate_max_charge(start, end).iloc[0])).item()
-                unit.battery_charge[start:end] = charging_volume
-                bids.append(
-                    {
-                        "start_time": start,
-                        "end_time": end,
-                        "only_hours": product[2],
-                        "price": bid_price,
-                        # zero bids are ignored by the market clearing and orders are deleted,
-                        # but we need the orderbook for the DRL to function,
-                        # therefore we add a small amount
-                        "volume": charging_volume + inflex_demand + pv_generation + 1e-8,
-                        "node": unit.node,
-                    }
-                )
+        if bid_direction == "charge":
+            charging_volume = (actions[1] * abs(unit.calculate_max_charge(start, end).iloc[0])).item()
+            unit.battery_charge[start:end] = charging_volume
+            bid = {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": only_hours,
+                    "price": bid_price,
+                    # zero bids are ignored by the market clearing and orders are deleted,
+                    # but we need the orderbook for the DRL to function,
+                    # therefore we add a small amount
+                    "volume": charging_volume + inflex_demand + pv_generation + 1e-8,
+                    "node": unit.node,
+                }
+        elif bid_direction == "discharge":
+            discharging_volume = (actions[1] * unit.calculate_max_discharge(start, end).iloc[0]).item()
+            unit.battery_charge[start:end] = discharging_volume
+            bid = {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": only_hours,
+                    "price": bid_price,
+                    "volume": discharging_volume + inflex_demand + pv_generation + 1e-8,  # negative value for demand
+                    "node": unit.node,
+                }
 
-            elif bid_direction == "discharge":
-                discharging_volume = (actions[1] * unit.calculate_max_discharge(start, end).iloc[0]).item()
-                unit.battery_charge[start:end] = discharging_volume
-                bids.append(
-                    {
-                        "start_time": start,
-                        "end_time": end,
-                        "only_hours": product[2],
-                        "price": bid_price,
-                        "volume": discharging_volume + inflex_demand + pv_generation + 1e-8,  # negative value for demand
-                        "node": unit.node,
-                    }
-                )
-            elif bid_direction == "hold_charge":
-                unit.battery_charge[start:end] = 0
-                bids.append(
-                    {
-                        "start_time": start,
-                        "end_time": end,
-                        "only_hours": product[2],
-                        "price": bid_price,
-                        "volume": inflex_demand + pv_generation + 1e-8,  # negative value for demand
-                        "node": unit.node,
-                    }
-                )
+        elif bid_direction == "hold_charge":
+            unit.battery_charge[start:end] = 0
+            bid = {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": only_hours,
+                    "price": bid_price,
+                    "volume": inflex_demand + pv_generation + 1e-8,  # negative value for demand
+                    "node": unit.node,
+                }
 
-            unit.outputs["rl_observations"].append(next_observation)
-            unit.outputs["rl_actions"].append(actions)
+        unit.outputs["rl_observations"].append(next_observation)
+        unit.outputs["rl_actions"].append(actions)
 
-            # store results in unit outputs as series to be written to the database by the unit operator
-            unit.outputs["actions"][start] = actions
-            unit.outputs["exploration_noise"][start] = noise
+        # store results in unit outputs as series to be written to the database by the unit operator
+        unit.outputs["actions"][start] = actions
+        unit.outputs["exploration_noise"][start] = noise
 
-        return bids
+        return [bid]
 
     def get_actions(self, next_observation):
         """
@@ -1347,11 +1340,14 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
 
         scaling_factor = 0.1 / unit.max_power_discharge if unit.has_battery_storage else 1
 
-        product_type = marketconfig.product_type
         reward = 0
+        factor_battery = 0.8
+        factor_other_electricity = 1 - factor_battery if unit.has_battery_storage else 1
 
         first_order_start = orderbook[0]["start_time"]
         last_order_start = orderbook[0]["start_time"]
+
+        battery_power = unit.battery_charge[first_order_start].copy()
         # Iterate over all orders in the orderbook to calculate order-specific profit
         for order in orderbook:
             first_order_start = min(first_order_start, order["start_time"])
@@ -1363,28 +1359,32 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
             duration = (end_time - start_time) / pd.Timedelta(unit.index.freq)
 
             # ignore very small volumes due to calculations
-            accepted_volume = order["accepted_volume"]
+            accepted_volume = order["accepted_volume"] if abs(order["accepted_volume"]) > 1e-8 else 0
+            other_electricity = accepted_volume - battery_power
+
+            battery_profit = order["accepted_price"] * battery_power * duration
 
             # Calculate profit and cost for the order
-            order_profit = order["accepted_price"] * accepted_volume * duration
+            other_profit = order["accepted_price"] * other_electricity * duration
 
             current_soc = unit.outputs["soc"][start_time]
             next_soc = unit.outputs["soc"][next_time]
 
             # Calculate and clip the energy cost for the start time
             unit.outputs["energy_cost"].at[next_time] = np.clip(
-                (unit.outputs["energy_cost"][start_time] * current_soc - order_profit)
+                (unit.outputs["energy_cost"][start_time] * current_soc - battery_profit)
                 / next_soc,
                 0,
                 self.max_bid_price,
             )
 
-            reward += order_profit * scaling_factor
+            reward += (factor_battery * battery_profit + factor_other_electricity * other_profit) * scaling_factor
 
             # Store results in unit outputs
-            unit.outputs["profit"].loc[start_time:end_exclusive] += order_profit
+            unit.outputs["profit"].loc[start_time:end_exclusive] += battery_profit + other_profit
             unit.outputs["reward"].loc[start_time:end_exclusive] = reward
-            unit.outputs["total_costs"].loc[start_time:end_exclusive] = 0
+            #unit.outputs["regret"].loc[start_time:end_exclusive] += regret_factor * regret
+            unit.outputs["total_costs"].loc[start_time:end_exclusive] = other_profit
         unit.outputs["rl_rewards"].extend(unit.outputs["reward"].loc[first_order_start:last_order_start])
 
     def create_observation(
