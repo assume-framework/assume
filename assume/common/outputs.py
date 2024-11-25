@@ -294,40 +294,39 @@ class WriteOutput(Role):
             return
 
         for table in self.write_dfs.keys():
-            with self.locks[table]:
-                if len(self.write_dfs[table]) == 0:
+            if len(self.write_dfs[table]) == 0:
                     continue
-
+            with self.locks[table]:
                 # concat all dataframes
                 # use join='outer' to keep all columns and fill missing values with NaN
                 df = pd.concat(self.write_dfs[table], axis=0, join="outer")
-
-                df.reset_index()
-                if df.empty:
-                    continue
-
-                df = df.apply(check_for_tensors)
-
-                if self.export_csv_path:
-                    data_path = self.export_csv_path / f"{table}.csv"
-                    df.to_csv(
-                        data_path,
-                        mode="a",
-                        header=not data_path.exists(),
-                        float_format="%.5g",
-                    )
-
-                if self.db is not None:
-                    try:
-                        with self.db.begin() as db:
-                            df.to_sql(table, db, if_exists="append")
-                    except (ProgrammingError, OperationalError, DataError):
-                        self.check_columns(table, df)
-                        # now try again
-                        with self.db.begin() as db:
-                            df.to_sql(table, db, if_exists="append")
-
                 self.write_dfs[table] = []
+
+            df.reset_index()
+            if df.empty:
+                continue
+
+            df = df.apply(check_for_tensors)
+
+            if self.export_csv_path:
+                data_path = self.export_csv_path / f"{table}.csv"
+                df.to_csv(
+                    data_path,
+                    mode="a",
+                    header=not data_path.exists(),
+                    float_format="%.5g",
+                )
+
+            if self.db is not None:
+                try:
+                    with self.db.begin() as db:
+                        df.to_sql(table, db, if_exists="append")
+                except (ProgrammingError, OperationalError, DataError):
+                    self.check_columns(table, df)
+                    # now try again
+                    with self.db.begin() as db:
+                        df.to_sql(table, db, if_exists="append")
+
 
         self.current_dfs_size = 0
 
