@@ -470,9 +470,9 @@ def test_powerplant_min_feedback(power_plant_1, mock_market_config):
     min_power, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
     )
-    assert min_power[start] == 200
+    assert min_power[0] == 200
 
-    assert max_power[start] == 1000
+    assert max_power[0] == 1000
     assert power_plant_1.outputs["energy"].at[start] == 0
 
     orderbook = [
@@ -496,9 +496,9 @@ def test_powerplant_min_feedback(power_plant_1, mock_market_config):
     )
 
     # we still need 100kw as a runtime requirement
-    assert min_power[start] == 100
+    assert min_power[0] == 100
     # we can not bid the maximum anymore, because we already provide energy on the other market
-    assert max_power[start] == 900
+    assert max_power[0] == 900
 
     orderbook = [
         {
@@ -520,9 +520,9 @@ def test_powerplant_min_feedback(power_plant_1, mock_market_config):
     )
 
     # we do not need additional min_power, as our runtime requirement is fulfilled
-    assert min_power[start] == 0
+    assert min_power[0] == 0
     # we can not bid the maximum anymore, because we already provide energy on the other market
-    assert max_power[start] == 700
+    assert max_power[0] == 700
 
     # this should not do anything here, as we are in our constraints
     power_plant_1.execute_current_dispatch(start, end)
@@ -535,8 +535,8 @@ def test_powerplant_min_feedback(power_plant_1, mock_market_config):
     )
 
     # now we can bid max_power and need min_power again
-    assert min_power[start] == 200
-    assert max_power[start] == 1000
+    assert min_power[0] == 200
+    assert max_power[0] == 1000
 
 
 def test_powerplant_ramp_feedback(power_plant_1, mock_market_config):
@@ -552,8 +552,8 @@ def test_powerplant_ramp_feedback(power_plant_1, mock_market_config):
     min_power, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
     )
-    assert min_power[start] == 200
-    assert max_power[start] == 1000
+    assert min_power[0] == 200
+    assert max_power[0] == 1000
     assert power_plant_1.outputs["energy"].at[start] == 0
 
     orderbook = [
@@ -577,9 +577,9 @@ def test_powerplant_ramp_feedback(power_plant_1, mock_market_config):
     )
 
     # we still need 100kw as a runtime requirement
-    assert min_power[start] == 100
+    assert min_power[0] == 100
     # we can not bid the maximum anymore, because we already provide energy on the other market
-    assert max_power[start] == 900
+    assert max_power[0] == 900
 
     power_plant_1.execute_current_dispatch(start, end)
 
@@ -591,8 +591,8 @@ def test_powerplant_ramp_feedback(power_plant_1, mock_market_config):
     )
 
     # now we can bid max_power and need min_power again
-    assert min_power[start] == 200
-    assert max_power[start] == 1000
+    assert min_power[0] == 200
+    assert max_power[0] == 1000
 
 
 if __name__ == "__main__":
