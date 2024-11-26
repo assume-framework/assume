@@ -201,6 +201,7 @@ class flexableEOMStorage(BaseStrategy):
 
         for order in orderbook:
             start = order["start_time"]
+            # end includes the end of the last product, to get the last products' start time we deduct the frequency once
             end_excl = order["end_time"] - unit.index.freq
 
             # Extract outputs and costs in one step

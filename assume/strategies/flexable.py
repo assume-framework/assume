@@ -595,6 +595,7 @@ def calculate_reward_EOM(
 
     for order in orderbook:
         start = order["start_time"]
+        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = order["end_time"] - unit.index.freq
 
         order_times = unit.index[start:end_excl]

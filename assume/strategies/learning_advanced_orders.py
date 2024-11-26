@@ -255,6 +255,7 @@ class RLAdvancedOrderStrategy(RLStrategy):
             The scaling factors are defined by the maximum residual load, the maximum bid price
             and the maximum capacity of the unit.
         """
+        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - unit.index.freq
 
         # get the forecast length depending on the time unit considered in the modelled unit
