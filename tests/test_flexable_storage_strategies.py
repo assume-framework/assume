@@ -22,18 +22,19 @@ from assume.units import Storage
 def storage() -> Storage:
     # Create a PowerPlant instance with some example parameters
     index = pd.date_range("2023-07-01", periods=48, freq="h")
+    forecaster = NaiveForecast(index, availability=1, price_forecast=50)
     return Storage(
         id="Test_Storage",
         unit_operator="TestOperator",
         technology="TestTechnology",
         bidding_strategies={},
+        forecaster=forecaster,
         max_power_charge=-100,
         max_power_discharge=100,
         max_soc=1000,
         initial_soc=500,
         efficiency_charge=0.9,
         efficiency_discharge=0.95,
-        index=index,
         ramp_down_charge=-50,
         ramp_down_discharge=50,
         ramp_up_charge=-60,

@@ -13,25 +13,28 @@ from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
 from assume.strategies.dmas_storage import DmasStorageStrategy
 from assume.strategies.naive_strategies import NaiveSingleBidStrategy
-from assume.units import PowerPlant, Storage
+from assume.units import Storage
 
 from .utils import get_test_prices
 
 
 @pytest.fixture
 def storage_unit() -> Storage:
+    index = pd.date_range("2022-01-01", periods=4, freq="h")
+    forecaster = NaiveForecast(index, availability=1, price_forecast=50)
+
     return Storage(
         id="Test_Storage",
         unit_operator="TestOperator",
         technology="TestTechnology",
         bidding_strategies={"EOM": NaiveSingleBidStrategy()},
+        forecaster=forecaster,
         max_power_charge=100,
         max_power_discharge=100,
         max_soc=1000,
         initial_soc=500,
         efficiency_charge=0.9,
         efficiency_discharge=0.95,
-        index=pd.date_range("2022-01-01", periods=4, freq="h"),
         ramp_down_charge=-50,
         ramp_down_discharge=50,
         ramp_up_charge=-60,
@@ -42,7 +45,7 @@ def storage_unit() -> Storage:
 
 
 @pytest.fixture
-def storage_day() -> PowerPlant:
+def storage_day() -> Storage:
     periods = 48
     index = pd.date_range("2022-01-01", periods=periods, freq="h")
 
@@ -64,7 +67,6 @@ def storage_day() -> PowerPlant:
         initial_soc=500,
         efficiency_charge=0.9,
         efficiency_discharge=0.95,
-        index=index,
         ramp_down_charge=-50,
         ramp_down_discharge=50,
         ramp_up_charge=-60,
@@ -78,8 +80,6 @@ def storage_day() -> PowerPlant:
 def test_dmas_str_init(storage_unit):
     strategy = DmasStorageStrategy()
     hour_count = len(storage_unit.index)
-
-    prices = get_test_prices()
 
     strategy.build_model(
         storage_unit,

@@ -202,19 +202,19 @@ class DmasPowerplantStrategy(BaseStrategy):
 
         # -> fuel costs
         fuel_cost = [
-            (self.model.p_out[t] / unit.efficiency) * fuel_prices.iloc[t] for t in tr
+            (self.model.p_out[t] / unit.efficiency) * fuel_prices[t] for t in tr
         ]
         # -> emission costs
         emission_cost = [
             (self.model.p_out[t] / unit.efficiency * unit.emission_factor)
-            * emission_prices.iloc[t]
+            * emission_prices[t]
             for t in tr
         ]
         # -> start costs
         start_cost = [self.model.v[t] * unit.cold_start_cost for t in tr]
 
         # -> profit and resulting cashflow
-        profit = [self.model.p_out[t] * power_prices.iloc[t] for t in tr]
+        profit = [self.model.p_out[t] * power_prices[t] for t in tr]
         cashflow = [
             profit[t] - (fuel_cost[t] + emission_cost[t] + start_cost[t]) for t in tr
         ]
@@ -308,8 +308,8 @@ class DmasPowerplantStrategy(BaseStrategy):
         )
         hour_count2 = 2 * hour_count
         steps = steps or self.steps
-        prices_24h = prices.iloc[:hour_count].copy()
-        prices_48h = prices.iloc[:hour_count2].copy()
+        prices_24h = prices[:hour_count].copy()
+        prices_48h = prices[:hour_count2].copy()
         try:
             fuel_prices = unit.forecaster.get_price(unit.fuel_type)
             emission_prices = unit.forecaster.get_price("co2")
@@ -318,9 +318,14 @@ class DmasPowerplantStrategy(BaseStrategy):
             raise Exception(f"No Fuel prices given for fuel {unit.fuel_type}")
 
         for step in steps:
-            adjusted_price = base_price.iloc[:hour_count] + step
+            adjusted_price = base_price[:hour_count] + step
             cashflow = self.build_model(
-                unit, start, hour_count, emission_prices, fuel_prices, adjusted_price
+                unit,
+                start,
+                hour_count,
+                emission_prices.iloc[:hour_count],
+                fuel_prices.iloc[:hour_count],
+                adjusted_price,
             )
             self.model.obj = Objective(expr=quicksum(cashflow), sense=maximize)
             r = self.opt.solve(self.model)
@@ -331,8 +336,8 @@ class DmasPowerplantStrategy(BaseStrategy):
 
                 self._set_results(
                     unit,
-                    emission_prices[:hour_count],
-                    fuel_prices[:hour_count],
+                    emission_prices.iloc[:hour_count],
+                    fuel_prices.iloc[:hour_count],
                     adjusted_price,
                     start=start,
                     step=step,
@@ -354,8 +359,8 @@ class DmasPowerplantStrategy(BaseStrategy):
                         unit,
                         start,
                         hour_count,
-                        emission_prices[:hour_count],
-                        fuel_prices[:hour_count],
+                        emission_prices.iloc[:hour_count],
+                        fuel_prices.iloc[:hour_count],
                         prices_24h,
                         runtime,
                         p0,
@@ -377,8 +382,8 @@ class DmasPowerplantStrategy(BaseStrategy):
                         unit,
                         start,
                         hour_count2,
-                        emission_prices[:hour_count2],
-                        fuel_prices[:hour_count2],
+                        emission_prices.iloc[:hour_count2],
+                        fuel_prices.iloc[:hour_count2],
                         prices_48h,
                         runtime,
                         p0,
@@ -413,7 +418,7 @@ class DmasPowerplantStrategy(BaseStrategy):
                 for key in ["power", "emission", "fuel", "start", "profit"]:
                     self.opt_results[step][key] = np.zeros(self.T)
                 self.opt_results[step]["obj"] = 0
-        return unit.outputs["generation"][start:]
+        return unit.outputs["generation"].loc[start:]
 
     def calculate_bids(
         self,
@@ -457,8 +462,8 @@ class DmasPowerplantStrategy(BaseStrategy):
         self.optimize(unit, start, hour_count, base_price)
 
         def get_cost(p: float, t: int):
-            f = fuel_price.iloc[t]
-            e = e_price.iloc[t]
+            f = fuel_price[t]
+            e = e_price[t]
             return (p / unit.efficiency) * (f + e * unit.emission_factor)
 
         def get_marginal(p0: float, p1: float, t: int):

@@ -29,26 +29,6 @@ This class implements the pay-as-clear mechanism within the merit order clearing
    :members:
    :undoc-members:
 
-All-or-Nothing Market Clearing Algorithms
------------------------------------------
-
-Pay-as-Bid
-^^^^^^^^^^
-This class implements the pay-as-bid mechanism where each bid's volume requires an exactly matching order with the same volume. Partial clearing is not allowed here.
-
-.. autoclass:: assume.markets.clearing_algorithms.all_or_nothing.PayAsBidAonRole
-   :members:
-   :undoc-members:
-
-Pay-as-Clear
-^^^^^^^^^^^^
-This class implements the pay-as-clear mechanism within the all-or-nothing clearing algorithm.
-
-.. autoclass:: assume.markets.clearing_algorithms.all_or_nothing.PayAsClearAonRole
-   :members:
-   :undoc-members:
-
-
 Complex Clearing Algorithm
 --------------------------
 

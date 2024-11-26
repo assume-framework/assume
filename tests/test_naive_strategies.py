@@ -4,7 +4,6 @@
 
 from datetime import datetime
 
-import pandas as pd
 from dateutil.relativedelta import relativedelta as rd
 
 from assume.common.market_objects import MarketProduct
@@ -15,7 +14,6 @@ from assume.strategies import (
     NaiveProfileStrategy,
     NaiveSingleBidStrategy,
 )
-from tests.conftest import MockMinMaxUnit
 
 start = datetime(2023, 7, 1)
 end = datetime(2023, 7, 2)
@@ -73,12 +71,6 @@ def test_naive_da_strategy(mock_market_config, mock_supports_minmax):
     next_opening = start
     products = get_available_products(mc.market_products, next_opening)
     assert len(products) == 24
-    index = pd.date_range(
-        start=products[0][0],
-        end=products[-1][0],
-        freq="1h",
-    )
-    unit = MockMinMaxUnit(index)
 
     bids = strategy.calculate_bids(unit, mc, product_tuples=products)
     assert bids[0]["price"] == 3

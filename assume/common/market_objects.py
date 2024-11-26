@@ -10,7 +10,7 @@ from typing import NamedTuple, TypedDict
 
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
-from mango import Agent
+from mango import Agent, AgentAddress
 
 
 class OnlyHours(NamedTuple):
@@ -141,8 +141,7 @@ class MarketConfig:
     supports_get_unmatched: bool = False
     eligible_obligations_lambda: eligible_lambda = lambda x: True
     param_dict: dict = field(default_factory=dict)
-    addr: str = " "
-    aid: str = " "
+    addr: AgentAddress | None = None
 
 
 class OpeningMessage(TypedDict):

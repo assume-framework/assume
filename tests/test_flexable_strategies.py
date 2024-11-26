@@ -24,12 +24,12 @@ end = datetime(2023, 7, 2)
 def power_plant() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
     index = pd.date_range("2023-07-01", periods=48, freq="h")
-    ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
+    forecaster = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
         technology="hard coal",
-        index=index,
+        index=forecaster.index,
         max_power=1000,
         min_power=200,
         efficiency=0.5,
@@ -37,7 +37,7 @@ def power_plant() -> PowerPlant:
         bidding_strategies={},
         fuel_type="lignite",
         emission_factor=0.5,
-        forecaster=ff,
+        forecaster=forecaster,
     )
 
 

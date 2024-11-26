@@ -61,7 +61,6 @@ def load_oeds(
         end=end,
         save_frequency_hours=48,
         simulation_id=sim_id,
-        index=index,
     )
     # setup eom market
 

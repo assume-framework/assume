@@ -20,7 +20,11 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 
 from assume.common.market_objects import MetaDict
-from assume.common.utils import check_for_tensors, separate_orders
+from assume.common.utils import (
+    calculate_content_size,
+    check_for_tensors,
+    separate_orders,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +49,7 @@ class WriteOutput(Role):
         learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
         perform_evaluation (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
         additional_kpis (dict[str, OutputDef], optional): makes it possible to define additional kpis evaluated
+        max_dfs_size_mb (int, optional): The maximum storage size for storing output data before saving it. Defaults to 250 MB.
     """
 
     def __init__(
@@ -58,6 +63,7 @@ class WriteOutput(Role):
         learning_mode: bool = False,
         perform_evaluation: bool = False,
         additional_kpis: dict[str, OutputDef] = {},
+        max_dfs_size_mb: int = 250,
     ):
         super().__init__()
 
@@ -94,6 +100,10 @@ class WriteOutput(Role):
         # construct all timeframe under which hourly values are written to excel and db
         self.start = start
         self.end = end
+
+        self.max_dfs_size = max_dfs_size_mb * 1024 * 1024
+        self.current_dfs_size = 0
+
         # initializes dfs for storing and writing asynchronous
         self.write_dfs: dict = defaultdict(list)
         self.locks = defaultdict(lambda: Lock())
@@ -210,30 +220,38 @@ class WriteOutput(Role):
             content (dict): The content of the message.
             meta (MetaDict): The metadata associated with the message.
         """
+        content_data = content.get("data")
 
         if content.get("type") == "store_order_book":
-            self.write_market_orders(content.get("data"), content.get("market_id"))
+            self.write_market_orders(content_data, content.get("market_id"))
 
         elif content.get("type") == "store_market_results":
-            self.write_market_results(content.get("data"))
+            self.write_market_results(content_data)
 
         elif content.get("type") == "store_units":
-            self.write_units_definition(content.get("data"))
+            self.write_units_definition(content_data)
 
         elif content.get("type") == "market_dispatch":
-            self.write_market_dispatch(content.get("data"))
+            self.write_market_dispatch(content_data)
 
         elif content.get("type") == "unit_dispatch":
-            self.write_unit_dispatch(content.get("data"))
+            self.write_unit_dispatch(content_data)
 
         elif content.get("type") == "rl_learning_params":
-            self.write_rl_params(content.get("data"))
+            self.write_rl_params(content_data)
 
         elif content.get("type") == "grid_topology":
-            self.store_grid(content.get("data"), content.get("market_id"))
+            self.store_grid(content_data, content.get("market_id"))
 
         elif content.get("type") == "store_flows":
-            self.write_flows(content.get("data"))
+            self.write_flows(content_data)
+
+        # # keep track of the memory usage of the data
+        self.current_dfs_size += calculate_content_size(content_data)
+        # if the current size is larger than self.max_dfs_size, store the data
+        if self.current_dfs_size > self.max_dfs_size:
+            logger.debug("storing output data due to size limit")
+            self.context.schedule_instant_task(coroutine=self.store_dfs())
 
     def write_rl_params(self, rl_params: dict):
         """
@@ -276,40 +294,41 @@ class WriteOutput(Role):
             return
 
         for table in self.write_dfs.keys():
-            with self.locks[table]:
-                if len(self.write_dfs[table]) == 0:
+            if len(self.write_dfs[table]) == 0:
                     continue
-
+            with self.locks[table]:
                 # concat all dataframes
                 # use join='outer' to keep all columns and fill missing values with NaN
                 df = pd.concat(self.write_dfs[table], axis=0, join="outer")
-
-                df.reset_index()
-                if df.empty:
-                    continue
-
-                df = df.apply(check_for_tensors)
-
-                if self.export_csv_path:
-                    data_path = self.export_csv_path / f"{table}.csv"
-                    df.to_csv(
-                        data_path,
-                        mode="a",
-                        header=not data_path.exists(),
-                        float_format="%.5g",
-                    )
-
-                if self.db is not None:
-                    try:
-                        with self.db.begin() as db:
-                            df.to_sql(table, db, if_exists="append")
-                    except (ProgrammingError, OperationalError, DataError):
-                        self.check_columns(table, df)
-                        # now try again
-                        with self.db.begin() as db:
-                            df.to_sql(table, db, if_exists="append")
-
                 self.write_dfs[table] = []
+
+            df.reset_index()
+            if df.empty:
+                continue
+
+            df = df.apply(check_for_tensors)
+
+            if self.export_csv_path:
+                data_path = self.export_csv_path / f"{table}.csv"
+                df.to_csv(
+                    data_path,
+                    mode="a",
+                    header=not data_path.exists(),
+                    float_format="%.5g",
+                )
+
+            if self.db is not None:
+                try:
+                    with self.db.begin() as db:
+                        df.to_sql(table, db, if_exists="append")
+                except (ProgrammingError, OperationalError, DataError):
+                    self.check_columns(table, df)
+                    # now try again
+                    with self.db.begin() as db:
+                        df.to_sql(table, db, if_exists="append")
+
+
+        self.current_dfs_size = 0
 
     def store_grid(
         self,
@@ -483,13 +502,15 @@ class WriteOutput(Role):
             df["simulation"] = self.simulation_id
             self.write_dfs["market_dispatch"].append(df)
 
-    def write_unit_dispatch(self, data: any):
+    def write_unit_dispatch(self, unit_dispatch: dict):
         """
         Writes the actual dispatch of the units to a CSV and database.
 
         Args:
             data (any): The records to be put into the table. Formatted like, "datetime, power, market_id, unit_id".
         """
+        data = pd.concat([pd.DataFrame.from_dict(d) for d in unit_dispatch])
+        data = data.set_index("time")
         data["simulation"] = self.simulation_id
         self.write_dfs["unit_dispatch"].append(data)
 
@@ -568,9 +589,9 @@ class WriteOutput(Role):
         query = text(
             f"select unit, SUM(reward) FROM rl_params where simulation='{self.simulation_id}' GROUP BY unit"
         )
-
-        with self.db.begin() as db:
-            rewards_by_unit = db.execute(query).fetchall()
+        if self.db is not None:
+            with self.db.begin() as db:
+                rewards_by_unit = db.execute(query).fetchall()
 
         # convert into a numpy array
         rewards_by_unit = [r[1] for r in rewards_by_unit]

@@ -18,6 +18,7 @@ from mango import (
 )
 from mango.util.clock import ExternalClock
 
+from assume.common.fast_pandas import FastIndex
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
@@ -74,7 +75,7 @@ async def test_request_messages():
     units_agent.add_role(units_role)
     container.register(units_agent, suggested_aid="test_operator")
 
-    index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
+    index = FastIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 
     params_dict = {
         "bidding_strategies": {"energy": NaiveSingleBidStrategy()},
@@ -84,7 +85,7 @@ async def test_request_messages():
         "min_power": 0,
         "forecaster": NaiveForecast(index, demand=1000),
     }
-    unit = Demand("testdemand", index=index, **params_dict)
+    unit = Demand("testdemand", **params_dict)
     units_role.add_unit(unit)
 
     market_role = MarketRole(marketconfig)
