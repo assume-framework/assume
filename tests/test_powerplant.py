@@ -471,7 +471,6 @@ def test_powerplant_min_feedback(power_plant_1, mock_market_config):
         start, end, product_type=product_type
     )
     assert min_power[0] == 200
-
     assert max_power[0] == 1000
     assert power_plant_1.outputs[product_type].at[start] == 0
 
