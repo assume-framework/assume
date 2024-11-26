@@ -92,5 +92,6 @@ For better interoperability with other energy system model data, adapters to int
 # Acknowledgements
 
 Kim K. Miskiw, Nick Harder and Manish Khanra thank the German Federal Ministry for Economic Affairs and Climate Action for the funding of the `ASSUME` project under grant number BMWK 03EI1052A.
+We express our gratitude to all contributors to ASSUME.
 
 # References
