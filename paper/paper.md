@@ -1,9 +1,3 @@
-<!--
-SPDX-FileCopyrightText: ASSUME Developers
-
-SPDX-License-Identifier: AGPL-3.0-or-later
--->
-
 ---
 title: 'ASSUME - Agent-based Simulation for Studying and Understanding Market Evolution'
 tags:
@@ -18,11 +12,10 @@ authors:
     corresponding: true
     equal-contrib: true
     affiliation: 1
-    "affiliation": 1
   - name: Nick Harder
     orcid: 0000-0003-1897-3671
     equal-contrib: true
-    "affiliation": 2
+    affiliation: 2
   - name: Kim K. Miskiw
     orcid: 0009-0009-1389-4844
     equal-contrib: true
@@ -45,8 +38,6 @@ date: 13 November 2024
 bibliography: paper.bib
 ---
 
-<!-- pandoc -s paper.md -o paper.pdf --bibliography paper.bib --csl=apa.csl --filter pandoc-citeproc --pdf-engine=xelatex-->
-
 # Summary
 
 **ASSUME** is an open-source toolbox for agent-based simulations of various energy markets, with a primary focus on European electricity markets. Developed as an open-source model, its objectives are to ensure usability and customizability for a wide range of users and use cases in the energy system modeling community.
@@ -58,7 +49,7 @@ A unique feature of the `ASSUME` toolbox is its integration of **Deep Reinforcem
 Various open-source agent-based models have been developed for studying energy markets, such as PowerACE [@bublitzAgentbasedSimulationGerman2014] and AMIRIS [@schimeczekAMIRISAgentbasedMarket2023].
 Yet, the possible integration of reinforcement learning methods into the behavioral strategies of market agents is currently unique to `ASSUME` and is build upon prior research on multi-agent reinforcement learning [@harderFitPurposeModeling2023].
 Simulations which solely rely on rule-based bidding strategy representation, limit the ability to represent future markets or alternative markets designs, as in reality bidding agents would adapt to the new market design.
-Most notably, `ASSUME` enables the highest number of simultanelously learning market agents in literature [@miskiwExplainableDeepReinforcement2024].  
+Most notably, `ASSUME` enables the highest number of simultanelously learning market agents in literature [@miskiwExplainableDeepReinforcement2024].
 This feature allows for the exploration of new market designs and emergent dynamics in energy markets using a common open-source simulation framework.
 Further unique features of `ASSUME` are the extensive market abstraction which allows to define complex multi-market scenarios as shown in [@maurerMarketAbstractionEnergy2023].
 Even redispatch markets and nodal markets are supported, making it possible to represent network constraints and market coupling.
@@ -91,6 +82,7 @@ For better interoperability with other energy system model data, adapters to int
 
 # Acknowledgements
 
-Kim K. Miskiw, Nick Harder and Manish Khanra thank the German Federal Ministry for Economic Affairs and Climate Action for the funding of the `ASSUME` project under grant number BMWK 03EI1052A.
+This work was conducted as part of the project "ASSUME: Agent-Based Electricity Markets Simulation Toolbox," funded by the German Federal Ministry for Economic Affairs and Energy under grant number BMWK 03EI1052A.
+We express our gratitude to all contributors to ASSUME.
 
 # References
