@@ -321,7 +321,7 @@ def test_powerplant_availability(power_plant_1):
     ### HOUR 1
     start += timedelta(hours=1)
     end += timedelta(hours=1)
-    min_power, max_power = power_plant_1.calculate_min_max_power(
+    _, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
     )
     op_time = power_plant_1.get_operation_time(start)
@@ -332,7 +332,7 @@ def test_powerplant_availability(power_plant_1):
     ### HOUR 2
     start += timedelta(hours=1)
     end += timedelta(hours=1)
-    min_power, max_power = power_plant_1.calculate_min_max_power(
+    _, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
     )
     op_time = power_plant_1.get_operation_time(start)
@@ -468,12 +468,12 @@ def test_powerplant_min_feedback(power_plant_1, mock_market_config):
 
     # start bidding by calculating min and max power
     min_power, max_power = power_plant_1.calculate_min_max_power(
-        start, end, product_type="energy"
+        start, end, product_type=product_type
     )
     assert min_power[0] == 200
 
     assert max_power[0] == 1000
-    assert power_plant_1.outputs["energy"].at[start] == 0
+    assert power_plant_1.outputs[product_type].at[start] == 0
 
     orderbook = [
         {
@@ -492,7 +492,7 @@ def test_powerplant_min_feedback(power_plant_1, mock_market_config):
 
     # second market request for same interval
     min_power, max_power = power_plant_1.calculate_min_max_power(
-        start, end, product_type="energy"
+        start, end, product_type=product_type
     )
 
     # we still need 100kw as a runtime requirement
@@ -516,7 +516,7 @@ def test_powerplant_min_feedback(power_plant_1, mock_market_config):
     power_plant_1.set_dispatch_plan(mock_market_config, orderbook)
 
     min_power, max_power = power_plant_1.calculate_min_max_power(
-        start, end, product_type="energy"
+        start, end, product_type=product_type
     )
 
     # we do not need additional min_power, as our runtime requirement is fulfilled
@@ -531,7 +531,7 @@ def test_powerplant_min_feedback(power_plant_1, mock_market_config):
     start = datetime(2022, 1, 1, 1)
     end = datetime(2022, 1, 1, 2)
     min_power, max_power = power_plant_1.calculate_min_max_power(
-        start, end, product_type="energy"
+        start, end, product_type=product_type
     )
 
     # now we can bid max_power and need min_power again
@@ -550,11 +550,11 @@ def test_powerplant_ramp_feedback(power_plant_1, mock_market_config):
 
     # start bidding by calculating min and max power
     min_power, max_power = power_plant_1.calculate_min_max_power(
-        start, end, product_type="energy"
+        start, end, product_type=product_type
     )
     assert min_power[0] == 200
     assert max_power[0] == 1000
-    assert power_plant_1.outputs["energy"].at[start] == 0
+    assert power_plant_1.outputs[product_type].at[start] == 0
 
     orderbook = [
         {
@@ -573,7 +573,7 @@ def test_powerplant_ramp_feedback(power_plant_1, mock_market_config):
 
     # second market request for same interval
     min_power, max_power = power_plant_1.calculate_min_max_power(
-        start, end, product_type="energy"
+        start, end, product_type=product_type
     )
 
     # we still need 100kw as a runtime requirement
@@ -587,7 +587,7 @@ def test_powerplant_ramp_feedback(power_plant_1, mock_market_config):
     start = datetime(2022, 1, 1, 1)
     end = datetime(2022, 1, 1, 2)
     min_power, max_power = power_plant_1.calculate_min_max_power(
-        start, end, product_type="energy"
+        start, end, product_type=product_type
     )
 
     # now we can bid max_power and need min_power again
