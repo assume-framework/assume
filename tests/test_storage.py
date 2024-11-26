@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import math
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pandas as pd
 import pytest
@@ -80,13 +80,8 @@ def test_reset_function(storage_unit):
 
 
 def test_calculate_operational_window(storage_unit):
-    product_tuple = (
-        pd.Timestamp("2022-01-01 00:00:00"),
-        pd.Timestamp("2022-01-01 01:00:00"),
-        None,
-    )
-    start = product_tuple[0]
-    end = product_tuple[1]
+    start = datetime(2022, 1, 1, 0)
+    end = datetime(2022, 1, 1, 1)
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end, product_type="energy"
     )
@@ -128,13 +123,8 @@ def test_calculate_operational_window(storage_unit):
 
 def test_soc_constraint(storage_unit):
     # start should not be the first hour of index to manipulate soc
-    product_tuple = (
-        pd.Timestamp("2022-01-01 01:00:00"),
-        pd.Timestamp("2022-01-01 02:00:00"),
-        None,
-    )
-    start = product_tuple[0]
-    end = product_tuple[1]
+    start = datetime(2022, 1, 1, 1)
+    end = datetime(2022, 1, 1, 2)
 
     storage_unit.outputs["energy"][start] = 10
     storage_unit.outputs["capacity_neg"][start] = -50
@@ -160,14 +150,8 @@ def test_soc_constraint(storage_unit):
 
 
 def test_storage_feedback(storage_unit, mock_market_config):
-    product_tuple = (
-        pd.Timestamp("2022-01-01 00:00:00"),
-        pd.Timestamp("2022-01-01 01:00:00"),
-        None,
-    )
-
-    start = product_tuple[0]
-    end = product_tuple[1]
+    start = datetime(2022, 1, 1, 0)
+    end = datetime(2022, 1, 1, 1)
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end, product_type="energy"
     )
@@ -210,8 +194,8 @@ def test_storage_feedback(storage_unit, mock_market_config):
 
     storage_unit.execute_current_dispatch(start, end)
     # second market request for next interval
-    start = pd.Timestamp("2022-01-01 01:00:00")
-    end = pd.Timestamp("2022-01-01 02:00:00")
+    start = datetime(2022, 1, 1, 1)
+    end = datetime(2022, 1, 1, 2)
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end, product_type="energy"
     )
@@ -222,14 +206,8 @@ def test_storage_feedback(storage_unit, mock_market_config):
 
 
 def test_storage_ramping(storage_unit):
-    product_tuple = (
-        pd.Timestamp("2022-01-01 00:00:00"),
-        pd.Timestamp("2022-01-01 04:00:00"),
-        None,
-    )
-
-    start = product_tuple[0]
-    end = product_tuple[1]
+    start = datetime(2022, 1, 1, 0)
+    end = datetime(2022, 1, 1, 1)
 
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end, product_type="energy"
@@ -257,14 +235,8 @@ def test_storage_ramping(storage_unit):
     storage_unit.outputs["energy"][start] += 60
 
     # next hour
-    product_tuple = (
-        pd.Timestamp("2022-01-01 01:00:00"),
-        pd.Timestamp("2022-01-01 02:00:00"),
-        None,
-    )
-
-    start = product_tuple[0]
-    end = product_tuple[1]
+    start = datetime(2022, 1, 1, 1)
+    end = datetime(2022, 1, 1, 2)
 
     max_ramp_discharge = storage_unit.calculate_ramp_discharge(
         500, 60, max_power_discharge[0]
@@ -278,14 +250,8 @@ def test_storage_ramping(storage_unit):
     storage_unit.outputs["energy"][start] = -60
 
     # next hour
-    product_tuple = (
-        pd.Timestamp("2022-01-01 02:00:00"),
-        pd.Timestamp("2022-01-01 03:00:00"),
-        None,
-    )
-
-    start = product_tuple[0]
-    end = product_tuple[1]
+    start = datetime(2022, 1, 1, 2)
+    end = datetime(2022, 1, 1, 3)
 
     max_ramp_discharge = storage_unit.calculate_ramp_discharge(
         500, -60, max_power_discharge[0]
@@ -297,13 +263,8 @@ def test_storage_ramping(storage_unit):
 
 
 def test_execute_dispatch(storage_unit):
-    product_tuple = (
-        pd.Timestamp("2022-01-01 01:00:00"),
-        pd.Timestamp("2022-01-01 02:00:00"),
-        None,
-    )
-    start = product_tuple[0]
-    end = product_tuple[1]
+    start = datetime(2022, 1, 1, 1)
+    end = datetime(2022, 1, 1, 2)
 
     storage_unit.outputs["energy"][start] = 100
     storage_unit.outputs["soc"][start] = 0.5 * storage_unit.max_soc
@@ -355,13 +316,8 @@ def test_execute_dispatch(storage_unit):
 
 
 def test_set_dispatch_plan(mock_market_config, storage_unit):
-    product_tuple = (
-        pd.Timestamp("2022-01-01 01:00:00"),
-        pd.Timestamp("2022-01-01 02:00:00"),
-        None,
-    )
-    start = product_tuple[0]
-    end = product_tuple[1]
+    start = datetime(2022, 1, 1, 1)
+    end = datetime(2022, 1, 1, 2)
 
     mc = mock_market_config
 

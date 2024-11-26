@@ -6,7 +6,6 @@ import os
 from datetime import datetime
 
 import numpy as np
-import pandas as pd
 from sqlalchemy import create_engine
 
 from assume.common.outputs import WriteOutput
@@ -144,10 +143,7 @@ def test_output_unit_dispatch():
             {
                 "power": np.array([0.0, 1000.0]),
                 "energy_cashflow": np.array([0.0, 45050.0]),
-                "time": [
-                    pd.Timestamp("2019-01-01 00:00:00"),
-                    pd.Timestamp("2019-01-01 01:00:00"),
-                ],
+                "time": [datetime(2022, 1, 1, 0), datetime(2022, 1, 1, 1)],
                 "unit": "Unit 2",
             }
         ],

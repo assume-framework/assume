@@ -295,7 +295,7 @@ class WriteOutput(Role):
 
         for table in self.write_dfs.keys():
             if len(self.write_dfs[table]) == 0:
-                    continue
+                continue
             with self.locks[table]:
                 # concat all dataframes
                 # use join='outer' to keep all columns and fill missing values with NaN
@@ -326,7 +326,6 @@ class WriteOutput(Role):
                     # now try again
                     with self.db.begin() as db:
                         df.to_sql(table, db, if_exists="append")
-
 
         self.current_dfs_size = 0
 

@@ -119,13 +119,8 @@ def test_reset_function(power_plant_1):
 
 
 def test_calculate_operational_window(power_plant_1):
-    product_tuple = (
-        pd.Timestamp("2022-01-01 00:00:00"),
-        pd.Timestamp("2022-01-01 01:00:00"),
-        None,
-    )
-    start = product_tuple[0]
-    end = product_tuple[1]
+    start = datetime(2022, 1, 1, 0)
+    end = datetime(2022, 1, 1, 1)
     min_power, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
     )
@@ -143,13 +138,8 @@ def test_calculate_operational_window(power_plant_1):
 
 
 def test_powerplant_feedback(power_plant_1, mock_market_config):
-    product_tuple = (
-        pd.Timestamp("2022-01-01 00:00:00"),
-        pd.Timestamp("2022-01-01 01:00:00"),
-        None,
-    )
-    start = product_tuple[0]
-    end = product_tuple[1]
+    start = datetime(2022, 1, 1, 0)
+    end = datetime(2022, 1, 1, 1)
     min_power, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
     )
@@ -189,8 +179,8 @@ def test_powerplant_feedback(power_plant_1, mock_market_config):
     assert max_power[0] == 800
 
     # second market request for next interval
-    start = pd.Timestamp("2022-01-01 01:00:00")
-    end = pd.Timestamp("2022-01-01 02:00:00")
+    start = datetime(2022, 1, 1, 1)
+    end = datetime(2022, 1, 1, 2)
     min_power, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
     )
@@ -331,7 +321,7 @@ def test_powerplant_availability(power_plant_1):
     ### HOUR 1
     start += timedelta(hours=1)
     end += timedelta(hours=1)
-    min_power, max_power = power_plant_1.calculate_min_max_power(
+    _, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
     )
     op_time = power_plant_1.get_operation_time(start)
@@ -342,7 +332,7 @@ def test_powerplant_availability(power_plant_1):
     ### HOUR 2
     start += timedelta(hours=1)
     end += timedelta(hours=1)
-    min_power, max_power = power_plant_1.calculate_min_max_power(
+    _, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
     )
     op_time = power_plant_1.get_operation_time(start)
@@ -464,6 +454,144 @@ def test_powerplant_execute_dispatch():
     assert all(
         power_plant.outputs["energy"].loc[index[20] : index[23]] == [420, 620, 700, 700]
     )
+
+
+def test_powerplant_min_feedback(power_plant_1, mock_market_config):
+    """
+    Test that powerplant works fine for multi market bidding.
+    Has two bids which add up to be above the minimum power.
+    Make sure that ramping is not enforced to early.
+    """
+    start = datetime(2022, 1, 1, 0)
+    end = datetime(2022, 1, 1, 1)
+    product_type = "energy"
+
+    # start bidding by calculating min and max power
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type=product_type
+    )
+    assert min_power[0] == 200
+    assert max_power[0] == 1000
+    assert power_plant_1.outputs[product_type].at[start] == 0
+
+    orderbook = [
+        {
+            "start_time": start,
+            "end_time": end,
+            "only_hours": None,
+            "price": 40,
+            "accepted_price": 40,
+            "accepted_volume": 100,
+            # half of min_power
+        }
+    ]
+
+    # min_power gets accepted by fictional market
+    power_plant_1.set_dispatch_plan(mock_market_config, orderbook)
+
+    # second market request for same interval
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type=product_type
+    )
+
+    # we still need 100kw as a runtime requirement
+    assert min_power[0] == 100
+    # we can not bid the maximum anymore, because we already provide energy on the other market
+    assert max_power[0] == 900
+
+    orderbook = [
+        {
+            "start_time": start,
+            "end_time": end,
+            "only_hours": None,
+            "price": 40,
+            "accepted_price": 40,
+            "accepted_volume": 200,
+            # half of min_power
+        }
+    ]
+
+    # min_power gets accepted
+    power_plant_1.set_dispatch_plan(mock_market_config, orderbook)
+
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type=product_type
+    )
+
+    # we do not need additional min_power, as our runtime requirement is fulfilled
+    assert min_power[0] == 0
+    # we can not bid the maximum anymore, because we already provide energy on the other market
+    assert max_power[0] == 700
+
+    # this should not do anything here, as we are in our constraints
+    power_plant_1.execute_current_dispatch(start, end)
+
+    # second market request for next interval
+    start = datetime(2022, 1, 1, 1)
+    end = datetime(2022, 1, 1, 2)
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type=product_type
+    )
+
+    # now we can bid max_power and need min_power again
+    assert min_power[0] == 200
+    assert max_power[0] == 1000
+
+
+def test_powerplant_ramp_feedback(power_plant_1, mock_market_config):
+    """
+    Make sure that ramping is enforced when a accepted volume at the prior time
+    is below the minimum power.
+    """
+    product_type = "energy"
+    start = datetime(2022, 1, 1, 0)
+    end = datetime(2022, 1, 1, 1)
+
+    # start bidding by calculating min and max power
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type=product_type
+    )
+    assert min_power[0] == 200
+    assert max_power[0] == 1000
+    assert power_plant_1.outputs[product_type].at[start] == 0
+
+    orderbook = [
+        {
+            "start_time": start,
+            "end_time": end,
+            "only_hours": None,
+            "price": 40,
+            "accepted_price": 40,
+            "accepted_volume": 100,
+            # half of min_power
+        }
+    ]
+
+    # min_power gets accepted by fictional market
+    power_plant_1.set_dispatch_plan(mock_market_config, orderbook)
+
+    # second market request for same interval
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type=product_type
+    )
+
+    # we still need 100kw as a runtime requirement
+    assert min_power[0] == 100
+    # we can not bid the maximum anymore, because we already provide energy on the other market
+    assert max_power[0] == 900
+
+    power_plant_1.execute_current_dispatch(start, end)
+
+    # second market request for next interval
+    start = datetime(2022, 1, 1, 1)
+    end = datetime(2022, 1, 1, 2)
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type=product_type
+    )
+
+    # now we can bid max_power and need min_power again
+    assert min_power[0] == 200
+    assert max_power[0] == 1000
 
 
 if __name__ == "__main__":
