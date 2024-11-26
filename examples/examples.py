@@ -91,6 +91,7 @@ available_examples = {
     },
     "large_2019_rl": {"scenario": "example_03a", "study_case": "base_case_2019"},
     "large_2021_rl": {"scenario": "example_03b", "study_case": "base_case_2021"},
+    "experiment": {"scenario": "experiment", "study_case": "dst_flexibility_case"},
 }
 
 
@@ -107,7 +108,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "small"
+    example = "experiment"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
