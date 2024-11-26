@@ -16,8 +16,6 @@ from pyomo.opt import (
 from assume.common.base import SupportsMinMax
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecasts import Forecaster
-from assume.common.market_objects import MarketConfig, Orderbook
-from assume.common.utils import get_products_index
 from assume.units.dsm_load_shift import DSMFlex
 
 SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
@@ -520,47 +518,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         instance.total_cost = self.total_cost
 
         return instance
-
-    def set_dispatch_plan(
-        self,
-        marketconfig: MarketConfig,
-        orderbook: Orderbook,
-    ) -> None:
-        """
-        Adds the dispatch plan from the current market result to the total dispatch plan and calculates the cashflow.
-
-        Args:
-            marketconfig (MarketConfig): The market configuration.
-            orderbook (Orderbook): The orderbook.
-        """
-        products_index = get_products_index(orderbook)
-
-        product_type = marketconfig.product_type
-        for order in orderbook:
-            start = order["start_time"]
-            end = order["end_time"]
-            end_excl = end - self.index.freq
-            if isinstance(order["accepted_volume"], dict):
-                self.outputs[product_type].loc[start:end_excl] += [
-                    order["accepted_volume"][key]
-                    for key in order["accepted_volume"].keys()
-                ]
-            else:
-                self.outputs[product_type].loc[start:end_excl] += order[
-                    "accepted_volume"
-                ]
-
-        self.calculate_cashflow(product_type, orderbook)
-
-        for start in products_index:
-            current_power = self.outputs[product_type].at[start]
-            self.outputs[product_type].at[start] = current_power
-
-        self.bidding_strategies[marketconfig.market_id].calculate_reward(
-            unit=self,
-            marketconfig=marketconfig,
-            orderbook=orderbook,
-        )
 
     def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """
