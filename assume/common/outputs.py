@@ -108,6 +108,9 @@ class WriteOutput(Role):
         self.write_dfs: dict = defaultdict(list)
         self.locks = defaultdict(lambda: Lock())
 
+        # Buffers for batching
+        self.buffers = {"unit_dispatch": [], "market_dispatch": []}
+
         self.kpi_defs: dict[str, OutputDef] = {
             "avg_price": {
                 "value": "avg(price)",
@@ -232,10 +235,10 @@ class WriteOutput(Role):
             self.write_units_definition(content_data)
 
         elif content.get("type") == "market_dispatch":
-            self.write_market_dispatch(content_data)
+            self.buffers["market_dispatch"].extend(content_data)
 
         elif content.get("type") == "unit_dispatch":
-            self.write_unit_dispatch(content_data)
+            self.buffers["unit_dispatch"].extend(content_data)
 
         elif content.get("type") == "rl_learning_params":
             self.write_rl_params(content_data)
@@ -292,6 +295,10 @@ class WriteOutput(Role):
         """
         if not self.db and not self.export_csv_path:
             return
+
+        # check if buffer is not empty
+        self.write_unit_dispatch()
+        self.write_market_dispatch()
 
         for table in self.write_dfs.keys():
             if len(self.write_dfs[table]) == 0:
@@ -495,29 +502,66 @@ class WriteOutput(Role):
         with self.locks[table_name]:
             self.write_dfs[table_name].append(pd.DataFrame(u_info).T)
 
-    def write_market_dispatch(self, data: any):
+    def write_market_dispatch(self):
         """
         Writes the planned dispatch of the units after the market clearing to a CSV and database.
 
         Args:
             data (any): The records to be put into the table. Formatted like, "datetime, power, market_id, unit_id".
         """
-        df = pd.DataFrame(data, columns=["datetime", "power", "market_id", "unit_id"])
+        # if self.buffers["market_dispatch"] is empty, return early
+        if len(self.buffers["market_dispatch"]) == 0:
+            return
+
+        df = pd.DataFrame(
+            self.buffers["market_dispatch"],
+            columns=["datetime", "power", "market_id", "unit_id"],
+        )
         if not df.empty:
             df["simulation"] = self.simulation_id
             self.write_dfs["market_dispatch"].append(df)
 
-    def write_unit_dispatch(self, unit_dispatch: dict):
+        self.buffers["market_dispatch"].clear()
+
+    def write_unit_dispatch(self):
         """
-        Writes the actual dispatch of the units to a CSV and database.
+        Writes the actual dispatch of the units to a DataFrame.
 
         Args:
-            data (any): The records to be put into the table. Formatted like, "datetime, power, market_id, unit_id".
+            unit_dispatch (list): A list of dictionaries containing unit dispatch data.
+                                Each dictionary includes arrays for multiple values (e.g., power, costs) and other metadata.
         """
-        data = pd.concat([pd.DataFrame.from_dict(d) for d in unit_dispatch])
-        data = data.set_index("time")
+        # if self.buffers["unit_dispatch"] is empty, return early
+        if len(self.buffers["unit_dispatch"]) == 0:
+            return
+
+        # Flatten and expand the arrays in `unit_dispatch` into a list of records for DataFrame construction
+        records = []
+        for dispatch in self.buffers["unit_dispatch"]:
+            time_values = dispatch["time"]
+            num_records = len(time_values)
+
+            # Create a record for each time step, expanding array-based fields
+            for i in range(num_records):
+                record = {
+                    key: (value[i] if isinstance(value, (list | np.ndarray)) else value)
+                    for key, value in dispatch.items()
+                }
+                record["time"] = time_values[i]
+                records.append(record)
+
+        # Convert the list of records into a DataFrame
+        data = pd.DataFrame.from_records(records)
+
+        # Set the index and add the simulation ID
+        data.set_index("time", inplace=True)
         data["simulation"] = self.simulation_id
+
+        # Append to the unit_dispatch DataFrame
         self.write_dfs["unit_dispatch"].append(data)
+
+        # Clear the buffer
+        self.buffers["unit_dispatch"].clear()
 
     async def on_stop(self):
         """
