@@ -91,13 +91,10 @@ available_examples = {
     },
     "large_2019_rl": {"scenario": "example_03a", "study_case": "base_case_2019"},
     "large_2021_rl": {"scenario": "example_03b", "study_case": "base_case_2021"},
-
-
     "redisp_valid_Germany_2019": {"scenario": "example_05c", "study_case": "base"},
     # paper risk examples
     "paper_risk_O45Strom": {"scenario": "example_06a", "study_case": "base"},
     "paper_risk_O45H2": {"scenario": "example_06b", "study_case": "base"},
-
 }
 
 

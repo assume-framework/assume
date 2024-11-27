@@ -11,11 +11,9 @@ import pypsa
 from assume.common.grid_utils import (
     add_redispatch_generators,
     add_redispatch_loads,
-    calculate_network_meta,
     read_pypsa_grid,
 )
 from assume.common.market_objects import MarketConfig, Orderbook
-from assume.common.utils import suppress_output
 from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
@@ -184,7 +182,46 @@ class RedispatchMarketRole(MarketRole):
         line_loading = (
             redispatch_network.lines_t.p0.abs() / redispatch_network.lines.s_nom
         )
-        """ 
+
+        # Save directly to CSV
+        line_loading_df = line_loading.reset_index()
+        output_file = "examples/outputs/line_loading.csv"
+        try:
+            existing_df = pd.read_csv(output_file)
+            existing_headers = list(existing_df.columns)
+
+            # Compare headers
+            if list(line_loading_df.columns) == existing_headers:
+                # If headers match, append without adding a header
+                line_loading_df.to_csv(
+                    output_file,
+                    mode="a",  # Append mode
+                    header=False,  # Don't write header if it matches
+                    index=False,
+                    float_format="%.5g",
+                )
+            else:
+                # If headers don't match, write with a new header column
+                line_loading_df.to_csv(
+                    output_file,
+                    mode="a",  # Append mode
+                    header=True,  # Write the header for the new columns
+                    index=False,
+                    float_format="%.5g",
+                )
+        except FileNotFoundError:
+            # If the file doesn't exist, write it with headers
+            line_loading_df.to_csv(
+                output_file,
+                mode="w",  # Write mode
+                header=True,  # Write header
+                index=False,
+                float_format="%.5g",
+            )
+
+        logger.info(f"Line loading data appended to {output_file}")
+
+        """
         # if any line is congested, perform redispatch
         if line_loading.max().max() > 1:
             logger.debug("Congestion detected")
@@ -229,7 +266,7 @@ class RedispatchMarketRole(MarketRole):
         return accepted_orders, rejected_orders, meta, flows
         """
         return [], [], [], []
-    
+
     def process_dispatch_data(self, network: pypsa.Network, orderbook_df: pd.DataFrame):
         """
         This function processes the dispatch data to calculate the redispatch volumes and prices
