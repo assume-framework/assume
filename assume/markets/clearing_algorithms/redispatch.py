@@ -185,7 +185,7 @@ class RedispatchMarketRole(MarketRole):
 
         # Save directly to CSV
         line_loading_df = line_loading.reset_index()
-        output_file = "examples/outputs/line_loading.csv"
+        output_file = "./examples/outputs/line_loading.csv"
         try:
             existing_df = pd.read_csv(output_file)
             existing_headers = list(existing_df.columns)
@@ -266,15 +266,15 @@ class RedispatchMarketRole(MarketRole):
         return accepted_orders, rejected_orders, meta, flows
         """
         return [], [], [], []
-
+    """ 
     def process_dispatch_data(self, network: pypsa.Network, orderbook_df: pd.DataFrame):
-        """
+
         This function processes the dispatch data to calculate the redispatch volumes and prices
         and update the orderbook with the accepted volumes and prices.
 
         Args:
             orderbook_df (pd.DataFrame): The orderbook to be cleared.
-        """
+
 
         # Get all generators except for _backup generators
         generators_t_p = network.generators_t.p.filter(regex="^(?!.*_backup)")
@@ -321,3 +321,4 @@ class RedispatchMarketRole(MarketRole):
                     nodal_marginal_prices[unit_node],
                     0,
                 )
+    """
