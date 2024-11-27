@@ -126,7 +126,7 @@ def test_output_market_dispatch():
         "data": [[start, 90, "EOM", "TestUnit"]],
     }
     output_writer.handle_output_message(content, meta)
-    assert len(output_writer.write_dfs["market_dispatch"]) == 1, "market_dispatch"
+    assert len(output_writer.buffers["market_dispatch"]) == 1, "market_dispatch"
 
 
 def test_output_unit_dispatch():
@@ -150,7 +150,7 @@ def test_output_unit_dispatch():
     }
 
     output_writer.handle_output_message(content, meta)
-    assert len(output_writer.write_dfs["unit_dispatch"]) == 1, "unit_dispatch"
+    assert len(output_writer.buffers["unit_dispatch"]) == 1, "unit_dispatch"
 
 
 def test_output_write_flows():
