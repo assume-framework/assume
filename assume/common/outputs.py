@@ -63,7 +63,7 @@ class WriteOutput(Role):
         learning_mode: bool = False,
         perform_evaluation: bool = False,
         additional_kpis: dict[str, OutputDef] = {},
-        max_dfs_size_mb: int = 250,
+        max_dfs_size_mb: int = 300,
     ):
         super().__init__()
 
@@ -246,7 +246,7 @@ class WriteOutput(Role):
         elif content.get("type") == "store_flows":
             self.write_flows(content_data)
 
-        # # keep track of the memory usage of the data
+        # keep track of the memory usage of the data
         self.current_dfs_size += calculate_content_size(content_data)
         # if the current size is larger than self.max_dfs_size, store the data
         if self.current_dfs_size > self.max_dfs_size:
@@ -440,31 +440,37 @@ class WriteOutput(Role):
             market_orders (any): The market orders.
             market_id (str): The id of the market.
         """
-        # check if market results list is empty and skip the function and raise a warning
+        # Check if market orders are empty and exit early
         if not market_orders:
             return
 
+        # Separate orders outside of lock to reduce locking time
         market_orders = separate_orders(market_orders)
+
+        # Construct DataFrame and perform vectorized operations
         df = pd.DataFrame.from_records(market_orders, index="start_time")
+
+        # Replace lambda functions with vectorized operations
         if "eligible_lambda" in df.columns:
-            df["eligible_lambda"] = df["eligible_lambda"].apply(lambda x: x.__name__)
-        if "evaluation_frequency" in df.columns:
-            df["evaluation_frequency"] = df["evaluation_frequency"].apply(
-                lambda x: repr(x)
+            df["eligible_lambda"] = df["eligible_lambda"].map(
+                lambda x: getattr(x, "__name__", None)
             )
+        if "evaluation_frequency" in df.columns:
+            df["evaluation_frequency"] = df["evaluation_frequency"].astype(str)
 
-        del df["only_hours"]
-        del df["agent_addr"]
+        # Remove unnecessary columns (use a list to minimize deletion calls)
+        df.drop(columns=["only_hours", "agent_addr"], inplace=True, errors=False)
 
-        if "bid_type" not in df.columns:
-            df["bid_type"] = None
+        # Add missing columns with defaults
+        for col in ["bid_type", "node"]:
+            if col not in df.columns:
+                df[col] = None
 
-        if "node" not in df.columns:
-            df["node"] = None
-
+        # Add constant columns
         df["simulation"] = self.simulation_id
         df["market_id"] = market_id
 
+        # Append to the shared DataFrame within lock
         with self.locks["market_orders"]:
             self.write_dfs["market_orders"].append(df)
 

@@ -55,7 +55,11 @@ class FastIndex:
             total_seconds = (self._end - self._start).total_seconds()
             self._count = int(np.floor(total_seconds / self._freq_seconds)) + 1
 
-        self._tolerance_seconds = 1
+        # Precompute the mapping
+        self._date_to_index = {
+            self._start + i * self._freq: i for i in range(self._count)
+        }
+
         self._date_list = None  # Lazy-loaded
 
     @property
@@ -77,11 +81,6 @@ class FastIndex:
     def freq_seconds(self) -> float:
         """Get the frequency of the index in total seconds."""
         return self._freq_seconds
-
-    @property
-    def tolerance_seconds(self) -> int:
-        """Get the tolerance in seconds for date alignment."""
-        return self._tolerance_seconds
 
     def __getitem__(self, item: int | slice):
         """
@@ -228,21 +227,12 @@ class FastIndex:
             KeyError: If the input `date` is None.
             ValueError: If the `date` is not aligned with the frequency within tolerance.
         """
-        if date is None:
-            raise KeyError("Date cannot be None. Please provide a valid datetime.")
 
-        delta_seconds = (date - self.start).total_seconds()
-        remainder = delta_seconds % self.freq_seconds
-
-        if remainder > self.tolerance_seconds and remainder < (
-            self.freq_seconds - self.tolerance_seconds
-        ):
+        if date not in self._date_to_index:
             raise ValueError(
-                f"Date {date} is not aligned with frequency {self.freq_seconds} seconds. "
-                f"Allowed tolerance: {self.tolerance_seconds} seconds."
+                f"Date {date} is not aligned with the frequency or out of range."
             )
-
-        return round(delta_seconds / self.freq_seconds)
+        return self._date_to_index[date]
 
     @staticmethod
     def _convert_to_datetime(value: datetime | str) -> datetime:
@@ -457,12 +447,6 @@ class FastSeries:
                 [(d - self.index.start).total_seconds() for d in dates]
             )
             indices = (delta_seconds / self.index.freq_seconds).round().astype(int)
-            remainders = delta_seconds % self.index.freq_seconds
-
-            if not np.all(remainders <= self.index.tolerance_seconds):
-                raise ValueError(
-                    "One or more dates are not aligned with the index frequency."
-                )
             return self.data[indices]
 
         elif isinstance(item, str):

@@ -3,17 +3,17 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 
-from assume.common.base import BaseStrategy, SupportsMinMax
+from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import parse_duration
 from assume.strategies.flexable import (
     calculate_EOM_price_if_off,
     calculate_EOM_price_if_on,
-    calculate_reward_EOM,
+    flexableEOM,
 )
 
 
-class flexableEOMBlock(BaseStrategy):
+class flexableEOMBlock(flexableEOM):
     """
     A strategy that bids on the EOM-market with block bids.
 
@@ -69,7 +69,6 @@ class flexableEOMBlock(BaseStrategy):
         bid_quantity_block = {}
         bid_price_block = []
         op_time = unit.get_operation_time(start)
-        avg_op_time, avg_down_time = unit.get_average_operation_times(start)
 
         for product, min_power, max_power in zip(
             product_tuples, min_power_values, max_power_values
@@ -120,7 +119,7 @@ class flexableEOMBlock(BaseStrategy):
                     marginal_cost_flex=marginal_cost_flex,
                     bid_quantity_inflex=bid_quantity_inflex,
                     foresight=self.foresight,
-                    avg_down_time=avg_down_time,
+                    avg_down_time=unit.avg_down_time,
                 )
             else:
                 bid_price_inflex = calculate_EOM_price_if_off(
@@ -128,7 +127,7 @@ class flexableEOMBlock(BaseStrategy):
                     marginal_cost_inflex=marginal_cost_inflex,
                     bid_quantity_inflex=bid_quantity_inflex,
                     op_time=op_time,
-                    avg_op_time=avg_op_time,
+                    avg_op_time=unit.avg_op_time,
                 )
 
             if unit.outputs["heat"].at[start] > 0:
@@ -190,30 +189,8 @@ class flexableEOMBlock(BaseStrategy):
 
         return bids
 
-    def calculate_reward(
-        self,
-        unit,
-        marketconfig: MarketConfig,
-        orderbook: Orderbook,
-    ):
-        """
-        Calculates and writes the reward (costs and profit).
 
-        Args:
-            unit (SupportsMinMax): A unit that the unit operator manages.
-            marketconfig (MarketConfig): A market configuration.
-            orderbook (Orderbook): An orderbook with accepted and rejected orders for the unit.
-        """
-        # TODO: Calculate profits over all markets
-
-        calculate_reward_EOM(
-            unit=unit,
-            marketconfig=marketconfig,
-            orderbook=orderbook,
-        )
-
-
-class flexableEOMLinked(BaseStrategy):
+class flexableEOMLinked(flexableEOM):
     """
     A strategy that bids on the EOM-market with block and linked bids.
     """
@@ -261,7 +238,6 @@ class flexableEOMLinked(BaseStrategy):
         bid_quantity_block = {}
         bid_price_block = []
         op_time = unit.get_operation_time(start)
-        avg_op_time, avg_down_time = unit.get_average_operation_times(start)
 
         block_id = unit.id + "_block"
 
@@ -314,7 +290,7 @@ class flexableEOMLinked(BaseStrategy):
                     marginal_cost_flex=marginal_cost_flex,
                     bid_quantity_inflex=bid_quantity_inflex,
                     foresight=self.foresight,
-                    avg_down_time=avg_down_time,
+                    avg_down_time=unit.avg_down_time,
                 )
             else:
                 bid_price_inflex = calculate_EOM_price_if_off(
@@ -322,7 +298,7 @@ class flexableEOMLinked(BaseStrategy):
                     marginal_cost_inflex=marginal_cost_inflex,
                     bid_quantity_inflex=bid_quantity_inflex,
                     op_time=op_time,
-                    avg_op_time=avg_op_time,
+                    avg_op_time=unit.avg_op_time,
                 )
 
             if unit.outputs["heat"].at[start] > 0:
@@ -388,26 +364,3 @@ class flexableEOMLinked(BaseStrategy):
         bids = self.remove_empty_bids(bids)
 
         return bids
-
-    def calculate_reward(
-        self,
-        unit,
-        marketconfig: MarketConfig,
-        orderbook: Orderbook,
-    ):
-        """
-        Calculates and writes the reward (costs and profit).
-
-        Args:
-            unit (SupportsMinMax): A unit that the unit operator manages.
-            marketconfig (MarketConfig): A market configuration.
-            orderbook (Orderbook): An orderbook with accepted and rejected orders for the unit.
-        """
-
-        # TODO: Calculate profits over all markets
-
-        calculate_reward_EOM(
-            unit=unit,
-            marketconfig=marketconfig,
-            orderbook=orderbook,
-        )

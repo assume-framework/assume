@@ -346,39 +346,36 @@ def separate_orders(orderbook: Orderbook):
     Notes:
         This function separates orders with several hours into single hour orders and modifies the orderbook in place.
     """
+    new_orders = []
 
-    # separate orders with several hours into single hour orders
-    delete_orders = []
     for order in orderbook:
-        if any([isinstance(value, dict) for value in order.values()]):
-            start_hour = order["start_time"]
-            end_hour = order["end_time"]
-            order_len = max(
-                len(value) for value in order.values() if isinstance(value, dict)
+        # Skip orders that don't need separation
+        if not any(isinstance(value, dict) for value in order.values()):
+            new_orders.append(order)
+            continue
+
+        # Calculate duration and generate single-hour orders
+        start_hour = order["start_time"]
+        end_hour = order["end_time"]
+        order_len = max(
+            len(value) for value in order.values() if isinstance(value, dict)
+        )
+        duration = (end_hour - start_hour) / order_len
+
+        # Generate new single-hour orders
+        for start in pd.date_range(start_hour, end_hour - duration, freq=duration):
+            single_order = {
+                k: (v[start] if isinstance(v, dict) else v) for k, v in order.items()
+            }
+            single_order.update(
+                {
+                    "start_time": start,
+                    "end_time": start + duration,
+                }
             )
-            duration = (end_hour - start_hour) / order_len
+            new_orders.append(single_order)
 
-            for start in pd.date_range(start_hour, end_hour - duration, freq=duration):
-                single_order = order.copy()
-                for key in order.keys():
-                    if isinstance(order[key], dict):
-                        single_order.update({key: order[key][start]})
-                if single_order != order:
-                    single_order.update(
-                        {
-                            "start_time": start,
-                            "end_time": start + duration,
-                        }
-                    )
-
-                orderbook.append(single_order)
-
-            delete_orders.append(order)
-
-    for order in delete_orders:
-        orderbook.remove(order)
-
-    return orderbook
+    return new_orders
 
 
 def get_products_index(orderbook: Orderbook) -> pd.DatetimeIndex:

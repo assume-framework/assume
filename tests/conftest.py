@@ -48,7 +48,7 @@ def mock_market_config():
 @pytest.fixture
 def mock_supports_minmax():
     index = pd.date_range(
-        start=datetime(2023, 7, 1), end=datetime(2023, 7, 2), freq="1h"
+        start=datetime(2023, 7, 1), end=datetime(2023, 7, 3), freq="1h"
     )
     forecaster = NaiveForecast(index, demand=150)
     return MockMinMaxUnit(forecaster=forecaster)

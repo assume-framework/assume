@@ -141,9 +141,13 @@ class CsvForecaster(Forecaster):
 
         if column not in self.forecasts.keys():
             if "availability" in column:
-                self.forecasts[column] = FastSeries(value=1.0, index=self.index)
+                self.forecasts[column] = FastSeries(
+                    value=1.0, index=self.index, name=column
+                )
             else:
-                self.forecasts[column] = FastSeries(value=0.0, index=self.index)
+                self.forecasts[column] = FastSeries(
+                    value=0.0, index=self.index, name=column
+                )
 
         return self.forecasts[column]
 

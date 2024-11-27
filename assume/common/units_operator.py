@@ -60,7 +60,7 @@ class UnitsOperator(Role):
 
         self.available_markets = available_markets
         self.registered_markets: dict[str, MarketConfig] = {}
-        self.last_sent_dispatch = defaultdict(lambda: 0)
+        self.last_sent_dispatch = defaultdict(lambda: datetime(1970, 1, 1, 1, 0))
 
         if opt_portfolio is None:
             self.use_portfolio_opt = False
@@ -292,7 +292,7 @@ class UnitsOperator(Role):
             )
 
     def get_actual_dispatch(
-        self, product_type: str, last: datetime
+        self, product_type: str, start: datetime, end: datetime
     ) -> tuple[list[tuple[datetime, float, str, str]], list[dict]]:
         """
         Retrieves the actual dispatch and commits it in the unit.
@@ -301,27 +301,26 @@ class UnitsOperator(Role):
 
         Args:
             product_type (str): The product type for which this is done
-            last (datetime.datetime): the last date until which the dispatch was already sent
+            start (datetime): The start time of the dispatch.
+            end (datetime): The end time of the dispatch.
 
         Returns:
             tuple[list[tuple[datetime, float, str, str]], list[dict]]: market_dispatch and unit_dispatch dataframes
         """
-        now = timestamp2datetime(self.context.current_timestamp)
-        start = timestamp2datetime(last + 1)
-
         market_dispatch = aggregate_step_amount(
             orderbook=self.valid_orders[product_type],
-            begin=timestamp2datetime(last),
-            end=now,
+            begin=start,
+            end=end,
             groupby=["market_id", "unit_id"],
         )
 
         unit_dispatch = []
         for unit_id, unit in self.units.items():
-            current_dispatch = unit.execute_current_dispatch(start, now)
-            end = now
+            if start < unit.index.start:
+                start = unit.index.start
+            current_dispatch = unit.execute_current_dispatch(start, end)
             dispatch = {"power": current_dispatch}
-            unit.calculate_generation_cost(start, now, "energy")
+            unit.calculate_generation_cost(start, end, "energy")
             valid_outputs = [
                 "soc",
                 "cashflow",
@@ -346,22 +345,25 @@ class UnitsOperator(Role):
         Args:
             product_type (str): The type of the product.
         """
+        current_time = timestamp2datetime(self.context.current_timestamp)
+        last_dispatch_time = self.last_sent_dispatch[product_type]
 
-        last = self.last_sent_dispatch[product_type]
-        if self.context.current_timestamp == last:
+        if current_time == last_dispatch_time:
             # stop if we exported at this time already
             return
-        self.last_sent_dispatch[product_type] = self.context.current_timestamp
+        # Update the last dispatch timestamp for this product
+        self.last_sent_dispatch[product_type] = current_time
 
-        market_dispatch, unit_dispatch = self.get_actual_dispatch(product_type, last)
-
-        now = timestamp2datetime(self.context.current_timestamp)
-        self.valid_orders[product_type] = list(
-            filter(
-                lambda x: x["end_time"] > now,
-                self.valid_orders[product_type],
-            )
+        market_dispatch, unit_dispatch = self.get_actual_dispatch(
+            product_type=product_type, start=last_dispatch_time, end=current_time
         )
+
+        # Filter valid orders to remove expired ones
+        self.valid_orders[product_type] = [
+            order
+            for order in self.valid_orders[product_type]
+            if order["end_time"] > current_time
+        ]
 
         db_addr = self.context.data.get("output_agent_addr")
         if db_addr:

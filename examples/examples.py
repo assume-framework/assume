@@ -7,7 +7,7 @@ import logging
 import os
 
 from assume import World
-from assume.scenario.loader_csv import load_scenario_folder, run_learning
+from assume.scenario.loader_csv import load_scenario_folder
 
 log = logging.getLogger(__name__)
 
@@ -115,7 +115,7 @@ if __name__ == "__main__":
         db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
     # create world
-    world = World(database_uri=None, export_csv_path=None)
+    world = World(database_uri=db_uri, export_csv_path=csv_path)
 
     # load scenario
     load_scenario_folder(
@@ -145,13 +145,36 @@ if __name__ == "__main__":
     #     unit_type="custom_unit",
     # )
 
-    if world.learning_config.get("learning_mode", False):
-        # run learning if learning mode is enabled
-        run_learning(
-            world,
-            inputs_path="examples/inputs",
-            scenario=available_examples[example]["scenario"],
-            study_case=available_examples[example]["study_case"],
-        )
+    # if world.learning_config.get("learning_mode", False):
+    #     # run learning if learning mode is enabled
+    #     run_learning(
+    #         world,
+    #         inputs_path="examples/inputs",
+    #         scenario=available_examples[example]["scenario"],
+    #         study_case=available_examples[example]["study_case"],
+    #     )
 
     world.run()
+
+    # %%
+    # import cProfile
+
+    # # Example function to profile
+    # def run_simulation():
+    #     # create world
+    #     world = World(database_uri=db_uri, export_csv_path=csv_path)
+
+    #     # load scenario
+    #     load_scenario_folder(
+    #         world,
+    #         inputs_path="examples/inputs",
+    #         scenario=available_examples[example]["scenario"],
+    #         study_case=available_examples[example]["study_case"],
+    #     )
+
+    #     world.run()
+
+    # # Profile the function and save the results
+    # profiler = cProfile.Profile()
+    # profiler.run('run_simulation()')
+    # profiler.dump_stats('simulation_profile.prof')

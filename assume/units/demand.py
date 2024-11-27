@@ -102,7 +102,10 @@ class Demand(SupportsMinMax):
             tuple[pandas.Series, pandas.Series]: The bid colume as both the minimum and maximum power output of the unit.
         """
         end_excl = end - self.index.freq
-        bid_volume = (self.volume - self.outputs[product_type]).loc[start:end_excl]
+        bid_volume = (
+            self.volume.loc[start:end_excl]
+            - self.outputs[product_type].loc[start:end_excl]
+        )
 
         return bid_volume, bid_volume
 
