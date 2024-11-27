@@ -107,16 +107,13 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "small_learning_1"
+    example = "small"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
     elif data_format == "timescale":
         db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
-    import time
-
-    start = time.time()
     # create world
     world = World(database_uri=db_uri, export_csv_path=csv_path)
 
@@ -158,7 +155,3 @@ if __name__ == "__main__":
         )
 
     world.run()
-
-    end = time.time()
-    # print in second rounded to full seconds
-    print(f"Simulation took {round(end - start)} seconds")

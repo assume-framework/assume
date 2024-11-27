@@ -4,7 +4,7 @@
 
 base_case_2019:
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-31 23:00
+  end_date: 2019-03-31 23:00
   time_step: 1h
   industrial_dsm_units: null
   save_frequency_hours: 720

@@ -7,7 +7,7 @@ base:
   end_date: 2019-03-31 00:00
   time_step: 1h
   learning_mode: true
-  save_frequency_hours: null
+  save_frequency_hours: 720
 
   learning_config:
     continue_learning: false
@@ -50,7 +50,7 @@ base_lstm:
   end_date: 2019-03-31 00:00
   time_step: 1h
   learning_mode: true
-  save_frequency_hours: null
+  save_frequency_hours: 720
 
   learning_config:
     continue_learning: false
@@ -96,7 +96,7 @@ tiny:
   end_date: 2019-01-05 00:00
   time_step: 1h
   learning_mode: true
-  save_frequency_hours: null
+  save_frequency_hours: 720
 
   learning_config:
     continue_learning: false

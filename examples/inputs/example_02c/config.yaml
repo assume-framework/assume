@@ -6,7 +6,7 @@ base:
   start_date: 2019-03-01 00:00
   end_date: 2019-04-01 00:00
   time_step: 1h
-  save_frequency_hours: null
+  save_frequency_hours: 720
   learning_mode: True
 
   learning_config:
