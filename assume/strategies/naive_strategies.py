@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
@@ -155,7 +155,7 @@ class NaiveDASteelplantStrategy(BaseStrategy):
     ) -> Orderbook:
         # calculate the optimal operation of the unit
         unit.determine_optimal_operation_with_flex()
-        self.plot_power_requirements(unit)
+        # self.plot_power_requirements(unit)
 
         bids = []
         for product in product_tuples:
@@ -181,40 +181,40 @@ class NaiveDASteelplantStrategy(BaseStrategy):
 
         return bids
 
-    def plot_power_requirements(self, unit: SupportsMinMax):
-        """
-        Plots the optimal power requirement and flexibility power requirement for comparison.
+    # def plot_power_requirements(self, unit: SupportsMinMax):
+    #     """
+    #     Plots the optimal power requirement and flexibility power requirement for comparison.
 
-        Args:
-            unit (SupportsMinMax): The unit containing power requirements.
-        """
-        # Retrieve power requirements data
-        opt_power_requirement = unit.opt_power_requirement
-        flex_power_requirement = unit.flex_power_requirement
+    #     Args:
+    #         unit (SupportsMinMax): The unit containing power requirements.
+    #     """
+    #     # Retrieve power requirements data
+    #     opt_power_requirement = unit.opt_power_requirement
+    #     flex_power_requirement = unit.flex_power_requirement
 
-        # Plotting
-        plt.figure(figsize=(10, 6))
-        plt.plot(
-            opt_power_requirement.index,
-            opt_power_requirement,
-            label="Optimal Power Requirement",
-            color="blue",
-        )
-        plt.plot(
-            flex_power_requirement.index,
-            flex_power_requirement,
-            label="Flex Power Requirement",
-            color="orange",
-            linestyle="--",
-        )
+    #     # Plotting
+    #     plt.figure(figsize=(10, 6))
+    #     plt.plot(
+    #         opt_power_requirement.index,
+    #         opt_power_requirement,
+    #         label="Optimal Power Requirement",
+    #         color="blue",
+    #     )
+    #     plt.plot(
+    #         flex_power_requirement.index,
+    #         flex_power_requirement,
+    #         label="Flex Power Requirement",
+    #         color="orange",
+    #         linestyle="--",
+    #     )
 
-        # Labels and title
-        plt.xlabel("Time")
-        plt.ylabel("Power Requirement (kW)")
-        plt.title("Comparison of Optimal and Flexible Power Requirements")
-        plt.legend()
-        plt.grid(True)
-        plt.show()
+    #     # Labels and title
+    #     plt.xlabel("Time")
+    #     plt.ylabel("Power Requirement (kW)")
+    #     plt.title("Comparison of Optimal and Flexible Power Requirements")
+    #     plt.legend()
+    #     plt.grid(True)
+    #     plt.show()
 
 
 class NaiveRedispatchSteelplantStrategy(BaseStrategy):
