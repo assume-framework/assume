@@ -7,7 +7,6 @@ from datetime import datetime
 import numpy as np
 
 from assume.common.base import SupportsMinMax
-from assume.common.fast_pandas import FastSeries
 from assume.common.forecasts import Forecaster
 
 
@@ -66,8 +65,30 @@ class Demand(SupportsMinMax):
         self.ramp_down = max(abs(min_power), abs(max_power))
         self.ramp_up = max(abs(min_power), abs(max_power))
 
-        self.volume = -abs(self.forecaster[self.id])  # demand is negative
-        self.price = FastSeries(index=self.index, value=price)
+        self.volume = -abs(self.forecaster[self.id])  # demand == negative
+        # self.price = FastSeries(index=self.index, value=price)
+        if self.id == "Denmark":
+            self.price = self.forecaster["Denmark"]
+        elif self.id == "France":
+            self.price = self.forecaster["France"]
+        elif self.id == "Netherlands":
+            self.price = self.forecaster["Netherlands"]
+        elif self.id == "Norway":
+            self.price = self.forecaster["Norway"]
+        elif self.id == "Austria":
+            self.price = self.forecaster["electricity_price"]
+        elif self.id == "Poland":
+            self.price = self.forecaster["Poland"]
+        elif self.id == "Sweden":
+            self.price = self.forecaster["Sweden"]
+        elif self.id == "Switzerland":
+            self.price = self.forecaster["Switzerland"]
+        elif self.id == "Sweden":
+            self.price = self.forecaster["Czech Republic"]
+        elif self.id == "export":
+            self.price = self.forecaster["export"]
+        else:
+            self.price = 3000.0
 
     def execute_current_dispatch(
         self,
@@ -117,7 +138,28 @@ class Demand(SupportsMinMax):
         Returns:
             float: the marginal cost of the unit for the given power.
         """
-        return self.price.at[start]
+        if self.id == "Denmark":
+            return self.price.at[start]
+        elif self.id == "France":
+            return self.price.at[start]
+        elif self.id == "Netherlands":
+            return self.price.at[start]
+        elif self.id == "Norway":
+            return self.price.at[start]
+        elif self.id == "Austria":
+            return self.price.at[start]
+        elif self.id == "Poland":
+            return self.price.at[start]
+        elif self.id == "Sweden":
+            return self.price.at[start]
+        elif self.id == "Switzerland":
+            return self.price.at[start]
+        elif self.id == "Sweden":
+            return self.price.at[start]
+        elif self.id == "export":
+            return self.price.at[start]
+        else:
+            return 3000.0
 
     def as_dict(self) -> dict:
         """
