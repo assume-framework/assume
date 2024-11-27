@@ -107,7 +107,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "small"
+    example = "large_2019_eom"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
@@ -115,7 +115,7 @@ if __name__ == "__main__":
         db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
     # create world
-    world = World(database_uri=db_uri, export_csv_path=csv_path)
+    world = World(database_uri=None, export_csv_path=None)
 
     # load scenario
     load_scenario_folder(
