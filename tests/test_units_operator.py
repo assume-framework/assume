@@ -16,7 +16,7 @@ from assume.common.fast_pandas import FastIndex
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
-from assume.common.utils import datetime2timestamp
+from assume.common.utils import datetime2timestamp, timestamp2datetime
 from assume.strategies.naive_strategies import NaiveSingleBidStrategy
 from assume.units.demand import Demand
 from assume.units.powerplant import PowerPlant
@@ -144,9 +144,9 @@ async def test_set_unit_dispatch(units_operator: UnitsOperator):
 async def test_write_actual_dispatch(units_operator: UnitsOperator):
     units_operator.write_actual_dispatch("energy")
     assert units_operator.last_sent_dispatch["energy"] != 0
-    assert units_operator.last_sent_dispatch["test"] == datetime(1970, 1, 1, 1, 0)
+    assert units_operator.last_sent_dispatch["test"] == 0
     units_operator.write_actual_dispatch("test")
-    assert units_operator.last_sent_dispatch["test"] != datetime(1970, 1, 1, 1, 0)
+    assert units_operator.last_sent_dispatch["test"] != 0
 
 
 async def test_formulate_bids(units_operator: UnitsOperator):
@@ -240,8 +240,11 @@ async def test_get_actual_dispatch(units_operator: UnitsOperator):
 
     last = clock.time
     clock.set_time(clock.time + 3600)
+
     # WHEN actual_dispatch is called
-    market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
+    market_dispatch, unit_dfs = units_operator.get_actual_dispatch(
+        "energy", timestamp2datetime(last), timestamp2datetime(clock.time)
+    )
     # THEN resulting unit dispatch dataframe contains one row
     # which is for the current time - as we must know our current dispatch
     assert datetime2timestamp(unit_dfs[0]["time"][0]) == last
@@ -255,7 +258,9 @@ async def test_get_actual_dispatch(units_operator: UnitsOperator):
     clock.set_time(clock.time + 3600)
 
     # THEN resulting unit dispatch dataframe contains only one row with current dispatch
-    market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
+    market_dispatch, unit_dfs = units_operator.get_actual_dispatch(
+        "energy", timestamp2datetime(last), timestamp2datetime(clock.time)
+    )
     assert datetime2timestamp(unit_dfs[0]["time"][0]) == last
     assert datetime2timestamp(unit_dfs[0]["time"][1]) == clock.time
     assert len(unit_dfs[0]["time"]) == 2
@@ -264,7 +269,9 @@ async def test_get_actual_dispatch(units_operator: UnitsOperator):
     last = clock.time
     clock.set_time(clock.time + 3600)
 
-    market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
+    market_dispatch, unit_dfs = units_operator.get_actual_dispatch(
+        "energy", timestamp2datetime(last), timestamp2datetime(clock.time)
+    )
     assert datetime2timestamp(unit_dfs[0]["time"][0]) == last
     assert datetime2timestamp(unit_dfs[0]["time"][1]) == clock.time
     assert len(unit_dfs[0]["time"]) == 2

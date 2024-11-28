@@ -60,7 +60,7 @@ class UnitsOperator(Role):
 
         self.available_markets = available_markets
         self.registered_markets: dict[str, MarketConfig] = {}
-        self.last_sent_dispatch = defaultdict(lambda: datetime(1970, 1, 1, 1, 0))
+        self.last_sent_dispatch = defaultdict(lambda: 0)
 
         if opt_portfolio is None:
             self.use_portfolio_opt = False
@@ -346,13 +346,13 @@ class UnitsOperator(Role):
             product_type (str): The type of the product.
         """
         current_time = timestamp2datetime(self.context.current_timestamp)
-        last_dispatch_time = self.last_sent_dispatch[product_type]
+        last_dispatch_time = timestamp2datetime(self.last_sent_dispatch[product_type])
 
         if current_time == last_dispatch_time:
             # stop if we exported at this time already
             return
         # Update the last dispatch timestamp for this product
-        self.last_sent_dispatch[product_type] = current_time
+        self.last_sent_dispatch[product_type] = self.context.current_timestamp
 
         market_dispatch, unit_dispatch = self.get_actual_dispatch(
             product_type=product_type, start=last_dispatch_time, end=current_time
