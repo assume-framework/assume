@@ -397,8 +397,8 @@ class RLAdvancedOrderStrategy(RLStrategy):
             end_excl = order["end_time"] - unit.index.freq
 
             order_times = unit.index[start:end_excl]
-            accepted_volume = order["accepted_volume"]
-            accepted_price = order["accepted_price"]
+            accepted_volume = order.get("accepted_volume", 0)
+            accepted_price = order.get("accepted_price", 0)
 
             for start, max_power in zip(order_times, max_power_values):
                 idx = index_map.get(start)

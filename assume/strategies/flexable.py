@@ -200,8 +200,8 @@ class flexableEOM(BaseStrategy):
             end_excl = order["end_time"] - unit.index.freq
 
             order_times = unit.index[start:end_excl]
-            accepted_volume = order["accepted_volume"]
-            accepted_price = order["accepted_price"]
+            accepted_volume = order.get("accepted_volume", 0)
+            accepted_price = order.get("accepted_price", 0)
 
             for start in order_times:
                 idx = index_map.get(start)
@@ -496,8 +496,6 @@ def calculate_EOM_price_if_off(
         float: The inflexible bid price of the unit.
 
     """
-    # ensure that we don't divide by 0
-    avg_op_time = max(avg_op_time, 1)
 
     starting_cost = unit.get_starting_costs(op_time)
     # if we split starting_cost across av_operating_time
@@ -544,8 +542,6 @@ def calculate_EOM_price_if_on(
     Returns:
         float: The inflexible bid price of the unit.
     """
-    # ensure that we don't divide by 0
-    avg_down_time = max(avg_down_time, 1)
 
     if bid_quantity_inflex == 0:
         return 0

@@ -58,8 +58,8 @@ class BaseUnit:
         self.outputs = defaultdict(lambda: FastSeries(value=0.0, index=self.index))
         # series does not like to convert from tensor to float otherwise
 
-        self.avg_op_time = 0
-        self.avg_down_time = 0
+        self.avg_op_time = 1
+        self.avg_down_time = 1
 
         # some data is stored as series to allow to store it in the outputs
         # check if any bidding strategy is using the RL strategy

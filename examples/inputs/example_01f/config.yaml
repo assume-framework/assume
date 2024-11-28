@@ -4,7 +4,7 @@
 
 eom_case:
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-21 00:00
+  end_date: 2019-01-22 00:00
   time_step: 1h
 
   markets_config:
@@ -25,7 +25,7 @@ eom_case:
 
 ltm_case:
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-21 00:00
+  end_date: 2019-01-22 00:00
   time_step: 1h
 
   markets_config:

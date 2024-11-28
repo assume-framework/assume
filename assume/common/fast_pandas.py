@@ -227,7 +227,6 @@ class FastIndex:
             KeyError: If the input `date` is None.
             ValueError: If the `date` is not aligned with the frequency within tolerance.
         """
-
         if date not in self._date_to_index:
             raise ValueError(
                 f"Date {date} is not aligned with the frequency or out of range."
