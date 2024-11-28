@@ -388,6 +388,7 @@ class RLStrategy(AbstractLearningStrategy):
         the total capacity and marginal cost, scaled by maximum power and bid price, respectively.
         """
 
+        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - unit.index.freq
 
         # get the forecast length depending on the tme unit considered in the modelled unit
@@ -521,6 +522,7 @@ class RLStrategy(AbstractLearningStrategy):
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
+            # end includes the end of the last product, to get the last products' start time we deduct the frequency once
             end_excl = end - unit.index.freq
 
             # depending on way the unit calculates marginal costs we take costs
@@ -995,6 +997,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
         the agent's action selection.
         """
 
+        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - unit.index.freq
 
         # get the forecast length depending on the tme unit considered in the modelled unit

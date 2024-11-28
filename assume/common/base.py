@@ -159,6 +159,7 @@ class BaseUnit:
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
+            # end includes the end of the last product, to get the last products' start time we deduct the frequency once
             end_excl = end - self.index.freq
 
             # Determine the added volume
@@ -290,6 +291,7 @@ class BaseUnit:
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
+            # end includes the end of the last product, to get the last products' start time we deduct the frequency once
             end_excl = end - self.index.freq
 
             if isinstance(order["accepted_volume"], dict):
