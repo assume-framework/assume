@@ -110,7 +110,6 @@ class flexableEOM(BaseStrategy):
                     marginal_cost_flex=marginal_cost_flex,
                     bid_quantity_inflex=bid_quantity_inflex,
                     foresight=self.foresight,
-                    avg_down_time=unit.avg_down_time,
                 )
             else:
                 bid_price_inflex = calculate_EOM_price_if_off(
@@ -118,7 +117,6 @@ class flexableEOM(BaseStrategy):
                     marginal_cost_inflex=marginal_cost_inflex,
                     bid_quantity_inflex=bid_quantity_inflex,
                     op_time=op_time,
-                    avg_op_time=unit.avg_op_time,
                 )
 
             if unit.outputs["heat"].at[start] > 0:
@@ -476,7 +474,6 @@ def calculate_EOM_price_if_off(
     marginal_cost_inflex,
     bid_quantity_inflex,
     op_time,
-    avg_op_time=1,
 ):
     """
     The powerplant is currently off and calculates a startup markup as an extra
@@ -490,7 +487,6 @@ def calculate_EOM_price_if_off(
         marginal_cost_inflex (float): The marginal cost of the unit.
         bid_quantity_inflex (float): The bid quantity of the unit.
         op_time (int): The operation time of the unit.
-        avg_op_time (int): The average operation time of the unit.
 
     Returns:
         float: The inflexible bid price of the unit.
@@ -502,9 +498,9 @@ def calculate_EOM_price_if_off(
     # we are never adding the other parts of the cost to the following hours
 
     if bid_quantity_inflex == 0:
-        markup = starting_cost / avg_op_time
+        markup = starting_cost / unit.avg_op_time
     else:
-        markup = starting_cost / avg_op_time / bid_quantity_inflex
+        markup = starting_cost / unit.avg_op_time / bid_quantity_inflex
 
     bid_price_inflex = min(marginal_cost_inflex + markup, 3000.0)
 
@@ -518,7 +514,6 @@ def calculate_EOM_price_if_on(
     marginal_cost_flex,
     bid_quantity_inflex,
     foresight,
-    avg_down_time=-1,
 ):
     """
     The powerplant is currently on and calculates a price reduction to prevent shutdowns.
@@ -537,7 +532,6 @@ def calculate_EOM_price_if_on(
         marginal_cost_flex (float): The marginal cost of the unit.
         bid_quantity_inflex (float): The bid quantity of the unit.
         foresight (datetime.timedelta): The foresight of the unit.
-        avg_down_time (int): The average down time of the unit.
 
     Returns:
         float: The inflexible bid price of the unit.
@@ -549,9 +543,9 @@ def calculate_EOM_price_if_on(
     t = start
 
     # TODO is it correct to bill for cold, hot and warm starts in one start?
-    starting_cost = unit.get_starting_costs(avg_down_time)
+    starting_cost = unit.get_starting_costs(unit.avg_down_time)
 
-    price_reduction_restart = starting_cost / -avg_down_time / bid_quantity_inflex
+    price_reduction_restart = starting_cost / -unit.avg_down_time / bid_quantity_inflex
 
     if unit.outputs["heat"][t] > 0:
         heat_gen_cost = (

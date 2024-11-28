@@ -119,7 +119,6 @@ class flexableEOMBlock(flexableEOM):
                     marginal_cost_flex=marginal_cost_flex,
                     bid_quantity_inflex=bid_quantity_inflex,
                     foresight=self.foresight,
-                    avg_down_time=unit.avg_down_time,
                 )
             else:
                 bid_price_inflex = calculate_EOM_price_if_off(
@@ -127,7 +126,6 @@ class flexableEOMBlock(flexableEOM):
                     marginal_cost_inflex=marginal_cost_inflex,
                     bid_quantity_inflex=bid_quantity_inflex,
                     op_time=op_time,
-                    avg_op_time=unit.avg_op_time,
                 )
 
             if unit.outputs["heat"].at[start] > 0:
@@ -290,7 +288,6 @@ class flexableEOMLinked(flexableEOM):
                     marginal_cost_flex=marginal_cost_flex,
                     bid_quantity_inflex=bid_quantity_inflex,
                     foresight=self.foresight,
-                    avg_down_time=unit.avg_down_time,
                 )
             else:
                 bid_price_inflex = calculate_EOM_price_if_off(
@@ -298,7 +295,6 @@ class flexableEOMLinked(flexableEOM):
                     marginal_cost_inflex=marginal_cost_inflex,
                     bid_quantity_inflex=bid_quantity_inflex,
                     op_time=op_time,
-                    avg_op_time=unit.avg_op_time,
                 )
 
             if unit.outputs["heat"].at[start] > 0:
