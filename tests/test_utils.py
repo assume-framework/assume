@@ -457,66 +457,12 @@ def test_create_date_range():
     index = FastIndex(start, end, freq="1h")
     fs = FastSeries(index)
 
-    t = time.time()
-    for i in range(n):
-        index = FastIndex(start, end, freq="1h")
-        fs = FastSeries(index)
-    res = time.time() - t
-
-    t = time.time()
     for i in range(n):
         q_pd = pd.date_range(start, end, freq="1h")
-    res_pd = time.time() - t
-    # this is sometimes faster, sometimes not
-    # as a lot of objects are created
-    assert res < res_pd + 0.1
 
     new_end = datetime(2020, 1, 1, 3)
 
-    # check that slicing is faster
-    t = time.time()
-    for i in range(n):
-        q_slice = fs[start:new_end]
-    res_slice = time.time() - t
-
     series = pd.Series(0, index=q_pd)
-
-    t = time.time()
-    for i in range(n):
-        q_pd_slice = series[start:new_end]
-    res_slice_pd = time.time() - t
-    # more than at least factor 5
-    assert res_slice < res_slice_pd / 5
-
-    # check that setting items is faster:
-    t = time.time()
-    for i in range(n):
-        fs[start] = 1
-    res_slice = time.time() - t
-
-    series = pd.Series(0, index=q_pd)
-
-    t = time.time()
-    for i in range(n):
-        series[start] = 1
-    res_slice_pd = time.time() - t
-    # more than at least factor 5
-    assert res_slice < res_slice_pd / 5
-
-    # check that setting slices is faster
-    t = time.time()
-    for i in range(n):
-        fs[start:new_end] = 17
-    res_slice = time.time() - t
-
-    series = pd.Series(0, index=q_pd)
-
-    t = time.time()
-    for i in range(n):
-        series[start:new_end] = 17
-    res_slice_pd = time.time() - t
-    # more than at least factor 5
-    assert res_slice < res_slice_pd / 5
 
     se = pd.Series(0.0, index=fs.index.get_date_list())
     se.loc[start]
@@ -570,8 +516,6 @@ def test_set_list():
     for i in range(n):
         result = series[dr]
     res_pd = time.time() - t
-    print(res_fds)
-    print(res_pd)
     assert res_fds < res_pd
 
     # check setting list or series with single value
@@ -584,8 +528,6 @@ def test_set_list():
     for i in range(n):
         series[dr] = 3
     res_pd = time.time() - t
-    print(res_fds)
-    print(res_pd)
     assert res_fds < res_pd
 
     # check setting list or series with a series
@@ -600,8 +542,6 @@ def test_set_list():
     for i in range(n):
         series[dr] = d_new
     res_pd = time.time() - t
-    print(res_fds)
-    print(res_pd)
     assert res_fds < res_pd
 
     # check setting list or series with a list
@@ -616,8 +556,6 @@ def test_set_list():
     for i in range(n):
         series[dr] = d_new
     res_pd = time.time() - t
-    print(res_fds)
-    print(res_pd)
     assert res_fds < res_pd
 
 

@@ -109,7 +109,7 @@ class WriteOutput(Role):
         self.locks = defaultdict(lambda: Lock())
 
         # Buffers for batching
-        self.buffers = {"unit_dispatch": [], "market_dispatch": []}
+        self.buffers = defaultdict(list)
 
         self.kpi_defs: dict[str, OutputDef] = {
             "avg_price": {
@@ -229,10 +229,7 @@ class WriteOutput(Role):
             self.write_market_orders(content_data, content.get("market_id"))
 
         elif content.get("type") == "store_market_results":
-            self.write_market_results(content_data)
-
-        elif content.get("type") == "store_units":
-            self.write_units_definition(content_data)
+            self.buffers["market_results"].extend(content_data)
 
         elif content.get("type") == "market_dispatch":
             self.buffers["market_dispatch"].extend(content_data)
@@ -241,13 +238,16 @@ class WriteOutput(Role):
             self.buffers["unit_dispatch"].extend(content_data)
 
         elif content.get("type") == "rl_learning_params":
-            self.write_rl_params(content_data)
-
-        elif content.get("type") == "grid_topology":
-            self.store_grid(content_data, content.get("market_id"))
+            self.buffers["rl_learning_params"].extend(content_data)
 
         elif content.get("type") == "store_flows":
             self.write_flows(content_data)
+
+        elif content.get("type") == "store_units":
+            self.write_units_definition(content_data)
+
+        elif content.get("type") == "grid_topology":
+            self.store_grid(content_data, content.get("market_id"))
 
         # keep track of the memory usage of the data
         self.current_dfs_size += calculate_content_size(content_data)
@@ -256,7 +256,7 @@ class WriteOutput(Role):
             logger.debug("storing output data due to size limit")
             self.context.schedule_instant_task(coroutine=self.store_dfs())
 
-    def write_rl_params(self, rl_params: dict):
+    def write_rl_params(self, rl_params: list[dict]):
         """
         Writes the RL parameters such as reward, regret, and profit to the corresponding data frame.
 
@@ -265,9 +265,6 @@ class WriteOutput(Role):
         """
 
         df = pd.DataFrame.from_records(rl_params, index="datetime")
-        if df.empty:
-            return
-
         df["simulation"] = self.simulation_id
         df["learning_mode"] = self.learning_mode
         df["perform_evaluation"] = self.perform_evaluation
@@ -275,19 +272,48 @@ class WriteOutput(Role):
 
         self.write_dfs["rl_params"].append(df)
 
-    def write_market_results(self, market_meta: dict):
+    def write_market_results(self, market_results: list[dict]):
         """
         Writes market results to the corresponding data frame.
 
         Args:
             market_meta (dict): The market metadata, which includes the clearing price and volume.
         """
-
-        df = pd.DataFrame(market_meta)
-        if df.empty:
+        if len(market_results) == 0:
             return
+
+        df = pd.DataFrame(market_results)
         df["simulation"] = self.simulation_id
         self.write_dfs["market_meta"].append(df)
+
+    def process_buffers(self):
+        """
+        Processes all message buffers in a batch manner, ensuring efficient handling of all data types.
+        """
+        for message_type, buffer in self.buffers.items():
+            if not buffer:
+                continue
+
+            # Process each message type in bulk
+            if message_type == "market_dispatch":
+                self.write_market_dispatch(buffer)
+            elif message_type == "unit_dispatch":
+                self.write_unit_dispatch(buffer)
+            elif message_type == "store_market_results":
+                self.write_market_results(buffer)
+            # elif message_type == "store_order_book":
+            #     self.process_market_orders(buffer)
+            # elif message_type == "store_units":
+            #     self.process_units_definition(buffer)
+            elif message_type == "rl_learning_params":
+                self.write_rl_params(buffer)
+            # elif message_type == "grid_topology":
+            #     self.process_grid_topology(buffer)
+            # elif message_type == "store_flows":
+            #     self.process_flows(buffer)
+
+            # Clear the buffer after processing
+            buffer.clear()
 
     async def store_dfs(self):
         """
@@ -296,9 +322,7 @@ class WriteOutput(Role):
         if not self.db and not self.export_csv_path:
             return
 
-        # check if buffer is not empty
-        self.write_unit_dispatch()
-        self.write_market_dispatch()
+        self.process_buffers()
 
         for table in self.write_dfs.keys():
             if len(self.write_dfs[table]) == 0:
@@ -502,28 +526,23 @@ class WriteOutput(Role):
         with self.locks[table_name]:
             self.write_dfs[table_name].append(pd.DataFrame(u_info).T)
 
-    def write_market_dispatch(self):
+    def write_market_dispatch(self, market_dispatch: list[dict]):
         """
         Writes the planned dispatch of the units after the market clearing to a CSV and database.
 
         Args:
             data (any): The records to be put into the table. Formatted like, "datetime, power, market_id, unit_id".
         """
-        # if self.buffers["market_dispatch"] is empty, return early
-        if len(self.buffers["market_dispatch"]) == 0:
-            return
 
         df = pd.DataFrame(
-            self.buffers["market_dispatch"],
+            market_dispatch,
             columns=["datetime", "power", "market_id", "unit_id"],
         )
         if not df.empty:
             df["simulation"] = self.simulation_id
             self.write_dfs["market_dispatch"].append(df)
 
-        self.buffers["market_dispatch"].clear()
-
-    def write_unit_dispatch(self):
+    def write_unit_dispatch(self, unit_dispatch: list[dict]):
         """
         Writes the actual dispatch of the units to a DataFrame.
 
@@ -531,13 +550,10 @@ class WriteOutput(Role):
             unit_dispatch (list): A list of dictionaries containing unit dispatch data.
                                 Each dictionary includes arrays for multiple values (e.g., power, costs) and other metadata.
         """
-        # if self.buffers["unit_dispatch"] is empty, return early
-        if len(self.buffers["unit_dispatch"]) == 0:
-            return
 
         # Flatten and expand the arrays in `unit_dispatch` into a list of records for DataFrame construction
         records = []
-        for dispatch in self.buffers["unit_dispatch"]:
+        for dispatch in unit_dispatch:
             time_values = dispatch["time"]
             num_records = len(time_values)
 
@@ -559,9 +575,6 @@ class WriteOutput(Role):
 
         # Append to the unit_dispatch DataFrame
         self.write_dfs["unit_dispatch"].append(data)
-
-        # Clear the buffer
-        self.buffers["unit_dispatch"].clear()
 
     async def on_stop(self):
         """

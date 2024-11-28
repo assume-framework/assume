@@ -105,7 +105,7 @@ def test_output_market_results():
         ],
     }
     output_writer.handle_output_message(content, meta)
-    assert len(output_writer.write_dfs["market_meta"]) == 1, "market_meta"
+    assert len(output_writer.buffers["market_results"]) == 1, "market_results"
 
 
 def test_output_market_dispatch():
