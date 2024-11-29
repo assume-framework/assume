@@ -28,6 +28,11 @@ class flexableEOM(BaseStrategy):
 
         # check if kwargs contains eom_foresight argument
         self.foresight = parse_duration(kwargs.get("eom_foresight", "12h"))
+        self.on_times = [1]
+        # the average time how long the unit operates, if it operates
+        self.down_times = [1]
+        # the average time how long the unit stays off, if it is turned off
+
 
     def calculate_bids(
         self,
@@ -63,7 +68,20 @@ class flexableEOM(BaseStrategy):
         min_power_values, max_power_values = unit.calculate_min_max_power(start, end)
 
         op_time = unit.get_operation_time(start)
-        avg_op_time, avg_down_time = unit.get_average_operation_times(start)
+        if op_time > 0:
+            # if the op_time is higher than the last state, we are still running
+            if op_time > self.on_times[-1]:
+                self.on_times[-1] = op_time
+            else:
+                # else, we have a new operation time
+                self.on_times.append(op_time)
+        else:
+            if op_time < self.down_times[-1]:
+                self.down_times[-1] = op_time
+            else:
+                self.down_times.append(op_time)
+        avg_op_time = np.mean(self.on_times)
+        avg_down_time = np.mean(self.down_times)
 
         bids = []
         for product, min_power, max_power in zip(

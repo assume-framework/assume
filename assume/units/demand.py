@@ -104,7 +104,10 @@ class Demand(SupportsMinMax):
 
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
-        bid_volume = (self.volume - self.outputs[product_type]).loc[start:end_excl]
+        bid_volume = (
+            self.volume.loc[start:end_excl]
+            - self.outputs[product_type].loc[start:end_excl]
+        )
 
         return bid_volume, bid_volume
 

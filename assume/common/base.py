@@ -411,56 +411,6 @@ class SupportsMinMax(BaseUnit):
         # Return positive time if operating, negative if shut down
         return -run if is_off else run
 
-    def get_average_operation_times(self, start: datetime) -> tuple[float, float]:
-        """
-        Calculates the average uninterrupted operation and down time.
-
-        Args:
-            start (datetime.datetime): The current time.
-
-        Returns:
-            tuple[float, float]: Tuple of the average operation time avg_op_time and average down time avg_down_time.
-
-        Note:
-            down_time in general is indicated with negative values
-        """
-        op_series = []
-
-        before = start - self.index.freq
-        arr = self.outputs["energy"].loc[self.index[0] : before][::-1] > 0
-
-        if len(arr) < 1:
-            # before start of index
-            return max(self.min_operating_time, 1), min(-self.min_down_time, -1)
-
-        op_series = []
-        status = arr[0]
-        run = 0
-        for val in arr:
-            if val == status:
-                run += 1
-            else:
-                op_series.append(-((-1) ** status) * run)
-                run = 1
-                status = val
-        op_series.append(-((-1) ** status) * run)
-
-        op_times = [operation for operation in op_series if operation > 0]
-        if op_times == []:
-            avg_op_time = self.min_operating_time
-        else:
-            avg_op_time = sum(op_times) / len(op_times)
-
-        down_times = [operation for operation in op_series if operation < 0]
-        if down_times == []:
-            avg_down_time = self.min_down_time
-        else:
-            avg_down_time = sum(down_times) / len(down_times)
-
-        return max(1, avg_op_time, self.min_operating_time), min(
-            -1, avg_down_time, -self.min_down_time
-        )
-
     def get_starting_costs(self, op_time: int) -> float:
         """
         Returns the start-up cost for the given operation time.
