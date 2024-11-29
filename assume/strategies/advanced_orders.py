@@ -69,6 +69,7 @@ class flexableEOMBlock(flexableEOM):
         bid_quantity_block = {}
         bid_price_block = []
         op_time = unit.get_operation_time(start)
+        avg_op_time = self.update_avg_op_time(op_time)
 
         for product, min_power, max_power in zip(
             product_tuples, min_power_values, max_power_values
@@ -126,6 +127,7 @@ class flexableEOMBlock(flexableEOM):
                     marginal_cost_inflex=marginal_cost_inflex,
                     bid_quantity_inflex=bid_quantity_inflex,
                     op_time=op_time,
+                    avg_op_time=avg_op_time,
                 )
 
             if unit.outputs["heat"].at[start] > 0:
@@ -236,6 +238,7 @@ class flexableEOMLinked(flexableEOM):
         bid_quantity_block = {}
         bid_price_block = []
         op_time = unit.get_operation_time(start)
+        avg_op_time = self.update_avg_op_time(op_time)
 
         block_id = unit.id + "_block"
 
@@ -295,6 +298,7 @@ class flexableEOMLinked(flexableEOM):
                     marginal_cost_inflex=marginal_cost_inflex,
                     bid_quantity_inflex=bid_quantity_inflex,
                     op_time=op_time,
+                    avg_op_time=avg_op_time,
                 )
 
             if unit.outputs["heat"].at[start] > 0:

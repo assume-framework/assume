@@ -28,6 +28,9 @@ class flexableEOM(BaseStrategy):
 
         # check if kwargs contains eom_foresight argument
         self.foresight = parse_duration(kwargs.get("eom_foresight", "12h"))
+        self.on_times = [1]
+        # the average time how long the unit operates, if it operates
+
 
     def calculate_bids(
         self,
@@ -63,6 +66,7 @@ class flexableEOM(BaseStrategy):
         min_power_values, max_power_values = unit.calculate_min_max_power(start, end)
 
         op_time = unit.get_operation_time(start)
+        avg_op_time = self.update_avg_op_time(op_time)
 
         bids = []
         for product, min_power, max_power in zip(
@@ -117,6 +121,7 @@ class flexableEOM(BaseStrategy):
                     marginal_cost_inflex=marginal_cost_inflex,
                     bid_quantity_inflex=bid_quantity_inflex,
                     op_time=op_time,
+                    avg_op_time=avg_op_time,
                 )
 
             if unit.outputs["heat"].at[start] > 0:
@@ -159,6 +164,22 @@ class flexableEOM(BaseStrategy):
         bids = self.remove_empty_bids(bids)
 
         return bids
+
+    def update_avg_op_time(self, op_time):
+
+        """
+        Updates the average operation time and average down time.
+        """
+        if op_time > 0:
+            # if the op_time is higher than the last state, we are still running
+            if op_time > self.on_times[-1]:
+                self.on_times[-1] = op_time
+            else:
+                # else, we have a new operation time
+                self.on_times.append(op_time)
+        avg_op_time = np.mean(self.on_times)
+        return avg_op_time
+
 
     def calculate_reward(
         self,
@@ -474,6 +495,7 @@ def calculate_EOM_price_if_off(
     marginal_cost_inflex,
     bid_quantity_inflex,
     op_time,
+    avg_op_time=1,
 ):
     """
     The powerplant is currently off and calculates a startup markup as an extra
@@ -487,20 +509,21 @@ def calculate_EOM_price_if_off(
         marginal_cost_inflex (float): The marginal cost of the unit.
         bid_quantity_inflex (float): The bid quantity of the unit.
         op_time (int): The operation time of the unit.
+        avg_op_time (int): The average operation time of the unit.
 
     Returns:
         float: The inflexible bid price of the unit.
 
     """
-    if bid_quantity_inflex == 0:
-        return 0
-
-    avg_operating_time = max(unit.avg_op_time, unit.min_operating_time)
+    avg_op_time = max(avg_op_time, unit.min_operating_time)
     starting_cost = unit.get_starting_costs(op_time)
     # if we split starting_cost across av_operating_time
     # we are never adding the other parts of the cost to the following hours
 
-    markup = starting_cost / avg_operating_time / bid_quantity_inflex
+    if bid_quantity_inflex == 0:
+        markup = starting_cost / avg_op_time
+    else:
+        markup = starting_cost / avg_op_time / bid_quantity_inflex
 
     bid_price_inflex = min(marginal_cost_inflex + markup, 3000.0)
 
