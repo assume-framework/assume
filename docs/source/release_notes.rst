@@ -20,6 +20,7 @@ Upcoming Release
   pandas Series. The `FastSeries` class retains a close resemblance to the pandas Series, including core
   functionalities like indexing, slicing, and arithmetic operations. This ensures seamless integration,
   allowing users to work with the new class without requiring significant code adaptation.
+- **Performance Optimization:** Output role handles dict data directly and only converts to DataFrame on Database write.
 
 **Bugfixes:**
   - **Tutorials**: General fixes of the tutorials, to align with updated functionalitites of Assume
