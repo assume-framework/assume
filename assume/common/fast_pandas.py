@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from datetime import datetime, timedelta
+from functools import lru_cache
 
 import numpy as np
 import pandas as pd
@@ -181,6 +182,7 @@ class FastIndex:
         """Return an informal string representation of the FastIndex."""
         return self.__repr__()
 
+    @lru_cache(maxsize=1000)
     def get_date_list(
         self, start: datetime | None = None, end: datetime | None = None
     ) -> list[datetime]:
@@ -214,6 +216,7 @@ class FastIndex:
         # Convert to pandas DatetimeIndex
         return pd.DatetimeIndex(pd.to_datetime(datetimes), name="FastIndex")
 
+    @lru_cache(maxsize=1000)
     def _get_idx_from_date(self, date: datetime) -> int:
         """
         Convert a datetime to its corresponding index in the range.
