@@ -16,7 +16,7 @@ from assume.units import PowerPlant
 def power_plant_1() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
     index = pd.date_range("2022-01-01", periods=4, freq="h")
-    ff = NaiveForecast(
+    forecaster = NaiveForecast(
         index, availability=1, fuel_price=[10, 11, 12, 13], co2_price=[10, 20, 30, 30]
     )
     return PowerPlant(
@@ -24,14 +24,14 @@ def power_plant_1() -> PowerPlant:
         unit_operator="test_operator",
         technology="hard coal",
         bidding_strategies={"EOM": NaiveSingleBidStrategy()},
-        index=index,
+        index=forecaster.index,
         max_power=1000,
         min_power=200,
         efficiency=0.5,
         additional_cost=10,
         fuel_type="lignite",
         emission_factor=0.5,
-        forecaster=ff,
+        forecaster=forecaster,
     )
 
 
@@ -39,19 +39,19 @@ def power_plant_1() -> PowerPlant:
 def power_plant_2() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
     index = pd.date_range("2022-01-01", periods=4, freq="h")
-    ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
+    forecaster = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
         technology="hard coal",
         bidding_strategies={"EOM": NaiveSingleBidStrategy()},
-        index=index,
+        index=forecaster.index,
         max_power=1000,
         min_power=0,
         efficiency=0.5,
         additional_cost=10,
         fuel_type="lignite",
-        forecaster=ff,
+        forecaster=forecaster,
         emission_factor=0.5,
     )
 
@@ -60,20 +60,20 @@ def power_plant_2() -> PowerPlant:
 def power_plant_3() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
     index = pd.date_range("2022-01-01", periods=4, freq="h")
-    ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
+    forecaster = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
         technology="hard coal",
         bidding_strategies={"EOM": NaiveSingleBidStrategy()},
-        index=index,
+        index=forecaster.index,
         max_power=1000,
         min_power=0,
         efficiency=0.5,
         additional_cost=10,
         fuel_type="lignite",
         emission_factor=0.5,
-        forecaster=ff,
+        forecaster=forecaster,
         partial_load_eff=True,
     )
 
@@ -90,84 +90,66 @@ def test_init_function(power_plant_1, power_plant_2, power_plant_3):
     assert power_plant_1.emission_factor == 0.5
     assert power_plant_1.ramp_up == 1000
     assert power_plant_1.ramp_down == 1000
+
     index = pd.date_range("2022-01-01", periods=4, freq="h")
     assert (
-        power_plant_1.marginal_cost.to_dict()
-        == pd.Series(
-            [40.0, 52.0, 64.0, 66.0],
-            index,
-        ).to_dict()
-    )
+        power_plant_1.marginal_cost == pd.Series([40.0, 52.0, 64.0, 66.0], index)
+    ).all()
 
-    assert power_plant_2.marginal_cost.to_dict() == pd.Series(40, index).to_dict()
-    assert power_plant_3.marginal_cost.to_dict() == pd.Series(40, index).to_dict()
+    assert (power_plant_2.marginal_cost == pd.Series(40, index)).all()
+    assert (power_plant_3.marginal_cost == pd.Series(40, index)).all()
 
 
 def test_reset_function(power_plant_1):
-    # check if total_power_output is reset
-    assert power_plant_1.outputs["energy"].equals(
-        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
-    )
-    # the same for pos and neg capacity reserve
-    assert power_plant_1.outputs["pos_capacity"].equals(
-        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
-    )
-    assert power_plant_1.outputs["neg_capacity"].equals(
-        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
+    # Expected series with zero values
+    expected_series = pd.Series(
+        0.0, index=pd.date_range("2022-01-01", periods=4, freq="h")
     )
 
-    # the same for total_heat_output and power_loss_chp
-    assert power_plant_1.outputs["heat"].equals(
-        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
-    )
-    assert power_plant_1.outputs["power_loss"].equals(
-        pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
-    )
+    # Check if total_power_output is reset
+    assert (power_plant_1.outputs["energy"].data == expected_series.values).all()
+
+    # The same for pos and neg capacity reserve
+    assert (power_plant_1.outputs["pos_capacity"].data == expected_series.values).all()
+    assert (power_plant_1.outputs["neg_capacity"].data == expected_series.values).all()
+
+    # The same for total_heat_output and power_loss_chp
+    assert (power_plant_1.outputs["heat"].data == expected_series.values).all()
+    assert (power_plant_1.outputs["power_loss"].data == expected_series.values).all()
 
 
 def test_calculate_operational_window(power_plant_1):
-    product_tuple = (
-        pd.Timestamp("2022-01-01 00:00:00"),
-        pd.Timestamp("2022-01-01 01:00:00"),
-        None,
-    )
-    start = product_tuple[0]
-    end = product_tuple[1]
+    start = datetime(2022, 1, 1, 0)
+    end = datetime(2022, 1, 1, 1)
     min_power, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
     )
 
-    min_cost = power_plant_1.calculate_marginal_cost(start, min_power[start])
-    max_cost = power_plant_1.calculate_marginal_cost(start, max_power[start])
+    min_cost = power_plant_1.calculate_marginal_cost(start, min_power[0])
+    max_cost = power_plant_1.calculate_marginal_cost(start, max_power[0])
 
-    assert min_power[start] == 200
+    assert min_power[0] == 200
     assert min_cost == 40.0
 
-    assert max_power[start] == 1000
+    assert max_power[0] == 1000
     assert max_cost == 40
 
     assert power_plant_1.outputs["energy"].at[start] == 0
 
 
 def test_powerplant_feedback(power_plant_1, mock_market_config):
-    product_tuple = (
-        pd.Timestamp("2022-01-01 00:00:00"),
-        pd.Timestamp("2022-01-01 01:00:00"),
-        None,
-    )
-    product_type = "energy"
-    start = product_tuple[0]
-    end = product_tuple[1]
+    start = datetime(2022, 1, 1, 0)
+    end = datetime(2022, 1, 1, 1)
     min_power, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
     )
-    min_cost = power_plant_1.calculate_marginal_cost(start, min_power[start])
-    max_cost = power_plant_1.calculate_marginal_cost(start, max_power[start])
+    min_cost = power_plant_1.calculate_marginal_cost(start, min_power[0])
+    max_cost = power_plant_1.calculate_marginal_cost(start, max_power[0])
 
-    assert min_power[start] == 200
+    assert min_power[0] == 200
     assert min_cost == 40.0
 
-    assert max_power[start] == 1000
+    assert max_power[0] == 1000
     assert max_cost == 40
     assert power_plant_1.outputs["energy"].at[start] == 0
 
@@ -178,7 +160,7 @@ def test_powerplant_feedback(power_plant_1, mock_market_config):
             "only_hours": None,
             "price": min_cost,
             "accepted_price": min_cost,
-            "accepted_volume": min_power[start],
+            "accepted_volume": min_power[0],
         }
     ]
 
@@ -192,20 +174,20 @@ def test_powerplant_feedback(power_plant_1, mock_market_config):
     )
 
     # we do not need additional min_power, as our runtime requirement is fulfilled
-    assert min_power[start] == 0
+    assert min_power[0] == 0
     # we can not bid the maximum anymore, because we already provide energy on the other market
-    assert max_power[start] == 800
+    assert max_power[0] == 800
 
     # second market request for next interval
-    start = pd.Timestamp("2022-01-01 01:00:00")
-    end = pd.Timestamp("2022-01-01 02:00:00")
+    start = datetime(2022, 1, 1, 1)
+    end = datetime(2022, 1, 1, 2)
     min_power, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
     )
 
     # now we can bid max_power and need min_power again
-    assert min_power[start] == 200
-    assert max_power[start] == 1000
+    assert min_power[0] == 200
+    assert max_power[0] == 1000
 
 
 def test_powerplant_ramping(power_plant_1):
@@ -222,16 +204,16 @@ def test_powerplant_ramping(power_plant_1):
         start, end, product_type="energy"
     )
 
-    assert min_power[start] == 50
-    assert max_power[start] == 1000
+    assert min_power[0] == 50
+    assert max_power[0] == 1000
 
     op_time = power_plant_1.get_operation_time(start)
     assert op_time == 3
 
-    min_cost = power_plant_1.calculate_marginal_cost(start, min_power[start])
-    max_cost = power_plant_1.calculate_marginal_cost(start, max_power[start])
-    max_ramp = power_plant_1.calculate_ramp(op_time, 100, max_power[start])
-    min_ramp = power_plant_1.calculate_ramp(op_time, 100, min_power[start])
+    min_cost = power_plant_1.calculate_marginal_cost(start, min_power[0])
+    max_cost = power_plant_1.calculate_marginal_cost(start, max_power[0])
+    max_ramp = power_plant_1.calculate_ramp(op_time, 100, max_power[0])
+    min_ramp = power_plant_1.calculate_ramp(op_time, 100, min_power[0])
 
     assert min_ramp == 50
     assert min_cost == 40.0
@@ -252,14 +234,14 @@ def test_powerplant_ramping(power_plant_1):
         start, end, product_type="energy"
     )
 
-    assert min_power[start] == 50
-    assert max_power[start] == 1000
+    assert min_power[0] == 50
+    assert max_power[0] == 1000
 
     op_time = power_plant_1.get_operation_time(start)
     assert op_time == 1
 
-    min_ramp = power_plant_1.calculate_ramp(op_time, 300, min_power[start])
-    max_ramp = power_plant_1.calculate_ramp(op_time, 300, max_power[start])
+    min_ramp = power_plant_1.calculate_ramp(op_time, 300, min_power[0])
+    max_ramp = power_plant_1.calculate_ramp(op_time, 300, max_power[0])
 
     assert min_ramp == 200
     assert max_ramp == 500
@@ -279,8 +261,8 @@ def test_powerplant_ramping(power_plant_1):
     op_time = power_plant_1.get_operation_time(start)
     assert op_time == 2
 
-    min_ramp = power_plant_1.calculate_ramp(op_time, 500, min_power[start])
-    max_ramp = power_plant_1.calculate_ramp(op_time, 500, max_power[start])
+    min_ramp = power_plant_1.calculate_ramp(op_time, 500, min_power[0])
+    max_ramp = power_plant_1.calculate_ramp(op_time, 500, max_power[0])
 
     assert min_ramp == 400
     assert max_ramp == 700
@@ -333,40 +315,40 @@ def test_powerplant_availability(power_plant_1):
         start, end, product_type="energy"
     )
     op_time = power_plant_1.get_operation_time(start)
-    max_ramp = power_plant_1.calculate_ramp(op_time, 0, max_power[start])
+    max_ramp = power_plant_1.calculate_ramp(op_time, 0, max_power[0])
     assert max_ramp == power_plant_1.max_power / 2
 
     ### HOUR 1
     start += timedelta(hours=1)
     end += timedelta(hours=1)
-    min_power, max_power = power_plant_1.calculate_min_max_power(
+    _, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
     )
     op_time = power_plant_1.get_operation_time(start)
     # run min_power if 0 < power <= min_power is needed
-    max_ramp = power_plant_1.calculate_ramp(op_time, 0, max_power[start])
+    max_ramp = power_plant_1.calculate_ramp(op_time, 0, max_power[0])
     assert max_ramp == power_plant_1.min_power
 
     ### HOUR 2
     start += timedelta(hours=1)
     end += timedelta(hours=1)
-    min_power, max_power = power_plant_1.calculate_min_max_power(
+    _, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type="energy"
     )
     op_time = power_plant_1.get_operation_time(start)
-    max_ramp = power_plant_1.calculate_ramp(op_time, 0, max_power[start])
+    max_ramp = power_plant_1.calculate_ramp(op_time, 0, max_power[0])
     assert max_ramp == power_plant_1.max_power
 
 
 def test_powerplant_execute_dispatch():
     index = pd.date_range("2022-01-01", periods=24, freq="h")
-    ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
+    forecaster = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
     power_plant = PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
         technology="coal",
         bidding_strategies={"EOM": NaiveSingleBidStrategy()},
-        index=index,
+        index=forecaster.index,
         max_power=700,
         min_power=50,
         efficiency=0.5,
@@ -375,10 +357,10 @@ def test_powerplant_execute_dispatch():
         ramp_up=200,
         min_operating_time=3,
         min_down_time=2,
-        forecaster=ff,
+        forecaster=forecaster,
     )
     # was running before
-    assert power_plant.execute_current_dispatch(index[0], index[0]).iloc[0] == 0
+    assert power_plant.execute_current_dispatch(index[0], index[0])[0] == 0
 
     power_plant.outputs["energy"].loc[index] = [
         0,
@@ -472,6 +454,144 @@ def test_powerplant_execute_dispatch():
     assert all(
         power_plant.outputs["energy"].loc[index[20] : index[23]] == [420, 620, 700, 700]
     )
+
+
+def test_powerplant_min_feedback(power_plant_1, mock_market_config):
+    """
+    Test that powerplant works fine for multi market bidding.
+    Has two bids which add up to be above the minimum power.
+    Make sure that ramping is not enforced to early.
+    """
+    start = datetime(2022, 1, 1, 0)
+    end = datetime(2022, 1, 1, 1)
+    product_type = "energy"
+
+    # start bidding by calculating min and max power
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type=product_type
+    )
+    assert min_power[0] == 200
+    assert max_power[0] == 1000
+    assert power_plant_1.outputs[product_type].at[start] == 0
+
+    orderbook = [
+        {
+            "start_time": start,
+            "end_time": end,
+            "only_hours": None,
+            "price": 40,
+            "accepted_price": 40,
+            "accepted_volume": 100,
+            # half of min_power
+        }
+    ]
+
+    # min_power gets accepted by fictional market
+    power_plant_1.set_dispatch_plan(mock_market_config, orderbook)
+
+    # second market request for same interval
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type=product_type
+    )
+
+    # we still need 100kw as a runtime requirement
+    assert min_power[0] == 100
+    # we can not bid the maximum anymore, because we already provide energy on the other market
+    assert max_power[0] == 900
+
+    orderbook = [
+        {
+            "start_time": start,
+            "end_time": end,
+            "only_hours": None,
+            "price": 40,
+            "accepted_price": 40,
+            "accepted_volume": 200,
+            # half of min_power
+        }
+    ]
+
+    # min_power gets accepted
+    power_plant_1.set_dispatch_plan(mock_market_config, orderbook)
+
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type=product_type
+    )
+
+    # we do not need additional min_power, as our runtime requirement is fulfilled
+    assert min_power[0] == 0
+    # we can not bid the maximum anymore, because we already provide energy on the other market
+    assert max_power[0] == 700
+
+    # this should not do anything here, as we are in our constraints
+    power_plant_1.execute_current_dispatch(start, end)
+
+    # second market request for next interval
+    start = datetime(2022, 1, 1, 1)
+    end = datetime(2022, 1, 1, 2)
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type=product_type
+    )
+
+    # now we can bid max_power and need min_power again
+    assert min_power[0] == 200
+    assert max_power[0] == 1000
+
+
+def test_powerplant_ramp_feedback(power_plant_1, mock_market_config):
+    """
+    Make sure that ramping is enforced when a accepted volume at the prior time
+    is below the minimum power.
+    """
+    product_type = "energy"
+    start = datetime(2022, 1, 1, 0)
+    end = datetime(2022, 1, 1, 1)
+
+    # start bidding by calculating min and max power
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type=product_type
+    )
+    assert min_power[0] == 200
+    assert max_power[0] == 1000
+    assert power_plant_1.outputs[product_type].at[start] == 0
+
+    orderbook = [
+        {
+            "start_time": start,
+            "end_time": end,
+            "only_hours": None,
+            "price": 40,
+            "accepted_price": 40,
+            "accepted_volume": 100,
+            # half of min_power
+        }
+    ]
+
+    # min_power gets accepted by fictional market
+    power_plant_1.set_dispatch_plan(mock_market_config, orderbook)
+
+    # second market request for same interval
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type=product_type
+    )
+
+    # we still need 100kw as a runtime requirement
+    assert min_power[0] == 100
+    # we can not bid the maximum anymore, because we already provide energy on the other market
+    assert max_power[0] == 900
+
+    power_plant_1.execute_current_dispatch(start, end)
+
+    # second market request for next interval
+    start = datetime(2022, 1, 1, 1)
+    end = datetime(2022, 1, 1, 2)
+    min_power, max_power = power_plant_1.calculate_min_max_power(
+        start, end, product_type=product_type
+    )
+
+    # now we can bid max_power and need min_power again
+    assert min_power[0] == 200
+    assert max_power[0] == 1000
 
 
 if __name__ == "__main__":

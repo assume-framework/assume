@@ -184,7 +184,7 @@ class DmasStorageStrategy(BaseStrategy):
         ]
 
         for key, func in PRICE_FUNCS.items():
-            prices = func(base_price.values)
+            prices = func(base_price)
             self.power = self.build_model(unit, start, hour_count)
             profit = [-self.power[t] * prices[t] for t in time_range]
             self.model.obj = pyo.Objective(
@@ -256,14 +256,14 @@ class DmasStorageStrategy(BaseStrategy):
             bid_hours = np.argwhere(power < 0).flatten()
             ask_hours = np.argwhere(power > 0).flatten()
             if len(bid_hours) > 1:
-                max_charging_price = power_prices.values[bid_hours].max()
+                max_charging_price = power_prices[bid_hours].max()
             else:
                 max_charging_price = 0
             min_discharging_price = max_charging_price / (
                 unit.efficiency_discharge * unit.efficiency_discharge
             )
-            prc[ask_hours] = (power_prices.iloc[ask_hours] + min_discharging_price) / 2
-            prc[bid_hours] = power_prices.values[bid_hours]
+            prc[ask_hours] = (power_prices[ask_hours] + min_discharging_price) / 2
+            prc[bid_hours] = power_prices[bid_hours]
             add = True
             for orders in total_orders.values():
                 if any(prc != orders["price"]) or any(power != orders["volume"]):

@@ -17,6 +17,20 @@ Upcoming Release
 - **Learning rate and noise scheduling**: Added the possibility to schedule the learning rate and noise in the learning process. This feature enables streamlining the learning progress. It was designed similar to the stable baselines implementation. This can be done by setting the `use_lr_schedule` and `use_noise_schedule` in the learning config.
 The schedules are linear (default: from `learning_rate`/ `noise_dt` to 0 over given `training_episodes`) and can be adjusted by the user. The schedules are not adjustable in the config file yet, but can be set in the code.
 
+**Improvements:**
+- **Performance Optimization:** Switched to a custom `FastSeries` class, which is based on the pandas Series
+  but utilizes NumPy arrays for internal data storage and indexing. This change significantly improves the
+  performance of read and write operations, achieving an average speedup of **2x to 3x** compared to standard
+  pandas Series. The `FastSeries` class retains a close resemblance to the pandas Series, including core
+  functionalities like indexing, slicing, and arithmetic operations. This ensures seamless integration,
+  allowing users to work with the new class without requiring significant code adaptation.
+- **Performance Optimization:** Output role handles dict data directly and only converts to DataFrame on Database write.
+
+**Bugfixes:**
+  - **Tutorials**: General fixes of the tutorials, to align with updated functionalitites of Assume
+  - **Tutorial 07**: Aligned Amiris loader with changes in format in Amiris compare (https://gitlab.com/fame-framework/fame-io/-/issues/203 and https://gitlab.com/fame-framework/fame-io/-/issues/208)
+  - **Powerplant**: Remove duplicate `Powerplant.set_dispatch_plan()` which broke multi-market bidding
+
 v0.4.3 - (11th November 2024)
 ===========================================
 

@@ -5,10 +5,10 @@
 from datetime import timedelta
 
 import numpy as np
-import pandas as pd
 
 from assume.common.base import BaseStrategy, SupportsMinMaxCharge
 from assume.common.market_objects import MarketConfig, Orderbook, Product
+from assume.common.utils import parse_duration
 
 
 class flexableEOMStorage(BaseStrategy):
@@ -21,7 +21,7 @@ class flexableEOMStorage(BaseStrategy):
     Otherwise, the unit will charge with the price defined as the average price multiplied by the charge efficiency of the unit.
 
     Attributes:
-        foresight (pandas.Timedelta): Foresight for the average price calculation.
+        foresight (datetime.timedelta): Foresight for the average price calculation.
 
     Args:
         *args: Additional arguments.
@@ -31,7 +31,7 @@ class flexableEOMStorage(BaseStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.foresight = pd.Timedelta(kwargs.get("eom_foresight", "12h"))
+        self.foresight = parse_duration(kwargs.get("eom_foresight", "12h"))
 
     def calculate_bids(
         self,
@@ -66,63 +66,73 @@ class flexableEOMStorage(BaseStrategy):
         previous_power = unit.get_output_before(start)
 
         # save a theoretic SOC to calculate the ramping
-        theoretic_SOC = unit.outputs["soc"][start]
+        theoretic_SOC = unit.outputs["soc"].at[start]
 
         # calculate min and max power for charging and discharging
-        min_power_charge, max_power_charge = unit.calculate_min_max_charge(
-            start, end_all
+        min_power_charge_values, max_power_charge_values = (
+            unit.calculate_min_max_charge(start, end_all)
         )
-        min_power_discharge, max_power_discharge = unit.calculate_min_max_discharge(
-            start, end_all
+        min_power_discharge_values, max_power_discharge_values = (
+            unit.calculate_min_max_discharge(start, end_all)
         )
 
         # =============================================================================
         # Calculate bids
         # =============================================================================
         bids = []
-        for product in product_tuples:
-            start = product[0]
-            end = product[1]
+
+        for (
+            product,
+            max_power_discharge,
+            min_power_discharge,
+            max_power_charge,
+            min_power_charge,
+        ) in zip(
+            product_tuples,
+            max_power_discharge_values,
+            min_power_discharge_values,
+            max_power_charge_values,
+            min_power_charge_values,
+        ):
+            start, end = product[0], product[1]
 
             current_power = unit.outputs["energy"].at[start]
             current_power_discharge = max(current_power, 0)
             current_power_charge = min(current_power, 0)
 
-            # calculate ramping constraints
-            max_power_discharge[start] = unit.calculate_ramp_discharge(
+            # Calculate ramping constraints using helper function
+            max_power_discharge = unit.calculate_ramp_discharge(
                 theoretic_SOC,
                 previous_power,
-                max_power_discharge[start],
+                max_power_discharge,
                 current_power_discharge,
-                min_power_discharge[start],
+                min_power_discharge,
             )
-            min_power_discharge[start] = unit.calculate_ramp_discharge(
+            min_power_discharge = unit.calculate_ramp_discharge(
                 theoretic_SOC,
                 previous_power,
-                min_power_discharge[start],
+                min_power_discharge,
                 current_power_discharge,
-                min_power_discharge[start],
+                min_power_discharge,
             )
-            max_power_charge[start] = unit.calculate_ramp_charge(
+            max_power_charge = unit.calculate_ramp_charge(
                 theoretic_SOC,
                 previous_power,
-                max_power_charge[start],
+                max_power_charge,
                 current_power_charge,
-                min_power_charge[start],
+                min_power_charge,
             )
-            min_power_charge[start] = unit.calculate_ramp_charge(
+            min_power_charge = unit.calculate_ramp_charge(
                 theoretic_SOC,
                 previous_power,
-                min_power_charge[start],
+                min_power_charge,
                 current_power_charge,
-                min_power_charge[start],
+                min_power_charge,
             )
-
             price_forecast = unit.forecaster[f"price_{market_config.market_id}"]
 
             # calculate average price
             average_price = calculate_price_average(
-                unit=unit,
                 current_time=start,
                 foresight=self.foresight,
                 price_forecast=price_forecast,
@@ -131,12 +141,12 @@ class flexableEOMStorage(BaseStrategy):
             # if price is higher than average price, discharge
             # if price is lower than average price, charge
             # if price forecast favors discharge, but max discharge is zero, set a bid for charging
-            if price_forecast[start] >= average_price and max_power_discharge[start]:
+            if price_forecast[start] >= average_price and max_power_discharge:
                 price = average_price / unit.efficiency_discharge
-                bid_quantity = max_power_discharge[start]
+                bid_quantity = max_power_discharge
             else:
                 price = average_price * unit.efficiency_charge
-                bid_quantity = max_power_charge[start]
+                bid_quantity = max_power_charge
 
             bids.append(
                 {
@@ -191,23 +201,22 @@ class flexableEOMStorage(BaseStrategy):
 
         for order in orderbook:
             start = order["start_time"]
-            end = order["end_time"]
-            end_excl = end - unit.index.freq
-            index = pd.date_range(start, end_excl, freq=unit.index.freq)
-            costs = pd.Series(0.0, index=index)
-            for start in index:
-                if unit.outputs[product_type][start] != 0:
-                    costs[start] += abs(
-                        unit.outputs[product_type][start]
-                        * unit.calculate_marginal_cost(
-                            start, unit.outputs[product_type][start]
-                        )
-                    )
+            # end includes the end of the last product, to get the last products' start time we deduct the frequency once
+            end_excl = order["end_time"] - unit.index.freq
 
-            unit.outputs["profit"][index] = (
-                unit.outputs[f"{product_type}_cashflow"][index] - costs
+            # Extract outputs and costs in one step
+            outputs = unit.outputs[product_type].loc[start:end_excl]
+            costs = np.where(
+                outputs != 0,
+                np.abs(outputs)
+                * np.array([unit.calculate_marginal_cost(start, x) for x in outputs]),
+                0,
             )
-            unit.outputs["total_costs"][index] = costs
+
+            unit.outputs["profit"].loc[start:end_excl] = (
+                unit.outputs[f"{product_type}_cashflow"].loc[start:end_excl] - costs
+            )
+            unit.outputs["total_costs"].loc[start:end_excl] = costs
 
 
 class flexablePosCRMStorage(BaseStrategy):
@@ -218,7 +227,7 @@ class flexablePosCRMStorage(BaseStrategy):
     Otherwise, the strategy bids the capacity_price for the capacity_pos product.
 
     Attributes:
-        foresight (pandas.Timedelta): Foresight for the average price calculation.
+        foresight (datetime.timedelta): Foresight for the average price calculation.
 
     Args:
         *args: Additional arguments.
@@ -229,7 +238,7 @@ class flexablePosCRMStorage(BaseStrategy):
         super().__init__(*args, **kwargs)
 
         # check if kwargs contains crm_foresight argument
-        self.foresight = pd.Timedelta(kwargs.get("crm_foresight", "4h"))
+        self.foresight = parse_duration(kwargs.get("crm_foresight", "4h"))
 
     def calculate_bids(
         self,
@@ -259,10 +268,13 @@ class flexablePosCRMStorage(BaseStrategy):
 
         previous_power = unit.get_output_before(start)
 
-        _, max_power_discharge = unit.calculate_min_max_discharge(start, end)
+        _, max_power_discharge_values = unit.calculate_min_max_discharge(start, end)
         bids = []
-        theoretic_SOC = unit.outputs["soc"][start]
-        for product in product_tuples:
+        theoretic_SOC = unit.outputs["soc"].at[start]
+
+        for product, max_power_discharge in zip(
+            product_tuples, max_power_discharge_values
+        ):
             start = product[0]
             current_power = unit.outputs["energy"].at[start]
 
@@ -270,7 +282,7 @@ class flexablePosCRMStorage(BaseStrategy):
             bid_quantity = unit.calculate_ramp_discharge(
                 theoretic_SOC,
                 previous_power,
-                max_power_discharge[start],
+                max_power_discharge,
                 current_power,
             )
 
@@ -348,7 +360,7 @@ class flexableNegCRMStorage(BaseStrategy):
     A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
 
     Attributes:
-        foresight (pandas.Timedelta): Foresight for the average price calculation.
+        foresight (datetime.timedelta): Foresight for the average price calculation.
 
     Args:
         *args: Additional arguments.
@@ -358,7 +370,7 @@ class flexableNegCRMStorage(BaseStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.foresight = pd.Timedelta(kwargs.get("crm_foresight", "4h"))
+        self.foresight = parse_duration(kwargs.get("crm_foresight", "4h"))
 
     def calculate_bids(
         self,
@@ -386,19 +398,19 @@ class flexableNegCRMStorage(BaseStrategy):
 
         previous_power = unit.get_output_before(start)
 
-        theoretic_SOC = unit.outputs["soc"][start]
+        theoretic_SOC = unit.outputs["soc"].at[start]
 
-        _, max_power_charge = unit.calculate_min_max_charge(start, end)
+        _, max_power_charge_values = unit.calculate_min_max_charge(start, end)
 
         bids = []
-        for product in product_tuples:
+        for product, max_power_charge in zip(product_tuples, max_power_charge_values):
             start = product[0]
             current_power = unit.outputs["energy"].at[start]
             bid_quantity = abs(
                 unit.calculate_ramp_charge(
                     theoretic_SOC,
                     previous_power,
-                    max_power_charge[start],
+                    max_power_charge,
                     current_power,
                 )
             )
@@ -450,22 +462,22 @@ class flexableNegCRMStorage(BaseStrategy):
         return bids
 
 
-def calculate_price_average(unit, current_time, foresight, price_forecast):
+def calculate_price_average(current_time, foresight, price_forecast):
     """
     Calculates the average price for a given foresight and returns the average price.
 
     Args:
-        unit (SupportsMinMaxCharge): The unit that is dispatched.
-        current_time (pandas.Timestamp): The current time.
-        foresight (pandas.Timedelta): The foresight.
-        price_forecast (pandas.Series): The price forecast.
+        current_time (datetime.datetime): The current time.
+        foresight (datetime.timedelta): The foresight.
+        price_forecast (FastSeries): The price forecast.
 
     Returns:
         float: The average price.
     """
-    average_price = np.mean(
-        price_forecast[current_time - foresight : current_time + foresight]
-    )
+    start = max(current_time - foresight, price_forecast.index[0])
+    end = min(current_time + foresight, price_forecast.index[-1])
+
+    average_price = np.mean(price_forecast.loc[start:end])
 
     return average_price
 
@@ -479,34 +491,37 @@ def get_specific_revenue(unit, marginal_cost, t, foresight, price_forecast):
         unit (SupportsMinMaxCharge): The unit that is dispatched.
         marginal_cost (float): The marginal cost.
         t (datetime.datetime): The start time of the product.
-        foresight (pandas.Timedelta): The foresight.
-        price_forecast (pandas.Series): The price forecast.
+        foresight (datetime.timedelta): The foresight.
+        price_forecast (FastSeries): The price forecast.
 
     Returns:
         float: The specific revenue.
     """
 
     if t + foresight > price_forecast.index[-1]:
-        price_forecast = price_forecast.loc[t:]
-        _, max_power_discharge = unit.calculate_min_max_discharge(
+        _, max_power_discharge_values = unit.calculate_min_max_discharge(
             start=t, end=price_forecast.index[-1] + unit.index.freq
         )
+        price_forecast = price_forecast.loc[t:]
     else:
-        price_forecast = price_forecast.loc[t : t + foresight]
-        _, max_power_discharge = unit.calculate_min_max_discharge(
+        _, max_power_discharge_values = unit.calculate_min_max_discharge(
             start=t, end=t + foresight + unit.index.freq
         )
+        price_forecast = price_forecast.loc[t : t + foresight]
 
     possible_revenue = 0
     soc = unit.outputs["soc"][t]
     theoretic_SOC = soc
 
     previous_power = unit.get_output_before(t)
-    for i, market_price in enumerate(price_forecast):
+
+    for market_price, max_power_discharge in zip(
+        price_forecast, max_power_discharge_values
+    ):
         theoretic_power_discharge = unit.calculate_ramp_discharge(
             theoretic_SOC,
             previous_power=previous_power,
-            power_discharge=max_power_discharge.iloc[i],
+            power_discharge=max_power_discharge,
         )
         possible_revenue += (market_price - marginal_cost) * theoretic_power_discharge
         theoretic_SOC -= theoretic_power_discharge
