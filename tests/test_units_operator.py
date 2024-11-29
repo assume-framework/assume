@@ -143,10 +143,10 @@ async def test_set_unit_dispatch(units_operator: UnitsOperator):
 
 async def test_write_actual_dispatch(units_operator: UnitsOperator):
     units_operator.write_actual_dispatch("energy")
-    assert units_operator.last_sent_dispatch["energy"] != 0
+    assert units_operator.last_sent_dispatch["energy"] > 0
     assert units_operator.last_sent_dispatch["test"] == 0
     units_operator.write_actual_dispatch("test")
-    assert units_operator.last_sent_dispatch["test"] != 0
+    assert units_operator.last_sent_dispatch["test"] > 0
 
 
 async def test_formulate_bids(units_operator: UnitsOperator):

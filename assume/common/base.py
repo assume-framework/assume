@@ -58,8 +58,7 @@ class BaseUnit:
         self.outputs = defaultdict(lambda: FastSeries(value=0.0, index=self.index))
         # series does not like to convert from tensor to float otherwise
 
-        self.avg_op_time = 1
-        self.avg_down_time = 1
+        self.avg_op_time = 0
 
         # some data is stored as series to allow to store it in the outputs
         # check if any bidding strategy is using the RL strategy
@@ -153,7 +152,6 @@ class BaseUnit:
 
         # Initialize counters for operation and downtime updates
         total_op_time = self.avg_op_time * len(self.outputs[product_type])
-        total_down_time = self.avg_down_time * len(self.outputs[product_type])
         total_periods = len(self.outputs[product_type])
 
         for order in orderbook:
@@ -181,14 +179,11 @@ class BaseUnit:
 
                 if was_operating and not now_operating:  # Transition to downtime
                     total_op_time -= 1
-                    total_down_time += 1
                 elif not was_operating and now_operating:  # Transition to operating
                     total_op_time += 1
-                    total_down_time -= 1
 
         # Recalculate averages
         self.avg_op_time = total_op_time / total_periods
-        self.avg_down_time = total_down_time / total_periods
 
         # Calculate cashflow and reward
         self.calculate_cashflow(product_type, orderbook)
@@ -459,19 +454,20 @@ class SupportsMinMax(BaseUnit):
             float: The start-up costs depending on the down time.
         """
         if op_time > 0:
-            # unit is running
+            # The unit is running, no start-up cost is needed
             return 0
 
-        if self.downtime_hot_start is not None and self.hot_start_cost is not None:
-            if -op_time <= self.downtime_hot_start:
-                return self.hot_start_cost
-        if self.downtime_warm_start is not None and self.warm_start_cost is not None:
-            if -op_time <= self.downtime_warm_start:
-                return self.warm_start_cost
-        if self.cold_start_cost is not None:
-            return self.cold_start_cost
+        downtime = abs(op_time)
 
-        return 0
+        # Check and return the appropriate start-up cost
+        if downtime <= self.downtime_hot_start:
+            return self.hot_start_cost
+
+        if downtime <= self.downtime_warm_start:
+            return self.warm_start_cost
+
+        # If it exceeds warm start threshold, return cold start cost
+        return self.cold_start_cost
 
 
 class SupportsMinMaxCharge(BaseUnit):

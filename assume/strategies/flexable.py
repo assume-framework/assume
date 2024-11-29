@@ -492,15 +492,15 @@ def calculate_EOM_price_if_off(
         float: The inflexible bid price of the unit.
 
     """
+    if bid_quantity_inflex == 0:
+        return 0
 
+    avg_operating_time = max(unit.avg_op_time, unit.min_operating_time)
     starting_cost = unit.get_starting_costs(op_time)
     # if we split starting_cost across av_operating_time
     # we are never adding the other parts of the cost to the following hours
 
-    if bid_quantity_inflex == 0:
-        markup = starting_cost / unit.avg_op_time
-    else:
-        markup = starting_cost / unit.avg_op_time / bid_quantity_inflex
+    markup = starting_cost / avg_operating_time / bid_quantity_inflex
 
     bid_price_inflex = min(marginal_cost_inflex + markup, 3000.0)
 
@@ -519,7 +519,7 @@ def calculate_EOM_price_if_on(
     The powerplant is currently on and calculates a price reduction to prevent shutdowns.
 
     The price reduction is calculated as follows:
-    starting_cost / -avg_down_time / bid_quantity_inflex
+    starting_cost / min_down_time / bid_quantity_inflex
     If the unit is a CHP, the heat generation costs are added to the price reduction with the following formula:
     heat_gen_cost = (heat_output * (natural_gas_price / 0.9)) / bid_quantity_inflex
     If the estimated revenue for the time defined in foresight is positive,
@@ -540,17 +540,15 @@ def calculate_EOM_price_if_on(
     if bid_quantity_inflex == 0:
         return 0
 
-    t = start
+    # check the starting cost if the unit were turned off for min_down_time
+    starting_cost = unit.get_starting_costs(-unit.min_down_time)
 
-    # TODO is it correct to bill for cold, hot and warm starts in one start?
-    starting_cost = unit.get_starting_costs(unit.avg_down_time)
+    price_reduction_restart = starting_cost / unit.min_down_time / bid_quantity_inflex
 
-    price_reduction_restart = starting_cost / -unit.avg_down_time / bid_quantity_inflex
-
-    if unit.outputs["heat"][t] > 0:
+    if unit.outputs["heat"].at[start] > 0:
         heat_gen_cost = (
-            unit.outputs["heat"][t]
-            * (unit.forecaster.get_price("natural gas")[t] / 0.9)
+            unit.outputs["heat"].at[start]
+            * (unit.forecaster.get_price("natural gas").at[start] / 0.9)
         ) / bid_quantity_inflex
     else:
         heat_gen_cost = 0.0
@@ -563,7 +561,7 @@ def calculate_EOM_price_if_on(
     )
     if (
         possible_revenue >= 0
-        and unit.forecaster[f"price_{market_id}"][t] < marginal_cost_flex
+        and unit.forecaster[f"price_{market_id}"].at[start] < marginal_cost_flex
     ):
         marginal_cost_flex = 0
 
