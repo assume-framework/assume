@@ -19,16 +19,16 @@ def test_output_market_orders():
     start = datetime(2020, 1, 1)
     end = datetime(2020, 1, 2)
     output_writer = WriteOutput("test_sim", start, end, engine)
-    assert len(output_writer.write_dfs.keys()) == 0
+    assert len(output_writer.write_buffers.keys()) == 0
     meta = {"sender_id": None}
     content = {
         "context": "write_results",
-        "type": "store_order_book",
+        "type": "market_orders",
         "sender": "CRM_pos",
         "data": [],
     }
     output_writer.handle_output_message(content, meta)
-    assert len(output_writer.write_dfs["market_orders"]) == 0
+    assert len(output_writer.write_buffers["market_orders"]) == 0
 
     orderbook = [
         {
@@ -67,12 +67,12 @@ def test_output_market_orders():
 
     content = {
         "context": "write_results",
-        "type": "store_order_book",
+        "type": "market_orders",
         "sender": "CRM_pos",
         "data": orderbook,
     }
     output_writer.handle_output_message(content, meta)
-    assert len(output_writer.write_dfs["market_orders"]) == 1
+    assert len(output_writer.write_buffers["market_orders"]) == 1
 
 
 def test_output_market_results():
@@ -80,11 +80,11 @@ def test_output_market_results():
     start = datetime(2020, 1, 1)
     end = datetime(2020, 1, 2)
     output_writer = WriteOutput("test_sim", start, end, engine)
-    assert len(output_writer.write_dfs.keys()) == 0
+    assert len(output_writer.write_buffers.keys()) == 0
     meta = {"sender_id": None}
     content = {
         "context": "write_results",
-        "type": "store_market_results",
+        "type": "market_meta",
         "sender": "CRM_pos",
         "data": [
             {
@@ -105,7 +105,7 @@ def test_output_market_results():
         ],
     }
     output_writer.handle_output_message(content, meta)
-    assert len(output_writer.buffers["market_results"]) == 1, "market_results"
+    assert len(output_writer.write_buffers["market_meta"]) == 1, "market_meta"
 
 
 def test_output_market_dispatch():
@@ -113,12 +113,12 @@ def test_output_market_dispatch():
     start = datetime(2020, 1, 1)
     end = datetime(2020, 1, 2)
     output_writer = WriteOutput("test_sim", start, end, engine)
-    assert len(output_writer.write_dfs.keys()) == 0
+    assert len(output_writer.write_buffers.keys()) == 0
     meta = {"sender_id": None}
     content = {"context": "write_results", "type": "market_dispatch", "data": []}
     output_writer.handle_output_message(content, meta)
     # empty dfs are discarded
-    assert len(output_writer.write_dfs["market_dispatch"]) == 0, "market_dispatch"
+    assert len(output_writer.write_buffers["market_dispatch"]) == 0, "market_dispatch"
 
     content = {
         "context": "write_results",
@@ -126,7 +126,7 @@ def test_output_market_dispatch():
         "data": [[start, 90, "EOM", "TestUnit"]],
     }
     output_writer.handle_output_message(content, meta)
-    assert len(output_writer.buffers["market_dispatch"]) == 1, "market_dispatch"
+    assert len(output_writer.write_buffers["market_dispatch"]) == 1, "market_dispatch"
 
 
 def test_output_unit_dispatch():
@@ -134,7 +134,7 @@ def test_output_unit_dispatch():
     start = datetime(2020, 1, 1)
     end = datetime(2020, 1, 2)
     output_writer = WriteOutput("test_sim", start, end, engine)
-    assert len(output_writer.write_dfs.keys()) == 0
+    assert len(output_writer.write_buffers.keys()) == 0
     meta = {"sender_id": None}
     content = {
         "context": "write_results",
@@ -150,7 +150,7 @@ def test_output_unit_dispatch():
     }
 
     output_writer.handle_output_message(content, meta)
-    assert len(output_writer.buffers["unit_dispatch"]) == 1, "unit_dispatch"
+    assert len(output_writer.write_buffers["unit_dispatch"]) == 1, "unit_dispatch"
 
 
 def test_output_write_flows():
@@ -158,13 +158,13 @@ def test_output_write_flows():
     start = datetime(2020, 1, 1)
     end = datetime(2020, 1, 2)
     output_writer = WriteOutput("test_sim", start, end, engine)
-    assert len(output_writer.write_dfs.keys()) == 0
+    assert len(output_writer.write_buffers.keys()) == 0
     meta = {"sender_id": None}
     content = {
         "context": "write_results",
-        "type": "store_flows",
+        "type": "grid_flows",
         "data": {(datetime(2019, 1, 1, 0, 0), "north_south_example"): 0.0},
     }
 
     output_writer.handle_output_message(content, meta)
-    assert len(output_writer.write_dfs["flows"]) == 1, "flows"
+    assert len(output_writer.write_buffers["grid_flows"]) == 1, "grid_flows"
