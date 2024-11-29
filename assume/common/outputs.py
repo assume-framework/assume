@@ -63,7 +63,7 @@ class WriteOutput(Role):
         learning_mode: bool = False,
         perform_evaluation: bool = False,
         additional_kpis: dict[str, OutputDef] = {},
-        max_dfs_size_mb: int = 250,
+        max_dfs_size_mb: int = 300,
     ):
         super().__init__()
 
@@ -105,7 +105,7 @@ class WriteOutput(Role):
         self.current_dfs_size = 0
 
         # initializes dfs for storing and writing asynchronous
-        self.write_dfs: dict = defaultdict(list)
+        self.write_buffers: dict = defaultdict(list)
         self.locks = defaultdict(lambda: Lock())
 
         self.kpi_defs: dict[str, OutputDef] = {
@@ -221,70 +221,62 @@ class WriteOutput(Role):
             meta (MetaDict): The metadata associated with the message.
         """
         content_data = content.get("data")
+        content_type = content.get("type")
+        market_id = content.get("market_id")
 
-        if content.get("type") == "store_order_book":
-            self.write_market_orders(content_data, content.get("market_id"))
+        if not content_data:
+            return
 
-        elif content.get("type") == "store_market_results":
-            self.write_market_results(content_data)
-
-        elif content.get("type") == "store_units":
-            self.write_units_definition(content_data)
-
-        elif content.get("type") == "market_dispatch":
-            self.write_market_dispatch(content_data)
-
-        elif content.get("type") == "unit_dispatch":
-            self.write_unit_dispatch(content_data)
-
-        elif content.get("type") == "rl_learning_params":
-            self.write_rl_params(content_data)
-
-        elif content.get("type") == "grid_topology":
-            self.store_grid(content_data, content.get("market_id"))
-
-        elif content.get("type") == "store_flows":
-            self.write_flows(content_data)
-
-        # # keep track of the memory usage of the data
+        if content_type in ["market_meta", "market_dispatch", "unit_dispatch", "rl_learning_params"]:
+            # these can be processed as a single dataframe
+            self.write_buffers[content_type].extend(content_data)
+        elif content_type == "store_units":
+            table_name = content_data["unit_type"] + "_meta"
+            self.write_buffers[table_name].append(content_data)
+            
+        elif content_type == "grid_flows":
+            # these need to be converted to df individually
+            self.write_buffers[content_type].append(content_data)
+        elif content_type in ["market_orders", "grid_topology"]:
+            # here we need an additional market_id
+            self.write_buffers[content_type].append((content_data, market_id))
+        
+        # keep track of the memory usage of the data
         self.current_dfs_size += calculate_content_size(content_data)
         # if the current size is larger than self.max_dfs_size, store the data
         if self.current_dfs_size > self.max_dfs_size:
             logger.debug("storing output data due to size limit")
             self.context.schedule_instant_task(coroutine=self.store_dfs())
 
-    def write_rl_params(self, rl_params: dict):
+    def convert_rl_params(self, rl_params: list[dict]):
         """
-        Writes the RL parameters such as reward, regret, and profit to the corresponding data frame.
+        Convert the RL parameters such as reward, regret, and profit to a dataframe.
 
         Args:
             rl_params (dict): The RL parameters.
         """
 
         df = pd.DataFrame.from_records(rl_params, index="datetime")
-        if df.empty:
-            return
-
         df["simulation"] = self.simulation_id
         df["learning_mode"] = self.learning_mode
         df["perform_evaluation"] = self.perform_evaluation
         df["episode"] = self.episode
 
-        self.write_dfs["rl_params"].append(df)
+        return df
 
-    def write_market_results(self, market_meta: dict):
+    def convert_market_results(self, market_results: list[dict]):
         """
-        Writes market results to the corresponding data frame.
+        Convert market results to a dataframe.
 
         Args:
             market_meta (dict): The market metadata, which includes the clearing price and volume.
         """
-
-        df = pd.DataFrame(market_meta)
-        if df.empty:
+        if len(market_results) == 0:
             return
+
+        df = pd.DataFrame(market_results)
         df["simulation"] = self.simulation_id
-        self.write_dfs["market_meta"].append(df)
+        return df
 
     async def store_dfs(self):
         """
@@ -293,15 +285,52 @@ class WriteOutput(Role):
         if not self.db and not self.export_csv_path:
             return
 
-        for table in self.write_dfs.keys():
-            if len(self.write_dfs[table]) == 0:
-                continue
-            with self.locks[table]:
-                # concat all dataframes
-                # use join='outer' to keep all columns and fill missing values with NaN
-                df = pd.concat(self.write_dfs[table], axis=0, join="outer")
-                self.write_dfs[table] = []
+        for table, data_list in self.write_buffers.items():
 
+            if len(data_list) == 0:
+                continue
+            df = None
+            with self.locks[table]:
+                if table == "grid_topology":
+                    for grid_data, market_id in data_list:
+                        self.store_grid(grid_data, market_id)
+                    data_list.clear()
+                    continue
+                    
+                match table:
+                    case "market_meta":
+                        df = self.convert_market_results(data_list)
+                    case "market_dispatch":
+                        df = self.convert_market_dispatch(data_list)
+                    case "unit_dispatch":
+                        df = self.convert_unit_dispatch(data_list)
+                    case "rl_learning_params":
+                        df = self.convert_rl_params(data_list)
+                    case "grid_flows":
+                        dfs = []
+                        for data in data_list:
+                            df = self.convert_flows(data)
+                            dfs.append(df)
+                        df = pd.concat(dfs, axis=0, join="outer")
+                    case "market_orders":
+                        dfs = []
+                        for market_data, market_id in data_list:
+                            df = self.convert_market_orders(market_data, market_id)
+                            dfs.append(df)
+                        df = pd.concat(dfs, axis=0, join="outer")
+                    case _:
+                        # store_units has the name of the units_meta
+                        dfs = []
+                        for data in data_list:
+                            df = self.convert_units_definition(data)
+                            dfs.append(df)
+                        df = pd.concat(dfs, axis=0, join="outer")
+                data_list.clear()
+            # concat all dataframes
+            # use join='outer' to keep all columns and fill missing values with NaN            
+            if df is None:
+                continue 
+              
             df.reset_index()
             if df.empty:
                 continue
@@ -432,86 +461,109 @@ class WriteOutput(Role):
             with self.db.begin() as db:
                 db.execute(text(query))
 
-    def write_market_orders(self, market_orders: any, market_id: str):
+    def convert_market_orders(self, market_orders: any, market_id: str):
         """
-        Writes market orders to the corresponding data frame.
+        Convert market orders to a dataframe.
 
         Args:
             market_orders (any): The market orders.
             market_id (str): The id of the market.
         """
-        # check if market results list is empty and skip the function and raise a warning
+        # Check if market orders are empty and exit early
         if not market_orders:
             return
 
+        # Separate orders outside of lock to reduce locking time
         market_orders = separate_orders(market_orders)
+
+        # Construct DataFrame and perform vectorized operations
         df = pd.DataFrame.from_records(market_orders, index="start_time")
+
+        # Replace lambda functions with vectorized operations
         if "eligible_lambda" in df.columns:
-            df["eligible_lambda"] = df["eligible_lambda"].apply(lambda x: x.__name__)
-        if "evaluation_frequency" in df.columns:
-            df["evaluation_frequency"] = df["evaluation_frequency"].apply(
-                lambda x: repr(x)
+            df["eligible_lambda"] = df["eligible_lambda"].map(
+                lambda x: getattr(x, "__name__", None)
             )
+        if "evaluation_frequency" in df.columns:
+            df["evaluation_frequency"] = df["evaluation_frequency"].astype(str)
 
-        del df["only_hours"]
-        del df["agent_addr"]
+        # Remove unnecessary columns (use a list to minimize deletion calls)
+        df.drop(columns=["only_hours", "agent_addr"], inplace=True, errors=False)
 
-        if "bid_type" not in df.columns:
-            df["bid_type"] = None
+        # Add missing columns with defaults
+        for col in ["bid_type", "node"]:
+            if col not in df.columns:
+                df[col] = None
 
-        if "node" not in df.columns:
-            df["node"] = None
-
+        # Add constant columns
         df["simulation"] = self.simulation_id
         df["market_id"] = market_id
 
-        with self.locks["market_orders"]:
-            self.write_dfs["market_orders"].append(df)
+        # Append to the shared DataFrame within lock
+        return df
 
-    def write_units_definition(self, unit_info: dict):
+    def convert_units_definition(self, unit_info: dict):
         """
-        Writes unit definitions to the corresponding data frame and directly stores it in the database and CSV.
+        Convert unit definitions to a dataframe.
 
         Args:
             unit_info (dict): The unit information.
         """
-
-        table_name = unit_info["unit_type"] + "_meta"
-
-        if table_name is None:
-            logger.info(f"unknown {unit_info['unit_type']} is not exported")
-            return False
         del unit_info["unit_type"]
         unit_info["simulation"] = self.simulation_id
         u_info = {unit_info["id"]: unit_info}
         del unit_info["id"]
 
-        with self.locks[table_name]:
-            self.write_dfs[table_name].append(pd.DataFrame(u_info).T)
+        return pd.DataFrame(u_info).T
 
-    def write_market_dispatch(self, data: any):
+    def convert_market_dispatch(self, market_dispatch: list[dict]):
         """
-        Writes the planned dispatch of the units after the market clearing to a CSV and database.
+        Convert the planned dispatch of the units to a DataFrame.
 
         Args:
             data (any): The records to be put into the table. Formatted like, "datetime, power, market_id, unit_id".
         """
-        df = pd.DataFrame(data, columns=["datetime", "power", "market_id", "unit_id"])
+
+        df = pd.DataFrame(
+            market_dispatch,
+            columns=["datetime", "power", "market_id", "unit_id"],
+        )
         if not df.empty:
             df["simulation"] = self.simulation_id
-            self.write_dfs["market_dispatch"].append(df)
+        return df
 
-    def write_unit_dispatch(self, unit_dispatch: dict):
+    def convert_unit_dispatch(self, unit_dispatch: list[dict]):
         """
-        Writes the actual dispatch of the units to a CSV and database.
+        Convert the actual dispatch of the units to a DataFrame.
 
         Args:
-            data (any): The records to be put into the table. Formatted like, "datetime, power, market_id, unit_id".
+            unit_dispatch (list): A list of dictionaries containing unit dispatch data.
+                                Each dictionary includes arrays for multiple values (e.g., power, costs) and other metadata.
         """
-        data = pd.concat([pd.DataFrame.from_dict(d) for d in unit_dispatch])
-        data = data.set_index("time")
+
+        # Flatten and expand the arrays in `unit_dispatch` into a list of records for DataFrame construction
+        records = []
+        for dispatch in unit_dispatch:
+            time_values = dispatch["time"]
+            num_records = len(time_values)
+
+            # Create a record for each time step, expanding array-based fields
+            for i in range(num_records):
+                record = {
+                    key: (value[i] if isinstance(value, (list | np.ndarray)) else value)
+                    for key, value in dispatch.items()
+                }
+                record["time"] = time_values[i]
+                records.append(record)
+
+        # Convert the list of records into a DataFrame
+        data = pd.DataFrame.from_records(records)
+
+        # Set the index and add the simulation ID
+        data.set_index("time", inplace=True)
         data["simulation"] = self.simulation_id
-        self.write_dfs["unit_dispatch"].append(data)
+
+        return data
 
     async def on_stop(self):
         """
@@ -598,9 +650,9 @@ class WriteOutput(Role):
 
         return rewards_by_unit
 
-    def write_flows(self, data: dict[tuple[datetime, str], float]):
+    def convert_flows(self, data: dict[tuple[datetime, str], float]):
         """
-        Writes the flows of the grid results into the database.
+        Convert the flows of the grid results into a dataframe.
 
         Args:
             data: The records to be put into the table. Formatted like, "(datetime, line), flow" if generated by pyomo or df if it comes from pypsa.
@@ -630,5 +682,4 @@ class WriteOutput(Role):
 
         df["simulation"] = self.simulation_id
 
-        with self.locks["flows"]:
-            self.write_dfs["flows"].append(df)
+        return df

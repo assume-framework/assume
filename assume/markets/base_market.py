@@ -702,7 +702,7 @@ class MarketRole(MarketMechanism, Role):
         if db_addr:
             message = {
                 "context": "write_results",
-                "type": "store_order_book",
+                "type": "market_orders",
                 "market_id": self.marketconfig.market_id,
                 "data": orderbook,
             }
@@ -724,7 +724,7 @@ class MarketRole(MarketMechanism, Role):
         if db_addr:
             message = {
                 "context": "write_results",
-                "type": "store_market_results",
+                "type": "market_meta",
                 "market_id": self.marketconfig.market_id,
                 "data": market_meta,
             }
@@ -746,7 +746,7 @@ class MarketRole(MarketMechanism, Role):
         if db_addr:
             message = {
                 "context": "write_results",
-                "type": "store_flows",
+                "type": "grid_flows",
                 "market_id": self.marketconfig.market_id,
                 "data": flows,
             }
