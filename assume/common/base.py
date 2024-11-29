@@ -59,6 +59,7 @@ class BaseUnit:
         # series does not like to convert from tensor to float otherwise
 
         self.avg_op_time = 0
+        self.total_op_time = 0
 
         # some data is stored as series to allow to store it in the outputs
         # check if any bidding strategy is using the RL strategy
@@ -142,18 +143,13 @@ class BaseUnit:
         Iterates through the orderbook, adding the accepted volumes to the corresponding time slots
         in the dispatch plan. It then calculates the cashflow and the reward for the bidding strategies.
 
-        Additionally, updates the average operation and downtime dynamically.
-
         Args:
             marketconfig (MarketConfig): The market configuration.
             orderbook (Orderbook): The orderbook.
+
         """
+
         product_type = marketconfig.product_type
-
-        # Initialize counters for operation and downtime updates
-        total_op_time = self.avg_op_time * len(self.outputs[product_type])
-        total_periods = len(self.outputs[product_type])
-
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
@@ -165,28 +161,9 @@ class BaseUnit:
                 added_volume = list(order["accepted_volume"].values())
             else:
                 added_volume = order["accepted_volume"]
-
-            # Update outputs and track changes
-            current_slice = self.outputs[product_type].loc[start:end_excl]
             self.outputs[product_type].loc[start:end_excl] += added_volume
-
-            # Detect changes in operation/downtime
-            for idx, volume in enumerate(
-                self.outputs[product_type].loc[start:end_excl]
-            ):
-                was_operating = current_slice[idx] > 0
-                now_operating = volume > 0
-
-                if was_operating and not now_operating:  # Transition to downtime
-                    total_op_time -= 1
-                elif not was_operating and now_operating:  # Transition to operating
-                    total_op_time += 1
-
-        # Recalculate averages
-        self.avg_op_time = total_op_time / total_periods
-
-        # Calculate cashflow and reward
         self.calculate_cashflow(product_type, orderbook)
+
         self.bidding_strategies[marketconfig.market_id].calculate_reward(
             unit=self,
             marketconfig=marketconfig,

@@ -238,6 +238,9 @@ class flexableEOM(BaseStrategy):
         unit.outputs["profit"].loc[products_index] = profit
         unit.outputs["total_costs"].loc[products_index] = costs
 
+        # update average operation time
+        update_avg_op_time(unit, product_type, products_index[0], products_index[-1])
+
 
 class flexablePosCRM(BaseStrategy):
     """
@@ -601,3 +604,24 @@ def get_specific_revenue(
     possible_revenue = (price_forecast - marginal_cost).sum()
 
     return possible_revenue
+
+
+def update_avg_op_time(unit, product_type, start, end):
+    """
+    Updates the average operation time for the unit based on the specified slice of outputs.
+
+    Args:
+        unit: The unit object containing `outputs`, `total_op_time`, and `avg_op_time`.
+        product_type: The product type to update.
+        start: The start index of the slice being updated.
+        end: The end index of the slice being updated (inclusive).
+    """
+    # Get the current slice of outputs
+    current_slice = unit.outputs[product_type].loc[start:end]
+
+    # Increment total operation time for operating periods in the slice
+    unit.total_op_time += (current_slice > 0).sum()
+
+    # Update the average operation time
+    total_periods = len(unit.index[:end]) + 1  # Total periods up to and including 'end'
+    unit.avg_op_time = unit.total_op_time / total_periods
