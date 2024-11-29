@@ -260,7 +260,7 @@ class PowerPlant(SupportsMinMax):
         Note:
             The calculation does not include ramping constraints and can be used for arbitrary start times in the future.
         """
-        # end includes the end of the last product, to get the last products' start time we deduct the frequency once          
+        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
 
         base_load = self.outputs["energy"].loc[start:end_excl]

@@ -95,7 +95,7 @@ class WriteOutput(Role):
 
             # check if episode=0 and delete all similar runs
             if self.episode == 0:
-                self.del_similar_runs()
+                self.delete_similar_runs()
 
         # construct all timeframe under which hourly values are written to excel and db
         self.start = start
@@ -165,7 +165,7 @@ class WriteOutput(Role):
                     f"could not clear old scenarios from table {table_name} - {e}"
                 )
 
-    def del_similar_runs(self):
+    def delete_similar_runs(self):
         """
         Deletes all similar runs from the database based on the simulation ID. This ensures that we overwrite simulations results when restarting one. Please note that a simulation which you also want to keep need to be assigned anew ID.
         """
@@ -209,7 +209,10 @@ class WriteOutput(Role):
                 cache=True,
             )
             self.context.schedule_recurrent_task(
-                self.store_dfs, recurrency_task, src="no_wait"
+                self.store_dfs,
+                recurrency_task,
+                src="no_wait",
+                # this should not wait for the task to finish to block the simulation
             )
 
     def handle_output_message(self, content: dict, meta: MetaDict):
@@ -227,20 +230,25 @@ class WriteOutput(Role):
         if not content_data:
             return
 
-        if content_type in ["market_meta", "market_dispatch", "unit_dispatch", "rl_learning_params"]:
+        if content_type in [
+            "market_meta",
+            "market_dispatch",
+            "unit_dispatch",
+            "rl_learning_params",
+        ]:
             # these can be processed as a single dataframe
             self.write_buffers[content_type].extend(content_data)
         elif content_type == "store_units":
             table_name = content_data["unit_type"] + "_meta"
             self.write_buffers[table_name].append(content_data)
-            
+
         elif content_type == "grid_flows":
             # these need to be converted to df individually
             self.write_buffers[content_type].append(content_data)
         elif content_type in ["market_orders", "grid_topology"]:
             # here we need an additional market_id
             self.write_buffers[content_type].append((content_data, market_id))
-        
+
         # keep track of the memory usage of the data
         self.current_dfs_size += calculate_content_size(content_data)
         # if the current size is larger than self.max_dfs_size, store the data
@@ -278,6 +286,144 @@ class WriteOutput(Role):
         df["simulation"] = self.simulation_id
         return df
 
+    def convert_market_orders(self, market_orders: any, market_id: str):
+        """
+        Convert market orders to a dataframe.
+
+        Args:
+            market_orders (any): The market orders.
+            market_id (str): The id of the market.
+        """
+        # Check if market orders are empty and exit early
+        if not market_orders:
+            return
+
+        # Separate orders outside of lock to reduce locking time
+        market_orders = separate_orders(market_orders)
+
+        # Construct DataFrame and perform vectorized operations
+        df = pd.DataFrame.from_records(market_orders, index="start_time")
+
+        # Replace lambda functions with vectorized operations
+        if "eligible_lambda" in df.columns:
+            df["eligible_lambda"] = df["eligible_lambda"].map(
+                lambda x: getattr(x, "__name__", None)
+            )
+        if "evaluation_frequency" in df.columns:
+            df["evaluation_frequency"] = df["evaluation_frequency"].astype(str)
+
+        # Remove unnecessary columns (use a list to minimize deletion calls)
+        df.drop(columns=["only_hours", "agent_addr"], inplace=True, errors=False)
+
+        # Add missing columns with defaults
+        for col in ["bid_type", "node"]:
+            if col not in df.columns:
+                df[col] = None
+
+        # Add constant columns
+        df["simulation"] = self.simulation_id
+        df["market_id"] = market_id
+
+        # Append to the shared DataFrame within lock
+        return df
+
+    def convert_units_definition(self, unit_info: dict):
+        """
+        Convert unit definitions to a dataframe.
+
+        Args:
+            unit_info (dict): The unit information.
+        """
+        del unit_info["unit_type"]
+        unit_info["simulation"] = self.simulation_id
+        u_info = {unit_info["id"]: unit_info}
+        del unit_info["id"]
+
+        return pd.DataFrame(u_info).T
+
+    def convert_market_dispatch(self, market_dispatch: list[dict]):
+        """
+        Convert the planned dispatch of the units to a DataFrame.
+
+        Args:
+            data (any): The records to be put into the table. Formatted like, "datetime, power, market_id, unit_id".
+        """
+
+        df = pd.DataFrame(
+            market_dispatch,
+            columns=["datetime", "power", "market_id", "unit_id"],
+        )
+        if not df.empty:
+            df["simulation"] = self.simulation_id
+        return df
+
+    def convert_unit_dispatch(self, unit_dispatch: list[dict]):
+        """
+        Convert the actual dispatch of the units to a DataFrame.
+
+        Args:
+            unit_dispatch (list): A list of dictionaries containing unit dispatch data.
+                                Each dictionary includes arrays for multiple values (e.g., power, costs) and other metadata.
+        """
+
+        # Flatten and expand the arrays in `unit_dispatch` into a list of records for DataFrame construction
+        records = []
+        for dispatch in unit_dispatch:
+            time_values = dispatch["time"]
+            num_records = len(time_values)
+
+            # Create a record for each time step, expanding array-based fields
+            for i in range(num_records):
+                record = {
+                    key: (value[i] if isinstance(value, (list | np.ndarray)) else value)
+                    for key, value in dispatch.items()
+                }
+                record["time"] = time_values[i]
+                records.append(record)
+
+        # Convert the list of records into a DataFrame
+        data = pd.DataFrame.from_records(records)
+
+        # Set the index and add the simulation ID
+        data.set_index("time", inplace=True)
+        data["simulation"] = self.simulation_id
+
+        return data
+
+    def convert_flows(self, data: dict[tuple[datetime, str], float]):
+        """
+        Convert the flows of the grid results into a dataframe.
+
+        Args:
+            data: The records to be put into the table. Formatted like, "(datetime, line), flow" if generated by pyomo or df if it comes from pypsa.
+        """
+        # Daten in ein DataFrame umwandeln depending on the data format which differs when different solver are used
+        # transformation done here to avoid adapting format during clearing
+
+        # if data is dataframe
+        if isinstance(data, pd.DataFrame):
+            df = data
+
+        # if data is dict
+        elif isinstance(data, dict):
+            # Convert the dictionary to a DataFrame
+            df = pd.DataFrame.from_dict(
+                data, orient="index", columns=["flow"]
+            ).reset_index()
+            # Split the 'index' column into 'timestamp' and 'line'
+            df[["timestamp", "line"]] = pd.DataFrame(
+                df["index"].tolist(), index=df.index
+            )
+            # Rename the columns
+            df = df.drop(columns=["index"])
+
+            # set timestamp to index
+            df.set_index("timestamp", inplace=True)
+
+        df["simulation"] = self.simulation_id
+
+        return df
+
     async def store_dfs(self):
         """
         Stores the data frames to CSV files and the database. Is scheduled as a recurrent task based on the frequency.
@@ -286,7 +432,6 @@ class WriteOutput(Role):
             return
 
         for table, data_list in self.write_buffers.items():
-
             if len(data_list) == 0:
                 continue
             df = None
@@ -296,7 +441,7 @@ class WriteOutput(Role):
                         self.store_grid(grid_data, market_id)
                     data_list.clear()
                     continue
-                    
+
                 match table:
                     case "market_meta":
                         df = self.convert_market_results(data_list)
@@ -327,10 +472,10 @@ class WriteOutput(Role):
                         df = pd.concat(dfs, axis=0, join="outer")
                 data_list.clear()
             # concat all dataframes
-            # use join='outer' to keep all columns and fill missing values with NaN            
+            # use join='outer' to keep all columns and fill missing values with NaN
             if df is None:
-                continue 
-              
+                continue
+
             df.reset_index()
             if df.empty:
                 continue
@@ -461,110 +606,6 @@ class WriteOutput(Role):
             with self.db.begin() as db:
                 db.execute(text(query))
 
-    def convert_market_orders(self, market_orders: any, market_id: str):
-        """
-        Convert market orders to a dataframe.
-
-        Args:
-            market_orders (any): The market orders.
-            market_id (str): The id of the market.
-        """
-        # Check if market orders are empty and exit early
-        if not market_orders:
-            return
-
-        # Separate orders outside of lock to reduce locking time
-        market_orders = separate_orders(market_orders)
-
-        # Construct DataFrame and perform vectorized operations
-        df = pd.DataFrame.from_records(market_orders, index="start_time")
-
-        # Replace lambda functions with vectorized operations
-        if "eligible_lambda" in df.columns:
-            df["eligible_lambda"] = df["eligible_lambda"].map(
-                lambda x: getattr(x, "__name__", None)
-            )
-        if "evaluation_frequency" in df.columns:
-            df["evaluation_frequency"] = df["evaluation_frequency"].astype(str)
-
-        # Remove unnecessary columns (use a list to minimize deletion calls)
-        df.drop(columns=["only_hours", "agent_addr"], inplace=True, errors=False)
-
-        # Add missing columns with defaults
-        for col in ["bid_type", "node"]:
-            if col not in df.columns:
-                df[col] = None
-
-        # Add constant columns
-        df["simulation"] = self.simulation_id
-        df["market_id"] = market_id
-
-        # Append to the shared DataFrame within lock
-        return df
-
-    def convert_units_definition(self, unit_info: dict):
-        """
-        Convert unit definitions to a dataframe.
-
-        Args:
-            unit_info (dict): The unit information.
-        """
-        del unit_info["unit_type"]
-        unit_info["simulation"] = self.simulation_id
-        u_info = {unit_info["id"]: unit_info}
-        del unit_info["id"]
-
-        return pd.DataFrame(u_info).T
-
-    def convert_market_dispatch(self, market_dispatch: list[dict]):
-        """
-        Convert the planned dispatch of the units to a DataFrame.
-
-        Args:
-            data (any): The records to be put into the table. Formatted like, "datetime, power, market_id, unit_id".
-        """
-
-        df = pd.DataFrame(
-            market_dispatch,
-            columns=["datetime", "power", "market_id", "unit_id"],
-        )
-        if not df.empty:
-            df["simulation"] = self.simulation_id
-        return df
-
-    def convert_unit_dispatch(self, unit_dispatch: list[dict]):
-        """
-        Convert the actual dispatch of the units to a DataFrame.
-
-        Args:
-            unit_dispatch (list): A list of dictionaries containing unit dispatch data.
-                                Each dictionary includes arrays for multiple values (e.g., power, costs) and other metadata.
-        """
-
-        # Flatten and expand the arrays in `unit_dispatch` into a list of records for DataFrame construction
-        records = []
-        for dispatch in unit_dispatch:
-            time_values = dispatch["time"]
-            num_records = len(time_values)
-
-            # Create a record for each time step, expanding array-based fields
-            for i in range(num_records):
-                record = {
-                    key: (value[i] if isinstance(value, (list | np.ndarray)) else value)
-                    for key, value in dispatch.items()
-                }
-                record["time"] = time_values[i]
-                records.append(record)
-
-        # Convert the list of records into a DataFrame
-        data = pd.DataFrame.from_records(records)
-
-        # Set the index and add the simulation ID
-        data.set_index("time", inplace=True)
-        data["simulation"] = self.simulation_id
-
-        return data
-
     async def on_stop(self):
         """
         This function makes it possible to calculate Key Performance Indicators.
@@ -649,37 +690,3 @@ class WriteOutput(Role):
         rewards_by_unit = np.array(rewards_by_unit)
 
         return rewards_by_unit
-
-    def convert_flows(self, data: dict[tuple[datetime, str], float]):
-        """
-        Convert the flows of the grid results into a dataframe.
-
-        Args:
-            data: The records to be put into the table. Formatted like, "(datetime, line), flow" if generated by pyomo or df if it comes from pypsa.
-        """
-        # Daten in ein DataFrame umwandeln depending on the data format which differs when different solver are used
-        # transformation done here to avoid adapting format during clearing
-
-        # if data is dataframe
-        if isinstance(data, pd.DataFrame):
-            df = data
-
-        # if data is dict
-        elif isinstance(data, dict):
-            # Convert the dictionary to a DataFrame
-            df = pd.DataFrame.from_dict(
-                data, orient="index", columns=["flow"]
-            ).reset_index()
-            # Split the 'index' column into 'timestamp' and 'line'
-            df[["timestamp", "line"]] = pd.DataFrame(
-                df["index"].tolist(), index=df.index
-            )
-            # Rename the columns
-            df = df.drop(columns=["index"])
-
-            # set timestamp to index
-            df.set_index("timestamp", inplace=True)
-
-        df["simulation"] = self.simulation_id
-
-        return df
