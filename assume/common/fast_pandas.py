@@ -1120,7 +1120,7 @@ class FastSeriesAtIndexer:
     def __init__(self, series: FastSeries):
         self._series = series
 
-    def __getitem__(self, item: datetime | str):
+    def __getitem__(self, item):
         """
         Retrieve a single item using label-based indexing.
 
@@ -1130,11 +1130,9 @@ class FastSeriesAtIndexer:
         Returns:
             float: The retrieved value.
         """
-        if isinstance(item, str):
-            item = pd.to_datetime(item).to_pydatetime()
         return self._series[item]
 
-    def __setitem__(self, item: datetime | str, value: float):
+    def __setitem__(self, item, value: float):
         """
         Assign a value using label-based indexing.
 
@@ -1142,8 +1140,6 @@ class FastSeriesAtIndexer:
             item (datetime | str): The label.
             value (float): The value to assign.
         """
-        if isinstance(item, str):
-            item = pd.to_datetime(item).to_pydatetime()
         self._series[item] = value
 
 
