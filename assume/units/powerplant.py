@@ -68,8 +68,8 @@ class PowerPlant(SupportsMinMax):
         cold_start_cost: float = 0,
         min_operating_time: float = 0,
         min_down_time: float = 0,
-        downtime_hot_start: int = 8,  # hours
-        downtime_warm_start: int = 48,  # hours
+        downtime_hot_start: int = 0,  # hours
+        downtime_warm_start: int = 0,  # hours
         heat_extraction: bool = False,
         max_heat_extraction: float = 0,
         location: tuple[float, float] = (0.0, 0.0),
