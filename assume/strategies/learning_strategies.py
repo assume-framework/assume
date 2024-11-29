@@ -532,9 +532,12 @@ class RLStrategy(AbstractLearningStrategy):
 
             duration = (end - start) / timedelta(hours=1)
 
+            accepted_volume = order.get("accepted_volume", 0)
+            accepted_price = order.get("accepted_price", 0)
+
             # calculate profit as income - running_cost from this event
-            order_profit = order["accepted_price"] * order["accepted_volume"] * duration
-            order_cost = marginal_cost * order["accepted_volume"] * duration
+            order_profit = accepted_price * accepted_volume * duration
+            order_cost = marginal_cost * accepted_volume * duration
 
             # collect profit and opportunity cost for all orders
             profit += order_profit
@@ -543,7 +546,7 @@ class RLStrategy(AbstractLearningStrategy):
         # calculate opportunity cost
         # as the loss of income we have because we are not running at full power
         opportunity_cost = (
-            (order["accepted_price"] - marginal_cost)
+            (accepted_price - marginal_cost)
             * (unit.max_power - unit.outputs[product_type].loc[start:end_excl]).sum()
             * duration
         )
@@ -929,13 +932,13 @@ class StorageRLStrategy(AbstractLearningStrategy):
             )
             marginal_cost += unit.get_starting_costs(int(duration_hours))
 
+            accepted_volume = order.get("accepted_volume", 0)
             # ignore very small volumes due to calculations
-            accepted_volume = (
-                order["accepted_volume"] if abs(order["accepted_volume"]) > 1 else 0
-            )
+            accepted_volume = accepted_volume if abs(accepted_volume) > 1 else 0
+            accepted_price = order.get("accepted_price", 0)
 
             # Calculate profit and cost for the order
-            order_profit = order["accepted_price"] * accepted_volume * duration_hours
+            order_profit = accepted_price * accepted_volume * duration_hours
             order_cost = abs(marginal_cost * accepted_volume * duration_hours)
 
             current_soc = unit.outputs["soc"].at[start_time]

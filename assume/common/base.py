@@ -58,6 +58,8 @@ class BaseUnit:
         self.outputs = defaultdict(lambda: FastSeries(value=0.0, index=self.index))
         # series does not like to convert from tensor to float otherwise
 
+        self.avg_op_time = 0
+
         # some data is stored as series to allow to store it in the outputs
         # check if any bidding strategy is using the RL strategy
         if any(
@@ -70,6 +72,7 @@ class BaseUnit:
                 index=self.index,
             )
             self.outputs["reward"] = FastSeries(value=0.0, index=self.index)
+            self.outputs["regret"] = FastSeries(value=0.0, index=self.index)
 
             # RL data stored as lists to simplify storing to the buffer
             self.outputs["rl_observations"] = []
@@ -139,25 +142,51 @@ class BaseUnit:
         Iterates through the orderbook, adding the accepted volumes to the corresponding time slots
         in the dispatch plan. It then calculates the cashflow and the reward for the bidding strategies.
 
+        Additionally, updates the average operation and downtime dynamically.
+
         Args:
             marketconfig (MarketConfig): The market configuration.
             orderbook (Orderbook): The orderbook.
-
         """
-
         product_type = marketconfig.product_type
+
+        # Initialize counters for operation and downtime updates
+        total_op_time = self.avg_op_time * len(self.outputs[product_type])
+        total_periods = len(self.outputs[product_type])
+
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
             # end includes the end of the last product, to get the last products' start time we deduct the frequency once
             end_excl = end - self.index.freq
+
+            # Determine the added volume
             if isinstance(order["accepted_volume"], dict):
                 added_volume = list(order["accepted_volume"].values())
             else:
                 added_volume = order["accepted_volume"]
-            self.outputs[product_type].loc[start:end_excl] += added_volume
-        self.calculate_cashflow(product_type, orderbook)
 
+            # Update outputs and track changes
+            current_slice = self.outputs[product_type].loc[start:end_excl]
+            self.outputs[product_type].loc[start:end_excl] += added_volume
+
+            # Detect changes in operation/downtime
+            for idx, volume in enumerate(
+                self.outputs[product_type].loc[start:end_excl]
+            ):
+                was_operating = current_slice[idx] > 0
+                now_operating = volume > 0
+
+                if was_operating and not now_operating:  # Transition to downtime
+                    total_op_time -= 1
+                elif not was_operating and now_operating:  # Transition to operating
+                    total_op_time += 1
+
+        # Recalculate averages
+        self.avg_op_time = total_op_time / total_periods
+
+        # Calculate cashflow and reward
+        self.calculate_cashflow(product_type, orderbook)
         self.bidding_strategies[marketconfig.market_id].calculate_reward(
             unit=self,
             marketconfig=marketconfig,
@@ -411,56 +440,6 @@ class SupportsMinMax(BaseUnit):
         # Return positive time if operating, negative if shut down
         return -run if is_off else run
 
-    def get_average_operation_times(self, start: datetime) -> tuple[float, float]:
-        """
-        Calculates the average uninterrupted operation and down time.
-
-        Args:
-            start (datetime.datetime): The current time.
-
-        Returns:
-            tuple[float, float]: Tuple of the average operation time avg_op_time and average down time avg_down_time.
-
-        Note:
-            down_time in general is indicated with negative values
-        """
-        op_series = []
-
-        before = start - self.index.freq
-        arr = self.outputs["energy"].loc[self.index[0] : before][::-1] > 0
-
-        if len(arr) < 1:
-            # before start of index
-            return max(self.min_operating_time, 1), min(-self.min_down_time, -1)
-
-        op_series = []
-        status = arr[0]
-        run = 0
-        for val in arr:
-            if val == status:
-                run += 1
-            else:
-                op_series.append(-((-1) ** status) * run)
-                run = 1
-                status = val
-        op_series.append(-((-1) ** status) * run)
-
-        op_times = [operation for operation in op_series if operation > 0]
-        if op_times == []:
-            avg_op_time = self.min_operating_time
-        else:
-            avg_op_time = sum(op_times) / len(op_times)
-
-        down_times = [operation for operation in op_series if operation < 0]
-        if down_times == []:
-            avg_down_time = self.min_down_time
-        else:
-            avg_down_time = sum(down_times) / len(down_times)
-
-        return max(1, avg_op_time, self.min_operating_time), min(
-            -1, avg_down_time, -self.min_down_time
-        )
-
     def get_starting_costs(self, op_time: int) -> float:
         """
         Returns the start-up cost for the given operation time.
@@ -475,19 +454,20 @@ class SupportsMinMax(BaseUnit):
             float: The start-up costs depending on the down time.
         """
         if op_time > 0:
-            # unit is running
+            # The unit is running, no start-up cost is needed
             return 0
 
-        if self.downtime_hot_start is not None and self.hot_start_cost is not None:
-            if -op_time <= self.downtime_hot_start:
-                return self.hot_start_cost
-        if self.downtime_warm_start is not None and self.warm_start_cost is not None:
-            if -op_time <= self.downtime_warm_start:
-                return self.warm_start_cost
-        if self.cold_start_cost is not None:
-            return self.cold_start_cost
+        downtime = abs(op_time)
 
-        return 0
+        # Check and return the appropriate start-up cost
+        if downtime <= self.downtime_hot_start:
+            return self.hot_start_cost
+
+        if downtime <= self.downtime_warm_start:
+            return self.warm_start_cost
+
+        # If it exceeds warm start threshold, return cold start cost
+        return self.cold_start_cost
 
 
 class SupportsMinMaxCharge(BaseUnit):

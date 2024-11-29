@@ -63,7 +63,6 @@ class flexableEOM(BaseStrategy):
         min_power_values, max_power_values = unit.calculate_min_max_power(start, end)
 
         op_time = unit.get_operation_time(start)
-        avg_op_time, avg_down_time = unit.get_average_operation_times(start)
 
         bids = []
         for product, min_power, max_power in zip(
@@ -111,7 +110,6 @@ class flexableEOM(BaseStrategy):
                     marginal_cost_flex=marginal_cost_flex,
                     bid_quantity_inflex=bid_quantity_inflex,
                     foresight=self.foresight,
-                    avg_down_time=avg_down_time,
                 )
             else:
                 bid_price_inflex = calculate_EOM_price_if_off(
@@ -119,7 +117,6 @@ class flexableEOM(BaseStrategy):
                     marginal_cost_inflex=marginal_cost_inflex,
                     bid_quantity_inflex=bid_quantity_inflex,
                     op_time=op_time,
-                    avg_op_time=avg_op_time,
                 )
 
             if unit.outputs["heat"].at[start] > 0:
@@ -176,14 +173,70 @@ class flexableEOM(BaseStrategy):
             unit (SupportsMinMax): A unit that the unit operator manages.
             marketconfig (MarketConfig): A market configuration.
             orderbook (Orderbook): An orderbook with accepted and rejected orders for the unit.
-        """
-        # TODO: Calculate profits over all markets
 
-        calculate_reward_EOM(
-            unit=unit,
-            marketconfig=marketconfig,
-            orderbook=orderbook,
-        )
+        Note:
+            The reward is calculated as the profit minus the opportunity cost,
+            which is the loss of income we have because we are not running at full power.
+            The regret is the opportunity cost.
+            Because the regret_scale is set to 0 the reward equals the profit.
+            The profit is the income we have from the accepted bids.
+            The total costs are the running costs and the start-up costs.
+
+        """
+        product_type = marketconfig.product_type
+        products_index = get_products_index(orderbook)
+
+        # Initialize intermediate results as numpy arrays for better performance
+        profit = np.zeros(len(products_index))
+        costs = np.zeros(len(products_index))
+
+        # Map products_index to their positions for faster updates
+        index_map = {time: i for i, time in enumerate(products_index)}
+
+        for order in orderbook:
+            start = order["start_time"]
+            end_excl = order["end_time"] - unit.index.freq
+
+            order_times = unit.index[start:end_excl]
+            accepted_volume = order.get("accepted_volume", 0)
+            accepted_price = order.get("accepted_price", 0)
+
+            for start in order_times:
+                idx = index_map.get(start)
+
+                marginal_cost = unit.calculate_marginal_cost(
+                    start, unit.outputs[product_type].at[start]
+                )
+
+                if isinstance(accepted_volume, dict):
+                    accepted_volume = accepted_volume.get(start, 0)
+                else:
+                    accepted_volume = accepted_volume
+
+                if isinstance(accepted_price, dict):
+                    accepted_price = accepted_price.get(start, 0)
+                else:
+                    accepted_price = accepted_price
+
+                profit[idx] += accepted_price * accepted_volume
+
+        # consideration of start-up costs
+        for i, start in enumerate(products_index):
+            op_time = unit.get_operation_time(start)
+
+            output = unit.outputs[product_type].at[start]
+            marginal_cost = unit.calculate_marginal_cost(start, output)
+            costs[i] += marginal_cost * output
+
+            if output != 0 and op_time < 0:
+                start_up_cost = unit.get_starting_costs(op_time)
+                costs[i] += start_up_cost
+
+        profit -= costs
+
+        # store results in unit outputs which are written to database by unit operator
+        unit.outputs["profit"].loc[products_index] = profit
+        unit.outputs["total_costs"].loc[products_index] = costs
 
 
 class flexablePosCRM(BaseStrategy):
@@ -421,7 +474,6 @@ def calculate_EOM_price_if_off(
     marginal_cost_inflex,
     bid_quantity_inflex,
     op_time,
-    avg_op_time=1,
 ):
     """
     The powerplant is currently off and calculates a startup markup as an extra
@@ -435,20 +487,20 @@ def calculate_EOM_price_if_off(
         marginal_cost_inflex (float): The marginal cost of the unit.
         bid_quantity_inflex (float): The bid quantity of the unit.
         op_time (int): The operation time of the unit.
-        avg_op_time (int): The average operation time of the unit.
 
     Returns:
         float: The inflexible bid price of the unit.
 
     """
+    if bid_quantity_inflex == 0:
+        return 0
+
+    avg_operating_time = max(unit.avg_op_time, unit.min_operating_time)
     starting_cost = unit.get_starting_costs(op_time)
     # if we split starting_cost across av_operating_time
     # we are never adding the other parts of the cost to the following hours
 
-    if bid_quantity_inflex == 0:
-        markup = starting_cost / avg_op_time
-    else:
-        markup = starting_cost / avg_op_time / bid_quantity_inflex
+    markup = starting_cost / avg_operating_time / bid_quantity_inflex
 
     bid_price_inflex = min(marginal_cost_inflex + markup, 3000.0)
 
@@ -462,13 +514,12 @@ def calculate_EOM_price_if_on(
     marginal_cost_flex,
     bid_quantity_inflex,
     foresight,
-    avg_down_time=-1,
 ):
     """
     The powerplant is currently on and calculates a price reduction to prevent shutdowns.
 
     The price reduction is calculated as follows:
-    starting_cost / -avg_down_time / bid_quantity_inflex
+    starting_cost / min_down_time / bid_quantity_inflex
     If the unit is a CHP, the heat generation costs are added to the price reduction with the following formula:
     heat_gen_cost = (heat_output * (natural_gas_price / 0.9)) / bid_quantity_inflex
     If the estimated revenue for the time defined in foresight is positive,
@@ -481,25 +532,23 @@ def calculate_EOM_price_if_on(
         marginal_cost_flex (float): The marginal cost of the unit.
         bid_quantity_inflex (float): The bid quantity of the unit.
         foresight (datetime.timedelta): The foresight of the unit.
-        avg_down_time (int): The average down time of the unit.
 
     Returns:
         float: The inflexible bid price of the unit.
     """
+
     if bid_quantity_inflex == 0:
         return 0
 
-    t = start
+    # check the starting cost if the unit were turned off for min_down_time
+    starting_cost = unit.get_starting_costs(-unit.min_down_time)
 
-    # TODO is it correct to bill for cold, hot and warm starts in one start?
-    starting_cost = unit.get_starting_costs(avg_down_time)
+    price_reduction_restart = starting_cost / unit.min_down_time / bid_quantity_inflex
 
-    price_reduction_restart = starting_cost / -avg_down_time / bid_quantity_inflex
-
-    if unit.outputs["heat"][t] > 0:
+    if unit.outputs["heat"].at[start] > 0:
         heat_gen_cost = (
-            unit.outputs["heat"][t]
-            * (unit.forecaster.get_price("natural gas")[t] / 0.9)
+            unit.outputs["heat"].at[start]
+            * (unit.forecaster.get_price("natural gas").at[start] / 0.9)
         ) / bid_quantity_inflex
     else:
         heat_gen_cost = 0.0
@@ -512,7 +561,7 @@ def calculate_EOM_price_if_on(
     )
     if (
         possible_revenue >= 0
-        and unit.forecaster[f"price_{market_id}"][t] < marginal_cost_flex
+        and unit.forecaster[f"price_{market_id}"].at[start] < marginal_cost_flex
     ):
         marginal_cost_flex = 0
 
@@ -552,107 +601,3 @@ def get_specific_revenue(
     possible_revenue = (price_forecast - marginal_cost).sum()
 
     return possible_revenue
-
-
-def calculate_reward_EOM(
-    unit,
-    marketconfig: MarketConfig,
-    orderbook: Orderbook,
-):
-    """
-    Calculate and write reward, profit and regret to unit outputs.
-
-    Args:
-        unit (SupportsMinMax): The unit to calculate reward for.
-        marketconfig (MarketConfig): The market configuration.
-        orderbook (Orderbook): The Orderbook.
-
-    Note:
-        The reward is calculated as the profit minus the opportunity cost,
-        which is the loss of income we have because we are not running at full power.
-        The regret is the opportunity cost.
-        Because the regret_scale is set to 0 the reward equals the profit.
-        The profit is the income we have from the accepted bids.
-        The total costs are the running costs and the start-up costs.
-
-    """
-    # TODO: Calculate profits over all markets
-    product_type = marketconfig.product_type
-    products_index = get_products_index(orderbook)
-
-    max_power_values = (
-        unit.forecaster.get_availability(unit.id)[products_index] * unit.max_power
-    )
-
-    # Initialize intermediate results as numpy arrays for better performance
-    profit = np.zeros(len(products_index))
-    reward = np.zeros(len(products_index))
-    opportunity_cost = np.zeros(len(products_index))
-    costs = np.zeros(len(products_index))
-
-    # Map products_index to their positions for faster updates
-    index_map = {time: i for i, time in enumerate(products_index)}
-
-    for order in orderbook:
-        start = order["start_time"]
-        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
-        end_excl = order["end_time"] - unit.index.freq
-
-        order_times = unit.index[start:end_excl]
-        accepted_volume = order["accepted_volume"]
-        accepted_price = order["accepted_price"]
-
-        for start, max_power in zip(order_times, max_power_values):
-            idx = index_map.get(start)
-
-            marginal_cost = unit.calculate_marginal_cost(
-                start, unit.outputs[product_type].at[start]
-            )
-
-            if isinstance(accepted_volume, dict):
-                accepted_volume = accepted_volume.get(start, 0)
-            else:
-                accepted_volume = accepted_volume
-
-            if isinstance(accepted_price, dict):
-                accepted_price = accepted_price.get(start, 0)
-            else:
-                accepted_price = accepted_price
-
-            price_difference = accepted_price - marginal_cost
-
-            # calculate opportunity cost
-            # as the loss of income we have because we are not running at full power
-            order_opportunity_cost = price_difference * (
-                max_power - unit.outputs[product_type].at[start]
-            )
-            # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
-            # don't consider opportunity_cost more than once! Always the same for one timestep and one market
-            opportunity_cost[idx] = max(order_opportunity_cost, 0)
-            profit[idx] += accepted_price * accepted_volume
-
-    # consideration of start-up costs
-    for i, start in enumerate(products_index):
-        op_time = unit.get_operation_time(start)
-
-        output = unit.outputs[product_type].at[start]
-        marginal_cost = unit.calculate_marginal_cost(start, output)
-        costs[i] += marginal_cost * output
-
-        if output != 0 and op_time < 0:
-            start_up_cost = unit.get_starting_costs(op_time)
-            costs[i] += start_up_cost
-
-    profit -= costs
-    scaling = 0.1 / unit.max_power
-    regret_scale = 0.0
-    reward = (profit - regret_scale * opportunity_cost) * scaling
-
-    # store results in unit outputs which are written to database by unit operator
-    unit.outputs["profit"].loc[products_index] = profit
-    unit.outputs["reward"].loc[products_index] = reward
-    unit.outputs["regret"].loc[products_index] = opportunity_cost
-    unit.outputs["total_costs"].loc[products_index] = costs
-
-    if "rl_reward" in unit.outputs.keys():
-        unit.outputs["rl_reward"].append(reward)

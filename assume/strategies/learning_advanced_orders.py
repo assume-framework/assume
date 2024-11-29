@@ -9,7 +9,7 @@ import torch as th
 
 from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.strategies.flexable import calculate_reward_EOM
+from assume.common.utils import get_products_index
 from assume.strategies.learning_strategies import RLStrategy
 
 
@@ -377,4 +377,80 @@ class RLAdvancedOrderStrategy(RLStrategy):
 
         """
 
-        calculate_reward_EOM(unit, marketconfig, orderbook)
+        product_type = marketconfig.product_type
+        products_index = get_products_index(orderbook)
+
+        max_power_values = (
+            unit.forecaster.get_availability(unit.id)[products_index] * unit.max_power
+        )
+
+        # Initialize intermediate results as numpy arrays for better performance
+        profit = np.zeros(len(products_index))
+        reward = np.zeros(len(products_index))
+        opportunity_cost = np.zeros(len(products_index))
+        costs = np.zeros(len(products_index))
+
+        # Map products_index to their positions for faster updates
+        index_map = {time: i for i, time in enumerate(products_index)}
+
+        for order in orderbook:
+            start = order["start_time"]
+            end_excl = order["end_time"] - unit.index.freq
+
+            order_times = unit.index[start:end_excl]
+            accepted_volume = order.get("accepted_volume", 0)
+            accepted_price = order.get("accepted_price", 0)
+
+            for start, max_power in zip(order_times, max_power_values):
+                idx = index_map.get(start)
+
+                marginal_cost = unit.calculate_marginal_cost(
+                    start, unit.outputs[product_type].at[start]
+                )
+
+                if isinstance(accepted_volume, dict):
+                    accepted_volume = accepted_volume.get(start, 0)
+                else:
+                    accepted_volume = accepted_volume
+
+                if isinstance(accepted_price, dict):
+                    accepted_price = accepted_price.get(start, 0)
+                else:
+                    accepted_price = accepted_price
+
+                price_difference = accepted_price - marginal_cost
+
+                # calculate opportunity cost
+                # as the loss of income we have because we are not running at full power
+                order_opportunity_cost = price_difference * (
+                    max_power - unit.outputs[product_type].at[start]
+                )
+                # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
+                # don't consider opportunity_cost more than once! Always the same for one timestep and one market
+                opportunity_cost[idx] = max(order_opportunity_cost, 0)
+                profit[idx] += accepted_price * accepted_volume
+
+        # consideration of start-up costs
+        for i, start in enumerate(products_index):
+            op_time = unit.get_operation_time(start)
+
+            output = unit.outputs[product_type].at[start]
+            marginal_cost = unit.calculate_marginal_cost(start, output)
+            costs[i] += marginal_cost * output
+
+            if output != 0 and op_time < 0:
+                start_up_cost = unit.get_starting_costs(op_time)
+                costs[i] += start_up_cost
+
+        profit -= costs
+        scaling = 0.1 / unit.max_power
+        regret_scale = 0.2
+        reward = (profit - regret_scale * opportunity_cost) * scaling
+
+        # store results in unit outputs which are written to database by unit operator
+        unit.outputs["profit"].loc[products_index] = profit
+        unit.outputs["reward"].loc[products_index] = reward
+        unit.outputs["regret"].loc[products_index] = opportunity_cost
+        unit.outputs["total_costs"].loc[products_index] = costs
+
+        unit.outputs["rl_reward"].append(reward)
