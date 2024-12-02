@@ -91,10 +91,6 @@ available_examples = {
     },
     "large_2019_rl": {"scenario": "example_03a", "study_case": "base_case_2019"},
     "large_2021_rl": {"scenario": "example_03b", "study_case": "base_case_2021"},
-    "hydrogenplant_case": {
-        "scenario": "experiment",
-        "study_case": "hydrogenplant_case",
-    },
 }
 
 

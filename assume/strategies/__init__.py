@@ -13,8 +13,6 @@ from assume.strategies.flexable_storage import (
 )
 from assume.strategies.naive_strategies import (
     NaiveDADSMStrategy,
-    NaiveNegReserveStrategy,
-    NaivePosReserveStrategy,
     NaiveProfileStrategy,
     NaiveRedispatchSteelplantStrategy,
     NaiveRedispatchStrategy,
