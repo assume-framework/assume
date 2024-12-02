@@ -11,9 +11,11 @@ import pypsa
 from assume.common.grid_utils import (
     add_redispatch_generators,
     add_redispatch_loads,
+    calculate_network_meta,
     read_pypsa_grid,
 )
 from assume.common.market_objects import MarketConfig, Orderbook
+from assume.common.utils import suppress_output
 from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
@@ -182,6 +184,7 @@ class RedispatchMarketRole(MarketRole):
         line_loading = (
             redispatch_network.lines_t.p0.abs() / redispatch_network.lines.s_nom
         )
+
         # Save directly to CSV
         line_loading_df = line_loading.reset_index()
         output_file = "examples/outputs/line_loading.csv"
@@ -219,7 +222,7 @@ class RedispatchMarketRole(MarketRole):
             )
 
         logger.info(f"Line loading data appended to {output_file}")
-        """
+
         # if any line is congested, perform redispatch
         if line_loading.max().max() > 1:
             logger.debug("Congestion detected")
@@ -262,8 +265,6 @@ class RedispatchMarketRole(MarketRole):
         flows = []
 
         return accepted_orders, rejected_orders, meta, flows
-        """
-        return [], [], [], []
 
     def process_dispatch_data(self, network: pypsa.Network, orderbook_df: pd.DataFrame):
         """
