@@ -300,6 +300,7 @@ class Storage(SupportsMinMaxCharge):
         Returns:
             tuple[np.array, np.array]: The minimum and maximum charge power levels of the storage unit in MW.
         """
+        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
 
         base_load = self.outputs["energy"].loc[start:end_excl]
@@ -339,6 +340,7 @@ class Storage(SupportsMinMaxCharge):
         Returns:
             tuple[np.array, np.array]: The minimum and maximum discharge power levels of the storage unit in MW.
         """
+        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
 
         base_load = self.outputs["energy"].loc[start:end_excl]
