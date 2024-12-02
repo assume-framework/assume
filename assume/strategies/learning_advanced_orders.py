@@ -11,6 +11,7 @@ from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.strategies.flexable import calculate_reward_EOM
 from assume.strategies.learning_strategies import RLStrategy
+from assume.reinforcement_learning.learning_utils import min_max_scale
 
 
 class RLAdvancedOrderStrategy(RLStrategy):
@@ -263,17 +264,23 @@ class RLAdvancedOrderStrategy(RLStrategy):
         # =============================================================================
         # 1.1 Get the Observations, which are the basis of the action decision
         # =============================================================================
-        scaling_factor_res_load = self.max_demand
+        upper_scaling_factor_res_load = self.max_residual
+        lower_scaling_factor_res_load = self.min_residual
 
         # price forecast
-        scaling_factor_price = self.max_bid_price
+        upper_scaling_factor_price = self.max_bid_price
+        lower_scaling_factor_price = self.min_bid_price
 
         # total capacity and marginal cost
-        scaling_factor_total_capacity = unit.max_power
+        upper_scaling_factor_total_dispatch = unit.max_power
+        # if unit is not running, total dispatch is 0
+        lower_scaling_factor_total_dispatch = 0
 
         # marginal cost
         # Obs[2*foresight+1:2*foresight+2]
-        scaling_factor_marginal_cost = self.max_bid_price
+        # Could theoretically be negative (eg. subsidies), but assumed to be always positive in the simulation
+        upper_scaling_factor_marginal_cost = self.max_bid_price
+        lower_scaling_factor_marginal_cost = 0
 
         # checks if we are at end of simulation horizon, since we need to change the forecast then
         # for residual load and price forecast and scale them
@@ -283,34 +290,46 @@ class RLAdvancedOrderStrategy(RLStrategy):
             > unit.forecaster[f"residual_load_{market_id}"].index[-1]
         ):
             scaled_res_load_forecast = (
+                min_max_scale(
                 unit.forecaster[f"residual_load_{market_id}"][
                     -int(product_len + self.foresight - 1) :
                 ]
-                / scaling_factor_res_load
+                , lower_scaling_factor_res_load
+                , upper_scaling_factor_res_load
+                )
             )
 
         else:
             scaled_res_load_forecast = (
+                min_max_scale(
                 unit.forecaster[f"residual_load_{market_id}"].loc[
                     start : end_excl + forecast_len
                 ]
-                / scaling_factor_res_load
+                , lower_scaling_factor_res_load
+                , upper_scaling_factor_res_load
+                )
             )
 
         if end_excl + forecast_len > unit.forecaster[f"price_{market_id}"].index[-1]:
             scaled_price_forecast = (
+                min_max_scale(
                 unit.forecaster[f"price_{market_id}"][
                     -int(product_len + self.foresight - 1) :
                 ]
-                / scaling_factor_price
+                , lower_scaling_factor_price
+                , upper_scaling_factor_price
+                )
             )
 
         else:
             scaled_price_forecast = (
+                min_max_scale(
                 unit.forecaster[f"price_{market_id}"].loc[
                     start : end_excl + forecast_len
                 ]
-                / scaling_factor_price
+                , lower_scaling_factor_price
+                , upper_scaling_factor_price
+                )
             )
 
         # get last accepted bid volume and the current marginal costs of the unit
@@ -319,8 +338,16 @@ class RLAdvancedOrderStrategy(RLStrategy):
         current_costs = unit.calculate_marginal_cost(start, current_volume)
 
         # scale unit outputs
-        scaled_max_power = current_volume / scaling_factor_total_capacity
-        scaled_marginal_cost = current_costs / scaling_factor_marginal_cost
+        scaled_max_power = min_max_scale(
+            current_volume
+            , lower_scaling_factor_total_dispatch
+            , upper_scaling_factor_total_dispatch
+        )
+        scaled_marginal_cost = min_max_scale(
+            current_costs
+            , lower_scaling_factor_marginal_cost
+            , upper_scaling_factor_marginal_cost
+        )
 
         # calculate the time the unit has to continue to run or be down
         op_time = unit.get_operation_time(start)
@@ -328,9 +355,13 @@ class RLAdvancedOrderStrategy(RLStrategy):
             must_run_time = max(op_time - unit.min_operating_time, 0)
         elif op_time < 0:
             must_run_time = min(op_time + unit.min_down_time, 0)
-        scaling_factor_must_run_time = max(unit.min_operating_time, unit.min_down_time)
+        upper_scaling_factor_must_run_time = max(unit.min_operating_time, unit.min_down_time)
 
-        scaled_must_run_time = must_run_time / scaling_factor_must_run_time
+        scaled_must_run_time =  min_max_scale(
+            must_run_time
+            , 0
+            , upper_scaling_factor_must_run_time
+        )
 
         # concat all obsverations into one array
         observation = np.concatenate(

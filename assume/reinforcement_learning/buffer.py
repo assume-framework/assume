@@ -86,7 +86,7 @@ class ReplayBuffer:
                 total_memory_usage /= 1e9
                 mem_available /= 1e9
                 warnings.warn(
-                    "This system does not have apparently enough memory to store the complete "
+                    "This system apparently does not have enough memory to store the complete "
                     f"replay buffer {total_memory_usage:.2f}GB > {mem_available:.2f}GB"
                 )
 
@@ -108,7 +108,7 @@ class ReplayBuffer:
 
         Args:
             array (numpy.ndarray): The numpy array to convert.
-            copy (bool, optional): Whether to copy or not the data
+            copy (bool, optional): Whether to copy the data or not 
                 (may be useful to avoid changing things by reference). Defaults to True.
 
         Returns:

@@ -91,3 +91,15 @@ def polyak_update(params, target_params, tau: float):
         for param, target_param in zip(params, target_params):
             target_param.data.mul_(1 - tau)
             th.add(target_param.data, param.data, alpha=tau, out=target_param.data)
+
+
+def min_max_scale(x, min_val : float, max_val : float):
+    """
+    Min-Max scaling of a value x to the range [0, 1]
+
+    Args:
+        x: value(s) to scale
+        min_val: minimum value of the parameter
+        max_val: maximum value of the parameter
+    """
+    return (x - min_val) / (max_val - min_val)
