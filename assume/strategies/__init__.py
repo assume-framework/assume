@@ -28,8 +28,8 @@ from assume.strategies.dmas_storage import DmasStorageStrategy
 bidding_strategies: dict[str, BaseStrategy] = {
     "naive_eom": NaiveSingleBidStrategy,
     "naive_dam": NaiveProfileStrategy,
-    "naive_pos_reserve": NaivePosReserveStrategy,
-    "naive_neg_reserve": NaiveNegReserveStrategy,
+    "naive_pos_reserve": NaiveSingleBidStrategy,
+    "naive_neg_reserve": NaiveSingleBidStrategy,
     "otc_strategy": OTCStrategy,
     "flexable_eom": flexableEOM,
     "flexable_eom_block": flexableEOMBlock,

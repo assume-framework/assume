@@ -13,6 +13,20 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**Improvements:**
+- **Performance Optimization:** Switched to a custom `FastSeries` class, which is based on the pandas Series
+  but utilizes NumPy arrays for internal data storage and indexing. This change significantly improves the
+  performance of read and write operations, achieving an average speedup of **2x to 3x** compared to standard
+  pandas Series. The `FastSeries` class retains a close resemblance to the pandas Series, including core
+  functionalities like indexing, slicing, and arithmetic operations. This ensures seamless integration,
+  allowing users to work with the new class without requiring significant code adaptation.
+- **Performance Optimization:** Output role handles dict data directly and only converts to DataFrame on Database write.
+
+**Bugfixes:**
+  - **Tutorials**: General fixes of the tutorials, to align with updated functionalitites of Assume
+  - **Tutorial 07**: Aligned Amiris loader with changes in format in Amiris compare (https://gitlab.com/fame-framework/fame-io/-/issues/203 and https://gitlab.com/fame-framework/fame-io/-/issues/208)
+  - **Powerplant**: Remove duplicate `Powerplant.set_dispatch_plan()` which broke multi-market bidding
+
 v0.4.3 - (11th November 2024)
 ===========================================
 
