@@ -14,13 +14,23 @@ Upcoming Release
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
 **Improvements:**
-- **Performance Optimization:** Switched to a custom `FastSeries` class, which is based on the pandas Series
+- **Timeseries Performance Optimization:** Switched to a custom `FastIndex` and `FastSeries` class, which is based on the pandas Series
   but utilizes NumPy arrays for internal data storage and indexing. This change significantly improves the
   performance of read and write operations, achieving an average speedup of **2x to 3x** compared to standard
   pandas Series. The `FastSeries` class retains a close resemblance to the pandas Series, including core
   functionalities like indexing, slicing, and arithmetic operations. This ensures seamless integration,
   allowing users to work with the new class without requiring significant code adaptation.
-- **Performance Optimization:** Output role handles dict data directly and only converts to DataFrame on Database write.
+- **Outputs Role Performance Optimization:** Output role handles dict data directly and only converts to DataFrame on Database write.
+- **Overall Performance Optimization:** The overall performance of the framework has been improved by a factor of 5x to 12x
+  depending on the size of the simulation (number of units, markets, and time steps).
+
+**New Features:**
+- **Hydrogen Plant:** A new demand side unit representing a hydrogen plant has been added. The hydrogen plant consists of an
+  electrolyzer and a seasonal hydrogen storage unit. The electrolyzer converts electricity into hydrogen, which can be
+  stored in the hydrogen storage unit and later used.
+- **Seasonal Hydrogen Storage:** A new storage unit representing a seasonal hydrogen storage has been added. The seasonal hydrogen
+  storage unit can store hydrogen over long periods and release it when needed. It has specific constraints to avoid charging or
+  discharging during off-season or on-season time as well as a target level to be reached at the end of the season.
 
 **Bugfixes:**
   - **Tutorials**: General fixes of the tutorials, to align with updated functionalitites of Assume
