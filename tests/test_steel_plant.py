@@ -9,7 +9,7 @@ from assume.common.fast_pandas import FastSeries
 from assume.common.forecasts import NaiveForecast
 from assume.strategies.naive_strategies import (
     NaiveDADSMStrategy,
-    NaiveRedispatchSteelplantStrategy,
+    NaiveRedispatchDSMStrategy,
 )
 from assume.units.steel_plant import SteelPlant
 
@@ -66,7 +66,7 @@ def steel_plant(dsm_components) -> SteelPlant:
 
     bidding_strategies = {
         "EOM": NaiveDADSMStrategy(),
-        "RD": NaiveRedispatchSteelplantStrategy(),
+        "RD": NaiveRedispatchDSMStrategy(),
     }
     return SteelPlant(
         id="test_steel_plant",
@@ -74,7 +74,6 @@ def steel_plant(dsm_components) -> SteelPlant:
         objective="min_variable_cost",
         flexibility_measure="max_load_shift",
         bidding_strategies=bidding_strategies,
-        index=forecast.index,
         components=dsm_components,
         forecaster=forecast,
         demand=1000,
@@ -117,13 +116,6 @@ def test_determine_optimal_operation_without_flex(steel_plant):
             dri_output == dri_input
         ), f"DRI output at time {t} does not match DRI input"
 
-    # for t in instance.time_steps:
-    #     dri_output = instance.dsm_blocks["dri_plant"].dri_output[t].value
-    #     dri_input = instance.dsm_blocks["eaf"].dri_input[t].value
-    #     assert (
-    #         dri_output == dri_input
-    #     ), f"Material flow from DRI plant to EAF at time {t} is inconsistent"
-
     total_steel_output = sum(
         instance.dsm_blocks["eaf"].steel_output[t].value for t in instance.time_steps
     )
@@ -155,25 +147,6 @@ def test_ramping_constraints(steel_plant):
         assert (
             power_prev - power_curr <= ramp_down
         ), f"Electrolyser ramp-down constraint violated at time {t}"
-
-
-# def test_handle_missing_components():
-#     # Check for handling missing required components, as the SteelPlant requires dri_plant for initialization
-#     with pytest.raises(
-#         ValueError, match="Component dri_plant is required for the steel plant unit."
-#     ):
-#         _ = SteelPlant(
-#             id="test_steel_plant",
-#             unit_operator="test_operator",
-#             objective="min_variable_cost",
-#             flexibility_measure="max_load_shift",
-#             bidding_strategies={"EOM": NaiveDADSMStrategy()},
-#             index=pd.date_range("2023-01-01", periods=24, freq="h"),
-#             components={},  # No components provided
-#             forecaster=None,
-#             demand=1000,
-#             technology="unknown_tech",
-#         )
 
 
 def test_determine_optimal_operation_with_flex(steel_plant):
@@ -214,7 +187,7 @@ def steel_plant_without_electrolyser(dsm_components) -> SteelPlant:
 
     bidding_strategies = {
         "EOM": NaiveDADSMStrategy(),
-        "RD": NaiveRedispatchSteelplantStrategy(),
+        "RD": NaiveRedispatchDSMStrategy(),
     }
     return SteelPlant(
         id="test_steel_plant_without_electrolyser",
@@ -222,15 +195,11 @@ def steel_plant_without_electrolyser(dsm_components) -> SteelPlant:
         objective="min_variable_cost",
         flexibility_measure="max_load_shift",
         bidding_strategies=bidding_strategies,
-        index=index,
         components=dsm_components_without_electrolyser,
         forecaster=forecast,
         demand=1000,
         technology="steel_plant",
     )
-
-
-# Test cases
 
 
 def test_handle_missing_electrolyser(steel_plant_without_electrolyser):

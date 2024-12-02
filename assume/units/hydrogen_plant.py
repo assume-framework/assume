@@ -8,14 +8,10 @@ import pandas as pd
 import pyomo.environ as pyo
 from pyomo.opt import (
     SolverFactory,
-    SolverStatus,
-    TerminationCondition,
     check_available_solvers,
 )
 
 from assume.common.base import SupportsMinMax
-from assume.common.market_objects import MarketConfig, Orderbook
-from assume.common.utils import get_products_index
 from assume.units.dsm_load_shift import DSMFlex
 
 SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
@@ -45,7 +41,7 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
     """
 
     required_technologies = ["electrolyser"]
-    optional_technologies = ["h2_seasonal_storage"]
+    optional_technologies = ["hydrogen_seasonal_storage"]
 
     def __init__(
         self,
@@ -101,7 +97,9 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         self.cost_tolerance = cost_tolerance
 
         # Check for the presence of components
-        self.has_h2seasonal_storage = "h2_seasonal_storage" in self.components.keys()
+        self.has_h2seasonal_storage = (
+            "hydrogen_seasonal_storage" in self.components.keys()
+        )
         self.has_electrolyser = "electrolyser" in self.components.keys()
 
         # Define the Pyomo model
@@ -177,9 +175,11 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
             if self.has_h2seasonal_storage:
                 # With storage: demand can be fulfilled by electrolyser, storage discharge, or both
                 storage_discharge = self.model.dsm_blocks[
-                    "h2_seasonal_storage"
+                    "hydrogen_seasonal_storage"
                 ].discharge[t]
-                storage_charge = self.model.dsm_blocks["h2_seasonal_storage"].charge[t]
+                storage_charge = self.model.dsm_blocks[
+                    "hydrogen_seasonal_storage"
+                ].charge[t]
 
                 # Hydrogen can be supplied to demand and/or storage, and storage can also discharge to meet demand
                 return (
@@ -209,7 +209,9 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
                 return (
                     sum(
                         self.model.dsm_blocks["electrolyser"].hydrogen_out[t]
-                        + self.model.dsm_blocks["h2_seasonal_storage"].discharge[t]
+                        + self.model.dsm_blocks["hydrogen_seasonal_storage"].discharge[
+                            t
+                        ]
                         for t in self.model.time_steps
                     )
                     == self.model.absolute_hydrogen_demand
@@ -271,169 +273,6 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
 
         if self.opt_power_requirement is None and self.objective == "min_variable_cost":
             self.determine_optimal_operation_without_flex()
-
-    def determine_optimal_operation_without_flex(self):
-        """
-        Determines the optimal operation of the steel plant without considering flexibility.
-        """
-        # create an instance of the model
-        instance = self.model.create_instance()
-        # switch the instance to the optimal mode by deactivating the flexibility constraints and objective
-        instance = self.switch_to_opt(instance)
-
-        # solve the instance
-        results = self.solver.solve(instance, options=self.solver_options)
-
-        # Check solver status and termination condition
-        if (results.solver.status == SolverStatus.ok) and (
-            results.solver.termination_condition == TerminationCondition.optimal
-        ):
-            logger.debug("The model was solved optimally.")
-
-            # Display the Objective Function Value
-            objective_value = instance.obj_rule_opt()
-            logger.debug(f"The value of the objective function is {objective_value}.")
-
-        elif results.solver.termination_condition == TerminationCondition.infeasible:
-            logger.debug("The model is infeasible.")
-
-        else:
-            logger.debug("Solver Status: ", results.solver.status)
-            logger.debug(
-                "Termination Condition: ", results.solver.termination_condition
-            )
-
-        self.opt_power_requirement = pd.Series(
-            data=instance.total_power_input.get_values()
-        ).set_axis(self.index)
-
-        self.total_cost = sum(
-            instance.variable_cost[t].value for t in instance.time_steps
-        )
-
-        # Variable cost series
-        self.variable_cost_series = pd.Series(
-            data=instance.variable_cost.get_values()
-        ).set_axis(self.index)
-
-    def determine_optimal_operation_with_flex(self):
-        """
-        Determines the optimal operation of the steel plant without considering flexibility.
-        """
-        # create an instance of the model
-        instance = self.model.create_instance()
-        # switch the instance to the flexibility mode by deactivating the optimal constraints and objective
-        instance = self.switch_to_flex(instance)
-        # solve the instance
-        results = self.solver.solve(instance, options=self.solver_options)
-
-        # Check solver status and termination condition
-        if (results.solver.status == SolverStatus.ok) and (
-            results.solver.termination_condition == TerminationCondition.optimal
-        ):
-            logger.debug("The model was solved optimally.")
-
-            # Display the Objective Function Value
-            objective_value = instance.obj_rule_flex()
-            logger.debug(f"The value of the objective function is {objective_value}.")
-
-        elif results.solver.termination_condition == TerminationCondition.infeasible:
-            logger.debug("The model is infeasible.")
-
-        else:
-            logger.debug("Solver Status: ", results.solver.status)
-            logger.debug(
-                "Termination Condition: ", results.solver.termination_condition
-            )
-
-        temp = instance.total_power_input.get_values()
-        self.flex_power_requirement = pd.Series(data=temp)
-        self.flex_power_requirement.index = self.index
-
-        # Variable cost series
-        temp_1 = instance.variable_cost.get_values()
-        self.variable_cost_series = pd.Series(data=temp_1)
-        self.variable_cost_series.index = self.index
-
-    def switch_to_opt(self, instance):
-        """
-        Switches the instance to solve a cost based optimisation problem by deactivating the flexibility constraints and objective.
-
-        Args:
-            instance (pyomo.ConcreteModel): The instance of the Pyomo model.
-
-        Returns:
-            pyomo.ConcreteModel: The modified instance with flexibility constraints and objective deactivated.
-        """
-        # deactivate the flexibility constraints and objective
-        instance.obj_rule_flex.deactivate()
-
-        instance.total_cost_upper_limit.deactivate()
-        instance.total_power_input_constraint_with_flex.deactivate()
-
-        return instance
-
-    def switch_to_flex(self, instance):
-        """
-        Switches the instance to flexibility mode by deactivating few constraints and objective function.
-
-        Args:
-            instance (pyomo.ConcreteModel): The instance of the Pyomo model.
-
-        Returns:
-            pyomo.ConcreteModel: The modified instance with optimal constraints and objective deactivated.
-        """
-        # deactivate the optimal constraints and objective
-        instance.obj_rule_opt.deactivate()
-        instance.total_power_input_constraint.deactivate()
-
-        # fix values of model.total_power_input
-        for t in instance.time_steps:
-            instance.total_power_input[t].fix(self.opt_power_requirement.iloc[t])
-        instance.total_cost = self.total_cost
-
-        return instance
-
-    def set_dispatch_plan(
-        self,
-        marketconfig: MarketConfig,
-        orderbook: Orderbook,
-    ) -> None:
-        """
-        Adds the dispatch plan from the current market result to the total dispatch plan and calculates the cashflow.
-
-        Args:
-            marketconfig (MarketConfig): The market configuration.
-            orderbook (Orderbook): The orderbook.
-        """
-        products_index = get_products_index(orderbook)
-
-        product_type = marketconfig.product_type
-        for order in orderbook:
-            start = order["start_time"]
-            end = order["end_time"]
-            end_excl = end - self.index.freq
-            if isinstance(order["accepted_volume"], dict):
-                self.outputs[product_type].loc[start:end_excl] += [
-                    order["accepted_volume"][key]
-                    for key in order["accepted_volume"].keys()
-                ]
-            else:
-                self.outputs[product_type].loc[start:end_excl] += order[
-                    "accepted_volume"
-                ]
-
-        self.calculate_cashflow(product_type, orderbook)
-
-        for start in products_index:
-            current_power = self.outputs[product_type][start]
-            self.outputs[product_type][start] = current_power
-
-        self.bidding_strategies[marketconfig.market_id].calculate_reward(
-            unit=self,
-            marketconfig=marketconfig,
-            orderbook=orderbook,
-        )
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         """

@@ -1501,10 +1501,6 @@ class SeasonalHydrogenStorage(GenericStorage):
         **kwargs,
     ):
         horizon = int(horizon)
-        # off_season_start = int(off_season_start)
-        # off_season_end = int(off_season_end)
-        # on_season_start = int(on_season_start)
-        # on_season_end = int(on_season_end)
 
         super().__init__(
             max_capacity=max_capacity,
@@ -1665,7 +1661,7 @@ class DRIStorage(GenericStorage):
 demand_side_technologies: dict = {
     "electrolyser": Electrolyser,
     "hydrogen_buffer_storage": HydrogenBufferStorage,
-    "h2_seasonal_storage": SeasonalHydrogenStorage,
+    "hydrogen_seasonal_storage": SeasonalHydrogenStorage,
     "dri_plant": DRIPlant,
     "dri_storage": DRIStorage,
     "eaf": ElectricArcFurnace,

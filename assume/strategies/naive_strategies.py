@@ -176,7 +176,7 @@ class NaiveDADSMStrategy(BaseStrategy):
         return bids
 
 
-class NaiveRedispatchSteelplantStrategy(BaseStrategy):
+class NaiveRedispatchDSMStrategy(BaseStrategy):
     def calculate_bids(
         self,
         unit: SupportsMinMax,
