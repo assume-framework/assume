@@ -1081,7 +1081,10 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=52, act_dim=2, unique_obs_dim=2, *args, **kwargs)
+        foresight = kwargs.get("foresight", 24)
+        uniq_obs_dim = 2
+        obs_dim = foresight * 4 + uniq_obs_dim
+        super().__init__(obs_dim=obs_dim, act_dim=2, unique_obs_dim=uniq_obs_dim, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
 
@@ -1285,7 +1288,7 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
                 # define current action as soley noise
                 noise = (
                     th.normal(
-                        mean=0.0, std=0.4, size=(1, self.act_dim), dtype=self.float_type
+                        mean=0.0, std=0.2, size=(1, self.act_dim), dtype=self.float_type
                     )
                     .to(self.device)
                     .squeeze()
@@ -1338,54 +1341,44 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
         Rewards are based on profit and include fixed costs for charging and discharging.
         """
 
-        scaling_factor = 0.1 / unit.max_power_discharge if unit.has_battery_storage else 1
+        scaling_factor = (unit.max_power_discharge if unit.has_battery_storage else 1) * self.max_bid_price
 
-        reward = 0
-        factor_battery = 0.8
-        factor_other_electricity = 1 - factor_battery if unit.has_battery_storage else 1
+        start_time = orderbook[0]["start_time"]
+        end_time = orderbook[0]["end_time"]
+        end_exclusive = end_time - unit.index.freq
+        duration = (end_time - start_time) / pd.Timedelta(unit.index.freq)
+        next_time = start_time + unit.index.freq
 
-        first_order_start = orderbook[0]["start_time"]
-        last_order_start = orderbook[0]["start_time"]
-
-        battery_power = unit.battery_charge[first_order_start].copy()
-        # Iterate over all orders in the orderbook to calculate order-specific profit
+        battery_power = unit.battery_charge[start_time].copy()
+        # ignore very small volumes due to calculations
+        total_cost, total_volume = 0, 0
         for order in orderbook:
-            first_order_start = min(first_order_start, order["start_time"])
-            last_order_start = max(last_order_start, order["start_time"])
-            start_time = order["start_time"]
-            next_time = start_time + unit.index.freq
-            end_time = order["end_time"]
-            end_exclusive = end_time - unit.index.freq
-            duration = (end_time - start_time) / pd.Timedelta(unit.index.freq)
+            if abs(order["accepted_volume"]) > 1e-8:
+                total_cost += order["accepted_price"] * order["accepted_volume"]
+                total_volume += order["accepted_volume"]
 
-            # ignore very small volumes due to calculations
-            accepted_volume = order["accepted_volume"] if abs(order["accepted_volume"]) > 1e-8 else 0
-            other_electricity = accepted_volume - battery_power
+        avg_price = total_cost / total_volume if total_volume != 0 else 0
+        other_electricity = total_volume - battery_power
 
-            battery_profit = order["accepted_price"] * battery_power * duration
+        battery_profit = avg_price * battery_power * duration
+        other_profit = avg_price * other_electricity * duration
 
-            # Calculate profit and cost for the order
-            other_profit = order["accepted_price"] * other_electricity * duration
+        current_soc = unit.outputs["soc"][start_time]
+        next_soc = unit.outputs["soc"][next_time]
 
-            current_soc = unit.outputs["soc"][start_time]
-            next_soc = unit.outputs["soc"][next_time]
-
-            # Calculate and clip the energy cost for the start time
-            unit.outputs["energy_cost"].at[next_time] = np.clip(
-                (unit.outputs["energy_cost"][start_time] * current_soc - battery_profit)
-                / next_soc,
-                0,
-                self.max_bid_price,
+        # Calculate and clip the energy cost for the start time
+        unit.outputs["energy_cost"].at[next_time] = np.clip(
+            (unit.outputs["energy_cost"][start_time] * current_soc - battery_profit)
+            / next_soc,
+            0,
+            self.max_bid_price,
             )
 
-            reward += (factor_battery * battery_profit + factor_other_electricity * other_profit) * scaling_factor
-
-            # Store results in unit outputs
-            unit.outputs["profit"].loc[start_time:end_exclusive] += battery_profit + other_profit
-            unit.outputs["reward"].loc[start_time:end_exclusive] = reward
-            #unit.outputs["regret"].loc[start_time:end_exclusive] += regret_factor * regret
-            unit.outputs["total_costs"].loc[start_time:end_exclusive] = other_profit
-        unit.outputs["rl_rewards"].extend(unit.outputs["reward"].loc[first_order_start:last_order_start])
+        reward = total_cost / scaling_factor
+        unit.outputs["profit"].loc[start_time:end_exclusive] += total_cost
+        unit.outputs["reward"].loc[start_time:end_exclusive] = reward
+        unit.outputs["total_costs"].loc[start_time:end_exclusive] = other_profit
+        unit.outputs["rl_rewards"].append(reward)
 
     def create_observation(
             self,
@@ -1480,20 +1473,65 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
                     / scaling_factor_price
             )
 
+        max_inflex_demand = max(unit.inflex_demand)
+        scale_factor_inflex_demand = max_inflex_demand if max_inflex_demand != 0 else 1
+        if end_excl + forecast_len > unit.inflex_demand.index[-1]:
+            scaled_inflex_demand = (
+                    unit.inflex_demand.loc[start:].values
+                    / scale_factor_inflex_demand
+            )
+            scaled_inflex_demand = np.concatenate(
+                [
+                    scaled_inflex_demand,
+                    unit.inflex_demand.iloc[
+                    : self.foresight - len(scaled_inflex_demand)
+                    ],
+                ]
+            )
+
+        else:
+            scaled_inflex_demand = (
+                    unit.inflex_demand
+                    .loc[start: end_excl + forecast_len]
+                    .values
+                    / scale_factor_inflex_demand
+            )
+
+        scaling_factor_pv = unit.pv_max_power if unit.has_pv and unit.pv_max_power != 0 else 1
+        if end_excl + forecast_len > unit.pv_production.index[-1]:
+            scaled_pv_availability = (
+                    unit.pv_production.loc[start:].values
+                    / scaling_factor_pv
+            )
+            scaled_pv_availability = np.concatenate(
+                [
+                    scaled_pv_availability,
+                    unit.pv_production.iloc[
+                    : self.foresight - len(scaled_pv_availability)
+                    ],
+                ]
+            )
+
+        else:
+            scaled_pv_availability = (
+                    unit.pv_production
+                    .loc[start: end_excl + forecast_len]
+                    .values
+                    / scaling_factor_pv
+            )
+
         # get the current soc value
         soc_scaled = (unit.outputs["soc"].at[start] / unit.max_capacity) if unit.has_battery_storage and unit.max_capacity != 0 else 0
         energy_cost_scaled = unit.outputs["energy_cost"].at[start] / self.max_bid_price
-        max_inflex_demand = max(unit.inflex_demand)
-        scale_factor_inflex_demand = max_inflex_demand if max_inflex_demand != 0 else 1
-        inflex_demand_scaled = unit.inflex_demand[start] / scale_factor_inflex_demand
-        pv_availability = (unit.pv_production[start] / unit.pv_max_power) if unit.has_pv and unit.pv_max_power != 0 else 0
 
         # concat all observations into one array
         observation = np.concatenate(
             [
                 scaled_res_load_forecast,
                 scaled_price_forecast,
-                np.array([soc_scaled, energy_cost_scaled, inflex_demand_scaled, pv_availability]),
+                scaled_inflex_demand,
+                scaled_pv_availability,
+                np.array([soc_scaled, energy_cost_scaled]),
             ]
         )
 
