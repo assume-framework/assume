@@ -197,7 +197,7 @@ class Building(DSMFlex, SupportsMinMax):
         community_load_scaled = ((community_load - min_val) / (max_val - min_val) * 2) - 1
         spread = (buy_forecast - sell_forecast)
         price_delta = spread * community_load_scaled / 2
-        return np.round(buy_forecast - max(price_delta) + price_delta, 2)
+        return np.round(buy_forecast - max(price_delta) + price_delta, 5)
 
     def create_availability_df(self, availability_periods):
         """
@@ -533,7 +533,7 @@ class Building(DSMFlex, SupportsMinMax):
         if self.opt_power_requirement[start] != 0:
             marginal_cost = round(abs(
                 self.variable_expenses_series[start] / self.opt_power_requirement[start]
-            ),2)
+            ),5)
         return marginal_cost
 
     def calculate_max_discharge(self, start: pd.Timestamp, end: pd.Timestamp) -> pd.Series:

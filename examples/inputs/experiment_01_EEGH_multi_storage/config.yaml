@@ -19,11 +19,11 @@ EEGH_2024_multi_storage:
           first_delivery: 15min
       opening_frequency: 24h
       opening_duration: 15min
-      volume_unit: MWh
+      volume_unit: kWh
       maximum_bid_volume: 100000
       maximum_bid_price: 3000
       minimum_bid_price: -500
-      price_unit: EUR/MWh
+      price_unit: EUR/kWh
       market_mechanism: pay_as_bid_building
       
   learning_config:
@@ -47,3 +47,4 @@ EEGH_2024_multi_storage:
     validation_episodes_interval: 5
     early_stopping_steps: 10
     early_stopping_threshold: 0.05
+    foresight: 96
