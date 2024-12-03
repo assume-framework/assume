@@ -22,7 +22,6 @@ base:
     batch_size: 256
     gamma: 0.99
     device: cpu
-    use_lr_schedule: True
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
@@ -61,12 +60,11 @@ base_lstm:
     learning_rate: 0.001
     training_episodes: 50
     episodes_collecting_initial_experience: 5
-    train_freq: 12h
+    train_freq: 24h
     gradient_steps: -1
     batch_size: 256
     gamma: 0.99
     device: cpu
-    use_lr_schedule: True
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
