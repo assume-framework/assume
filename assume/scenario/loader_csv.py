@@ -997,6 +997,7 @@ def run_learning(
                 )
 
             if world.learning_role.rl_algorithm_name == "ppo":
+                # TODO: add surrogate loss as a parameter to compare_and_save_policies
                 # PPO uses the surrogate loss to monitor policy updates.
                 # The surrogate loss quantifies how much the new policy has changed compared to the old one.
                 # If the surrogate loss becomes too small or too large, it can indicate issues:
@@ -1013,7 +1014,6 @@ def run_learning(
                 # terminate = world.learning_role.compare_and_save_policies({"surrogate_loss": surrogate_loss})
 
                 # Reset the PPO Rollout Buffer after each update
-                # TODO: add surrogate loss as a parameter to compare_and_save_policies
                 inter_episodic_data["buffer"].reset()
 
                 total_rewards = world.output_role.get_sum_reward()

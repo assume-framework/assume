@@ -95,7 +95,7 @@ class CriticTD3(nn.Module):
 class CriticPPO(nn.Module):
     """Critic Network for Proximal Policy Optimization (PPO).
 
-    Centralized critic.
+    Centralized critic, meaning that is has access to the observation space of all competitive learning agents.
 
     Args:
         n_agents (int): Number of agents
@@ -182,8 +182,7 @@ class DistActor(MLPActor):
     def __init__(self, obs_dim: int, act_dim: int, float_type, *args, **kwargs):
         super().__init__(obs_dim, act_dim, float_type, *args, **kwargs)
 
-        #self.initialize_weights(final_gain=0.1)
-
+        
     def initialize_weights(self, final_gain=np.sqrt(2)):
         for layer in [self.FC1, self.FC2]:
             nn.init.orthogonal_(layer.weight, gain=np.sqrt(2))
@@ -198,11 +197,6 @@ class DistActor(MLPActor):
         x = F.relu(self.FC2(x))
         # Works with MATD3, output of softsign: [-1, 1]
         x = F.softsign(self.FC3(x))
-        
-        # x = th.tanh(self.FC3(x))
-
-        # Tested for PPO, scales the output to [0, 1] range
-        #x = th.sigmoid(self.FC3(x))
 
         # Create a normal distribution for continuous actions (with assumed standard deviation of 
         # TODO: 0.01/0.0 as in marlbenchmark or 1.0 or sheduled decrease?)

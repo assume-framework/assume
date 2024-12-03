@@ -78,27 +78,6 @@ class PPO(RLAlgorithm):
         self.save_critic_params(directory=f"{directory}/critics")
         self.save_actor_params(directory=f"{directory}/actors")
 
- 
-    # Removed critic_target in comparison to MATD3
-    # Decentralized
-    # def save_critic_params(self, directory):
-    #     """
-    #     Save the parameters of critic networks.
-
-    #     This method saves the parameters of the critic networks, including the critic's state_dict and the critic's optimizer state_dict. 
-    #     It organizes the saved parameters into a directory structure specific to the critic associated with each learning strategy.
-
-    #     Args:
-    #         directory (str): The base directory for saving the parameters.
-    #     """
-    #     os.makedirs(directory, exist_ok=True)
-    #     for u_id in self.learning_role.rl_strats.keys():
-    #         obj = {
-    #             "critic": self.learning_role.rl_strats[u_id].critic.state_dict(),
-    #             "critic_optimizer": self.learning_role.rl_strats[u_id].critic.optimizer.state_dict(),
-    #         }
-    #         path = f"{directory}/critic_{u_id}.pt"
-    #         th.save(obj, path)
 
 
     # Centralized
@@ -164,40 +143,6 @@ class PPO(RLAlgorithm):
         self.load_critic_params(directory)
         self.load_actor_params(directory)
 
-    # Removed critic_target in comparison to MATD3 (critic network = value function network)
-    # Decentralized
-    # def load_critic_params(self, directory: str) -> None:
-    #     """
-    #     Load the parameters of critic networks from a specified directory.
-
-    #     This method loads the parameters of critic networks, including the critic's state_dict and
-    #     the critic's optimizer state_dict, from the specified directory. It iterates through the learning strategies associated
-    #     with the learning role, loads the respective parameters, and updates the critic networks accordingly.
-
-    #     Args:
-    #         directory (str): The directory from which the parameters should be loaded.
-    #     """
-    #     logger.info("Loading critic parameters...")
-
-    #     if not os.path.exists(directory):
-    #         logger.warning(
-    #             "Specified directory for loading the critics does not exist! Starting with randomly initialized values!"
-    #         )
-    #         return
-
-    #     for u_id in self.learning_role.rl_strats.keys():
-    #         try:
-    #             critic_params = self.load_obj(
-    #                 directory=f"{directory}/critics/critic_{str(u_id)}.pt"
-    #             )
-    #             self.learning_role.rl_strats[u_id].critic.load_state_dict(
-    #                 critic_params["critic"]
-    #             )
-    #             self.learning_role.rl_strats[u_id].critic.optimizer.load_state_dict(
-    #                 critic_params["critic_optimizer"]
-    #             )
-    #         except Exception:
-    #             logger.warning(f"No critic values loaded for agent {u_id}")
 
 
     # Centralized
@@ -270,33 +215,6 @@ class PPO(RLAlgorithm):
             except Exception:
                 logger.warning(f"No actor values loaded for agent {u_id}")
 
-    # Removed target_critics and actor_target in comparison to MATD3
-    # Decentralized
-    # def initialize_policy(self, actors_and_critics: dict = None) -> None:
-    #     """
-    #     Create actor and critic networks for reinforcement learning.
-
-    #     If `actors_and_critics` is None, this method creates new actor and critic networks.
-    #     If `actors_and_critics` is provided, it assigns existing networks to the respective attributes.
-
-    #     Args:
-    #         actors_and_critics (dict): The actor and critic networks to be assigned.
-    #     """
-    #     if actors_and_critics is None:
-    #         self.create_actors()
-    #         self.create_critics()
-    #     else:
-    #         # Decentralized initialization of actors and critics
-    #         for u_id, unit_strategy in self.learning_role.rl_strats.items():
-    #             unit_strategy.actor = actors_and_critics["actors"][u_id]
-    #             # unit_strategy.actor_target = actors_and_critics["actor_targets"][u_id]
-    #             unit_strategy.critic = actors_and_critics["critics"][u_id]
-    #             # unit_strategy.critic_target = actors_and_critics["critic_targets"][u_id]
-
-    #         # Assign shared dimensions
-    #         self.obs_dim = actors_and_critics["obs_dim"]
-    #         self.act_dim = actors_and_critics["act_dim"]
-    #         self.unique_obs_dim = actors_and_critics["unique_obs_dim"]
 
     # Centralized
     def initialize_policy(self, actors_and_critics: dict = None) -> None:
@@ -372,44 +290,6 @@ class PPO(RLAlgorithm):
         else:
             self.act_dim = act_dim_list[0]
 
-    # Removed target_critics in comparison to MATD3
-    # Changed initialization of CriticPPO compared to MATD3
-    # Decentralized
-    # def create_critics(self) -> None:
-    #     """
-    #     Create decentralized critic networks for reinforcement learning.
-
-    #     This method initializes a separate critic network for each agent in the reinforcement learning setup.
-    #     Each critic learns to predict the value function based on the individual agent's observation.
-
-    #     Notes:
-    #         Each agent has its own critic, so the critic is no longer shared among all agents.
-    #     """
-
-    #     unique_obs_dim_list = []
-
-    #     for _, unit_strategy in self.learning_role.rl_strats.items():
-    #         unit_strategy.critic = CriticPPO(
-    #             obs_dim=unit_strategy.obs_dim,
-    #             float_type=self.float_type,
-    #         ).to(self.device)
-
-    #         unit_strategy.critic.optimizer = Adam(
-    #             unit_strategy.critic.parameters(), lr=self.learning_rate
-    #         )
-
-    #         unique_obs_dim_list.append(unit_strategy.unique_obs_dim)
-
-    #     # Check if all unique_obs_dim are the same and raise an error if not
-    #     # If they are all the same, set the unique_obs_dim attribute
-    #     if len(set(unique_obs_dim_list)) > 1:
-    #         raise ValueError(
-    #             "All unique_obs_dim values must be the same for all RL agents"
-    #         )
-    #     else:
-    #         self.unique_obs_dim = unique_obs_dim_list[0]
-
-
 
     # Centralized
     def create_critics(self) -> None:
@@ -455,34 +335,6 @@ class PPO(RLAlgorithm):
         else:
             self.unique_obs_dim = unique_obs_dim_list[0]
 
-    # Decentralized
-    # def extract_policy(self) -> dict:
-    #     """
-    #     Extract actor and critic networks.
-
-    #     This method extracts the actor and critic networks associated with each learning strategy and organizes them into a
-    #     dictionary structure. The extracted networks include actors and critics. The resulting
-    #     dictionary is typically used for saving and sharing these networks.
-
-    #     Returns:
-    #         dict: The extracted actor and critic networks.
-    #     """
-    #     actors = {}
-    #     critics = {}
-
-    #     for u_id, unit_strategy in self.learning_role.rl_strats.items():
-    #         actors[u_id] = unit_strategy.actor
-    #         critics[u_id] = unit_strategy.critic
-
-    #     actors_and_critics = {
-    #         "actors": actors,
-    #         "critics": critics,
-    #         "obs_dim": self.obs_dim,
-    #         "act_dim": self.act_dim,
-    #         "unique_obs_dim": self.unique_obs_dim,
-    #     }
-
-    #     return actors_and_critics
 
     # Centralized
     def extract_policy(self) -> dict:
@@ -614,16 +466,7 @@ class PPO(RLAlgorithm):
         full_values = self.get_values(full_transitions.observations, full_transitions.actions)
         full_advantages, full_returns = self.get_advantages(full_transitions.rewards, full_values)
         
-        #states = transitions.observations
-        #actions = transitions.actions
-        #rewards = transitions.rewards
-        #log_probs = transitions.log_probs
-        
-        # Pass the current states through the critic network to get value estimates.
-        #values = self.get_values(states, actions)
 
-        # Compute advantages using Generalized Advantage Estimation (GAE)
-        #advantages, returns = self.get_advantages(rewards, values)
 
         for _ in range(self.gradient_steps):
             self.n_updates += 1
@@ -753,8 +596,6 @@ def get_actions(rl_strategy, next_observation):
     log_prob_action = log_prob_action.detach()
 
     logger.debug(f"Detached log probability of the sampled action: {log_prob_action}")
-
-    logger.debug(f"Clamped sampled action: {sampled_action}")
 
 
     return sampled_action, log_prob_action

@@ -139,7 +139,8 @@ class RLStrategy(AbstractLearningStrategy):
 
         # based on learning config
         self.algorithm = kwargs.get("algorithm", "matd3")
-        actor_architecture = kwargs.get("actor_architecture", "mlp")
+        algo_config = kwargs.get(self.algorithm, {})
+        actor_architecture = algo_config.get("actor_architecture", "mlp")
 
         if actor_architecture in actor_architecture_aliases.keys():
             self.actor_architecture_class = actor_architecture_aliases[

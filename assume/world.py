@@ -656,11 +656,13 @@ class World:
             start_ts (datetime.datetime): The start timestamp for the simulation run.
             end_ts (datetime.datetime): The end timestamp for the simulation run.
         """
-        logger.info("activating container")
+        if not self.learning_mode:
+            logger.info("activating container")
         # agent is implicit added to self.container._agents
         async with activate(self.container) as c:
             await tasks_complete_or_sleeping(c)
-            logger.info("all agents up - starting simulation")
+            if not self.learning_mode:
+                logger.info("all agents up - starting simulation")
             pbar = tqdm(total=end_ts - start_ts)
 
             # allow registration before first opening
