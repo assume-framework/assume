@@ -188,6 +188,33 @@ def add_loads(
             columns=loads.index,
         )
 
+def add_storage_units(
+    network: pypsa.Network,
+    storage_units: pd.DataFrame,
+) -> None:
+    """
+    Add storage_unit as loads to the grid
+
+    Args:
+        network (pypsa.Network): the pypsa network to which the loads are connected
+        loads (pandas.DataFrame): the loads dataframe
+    """
+
+    # add loads
+    network.madd(
+        "Load",
+        names=storage_units.index,
+        bus=storage_units["node"],  # bus to which the generator is connected to
+        **storage_units,
+    )
+
+    if "p_set" not in storage_units.columns:
+        network.loads_t["p_set"] = pd.DataFrame(
+            np.zeros((len(network.snapshots), len(storage_units.index))),
+            index=network.snapshots,
+            columns=storage_units.index,
+        )
+
 
 def add_redispatch_loads(
     network: pypsa.Network,

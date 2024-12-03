@@ -310,12 +310,14 @@ def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame]:
     lines = pd.read_csv(network_path / "lines.csv", index_col=0)
     generators = pd.read_csv(network_path / "powerplant_units.csv", index_col=0)
     loads = pd.read_csv(network_path / "demand_units.csv", index_col=0)
+    storage_units = pd.read_csv(network_path / "storage_units.csv", index_col=0)
 
     return {
         "buses": buses,
         "lines": lines,
         "generators": generators,
         "loads": loads,
+        "storage_units": storage_units,
     }
 
 
