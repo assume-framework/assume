@@ -234,7 +234,7 @@ class WriteOutput(Role):
             "market_meta",
             "market_dispatch",
             "unit_dispatch",
-            "rl_learning_params",
+            "rl_params",
         ]:
             # these can be processed as a single dataframe
             self.write_buffers[content_type].extend(content_data)
@@ -449,7 +449,7 @@ class WriteOutput(Role):
                         df = self.convert_market_dispatch(data_list)
                     case "unit_dispatch":
                         df = self.convert_unit_dispatch(data_list)
-                    case "rl_learning_params":
+                    case "rl_params":
                         df = self.convert_rl_params(data_list)
                     case "grid_flows":
                         dfs = []

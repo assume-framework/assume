@@ -167,7 +167,7 @@ class RLUnitsOperator(UnitsOperator):
                 receiver_addr=db_addr,
                 content={
                     "context": "write_results",
-                    "type": "rl_learning_params",
+                    "type": "rl_params",
                     "data": output_agent_list,
                 },
             )

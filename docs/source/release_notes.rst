@@ -13,6 +13,19 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**New Features:**
+- **Learning rate and noise scheduling**: Added the possibility to schedule the learning rate and action noise in the learning process. This feature
+  enables streamlining the learning progress. Currently, only "linear" decay available by setting the `learning_rate_schedule` and
+  `action_noise_schedule` in the learning config to "linear". Defaults to no decay if not provided. It decays `learning_rate`/ `noise_dt`
+  linearly from starting value to 0 over given `training_episodes` which can be adjusted by the user. The schedule parameters (e.g. end value
+  and end fraction) are not adjustable in the config file, but can be set in the code.
+- **Hydrogen Plant:** A new demand side unit representing a hydrogen plant has been added. The hydrogen plant consists of an
+  electrolyzer and a seasonal hydrogen storage unit. The electrolyzer converts electricity into hydrogen, which can be
+  stored in the hydrogen storage unit and later used.
+- **Seasonal Hydrogen Storage:** A new storage unit representing a seasonal hydrogen storage has been added. The seasonal hydrogen
+  storage unit can store hydrogen over long periods and release it when needed. It has specific constraints to avoid charging or
+  discharging during off-season or on-season time as well as a target level to be reached at the end of the season.
+
 **Improvements:**
 - **Timeseries Performance Optimization:** Switched to a custom `FastIndex` and `FastSeries` class, which is based on the pandas Series
   but utilizes NumPy arrays for internal data storage and indexing. This change significantly improves the
@@ -23,14 +36,6 @@ Upcoming Release
 - **Outputs Role Performance Optimization:** Output role handles dict data directly and only converts to DataFrame on Database write.
 - **Overall Performance Optimization:** The overall performance of the framework has been improved by a factor of 5x to 12x
   depending on the size of the simulation (number of units, markets, and time steps).
-
-**New Features:**
-- **Hydrogen Plant:** A new demand side unit representing a hydrogen plant has been added. The hydrogen plant consists of an
-  electrolyzer and a seasonal hydrogen storage unit. The electrolyzer converts electricity into hydrogen, which can be
-  stored in the hydrogen storage unit and later used.
-- **Seasonal Hydrogen Storage:** A new storage unit representing a seasonal hydrogen storage has been added. The seasonal hydrogen
-  storage unit can store hydrogen over long periods and release it when needed. It has specific constraints to avoid charging or
-  discharging during off-season or on-season time as well as a target level to be reached at the end of the season.
 
 **Bugfixes:**
   - **Tutorials**: General fixes of the tutorials, to align with updated functionalitites of Assume

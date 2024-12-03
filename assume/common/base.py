@@ -754,6 +754,7 @@ class LearningConfig(TypedDict):
     algorithm: str
     actor_architecture: str
     learning_rate: float
+    learning_rate_schedule: str
     training_episodes: int
     episodes_collecting_initial_experience: int
     train_freq: str
@@ -764,6 +765,7 @@ class LearningConfig(TypedDict):
     noise_sigma: float
     noise_scale: int
     noise_dt: int
+    action_noise_schedule: str
     trained_policies_save_path: str
     early_stopping_steps: int
     early_stopping_threshold: float
