@@ -14,8 +14,7 @@ Upcoming Release
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
 **New Features:**
-- **Learning rate and noise scheduling**: Added the possibility to schedule the learning rate and noise in the learning process. This feature enables streamlining the learning progress. It was designed similar to the stable baselines implementation. This can be done by setting the `use_lr_schedule` and `use_noise_schedule` in the learning config.
-The schedules are linear (default: from `learning_rate`/ `noise_dt` to 0 over given `training_episodes`) and can be adjusted by the user. The schedules are not adjustable in the config file yet, but can be set in the code.
+- **Learning rate and noise scheduling**: Added the possibility to schedule the learning rate and action noise in the learning process. This feature enables streamlining the learning progress. Currently, only "linear" decay available by setting the `learning_rate_schedule` and `action_noise_schedule` in the learning config to "linear". Defaults to no decay if not provided. It decays `learning_rate`/ `noise_dt` linearly from starting value to 0 over given `training_episodes` which can be adjusted by the user. The schedule parameters (e.g. end value and end fraction) are not adjustable in the config file, but can be set in the code.
 
 **Improvements:**
 - **Performance Optimization:** Switched to a custom `FastSeries` class, which is based on the pandas Series

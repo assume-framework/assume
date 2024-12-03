@@ -88,7 +88,7 @@ class RLAlgorithm:
             - https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L68
 
         """
-        learning_rate = self.learning_role.lr_schedule(
+        learning_rate = self.learning_role.calc_lr_from_progress(
             self.learning_role.get_progress_remaining()
         )
 

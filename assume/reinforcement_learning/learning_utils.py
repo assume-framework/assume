@@ -69,13 +69,11 @@ class NormalActionNoise:
         self.dt = dt
 
     def noise(self):
-        # TODO: document changes to normal action noise and different usage of dt parameter?
         noise = (
             self.dt
             * self.scale
             * np.random.normal(self.mu, self.sigma, self.act_dimension)
         )
-        # self.scale = self.dt * self.scale  # if self.scale >= 0.1 else self.scale
         return noise
 
     def update_noise_decay(self, updated_decay: float):
@@ -106,33 +104,9 @@ def polyak_update(params, target_params, tau: float):
             th.add(target_param.data, param.data, alpha=tau, out=target_param.data)
 
 
-def get_schedule_fn(value_schedule: Schedule | float) -> Schedule:
-    """
-    Transform (if needed) values (e.g. learning rate, action noise scale, ...) to Schedule function.
-
-    Args:
-        value_schedule: Constant value of schedule function
-
-    Returns:
-        Schedule function (can return constant value)
-
-    Note:
-        Adapted from SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L80
-
-    """
-    # If the passed schedule is a float
-    # create a constant function
-    if isinstance(value_schedule, float | int):
-        # Cast to float to avoid errors
-        value_schedule = constant_schedule(float(value_schedule))
-    else:
-        assert callable(value_schedule)
-    # Cast to float to avoid unpickling errors to enable weights_only=True, see GH#1900
-    # Some types are have odd behaviors when part of a Schedule, like numpy floats
-    return lambda progress_remaining: float(value_schedule(progress_remaining))
-
-
-def linear_schedule(start: float, end: float = 0, end_fraction: float = 1) -> Schedule:
+def linear_schedule_func(
+    start: float, end: float = 0, end_fraction: float = 1
+) -> Schedule:
     """
     Create a function that interpolates linearly between start and end
     between ``progress_remaining`` = 1 and ``progress_remaining`` = 1 - ``end_fraction``.

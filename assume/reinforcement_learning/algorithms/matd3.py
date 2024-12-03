@@ -266,7 +266,7 @@ class TD3(RLAlgorithm):
 
             unit_strategy.actor.optimizer = Adam(
                 unit_strategy.actor.parameters(),
-                lr=self.learning_role.lr_schedule(
+                lr=self.learning_role.calc_lr_from_progress(
                     1
                 ),  # 1=100% of simulation remaining, uses learning_rate from config as starting point
             )
@@ -318,7 +318,7 @@ class TD3(RLAlgorithm):
 
             self.learning_role.critics[u_id].optimizer = Adam(
                 self.learning_role.critics[u_id].parameters(),
-                lr=self.learning_role.lr_schedule(
+                lr=self.learning_role.calc_lr_from_progress(
                     1
                 ),  # 1 = 100% of simulation remaining, uses learning_rate from config as starting point
             )
@@ -400,7 +400,7 @@ class TD3(RLAlgorithm):
         n_rl_agents = len(self.learning_role.rl_strats.keys())
 
         # update noise decay and learning rate
-        updated_noise_decay = self.learning_role.noise_schedule(
+        updated_noise_decay = self.learning_role.calc_noise_from_progress(
             self.learning_role.get_progress_remaining()
         )
 

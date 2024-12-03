@@ -4,6 +4,7 @@
 
 import logging
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 
 import torch as th
@@ -14,10 +15,7 @@ from assume.common.utils import datetime2timestamp
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
-from assume.reinforcement_learning.learning_utils import (
-    get_schedule_fn,
-    linear_schedule,
-)
+from assume.reinforcement_learning.learning_utils import linear_schedule_func
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +31,7 @@ class Learning(Role):
 
     """
 
-    def __init__(
-        self,
-        learning_config: LearningConfig,
-    ):
+    def __init__(self, learning_config: LearningConfig, start: datetime, end: datetime):
         # how many learning roles do exist and how are they named
         self.buffer: ReplayBuffer = None
         self.episodes_done = 0
@@ -66,7 +61,7 @@ class Learning(Role):
             ),
         )
         self.early_stopping_threshold = learning_config.get(
-            "early_stopping_threshold", 0
+            "early_stopping_threshold", 0.05
         )
 
         cuda_device = (
@@ -83,21 +78,24 @@ class Learning(Role):
         th.backends.cuda.matmul.allow_tf32 = True
         th.backends.cudnn.allow_tf32 = True
 
+        self.start = datetime2timestamp(start)
+        self.end = datetime2timestamp(end)
+
         self.learning_rate = learning_config.get("learning_rate", 1e-4)
-        use_lr_schedule = learning_config.get("use_lr_schedule", False)
-        if use_lr_schedule:
-            self.lr_schedule = get_schedule_fn(linear_schedule(self.learning_rate))
+        self.learning_rate_schedule = learning_config.get(
+            "learning_rate_schedule", None
+        )
+        if self.learning_rate_schedule == "linear":
+            self.calc_lr_from_progress = linear_schedule_func(self.learning_rate)
         else:
-            # constant schedule as no config item stating it should be scheduled is present
-            self.lr_schedule = get_schedule_fn(self.learning_rate)
+            self.calc_lr_from_progress = lambda x: self.learning_rate
 
         noise_dt = learning_config.get("noise_dt", 1)
-        use_noise_schedule = learning_config.get("use_noise_schedule", False)
-        if use_noise_schedule:
-            self.noise_schedule = get_schedule_fn(linear_schedule(noise_dt))
+        self.action_noise_schedule = learning_config.get("action_noise_schedule", None)
+        if self.action_noise_schedule == "linear":
+            self.calc_noise_from_progress = linear_schedule_func(noise_dt)
         else:
-            # constant schedule as no config item stating it should be scheduled is present
-            self.noise_schedule = get_schedule_fn(noise_dt)
+            self.calc_noise_from_progress = lambda x: noise_dt
 
         # if we do not have initial experience collected we will get an error as no samples are available on the
         # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
@@ -125,14 +123,6 @@ class Learning(Role):
         self.rl_eval = defaultdict(list)
         # list of avg_changes
         self.avg_rewards = []
-
-    def set_simulation_horizon_to_learning_role(self, start, end):
-        """
-        Add simulation horizon to learning role for calculation of decay.
-        """
-
-        self.start = datetime2timestamp(start)
-        self.end = datetime2timestamp(end)
 
     def load_inter_episodic_data(self, inter_episodic_data):
         """
@@ -367,9 +357,12 @@ class Learning(Role):
                         logger.info(
                             f"Stopping training as no improvement above {self.early_stopping_threshold} in last {self.early_stopping_steps} evaluations for {metric}"
                         )
-                        logger.info(
-                            "If learning rate or action noise were scheduled to decay, further learning improvement can be possible. End value of schedule may not have been reached."
-                        )
+                        if (
+                            self.learning_rate_schedule or self.action_noise_schedule
+                        ) is not None:
+                            logger.info(
+                                f"Learning rate schedule ({self.learning_rate_schedule}) or action noise schedule ({self.action_noise_schedule}) were scheduled to decay, further learning improvement can be possible. End value of schedule may not have been reached."
+                            )
 
                         self.rl_algorithm.save_params(
                             directory=f"{self.trained_policies_save_path}/last_policies"
