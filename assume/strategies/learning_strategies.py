@@ -394,7 +394,10 @@ class RLStrategy(AbstractLearningStrategy):
         # 1.1 Get the Observations, which are the basis of the action decision
         # =============================================================================
 
-        # defines bounds of actions space
+        # defines bounds of observation space
+        # stays here as it is unit specific, and different forecasts might apply for different units
+        # different handling would require an extra unit loop at learning role intiliazation and unit specific max/min values
+        # further forecasts might change during the simulation if advanced forecasting is used
         self.max_bid_price = max(unit.forecaster[f"price_{market_id}"])
         self.min_bid_price = min(unit.forecaster[f"price_{market_id}"])
         self.max_residual = max(unit.forecaster[f"residualy_load_{market_id}"])
